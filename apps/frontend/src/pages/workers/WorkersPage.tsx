@@ -2,27 +2,38 @@ import {
   useEffect,
   useState,
 } from 'react'
-import { useForm } from 'react-hook-form' // Ví dụ sử dụng react-hook-form
-import { toast } from 'react-hot-toast' // Để hiển thị thông báo
+
+import {
+  UserPlus,
+  Trash2,
+  ShieldCheck,
+  Phone,
+  Hammer,
+  Users,
+  Loader2,
+} from 'lucide-react'
 
 import { api } from '../../lib/api'
 
-// Định nghĩa interface cho Worker (cần được định nghĩa rõ ràng hơn dựa trên API)
 interface Worker {
-  id: string;
-  employeeCode: string;
-  fullName: string;
-  position: string;
-  team: string;
-  phone: string;
-  skill: string;
-  status: string;
+  id: string
+  employeeCode: string
+  fullName: string
+  position: string
+  team: string
+  phone: string
+  skill: string
+  status?: string
 }
 
 export function WorkersPage() {
   const [workers,
     setWorkers] =
-    useState<any[]>([])
+    useState<Worker[]>([])
+
+  const [isLoading,
+    setIsLoading] =
+    useState(true)
 
   const [form,
     setForm] =
@@ -36,42 +47,75 @@ export function WorkersPage() {
     })
 
   async function loadData() {
-    const response =
-      await api.get(
-        '/workers',
-      )
+    try {
+      setIsLoading(true)
 
-    setWorkers(
-      response.data,
-    )
+      const response =
+        await api.get(
+          '/workers',
+        )
+
+      setWorkers(
+        response.data,
+      )
+    } catch (error) {
+      console.error(
+        'Failed to load workers:',
+        error,
+      )
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   async function createWorker() {
-    await api.post(
-      '/workers',
-      form,
-    )
+    try {
+      await api.post(
+        '/workers',
+        form,
+      )
 
-    setForm({
-      employeeCode: '',
-      fullName: '',
-      position: '',
-      team: '',
-      phone: '',
-      skill: '',
-    })
+      setForm({
+        employeeCode: '',
+        fullName: '',
+        position: '',
+        team: '',
+        phone: '',
+        skill: '',
+      })
 
-    loadData()
+      await loadData()
+    } catch (error) {
+      console.error(
+        'Failed to create worker:',
+        error,
+      )
+    }
   }
 
   async function removeWorker(
     id: string,
   ) {
-    await api.delete(
-      `/workers/${id}`,
-    )
+    if (
+      !confirm(
+        'Are you sure you want to remove this worker?',
+      )
+    ) {
+      return
+    }
 
-    loadData()
+    try {
+      await api.delete(
+        `/workers/${id}`,
+      )
+
+      await loadData()
+    } catch (error) {
+      console.error(
+        'Failed to remove worker:',
+        error,
+      )
+    }
   }
 
   useEffect(() => {
@@ -79,15 +123,26 @@ export function WorkersPage() {
   }, [])
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">
-        Workforce Management
-      </h1>
+    <div className="p-6">
+      {/* HEADER */}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold flex items-center gap-3 text-white">
+          <Users className="w-8 h-8 text-cyan-500" />
+
+          Workforce Management
+        </h1>
+
+        <div className="text-zinc-400 font-mono text-sm">
+          TOTAL: {workers.length} PERSONNEL
+        </div>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-8">
         {/* FORM */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-          <h2 className="text-xl font-semibold mb-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-cyan-500" />
+
             Create Worker
           </h2>
 
@@ -104,7 +159,14 @@ export function WorkersPage() {
                 })
               }
               placeholder="Employee Code"
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3"
+              className="
+                w-full
+                bg-zinc-800
+                rounded-xl
+                px-4
+                py-3
+                outline-none
+              "
             />
 
             <input
@@ -119,7 +181,14 @@ export function WorkersPage() {
                 })
               }
               placeholder="Full Name"
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3"
+              className="
+                w-full
+                bg-zinc-800
+                rounded-xl
+                px-4
+                py-3
+                outline-none
+              "
             />
 
             <input
@@ -134,7 +203,14 @@ export function WorkersPage() {
                 })
               }
               placeholder="Position"
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3"
+              className="
+                w-full
+                bg-zinc-800
+                rounded-xl
+                px-4
+                py-3
+                outline-none
+              "
             />
 
             <input
@@ -149,7 +225,14 @@ export function WorkersPage() {
                 })
               }
               placeholder="Team"
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3"
+              className="
+                w-full
+                bg-zinc-800
+                rounded-xl
+                px-4
+                py-3
+                outline-none
+              "
             />
 
             <input
@@ -164,7 +247,14 @@ export function WorkersPage() {
                 })
               }
               placeholder="Phone"
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3"
+              className="
+                w-full
+                bg-zinc-800
+                rounded-xl
+                px-4
+                py-3
+                outline-none
+              "
             />
 
             <input
@@ -179,7 +269,14 @@ export function WorkersPage() {
                 })
               }
               placeholder="Skill"
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3"
+              className="
+                w-full
+                bg-zinc-800
+                rounded-xl
+                px-4
+                py-3
+                outline-none
+              "
             />
 
             <button
@@ -193,6 +290,7 @@ export function WorkersPage() {
                 rounded-xl
                 py-3
                 font-semibold
+                transition-colors
               "
             >
               Save Worker
@@ -202,109 +300,136 @@ export function WorkersPage() {
 
         {/* LIST */}
         <div className="space-y-4">
-          {workers.map(
-            (worker) => (
-              <div
-                key={
-                  worker.id
-                }
-                className="
-                  bg-zinc-900
-                  border border-zinc-800
-                  rounded-2xl
-                  p-6
-                "
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xl font-bold">
-                      {
-                        worker.fullName
-                      }
-                    </p>
-
-                    <p className="text-zinc-400 mt-2">
-                      {
-                        worker.employeeCode
-                      }
-                    </p>
-                  </div>
-
-                  <div className="bg-cyan-500/20 border border-cyan-500/30 rounded-xl px-4 py-2">
-                    {
-                      worker.status
-                    }
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <div>
-                    <p className="text-zinc-400 text-sm">
-                      Position
-                    </p>
-
-                    <p className="font-semibold">
-                      {
-                        worker.position
-                      }
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-zinc-400 text-sm">
-                      Team
-                    </p>
-
-                    <p className="font-semibold">
-                      {
-                        worker.team
-                      }
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-zinc-400 text-sm">
-                      Skill
-                    </p>
-
-                    <p className="font-semibold">
-                      {
-                        worker.skill
-                      }
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-zinc-400 text-sm">
-                      Phone
-                    </p>
-
-                    <p className="font-semibold">
-                      {
-                        worker.phone
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() =>
-                    removeWorker(
-                      worker.id,
-                    )
+          {isLoading ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+            </div>
+          ) : (
+            workers.map(
+              (worker) => (
+                <div
+                  key={
+                    worker.id
                   }
                   className="
-                    mt-6
-                    bg-red-500
-                    hover:bg-red-600
-                    px-4 py-2
-                    rounded-xl
+                    bg-zinc-900
+                    border
+                    border-zinc-800
+                    rounded-2xl
+                    p-6
+                    hover:border-zinc-700
+                    transition-all
                   "
                 >
-                  Delete
-                </button>
-              </div>
-            ),
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xl font-bold">
+                        {
+                          worker.fullName
+                        }
+                      </p>
+
+                      <p className="text-zinc-400 mt-1 font-mono text-sm">
+                        {
+                          worker.employeeCode
+                        }
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                      <ShieldCheck className="w-4 h-4" />
+
+                      {
+                        worker.status ||
+                        'Active'
+                      }
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-6">
+                    <div className="space-y-1">
+                      <p className="text-zinc-500 text-xs flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+
+                        Position
+                      </p>
+
+                      <p className="font-semibold">
+                        {
+                          worker.position
+                        }
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-zinc-500 text-xs flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+
+                        Team
+                      </p>
+
+                      <p className="font-semibold">
+                        {
+                          worker.team
+                        }
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-zinc-500 text-xs flex items-center gap-1">
+                        <Hammer className="w-3 h-3" />
+
+                        Skill
+                      </p>
+
+                      <p className="font-semibold">
+                        {
+                          worker.skill
+                        }
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-zinc-500 text-xs flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+
+                        Phone
+                      </p>
+
+                      <p className="font-semibold">
+                        {
+                          worker.phone
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end border-t border-zinc-800 pt-4">
+                    <button
+                      onClick={() =>
+                        removeWorker(
+                          worker.id,
+                        )
+                      }
+                      className="
+                        text-red-400
+                        hover:text-red-300
+                        flex
+                        items-center
+                        gap-2
+                        text-sm
+                        font-medium
+                        transition-colors
+                      "
+                    >
+                      <Trash2 className="w-4 h-4" />
+
+                      Delete Record
+                    </button>
+                  </div>
+                </div>
+              ),
+            )
           )}
         </div>
       </div>

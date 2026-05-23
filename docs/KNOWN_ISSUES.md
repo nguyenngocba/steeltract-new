@@ -1,21 +1,97 @@
-# KNOWN ISSUES
+# STEELTRACK KNOWN ISSUES
 
-## Prisma 7
-Prisma 7 causes runtime issues with NestJS.
-Use Prisma 6.
+# 1. Duplicate Imports
 
-## pnpm 11
-Need run:
-pnpm approve-builds
+Issue:
+Duplicate React/page/icon imports causing build errors.
 
-for:
-- prisma
-- bcrypt
+Fix:
+Remove duplicated imports.
 
-## Firewall
-Need open:
-- 5173
-- 3000
+---
 
-## Thunder Client
-May fail in remote VSCode SSH environment.
+# 2. Prisma Duplicate Fields
+
+Issue:
+Duplicate schema fields.
+
+Fix:
+Check schema carefully before migration.
+
+---
+
+# 3. Large Component Files
+
+Issue:
+Pages becoming too large.
+
+Fix:
+Extract:
+- shared components
+- hooks
+- services
+
+---
+
+# 4. Weak Type Safety
+
+Issue:
+Too many any types.
+
+Fix:
+Use:
+- DTO
+- interfaces
+- Zod validation
+
+---
+
+# 5. Direct Prisma Usage
+
+Issue:
+Controllers querying Prisma directly.
+
+Fix:
+Use:
+Controller
+→ Service
+→ Repository
+→ Prisma
+
+---
+
+# 6. Realtime Payload Size
+
+Issue:
+Sending huge objects over websocket.
+
+Fix:
+Send delta updates only.
+
+---
+
+# 7. UI Inconsistency
+
+Issue:
+Different page layouts/styles.
+
+Fix:
+Use shared components:
+- PageHeader
+- DashboardCard
+- SectionCard
+- StatusBadge
+
+---
+
+# 8. Technical Debt Risk
+
+Issue:
+Rapid feature expansion.
+
+Fix:
+Maintain:
+- modular structure
+- docs
+- shared systems
+- architecture discipline

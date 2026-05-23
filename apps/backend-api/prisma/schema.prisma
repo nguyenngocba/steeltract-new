@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
+// ENUMS
+//
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -21,6 +25,75 @@ enum TransactionType {
   ADJUSTMENT
 }
 
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  DELAYED
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum ComponentStatus {
+  STOCK
+  CUTTING
+  WELDING
+  PAINTING
+  READY
+  SHIPPED
+  DELIVERED
+  INSTALLED
+}
+
+enum WorkerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum VehicleStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+enum InspectionStatus {
+  OPEN
+  CLOSED
+  FAILED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+//
+// USER
+//
+
 model User {
   id        String     @id @default(cuid())
   username  String     @unique
@@ -28,19 +101,25 @@ model User {
   password  String
   fullName  String?
   status    UserStatus @default(ACTIVE)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
+
+//
+// INVENTORY
+//
 
 model InventoryCategory {
   id          String   @id @default(cuid())
   name        String
   code        String   @unique
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items InventoryItem[]
 
@@ -76,28 +155,48 @@ model InventoryItem {
 
   transactionItems InventoryTransactionItem[]
 
+  @@index([code])
+  @@index([name])
+
   @@map("inventory_items")
 }
 
 model InventoryTransaction {
-  id        String          @id @default(cuid())
-  code      String          @unique
-  type      TransactionType
-  note      String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id String @id @default(cuid())
+
+  code String @unique
+
+  type TransactionType
+
+  note String?
+
+  performedBy String?
+
+  referenceModule String?
+
+  referenceId String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 
   items InventoryTransactionItem[]
+
+  @@index([type])
 
   @@map("inventory_transactions")
 }
 
 model InventoryTransactionItem {
-  id              String   @id @default(cuid())
-  transactionId   String
+  id String @id @default(cuid())
+
+  transactionId String
+
   inventoryItemId String
-  quantity        Float
-  createdAt       DateTime @default(now())
+
+  quantity Float
+
+  createdAt DateTime @default(now())
 
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
 
@@ -106,14 +205,28 @@ model InventoryTransactionItem {
   @@map("inventory_transaction_items")
 }
 
+//
+// PROJECTS
+//
+
 model Project {
-  id          String      @id @default(cuid())
-  code        String      @unique
-  name        String
+  id String @id @default(cuid())
+
+  code String @unique
+
+  name String
+
   description String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  components  Component[]
+
+  status ProjectStatus @default(PLANNING)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  components Component[]
+
+  @@index([status])
 
   @@map("projects")
 }
@@ -139,13 +252,17 @@ model Component {
 
   y Float? @default(0)
 
-  status String? @default("STOCK")
+  status ComponentStatus @default(STOCK)
 
   plannedDate DateTime?
 
   installedDate DateTime?
 
   imageUrl String?
+
+  estimatedCost Float @default(0)
+
+  actualCost Float @default(0)
 
   createdAt DateTime @default(now())
 
@@ -157,9 +274,8 @@ model Component {
 
   tasks Task[]
 
-  estimatedCost Float @default(0)
-
-  actualCost Float @default(0)
+  @@index([status])
+  @@index([projectId])
 
   @@map("components")
 }
@@ -173,56 +289,73 @@ model ComponentTimeline {
 
   note String?
 
+  photoUrl String?
+
   createdAt DateTime @default(now())
 
   component Component @relation(fields: [componentId], references: [id])
 
-  photoUrl String?
-
   @@map("component_timelines")
 }
 
-model ActivityLog {
-  id        String   @id @default(cuid())
-  action    String
-  entity    String
-  entityId  String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  @@map("activity_logs")
-}
+//
+// TASKS
+//
 
 model Task {
-  id          String  @id @default(cuid())
-  title       String
+  id String @id @default(cuid())
+
+  title String
+
   description String?
 
-  status   TaskStatus   @default(PENDING)
+  status TaskStatus @default(PENDING)
+
   priority TaskPriority @default(MEDIUM)
 
   dueDate DateTime?
 
   componentId String?
-  component   Component? @relation(fields: [componentId], references: [id])
+
+  component Component? @relation(fields: [componentId], references: [id])
 
   createdAt DateTime @default(now())
+
   updatedAt DateTime @updatedAt
+
+  @@index([status])
 
   @@map("tasks")
 }
 
-enum TaskStatus {
-  PENDING
-  IN_PROGRESS
-  DONE
-}
+//
+// WORKERS
+//
 
-enum TaskPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
+model Worker {
+  id String @id @default(cuid())
+
+  employeeCode String @unique
+
+  fullName String
+
+  position String
+
+  team String?
+
+  phone String?
+
+  skill String?
+
+  status WorkerStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+
+  @@map("workers")
 }
 
 model Attendance {
@@ -236,8 +369,244 @@ model Attendance {
 
   createdAt DateTime @default(now())
 
+  updatedAt DateTime @updatedAt
+
   @@map("attendance")
 }
+
+//
+// VEHICLES
+//
+
+model Vehicle {
+  id String @id @default(cuid())
+
+  plateNumber String @unique
+
+  name String
+
+  type String
+
+  driverName String?
+
+  fuelType String?
+
+  status VehicleStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+
+  @@map("vehicles")
+}
+
+//
+// SAFETY
+//
+
+model SafetyInspection {
+  id String @id @default(cuid())
+
+  title String
+
+  location String
+
+  inspector String
+
+  status InspectionStatus @default(OPEN)
+
+  note String?
+
+  score Float @default(0)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+
+  @@map("safety_inspections")
+}
+
+//
+// PURCHASE
+//
+
+model PurchaseOrder {
+  id String @id @default(cuid())
+
+  poNumber String @unique
+
+  supplierName String
+
+  projectName String?
+
+  requestedBy String
+
+  status PurchaseOrderStatus @default(DRAFT)
+
+  totalAmount Float @default(0)
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  items PurchaseOrderItem[]
+
+  @@index([status])
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id String @id @default(cuid())
+
+  purchaseOrderId String
+
+  itemName String
+
+  quantity Float
+
+  unitPrice Float
+
+  totalPrice Float
+
+  createdAt DateTime @default(now())
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+//
+// MATERIAL REQUEST
+//
+
+model MaterialRequest {
+  id String @id @default(cuid())
+
+  requestNumber String @unique
+
+  projectName String
+
+  requestedBy String
+
+  status ApprovalStatus @default(PENDING)
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  items MaterialRequestItem[]
+
+  @@index([status])
+
+  @@map("material_requests")
+}
+
+model MaterialRequestItem {
+  id String @id @default(cuid())
+
+  requestId String
+
+  itemName String
+
+  quantity Float
+
+  unit String?
+
+  createdAt DateTime @default(now())
+
+  request MaterialRequest @relation(fields: [requestId], references: [id])
+
+  @@map("material_request_items")
+}
+
+//
+// APPROVAL
+//
+
+model Approval {
+  id String @id @default(cuid())
+
+  module String
+
+  referenceId String
+
+  requester String
+
+  approver String?
+
+  status ApprovalStatus @default(PENDING)
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  approvedAt DateTime?
+
+  @@index([status])
+
+  @@map("approvals")
+}
+
+//
+// WAREHOUSE
+//
+
+model WarehouseZone {
+  id String @id @default(cuid())
+
+  code String @unique
+
+  name String
+
+  description String?
+
+  color String @default("#06b6d4")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  inventoryItems InventoryItem[]
+
+  @@map("warehouse_zones")
+}
+
+//
+// SITE LOGS
+//
+
+model SiteLog {
+  id String @id @default(cuid())
+
+  title String
+
+  description String
+
+  weather String?
+
+  createdBy String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@map("site_logs")
+}
+
+//
+// SUPPLIER
+//
 
 model SupplierScore {
   id String @id @default(cuid())
@@ -254,8 +623,14 @@ model SupplierScore {
 
   createdAt DateTime @default(now())
 
+  updatedAt DateTime @updatedAt
+
   @@map("supplier_scores")
 }
+
+//
+// EQUIPMENT
+//
 
 model EquipmentBooking {
   id String @id @default(cuid())
@@ -272,234 +647,85 @@ model EquipmentBooking {
 
   createdAt DateTime @default(now())
 
+  updatedAt DateTime @updatedAt
+
   @@map("equipment_bookings")
 }
 
-model WarehouseZone {
-  id String @id @default(cuid())
-
-  code String @unique
-
-  name String
-
-  description String?
-
-  color String @default("#06b6d4")
-
-  createdAt      DateTime        @default(now())
-  inventoryItems InventoryItem[]
-
-  @@map("warehouse_zones")
-}
-
-model SiteLog {
-  id          String @id @default(cuid())
-
-  title       String
-
-  description String
-
-  weather     String?
-
-  createdBy   String
-
-  createdAt   DateTime @default(now())
-
-  @@map("site_logs")
-}
-
-model SafetyInspection {
-  id          String @id @default(cuid())
-
-  title       String
-
-  location    String
-
-  inspector   String
-
-  status      String @default("OPEN")
-
-  note        String?
-
-  score       Float @default(0)
-
-  createdAt   DateTime @default(now())
-
-  @@map("safety_inspections")
-}
-
-model Vehicle {
-  id            String @id @default(cuid())
-
-  plateNumber   String @unique
-
-  name          String
-
-  type          String
-
-  driverName    String?
-
-  fuelType      String?
-
-  status        String @default("ACTIVE")
-
-  createdAt     DateTime @default(now())
-
-  @@map("vehicles")
-}
-
-model MaterialRequest {
-  id            String @id @default(cuid())
-
-  requestNumber String @unique
-
-  projectName   String
-
-  requestedBy   String
-
-  status        String @default("PENDING")
-
-  note          String?
-
-  createdAt     DateTime @default(now())
-
-  items         MaterialRequestItem[]
-
-  @@map("material_requests")
-}
-
-model MaterialRequestItem {
-  id          String @id @default(cuid())
-
-  requestId   String
-
-  itemName    String
-
-  quantity    Float
-
-  unit        String?
-
-  createdAt   DateTime @default(now())
-
-  request MaterialRequest @relation(fields: [requestId],references: [id])
-
-  @@map("material_request_items")
-}
-
-model Approval {
-  id            String @id @default(cuid())
-
-  module        String
-
-  referenceId   String
-
-  requester     String
-
-  approver      String?
-
-  status        String @default("PENDING")
-
-  note          String?
-
-  createdAt     DateTime @default(now())
-
-  approvedAt    DateTime?
-
-  @@map("approvals")
-}
-
-model PurchaseOrder {
-  id            String @id @default(cuid())
-
-  poNumber      String @unique
-
-  supplierName  String
-
-  projectName   String?
-
-  requestedBy   String
-
-  status        String @default("DRAFT")
-
-  totalAmount   Float @default(0)
-
-  note          String?
-
-  createdAt     DateTime @default(now())
-
-  items         PurchaseOrderItem[]
-
-  @@map("purchase_orders")
-}
-
-model PurchaseOrderItem {
-  id            String @id @default(cuid())
-
-  purchaseOrderId String
-
-  itemName      String
-
-  quantity      Float
-
-  unitPrice     Float
-
-  totalPrice    Float
-
-  createdAt     DateTime @default(now())
-
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId],references: [id])
-
-  @@map("purchase_order_items")
-}
+//
+// ANALYTICS
+//
 
 model AnalyticsSnapshot {
-  id                String @id @default(cuid())
+  id String @id @default(cuid())
 
-  totalProjects     Int @default(0)
+  totalProjects Int @default(0)
 
-  totalComponents   Int @default(0)
+  totalComponents Int @default(0)
 
   completedProjects Int @default(0)
 
-  delayedProjects   Int @default(0)
+  delayedProjects Int @default(0)
 
-  inventoryValue    Float @default(0)
+  inventoryValue Float @default(0)
 
-  purchaseTotal     Float @default(0)
+  purchaseTotal Float @default(0)
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@map("analytics_snapshots")
 }
 
-model Worker {
-  id            String @id @default(cuid())
-
-  employeeCode  String @unique
-
-  fullName      String
-
-  position      String
-
-  team          String?
-
-  phone         String?
-
-  status        String @default("ACTIVE")
-
-  skill         String?
-
-  createdAt     DateTime @default(now())
-
-  @@map("workers")
-}
+//
+// NOTIFICATIONS
+//
 
 model Notification {
-  id        String   @id @default(cuid())
-  title     String
-  message   String
-  isRead    Boolean  @default(false)
+  id String @id @default(cuid())
+
+  title String
+
+  message String
+
+  type String?
+
+  severity String?
+
+  link String?
+
+  userId String?
+
+  isRead Boolean @default(false)
+
   createdAt DateTime @default(now())
 
+  updatedAt DateTime @updatedAt
+
   @@map("notifications")
+}
+
+//
+// ACTIVITY LOGS
+//
+
+model ActivityLog {
+  id String @id @default(cuid())
+
+  action String
+
+  entity String
+
+  entityId String?
+
+  module String?
+
+  userId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+
+  @@map("activity_logs")
 }

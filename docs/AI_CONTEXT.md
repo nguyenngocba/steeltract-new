@@ -1,143 +1,119 @@
-# STEELTRACK ERP — AI CONTEXT
+# STEELTRACK AI CONTEXT
 
-## PROJECT TYPE
-Enterprise ERP System for Steel Structure Manufacturing
+## Project Type
 
-## STACK
+STEELTRACK is an enterprise ERP platform for steel structure fabrication factories.
 
-### FRONTEND
-- React
-- TypeScript
-- Vite
-- TailwindCSS
-- Zustand
-- Axios
+The system manages:
 
-### BACKEND
-- NestJS
-- Prisma ORM
-- JWT Auth
-- PostgreSQL
-
-### INFRASTRUCTURE
-- Rocky Linux 9
-- Node.js 22
-- pnpm
-- GitHub
-
----
-
-# CURRENT STATUS
-
-## COMPLETED
-- Monorepo setup
-- Frontend foundation
-- Backend foundation
-- PostgreSQL setup
-- Prisma schema
-- JWT login API
-- ERP dashboard layout
-- Sidebar navigation
-- Protected routes
-- Login page
-- Zustand auth store
-
----
-
-# DATABASE TABLES
-
-- users
-- roles
-- permissions
-- inventory_items
-- inventory_categories
-- inventory_transactions
-- inventory_transaction_items
-- projects
-- components
-- activity_logs
-- notifications
-
----
-
-# FRONTEND STRUCTURE
-
-apps/frontend
-
-- components/ui
-- layouts
-- pages
-- routes
-- store
-- lib
-
----
-
-# BACKEND STRUCTURE
-
-apps/backend-api
-
-- core/prisma
-- modules/auth
-- modules/users
-
----
-
-# LOGIN
-
-## URL
-/login
-
-## DEFAULT ACCOUNT
-username: admin
-password: admin123
-
----
-
-# IMPORTANT NOTES
-
-## PRISMA
-Use Prisma 6 ONLY.
-Prisma 7 caused runtime issues with NestJS.
-
-## FIREWALL
-Need open ports:
-- 5173 frontend
-- 3000 backend
-
-## BACKEND
-Need enable CORS in main.ts
-
----
-
-# FUTURE MODULES
-
-- Inventory Management
-- Supplier Management
-- Project Management
-- BOM
+- Inventory
 - Production
-- Warehouse
-- Notifications
+- Planning
+- QC
+- Logistics
+- Material Yard
+- Projects
+- Users & Permissions
 - Reports
-- Role Permissions
-- Audit Logs
+- Realtime Tracking
 
 ---
 
-# CURRENT ARCHITECTURE
+# Architecture
+
+Architecture Style:
+- Modular Monolith
+- Domain-driven structure
+- Event-driven internal communication
+- Future microservices-ready
 
 Frontend:
-React + Zustand + Axios
+- React
+- Vite
+- TypeScript
+- TailwindCSS
+- Zustand
+- TanStack Query
+- shadcn/ui
 
 Backend:
-NestJS + Prisma + PostgreSQL
+- Node.js
+- Fastify
+- Prisma
+- PostgreSQL
+- Zod validation
 
-Authentication:
-JWT
+Realtime:
+- Socket.io
+- Delta update strategy
+- Lightweight websocket payload
 
 ---
 
-# GOAL
+# Business Workflow
 
-Build a scalable enterprise ERP system for steel structure manufacturing companies.
+Main Workflow:
+
+Project
+→ Planning
+→ Production
+→ QC
+→ Warehouse
+→ Transport
+→ Installation
+
+---
+
+# Current System Phase
+
+Current phase:
+- ERP Foundation
+- Module Scaffolding
+- Shared Component System
+- Architecture Stabilization
+
+NOT in optimization phase yet.
+
+Priority:
+- clean architecture
+- modular structure
+- reusable systems
+- enterprise workflow
+
+---
+
+# Important Rules
+
+1. Keep modules isolated.
+
+2. Never query another module tables directly.
+
+3. Use:
+Controller
+→ Service
+→ Repository
+→ Prisma
+
+4. Inventory system must be transaction-based.
+
+5. Never emit full objects over websocket.
+
+6. Use shared components whenever possible.
+
+7. Avoid giant files.
+
+8. Keep future scalability in mind.
+
+---
+
+# Long-term Vision
+
+Future goals:
+- AI forecasting
+- BIM integration
+- GPS tracking
+- Mobile warehouse app
+- IoT integration
+- Realtime factory dashboard
+- Multi-company ERP
+- Offline warehouse mode
