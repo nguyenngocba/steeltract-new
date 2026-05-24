@@ -170,7 +170,7 @@ export function ProjectFloorMapPage() {
                   0,
               }}
               onStop={(
-                e,
+                _e,
                 data,
               ) => {
                 updatePosition(

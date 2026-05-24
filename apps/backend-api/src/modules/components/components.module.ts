@@ -1,19 +1,15 @@
-import { Module } from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { ComponentsController } from './components.controller'
+import { PrismaModule } from '../../core/prisma/prisma.module';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
-
-import { EventsGateway } from '../../core/ws/events.gateway'
+import { ComponentsController } from './components.controller';
+import { ComponentsRepository } from './repositories/components.repository';
+import { ComponentsService } from './services/components.service';
 
 @Module({
-  controllers: [
-    ComponentsController,
-  ],
-
-  providers: [
-    PrismaService,
-    EventsGateway,
-  ],
+  imports: [PrismaModule],
+  controllers: [ComponentsController],
+  providers: [ComponentsRepository, ComponentsService],
+  exports: [ComponentsService],
 })
 export class ComponentsModule {}

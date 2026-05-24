@@ -6,123 +6,113 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import type {
+  AdjustmentOperationDto,
+  CreateInventoryItemDto,
+  ListInventoryDto,
+  StockOperationDto,
+  TransferOperationDto,
+  UpdateInventoryItemDto,
+} from './dto/inventory.dto';
 
-import { createActivityLog } from '../../common/utils/activity-log'
+import {
+  adjustmentOperationSchema,
+  createInventoryItemSchema,
+  listInventorySchema,
+  stockOperationSchema,
+  transferOperationSchema,
+  updateInventoryItemSchema,
+} from './dto/inventory.dto';
 
-import { sendTelegram } from '../../core/telegram/telegram.service'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { InventoryService } from './inventory.service';
 
 @Controller('inventory')
 export class InventoryController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private readonly inventoryService: InventoryService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll() {
-    return this.prisma.inventoryItem.findMany({
-      include: {
-        category: true,
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  findAll(
+    @Query(new ZodValidationPipe(listInventorySchema))
+    query: ListInventoryDto,
+  ) {
+    return this.inventoryService.findAll(query);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
+  create(
+    @Body(new ZodValidationPipe(createInventoryItemSchema))
+    body: CreateInventoryItemDto,
   ) {
-    const item =
-      await this.prisma.inventoryItem.create({
-        data: {
-          code: body.code,
-          name: body.name,
-
-          quantity:
-            Number(body.quantity),
-
-          minimumStock:
-            Number(
-              body.minimumStock || 0,
-            ),
-
-          categoryId:
-            body.categoryId,
-        },
-
-        include: {
-          category: true,
-        },
-      })
-
-    await createActivityLog(
-      this.prisma,
-      {
-        action: 'CREATE',
-
-        entity: 'InventoryItem',
-
-        entityId: item.id,
-
-        metadata: {
-          name: item.name,
-          code: item.code,
-        },
-      },
-    )
-      if (
-        item.quantity <=
-        item.minimumStock
-      ) {
-        sendTelegram(
-          `LOW STOCK ALERT:
-      ${item.name}
-      Qty: ${item.quantity}`,
-        )
-      }
-    return item
+    return this.inventoryService.createItem(body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(
+  update(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateInventoryItemSchema))
+    body: UpdateInventoryItemDto,
   ) {
-    return this.prisma.inventoryItem.update({
-      where: {
-        id,
-      },
-
-      data: {
-        name: body.name,
-        code: body.code,
-
-        quantity:
-          Number(body.quantity),
-      },
-    })
+    return this.inventoryService.updateItem(id, body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
+  remove(@Param('id') id: string) {
+    return this.inventoryService.deleteItem(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('import')
+  importStock(
+    @Body(new ZodValidationPipe(stockOperationSchema))
+    body: StockOperationDto,
   ) {
-    return this.prisma.inventoryItem.delete({
-      where: {
-        id,
-      },
-    })
+    return this.inventoryService.importStock(body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('export')
+  exportStock(
+    @Body(new ZodValidationPipe(stockOperationSchema))
+    body: StockOperationDto,
+  ) {
+    return this.inventoryService.exportStock(body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('adjustment')
+  adjustment(
+    @Body(new ZodValidationPipe(adjustmentOperationSchema))
+    body: AdjustmentOperationDto,
+  ) {
+    return this.inventoryService.adjustment(body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('adjust')
+  adjust(
+    @Body(new ZodValidationPipe(adjustmentOperationSchema))
+    body: AdjustmentOperationDto,
+  ) {
+    return this.inventoryService.adjustment(body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('transfer')
+  transfer(
+    @Body(new ZodValidationPipe(transferOperationSchema))
+    body: TransferOperationDto,
+  ) {
+    return this.inventoryService.transfer(body);
   }
 }

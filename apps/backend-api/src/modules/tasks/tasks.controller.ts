@@ -1,114 +1,67 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
   Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import type {
+  CreateTaskDto,
+  ListTasksDto,
+  UpdateTaskDto,
+} from './dto/tasks.dto';
+
+import {
+  createTaskSchema,
+  listTasksSchema,
+  updateTaskSchema,
+} from './dto/tasks.dto';
+
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { TasksService } from './services/tasks.service';
 
 @Controller('tasks')
 export class TasksController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private readonly tasksService: TasksService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll() {
-    return this.prisma.task.findMany({
-      include: {
-        component: true,
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  findAll(
+    @Query(new ZodValidationPipe(listTasksSchema))
+    query: ListTasksDto,
+  ) {
+    return this.tasksService.findAll(query);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
+  create(
+    @Body(new ZodValidationPipe(createTaskSchema))
+    body: CreateTaskDto,
   ) {
-    return this.prisma.task.create({
-      data: {
-        title: body.title,
-
-        description:
-          body.description,
-
-        status:
-          body.status,
-
-        priority:
-          body.priority,
-
-        dueDate:
-          body.dueDate,
-
-        componentId:
-          body.componentId,
-      },
-    })
+    return this.tasksService.create(body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(
+  update(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateTaskSchema))
+    body: UpdateTaskDto,
   ) {
-    return this.prisma.task.update({
-      where: {
-        id,
-      },
-
-      data: {
-        title:
-          body.title !== undefined
-            ? body.title
-            : undefined,
-
-        description:
-          body.description !== undefined
-            ? body.description
-            : undefined,
-
-        status:
-          body.status !== undefined
-            ? body.status
-            : undefined,
-
-        priority:
-          body.priority !== undefined
-            ? body.priority
-            : undefined,
-
-        dueDate:
-          body.dueDate !== undefined
-            ? body.dueDate
-            : undefined,
-      },
-    })
+    return this.tasksService.update(id, body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.task.delete({
-      where: {
-        id,
-      },
-    })
+  remove(@Param('id') id: string) {
+    return this.tasksService.remove(id);
   }
 }

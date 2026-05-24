@@ -1,13 +1,18 @@
-import {
-  useEffect,
-  useState,
-} from 'react'
+import { useState } from 'react'
 
 import toast from 'react-hot-toast'
 
 import { PageHeader } from '../../components/layout/PageHeader'
 
-import { api } from '../../lib/api'
+import {
+  useCreateProjectMutation,
+  useDeleteProjectMutation,
+  useProjectsQuery,
+  useUpdateProjectMutation,
+} from '../../hooks/query/useProjectQueries'
+import type {
+  Project,
+} from '../../services/api/types'
 
 import {
   Card,
@@ -16,13 +21,6 @@ import {
   Input,
   Table,
 } from '../../components/ui'
-
-interface Project {
-  id: string
-  code: string
-  name: string
-  description?: string
-}
 
 export function ProjectsPage() {
   const [search, setSearch] =
@@ -36,16 +34,10 @@ export function ProjectsPage() {
 
   const [selectedProject,
     setSelectedProject] =
-    useState<any>(null)
+    useState<Project | null>(null)
 
   const [editingId, setEditingId] =
     useState<string | null>(null)
-
-  const [projects, setProjects] =
-    useState<Project[]>([])
-
-  const [loading, setLoading] =
-    useState(false)
 
   const [name, setName] =
     useState('')
@@ -57,26 +49,19 @@ export function ProjectsPage() {
     setDescription] =
     useState('')
 
-  async function loadProjects() {
-    try {
-      setLoading(true)
+  const {
+    data: projects = [],
+    isLoading: loading,
+  } = useProjectsQuery()
 
-      const response =
-        await api.get('/projects')
+  const createProjectMutation =
+    useCreateProjectMutation()
 
-      setProjects(response.data)
-    } catch {
-      toast.error(
-        'Failed to load projects',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
+  const updateProjectMutation =
+    useUpdateProjectMutation()
 
-  useEffect(() => {
-    loadProjects()
-  }, [])
+  const deleteProjectMutation =
+    useDeleteProjectMutation()
 
   const filteredProjects =
     projects.filter((project) =>
@@ -88,20 +73,20 @@ export function ProjectsPage() {
   async function saveProject() {
     try {
       if (editingId) {
-        await api.patch(
-          `/projects/${editingId}`,
-          {
+        await updateProjectMutation.mutateAsync({
+          id: editingId,
+          payload: {
             name,
             code,
             description,
           },
-        )
+        })
 
         toast.success(
           'Project updated',
         )
       } else {
-        await api.post('/projects', {
+        await createProjectMutation.mutateAsync({
           name,
           code,
           description,
@@ -119,8 +104,6 @@ export function ProjectsPage() {
       setEditingId(null)
 
       setOpenModal(false)
-
-      loadProjects()
     } catch {
       toast.error(
         'Failed to save project',
@@ -139,15 +122,14 @@ export function ProjectsPage() {
     if (!confirmed) return
 
     try {
-      await api.delete(
-        `/projects/${id}`,
+      await deleteProjectMutation.mutateAsync(
+        id,
       )
 
       toast.success(
         'Project deleted',
       )
 
-      loadProjects()
     } catch {
       toast.error(
         'Failed to delete project',
@@ -155,7 +137,7 @@ export function ProjectsPage() {
     }
   }
 
-  const columns: any[] = [
+  const columns = [
     {
       key: 'code',
       title: 'Code',
@@ -175,7 +157,10 @@ export function ProjectsPage() {
       key: 'actions',
       title: '',
 
-      render: (_: any, row: any) => (
+      render: (
+        _: unknown,
+        row: Project,
+      ) => (
         <div className="flex items-center gap-4">
           <button
             onClick={() => {

@@ -1,13 +1,11 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
+
+import { SectionCard } from '../../ui-system'
 
 interface CardProps {
   children: ReactNode
 }
 
 export function Card({ children }: CardProps) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-      {children}
-    </div>
-  )
+  return <SectionCard>{children}</SectionCard>
 }

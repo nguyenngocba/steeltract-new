@@ -90,6 +90,270 @@ enum TaskPriority {
   URGENT
 }
 
+enum WorkflowDefinitionStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum WorkflowInstanceStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+  ESCALATED
+}
+
+enum WorkflowStepType {
+  APPROVAL
+  REVIEW
+  AUTOMATION
+  NOTIFICATION
+}
+
+enum WorkflowStepStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  SKIPPED
+  ESCALATED
+  COMPLETED
+}
+
+enum WorkflowActionType {
+  START
+  APPROVE
+  REJECT
+  MOVE_NEXT
+  ESCALATE
+  COMPLETE
+  CANCEL
+}
+
+enum AttachmentCategory {
+  DOCUMENT
+  DRAWING
+  PHOTO
+  QC
+  CONTRACT
+  OTHER
+}
+
+enum OutboxEventStatus {
+  PENDING
+  DISPATCHING
+  DISPATCHED
+  FAILED
+  DEAD_LETTER
+}
+
+enum BackgroundJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  RETRYING
+  CANCELLED
+  DEAD_LETTER
+}
+
+enum JobExecutionStatus {
+  STARTED
+  COMPLETED
+  FAILED
+}
+
+enum ProductionOrderStatus {
+  DRAFT
+  PLANNED
+  RELEASED
+  IN_PROGRESS
+  DELAYED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionStageCode {
+  CUTTING
+  ASSEMBLY
+  WELDING
+  DRILLING
+  PAINTING
+  GALVANIZING
+  PACKING
+}
+
+enum ProductionStageStatus {
+  PENDING
+  READY
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  SKIPPED
+}
+
+enum ProductionTaskStatus {
+  TODO
+  ASSIGNED
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum MachineStatus {
+  AVAILABLE
+  RUNNING
+  MAINTENANCE
+  OFFLINE
+}
+
+enum WorkCenterStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductionLogType {
+  NOTE
+  START
+  COMPLETE
+  DELAY
+  QUALITY
+  MACHINE
+  MATERIAL
+}
+
+enum YardZoneStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum YardSlotStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  BLOCKED
+}
+
+enum YardItemType {
+  COMPONENT
+  MATERIAL
+  INVENTORY
+  PRODUCTION
+  OTHER
+}
+
+enum YardMovementType {
+  PLACE
+  MOVE
+  REMOVE
+  ADJUST
+}
+
+enum CraneStatus {
+  AVAILABLE
+  ASSIGNED
+  MAINTENANCE
+  OFFLINE
+}
+
+enum QcInspectionStatus {
+  DRAFT
+  READY
+  IN_PROGRESS
+  PASSED
+  FAILED
+  REWORK_REQUIRED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum QcChecklistType {
+  DIMENSIONAL
+  WELDING
+  PAINTING
+  COATING
+  MATERIAL
+  FINAL
+}
+
+enum QcResultStatus {
+  PENDING
+  PASS
+  FAIL
+  NA
+}
+
+enum QcIssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum QcIssueStatus {
+  OPEN
+  CORRECTIVE_ACTION_ASSIGNED
+  RESOLVED
+  VERIFIED
+  CLOSED
+}
+
+enum NcrStatus {
+  OPEN
+  UNDER_REVIEW
+  REWORK_REQUIRED
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum AnalyticsDomain {
+  PRODUCTION
+  QC
+  INVENTORY
+  YARD
+  WORKFLOW
+  MACHINE
+  WORKER
+  ERP
+}
+
+enum AnalyticsMetricType {
+  KPI
+  COUNT
+  RATE
+  DURATION
+  UTILIZATION
+  COST
+  TREND
+}
+
+enum AnalyticsAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AnalyticsAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum AnalyticsPredictionStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  EXPIRED
+}
+
 //
 // USER
 //
@@ -105,7 +369,83 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  refreshTokens RefreshToken[]
+  userRoles     UserRole[]
+
   @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
 
 //
@@ -659,6 +999,17 @@ model EquipmentBooking {
 model AnalyticsSnapshot {
   id String @id @default(cuid())
 
+  domain       AnalyticsDomain @default(ERP)
+  snapshotType String          @default("operational")
+  periodStart  DateTime?
+  periodEnd    DateTime?
+  metrics      Json?
+  trends       Json?
+  bottlenecks  Json?
+  slaViolations Json?
+  anomalies    Json?
+  generatedByJobId String?
+
   totalProjects Int @default(0)
 
   totalComponents Int @default(0)
@@ -673,7 +1024,110 @@ model AnalyticsSnapshot {
 
   createdAt DateTime @default(now())
 
+  metricRecords AnalyticsMetric[]
+  aggregations   AnalyticsAggregation[]
+  alerts         AnalyticsAlert[]
+  predictions    AnalyticsPrediction[]
+
+  @@index([domain])
+  @@index([snapshotType])
+  @@index([periodStart, periodEnd])
   @@map("analytics_snapshots")
+}
+
+model AnalyticsMetric {
+  id         String              @id @default(cuid())
+  snapshotId String?
+  domain     AnalyticsDomain
+  key        String
+  label      String
+  type       AnalyticsMetricType @default(KPI)
+  value      Float
+  unit       String?
+  target     Float?
+  threshold  Float?
+  trend      Float?
+  metadata   Json?
+  recordedAt DateTime            @default(now())
+  createdAt  DateTime            @default(now())
+
+  snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([domain, key])
+  @@index([recordedAt])
+  @@map("analytics_metrics")
+}
+
+model AnalyticsAggregation {
+  id         String          @id @default(cuid())
+  snapshotId String?
+  domain     AnalyticsDomain
+  key        String
+  interval   String          @default("realtime")
+  value      Json
+  periodStart DateTime?
+  periodEnd   DateTime?
+  metadata   Json?
+  createdAt  DateTime        @default(now())
+
+  snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([domain, key])
+  @@index([periodStart, periodEnd])
+  @@map("analytics_aggregations")
+}
+
+model AnalyticsAlert {
+  id          String                 @id @default(cuid())
+  snapshotId  String?
+  domain      AnalyticsDomain
+  key         String
+  title       String
+  message     String
+  severity    AnalyticsAlertSeverity @default(WARNING)
+  status      AnalyticsAlertStatus   @default(OPEN)
+  threshold   Float?
+  actualValue Float?
+  metadata    Json?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([domain])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+  @@map("analytics_alerts")
+}
+
+model AnalyticsPrediction {
+  id          String                    @id @default(cuid())
+  snapshotId  String?
+  domain      AnalyticsDomain
+  key         String
+  title       String
+  prediction  Json
+  confidence  Float?
+  horizon     String?
+  status      AnalyticsPredictionStatus @default(DRAFT)
+  modelName   String?
+  metadata    Json?
+  createdAt   DateTime                  @default(now())
+  expiresAt   DateTime?
+
+  snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([domain, key])
+  @@index([status])
+  @@index([createdAt])
+  @@map("analytics_predictions")
 }
 
 //
@@ -702,6 +1156,817 @@ model Notification {
   updatedAt DateTime @updatedAt
 
   @@map("notifications")
+}
+
+//
+// WORKFLOW
+//
+
+model WorkflowDefinition {
+  id          String                   @id @default(cuid())
+  key         String                   @unique
+  name        String
+  description String?
+  module      String?
+  status      WorkflowDefinitionStatus @default(ACTIVE)
+  version     Int                      @default(1)
+  metadata    Json?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  steps     WorkflowStep[]
+  instances WorkflowInstance[]
+
+  @@index([module])
+  @@index([status])
+  @@map("workflow_definitions")
+}
+
+model WorkflowStep {
+  id           String           @id @default(cuid())
+  definitionId String
+  key          String
+  name         String
+  description  String?
+  type         WorkflowStepType @default(APPROVAL)
+  order        Int
+  approverRole String?
+  approverUserId String?
+  requiredPermission String?
+  slaHours     Int?
+  escalationRole String?
+  escalationAfterHours Int?
+  metadata     Json?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  instances  WorkflowInstance[] @relation("CurrentWorkflowStep")
+  actions    WorkflowAction[]
+
+  @@unique([definitionId, key])
+  @@unique([definitionId, order])
+  @@index([definitionId])
+  @@map("workflow_steps")
+}
+
+model WorkflowInstance {
+  id             String                 @id @default(cuid())
+  definitionId   String
+  currentStepId  String?
+  referenceModule String
+  referenceId     String
+  status         WorkflowInstanceStatus @default(PENDING)
+  startedById    String?
+  completedAt    DateTime?
+  dueAt          DateTime?
+  escalatedAt    DateTime?
+  metadata       Json?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  definition  WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  currentStep WorkflowStep?      @relation("CurrentWorkflowStep", fields: [currentStepId], references: [id], onDelete: SetNull)
+  actions     WorkflowAction[]
+
+  @@index([definitionId])
+  @@index([currentStepId])
+  @@index([referenceModule, referenceId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("workflow_instances")
+}
+
+model WorkflowAction {
+  id         String             @id @default(cuid())
+  instanceId String
+  stepId     String?
+  type       WorkflowActionType
+  actorId    String?
+  comment    String?
+  fromStatus String?
+  toStatus   String?
+  metadata   Json?
+  createdAt  DateTime           @default(now())
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step     WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: SetNull)
+
+  @@index([instanceId])
+  @@index([stepId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("workflow_actions")
+}
+
+//
+// ATTACHMENTS
+//
+
+model Attachment {
+  id          String             @id @default(cuid())
+  title       String
+  description String?
+  category    AttachmentCategory @default(OTHER)
+  mimeType    String
+  fileSize    Int
+  uploaderId  String?
+  tags        String[]           @default([])
+  currentVersionId String?
+  thumbnailUrl String?
+  ocrStatus   String?
+  metadata    Json?
+  deletedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  versions AttachmentVersion[]
+  links    AttachmentLink[]
+  qcLinks  QcAttachment[]
+
+  @@index([category])
+  @@index([mimeType])
+  @@index([uploaderId])
+  @@index([deletedAt])
+  @@map("attachments")
+}
+
+model AttachmentVersion {
+  id           String   @id @default(cuid())
+  attachmentId String
+  version      Int
+  originalName String
+  storageKey   String
+  publicUrl    String?
+  signedUrlExpiresAt DateTime?
+  mimeType     String
+  fileSize     Int
+  checksum     String?
+  uploadedById String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  attachment Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([attachmentId, version])
+  @@index([attachmentId])
+  @@index([storageKey])
+  @@map("attachment_versions")
+}
+
+model AttachmentLink {
+  id           String   @id @default(cuid())
+  attachmentId String
+  module       String
+  entityId     String
+  purpose      String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attachment Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([attachmentId, module, entityId, purpose])
+  @@index([module, entityId])
+  @@index([attachmentId])
+  @@map("attachment_links")
+}
+
+//
+// OUTBOX + BACKGROUND JOBS
+//
+
+model OutboxEvent {
+  id             String            @id @default(cuid())
+  eventName      String
+  payload        Json
+  metadata       Json?
+  status         OutboxEventStatus @default(PENDING)
+  idempotencyKey String?
+  retryCount     Int               @default(0)
+  maxRetries     Int               @default(5)
+  nextAttemptAt  DateTime          @default(now())
+  dispatchedAt   DateTime?
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastError      String?
+  deadLetteredAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([idempotencyKey])
+  @@index([status, nextAttemptAt])
+  @@index([eventName])
+  @@index([createdAt])
+  @@map("outbox_events")
+}
+
+model BackgroundJob {
+  id             String              @id @default(cuid())
+  name           String
+  queue          String              @default("default")
+  payload        Json
+  status         BackgroundJobStatus @default(QUEUED)
+  idempotencyKey String?
+  priority       Int                 @default(0)
+  runAt          DateTime            @default(now())
+  retryCount     Int                 @default(0)
+  maxRetries     Int                 @default(5)
+  lockedAt       DateTime?
+  lockedBy       String?
+  heartbeatAt    DateTime?
+  completedAt    DateTime?
+  failedAt       DateTime?
+  deadLetteredAt DateTime?
+  lastError      String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  executions JobExecution[]
+
+  @@unique([idempotencyKey])
+  @@index([queue, status, runAt])
+  @@index([name])
+  @@index([heartbeatAt])
+  @@map("background_jobs")
+}
+
+model JobExecution {
+  id          String             @id @default(cuid())
+  jobId       String
+  status      JobExecutionStatus @default(STARTED)
+  workerId    String?
+  startedAt   DateTime           @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+  error       String?
+  metadata    Json?
+
+  job BackgroundJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("job_executions")
+}
+
+//
+// PRODUCTION
+//
+
+model WorkCenter {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  name        String
+  description String?
+  status      WorkCenterStatus @default(ACTIVE)
+  capacityPerDay Float?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  machines  Machine[]
+  stages    ProductionStage[]
+  tasks     ProductionTask[]
+  schedules ProductionSchedule[]
+
+  @@index([status])
+  @@map("work_centers")
+}
+
+model Machine {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  description  String?
+  status       MachineStatus @default(AVAILABLE)
+  workCenterId String?
+  utilization  Float         @default(0)
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  workCenter WorkCenter? @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  stages     ProductionStage[]
+  tasks      ProductionTask[]
+  schedules  ProductionSchedule[]
+
+  @@index([status])
+  @@index([workCenterId])
+  @@map("machines")
+}
+
+model ProductionOrder {
+  id              String                @id @default(cuid())
+  orderNo         String                @unique
+  title           String
+  description     String?
+  projectId       String?
+  componentId     String?
+  quantity        Float                 @default(1)
+  priority        TaskPriority          @default(MEDIUM)
+  status          ProductionOrderStatus @default(DRAFT)
+  currentStageCode ProductionStageCode?
+  plannedStartAt  DateTime?
+  plannedEndAt    DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  delayedAt       DateTime?
+  delayReason     String?
+  workflowInstanceId String?
+  metadata        Json?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  stages    ProductionStage[]
+  tasks     ProductionTask[]
+  schedules ProductionSchedule[]
+  logs      ProductionLog[]
+
+  @@index([status])
+  @@index([projectId])
+  @@index([componentId])
+  @@index([currentStageCode])
+  @@map("production_orders")
+}
+
+model ProductionStage {
+  id                String                @id @default(cuid())
+  productionOrderId String
+  code              ProductionStageCode
+  name              String
+  sequence          Int
+  status            ProductionStageStatus @default(PENDING)
+  workCenterId      String?
+  machineId         String?
+  assignedWorkerId  String?
+  plannedStartAt    DateTime?
+  plannedEndAt      DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  qualityStatus     String?
+  metadata          Json?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workCenter      WorkCenter?     @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  machine         Machine?        @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  tasks           ProductionTask[]
+  logs            ProductionLog[]
+
+  @@unique([productionOrderId, code])
+  @@unique([productionOrderId, sequence])
+  @@index([status])
+  @@index([workCenterId])
+  @@index([machineId])
+  @@map("production_stages")
+}
+
+model ProductionTask {
+  id                String               @id @default(cuid())
+  productionOrderId String
+  stageId           String?
+  title             String
+  description       String?
+  status            ProductionTaskStatus @default(TODO)
+  priority          TaskPriority         @default(MEDIUM)
+  workCenterId      String?
+  machineId         String?
+  assignedWorkerId  String?
+  plannedStartAt    DateTime?
+  plannedEndAt      DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  stage           ProductionStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  workCenter      WorkCenter?      @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  machine         Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([productionOrderId])
+  @@index([stageId])
+  @@index([assignedWorkerId])
+  @@map("production_tasks")
+}
+
+model ProductionSchedule {
+  id                String   @id @default(cuid())
+  productionOrderId String
+  workCenterId      String?
+  machineId         String?
+  startAt           DateTime
+  endAt             DateTime
+  capacityPlanned   Float?
+  capacityUsed      Float?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workCenter      WorkCenter?      @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  machine         Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
+
+  @@index([startAt, endAt])
+  @@index([workCenterId])
+  @@index([machineId])
+  @@map("production_schedules")
+}
+
+model ProductionLog {
+  id                String            @id @default(cuid())
+  productionOrderId String
+  stageId           String?
+  type              ProductionLogType @default(NOTE)
+  message           String
+  quantity          Float?
+  workerId          String?
+  machineId         String?
+  attachmentIds     String[]          @default([])
+  metadata          Json?
+  createdAt         DateTime          @default(now())
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  stage           ProductionStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  @@index([productionOrderId])
+  @@index([stageId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("production_logs")
+}
+
+//
+// QUALITY CONTROL
+//
+
+model QcChecklist {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  name        String
+  type        QcChecklistType @default(FINAL)
+  revision    String          @default("A")
+  description String?
+  isActive    Boolean         @default(true)
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  items       QcChecklistItem[]
+  inspections QcInspection[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("qc_checklists")
+}
+
+model QcChecklistItem {
+  id            String   @id @default(cuid())
+  checklistId   String
+  sequence      Int
+  title         String
+  description   String?
+  required      Boolean  @default(true)
+  expectedValue String?
+  tolerance     String?
+  unit          String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  checklist QcChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  results   QcResult[]
+
+  @@unique([checklistId, sequence])
+  @@index([checklistId])
+  @@map("qc_checklist_items")
+}
+
+model QcInspection {
+  id                 String             @id @default(cuid())
+  inspectionNo       String             @unique
+  checklistId        String?
+  productionOrderId  String?
+  productionStageId  String?
+  componentId        String?
+  projectId          String?
+  status             QcInspectionStatus @default(DRAFT)
+  inspectorId        String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  approvedById       String?
+  approvedAt         DateTime?
+  rejectedById       String?
+  rejectedAt         DateTime?
+  rejectionReason    String?
+  workflowInstanceId String?
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  checklist   QcChecklist?            @relation(fields: [checklistId], references: [id], onDelete: SetNull)
+  results     QcResult[]
+  issues      QcIssue[]
+  attachments QcAttachment[]
+  ncrs        NonConformanceReport[]
+
+  @@index([status])
+  @@index([productionOrderId])
+  @@index([productionStageId])
+  @@index([componentId])
+  @@index([projectId])
+  @@index([checklistId])
+  @@map("qc_inspections")
+}
+
+model QcResult {
+  id              String         @id @default(cuid())
+  inspectionId    String
+  checklistItemId String?
+  category        QcChecklistType @default(FINAL)
+  status          QcResultStatus @default(PENDING)
+  measuredValue   String?
+  expectedValue   String?
+  tolerance       String?
+  unit            String?
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  inspection    QcInspection     @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  checklistItem QcChecklistItem? @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
+  issues        QcIssue[]
+
+  @@index([inspectionId])
+  @@index([checklistItemId])
+  @@index([category])
+  @@index([status])
+  @@map("qc_results")
+}
+
+model QcIssue {
+  id               String          @id @default(cuid())
+  inspectionId     String
+  resultId         String?
+  code             String?
+  title            String
+  description      String?
+  severity         QcIssueSeverity @default(MEDIUM)
+  status           QcIssueStatus   @default(OPEN)
+  correctiveAction String?
+  assignedToId     String?
+  createdById      String?
+  dueAt            DateTime?
+  resolvedAt       DateTime?
+  verifiedAt       DateTime?
+  metadata         Json?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  inspection  QcInspection           @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  result      QcResult?              @relation(fields: [resultId], references: [id], onDelete: SetNull)
+  attachments QcAttachment[]
+  ncrs        NonConformanceReport[]
+
+  @@index([inspectionId])
+  @@index([resultId])
+  @@index([severity])
+  @@index([status])
+  @@map("qc_issues")
+}
+
+model QcAttachment {
+  id           String   @id @default(cuid())
+  inspectionId String?
+  issueId      String?
+  ncrId        String?
+  attachmentId String
+  purpose      String   @default("")
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  inspection QcInspection?         @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  issue      QcIssue?              @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  ncr        NonConformanceReport? @relation(fields: [ncrId], references: [id], onDelete: Cascade)
+  attachment Attachment            @relation(fields: [attachmentId], references: [id], onDelete: Restrict)
+
+  @@index([inspectionId])
+  @@index([issueId])
+  @@index([ncrId])
+  @@index([attachmentId])
+  @@map("qc_attachments")
+}
+
+model NonConformanceReport {
+  id                String          @id @default(cuid())
+  ncrNo             String          @unique
+  inspectionId      String
+  issueId           String?
+  productionOrderId String?
+  componentId       String?
+  status            NcrStatus       @default(OPEN)
+  severity          QcIssueSeverity @default(HIGH)
+  title             String
+  description       String?
+  rootCause         String?
+  correctiveAction  String?
+  disposition       String?
+  raisedById        String?
+  approvedById      String?
+  closedAt          DateTime?
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  inspection  QcInspection   @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  issue       QcIssue?       @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  attachments QcAttachment[]
+
+  @@index([inspectionId])
+  @@index([issueId])
+  @@index([productionOrderId])
+  @@index([componentId])
+  @@index([status])
+  @@index([severity])
+  @@map("non_conformance_reports")
+}
+
+//
+// YARD
+//
+
+model YardZone {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  name        String
+  description String?
+  status      YardZoneStatus @default(ACTIVE)
+  originX     Float          @default(0)
+  originY     Float          @default(0)
+  width       Float          @default(0)
+  height      Float          @default(0)
+  color       String         @default("#06b6d4")
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  rows      YardRow[]
+  slots     YardSlot[]
+  snapshots YardSnapshot[]
+
+  @@index([status])
+  @@map("yard_zones")
+}
+
+model YardRow {
+  id        String   @id @default(cuid())
+  zoneId    String
+  code      String
+  name      String?
+  index     Int
+  originX   Float    @default(0)
+  originY   Float    @default(0)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  zone  YardZone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  slots YardSlot[]
+
+  @@unique([zoneId, code])
+  @@unique([zoneId, index])
+  @@index([zoneId])
+  @@map("yard_rows")
+}
+
+model YardSlot {
+  id             String         @id @default(cuid())
+  zoneId         String
+  rowId          String?
+  code           String
+  status         YardSlotStatus @default(AVAILABLE)
+  x              Float
+  y              Float
+  width          Float          @default(1)
+  height         Float          @default(1)
+  maxStackLevel  Int            @default(1)
+  currentStackLevel Int         @default(0)
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  zone       YardZone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  row        YardRow?             @relation(fields: [rowId], references: [id], onDelete: SetNull)
+  placements YardItemPlacement[]
+  fromMoves  YardMovement[]       @relation("YardMovementFromSlot")
+  toMoves    YardMovement[]       @relation("YardMovementToSlot")
+
+  @@unique([zoneId, code])
+  @@index([zoneId])
+  @@index([rowId])
+  @@index([status])
+  @@map("yard_slots")
+}
+
+model YardItemPlacement {
+  id             String       @id @default(cuid())
+  slotId         String
+  itemType       YardItemType
+  itemId         String
+  itemCode       String
+  itemName       String?
+  quantity       Float        @default(1)
+  stackLevel     Int          @default(1)
+  weight         Float?
+  length         Float?
+  width          Float?
+  height         Float?
+  placedById     String?
+  placedAt       DateTime     @default(now())
+  removedAt      DateTime?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  slot      YardSlot       @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  movements YardMovement[]
+
+  @@index([slotId])
+  @@index([itemType, itemId])
+  @@index([itemCode])
+  @@index([removedAt])
+  @@map("yard_item_placements")
+}
+
+model YardMovement {
+  id            String           @id @default(cuid())
+  placementId   String?
+  type          YardMovementType
+  itemType      YardItemType
+  itemId        String
+  itemCode      String
+  fromSlotId    String?
+  toSlotId      String?
+  craneId       String?
+  movedById     String?
+  reason        String?
+  metadata      Json?
+  createdAt     DateTime         @default(now())
+
+  placement YardItemPlacement? @relation(fields: [placementId], references: [id], onDelete: SetNull)
+  fromSlot  YardSlot?          @relation("YardMovementFromSlot", fields: [fromSlotId], references: [id], onDelete: SetNull)
+  toSlot    YardSlot?          @relation("YardMovementToSlot", fields: [toSlotId], references: [id], onDelete: SetNull)
+  crane     Crane?             @relation(fields: [craneId], references: [id], onDelete: SetNull)
+
+  @@index([itemType, itemId])
+  @@index([fromSlotId])
+  @@index([toSlotId])
+  @@index([craneId])
+  @@index([createdAt])
+  @@map("yard_movements")
+}
+
+model Crane {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  name        String
+  status      CraneStatus @default(AVAILABLE)
+  currentX    Float       @default(0)
+  currentY    Float       @default(0)
+  utilization Float       @default(0)
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  movements YardMovement[]
+
+  @@index([status])
+  @@map("cranes")
+}
+
+model YardSnapshot {
+  id           String   @id @default(cuid())
+  zoneId       String?
+  name         String
+  occupancyRate Float   @default(0)
+  totalSlots   Int      @default(0)
+  occupiedSlots Int     @default(0)
+  heatmap      Json?
+  congestion   Json?
+  payload      Json
+  generatedById String?
+  createdAt    DateTime @default(now())
+
+  zone YardZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@index([zoneId])
+  @@index([createdAt])
+  @@map("yard_snapshots")
 }
 
 //

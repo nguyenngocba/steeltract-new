@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api } from '../../lib/api'
+import {
+  login,
+} from '../../lib/auth/auth-api'
 import { useAuthStore } from '../../store/auth.store'
 
 export function LoginPage() {
@@ -25,22 +27,23 @@ export function LoginPage() {
     try {
       setLoading(true)
 
-      const response =
-        await api.post(
-          '/auth/login',
-          {
-            username,
-            password,
-          },
-        )
+      const response = await login({
+        username,
+        password,
+      })
 
       setAuth(
-        response.data.access_token,
-        response.data.user,
+        response.accessToken ||
+          response.access_token ||
+          '',
+        response.user,
+        response.refreshToken ||
+          response.refresh_token ||
+          '',
       )
 
       navigate('/')
-    } catch (error) {
+    } catch {
       alert('Login failed')
     } finally {
       setLoading(false)

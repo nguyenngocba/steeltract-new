@@ -1,10 +1,12 @@
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { Prisma } from '@prisma/client';
+
+import { PrismaService } from '../../core/prisma/prisma.service';
 
 interface ActivityLogData {
-  action: string
-  entity: string
-  entityId?: string
-  metadata?: any
+  action: string;
+  entity: string;
+  entityId?: string;
+  metadata?: Prisma.InputJsonValue;
 }
 
 export async function createActivityLog(
@@ -18,5 +20,5 @@ export async function createActivityLog(
       entityId: data.entityId,
       metadata: data.metadata,
     },
-  })
+  });
 }

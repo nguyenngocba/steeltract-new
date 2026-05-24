@@ -1,0 +1,424 @@
+.
+├── apps
+│   ├── backend
+│   │   ├── package.json
+│   │   ├── prisma
+│   │   │   ├── migrations
+│   │   │   │   ├── 20260521023720_init
+│   │   │   │   │   └── migration.sql
+│   │   │   │   └── migration_lock.toml
+│   │   │   └── schema.prisma
+│   │   └── prisma.config.ts
+│   ├── backend-api
+│   │   ├── eslint.config.mjs
+│   │   ├── nest-cli.json
+│   │   ├── package.json
+│   │   ├── prisma
+│   │   │   ├── migrations
+│   │   │   │   ├── 20260521023720_init
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522024309_add_minimum_stock
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522032531_component_tracking
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522043538_component_timeline
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522050214_component_coordinates
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522064649_component_schedule
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522080216_install_photo
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522082553_task_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522084126_attendance
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522090804_component_cost
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522091829_supplier_score
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522100357_equipment_booking
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522100845_worker_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522104637_warehouse_zones
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522105142_site_logs
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522105947_safety_inspection
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522110729_vehicle_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522111403_material_request
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522111832_approval_system
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522112250_purchase_order
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522112712_analytics_engine
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522113225_worker_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523025546_schema_upgrade
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523025923_add_missing_statuses
+│   │   │   │   │   └── migration.sql
+│   │   │   │   └── migration_lock.toml
+│   │   │   ├── schema.prisma
+│   │   │   └── seed.ts
+│   │   ├── README.md
+│   │   ├── src
+│   │   │   ├── app.controller.spec.ts
+│   │   │   ├── app.controller.ts
+│   │   │   ├── app.module.ts
+│   │   │   ├── app.service.ts
+│   │   │   ├── common
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── filter.dto.ts
+│   │   │   │   │   ├── pagination.dto.ts
+│   │   │   │   │   └── query.dto.ts
+│   │   │   │   ├── pipes
+│   │   │   │   │   └── zod-validation.pipe.ts
+│   │   │   │   └── utils
+│   │   │   │       └── activity-log.ts
+│   │   │   ├── core
+│   │   │   │   ├── events
+│   │   │   │   │   ├── domain-event.interface.ts
+│   │   │   │   │   ├── event-bus.service.ts
+│   │   │   │   │   ├── event-handler.interface.ts
+│   │   │   │   │   └── events.module.ts
+│   │   │   │   ├── prisma
+│   │   │   │   │   ├── prisma.module.ts
+│   │   │   │   │   └── prisma.service.ts
+│   │   │   │   ├── telegram
+│   │   │   │   │   └── telegram.service.ts
+│   │   │   │   └── ws
+│   │   │   │       ├── events.gateway.ts
+│   │   │   │       ├── websocket-event-mapper.ts
+│   │   │   │       ├── websocket-events.ts
+│   │   │   │       └── websocket.module.ts
+│   │   │   ├── main.ts
+│   │   │   ├── modules
+│   │   │   │   ├── analytics
+│   │   │   │   │   ├── analytics.controller.ts
+│   │   │   │   │   └── analytics.module.ts
+│   │   │   │   ├── approvals
+│   │   │   │   │   ├── approvals.controller.ts
+│   │   │   │   │   └── approvals.module.ts
+│   │   │   │   ├── attendance
+│   │   │   │   │   ├── attendance.controller.ts
+│   │   │   │   │   └── attendance.module.ts
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── auth.controller.ts
+│   │   │   │   │   ├── auth.module.ts
+│   │   │   │   │   ├── auth.service.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── login.dto.ts
+│   │   │   │   │   ├── jwt-auth.guard.ts
+│   │   │   │   │   └── strategies
+│   │   │   │   │       └── jwt.strategy.ts
+│   │   │   │   ├── components
+│   │   │   │   │   ├── components.controller.ts
+│   │   │   │   │   ├── components.module.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── components.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── components.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── components.service.ts
+│   │   │   │   ├── dashboard
+│   │   │   │   │   ├── dashboard.controller.ts
+│   │   │   │   │   └── dashboard.module.ts
+│   │   │   │   ├── equipment
+│   │   │   │   │   ├── equipment.controller.ts
+│   │   │   │   │   └── equipment.module.ts
+│   │   │   │   ├── inventory
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── inventory.dto.ts
+│   │   │   │   │   ├── inventory.controller.ts
+│   │   │   │   │   ├── inventory.module.ts
+│   │   │   │   │   ├── inventory.repository.ts
+│   │   │   │   │   └── inventory.service.ts
+│   │   │   │   ├── material-requests
+│   │   │   │   │   ├── material-requests.controller.ts
+│   │   │   │   │   └── material-requests.module.ts
+│   │   │   │   ├── projects
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── projects.dto.ts
+│   │   │   │   │   ├── projects.controller.ts
+│   │   │   │   │   ├── projects.module.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── projects.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── projects.service.ts
+│   │   │   │   ├── purchase-orders
+│   │   │   │   │   ├── purchase-orders.controller.ts
+│   │   │   │   │   └── purchase-orders.module.ts
+│   │   │   │   ├── safety
+│   │   │   │   │   ├── safety.controller.ts
+│   │   │   │   │   └── safety.module.ts
+│   │   │   │   ├── site-logs
+│   │   │   │   │   ├── site-logs.controller.ts
+│   │   │   │   │   └── site-logs.module.ts
+│   │   │   │   ├── supplier-score
+│   │   │   │   │   ├── supplier-score.controller.ts
+│   │   │   │   │   └── supplier-score.module.ts
+│   │   │   │   ├── tasks
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── tasks.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── tasks.repository.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── tasks.service.ts
+│   │   │   │   │   ├── tasks.controller.ts
+│   │   │   │   │   └── tasks.module.ts
+│   │   │   │   ├── _template
+│   │   │   │   │   ├── controllers
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── entities
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   └── validators
+│   │   │   │   │       └── index.ts
+│   │   │   │   ├── transactions
+│   │   │   │   │   ├── transactions.controller.ts
+│   │   │   │   │   └── transactions.module.ts
+│   │   │   │   ├── users
+│   │   │   │   ├── vehicles
+│   │   │   │   │   ├── vehicles.controller.ts
+│   │   │   │   │   └── vehicles.module.ts
+│   │   │   │   ├── workers
+│   │   │   │   │   ├── workers.controller.ts
+│   │   │   │   │   └── workers.module.ts
+│   │   │   │   └── zones
+│   │   │   │       ├── zones.controller.ts
+│   │   │   │       └── zones.module.ts
+│   │   │   └── store
+│   │   ├── test
+│   │   │   ├── app.e2e-spec.ts
+│   │   │   └── jest-e2e.json
+│   │   ├── tsconfig.build.json
+│   │   ├── tsconfig.json
+│   │   └── uploads
+│   │       ├── components
+│   │       └── timeline
+│   └── frontend
+│       ├── eslint.config.js
+│       ├── index.html
+│       ├── package.json
+│       ├── public
+│       │   ├── favicon.svg
+│       │   └── icons.svg
+│       ├── README.md
+│       ├── src
+│       │   ├── App.css
+│       │   ├── App.tsx
+│       │   ├── assets
+│       │   │   ├── hero.png
+│       │   │   ├── react.svg
+│       │   │   └── vite.svg
+│       │   ├── components
+│       │   │   ├── layout
+│       │   │   │   └── PageHeader
+│       │   │   │       ├── index.ts
+│       │   │   │       └── PageHeader.tsx
+│       │   │   └── ui
+│       │   │       ├── Button
+│       │   │       │   ├── Button.tsx
+│       │   │       │   └── index.ts
+│       │   │       ├── Card
+│       │   │       │   ├── Card.tsx
+│       │   │       │   └── index.ts
+│       │   │       ├── ComponentStatusBadge.tsx
+│       │   │       ├── Drawer
+│       │   │       │   ├── Drawer.tsx
+│       │   │       │   └── index.ts
+│       │   │       ├── index.ts
+│       │   │       ├── Input
+│       │   │       │   ├── index.ts
+│       │   │       │   └── Input.tsx
+│       │   │       ├── KpiCard
+│       │   │       │   ├── index.ts
+│       │   │       │   └── KpiCard.tsx
+│       │   │       ├── Modal
+│       │   │       │   ├── index.ts
+│       │   │       │   └── Modal.tsx
+│       │   │       ├── SearchBar
+│       │   │       │   ├── index.ts
+│       │   │       │   └── SearchBar.tsx
+│       │   │       ├── Select
+│       │   │       │   ├── index.ts
+│       │   │       │   └── Select.tsx
+│       │   │       ├── StatusBadge
+│       │   │       │   ├── index.ts
+│       │   │       │   └── StatusBadge.tsx
+│       │   │       ├── Table
+│       │   │       │   ├── index.ts
+│       │   │       │   └── Table.tsx
+│       │   │       ├── Tabs
+│       │   │       │   ├── index.ts
+│       │   │       │   └── Tabs.tsx
+│       │   │       └── Workspace
+│       │   │           ├── index.ts
+│       │   │           └── Workspace.tsx
+│       │   ├── hooks
+│       │   │   └── query
+│       │   │       ├── useComponentQueries.ts
+│       │   │       ├── useDashboardQueries.ts
+│       │   │       ├── useInventoryQueries.ts
+│       │   │       ├── useProjectQueries.ts
+│       │   │       └── useTaskQueries.ts
+│       │   ├── index.css
+│       │   ├── layouts
+│       │   │   └── AppLayout.tsx
+│       │   ├── lib
+│       │   │   ├── api.ts
+│       │   │   ├── query
+│       │   │   │   ├── invalidation.ts
+│       │   │   │   ├── query-client.ts
+│       │   │   │   ├── query-keys.ts
+│       │   │   │   └── QueryProvider.tsx
+│       │   │   ├── realtime
+│       │   │   │   ├── event-handlers.ts
+│       │   │   │   ├── query-event-bridge.ts
+│       │   │   │   ├── realtime-provider.tsx
+│       │   │   │   └── socket-client.ts
+│       │   │   └── socket.ts
+│       │   ├── main.tsx
+│       │   ├── modules
+│       │   │   └── _template
+│       │   │       ├── api
+│       │   │       │   └── index.ts
+│       │   │       ├── components
+│       │   │       ├── hooks
+│       │   │       │   └── index.ts
+│       │   │       ├── index.ts
+│       │   │       ├── pages
+│       │   │       │   └── index.ts
+│       │   │       ├── services
+│       │   │       │   └── index.ts
+│       │   │       ├── store
+│       │   │       │   └── index.ts
+│       │   │       ├── types
+│       │   │       │   └── index.ts
+│       │   │       └── utils
+│       │   │           └── index.ts
+│       │   ├── pages
+│       │   │   ├── analytics
+│       │   │   │   └── AnalyticsPage.tsx
+│       │   │   ├── anomalies
+│       │   │   │   └── AnomaliesPage.tsx
+│       │   │   ├── approvals
+│       │   │   │   └── ApprovalsPage.tsx
+│       │   │   ├── attendance
+│       │   │   │   └── AttendancePage.tsx
+│       │   │   ├── boq
+│       │   │   │   └── BoqPage.tsx
+│       │   │   ├── component-detail
+│       │   │   │   └── ComponentDetailPage.tsx
+│       │   │   ├── components
+│       │   │   │   └── ComponentsPage.tsx
+│       │   │   ├── dashboard
+│       │   │   │   └── DashboardPage.tsx
+│       │   │   ├── equipment
+│       │   │   │   └── EquipmentPage.tsx
+│       │   │   ├── executive
+│       │   │   │   └── ExecutiveDashboardPage.tsx
+│       │   │   ├── floor-map
+│       │   │   │   └── FloorMapPage.tsx
+│       │   │   ├── inventory
+│       │   │   │   └── InventoryPage.tsx
+│       │   │   ├── login
+│       │   │   │   └── LoginPage.tsx
+│       │   │   ├── material-requests
+│       │   │   │   └── MaterialRequestsPage.tsx
+│       │   │   ├── ocr
+│       │   │   │   └── OcrPage.tsx
+│       │   │   ├── procurement
+│       │   │   │   └── ProcurementPage.tsx
+│       │   │   ├── project-detail
+│       │   │   │   ├── ExecutionCalendar.tsx
+│       │   │   │   ├── ProjectDetailPage.tsx
+│       │   │   │   └── ProjectFloorMapPage.tsx
+│       │   │   ├── projects
+│       │   │   │   └── ProjectsPage.tsx
+│       │   │   ├── purchase-orders
+│       │   │   │   └── PurchaseOrdersPage.tsx
+│       │   │   ├── qr-scan
+│       │   │   │   └── QrScanPage.tsx
+│       │   │   ├── reports
+│       │   │   │   └── ReportsPage.tsx
+│       │   │   ├── safety
+│       │   │   │   └── SafetyPage.tsx
+│       │   │   ├── schedule
+│       │   │   │   └── SchedulePage.tsx
+│       │   │   ├── site-logs
+│       │   │   │   └── SiteLogsPage.tsx
+│       │   │   ├── suppliers
+│       │   │   │   └── SuppliersPage.tsx
+│       │   │   ├── tasks
+│       │   │   │   └── TasksPage.tsx
+│       │   │   ├── transactions
+│       │   │   │   └── TransactionsPage.tsx
+│       │   │   ├── vehicles
+│       │   │   │   └── VehiclesPage.tsx
+│       │   │   ├── workers
+│       │   │   │   └── WorkersPage.tsx
+│       │   │   ├── yard-map
+│       │   │   │   └── YardMapPage.tsx
+│       │   │   └── zones
+│       │   │       └── ZonesPage.tsx
+│       │   ├── providers
+│       │   │   └── AuthProvider.tsx
+│       │   ├── routes
+│       │   │   └── ProtectedRoute.tsx
+│       │   ├── services
+│       │   │   └── api
+│       │   │       ├── components.api.ts
+│       │   │       ├── dashboard.api.ts
+│       │   │       ├── inventory.api.ts
+│       │   │       ├── projects.api.ts
+│       │   │       ├── tasks.api.ts
+│       │   │       └── types.ts
+│       │   ├── store
+│       │   │   ├── auth.store.ts
+│       │   │   └── notification.store.ts
+│       │   └── vite-env.d.ts
+│       ├── tsconfig.app.json
+│       ├── tsconfig.json
+│       ├── tsconfig.node.json
+│       └── vite.config.ts
+├── docs
+│   ├── AI_CONTEXT.md
+│   ├── AI_RULES.md
+│   ├── api
+│   ├── architecture
+│   ├── backend
+│   ├── database
+│   ├── frontend
+│   ├── issues
+│   ├── KNOWN_ISSUES.md
+│   ├── modules
+│   ├── PROJECT_OVERVIEW.md
+│   ├── roadmap
+│   ├── ROADMAP.md
+│   ├── setup
+│   └── TREE_STRUCTURE.md
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── scripts
+│   └── create-module-templates.sh
+└── structure.txt
+
+173 directories, 248 files

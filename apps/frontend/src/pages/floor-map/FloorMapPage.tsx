@@ -237,7 +237,7 @@ export function FloorMapPage() {
                   0,
               }}
               onStop={(
-                e,
+                _e,
                 data,
               ) => {
                 updatePosition(

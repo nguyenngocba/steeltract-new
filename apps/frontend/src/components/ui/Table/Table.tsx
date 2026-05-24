@@ -1,61 +1,49 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-interface Column {
+import { DataTable } from '../../ui-system'
+import type {
+  DataTableColumn,
+} from '../../ui-system'
+
+interface Column<T extends object> {
   key: string
   title: string
-
   render?: (
-    value: any,
-    row: any,
+    value: unknown,
+    row: T,
   ) => ReactNode
 }
 
-interface TableProps {
-  columns: Column[]
-  data: Record<string, any>[]
+interface TableProps<T extends object> {
+  columns: Array<Column<T>>
+  data: T[]
 }
 
-export function Table({
+export function Table<T extends object>({
   columns,
   data,
-}: TableProps) {
-  return (
-    <table className="w-full">
-      <thead>
-        <tr className="border-b border-zinc-800 text-zinc-400">
-          {columns.map((column) => (
-            <th
-              key={column.key}
-              className="text-left py-4"
-            >
-              {column.title}
-            </th>
-          ))}
-        </tr>
-      </thead>
+}: TableProps<T>) {
+  const mappedColumns: Array<DataTableColumn<T>> = columns.map((column) => ({
+    key: column.key,
+    header: column.title,
+    render: (row) => {
+      const record = row as Record<string, unknown>
 
-      <tbody>
-        {data.map((row, index) => (
-          <tr
-            key={index}
-            className="border-b border-zinc-900"
-          >
-            {columns.map((column) => (
-              <td
-                key={column.key}
-                className="py-4"
-              >
-                {column.render
-                  ? column.render(
-                      row[column.key],
-                      row,
-                    )
-                  : row[column.key]}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      return column.render
+        ? column.render(record[column.key], row)
+        : String(record[column.key] ?? '')
+    },
+  }))
+
+  return (
+    <DataTable
+      data={data}
+      columns={mappedColumns}
+      rowKey={(row) => {
+        const record = row as Record<string, unknown>
+
+        return String(record.id ?? JSON.stringify(row))
+      }}
+    />
   )
 }

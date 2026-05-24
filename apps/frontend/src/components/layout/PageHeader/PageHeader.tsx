@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 interface PageHeaderProps {
   title: string
@@ -10,14 +10,16 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="flex items-center justify-between mb-6">
-      <h1 className="text-3xl font-bold">
+    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <h1 className="text-2xl font-semibold text-white md:text-3xl">
         {title}
       </h1>
 
-      <div>
-        {actions}
-      </div>
+      {actions ? (
+        <div className="flex flex-wrap gap-2">
+          {actions}
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -1,27 +1,10 @@
 import {
-  useEffect,
-  useState,
-} from 'react'
-
-import { api } from '../../lib/api'
+  useTasksQuery,
+} from '../../hooks/query/useTaskQueries'
 
 export function TasksPage() {
-  const [tasks,
-    setTasks] =
-    useState<any[]>([])
-
-  async function loadData() {
-    const response =
-      await api.get('/tasks')
-
-    setTasks(
-      response.data,
-    )
-  }
-
-  useEffect(() => {
-    loadData()
-  }, [])
+  const { data: tasks = [] } =
+    useTasksQuery()
 
   const grouped = {
     PENDING:

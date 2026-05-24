@@ -1,114 +1,30 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common'
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import type { CreateTransactionDto } from '../inventory/dto/inventory.dto';
+
+import { createTransactionSchema } from '../inventory/dto/inventory.dto';
+
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { InventoryService } from '../inventory/inventory.service';
 
 @Controller('transactions')
 export class TransactionsController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private readonly inventoryService: InventoryService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll() {
-    return this.prisma.inventoryTransaction.findMany({
-      include: {
-        items: {
-          include: {
-            inventoryItem: true,
-          },
-        },
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  findAll() {
+    return this.inventoryService.listTransactions();
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
+  create(
+    @Body(new ZodValidationPipe(createTransactionSchema))
+    body: CreateTransactionDto,
   ) {
-    const transaction =
-      await this.prisma.inventoryTransaction.create({
-        data: {
-          code: body.code,
-          type: body.type,
-          note: body.note,
-
-          items: {
-            create: body.items.map(
-              (item: any) => ({
-                quantity:
-                  item.quantity,
-
-                inventoryItem: {
-                  connect: {
-                    id: item.inventoryItemId,
-                  },
-                },
-              }),
-            ),
-          },
-        },
-
-        include: {
-          items: true,
-        },
-      })
-
-    for (const item of body.items) {
-      const inventory =
-        await this.prisma.inventoryItem.findUnique({
-          where: {
-            id: item.inventoryItemId,
-          },
-        })
-
-      if (!inventory) continue
-
-      let quantity =
-        inventory.quantity
-
-      if (
-        body.type === 'IMPORT'
-      ) {
-        quantity += item.quantity
-      }
-
-      if (
-        body.type === 'EXPORT'
-      ) {
-        quantity -= item.quantity
-      }
-
-      if (
-        body.type === 'RETURN'
-      ) {
-        quantity += item.quantity
-      }
-
-      await this.prisma.inventoryItem.update({
-        where: {
-          id: inventory.id,
-        },
-
-        data: {
-          quantity,
-        },
-      })
-    }
-
-    return transaction
+    return this.inventoryService.createTransaction(body);
   }
 }

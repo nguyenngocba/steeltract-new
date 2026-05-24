@@ -1,11 +1,21 @@
 import {
-  useEffect,
   useState,
 } from 'react'
 
 import toast from 'react-hot-toast'
 import QRCode from 'react-qr-code'
-import { api } from '../../lib/api'
+
+import {
+  useComponentsQuery,
+  useCreateComponentMutation,
+  useUploadComponentImageMutation,
+} from '../../hooks/query/useComponentQueries'
+import {
+  useProjectsQuery,
+} from '../../hooks/query/useProjectQueries'
+import type {
+  ComponentItem,
+} from '../../services/api/types'
 
 import {
   Card,
@@ -17,14 +27,6 @@ import {
 } from '../../components/ui'
 
 export function ComponentsPage() {
-  const [components,
-    setComponents] =
-    useState<any[]>([])
-
-  const [projects,
-    setProjects] =
-    useState<any[]>([])
-
   const [openModal,
     setOpenModal] =
     useState(false)
@@ -57,48 +59,30 @@ export function ComponentsPage() {
     setProjectId] =
     useState('')
 
-  async function loadData() {
-    const [
-      componentsResponse,
-      projectsResponse,
-    ] = await Promise.all([
-      api.get('/components'),
+  const {
+    data: components = [],
+  } = useComponentsQuery()
 
-      api.get('/projects'),
-    ])
+  const {
+    data: projects = [],
+  } = useProjectsQuery()
 
-    setComponents(
-      componentsResponse.data,
-    )
+  const createComponentMutation =
+    useCreateComponentMutation()
 
-    setProjects(
-      projectsResponse.data,
-    )
-  }
-
-  useEffect(() => {
-    loadData()
-  }, [])
+  const uploadComponentImageMutation =
+    useUploadComponentImageMutation()
 
   async function uploadImage(
     file: File,
   ) {
-    const formData =
-      new FormData()
-
-    formData.append(
-      'file',
-      file,
-    )
-
     const response =
-      await api.post(
-        '/components/upload',
-        formData,
+      await uploadComponentImageMutation.mutateAsync(
+        file,
       )
 
     setImageUrl(
-      response.data.imageUrl,
+      response.imageUrl,
     )
 
     toast.success(
@@ -108,8 +92,7 @@ export function ComponentsPage() {
 
   async function createComponent() {
     try {
-      await api.post(
-        '/components',
+      await createComponentMutation.mutateAsync(
         {
           code,
           name,
@@ -142,8 +125,6 @@ export function ComponentsPage() {
       setImageUrl('')
 
       setOpenModal(false)
-
-      loadData()
     } catch {
       toast.error(
         'Failed to create component',
@@ -166,7 +147,10 @@ export function ComponentsPage() {
       key: 'project',
       title: 'Project',
 
-      render: (_: any, row: any) =>
+      render: (
+        _: unknown,
+        row: ComponentItem,
+      ) =>
         row.project?.name,
     },
 
@@ -189,7 +173,10 @@ export function ComponentsPage() {
       key: 'qr',
       title: 'QR',
 
-      render: (_: any, row: any) => (
+      render: (
+        _: unknown,
+        row: ComponentItem,
+      ) => (
         <div className="bg-white p-2 rounded-lg w-fit">
           <QRCode
             size={60}
@@ -206,9 +193,9 @@ export function ComponentsPage() {
       key: 'status',
       title: 'Status',
 
-      render: (value: string) => (
+      render: (value: unknown) => (
         <ComponentStatusBadge
-          status={value}
+          status={String(value)}
         />
       ),
     },

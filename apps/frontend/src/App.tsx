@@ -1,48 +1,247 @@
 import {
+  Suspense,
+  lazy,
+} from 'react'
+import {
   Routes,
   Route,
 } from 'react-router-dom'
 
 import { AppLayout } from './layouts/AppLayout'
-
-import { DashboardPage } from './pages/dashboard/DashboardPage'
-import { ProjectsPage } from './pages/projects/ProjectsPage'
-import { InventoryPage } from './pages/inventory/InventoryPage'
-import { SuppliersPage } from './pages/suppliers/SuppliersPage'
-import { ReportsPage } from './pages/reports/ReportsPage'
-import { LoginPage } from './pages/login/LoginPage'
-import { ComponentsPage } from './pages/components/ComponentsPage'
-import { ComponentDetailPage } from './pages/component-detail/ComponentDetailPage'
-import { TransactionsPage } from './pages/transactions/TransactionsPage'
-import { YardMapPage } from './pages/yard-map/YardMapPage'
 import { AuthProvider } from './providers/AuthProvider'
 import { ProtectedRoute } from './routes/ProtectedRoute'
-import { ProjectDetailPage } from './pages/project-detail/ProjectDetailPage'
-import { ProjectFloorMapPage } from './pages/project-detail/ProjectFloorMapPage'
-import { SchedulePage } from './pages/schedule/SchedulePage'
-import { QrScanPage } from './pages/qr-scan/QrScanPage'
-import { TasksPage } from './pages/tasks/TasksPage'
-import { AttendancePage } from './pages/attendance/AttendancePage'
-import { ExecutiveDashboardPage } from './pages/executive/ExecutiveDashboardPage'
-import { ProcurementPage } from './pages/procurement/ProcurementPage'
-import { OcrPage } from './pages/ocr/OcrPage'
-import { BoqPage } from './pages/boq/BoqPage'
-import { AnomaliesPage } from './pages/anomalies/AnomaliesPage'
-import { EquipmentPage } from './pages/equipment/EquipmentPage'
-import { WorkersPage } from './pages/workers/WorkersPage'
-import { ZonesPage } from './pages/zones/ZonesPage'
-import { SiteLogsPage } from './pages/site-logs/SiteLogsPage'
-import { SafetyPage } from './pages/safety/SafetyPage'
-import { VehiclesPage } from './pages/vehicles/VehiclesPage'
-import { MaterialRequestsPage } from './pages/material-requests/MaterialRequestsPage'
-import { ApprovalsPage } from './pages/approvals/ApprovalsPage'
-import { PurchaseOrdersPage } from './pages/purchase-orders/PurchaseOrdersPage'
-import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
+
+const DashboardPage = lazy(() =>
+  import('./pages/dashboard/DashboardPage').then(
+    (module) => ({
+      default: module.DashboardPage,
+    }),
+  ),
+)
+const ProjectsPage = lazy(() =>
+  import('./pages/projects/ProjectsPage').then(
+    (module) => ({
+      default: module.ProjectsPage,
+    }),
+  ),
+)
+const InventoryPage = lazy(() =>
+  import('./pages/inventory/InventoryPage').then(
+    (module) => ({
+      default: module.InventoryPage,
+    }),
+  ),
+)
+const SuppliersPage = lazy(() =>
+  import('./pages/suppliers/SuppliersPage').then(
+    (module) => ({
+      default: module.SuppliersPage,
+    }),
+  ),
+)
+const ReportsPage = lazy(() =>
+  import('./pages/reports/ReportsPage').then(
+    (module) => ({
+      default: module.ReportsPage,
+    }),
+  ),
+)
+const LoginPage = lazy(() =>
+  import('./pages/login/LoginPage').then(
+    (module) => ({
+      default: module.LoginPage,
+    }),
+  ),
+)
+const ComponentsPage = lazy(() =>
+  import('./pages/components/ComponentsPage').then(
+    (module) => ({
+      default: module.ComponentsPage,
+    }),
+  ),
+)
+const ComponentDetailPage = lazy(() =>
+  import(
+    './pages/component-detail/ComponentDetailPage'
+  ).then((module) => ({
+    default: module.ComponentDetailPage,
+  })),
+)
+const TransactionsPage = lazy(() =>
+  import(
+    './pages/transactions/TransactionsPage'
+  ).then((module) => ({
+    default: module.TransactionsPage,
+  })),
+)
+const YardMapPage = lazy(() =>
+  import('./pages/yard-map/YardMapPage').then(
+    (module) => ({
+      default: module.YardMapPage,
+    }),
+  ),
+)
+const ProjectDetailPage = lazy(() =>
+  import(
+    './pages/project-detail/ProjectDetailPage'
+  ).then((module) => ({
+    default: module.ProjectDetailPage,
+  })),
+)
+const ProjectFloorMapPage = lazy(() =>
+  import(
+    './pages/project-detail/ProjectFloorMapPage'
+  ).then((module) => ({
+    default: module.ProjectFloorMapPage,
+  })),
+)
+const SchedulePage = lazy(() =>
+  import('./pages/schedule/SchedulePage').then(
+    (module) => ({
+      default: module.SchedulePage,
+    }),
+  ),
+)
+const QrScanPage = lazy(() =>
+  import('./pages/qr-scan/QrScanPage').then(
+    (module) => ({
+      default: module.QrScanPage,
+    }),
+  ),
+)
+const TasksPage = lazy(() =>
+  import('./pages/tasks/TasksPage').then(
+    (module) => ({
+      default: module.TasksPage,
+    }),
+  ),
+)
+const AttendancePage = lazy(() =>
+  import(
+    './pages/attendance/AttendancePage'
+  ).then((module) => ({
+    default: module.AttendancePage,
+  })),
+)
+const ExecutiveDashboardPage = lazy(() =>
+  import(
+    './pages/executive/ExecutiveDashboardPage'
+  ).then((module) => ({
+    default: module.ExecutiveDashboardPage,
+  })),
+)
+const ProcurementPage = lazy(() =>
+  import(
+    './pages/procurement/ProcurementPage'
+  ).then((module) => ({
+    default: module.ProcurementPage,
+  })),
+)
+const OcrPage = lazy(() =>
+  import('./pages/ocr/OcrPage').then(
+    (module) => ({
+      default: module.OcrPage,
+    }),
+  ),
+)
+const BoqPage = lazy(() =>
+  import('./pages/boq/BoqPage').then(
+    (module) => ({
+      default: module.BoqPage,
+    }),
+  ),
+)
+const AnomaliesPage = lazy(() =>
+  import(
+    './pages/anomalies/AnomaliesPage'
+  ).then((module) => ({
+    default: module.AnomaliesPage,
+  })),
+)
+const EquipmentPage = lazy(() =>
+  import(
+    './pages/equipment/EquipmentPage'
+  ).then((module) => ({
+    default: module.EquipmentPage,
+  })),
+)
+const WorkersPage = lazy(() =>
+  import('./pages/workers/WorkersPage').then(
+    (module) => ({
+      default: module.WorkersPage,
+    }),
+  ),
+)
+const ZonesPage = lazy(() =>
+  import('./pages/zones/ZonesPage').then(
+    (module) => ({
+      default: module.ZonesPage,
+    }),
+  ),
+)
+const SiteLogsPage = lazy(() =>
+  import(
+    './pages/site-logs/SiteLogsPage'
+  ).then((module) => ({
+    default: module.SiteLogsPage,
+  })),
+)
+const SafetyPage = lazy(() =>
+  import('./pages/safety/SafetyPage').then(
+    (module) => ({
+      default: module.SafetyPage,
+    }),
+  ),
+)
+const VehiclesPage = lazy(() =>
+  import('./pages/vehicles/VehiclesPage').then(
+    (module) => ({
+      default: module.VehiclesPage,
+    }),
+  ),
+)
+const MaterialRequestsPage = lazy(() =>
+  import(
+    './pages/material-requests/MaterialRequestsPage'
+  ).then((module) => ({
+    default: module.MaterialRequestsPage,
+  })),
+)
+const ApprovalsPage = lazy(() =>
+  import(
+    './pages/approvals/ApprovalsPage'
+  ).then((module) => ({
+    default: module.ApprovalsPage,
+  })),
+)
+const PurchaseOrdersPage = lazy(() =>
+  import(
+    './pages/purchase-orders/PurchaseOrdersPage'
+  ).then((module) => ({
+    default: module.PurchaseOrdersPage,
+  })),
+)
+const AnalyticsPage = lazy(() =>
+  import(
+    './pages/analytics/AnalyticsPage'
+  ).then((module) => ({
+    default: module.AnalyticsPage,
+  })),
+)
+
+function RouteLoading() {
+  return (
+    <div className="flex min-h-64 items-center justify-center text-sm text-zinc-400">
+      Loading workspace...
+    </div>
+  )
+}
 
 function App() {
   return (
     <AuthProvider>
-      <Routes>
+      <Suspense fallback={<RouteLoading />}>
+        <Routes>
         {/* Login */}
         <Route
           path="/login"
@@ -236,7 +435,8 @@ function App() {
             </ProtectedRoute>
           }
         />
-      </Routes>
+        </Routes>
+      </Suspense>
     </AuthProvider>
   )
 }

@@ -7,7 +7,7 @@ allowBuilds:
   '@prisma/engines': true
   bcrypt: true
   core-js: true
-  esbuild: set this to true or false
+  esbuild: true
   prisma: true
   tesseract.js: true
   unrs-resolver: true

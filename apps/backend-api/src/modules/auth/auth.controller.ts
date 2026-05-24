@@ -1,36 +1,52 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Get,
-  Req,
-  UseGuards,
-} from '@nestjs/common'
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 
-import { AuthService } from './auth.service'
-import { LoginDto } from './dto/login.dto'
-
-import { JwtAuthGuard } from './jwt-auth.guard'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { AuthUser } from '../rbac/types/auth-user';
+import type { LoginDto, RefreshTokenDto } from './dto/auth.dto';
+import { loginSchema, refreshTokenSchema } from './dto/auth.dto';
+import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(
-    @Body() dto: LoginDto,
+  login(
+    @Body(new ZodValidationPipe(loginSchema))
+    dto: LoginDto,
   ) {
-    return this.authService.login(
-      dto.username,
-      dto.password,
-    )
+    return this.authService.login(dto);
+  }
+
+  @Post('refresh')
+  refresh(
+    @Body(new ZodValidationPipe(refreshTokenSchema))
+    dto: RefreshTokenDto,
+  ) {
+    return this.authService.refresh(dto.refreshToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  logout(
+    @Req()
+    req: {
+      user: AuthUser;
+      body?: Partial<RefreshTokenDto>;
+    },
+  ) {
+    return this.authService.logout(req.user.id, req.body?.refreshToken);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() req: any) {
-    return req.user
+  me(
+    @Req()
+    req: {
+      user: AuthUser;
+    },
+  ) {
+    return this.authService.currentUser(req.user.id);
   }
 }

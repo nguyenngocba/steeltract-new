@@ -1,132 +1,70 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
   Body,
-  UseGuards,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { FileInterceptor } from '@nestjs/platform-express'
+import type {
+  CreateComponentDto,
+  ListComponentsDto,
+  UpdateComponentDto,
+} from './dto/components.dto';
 
-import { diskStorage } from 'multer'
+import {
+  createComponentSchema,
+  listComponentsSchema,
+  updateComponentSchema,
+} from './dto/components.dto';
 
-import { extname } from 'path'
-
-import { EventsGateway } from '../../core/ws/events.gateway'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { ComponentsService } from './services/components.service';
 
 @Controller('components')
 export class ComponentsController {
-  constructor(
-    private prisma: PrismaService,
-    private events: EventsGateway,
-  ) {}
+  constructor(private readonly componentsService: ComponentsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll() {
-    return this.prisma.component.findMany({
-      include: {
-        project: true,
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  findAll(
+    @Query(new ZodValidationPipe(listComponentsSchema))
+    query: ListComponentsDto,
+  ) {
+    return this.componentsService.findAll(query);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async findOne(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.component.findUnique({
-      where: {
-        id,
-      },
-
-      include: {
-        project: true,
-      },
-    })
+  findOne(@Param('id') id: string) {
+    return this.componentsService.findOne(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/timeline')
-  async timeline(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.componentTimeline.findMany({
-      where: {
-        componentId: id,
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  timeline(@Param('id') id: string) {
+    return this.componentsService.timeline(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
+  create(
+    @Body(new ZodValidationPipe(createComponentSchema))
+    body: CreateComponentDto,
   ) {
-    return this.prisma.component.create({
-      data: {
-        code:
-          body.code,
-
-        name:
-          body.name,
-
-        description:
-          body.description,
-
-        floor:
-          body.floor,
-
-        zone:
-          body.zone,
-
-        position:
-          body.position,
-
-        status:
-          body.status,
-
-        installedDate:
-          body.status ===
-          'INSTALLED'
-            ? new Date()
-            : undefined,
-
-        imageUrl:
-          body.imageUrl,
-
-        projectId:
-          body.projectId,
-
-        x:
-          body.x !== undefined
-            ? Number(body.x)
-            : 0,
-
-        y:
-          body.y !== undefined
-            ? Number(body.y)
-            : 0,
-      },
-    })
+    return this.componentsService.create(body);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -134,42 +72,18 @@ export class ComponentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination:
-          './uploads/components',
+        destination: './uploads/components',
 
-        filename: (
-          req,
-          file,
-          callback,
-        ) => {
-          const unique =
-            Date.now() +
-            '-' +
-            Math.round(
-              Math.random() *
-                1e9,
-            )
+        filename: (req, file, callback) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
 
-          callback(
-            null,
-            unique +
-              extname(
-                file.originalname,
-              ),
-          )
+          callback(null, unique + extname(file.originalname));
         },
       }),
     }),
   )
-  uploadFile(
-    @UploadedFile()
-    file: Express.Multer.File,
-  ) {
-    return {
-      imageUrl:
-        '/uploads/components/' +
-        file.filename,
-    }
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    return this.componentsService.getComponentUploadResponse(file);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -177,164 +91,33 @@ export class ComponentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination:
-          './uploads/timeline',
+        destination: './uploads/timeline',
 
-        filename: (
-          req,
-          file,
-          callback,
-        ) => {
-          const unique =
-            Date.now() +
-            '-' +
-            Math.round(
-              Math.random() *
-                1e9,
-            )
+        filename: (req, file, callback) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
 
-          callback(
-            null,
-            unique +
-              extname(
-                file.originalname,
-              ),
-          )
+          callback(null, unique + extname(file.originalname));
         },
       }),
     }),
   )
-  uploadTimelineFile(
-    @UploadedFile()
-    file: Express.Multer.File,
-  ) {
-    return {
-      photoUrl:
-        '/uploads/timeline/' +
-        file.filename,
-    }
+  uploadTimelineFile(@UploadedFile() file: Express.Multer.File) {
+    return this.componentsService.getTimelineUploadResponse(file);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(
+  update(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateComponentSchema))
+    body: UpdateComponentDto,
   ) {
-    const component =
-      await this.prisma.component.update({
-        where: {
-          id,
-        },
-
-        data: {
-          code:
-            body.code !== undefined
-              ? body.code
-              : undefined,
-
-          name:
-            body.name !== undefined
-              ? body.name
-              : undefined,
-
-          description:
-            body.description !== undefined
-              ? body.description
-              : undefined,
-
-          floor:
-            body.floor !== undefined
-              ? body.floor
-              : undefined,
-
-          zone:
-            body.zone !== undefined
-              ? body.zone
-              : undefined,
-
-          position:
-            body.position !== undefined
-              ? body.position
-              : undefined,
-
-          status:
-            body.status !== undefined
-              ? body.status
-              : undefined,
-
-          installedDate:
-            body.status ===
-            'INSTALLED'
-              ? new Date()
-              : undefined,
-
-          imageUrl:
-            body.imageUrl !== undefined
-              ? body.imageUrl
-              : undefined,
-
-          projectId:
-            body.projectId !== undefined
-              ? body.projectId
-              : undefined,
-
-          x:
-            body.x !== undefined
-              ? Number(body.x)
-              : undefined,
-
-          y:
-            body.y !== undefined
-              ? Number(body.y)
-              : undefined,
-        },
-      })
-
-    await this.prisma.componentTimeline.create({
-      data: {
-        componentId: id,
-
-        action:
-          body.status ||
-          'UPDATED',
-
-        note:
-          body.note ||
-          null,
-
-        photoUrl:
-          body.photoUrl ||
-          null,
-      },
-    })
-
-    this.events.emitEvent(
-      'component.updated',
-      {
-        id:
-          component.id,
-
-        code:
-          component.code,
-
-        status:
-          component.status,
-      },
-    )
-
-    return component
+    return this.componentsService.update(id, body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.component.delete({
-      where: {
-        id,
-      },
-    })
+  remove(@Param('id') id: string) {
+    return this.componentsService.remove(id);
   }
 }

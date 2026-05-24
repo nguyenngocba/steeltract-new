@@ -1,17 +1,14 @@
 import axios from 'axios'
 
+import {
+  setupAuthInterceptor,
+} from './auth/auth-interceptor'
+
+export const API_BASE_URL =
+  'http://172.168.53.116:3000'
+
 export const api = axios.create({
-  baseURL: 'http://172.168.53.116:3000',
+  baseURL: API_BASE_URL,
 })
 
-api.interceptors.request.use((config) => {
-  const token =
-    localStorage.getItem('token')
-
-  if (token) {
-    config.headers.Authorization =
-      `Bearer ${token}`
-  }
-
-  return config
-})
+setupAuthInterceptor(api, API_BASE_URL)

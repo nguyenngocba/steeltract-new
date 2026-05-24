@@ -1,245 +1,97 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
   Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import type {
+  CreateProjectDto,
+  ListProjectsDto,
+  UpdateProjectDto,
+} from './dto/projects.dto';
+
+import {
+  createProjectSchema,
+  listProjectsSchema,
+  updateProjectSchema,
+} from './dto/projects.dto';
+
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { ProjectsService } from './services/projects.service';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private readonly projectsService: ProjectsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll() {
-    return this.prisma.project.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  findAll(
+    @Query(new ZodValidationPipe(listProjectsSchema))
+    query: ListProjectsDto,
+  ) {
+    return this.projectsService.findAll(query);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
+  create(
+    @Body(new ZodValidationPipe(createProjectSchema))
+    body: CreateProjectDto,
   ) {
-    return this.prisma.project.create({
-      data: {
-        code: body.code,
-        name: body.name,
-        description:
-          body.description,
-      },
-    })
+    return this.projectsService.create(body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(
+  update(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateProjectSchema))
+    body: UpdateProjectDto,
   ) {
-    return this.prisma.project.update({
-      where: {
-        id,
-      },
-
-      data: {
-        code: body.code,
-        name: body.name,
-        description:
-          body.description,
-      },
-    })
+    return this.projectsService.update(id, body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async findOne(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.project.findUnique({
-      where: {
-        id,
-      },
-    })
+  findOne(@Param('id') id: string) {
+    return this.projectsService.findOne(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/components')
-  async components(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.component.findMany({
-      where: {
-        projectId: id,
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+  components(@Param('id') id: string) {
+    return this.projectsService.components(id);
   }
- 
+
   @UseGuards(JwtAuthGuard)
   @Get(':id/activity')
-  async activity(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.componentTimeline.findMany({
-      where: {
-        component: {
-          projectId: id,
-        },
-      },
-
-      include: {
-        component: true,
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-
-      take: 20,
-    })
+  activity(@Param('id') id: string) {
+    return this.projectsService.activity(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/progress-chart')
-  async progressChart(
-    @Param('id') id: string,
-  ) {
-    const timelines =
-      await this.prisma.componentTimeline.findMany({
-        where: {
-          component: {
-            projectId: id,
-          },
-
-          action: 'INSTALLED',
-        },
-
-        orderBy: {
-          createdAt: 'asc',
-        },
-      })
-
-    const grouped: Record<
-      string,
-      number
-    > = {}
-
-    timelines.forEach((item) => {
-      const date =
-        item.createdAt
-          .toISOString()
-          .split('T')[0]
-
-      grouped[date] =
-        (grouped[date] || 0) + 1
-    })
-
-    return Object.entries(
-      grouped,
-    ).map(([date, count]) => ({
-      date,
-      installed: count,
-    }))
+  progressChart(@Param('id') id: string) {
+    return this.projectsService.progressChart(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/kpis')
-  async kpis(
-    @Param('id') id: string,
-  ) {
-    const total =
-      await this.prisma.component.count({
-        where: {
-          projectId: id,
-        },
-      })
-
-    const installed =
-      await this.prisma.component.count({
-        where: {
-          projectId: id,
-
-          status: 'INSTALLED',
-        },
-      })
-
-    const delivered =
-      await this.prisma.component.count({
-        where: {
-          projectId: id,
-
-          status: 'DELIVERED',
-        },
-      })
-
-    const stock =
-      await this.prisma.component.count({
-        where: {
-          projectId: id,
-
-          status: 'STOCK',
-        },
-      })
-
-    const today =
-      new Date()
-
-    today.setHours(
-      0,
-      0,
-      0,
-      0,
-    )
-
-    const installedToday =
-      await this.prisma.componentTimeline.count({
-        where: {
-          component: {
-            projectId: id,
-          },
-
-          action: 'INSTALLED',
-
-          createdAt: {
-            gte: today,
-          },
-        },
-      })
-
-    return {
-      total,
-      installed,
-      delivered,
-      stock,
-      installedToday,
-    }
+  kpis(@Param('id') id: string) {
+    return this.projectsService.kpis(id);
   }
+
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ) {
-    return this.prisma.project.delete({
-      where: {
-        id,
-      },
-    })
+  remove(@Param('id') id: string) {
+    return this.projectsService.remove(id);
   }
 }

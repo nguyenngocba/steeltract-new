@@ -1,13 +1,18 @@
-import {
-  useEffect,
-  useState,
-} from 'react'
+import { useState } from 'react'
 
 import toast from 'react-hot-toast'
 
 import { PageHeader } from '../../components/layout/PageHeader'
 
-import { api } from '../../lib/api'
+import {
+  useCreateInventoryItemMutation,
+  useDeleteInventoryItemMutation,
+  useInventoryQuery,
+  useUpdateInventoryItemMutation,
+} from '../../hooks/query/useInventoryQueries'
+import type {
+  InventoryItem,
+} from '../../services/api/types'
 
 import {
   Card,
@@ -18,18 +23,6 @@ import {
   Select,
   Table,
 } from '../../components/ui'
-
-interface InventoryItem {
-  id: string
-  name: string
-  code: string
-  quantity: number
-  status: string
-
-  category?: {
-    name: string
-  }
-}
 
 export function InventoryPage() {
   const [search, setSearch] =
@@ -42,16 +35,10 @@ export function InventoryPage() {
     useState(false)
 
   const [selectedItem, setSelectedItem] =
-    useState<any>(null)
+    useState<InventoryItem | null>(null)
 
   const [editingId, setEditingId] =
     useState<string | null>(null)
-
-  const [items, setItems] =
-    useState<InventoryItem[]>([])
-
-  const [loading, setLoading] =
-    useState(false)
 
   const [name, setName] =
     useState('')
@@ -65,26 +52,19 @@ export function InventoryPage() {
   const [quantity, setQuantity] =
     useState<string>('')
 
-  async function loadItems() {
-    try {
-      setLoading(true)
+  const {
+    data: items = [],
+    isLoading: loading,
+  } = useInventoryQuery()
 
-      const response =
-        await api.get('/inventory')
+  const createInventoryItemMutation =
+    useCreateInventoryItemMutation()
 
-      setItems(response.data)
-    } catch {
-      toast.error(
-        'Failed to load inventory',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
+  const updateInventoryItemMutation =
+    useUpdateInventoryItemMutation()
 
-  useEffect(() => {
-    loadItems()
-  }, [])
+  const deleteInventoryItemMutation =
+    useDeleteInventoryItemMutation()
 
   const filteredItems =
     items.filter((item) =>
@@ -96,22 +76,21 @@ export function InventoryPage() {
   async function createItem() {
     try {
       if (editingId) {
-        await api.patch(
-          `/inventory/${editingId}`,
-          {
+        await updateInventoryItemMutation.mutateAsync({
+          id: editingId,
+          payload: {
             name,
             code,
             quantity,
             category,
           },
-        )
+        })
 
         toast.success(
           'Item updated',
         )
       } else {
-        await api.post(
-          '/inventory',
+        await createInventoryItemMutation.mutateAsync(
           {
             name,
             code,
@@ -133,8 +112,6 @@ export function InventoryPage() {
       setEditingId(null)
 
       setOpenModal(false)
-
-      loadItems()
     } catch {
       toast.error(
         'Failed to save item',
@@ -153,15 +130,14 @@ export function InventoryPage() {
     if (!confirmed) return
 
     try {
-      await api.delete(
-        `/inventory/${id}`,
+      await deleteInventoryItemMutation.mutateAsync(
+        id,
       )
 
       toast.success(
         'Item deleted',
       )
 
-      loadItems()
     } catch {
       toast.error(
         'Failed to delete item',
@@ -169,7 +145,7 @@ export function InventoryPage() {
     }
   }
 
-  const columns: any[] = [
+  const columns = [
     {
       key: 'code',
       title: 'Code',
@@ -184,7 +160,10 @@ export function InventoryPage() {
       key: 'category',
       title: 'Category',
 
-      render: (_: any, row: any) =>
+      render: (
+        _: unknown,
+        row: InventoryItem,
+      ) =>
         row.category?.name,
     },
 
@@ -197,8 +176,8 @@ export function InventoryPage() {
       key: 'status',
       title: 'Status',
 
-      render: (value: string) => (
-        <StatusBadge status={value} />
+      render: (value: unknown) => (
+        <StatusBadge status={String(value)} />
       ),
     },
 
@@ -206,7 +185,10 @@ export function InventoryPage() {
       key: 'actions',
       title: '',
 
-      render: (_: any, row: any) => (
+      render: (
+        _: unknown,
+        row: InventoryItem,
+      ) => (
         <div className="flex items-center gap-4">
           <button
             onClick={() => {
