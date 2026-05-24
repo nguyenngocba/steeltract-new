@@ -54,14 +54,45 @@ export function YardMovementLayer({
 
         const start = center(from)
         const end = center(to)
+        const control = {
+          x: (start.x + end.x) / 2,
+          y:
+            (start.y + end.y) / 2 -
+            Math.min(
+              Math.abs(end.x - start.x),
+              80,
+            ) *
+              0.18,
+        }
+
+        for (const trail of [8, 5, 2]) {
+          graphics.setStrokeStyle({
+            color: 0x0e7490,
+            alpha: 0.08 * trail,
+            width: trail,
+          })
+          graphics.moveTo(start.x, start.y)
+          graphics.quadraticCurveTo(
+            control.x,
+            control.y,
+            end.x,
+            end.y,
+          )
+          graphics.stroke()
+        }
 
         graphics.setStrokeStyle({
           color: 0x38bdf8,
-          alpha: 0.46,
+          alpha: 0.58,
           width: 2,
         })
         graphics.moveTo(start.x, start.y)
-        graphics.lineTo(end.x, end.y)
+        graphics.quadraticCurveTo(
+          control.x,
+          control.y,
+          end.x,
+          end.y,
+        )
         graphics.stroke()
 
         graphics.setFillStyle({
@@ -70,6 +101,13 @@ export function YardMovementLayer({
         })
         graphics.circle(end.x, end.y, 4)
         graphics.fill()
+        graphics.setStrokeStyle({
+          color: 0x67e8f9,
+          alpha: 0.3,
+          width: 1,
+        })
+        graphics.circle(end.x, end.y, 10)
+        graphics.stroke()
       }
     },
     [movements, world.slots],

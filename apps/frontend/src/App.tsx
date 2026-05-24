@@ -228,6 +228,51 @@ const AnalyticsPage = lazy(() =>
     default: module.AnalyticsPage,
   })),
 )
+const WarehouseOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.WarehouseOperationsPage,
+  })),
+)
+const ProductionOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.ProductionOperationsPage,
+  })),
+)
+const QcOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.QcOperationsPage,
+  })),
+)
+const YardOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.YardOperationsPage,
+  })),
+)
+const ProjectOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.ProjectOperationsPage,
+  })),
+)
+const SupplierManagementPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.SupplierManagementPage,
+  })),
+)
+const ProcurementOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.ProcurementOperationsPage,
+  })),
+)
+const WorkflowOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.WorkflowOperationsPage,
+  })),
+)
+const AdministrationOperationsPage = lazy(() =>
+  import('./pages/operations').then((module) => ({
+    default: module.AdministrationOperationsPage,
+  })),
+)
 
 function RouteLoading() {
   return (
@@ -266,6 +311,12 @@ function App() {
                     path="/projects"
                     element={
                       <ProjectsPage />
+                    }
+                  />
+                  <Route
+                    path="/operations/projects"
+                    element={
+                      <ProjectOperationsPage />
                     }
                   />
 
@@ -314,6 +365,12 @@ function App() {
                     }
                   />
                   <Route
+                    path="/operations/procurement"
+                    element={
+                      <ProcurementOperationsPage />
+                    }
+                  />
+                  <Route
                     path="/procurement"
                     element={
                       <ProcurementPage />
@@ -354,9 +411,27 @@ function App() {
                     }
                   />
                   <Route
+                    path="/operations/workflow"
+                    element={
+                      <WorkflowOperationsPage />
+                    }
+                  />
+                  <Route
                     path="/inventory"
                     element={
                       <InventoryPage />
+                    }
+                  />
+                  <Route
+                    path="/operations/inventory"
+                    element={
+                      <InventoryPage />
+                    }
+                  />
+                  <Route
+                    path="/operations/warehouse"
+                    element={
+                      <WarehouseOperationsPage />
                     }
                   />
 
@@ -398,6 +473,18 @@ function App() {
                       <ComponentsPage />
                     }
                   />
+                  <Route
+                    path="/operations/production"
+                    element={
+                      <ProductionOperationsPage />
+                    }
+                  />
+                  <Route
+                    path="/operations/qc"
+                    element={
+                      <QcOperationsPage />
+                    }
+                  />
 
                   <Route
                     path="/components/:id"
@@ -416,11 +503,29 @@ function App() {
                     path="/yard-map"
                     element={<YardMapPage />}
                   />
+                  <Route
+                    path="/operations/yard"
+                    element={
+                      <YardOperationsPage />
+                    }
+                  />
 
                   <Route
                     path="/suppliers"
                     element={
                       <SuppliersPage />
+                    }
+                  />
+                  <Route
+                    path="/operations/suppliers"
+                    element={
+                      <SupplierManagementPage />
+                    }
+                  />
+                  <Route
+                    path="/operations/administration"
+                    element={
+                      <AdministrationOperationsPage />
                     }
                   />
 

@@ -35,10 +35,14 @@ function craneColor(status: Crane['status']) {
 
 export function CraneLayer({
   cranes = [],
+  visibleSlots,
 }: CraneLayerProps) {
   const draw = useCallback(
     (graphics: Graphics) => {
       graphics.clear()
+      const congestedSlots = visibleSlots
+        .filter((slot) => slot.occupancy >= 0.75)
+        .slice(0, 8)
 
       for (const crane of cranes) {
         graphics.setFillStyle({
@@ -63,9 +67,47 @@ export function CraneLayer({
           14,
         )
         graphics.stroke()
+
+        if (
+          crane.status === 'ASSIGNED' &&
+          congestedSlots.length > 0
+        ) {
+          const nearest =
+            congestedSlots.reduce(
+              (closest, slot) => {
+                const distance =
+                  Math.abs(slot.x - crane.currentX) +
+                  Math.abs(slot.y - crane.currentY)
+
+                return distance <
+                  closest.distance
+                  ? { slot, distance }
+                  : closest
+              },
+              {
+                slot: congestedSlots[0],
+                distance: Number.POSITIVE_INFINITY,
+              },
+            ).slot
+
+          graphics.setStrokeStyle({
+            color: 0x22d3ee,
+            alpha: 0.28,
+            width: 1,
+          })
+          graphics.moveTo(
+            crane.currentX,
+            crane.currentY,
+          )
+          graphics.lineTo(
+            nearest.x + nearest.width / 2,
+            nearest.y + nearest.height / 2,
+          )
+          graphics.stroke()
+        }
       }
     },
-    [cranes],
+    [cranes, visibleSlots],
   )
 
   return <pixiGraphics draw={draw} />

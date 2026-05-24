@@ -51,6 +51,21 @@ export function YardHeatmapLayer({
           slot.height + 4,
         )
         graphics.fill()
+
+        if (slot.occupancy >= 0.75) {
+          graphics.setStrokeStyle({
+            color: 0xf97316,
+            width: 1.5,
+            alpha: 0.65,
+          })
+          graphics.rect(
+            slot.x - 4,
+            slot.y - 4,
+            slot.width + 8,
+            slot.height + 8,
+          )
+          graphics.stroke()
+        }
       }
     },
     [visibleSlots],

@@ -34,13 +34,16 @@ export function DynamicSidebar({
     useState<Set<string>>(() => new Set())
 
   return (
-    <nav className="space-y-4">
+    <nav className="space-y-3">
       {groups.map((group) => {
         const collapsed =
           collapsedGroups.has(group.id)
 
         return (
-          <section key={group.id}>
+          <section
+            key={group.id}
+            className="rounded-xl border border-zinc-800/80 bg-zinc-950/55 p-2"
+          >
             <button
               type="button"
               onClick={() => {
@@ -56,15 +59,23 @@ export function DynamicSidebar({
                   return next
                 })
               }}
-              className="flex w-full items-center justify-between px-2 py-1 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+              className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 hover:bg-zinc-900/70 hover:text-zinc-300"
             >
-              {group.label}
-              <ChevronDown
-                className={clsx(
-                  'h-3.5 w-3.5 transition-transform',
-                  collapsed && '-rotate-90',
-                )}
-              />
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.75)]" />
+                <span className="truncate">{group.label}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                  {group.items.length}
+                </span>
+                <ChevronDown
+                  className={clsx(
+                    'h-3.5 w-3.5 transition-transform',
+                    collapsed && '-rotate-90',
+                  )}
+                />
+              </span>
             </button>
 
             {!collapsed ? (
@@ -89,17 +100,28 @@ export function DynamicSidebar({
                           onNavigate(item)
                         }
                         className={clsx(
-                          'flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 pr-9 text-sm transition-colors',
+                          'flex min-h-10 items-center gap-3 rounded-lg border px-3 py-2 pr-9 text-sm transition-colors',
                           active
-                            ? 'bg-cyan-500 text-white'
-                            : 'text-zinc-300 hover:bg-zinc-900 hover:text-white',
+                            ? 'border-cyan-500/50 bg-cyan-500/15 text-white shadow-[0_0_24px_rgba(34,211,238,0.12)]'
+                            : 'border-transparent text-zinc-300 hover:border-zinc-800 hover:bg-zinc-900 hover:text-white',
                         )}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
+                        <span
+                          className={clsx(
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border',
+                            active
+                              ? 'border-cyan-400/40 bg-cyan-400/15 text-cyan-200'
+                              : 'border-zinc-800 bg-zinc-950 text-zinc-400',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
                         <span className="min-w-0 flex-1 truncate">
                           {item.label}
                         </span>
-                        {item.badge}
+                        {item.badge ?? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
+                        )}
                       </Link>
 
                       <button

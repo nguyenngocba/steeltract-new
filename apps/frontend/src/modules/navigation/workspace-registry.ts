@@ -16,7 +16,7 @@ export const workspaceRegistry: WorkspaceDefinition[] =
       label: 'Production',
       description:
         'Fabrication execution, work planning, and labor coordination.',
-      defaultPath: '/components',
+      defaultPath: '/operations/production',
       permissions: [
         'components.read',
         'tasks.read',
@@ -28,7 +28,7 @@ export const workspaceRegistry: WorkspaceDefinition[] =
       label: 'Warehouse',
       description:
         'Inventory, material movements, zones, and yard operations.',
-      defaultPath: '/inventory',
+      defaultPath: '/operations/inventory',
       permissions: [
         'inventory.read',
         'yard.read',
@@ -39,7 +39,7 @@ export const workspaceRegistry: WorkspaceDefinition[] =
       label: 'Quality',
       description:
         'Inspections, NCR, safety, and evidence workflows.',
-      defaultPath: '/safety',
+      defaultPath: '/operations/qc',
       permissions: [
         'qc.read',
         'workflow.read',
@@ -50,6 +50,6 @@ export const workspaceRegistry: WorkspaceDefinition[] =
       label: 'Logistics',
       description:
         'Vehicles, suppliers, procurement, and material requests.',
-      defaultPath: '/vehicles',
+      defaultPath: '/operations/yard',
     },
   ]

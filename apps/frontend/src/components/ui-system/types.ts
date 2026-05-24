@@ -28,5 +28,7 @@ export interface DataTableColumn<T> {
   header: ReactNode
   width?: string
   align?: 'left' | 'center' | 'right'
+  visible?: boolean
+  pinned?: 'left' | 'right'
   render: (row: T) => ReactNode
 }

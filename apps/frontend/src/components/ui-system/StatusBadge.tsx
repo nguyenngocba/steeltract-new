@@ -1,11 +1,14 @@
 import clsx from 'clsx'
+import type {
+  ReactNode,
+} from 'react'
 
 import type {
   Tone,
 } from './types'
 
 interface StatusBadgeProps {
-  children: string
+  children: ReactNode
   tone?: Tone
 }
 
@@ -21,6 +24,12 @@ export function StatusBadge({
   children,
   tone = 'neutral',
 }: StatusBadgeProps) {
+  const content =
+    typeof children === 'string' ||
+    typeof children === 'number'
+      ? String(children).replaceAll('_', ' ')
+      : children
+
   return (
     <span
       className={clsx(
@@ -28,7 +37,7 @@ export function StatusBadge({
         toneClassName[tone],
       )}
     >
-      {children.replaceAll('_', ' ')}
+      {content}
     </span>
   )
 }

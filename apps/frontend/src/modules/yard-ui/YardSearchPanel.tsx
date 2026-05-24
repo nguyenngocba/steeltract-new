@@ -41,6 +41,30 @@ export function YardSearchPanel({
         loading={loading}
         rowKey={(row) => row.id}
         empty="No matching yard items"
+        density="compact"
+        selectable
+        savedViewName="Yard slot search"
+        statusTone={(row) =>
+          row.removedAt ? 'neutral' : 'success'
+        }
+        rowActions={(row) => (
+          <button className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300">
+            {row.removedAt ? 'Trace' : 'Locate'}
+          </button>
+        )}
+        contextMenu={(row) => (
+          <div className="grid gap-1 text-left text-xs text-zinc-300">
+            <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+              Highlight slot
+            </button>
+            <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+              Movement history
+            </button>
+            <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+              Trace {row.itemCode}
+            </button>
+          </div>
+        )}
         columns={[
           {
             key: 'item',

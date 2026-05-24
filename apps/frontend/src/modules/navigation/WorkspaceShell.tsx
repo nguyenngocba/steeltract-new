@@ -200,13 +200,27 @@ export function WorkspaceShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="border-b border-zinc-800 px-4 py-4">
-        <h1 className="text-xl font-bold text-cyan-400">
-          SteelTrack
-        </h1>
-        <p className="mt-1 text-xs text-zinc-500">
-          Enterprise ERP workspace
-        </p>
+      <div className="relative overflow-hidden border-b border-zinc-800 px-4 py-4">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(8,145,178,0.12),transparent_55%)]" />
+        <div className="relative">
+          <h1 className="text-xl font-bold text-cyan-300">
+            SteelTrack
+          </h1>
+          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">
+            smart factory workspace
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-wide text-zinc-500">
+            <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300">
+              live
+            </span>
+            <span className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-cyan-300">
+              MES
+            </span>
+            <span className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1">
+              ERP
+            </span>
+          </div>
+        </div>
         <div className="mt-4">
           <WorkspaceSwitcher
             workspaces={workspaces}

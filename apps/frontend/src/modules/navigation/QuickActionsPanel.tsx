@@ -10,6 +10,10 @@ import {
 import type {
   NavigationItem,
 } from './navigation.types'
+import {
+  OperatorActionMenu,
+  useOperatorActions,
+} from '../operator-actions'
 
 interface QuickActionsPanelProps {
   items: NavigationItem[]
@@ -22,6 +26,17 @@ export function QuickActionsPanel({
   onOpenCommandPalette,
   onNavigate,
 }: QuickActionsPanelProps) {
+  const operatorActions = useOperatorActions({
+    domains: [
+      'production',
+      'qc',
+      'yard',
+      'inventory',
+      'workflow',
+      'procurement',
+    ],
+  })
+
   return (
     <section className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
       <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -50,6 +65,13 @@ export function QuickActionsPanel({
             {item.label}
           </Link>
         ))}
+
+        <div className="mt-1 border-t border-zinc-800 pt-2">
+          <OperatorActionMenu
+            compact
+            actions={operatorActions.slice(0, 6)}
+          />
+        </div>
       </div>
     </section>
   )

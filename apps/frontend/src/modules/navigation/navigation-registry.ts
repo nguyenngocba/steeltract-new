@@ -7,15 +7,23 @@ import {
   Brain,
   CalendarDays,
   ClipboardList,
+  ClipboardCheck,
+  Cpu,
   FileBarChart,
   FileSearch,
   FolderKanban,
+  Factory,
+  GitBranch,
   HardHat,
   LayoutDashboard,
   Map,
   NotebookPen,
+  PackageCheck,
+  Paperclip,
+  PlayCircle,
   QrCode,
   ScanText,
+  Settings,
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
@@ -32,7 +40,7 @@ export const navigationRegistry: NavigationItem[] =
   [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Command Center',
       path: '/',
       group: 'Overview',
       workspaceIds: [
@@ -45,6 +53,50 @@ export const navigationRegistry: NavigationItem[] =
       icon: LayoutDashboard,
       description:
         'Realtime ERP command overview',
+    },
+    {
+      id: 'operations-production',
+      label: 'Production Operations',
+      path: '/operations/production',
+      group: 'FABRICATION OPS',
+      workspaceIds: ['management', 'production'],
+      icon: Factory,
+      permissions: ['production.read'],
+      description:
+        'Fabrication lanes, stages, machines, and throughput',
+    },
+    {
+      id: 'operations-qc',
+      label: 'QC Operations',
+      path: '/operations/qc',
+      group: 'QUALITY CONTROL',
+      workspaceIds: ['management', 'qc', 'production'],
+      icon: ClipboardCheck,
+      permissions: ['qc.read'],
+      description:
+        'Inspections, NCR, defects, and rework control',
+    },
+    {
+      id: 'operations-yard',
+      label: 'Yard Operations',
+      path: '/operations/yard',
+      group: 'WAREHOUSE OPS',
+      workspaceIds: ['warehouse', 'logistics', 'production'],
+      icon: Map,
+      permissions: ['yard.read'],
+      description:
+        'Visual logistics, crane state, snapshots, and movements',
+    },
+    {
+      id: 'operations-warehouse',
+      label: 'Warehouse Operations',
+      path: '/operations/warehouse',
+      group: 'WAREHOUSE OPS',
+      workspaceIds: ['warehouse', 'logistics'],
+      icon: Warehouse,
+      permissions: ['inventory.read'],
+      description:
+        'Receiving, stock readiness, staging, and yard handoff',
     },
     {
       id: 'executive',
@@ -60,7 +112,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'projects',
       label: 'Projects',
       path: '/projects',
-      group: 'Projects',
+      group: 'PROJECT OPS',
       workspaceIds: [
         'management',
         'production',
@@ -71,10 +123,21 @@ export const navigationRegistry: NavigationItem[] =
         'Project portfolio and progress',
     },
     {
+      id: 'operations-projects',
+      label: 'Project Operations',
+      path: '/operations/projects',
+      group: 'PROJECT OPS',
+      workspaceIds: ['management', 'production'],
+      icon: FolderKanban,
+      permissions: ['projects.read'],
+      description:
+        'Delivery control, components, and execution pressure',
+    },
+    {
       id: 'schedule',
       label: 'Schedule',
       path: '/schedule',
-      group: 'Planning',
+      group: 'FABRICATION OPS',
       workspaceIds: [
         'management',
         'production',
@@ -87,7 +150,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'tasks',
       label: 'Tasks',
       path: '/tasks',
-      group: 'Execution',
+      group: 'PROJECT OPS',
       workspaceIds: [
         'management',
         'production',
@@ -102,7 +165,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'components',
       label: 'Components',
       path: '/components',
-      group: 'Execution',
+      group: 'FABRICATION OPS',
       workspaceIds: [
         'production',
         'qc',
@@ -116,17 +179,50 @@ export const navigationRegistry: NavigationItem[] =
       id: 'workers',
       label: 'Workers',
       path: '/workers',
-      group: 'Resources',
+      group: 'FABRICATION OPS',
       workspaceIds: ['production'],
       icon: Users,
       description:
         'Worker records and team allocation',
     },
     {
+      id: 'work-centers',
+      label: 'Work Centers',
+      path: '/operations/production',
+      group: 'FABRICATION OPS',
+      workspaceIds: ['production'],
+      icon: Factory,
+      permissions: ['production.read'],
+      description:
+        'Work-center load and routing telemetry',
+    },
+    {
+      id: 'machines',
+      label: 'Machines',
+      path: '/operations/production',
+      group: 'FABRICATION OPS',
+      workspaceIds: ['production'],
+      icon: Cpu,
+      permissions: ['production.read'],
+      description:
+        'Machine utilization and downtime visibility',
+    },
+    {
+      id: 'operators',
+      label: 'Operators',
+      path: '/operations/production',
+      group: 'FABRICATION OPS',
+      workspaceIds: ['production'],
+      icon: Users,
+      permissions: ['production.read'],
+      description:
+        'Operator workload and assignment control',
+    },
+    {
       id: 'attendance',
       label: 'Attendance',
       path: '/attendance',
-      group: 'Resources',
+      group: 'FABRICATION OPS',
       workspaceIds: [
         'management',
         'production',
@@ -139,7 +235,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'equipment',
       label: 'Equipment',
       path: '/equipment',
-      group: 'Resources',
+      group: 'FABRICATION OPS',
       workspaceIds: ['production'],
       icon: HardHat,
       description:
@@ -147,9 +243,9 @@ export const navigationRegistry: NavigationItem[] =
     },
     {
       id: 'inventory',
-      label: 'Inventory',
-      path: '/inventory',
-      group: 'Warehouse',
+      label: 'Inventory Operations',
+      path: '/operations/inventory',
+      group: 'WAREHOUSE OPS',
       workspaceIds: ['warehouse'],
       icon: Boxes,
       permissions: ['inventory.read'],
@@ -160,17 +256,50 @@ export const navigationRegistry: NavigationItem[] =
       id: 'transactions',
       label: 'Transactions',
       path: '/transactions',
-      group: 'Warehouse',
+      group: 'WAREHOUSE OPS',
       workspaceIds: ['warehouse'],
       icon: ArrowLeftRight,
       description:
         'Inventory movements and adjustments',
     },
     {
+      id: 'receiving',
+      label: 'Receiving',
+      path: '/operations/warehouse',
+      group: 'WAREHOUSE OPS',
+      workspaceIds: ['warehouse'],
+      icon: PackageCheck,
+      permissions: ['inventory.read'],
+      description:
+        'Inbound receiving queue and material intake',
+    },
+    {
+      id: 'dispatch',
+      label: 'Dispatch',
+      path: '/operations/warehouse',
+      group: 'WAREHOUSE OPS',
+      workspaceIds: ['warehouse', 'logistics'],
+      icon: Truck,
+      permissions: ['inventory.read'],
+      description:
+        'Outbound dispatch and yard handoff',
+    },
+    {
+      id: 'reservations',
+      label: 'Reservations',
+      path: '/operations/inventory',
+      group: 'WAREHOUSE OPS',
+      workspaceIds: ['warehouse', 'production'],
+      icon: ClipboardList,
+      permissions: ['inventory.read'],
+      description:
+        'Reservation and allocation workflow',
+    },
+    {
       id: 'zones',
       label: 'Zones',
       path: '/zones',
-      group: 'Warehouse',
+      group: 'WAREHOUSE OPS',
       workspaceIds: ['warehouse'],
       icon: Warehouse,
       description:
@@ -178,9 +307,9 @@ export const navigationRegistry: NavigationItem[] =
     },
     {
       id: 'yard-map',
-      label: 'Yard Map',
+      label: 'Yard Map Legacy',
       path: '/yard-map',
-      group: 'Warehouse',
+      group: 'WAREHOUSE OPS',
       workspaceIds: [
         'warehouse',
         'logistics',
@@ -194,7 +323,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'qr-scan',
       label: 'QR Scan',
       path: '/qr-scan',
-      group: 'Warehouse',
+      group: 'WAREHOUSE OPS',
       workspaceIds: [
         'warehouse',
         'production',
@@ -207,7 +336,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'safety',
       label: 'Safety',
       path: '/safety',
-      group: 'Quality',
+      group: 'QUALITY CONTROL',
       workspaceIds: ['qc'],
       icon: ShieldCheck,
       description:
@@ -217,7 +346,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'approvals',
       label: 'Approvals',
       path: '/approvals',
-      group: 'Quality',
+      group: 'QUALITY CONTROL',
       workspaceIds: [
         'management',
         'qc',
@@ -228,10 +357,54 @@ export const navigationRegistry: NavigationItem[] =
         'Pending workflow approvals',
     },
     {
+      id: 'inspections',
+      label: 'Inspections',
+      path: '/operations/qc',
+      group: 'QUALITY CONTROL',
+      workspaceIds: ['qc', 'production'],
+      icon: ClipboardCheck,
+      permissions: ['qc.read'],
+      description:
+        'Inspection queue and review board',
+    },
+    {
+      id: 'ncr',
+      label: 'NCR',
+      path: '/operations/qc',
+      group: 'QUALITY CONTROL',
+      workspaceIds: ['qc'],
+      icon: ShieldAlert,
+      permissions: ['qc.read'],
+      description:
+        'Non-conformance escalation lane',
+    },
+    {
+      id: 'rework',
+      label: 'Rework',
+      path: '/operations/qc',
+      group: 'QUALITY CONTROL',
+      workspaceIds: ['qc', 'production'],
+      icon: AlertTriangle,
+      permissions: ['qc.read'],
+      description:
+        'Rework visibility and corrective action pressure',
+    },
+    {
+      id: 'workflow-operations',
+      label: 'Workflow Operations',
+      path: '/operations/workflow',
+      group: 'PROJECT OPS',
+      workspaceIds: ['management', 'qc', 'production'],
+      icon: GitBranch,
+      permissions: ['workflow.read'],
+      description:
+        'Reusable approvals, SLA, escalation, and audit',
+    },
+    {
       id: 'ocr',
       label: 'OCR',
       path: '/ocr',
-      group: 'Quality',
+      group: 'QUALITY CONTROL',
       workspaceIds: ['qc'],
       icon: ScanText,
       permissions: ['attachments.read'],
@@ -242,7 +415,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'anomalies',
       label: 'AI Alerts',
       path: '/anomalies',
-      group: 'Quality',
+      group: 'QUALITY CONTROL',
       workspaceIds: [
         'management',
         'qc',
@@ -255,7 +428,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'boq',
       label: 'BOQ AI',
       path: '/boq',
-      group: 'Quality',
+      group: 'QUALITY CONTROL',
       workspaceIds: [
         'management',
         'qc',
@@ -268,7 +441,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'vehicles',
       label: 'Vehicles',
       path: '/vehicles',
-      group: 'Fleet',
+      group: 'SUPPLY CHAIN',
       workspaceIds: ['logistics'],
       icon: Truck,
       description:
@@ -276,32 +449,32 @@ export const navigationRegistry: NavigationItem[] =
     },
     {
       id: 'suppliers',
-      label: 'Suppliers',
-      path: '/suppliers',
-      group: 'Supply',
+      label: 'Supplier Management',
+      path: '/operations/suppliers',
+      group: 'SUPPLY CHAIN',
       workspaceIds: ['logistics'],
       icon: Truck,
       description:
-        'Supplier master records',
+        'Supplier scorecards and supply performance',
     },
     {
       id: 'procurement',
-      label: 'Procurement',
-      path: '/procurement',
-      group: 'Supply',
+      label: 'Procurement Operations',
+      path: '/operations/procurement',
+      group: 'SUPPLY CHAIN',
       workspaceIds: [
         'management',
         'logistics',
       ],
       icon: ShoppingCart,
       description:
-        'Procurement planning',
+        'POs, material requests, and supply readiness',
     },
     {
       id: 'purchase-orders',
       label: 'Purchase Orders',
       path: '/purchase-orders',
-      group: 'Supply',
+      group: 'SUPPLY CHAIN',
       workspaceIds: ['logistics'],
       icon: ShoppingCart,
       description:
@@ -311,7 +484,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'material-requests',
       label: 'Material Requests',
       path: '/material-requests',
-      group: 'Supply',
+      group: 'SUPPLY CHAIN',
       workspaceIds: [
         'production',
         'logistics',
@@ -324,7 +497,7 @@ export const navigationRegistry: NavigationItem[] =
       id: 'site-logs',
       label: 'Site Logs',
       path: '/site-logs',
-      group: 'Operations',
+      group: 'PROJECT OPS',
       workspaceIds: [
         'management',
         'production',
@@ -335,13 +508,55 @@ export const navigationRegistry: NavigationItem[] =
     },
     {
       id: 'analytics',
-      label: 'AI Analytics',
+      label: 'Analytics',
       path: '/analytics',
       group: 'Intelligence',
       workspaceIds: ['management'],
       icon: Brain,
       description:
         'Analytics and intelligence layer',
+    },
+    {
+      id: 'jobs',
+      label: 'Jobs',
+      path: '/operations/administration',
+      group: 'Administration',
+      workspaceIds: ['management'],
+      icon: Cpu,
+      permissions: ['jobs.read'],
+      description:
+        'Background job status and retry visibility',
+    },
+    {
+      id: 'attachments',
+      label: 'Attachments',
+      path: '/operations/administration',
+      group: 'Administration',
+      workspaceIds: ['management', 'qc', 'production'],
+      icon: Paperclip,
+      permissions: ['attachments.read'],
+      description:
+        'Document, drawing, evidence, and file registry',
+    },
+    {
+      id: 'simulation',
+      label: 'Simulation',
+      path: '/operations/administration',
+      group: 'Administration',
+      workspaceIds: ['management', 'production', 'warehouse', 'qc', 'logistics'],
+      icon: PlayCircle,
+      description:
+        'Factory demo scenarios and realtime ecosystem driver',
+    },
+    {
+      id: 'administration',
+      label: 'Administration',
+      path: '/operations/administration',
+      group: 'Administration',
+      workspaceIds: ['management'],
+      icon: Settings,
+      description:
+        'Platform controls, jobs, attachments, and simulation',
     },
     {
       id: 'reports',

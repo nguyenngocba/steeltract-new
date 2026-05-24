@@ -1,4 +1,10 @@
 import {
+  GitBranch,
+  QrCode,
+  Route,
+  ShieldCheck,
+} from 'lucide-react'
+import {
   useState,
 } from 'react'
 
@@ -18,18 +24,36 @@ import type {
 } from '../../services/api/types'
 
 import {
-  Card,
   Modal,
   Input,
   Select,
-  Table,
   ComponentStatusBadge,
 } from '../../components/ui'
+import {
+  DataTable,
+  PageLayout,
+  SectionCard,
+  StatCard,
+  StatusBadge,
+  Timeline,
+} from '../../components/ui-system'
+import {
+  ContextualOperationDrawer,
+} from '../../modules/operator-actions'
+import {
+  OperationalWorkspaceHero,
+} from '../operations/operations-utils'
 
 export function ComponentsPage() {
   const [openModal,
     setOpenModal] =
     useState(false)
+  const [drawerOpen,
+    setDrawerOpen] =
+    useState(false)
+  const [selectedComponent,
+    setSelectedComponent] =
+    useState<ComponentItem | null>(null)
 
   const [code, setCode] =
     useState('')
@@ -132,103 +156,248 @@ export function ComponentsPage() {
     }
   }
 
-  const columns = [
-    {
-      key: 'code',
-      title: 'Code',
-    },
-
-    {
-      key: 'name',
-      title: 'Name',
-    },
-
-    {
-      key: 'project',
-      title: 'Project',
-
-      render: (
-        _: unknown,
-        row: ComponentItem,
-      ) =>
-        row.project?.name,
-    },
-
-    {
-      key: 'floor',
-      title: 'Floor',
-    },
-
-    {
-      key: 'zone',
-      title: 'Zone',
-    },
-
-    {
-      key: 'position',
-      title: 'Position',
-    },
-
-    {
-      key: 'qr',
-      title: 'QR',
-
-      render: (
-        _: unknown,
-        row: ComponentItem,
-      ) => (
-        <div className="bg-white p-2 rounded-lg w-fit">
-          <QRCode
-            size={60}
-            value={
-              window.location.origin +
-              '/components/' +
-              row.id
-            }
-          />
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      title: 'Status',
-
-      render: (value: unknown) => (
-        <ComponentStatusBadge
-          status={String(value)}
-        />
-      ),
-    },
-  ]
+  const stockComponents = components.filter(
+    (component) => component.status === 'STOCK',
+  )
+  const installedComponents = components.filter(
+    (component) => component.status === 'INSTALLED',
+  )
+  const deliveredComponents = components.filter(
+    (component) => component.status === 'DELIVERED',
+  )
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">
-          Components
-        </h1>
-
+    <PageLayout
+      title="Component Traceability"
+      description="QR identity, project linkage, fabrication stage visibility and genealogy foundation for steel components."
+      actions={
         <button
+          type="button"
           onClick={() =>
             setOpenModal(true)
           }
-          className="
-            bg-cyan-500
-            hover:bg-cyan-600
-            px-4 py-2
-            rounded-xl
-          "
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-600"
         >
+          <QrCode className="h-4 w-4" />
           Add Component
         </button>
+      }
+    >
+      <OperationalWorkspaceHero
+        eyebrow="fabrication ops / traceability"
+        title="Components Traceability Center"
+        description="QR identity, project linkage, fabrication state, QC evidence readiness and genealogy visibility for steel components."
+        metrics={[
+          {
+            label: 'Components',
+            value: components.length,
+            tone: 'info',
+          },
+          {
+            label: 'Stock',
+            value: stockComponents.length,
+            tone: 'info',
+          },
+          {
+            label: 'Delivered',
+            value: deliveredComponents.length,
+            tone: 'warning',
+          },
+          {
+            label: 'Installed',
+            value: installedComponents.length,
+            tone: 'success',
+          },
+        ]}
+        actions={
+          <>
+            <StatusBadge tone="info">
+              QR identity
+            </StatusBadge>
+            <StatusBadge tone="success">
+              production linkage
+            </StatusBadge>
+            <StatusBadge tone="neutral">
+              QC evidence
+            </StatusBadge>
+          </>
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Components"
+          value={components.length}
+          icon={<GitBranch className="h-5 w-5" />}
+        />
+        <StatCard
+          label="In stock"
+          value={stockComponents.length}
+          icon={<Route className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Delivered"
+          value={deliveredComponents.length}
+          icon={<QrCode className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Installed"
+          value={installedComponents.length}
+          icon={<ShieldCheck className="h-5 w-5" />}
+        />
       </div>
 
-      <Card>
-        <Table
-          columns={columns}
-          data={components}
-        />
-      </Card>
+      <SectionCard
+        title="Fabrication stage strip"
+        description="Component status by fabrication, logistics and installation traceability stages."
+      >
+        <div className="grid gap-3 md:grid-cols-4">
+          {[
+            ['Stock', stockComponents.length, 'info'],
+            ['Fabrication link', components.filter((item) => item.projectId).length, 'success'],
+            ['Delivered', deliveredComponents.length, 'warning'],
+            ['Installed', installedComponents.length, 'success'],
+          ].map(([label, value, tone]) => (
+            <div
+              key={label}
+              className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">
+                  {label}
+                </span>
+                <StatusBadge
+                  tone={tone as 'info' | 'success' | 'warning'}
+                >
+                  {value}
+                </StatusBadge>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-900">
+                <div
+                  className="h-full rounded-full bg-cyan-300"
+                  style={{
+                    width: `${Math.min(Number(value) * 10, 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <SectionCard
+          title="Component identity table"
+          description="QR identity, project link, yard position and traceability status."
+        >
+          <DataTable
+            data={components}
+            rowKey={(row) => row.id}
+            empty="No components"
+            density="compact"
+            selectable
+            savedViewName="Traceability control"
+            statusTone={(row) =>
+              row.status === 'INSTALLED'
+                ? 'success'
+                : row.status === 'DELIVERED'
+                  ? 'warning'
+                  : 'info'
+            }
+            rowActions={(row) => (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedComponent(row)
+                  setDrawerOpen(true)
+                }}
+                className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-cyan-500/40 hover:text-white"
+              >
+                Trace
+              </button>
+            )}
+            contextMenu={() => (
+              <div className="grid gap-1 text-left text-xs text-zinc-300">
+                <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+                  Open QR identity
+                </button>
+                <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+                  Production linkage
+                </button>
+                <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+                  QC evidence
+                </button>
+                <button className="rounded px-2 py-1 text-left hover:bg-zinc-900">
+                  Yard movement history
+                </button>
+              </div>
+            )}
+            columns={[
+              {
+                key: 'component',
+                header: 'Component',
+                pinned: 'left',
+                render: (row) => (
+                  <div>
+                    <p className="font-medium text-white">{row.code}</p>
+                    <p className="text-xs text-zinc-500">{row.name}</p>
+                  </div>
+                ),
+              },
+              {
+                key: 'project',
+                header: 'Project',
+                render: (row) => row.project?.name ?? '-',
+              },
+              {
+                key: 'location',
+                header: 'Location',
+                render: (row) =>
+                  [row.floor, row.zone, row.position]
+                    .filter(Boolean)
+                    .join(' / ') || '-',
+              },
+              {
+                key: 'qr',
+                header: 'QR',
+                render: (row) => (
+                  <div className="w-fit rounded bg-white p-1">
+                    <QRCode
+                      size={42}
+                      value={`${window.location.origin}/components/${row.id}`}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (row) => (
+                  <ComponentStatusBadge status={row.status} />
+                ),
+              },
+            ]}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="Genealogy foundation"
+          description="Production/QC/yard links are prepared for component-level traceability."
+        >
+          <Timeline
+            items={(selectedComponent ? [selectedComponent] : components.slice(0, 4)).map((component) => ({
+              id: component.id,
+              title: component.code,
+              description: `${component.project?.name ?? 'No project'} / ${component.status}`,
+              tone:
+                component.status === 'INSTALLED'
+                  ? 'success'
+                  : component.status === 'DELIVERED'
+                    ? 'warning'
+                    : 'info',
+            }))}
+          />
+        </SectionCard>
+      </div>
 
       <Modal
         open={openModal}
@@ -362,6 +531,21 @@ export function ComponentsPage() {
           </button>
         </div>
       </Modal>
-    </div>
+      <ContextualOperationDrawer
+        open={drawerOpen}
+        title={
+          selectedComponent
+            ? `Component ${selectedComponent.code}`
+            : 'Component traceability'
+        }
+        subtitle={
+          selectedComponent
+            ? `${selectedComponent.name} / ${selectedComponent.status}`
+            : 'Select a component to inspect traceability context.'
+        }
+        domains={['production', 'qc', 'yard']}
+        onClose={() => setDrawerOpen(false)}
+      />
+    </PageLayout>
   )
 }

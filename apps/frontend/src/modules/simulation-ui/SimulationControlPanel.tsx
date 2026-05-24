@@ -136,6 +136,28 @@ export function SimulationControlPanel() {
           </button>
         </div>
 
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="uppercase tracking-wide text-zinc-500">
+              simulation speed visualizer
+            </span>
+            <StatusBadge tone={status?.running ? 'success' : 'neutral'}>
+              {speed}x
+            </StatusBadge>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
+            <div
+              className="h-full rounded-full bg-cyan-300 transition-all duration-500"
+              style={{
+                width: `${Math.min((speed / 20) * 100, 100)}%`,
+              }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            Replay and realtime domain events remain driven by the simulation service.
+          </p>
+        </div>
+
         <ScenarioRunner
           scenarios={scenarios}
           selectedScenario={scenario}
