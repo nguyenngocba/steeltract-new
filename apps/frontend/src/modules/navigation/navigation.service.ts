@@ -13,10 +13,19 @@ import type {
 export function isAdmin(user?: AuthUser | null) {
   return Boolean(
     user?.roles?.some(
-      (role) =>
-        role.toLowerCase() === 'admin' ||
-        role.toLowerCase() ===
-          'administrator',
+      (role) => {
+        const normalized = role
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+
+        return (
+          normalized === 'admin' ||
+          normalized === 'administrator' ||
+          normalized.includes('quan tri') ||
+          normalized.includes('system admin')
+        )
+      },
     ),
   )
 }
@@ -68,6 +77,65 @@ export function getVisibleNavigationItems(
 export function groupNavigationItems(
   items: NavigationItem[],
 ): ResolvedNavigationGroup[] {
+  const groupOrder = [
+    'COMMAND CENTER',
+    'MODULES',
+    'MASTER DATA',
+    'INTELLIGENCE',
+    'SYSTEM',
+  ]
+  const itemOrder = [
+    'dashboard',
+    'executive',
+    'inventory',
+    'operations-warehouse',
+    'master-data-center',
+    'master-data-uom',
+    'receiving',
+    'dispatch',
+    'return-workflow',
+    'reservations',
+    'operations-yard',
+    'yard-map',
+    'components',
+    'operations-production',
+    'schedule',
+    'projects',
+    'operations-projects',
+    'suppliers',
+    'operations-qc',
+    'vehicles',
+    'transactions',
+    'qr-scan',
+    'work-centers',
+    'machines',
+    'workers',
+    'operators',
+    'attendance',
+    'equipment',
+    'inspections',
+    'ncr',
+    'rework',
+    'procurement',
+    'purchase-orders',
+    'material-requests',
+    'workflow-operations',
+    'site-logs',
+    'analytics',
+    'alerts',
+    'reports',
+    'anomalies',
+    'boq',
+    'ocr',
+    'users',
+    'roles',
+    'system-logs',
+    'administration',
+    'backup',
+    'jobs',
+    'attachments',
+    'simulation',
+  ]
   const groups = new Map<
     string,
     NavigationItem[]
@@ -80,15 +148,49 @@ export function groupNavigationItems(
     ])
   })
 
-  return [...groups.entries()].map(
-    ([label, groupItems]) => ({
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      const aIndex = groupOrder.indexOf(a)
+      const bIndex = groupOrder.indexOf(b)
+
+      if (aIndex === -1 && bIndex === -1) {
+        return a.localeCompare(b)
+      }
+
+      if (aIndex === -1) {
+        return 1
+      }
+
+      if (bIndex === -1) {
+        return -1
+      }
+
+      return aIndex - bIndex
+    })
+    .map(([label, groupItems]) => ({
       id: label
         .toLowerCase()
         .replaceAll(' ', '-'),
       label,
-      items: groupItems,
-    }),
-  )
+      items: [...groupItems].sort((a, b) => {
+        const aIndex = itemOrder.indexOf(a.id)
+        const bIndex = itemOrder.indexOf(b.id)
+
+        if (aIndex === -1 && bIndex === -1) {
+          return a.label.localeCompare(b.label)
+        }
+
+        if (aIndex === -1) {
+          return 1
+        }
+
+        if (bIndex === -1) {
+          return -1
+        }
+
+        return aIndex - bIndex
+      }),
+    }))
 }
 
 export function resolveWorkspaceFromPath(

@@ -19,6 +19,16 @@ export interface InventoryItem {
   name: string
   code: string
   quantity: number
+  unit?: string
+  unitId?: string
+  unitMaster?: {
+    id: string
+    code: string
+    name: string
+    symbol: string
+    category: string
+  } | null
+  minimumStock?: number
   status?: string
   category?: {
     name: string

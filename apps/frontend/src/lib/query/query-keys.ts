@@ -50,6 +50,33 @@ export const queryKeys = {
         ...queryKeys.inventory.lists(),
         filters ?? {},
       ] as const,
+    transactions: () =>
+      [...queryKeys.inventory.all, 'transactions'] as const,
+    returns: () =>
+      [...queryKeys.inventory.all, 'returns'] as const,
+  },
+
+  masterData: {
+    all: ['master-data'] as const,
+    uom: () =>
+      [...queryKeys.masterData.all, 'uom'] as const,
+    uomList: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.masterData.uom(),
+        'list',
+        filters ?? {},
+      ] as const,
+    dictionary: (domain: string) =>
+      [...queryKeys.masterData.all, domain] as const,
+    dictionaryList: (
+      domain: string,
+      filters?: Record<string, unknown>,
+    ) =>
+      [
+        ...queryKeys.masterData.dictionary(domain),
+        'list',
+        filters ?? {},
+      ] as const,
   },
 
   projects: {

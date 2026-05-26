@@ -233,6 +233,13 @@ const WarehouseOperationsPage = lazy(() =>
     default: module.WarehouseOperationsPage,
   })),
 )
+const ReturnWorkflowPage = lazy(() =>
+  import('./pages/operations/ReturnWorkflowPage').then(
+    (module) => ({
+      default: module.ReturnWorkflowPage,
+    }),
+  ),
+)
 const ProductionOperationsPage = lazy(() =>
   import('./pages/operations').then((module) => ({
     default: module.ProductionOperationsPage,
@@ -271,6 +278,20 @@ const WorkflowOperationsPage = lazy(() =>
 const AdministrationOperationsPage = lazy(() =>
   import('./pages/operations').then((module) => ({
     default: module.AdministrationOperationsPage,
+  })),
+)
+const UomPage = lazy(() =>
+  import('./pages/master-data/UomPage').then(
+    (module) => ({
+      default: module.UomPage,
+    }),
+  ),
+)
+const MasterDataCenterPage = lazy(() =>
+  import(
+    './pages/master-data/MasterDataCenterPage'
+  ).then((module) => ({
+    default: module.MasterDataCenterPage,
   })),
 )
 
@@ -433,6 +454,18 @@ function App() {
                     element={
                       <WarehouseOperationsPage />
                     }
+                  />
+                  <Route
+                    path="/operations/returns"
+                    element={<ReturnWorkflowPage />}
+                  />
+                  <Route
+                    path="/master-data/uom"
+                    element={<UomPage />}
+                  />
+                  <Route
+                    path="/master-data"
+                    element={<MasterDataCenterPage />}
                   />
 
                   <Route

@@ -2,6 +2,7 @@ import {
   Activity,
   Bookmark,
   Filter,
+  LayoutGrid,
   RadioTower,
 } from 'lucide-react'
 import type {
@@ -244,6 +245,145 @@ export function OpsGrid({
   return (
     <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
       {children}
+    </div>
+  )
+}
+
+export function OperationalModuleTabs({
+  items,
+  active = 0,
+}: {
+  items: string[]
+  active?: number
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap gap-1 rounded-xl border border-cyan-500/10 bg-[#071321]/95 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+      {items.map((item, index) => (
+        <button
+          key={item}
+          type="button"
+          className={[
+            'rounded-lg px-4 py-2 text-xs font-medium transition-colors',
+            index === active
+              ? 'border border-blue-500/55 bg-blue-600/25 text-blue-100 shadow-[0_0_24px_rgba(37,99,235,0.16)]'
+              : 'border border-transparent text-zinc-400 hover:bg-cyan-500/10 hover:text-white',
+          ].join(' ')}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function OperationalSurface({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={[
+        'relative overflow-hidden rounded-2xl border border-cyan-500/10 bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.1),transparent_30%),linear-gradient(180deg,rgba(7,19,33,0.92),rgba(3,7,18,0.72))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_20px_65px_rgba(0,0,0,0.18)]',
+        className,
+      ].join(' ')}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.028)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.022)_1px,transparent_1px)] bg-[size:32px_32px]" />
+      <div className="relative space-y-4">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export function WorkspaceSplit({
+  main,
+  side,
+  bottom,
+}: {
+  main: ReactNode
+  side: ReactNode
+  bottom?: ReactNode
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_410px]">
+      <div className="min-w-0 space-y-4">
+        {main}
+        {bottom}
+      </div>
+      <aside className="min-w-0 space-y-4">
+        {side}
+      </aside>
+    </div>
+  )
+}
+
+export function OperationalInsightCard({
+  title,
+  children,
+  action,
+}: {
+  title: string
+  children: ReactNode
+  action?: ReactNode
+}) {
+  return (
+    <SectionCard
+      title={title}
+      actions={action}
+    >
+      {children}
+    </SectionCard>
+  )
+}
+
+export function MiniBarList({
+  rows,
+}: {
+  rows: Array<{
+    label: string
+    value: ReactNode
+    percent: number
+    tone?: 'info' | 'success' | 'warning' | 'danger'
+  }>
+}) {
+  const toneClass = {
+    info: 'from-blue-500 to-cyan-400',
+    success: 'from-emerald-500 to-green-400',
+    warning: 'from-amber-500 to-orange-400',
+    danger: 'from-red-500 to-rose-400',
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => (
+        <div
+          key={row.label}
+          className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-3"
+        >
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2">
+              <LayoutGrid className="h-3.5 w-3.5 text-cyan-300" />
+              <span className="truncate text-xs text-zinc-300">
+                {row.label}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-zinc-900">
+              <div
+                className={`h-full rounded-full bg-gradient-to-r ${toneClass[row.tone ?? 'info']}`}
+                style={{
+                  width: `${Math.min(Math.max(row.percent, 0), 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+          <div className="text-right text-xs font-medium text-white">
+            {row.value}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

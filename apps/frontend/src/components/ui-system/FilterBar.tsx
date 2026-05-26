@@ -36,9 +36,9 @@ export function FilterBar({
   return (
     <div
       className={[
-        'rounded-xl border border-zinc-800 bg-zinc-950/95 shadow-sm backdrop-blur',
+        'rounded-xl border border-cyan-500/10 bg-[#071321]/95 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur',
         sticky ? 'sticky top-0 z-30' : '',
-        compact ? 'p-2' : 'p-3',
+        compact ? 'p-2.5' : 'p-3',
       ].join(' ')}
     >
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">

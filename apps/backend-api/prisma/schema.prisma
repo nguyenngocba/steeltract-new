@@ -25,6 +25,29 @@ enum TransactionType {
   ADJUSTMENT
 }
 
+enum ReturnFlowType {
+  SITE_RETURN
+  PRODUCTION_RETURN
+  SUPPLIER_RETURN
+}
+
+enum ReturnRequestStatus {
+  REQUESTED
+  APPROVED
+  RECEIVED
+  INSPECTED
+  DISPOSED
+  CANCELLED
+}
+
+enum ReturnDisposition {
+  USABLE_STOCK
+  QC_HOLD
+  DAMAGED
+  SCRAP
+  REPAIR
+}
+
 enum ProjectStatus {
   PLANNING
   ACTIVE
@@ -457,13 +480,223 @@ model InventoryCategory {
   name        String
   code        String   @unique
   description String?
+  active      Boolean  @default(true)
+  color       String?
+  createdBy   String?
+  updatedBy   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   items InventoryItem[]
+  materialTypes MaterialType[]
 
   @@map("inventory_categories")
+}
+
+model MaterialType {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  categoryId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  category InventoryCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([active])
+  @@map("material_types")
+}
+
+model MasterTransactionType {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  direction String
+  affectsStock Boolean @default(true)
+  requiresApproval Boolean @default(false)
+  active Boolean @default(true)
+  color String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  transactions InventoryTransaction[]
+
+  @@index([direction])
+  @@index([active])
+  @@map("master_transaction_types")
+}
+
+model MasterWarehouse {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  zones WarehouseZone[]
+  transactions InventoryTransaction[]
+  transactionItems InventoryTransactionItem[]
+  returnRequests ReturnRequest[]
+
+  @@index([active])
+  @@map("master_warehouses")
+}
+
+model MasterQcStatus {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([active])
+  @@map("master_qc_statuses")
+}
+
+model MasterPriority {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([active])
+  @@map("master_priorities")
+}
+
+model MasterMaterialStatus {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([active])
+  @@map("master_material_statuses")
+}
+
+model MasterSupplierCategory {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([active])
+  @@map("master_supplier_categories")
+}
+
+model MasterProjectCategory {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([active])
+  @@map("master_project_categories")
+}
+
+model MasterWorkflowStatus {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  description String?
+  active Boolean @default(true)
+  color String?
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([active])
+  @@map("master_workflow_statuses")
+}
+
+model MasterUnit {
+  id String @id @default(cuid())
+
+  code String @unique
+
+  name String
+
+  symbol String
+
+  category String
+
+  precision Int @default(0)
+
+  active Boolean @default(true)
+
+  baseUnitId String?
+
+  conversionFactor Float?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  createdBy String?
+
+  updatedBy String?
+
+  baseUnit MasterUnit? @relation("UnitConversionBase", fields: [baseUnitId], references: [id])
+
+  derivedUnits MasterUnit[] @relation("UnitConversionBase")
+
+  inventoryItems InventoryItem[]
+  transactionItems InventoryTransactionItem[]
+  returnItems ReturnRequestItem[]
+
+  @@index([category])
+  @@index([active])
+  @@index([baseUnitId])
+
+  @@map("master_units")
 }
 
 model InventoryItem {
@@ -481,6 +714,8 @@ model InventoryItem {
 
   unit String?
 
+  unitId String?
+
   categoryId String
 
   zoneId String?
@@ -491,12 +726,16 @@ model InventoryItem {
 
   category InventoryCategory @relation(fields: [categoryId], references: [id])
 
+  unitMaster MasterUnit? @relation(fields: [unitId], references: [id])
+
   zone WarehouseZone? @relation(fields: [zoneId], references: [id])
 
   transactionItems InventoryTransactionItem[]
+  returnItems ReturnRequestItem[]
 
   @@index([code])
   @@index([name])
+  @@index([unitId])
 
   @@map("inventory_items")
 }
@@ -506,23 +745,57 @@ model InventoryTransaction {
 
   code String @unique
 
+  transactionNo String? @unique
+
   type TransactionType
+
+  transactionTypeId String?
+
+  direction String?
 
   note String?
 
   performedBy String?
 
+  approvedBy String?
+
   referenceModule String?
 
   referenceId String?
+
+  projectId String?
+
+  supplierId String?
+
+  warehouseId String?
+
+  zoneId String?
+
+  remarks String?
+
+  transactionDate DateTime @default(now())
 
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
 
+  transactionType MasterTransactionType? @relation(fields: [transactionTypeId], references: [id])
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+
+  zone WarehouseZone? @relation(fields: [zoneId], references: [id])
+
   items InventoryTransactionItem[]
 
   @@index([type])
+  @@index([transactionTypeId])
+  @@index([direction])
+  @@index([warehouseId])
+  @@index([zoneId])
+  @@index([projectId])
+  @@index([transactionDate])
 
   @@map("inventory_transactions")
 }
@@ -536,13 +809,84 @@ model InventoryTransactionItem {
 
   quantity Float
 
+  unitId String?
+
+  warehouseId String?
+
+  zoneId String?
+
+  slotId String?
+
   createdAt DateTime @default(now())
 
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
 
   transaction InventoryTransaction @relation(fields: [transactionId], references: [id])
 
+  unit MasterUnit? @relation(fields: [unitId], references: [id])
+
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+
+  zone WarehouseZone? @relation(fields: [zoneId], references: [id])
+
   @@map("inventory_transaction_items")
+}
+
+model ReturnRequest {
+  id String @id @default(cuid())
+  returnNo String @unique
+  flowType ReturnFlowType
+  status ReturnRequestStatus @default(REQUESTED)
+  projectId String?
+  supplierId String?
+  warehouseId String?
+  requestedBy String?
+  approvedBy String?
+  receivedBy String?
+  inspectedBy String?
+  remarks String?
+  requestedAt DateTime @default(now())
+  approvedAt DateTime?
+  receivedAt DateTime?
+  inspectedAt DateTime?
+  disposedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id])
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+  items ReturnRequestItem[]
+
+  @@index([flowType])
+  @@index([status])
+  @@index([projectId])
+  @@index([warehouseId])
+  @@map("return_requests")
+}
+
+model ReturnRequestItem {
+  id String @id @default(cuid())
+  returnRequestId String
+  inventoryItemId String
+  requestedQuantity Float
+  receivedQuantity Float?
+  inspectedQuantity Float?
+  disposition ReturnDisposition?
+  unitId String?
+  zoneId String?
+  remarks String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  unit MasterUnit? @relation(fields: [unitId], references: [id])
+  zone WarehouseZone? @relation(fields: [zoneId], references: [id])
+
+  @@index([returnRequestId])
+  @@index([inventoryItemId])
+  @@index([disposition])
+  @@map("return_request_items")
 }
 
 //
@@ -565,6 +909,8 @@ model Project {
   updatedAt DateTime @updatedAt
 
   components Component[]
+  inventoryTransactions InventoryTransaction[]
+  returnRequests ReturnRequest[]
 
   @@index([status])
 
@@ -913,11 +1259,27 @@ model WarehouseZone {
 
   color String @default("#06b6d4")
 
+  active Boolean @default(true)
+
+  warehouseId String?
+
+  createdBy String?
+
+  updatedBy String?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
 
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+
   inventoryItems InventoryItem[]
+  transactions InventoryTransaction[]
+  transactionItems InventoryTransactionItem[]
+  returnItems ReturnRequestItem[]
+
+  @@index([warehouseId])
+  @@index([active])
 
   @@map("warehouse_zones")
 }

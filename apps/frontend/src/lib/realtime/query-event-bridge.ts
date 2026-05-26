@@ -12,6 +12,9 @@ import {
 import type {
   RealtimeEventPayload,
 } from './socket-client'
+import {
+  publishOperationalEvent,
+} from '../../modules/operations/events/operational-event-bus'
 
 const dedupeWindow = new Map<string, number>()
 
@@ -87,6 +90,7 @@ export function bridgeRealtimeEventToQuery(
     return Promise.resolve()
   }
 
+  publishOperationalEvent(payload)
   queryInvalidationBatcher.push(payload)
 
   return Promise.resolve()

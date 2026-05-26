@@ -23,6 +23,10 @@ import { InventoryRepository } from './inventory.repository';
 interface StockLine {
   inventoryItemId: string;
   quantity: number;
+  unitId?: string;
+  warehouseId?: string;
+  zoneId?: string;
+  slotId?: string;
 }
 
 @Injectable()
@@ -74,13 +78,14 @@ export class InventoryService {
   async createItem(dto: CreateInventoryItemDto) {
     const result = await this.repository.transaction(async (tx) => {
       const categoryId = await this.resolveCategoryId(dto, tx);
+      const unit = await this.resolveUnit(dto, tx);
 
       const item = await this.repository.createItem(
         {
           code: dto.code,
           name: dto.name,
           description: dto.description,
-          unit: dto.unit,
+          unit: unit.symbol,
           minimumStock: dto.minimumStock,
           quantity: 0,
           category: {
@@ -88,6 +93,13 @@ export class InventoryService {
               id: categoryId,
             },
           },
+          unitMaster: unit
+            ? {
+                connect: {
+                  id: unit.id,
+                },
+              }
+            : undefined,
           zone: dto.zoneId
             ? {
                 connect: {
@@ -191,17 +203,28 @@ export class InventoryService {
         dto.categoryId || dto.category
           ? await this.resolveCategoryId(dto, tx)
           : undefined;
+      const unit =
+        dto.unitId || dto.unit
+          ? await this.resolveUnit(dto, tx)
+          : undefined;
 
       const data: Prisma.InventoryItemUpdateInput = {
         code: dto.code,
         name: dto.name,
         description: dto.description,
-        unit: dto.unit,
+        unit: unit ? unit.symbol : dto.unit,
         minimumStock: dto.minimumStock,
         category: categoryId
           ? {
               connect: {
                 id: categoryId,
+              },
+            }
+          : undefined,
+        unitMaster: unit
+          ? {
+              connect: {
+                id: unit.id,
               },
             }
           : undefined,
@@ -309,8 +332,17 @@ export class InventoryService {
       code: dto.code,
       note: dto.note,
       performedBy: dto.performedBy,
+      approvedBy: dto.approvedBy,
       referenceModule: dto.referenceModule,
       referenceId: dto.referenceId,
+      projectId: dto.projectId,
+      supplierId: dto.supplierId,
+      warehouseId: dto.warehouseId,
+      zoneId: dto.zoneId,
+      remarks: dto.remarks,
+      transactionTypeId: dto.transactionTypeId,
+      transactionTypeCode: dto.transactionTypeCode,
+      transactionDate: dto.transactionDate,
       items: [
         {
           inventoryItemId: dto.fromInventoryItemId,
@@ -334,8 +366,17 @@ export class InventoryService {
       code?: string;
       note?: string;
       performedBy?: string;
+      approvedBy?: string;
       referenceModule?: string;
       referenceId?: string;
+      projectId?: string;
+      supplierId?: string;
+      warehouseId?: string;
+      zoneId?: string;
+      remarks?: string;
+      transactionTypeId?: string;
+      transactionTypeCode?: string;
+      transactionDate?: Date;
       items: StockLine[];
     },
   ) {
@@ -368,14 +409,26 @@ export class InventoryService {
       code?: string;
       note?: string;
       performedBy?: string;
+      approvedBy?: string;
       referenceModule?: string;
       referenceId?: string;
+      projectId?: string;
+      supplierId?: string;
+      warehouseId?: string;
+      zoneId?: string;
+      remarks?: string;
+      transactionTypeId?: string;
+      transactionTypeCode?: string;
+      transactionDate?: Date;
       items: StockLine[];
     },
     tx: Prisma.TransactionClient,
   ) {
     const normalizedItems = this.normalizeItems(type, dto.items);
     const deltasByItem = this.groupDeltasByItem(normalizedItems);
+    const transactionType = await this.resolveTransactionType(type, dto, tx);
+    const direction = transactionType?.direction ?? this.directionFor(type);
+    const transactionCode = dto.code || this.generateTransactionCode(type);
 
     for (const [inventoryItemId, delta] of deltasByItem) {
       const inventoryItem = await this.repository.findItemById(
@@ -398,15 +451,71 @@ export class InventoryService {
 
     const transaction = await this.repository.createTransaction(
       {
-        code: dto.code || this.generateTransactionCode(type),
+        code: transactionCode,
+        transactionNo: transactionCode,
         type,
+        direction,
         note: dto.note,
         performedBy: dto.performedBy,
+        approvedBy: dto.approvedBy,
         referenceModule: dto.referenceModule,
         referenceId: dto.referenceId,
+        supplierId: dto.supplierId,
+        remarks: dto.remarks,
+        transactionDate: dto.transactionDate,
+        project: dto.projectId
+          ? {
+              connect: {
+                id: dto.projectId,
+              },
+            }
+          : undefined,
+        warehouse: dto.warehouseId
+          ? {
+              connect: {
+                id: dto.warehouseId,
+              },
+            }
+          : undefined,
+        zone: dto.zoneId
+          ? {
+              connect: {
+                id: dto.zoneId,
+              },
+            }
+          : undefined,
+        transactionType: transactionType
+          ? {
+              connect: {
+                id: transactionType.id,
+              },
+            }
+          : undefined,
         items: {
           create: normalizedItems.map((item) => ({
             quantity: item.quantity,
+            slotId: item.slotId,
+            unit: item.unitId
+              ? {
+                  connect: {
+                    id: item.unitId,
+                  },
+                }
+              : undefined,
+            warehouse: item.warehouseId || dto.warehouseId
+              ? {
+                  connect: {
+                    id: item.warehouseId || dto.warehouseId,
+                  },
+                }
+              : undefined,
+            zone: item.zoneId || dto.zoneId
+              ? {
+                  connect: {
+                    id: item.zoneId || dto.zoneId,
+                  },
+                }
+              : undefined,
             inventoryItem: {
               connect: {
                 id: item.inventoryItemId,
@@ -458,6 +567,10 @@ export class InventoryService {
       return {
         inventoryItemId: item.inventoryItemId,
         quantity,
+        unitId: item.unitId,
+        warehouseId: item.warehouseId,
+        zoneId: item.zoneId,
+        slotId: item.slotId,
         delta,
       };
     });
@@ -479,6 +592,51 @@ export class InventoryService {
     }
 
     return deltasByItem;
+  }
+
+  private async resolveTransactionType(
+    type: TransactionType,
+    dto: {
+      transactionTypeId?: string;
+      transactionTypeCode?: string;
+    },
+    tx: Prisma.TransactionClient,
+  ) {
+    const fallbackCodeByType: Partial<Record<TransactionType, string>> = {
+      [TransactionType.IMPORT]: 'PURCHASE_RECEIPT',
+      [TransactionType.EXPORT]: 'PRODUCTION_ISSUE',
+      [TransactionType.TRANSFER]: 'WAREHOUSE_TRANSFER',
+      [TransactionType.RETURN]: 'SITE_RETURN',
+      [TransactionType.ADJUSTMENT]: 'ADJUSTMENT',
+    };
+    const transactionType = dto.transactionTypeId
+      ? await this.repository.findTransactionTypeById(dto.transactionTypeId, tx)
+      : await this.repository.findTransactionTypeByCode(
+          dto.transactionTypeCode ?? fallbackCodeByType[type] ?? type,
+          tx,
+        );
+
+    if (dto.transactionTypeId && !transactionType) {
+      throw new BadRequestException('Transaction type not found');
+    }
+
+    if (transactionType && !transactionType.active) {
+      throw new BadRequestException('Transaction type is inactive');
+    }
+
+    return transactionType;
+  }
+
+  private directionFor(type: TransactionType) {
+    if (type === TransactionType.IMPORT || type === TransactionType.RETURN) {
+      return 'inbound';
+    }
+
+    if (type === TransactionType.EXPORT) {
+      return 'outbound';
+    }
+
+    return 'internal';
   }
 
   private getSnapshotDelta(type: TransactionType, quantity: number) {
@@ -545,6 +703,29 @@ export class InventoryService {
     }
 
     throw new BadRequestException('categoryId is required.');
+  }
+
+  private async resolveUnit(
+    dto:
+      | Pick<CreateInventoryItemDto, 'unitId' | 'unit'>
+      | Pick<UpdateInventoryItemDto, 'unitId' | 'unit'>,
+    tx: Prisma.TransactionClient,
+  ) {
+    const unit = dto.unitId
+      ? await this.repository.findUnitById(dto.unitId, tx)
+      : dto.unit
+        ? await this.repository.findUnitByCode(dto.unit, tx)
+        : null;
+
+    if (!unit) {
+      throw new BadRequestException('Unit of measure not found');
+    }
+
+    if (!unit.active) {
+      throw new BadRequestException('Unit of measure is inactive');
+    }
+
+    return unit;
   }
 
   private generateTransactionCode(type: TransactionType) {

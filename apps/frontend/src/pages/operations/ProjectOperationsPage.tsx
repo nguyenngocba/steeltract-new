@@ -16,7 +16,12 @@ import { useTasksQuery } from '../../hooks/query/useTaskQueries'
 import {
   OperationalWorkspaceHero,
   OperationalActivityPanel,
+  MiniBarList,
+  OperationalInsightCard,
+  OperationalModuleTabs,
+  OperationalSurface,
   StickyOpsToolbar,
+  WorkspaceSplit,
 } from './operations-utils'
 
 export function ProjectOperationsPage() {
@@ -72,87 +77,171 @@ export function ProjectOperationsPage() {
           </>
         }
       />
-      <StickyOpsToolbar
-        domain="projects"
-        quickFilters={
-          <>
-            <StatusBadge tone="info">
-              projects {projects.length}
-            </StatusBadge>
-            <StatusBadge tone="warning">
-              tasks {tasks.length}
-            </StatusBadge>
-          </>
-        }
-        counters={
-          <StatusBadge tone="neutral">
-            components {components.length}
-          </StatusBadge>
-        }
-      />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Projects"
-          value={projects.length}
-          icon={<FolderKanban className="h-5 w-5" />}
+      <OperationalSurface>
+        <OperationalModuleTabs
+          items={[
+            'Overview',
+            'Schedule',
+            'Progress',
+            'Components',
+            'Workflow',
+            'Site logs',
+          ]}
         />
-        <StatCard
-          label="Components"
-          value={components.length}
-          icon={<Landmark className="h-5 w-5" />}
+        <StickyOpsToolbar
+          domain="projects"
+          quickFilters={
+            <>
+              <StatusBadge tone="info">
+                projects {projects.length}
+              </StatusBadge>
+              <StatusBadge tone="warning">
+                tasks {tasks.length}
+              </StatusBadge>
+            </>
+          }
+          counters={
+            <StatusBadge tone="neutral">
+              components {components.length}
+            </StatusBadge>
+          }
         />
-      </div>
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard title="Project portfolio">
-          <DataTable
-            data={projects}
-            loading={projectsQuery.isLoading}
-            rowKey={(row) => row.id}
-            density="compact"
-            selectable
-            savedViewName="Project control"
-            statusTone={() => 'info'}
-            rowActions={() => (
-              <button className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300">
-                Open
-              </button>
-            )}
-            columns={[
-              {
-                key: 'project',
-                header: 'Project',
-                render: (row) => (
-                  <div>
-                    <p className="font-medium">{row.name}</p>
-                    <p className="text-xs text-zinc-500">{row.code}</p>
-                  </div>
-                ),
-              },
-              {
-                key: 'status',
-                header: 'Status',
-                render: (row) => (
-                  <StatusBadge tone="info">
-                    {row.status ?? 'ACTIVE'}
-                  </StatusBadge>
-                ),
-              },
-            ]}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Projects"
+            value={projects.length}
+            icon={<FolderKanban className="h-5 w-5" />}
           />
-        </SectionCard>
-        <OperationalActivityPanel
-          title="Execution pressure"
-          items={tasks.slice(0, 12).map((task) => ({
-            id: task.id,
-            label: task.title,
-            detail: `${task.status} / ${task.priority}`,
-            tone:
-              task.priority === 'URGENT' || task.priority === 'HIGH'
-                ? 'warning'
-                : 'info',
-          }))}
+          <StatCard
+            label="Components"
+            value={components.length}
+            icon={<Landmark className="h-5 w-5" />}
+          />
+          <StatCard
+            label="Open tasks"
+            value={tasks.length}
+            icon={<FolderKanban className="h-5 w-5" />}
+          />
+          <StatCard
+            label="Priority pressure"
+            value={tasks.filter((task) => ['URGENT', 'HIGH'].includes(task.priority)).length}
+            icon={<Landmark className="h-5 w-5" />}
+          />
+        </div>
+        <WorkspaceSplit
+          main={
+            <SectionCard title="Project portfolio">
+              <DataTable
+                data={projects}
+                loading={projectsQuery.isLoading}
+                rowKey={(row) => row.id}
+                density="compact"
+                selectable
+                savedViewName="Project control"
+                statusTone={() => 'info'}
+                rowActions={() => (
+                  <button className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300">
+                    Open
+                  </button>
+                )}
+                columns={[
+                  {
+                    key: 'project',
+                    header: 'Project',
+                    render: (row) => (
+                      <div>
+                        <p className="font-medium">{row.name}</p>
+                        <p className="text-xs text-zinc-500">{row.code}</p>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'status',
+                    header: 'Status',
+                    render: (row) => (
+                      <StatusBadge tone="info">
+                        {row.status ?? 'ACTIVE'}
+                      </StatusBadge>
+                    ),
+                  },
+                ]}
+              />
+            </SectionCard>
+          }
+          side={
+            <>
+              <OperationalInsightCard title="Project status distribution">
+                <MiniBarList
+                  rows={[
+                    {
+                      label: 'Active / running',
+                      value: projects.filter((project) => project.status !== 'COMPLETED').length,
+                      percent: projects.length
+                        ? (projects.filter((project) => project.status !== 'COMPLETED').length / projects.length) * 100
+                        : 0,
+                      tone: 'success',
+                    },
+                    {
+                      label: 'Completed',
+                      value: projects.filter((project) => project.status === 'COMPLETED').length,
+                      percent: projects.length
+                        ? (projects.filter((project) => project.status === 'COMPLETED').length / projects.length) * 100
+                        : 0,
+                      tone: 'info',
+                    },
+                    {
+                      label: 'High priority tasks',
+                      value: tasks.filter((task) => ['URGENT', 'HIGH'].includes(task.priority)).length,
+                      percent: tasks.length
+                        ? (tasks.filter((task) => ['URGENT', 'HIGH'].includes(task.priority)).length / tasks.length) * 100
+                        : 0,
+                      tone: 'warning',
+                    },
+                  ]}
+                />
+              </OperationalInsightCard>
+              <OperationalActivityPanel
+                title="Execution pressure"
+                items={tasks.slice(0, 12).map((task) => ({
+                  id: task.id,
+                  label: task.title,
+                  detail: `${task.status} / ${task.priority}`,
+                  tone:
+                    task.priority === 'URGENT' || task.priority === 'HIGH'
+                      ? 'warning'
+                      : 'info',
+                }))}
+              />
+            </>
+          }
+          bottom={
+            <SectionCard title="Construction progress telemetry">
+              <MiniBarList
+                rows={projects.slice(0, 6).map((project) => {
+                  const linkedComponents = components.filter(
+                    (component) => component.projectId === project.id,
+                  ).length
+                  const maxLinked = Math.max(
+                    1,
+                    ...projects.map((item) =>
+                      components.filter(
+                        (component) => component.projectId === item.id,
+                      ).length,
+                    ),
+                  )
+
+                  return {
+                    label: project.name,
+                    value: linkedComponents,
+                    percent: (linkedComponents / maxLinked) * 100,
+                    tone: project.status === 'COMPLETED' ? 'success' : 'info',
+                  }
+                })}
+              />
+            </SectionCard>
+          }
         />
-      </div>
+      </OperationalSurface>
     </PageLayout>
   )
 }

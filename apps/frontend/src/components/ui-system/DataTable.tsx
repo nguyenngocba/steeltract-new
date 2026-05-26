@@ -128,12 +128,12 @@ export function DataTable<T>({
     visibleColumns.length + utilityColumnCount
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/40">
+    <div className="overflow-hidden rounded-xl border border-cyan-500/10 bg-zinc-950/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
       {activeSelection.length > 0 || savedViewName ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/10 bg-[#071321] px-3 py-2 text-xs text-zinc-400">
           <div className="flex flex-wrap items-center gap-2">
             {savedViewName ? (
-              <span className="rounded-md bg-zinc-800 px-2 py-1">
+              <span className="rounded-md border border-cyan-500/15 bg-cyan-500/10 px-2 py-1 text-cyan-200">
                 View: {savedViewName}
               </span>
             ) : null}
@@ -155,7 +155,7 @@ export function DataTable<T>({
         <table className="min-w-full divide-y divide-zinc-800 text-sm">
           <thead
             className={clsx(
-              'bg-zinc-900',
+              'bg-[#101a2a]',
               stickyHeader && 'sticky top-0 z-10',
             )}
           >
@@ -205,7 +205,7 @@ export function DataTable<T>({
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-zinc-800 bg-zinc-950/40">
+          <tbody className="divide-y divide-cyan-500/10 bg-zinc-950/30">
             {loading ? (
               <tr>
                 <td
@@ -229,7 +229,7 @@ export function DataTable<T>({
                 <tr
                   key={rowKey(row)}
                   className={clsx(
-                    'relative transition-colors hover:bg-zinc-900/80',
+                    'relative transition-colors hover:bg-cyan-500/10',
                     highlightedRowIds.includes(rowKey(row)) &&
                       'animate-pulse bg-cyan-500/10',
                   )}

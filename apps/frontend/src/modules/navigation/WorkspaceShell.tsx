@@ -1,6 +1,9 @@
 import {
+  CircleHelp,
   Menu,
+  RadioTower,
   Search,
+  ShieldCheck,
   X,
 } from 'lucide-react'
 import {
@@ -20,12 +23,9 @@ import {
 import { useCurrentUser } from '../../lib/auth/useCurrentUser'
 import { useAuthStore } from '../../store/auth.store'
 import { DynamicSidebar } from './DynamicSidebar'
-import { FavoriteModulesPanel } from './FavoriteModulesPanel'
+import { LanguageSwitcher } from './LanguageSwitcher'
 import { NotificationCenter } from './NotificationCenter'
-import { QuickActionsPanel } from './QuickActionsPanel'
-import { RecentItemsPanel } from './RecentItemsPanel'
 import { SmartBreadcrumbs } from './SmartBreadcrumbs'
-import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 import {
   getVisibleNavigationItems,
   getVisibleWorkspaces,
@@ -45,6 +45,24 @@ import type {
   NavigationItem,
   WorkspaceId,
 } from './navigation.types'
+
+const sidebarCoreItemIds = new Set([
+  'dashboard',
+  'inventory',
+  'components',
+  'operations-production',
+  'schedule',
+  'operations-yard',
+  'projects',
+  'suppliers',
+  'operations-qc',
+  'vehicles',
+  'users',
+  'roles',
+  'system-logs',
+  'administration',
+  'backup',
+])
 
 interface WorkspaceShellProps {
   children: ReactNode
@@ -68,7 +86,7 @@ export function WorkspaceShell({
     )
   const [favoriteIds, setFavoriteIds] =
     useState<string[]>(readFavoriteIds)
-  const [recentIds, setRecentIds] =
+  const [, setRecentIds] =
     useState<string[]>(readRecentIds)
   const [mobileOpen, setMobileOpen] =
     useState(false)
@@ -90,70 +108,21 @@ export function WorkspaceShell({
     ) ??
     workspaces[0] ??
     workspaceRegistry[0]
-  const workspaceItems = useMemo(
-    () =>
-      getVisibleNavigationItems(
-        user,
-        activeWorkspace.id,
-      ),
-    [activeWorkspace.id, user],
-  )
   const allVisibleItems = useMemo(
     () => getVisibleNavigationItems(user),
     [user],
   )
+  const sidebarItems = useMemo(
+    () =>
+      allVisibleItems.filter((item) =>
+        sidebarCoreItemIds.has(item.id),
+      ),
+    [allVisibleItems],
+  )
   const groups = useMemo(
-    () => groupNavigationItems(workspaceItems),
-    [workspaceItems],
+    () => groupNavigationItems(sidebarItems),
+    [sidebarItems],
   )
-  const favoriteItems = useMemo(
-    () =>
-      favoriteIds
-        .map((id) =>
-          allVisibleItems.find(
-            (item) => item.id === id,
-          ),
-        )
-        .filter(
-          (item): item is NavigationItem =>
-            Boolean(item),
-        ),
-    [allVisibleItems, favoriteIds],
-  )
-  const recentItems = useMemo(
-    () =>
-      recentIds
-        .map((id) =>
-          allVisibleItems.find(
-            (item) => item.id === id,
-          ),
-        )
-        .filter(
-          (item): item is NavigationItem =>
-            Boolean(item),
-        ),
-    [allVisibleItems, recentIds],
-  )
-  function handleWorkspaceChange(
-    workspaceId: WorkspaceId,
-  ) {
-    const workspace =
-      workspaceRegistry.find(
-        (item) => item.id === workspaceId,
-      ) ?? workspaceRegistry[0]
-    const firstVisibleItem =
-      getVisibleNavigationItems(
-        user,
-        workspaceId,
-      )[0]
-
-    setActiveWorkspaceId(workspaceId)
-    navigate(
-      firstVisibleItem?.path ??
-        workspace.defaultPath,
-    )
-  }
-
   function handleToggleFavorite(
     itemId: string,
   ) {
@@ -199,44 +168,36 @@ export function WorkspaceShell({
   }))
 
   const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="relative overflow-hidden border-b border-zinc-800 px-4 py-4">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(8,145,178,0.12),transparent_55%)]" />
-        <div className="relative">
-          <h1 className="text-xl font-bold text-cyan-300">
-            SteelTrack
-          </h1>
-          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">
-            smart factory workspace
-          </p>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-wide text-zinc-500">
-            <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300">
-              live
-            </span>
-            <span className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-cyan-300">
-              MES
-            </span>
-            <span className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1">
-              ERP
-            </span>
+    <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.15),transparent_34%),linear-gradient(180deg,rgba(9,18,31,0.98),rgba(3,7,18,0.98))]">
+      <div className="relative overflow-hidden border-b border-cyan-500/15 px-4 py-4">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.045)_1px,transparent_1px)] bg-[size:28px_28px]" />
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/30 bg-blue-500/10 shadow-[0_0_32px_rgba(37,99,235,0.22)]">
+            <ShieldCheck className="h-5 w-5 text-blue-200" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold uppercase tracking-wide text-white">
+              SteelTrack
+            </h1>
+            <p className="mt-0.5 text-[11px] uppercase tracking-[0.22em] text-cyan-200/80">
+              ERP Platform
+            </p>
           </div>
         </div>
-        <div className="mt-4">
-          <WorkspaceSwitcher
-            workspaces={workspaces}
-            activeWorkspaceId={
-              activeWorkspace.id
-            }
-            onChange={handleWorkspaceChange}
-          />
+        <div className="relative mt-4 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-wide">
+          <span className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-center text-emerald-300">
+            live
+          </span>
+          <span className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-center text-cyan-300">
+            MES
+          </span>
+          <span className="rounded-lg border border-blue-500/25 bg-blue-500/10 px-2 py-1 text-center text-blue-200">
+            ERP
+          </span>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <FavoriteModulesPanel
-          items={favoriteItems}
-          onNavigate={handleNavigate}
-        />
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <DynamicSidebar
           groups={groups}
           favoriteIds={favoriteIds}
@@ -245,24 +206,35 @@ export function WorkspaceShell({
           }
           onNavigate={handleNavigate}
         />
-        <RecentItemsPanel
-          items={recentItems}
-          onNavigate={handleNavigate}
-        />
-        <QuickActionsPanel
-          items={workspaceItems}
-          onOpenCommandPalette={() =>
-            setCommandPaletteOpen(true)
-          }
-          onNavigate={handleNavigate}
-        />
+        <div className="mt-5 rounded-lg border border-cyan-500/10 bg-[#06111f]/80 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-100/60">
+            workspace command
+          </p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-wide">
+            <button
+              type="button"
+              onClick={() =>
+                setCommandPaletteOpen(true)
+              }
+              className="rounded-lg border border-blue-500/25 bg-blue-500/10 px-2 py-2 text-blue-200 hover:bg-blue-500/20"
+            >
+              search
+            </button>
+            <span className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 py-2 text-center text-emerald-300">
+              live
+            </span>
+            <span className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-2 text-center text-amber-200">
+              shift
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[var(--color-app)] text-white md:flex">
-      <aside className="hidden w-72 shrink-0 border-r border-zinc-800 bg-zinc-950/95 md:block">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.12),transparent_30%),linear-gradient(135deg,#020617,#07111f_52%,#020617)] text-white md:flex">
+      <aside className="hidden w-[264px] shrink-0 border-r border-cyan-500/10 bg-zinc-950/95 md:block">
         {sidebar}
       </aside>
 
@@ -289,7 +261,7 @@ export function WorkspaceShell({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-zinc-800 bg-zinc-950/90 px-4 py-3 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-cyan-500/10 bg-[#06111f]/95 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.22)] backdrop-blur md:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
@@ -317,12 +289,29 @@ export function WorkspaceShell({
               onClick={() =>
                 setCommandPaletteOpen(true)
               }
-              className="hidden h-10 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-300 hover:text-white lg:inline-flex"
+              className="hidden h-10 min-w-64 items-center justify-between gap-8 rounded-lg border border-cyan-500/15 bg-zinc-950/70 px-3 text-sm text-zinc-400 shadow-inner hover:border-cyan-500/35 hover:text-white lg:inline-flex"
             >
-              <Search className="h-4 w-4" />
-              Search modules
+              <span className="inline-flex items-center gap-2">
+                <Search className="h-4 w-4" />
+                Search operations
+              </span>
+              <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                Ctrl K
+              </span>
             </button>
+            <span className="hidden items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-2 text-xs text-emerald-300 xl:inline-flex">
+              <RadioTower className="h-3.5 w-3.5" />
+              live
+            </span>
             <NotificationCenter />
+            <button
+              className="hidden h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/70 text-zinc-300 lg:inline-flex"
+              aria-label="Operational help"
+              type="button"
+            >
+              <CircleHelp className="h-4 w-4" />
+            </button>
+            <LanguageSwitcher />
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium text-white">
                 {user?.fullName ??
@@ -335,13 +324,13 @@ export function WorkspaceShell({
               </p>
             </div>
             <div
-              className="h-9 w-9 rounded-full bg-cyan-500"
+              className="h-9 w-9 rounded-full border border-cyan-300/30 bg-gradient-to-br from-blue-500 to-violet-600 shadow-[0_0_24px_rgba(59,130,246,0.28)]"
               aria-hidden="true"
             />
           </div>
         </header>
 
-        <main className="p-4 md:p-6">
+        <main className="p-3 md:p-4 xl:p-5">
           {children}
         </main>
       </div>

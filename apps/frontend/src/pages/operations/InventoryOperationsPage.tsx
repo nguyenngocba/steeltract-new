@@ -162,7 +162,8 @@ export function InventoryOperationsPage() {
               {
                 key: 'unit',
                 header: 'Unit',
-                render: (row) => row.unit ?? '-',
+                render: (row) =>
+                  row.unitMaster?.symbol ?? row.unit ?? '-',
               },
               {
                 key: 'status',

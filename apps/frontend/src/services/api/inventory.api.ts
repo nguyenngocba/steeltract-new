@@ -10,6 +10,7 @@ export interface SaveInventoryItemPayload {
   code: string
   quantity?: string
   category?: string
+  unitId?: string
 }
 
 export async function getInventory(

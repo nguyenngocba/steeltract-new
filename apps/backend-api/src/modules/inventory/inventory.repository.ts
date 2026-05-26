@@ -23,6 +23,7 @@ export class InventoryRepository {
       where,
       include: {
         category: true,
+        unitMaster: true,
         zone: true,
       },
       orderBy: {
@@ -46,6 +47,7 @@ export class InventoryRepository {
       },
       include: {
         category: true,
+        unitMaster: true,
         zone: true,
       },
     });
@@ -80,6 +82,34 @@ export class InventoryRepository {
     });
   }
 
+  findUnitById(id: string, db: DbClient = this.prisma) {
+    return db.masterUnit.findUnique({
+      where: {
+        id,
+      },
+    });
+  }
+
+  findUnitByCode(value: string, db: DbClient = this.prisma) {
+    return db.masterUnit.findUnique({
+      where: {
+        code: value.trim().toUpperCase(),
+      },
+    });
+  }
+
+  findTransactionTypeById(id: string, db: DbClient = this.prisma) {
+    return db.masterTransactionType.findUnique({
+      where: { id },
+    });
+  }
+
+  findTransactionTypeByCode(code: string, db: DbClient = this.prisma) {
+    return db.masterTransactionType.findUnique({
+      where: { code: code.trim().toUpperCase() },
+    });
+  }
+
   createItem(
     data: Prisma.InventoryItemCreateInput,
     db: DbClient = this.prisma,
@@ -88,6 +118,7 @@ export class InventoryRepository {
       data,
       include: {
         category: true,
+        unitMaster: true,
         zone: true,
       },
     });
@@ -105,6 +136,7 @@ export class InventoryRepository {
       data,
       include: {
         category: true,
+        unitMaster: true,
         zone: true,
       },
     });
@@ -125,9 +157,16 @@ export class InventoryRepository {
     return db.inventoryTransaction.create({
       data,
       include: {
+        transactionType: true,
+        warehouse: true,
+        zone: true,
+        project: true,
         items: {
           include: {
             inventoryItem: true,
+            unit: true,
+            warehouse: true,
+            zone: true,
           },
         },
       },
@@ -137,9 +176,16 @@ export class InventoryRepository {
   listTransactions(params: { skip?: number; take?: number }) {
     return this.prisma.inventoryTransaction.findMany({
       include: {
+        transactionType: true,
+        warehouse: true,
+        zone: true,
+        project: true,
         items: {
           include: {
             inventoryItem: true,
+            unit: true,
+            warehouse: true,
+            zone: true,
           },
         },
       },

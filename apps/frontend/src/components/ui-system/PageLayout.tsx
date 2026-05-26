@@ -16,18 +16,18 @@ export function PageLayout({
   children,
 }: PageLayoutProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {title || actions ? (
-        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-3 border-b border-cyan-500/10 pb-3 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             {title ? (
-              <h1 className="text-2xl font-semibold tracking-normal text-white md:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-normal text-white md:text-[28px]">
                 {title}
               </h1>
             ) : null}
 
             {description ? (
-              <p className="mt-2 max-w-3xl text-sm text-zinc-400">
+              <p className="mt-1 max-w-4xl text-sm text-zinc-400">
                 {description}
               </p>
             ) : null}

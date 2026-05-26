@@ -1,3 +1,33 @@
 @import "tailwindcss";
 @import 'react-calendar/dist/Calendar.css';
 @import './theme/theme.css';
+
+html {
+  background: #020617;
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(14, 165, 233, 0.12), transparent 32%),
+    linear-gradient(135deg, #020617 0%, #07111f 52%, #020617 100%);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.28) rgba(15, 23, 42, 0.4);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.42);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(15, 23, 42, 0.62);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.28);
+}

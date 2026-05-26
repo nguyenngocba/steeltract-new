@@ -1,12 +1,14 @@
 import {
-  useState,
-} from 'react'
-
-import {
-  PageLayout,
   SectionCard,
   StatusBadge,
 } from '../../components/ui-system'
+import {
+  ContextInsightPanel,
+  OperationalWorkspaceShell,
+  SplitWorkspaceLayout,
+  TelemetryStrip,
+  WorkspaceEventSurface,
+} from '../../modules/operations'
 import {
   ContextualOperationDrawer,
   OperatorQuickActionsPanel,
@@ -19,12 +21,10 @@ import {
   ProductionTaskTable,
   StageTimeline,
   WorkCenterCards,
-  useMachinesQuery,
-  useProductionMetricsQuery,
-  useProductionOrdersQuery,
-  useWorkCentersQuery,
 } from '../../modules/production-ui'
-import { asList } from './operations-data'
+import {
+  useProductionWorkspace,
+} from '../../modules/production'
 import {
   OpsLane,
   OperationalWorkspaceHero,
@@ -32,48 +32,31 @@ import {
 } from './operations-utils'
 
 export function ProductionOperationsPage() {
-  const [detailOpen, setDetailOpen] =
-    useState(false)
-  const metricsQuery = useProductionMetricsQuery()
-  const ordersQuery = useProductionOrdersQuery({
-    page: 1,
-    limit: 50,
-  })
-  const workCentersQuery = useWorkCentersQuery()
-  const machinesQuery = useMachinesQuery()
-  const orders = asList(ordersQuery.data)
-  const activeOrder =
-    orders.find((order) => order.status === 'IN_PROGRESS') ??
-    orders[0]
-  const delayedOrders = orders.filter(
-    (order) => order.status === 'DELAYED',
-  )
-  const activeTasks = orders.flatMap(
-    (order) => order.tasks ?? [],
-  )
-  const blockedTasks = activeTasks.filter(
-    (task) => task.status === 'BLOCKED',
-  )
-  const operatorLoad = new Set(
-    activeTasks
-      .map((task) => task.assignedWorkerId)
-      .filter(Boolean),
-  ).size
-  const machines = machinesQuery.data ?? []
-  const constrainedMachines = machines.filter((machine) =>
-    ['MAINTENANCE', 'OFFLINE'].includes(machine.status),
-  )
-  const activeStage =
-    activeOrder?.stages?.find((stage) =>
-      ['READY', 'IN_PROGRESS'].includes(stage.status),
-    ) ?? activeOrder?.stages?.[0]
-  const productionContext = {
-    productionOrderId: activeOrder?.id,
-    productionStageId: activeStage?.id,
-  }
+  const workspace = useProductionWorkspace()
+  const {
+    contextOpen,
+    setContextOpen,
+    selectEntity,
+    clearSelection,
+    metricsQuery,
+    ordersQuery,
+    workCentersQuery,
+    machinesQuery,
+    orders,
+    activeOrder,
+    delayedOrders,
+    activeTasks,
+    blockedTasks,
+    operatorLoad,
+    machines,
+    constrainedMachines,
+    activeStage,
+    productionContext,
+    workspaceEvents,
+  } = workspace
 
   return (
-    <PageLayout
+    <OperationalWorkspaceShell
       title="Production Operations"
       description="Fabrication execution lanes, machine load, stage progression, and production tasks."
     >
@@ -117,6 +100,46 @@ export function ProductionOperationsPage() {
           </>
         }
       />
+      <TelemetryStrip
+        dense
+        items={[
+          {
+            label: 'Active order',
+            value: activeOrder?.orderNo ?? 'none',
+            tone: activeOrder ? 'success' : 'neutral',
+            detail: activeStage?.code ?? 'stage waiting',
+          },
+          {
+            label: 'Delayed lane',
+            value: delayedOrders.length,
+            tone: delayedOrders.length > 0 ? 'warning' : 'success',
+            progress: delayedOrders.length * 20,
+          },
+          {
+            label: 'Blocked tasks',
+            value: blockedTasks.length,
+            tone: blockedTasks.length > 0 ? 'danger' : 'success',
+            detail: 'operator intervention',
+          },
+          {
+            label: 'Machine constraints',
+            value: constrainedMachines.length,
+            tone:
+              constrainedMachines.length > 0
+                ? 'danger'
+                : 'success',
+            detail: 'maintenance/offline',
+          },
+          {
+            label: 'Last event',
+            value: workspaceEvents.lastEvent?.event ?? 'waiting',
+            tone: workspaceEvents.lastEvent ? 'info' : 'neutral',
+            detail:
+              workspaceEvents.lastEvent?.entityId ??
+              'domain stream idle',
+          },
+        ]}
+      />
       <StickyOpsToolbar
         domain="production"
         quickFilters={
@@ -142,7 +165,13 @@ export function ProductionOperationsPage() {
         actions={
           <button
             type="button"
-            onClick={() => setDetailOpen(true)}
+            onClick={() => {
+              if (activeOrder) {
+                selectEntity(activeOrder)
+              } else {
+                setContextOpen(true)
+              }
+            }}
             className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-200"
           >
             Open context
@@ -209,59 +238,108 @@ export function ProductionOperationsPage() {
           tone="neutral"
         />
       </div>
-      <ProductionBoard orders={ordersQuery.data} />
-      <SectionCard
-        title="Machine utilization strip"
-        description="Live work-center load and downtime awareness from production metrics."
-      >
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {machines.slice(0, 8).map((machine) => (
-            <div
-              key={machine.id}
-              className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3"
+      <SplitWorkspaceLayout
+        ratio="main-heavy"
+        main={
+          <>
+            <ProductionBoard orders={ordersQuery.data} />
+            <SectionCard
+              title="Machine utilization strip"
+              description="Live work-center load and downtime awareness from production metrics."
             >
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="font-medium text-white">
-                  {machine.code}
-                </span>
-                <StatusBadge
-                  tone={
-                    machine.status === 'RUNNING'
-                      ? 'success'
-                      : machine.status === 'MAINTENANCE'
-                        ? 'warning'
-                        : machine.status === 'OFFLINE'
-                          ? 'danger'
-                          : 'neutral'
-                  }
-                >
-                  {machine.status}
-                </StatusBadge>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {machines.slice(0, 8).map((machine) => (
+                  <div
+                    key={machine.id}
+                    className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-medium text-white">
+                        {machine.code}
+                      </span>
+                      <StatusBadge
+                        tone={
+                          machine.status === 'RUNNING'
+                            ? 'success'
+                            : machine.status === 'MAINTENANCE'
+                              ? 'warning'
+                              : machine.status === 'OFFLINE'
+                                ? 'danger'
+                                : 'neutral'
+                        }
+                      >
+                        {machine.status}
+                      </StatusBadge>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
+                      <div
+                        className="h-full rounded-full bg-cyan-400"
+                        style={{
+                          width: `${Math.min(machine.utilization, 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-500">
+                      {machine.name} - {machine.utilization}% load
+                    </p>
+                  </div>
+                ))}
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
-                <div
-                  className="h-full rounded-full bg-cyan-400"
-                  style={{
-                    width: `${Math.min(machine.utilization, 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-zinc-500">
-                {machine.name} - {machine.utilization}% load
-              </p>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
+            </SectionCard>
+          </>
+        }
+        side={
+          <>
+            <OperatorQuickActionsPanel
+              domains={['production']}
+              context={productionContext}
+              title="Production operator actions"
+            />
+            <ContextInsightPanel
+              title="Production context"
+              subtitle="Selection-aware production side workspace."
+              selectedLabel={
+                activeOrder
+                  ? `${activeOrder.orderNo} / ${activeOrder.status}`
+                  : undefined
+              }
+              metrics={[
+                {
+                  label: 'active stage',
+                  value: activeStage?.code ?? '-',
+                  tone: activeStage ? 'info' : 'neutral',
+                },
+                {
+                  label: 'tasks',
+                  value: activeOrder?.tasks?.length ?? 0,
+                  tone: 'success',
+                },
+              ]}
+              timeline={(activeOrder?.stages ?? [])
+                .slice(0, 5)
+                .map((stage) => ({
+                  id: stage.id,
+                  title: stage.code,
+                  description: stage.status,
+                  tone:
+                    stage.status === 'BLOCKED'
+                      ? 'danger'
+                      : stage.status === 'COMPLETED'
+                        ? 'success'
+                        : 'info',
+                }))}
+            />
+            <WorkspaceEventSurface
+              title="Production event surface"
+              events={workspaceEvents.events}
+            />
+          </>
+        }
+      />
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
         <StageTimeline order={activeOrder} />
         <ProductionProgressVisualization metrics={metricsQuery.data} />
       </div>
-      <OperatorQuickActionsPanel
-        domains={['production']}
-        context={productionContext}
-        title="Production operator actions"
-      />
       <div className="grid gap-5 xl:grid-cols-2">
         <WorkCenterCards workCenters={workCentersQuery.data} />
         <MachineStatusWidgets machines={machinesQuery.data} />
@@ -270,7 +348,7 @@ export function ProductionOperationsPage() {
         tasks={activeTasks}
       />
       <ContextualOperationDrawer
-        open={detailOpen}
+        open={contextOpen}
         title={
           activeOrder
             ? `Production ${activeOrder.orderNo}`
@@ -283,8 +361,11 @@ export function ProductionOperationsPage() {
         }
         context={productionContext}
         domains={['production']}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => {
+          setContextOpen(false)
+          clearSelection()
+        }}
       />
-    </PageLayout>
+    </OperationalWorkspaceShell>
   )
 }

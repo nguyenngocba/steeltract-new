@@ -35,6 +35,8 @@ import { ProductionModule } from './modules/production/production.module';
 import { QcModule } from './modules/qc/qc.module';
 import { YardModule } from './modules/yard/yard.module';
 import { SimulationModule } from './modules/simulation/simulation.module';
+import { DictionariesModule } from './modules/master-data/dictionaries/dictionaries.module';
+import { UomModule } from './modules/master-data/uom/uom.module';
 @Module({
   imports: [
     EventsModule,
@@ -70,6 +72,8 @@ import { SimulationModule } from './modules/simulation/simulation.module';
     QcModule,
     YardModule,
     SimulationModule,
+    UomModule,
+    DictionariesModule,
   ],
   controllers: [AppController],
 })

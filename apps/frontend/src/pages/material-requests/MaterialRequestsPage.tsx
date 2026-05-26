@@ -4,8 +4,12 @@ import {
 } from 'react'
 
 import { api } from '../../lib/api'
+import {
+  useActiveUomQuery,
+} from '../../modules/master-data/uom'
 
 export function MaterialRequestsPage() {
+  const uomQuery = useActiveUomQuery()
   const [requests,
     setRequests] =
     useState<any[]>([])
@@ -215,7 +219,7 @@ export function MaterialRequestsPage() {
                       className="w-full bg-zinc-700 rounded-xl px-4 py-3"
                     />
 
-                    <input
+                    <select
                       value={
                         item.unit
                       }
@@ -226,9 +230,20 @@ export function MaterialRequestsPage() {
                           e.target.value,
                         )
                       }
-                      placeholder="Unit"
                       className="w-full bg-zinc-700 rounded-xl px-4 py-3"
-                    />
+                    >
+                      <option value="">
+                        Unit of measure
+                      </option>
+                      {(uomQuery.data ?? []).map((unit) => (
+                        <option
+                          key={unit.id}
+                          value={unit.symbol}
+                        >
+                          {unit.code} - {unit.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ),
               )}
