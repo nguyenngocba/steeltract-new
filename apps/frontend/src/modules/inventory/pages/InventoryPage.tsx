@@ -1,10 +1,8 @@
-import { useState } from 'react'
+import { useState }
+from 'react'
 
-import { InventoryDashboardTab }
-from '../tabs/dashboard/InventoryDashboardTab'
-
-import { MaterialsTab }
-from '../tabs/materials/MaterialsTab'
+import { MaterialTable }
+from '../components/material-table/MaterialTable'
 
 const tabs = [
   'dashboard',
@@ -22,7 +20,7 @@ const tabs = [
 export function InventoryPage() {
 
   const [activeTab, setActiveTab] =
-    useState('dashboard')
+    useState('materials')
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-zinc-950">
@@ -30,21 +28,13 @@ export function InventoryPage() {
       {/* HEADER */}
       <div className="border-b border-zinc-800 px-6 py-5">
 
-        <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">
+          Inventory Runtime
+        </h1>
 
-          <div>
-
-            <h1 className="text-3xl font-bold text-white">
-              Inventory Runtime
-            </h1>
-
-            <p className="mt-1 text-sm text-zinc-500">
-              Warehouse + Yard + Material Management
-            </p>
-
-          </div>
-
-        </div>
+        <p className="mt-1 text-sm text-zinc-500">
+          Warehouse + Yard + Material Management
+        </p>
 
       </div>
 
@@ -72,12 +62,8 @@ export function InventoryPage() {
       {/* CONTENT */}
       <div className="flex-1 overflow-auto p-6">
 
-        {activeTab === 'dashboard' && (
-          <InventoryDashboardTab />
-        )}
-
         {activeTab === 'materials' && (
-          <MaterialsTab />
+          <MaterialTable />
         )}
 
       </div>

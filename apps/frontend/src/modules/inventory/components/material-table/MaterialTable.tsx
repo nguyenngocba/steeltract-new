@@ -1,0 +1,126 @@
+import { useQuery }
+from '@tanstack/react-query'
+
+import { getMaterials }
+from '../../api/materials.api'
+
+export function MaterialTable() {
+
+  const {
+    data,
+    isLoading,
+  } = useQuery({
+
+    queryKey: ['materials'],
+
+    queryFn: getMaterials,
+  })
+
+  if (isLoading) {
+
+    return (
+      <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-400">
+        Loading materials...
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900">
+
+      {/* HEADER */}
+      <div className="border-b border-zinc-800 px-6 py-4">
+
+        <h2 className="text-xl font-bold text-white">
+          Material Runtime
+        </h2>
+
+      </div>
+
+      {/* TABLE */}
+      <div className="overflow-auto">
+
+        <table className="w-full">
+
+          <thead className="bg-zinc-950">
+
+            <tr>
+
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                Material Code
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                Material Name
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                Category
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                Quantity
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                Warehouse
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                Status
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {data?.map((item: any) => (
+
+              <tr
+                key={item.id}
+                className="border-t border-zinc-800 hover:bg-zinc-800/30"
+              >
+
+                <td className="px-4 py-4 text-cyan-400">
+                  {item.materialCode}
+                </td>
+
+                <td className="px-4 py-4 text-white">
+                  {item.materialName}
+                </td>
+
+                <td className="px-4 py-4 text-zinc-400">
+                  {item.category}
+                </td>
+
+                <td className="px-4 py-4 text-emerald-400">
+                  {item.quantity}
+                </td>
+
+                <td className="px-4 py-4 text-zinc-400">
+                  {item.warehouse}
+                </td>
+
+                <td className="px-4 py-4">
+
+                  <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-400">
+                    {item.status}
+                  </span>
+
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+  )
+}
