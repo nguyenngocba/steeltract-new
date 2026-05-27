@@ -1,0 +1,21 @@
+{
+  "overview": {
+    "title": "Yard Operations Center",
+    "subtitle": "Realtime yard telemetry and movement intelligence"
+  },
+
+  "tabs": {
+    "overview": "Overview",
+    "map2d": "2D Map",
+    "map3d": "3D Map",
+    "inbound": "Inbound Yard",
+    "outbound": "Outbound Yard",
+    "movement": "Movement",
+    "tracking": "Tracking",
+    "staging": "Shipment Staging",
+    "heatmap": "Heatmaps",
+    "crane": "Crane Operations",
+    "history": "History",
+    "analytics": "Analytics"
+  }
+}

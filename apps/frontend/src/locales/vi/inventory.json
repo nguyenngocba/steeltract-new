@@ -1,0 +1,21 @@
+{
+  "overview": {
+    "title": "Trung tâm vận hành kho vật tư",
+    "subtitle": "Giám sát tồn kho và telemetry thời gian thực"
+  },
+
+  "tabs": {
+    "overview": "Tổng quan",
+    "stock": "Tồn kho",
+    "receiving": "Nhập kho",
+    "outbound": "Xuất kho",
+    "transfer": "Điều chuyển",
+    "counting": "Kiểm kê",
+    "transactions": "Lịch sử giao dịch",
+    "alerts": "Cảnh báo",
+    "returns": "Trả vật tư",
+    "reservations": "Reservation",
+    "map": "Bản đồ kho",
+    "analytics": "Phân tích"
+  }
+}

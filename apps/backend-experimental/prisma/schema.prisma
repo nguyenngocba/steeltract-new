@@ -1,0 +1,731 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  password    String
+  fullName    String
+  roleId      String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  role        Role @relation(fields: [roleId], references: [id])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  createdAt   DateTime @default(now())
+
+  users       User[]
+  permissions Permission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  roleId      String
+
+  module      String
+  canView     Boolean @default(false)
+  canCreate   Boolean @default(false)
+  canUpdate   Boolean @default(false)
+  canDelete   Boolean @default(false)
+
+  role        Role @relation(fields: [roleId], references: [id])
+}
+
+model Material {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  category      String
+  unit          String
+  quantity      Float
+  warehouse     String
+  location      String
+  minStock      Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model InventoryTransaction {
+  id            String   @id @default(cuid())
+  type          String
+  materialCode  String
+  quantity      Float
+  fromLocation  String?
+  toLocation    String?
+  createdAt     DateTime @default(now())
+}
+
+model YardSlot {
+  id            String   @id @default(cuid())
+  slotCode      String   @unique
+  zone          String
+  level         Int
+  occupancy     Float
+  material      String?
+  quantity      Float?
+  updatedAt     DateTime @updatedAt
+}
+
+model Component {
+  id            String   @id @default(cuid())
+  componentCode String   @unique
+  name          String
+  status        String
+  progress      Float
+  machine       String?
+  zone          String?
+  createdAt     DateTime @default(now())
+}
+
+model MachineTelemetry {
+  id            String   @id @default(cuid())
+  machineCode   String
+  temperature   Float
+  load          Float
+  status        String
+  createdAt     DateTime @default(now())
+}
+
+model ProductionOrder {
+  id              String   @id @default(cuid())
+
+  orderCode       String   @unique
+
+  projectName     String
+
+  componentCode   String
+
+  quantity        Float
+
+  status          String
+
+  priority        String
+
+  startDate       DateTime
+
+  dueDate         DateTime
+
+  assignedMachine String?
+
+  assignedZone    String?
+
+  progress        Float    @default(0)
+
+  createdAt       DateTime @default(now())
+}
+
+model ProductionTask {
+  id              String   @id @default(cuid())
+
+  productionOrderId String
+
+  taskName        String
+
+  machineCode     String?
+
+  operatorName    String?
+
+  status          String
+
+  progress        Float
+
+  startedAt       DateTime?
+
+  completedAt     DateTime?
+
+  productionOrder ProductionOrder
+  @relation(
+    fields: [productionOrderId],
+    references: [id]
+  )
+}
+
+model ProductionSchedule {
+  id              String   @id @default(cuid())
+
+  machineCode     String
+
+  shift           String
+
+  startTime       DateTime
+
+  endTime         DateTime
+
+  status          String
+
+  createdAt       DateTime @default(now())
+}
+
+model MaintenanceMachine {
+  id                String   @id @default(cuid())
+
+  machineCode       String   @unique
+
+  machineName       String
+
+  category          String
+
+  manufacturer      String?
+
+  serialNumber      String?
+
+  installationDate  DateTime?
+
+  status            String
+
+  location          String?
+
+  healthScore       Float    @default(100)
+
+  createdAt         DateTime @default(now())
+}
+
+model MaintenanceWorkOrder {
+  id                String   @id @default(cuid())
+
+  workOrderCode     String   @unique
+
+  machineCode       String
+
+  maintenanceType   String
+
+  priority          String
+
+  assignedTechnician String?
+
+  issueDescription  String
+
+  status            String
+
+  estimatedHours    Float?
+
+  startedAt         DateTime?
+
+  completedAt       DateTime?
+
+  createdAt         DateTime @default(now())
+}
+
+model MaintenanceSchedule {
+  id                String   @id @default(cuid())
+
+  machineCode       String
+
+  scheduleType      String
+
+  frequency         String
+
+  nextMaintenance   DateTime
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model MaintenanceHistory {
+  id                String   @id @default(cuid())
+
+  machineCode       String
+
+  actionType        String
+
+  description       String
+
+  technician        String?
+
+  cost              Float?
+
+  createdAt         DateTime @default(now())
+}
+
+model TrackingTag {
+  id              String   @id @default(cuid())
+
+  tagCode         String   @unique
+
+  tagType         String
+
+  referenceType   String
+
+  referenceCode   String
+
+  status          String
+
+  lastLocation    String?
+
+  createdAt       DateTime @default(now())
+}
+
+model TrackingHistory {
+  id              String   @id @default(cuid())
+
+  tagCode         String
+
+  actionType      String
+
+  fromLocation    String?
+
+  toLocation      String?
+
+  scannedBy       String?
+
+  deviceId        String?
+
+  createdAt       DateTime @default(now())
+}
+
+model ScannerDevice {
+  id              String   @id @default(cuid())
+
+  deviceCode      String   @unique
+
+  deviceName      String
+
+  deviceType      String
+
+  status          String
+
+  lastSync        DateTime?
+
+  createdAt       DateTime @default(now())
+}
+
+model QualityInspection {
+  id                String   @id @default(cuid())
+
+  inspectionCode    String   @unique
+
+  referenceType     String
+
+  referenceCode     String
+
+  inspector         String
+
+  inspectionType    String
+
+  status            String
+
+  score             Float?
+
+  note              String?
+
+  createdAt         DateTime @default(now())
+}
+
+model DefectReport {
+  id                String   @id @default(cuid())
+
+  defectCode        String   @unique
+
+  referenceCode     String
+
+  defectType        String
+
+  severity          String
+
+  location          String?
+
+  description       String
+
+  imageUrl          String?
+
+  status            String
+
+  reportedBy        String
+
+  createdAt         DateTime @default(now())
+}
+
+model NCRRecord {
+  id                String   @id @default(cuid())
+
+  ncrCode           String   @unique
+
+  defectCode        String
+
+  correctiveAction  String?
+
+  rootCause         String?
+
+  assignedTo        String?
+
+  dueDate           DateTime?
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model QualityChecklist {
+  id                String   @id @default(cuid())
+
+  checklistCode     String   @unique
+
+  title             String
+
+  category          String
+
+  items             Json
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model Employee {
+  id                String   @id @default(cuid())
+
+  employeeCode      String   @unique
+
+  fullName          String
+
+  department        String
+
+  position          String
+
+  phoneNumber       String?
+
+  email             String?
+
+  shiftGroup        String?
+
+  status            String
+
+  joinedAt          DateTime
+
+  createdAt         DateTime @default(now())
+}
+
+model ShiftSchedule {
+  id                String   @id @default(cuid())
+
+  shiftCode         String   @unique
+
+  shiftName         String
+
+  startTime         String
+
+  endTime           String
+
+  breakMinutes      Int
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model AttendanceRecord {
+  id                String   @id @default(cuid())
+
+  employeeCode      String
+
+  shiftCode         String?
+
+  checkIn           DateTime?
+
+  checkOut          DateTime?
+
+  workingHours      Float?
+
+  attendanceStatus  String
+
+  createdAt         DateTime @default(now())
+}
+
+model OperatorAssignment {
+  id                String   @id @default(cuid())
+
+  employeeCode      String
+
+  machineCode       String
+
+  assignedShift     String
+
+  assignedDate      DateTime
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model Supplier {
+  id                String   @id @default(cuid())
+
+  supplierCode      String   @unique
+
+  supplierName      String
+
+  contactPerson     String?
+
+  phoneNumber       String?
+
+  email             String?
+
+  address           String?
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model PurchaseOrder {
+  id                String   @id @default(cuid())
+
+  poCode            String   @unique
+
+  supplierCode      String
+
+  orderDate         DateTime
+
+  expectedDate      DateTime?
+
+  totalAmount       Float
+
+  status            String
+
+  createdBy         String?
+
+  createdAt         DateTime @default(now())
+}
+
+model PurchaseOrderItem {
+  id                String   @id @default(cuid())
+
+  poCode            String
+
+  materialCode      String
+
+  materialName      String
+
+  quantity          Float
+
+  unitPrice         Float
+
+  totalPrice        Float
+
+  createdAt         DateTime @default(now())
+}
+
+model ExpenseRecord {
+  id                String   @id @default(cuid())
+
+  expenseCode       String   @unique
+
+  category          String
+
+  amount            Float
+
+  description       String?
+
+  recordedBy        String?
+
+  expenseDate       DateTime
+
+  createdAt         DateTime @default(now())
+}
+
+model CostingRecord {
+  id                String   @id @default(cuid())
+
+  costingCode       String   @unique
+
+  referenceCode     String
+
+  materialCost      Float
+
+  laborCost         Float
+
+  machineCost       Float
+
+  overheadCost      Float
+
+  totalCost         Float
+
+  createdAt         DateTime @default(now())
+}
+
+model FinancialTransaction {
+  id                String   @id @default(cuid())
+
+  transactionCode   String   @unique
+
+  transactionType   String
+
+  amount            Float
+
+  description       String?
+
+  status            String
+
+  transactionDate   DateTime
+
+  createdAt         DateTime @default(now())
+}
+
+model WorkflowDefinition {
+  id                String   @id @default(cuid())
+
+  workflowCode      String   @unique
+
+  workflowName      String
+
+  module            String
+
+  triggerType       String
+
+  steps             Json
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model WorkflowExecution {
+  id                String   @id @default(cuid())
+
+  executionCode     String   @unique
+
+  workflowCode      String
+
+  referenceCode     String?
+
+  currentStep       Int
+
+  status            String
+
+  startedBy         String?
+
+  createdAt         DateTime @default(now())
+}
+
+model ApprovalRequest {
+  id                String   @id @default(cuid())
+
+  requestCode       String   @unique
+
+  module            String
+
+  referenceCode     String
+
+  requester         String
+
+  approver          String?
+
+  approvalLevel     Int
+
+  status            String
+
+  comment           String?
+
+  createdAt         DateTime @default(now())
+}
+
+model AutomationRule {
+  id                String   @id @default(cuid())
+
+  ruleCode          String   @unique
+
+  ruleName          String
+
+  triggerEvent      String
+
+  conditions        Json
+
+  actions           Json
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model NotificationEvent {
+  id                String   @id @default(cuid())
+
+  eventCode         String   @unique
+
+  eventType         String
+
+  recipient         String?
+
+  title             String
+
+  message           String
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model AiAgent {
+  id                String   @id @default(cuid())
+
+  agentCode         String   @unique
+
+  agentName         String
+
+  agentType         String
+
+  model             String
+
+  status            String
+
+  createdAt         DateTime @default(now())
+}
+
+model AiPrediction {
+  id                String   @id @default(cuid())
+
+  predictionCode    String   @unique
+
+  predictionType    String
+
+  referenceCode     String?
+
+  inputData         Json
+
+  predictionResult  Json
+
+  confidence        Float?
+
+  createdAt         DateTime @default(now())
+}
+
+model AiOptimization {
+  id                String   @id @default(cuid())
+
+  optimizationCode  String   @unique
+
+  optimizationType  String
+
+  beforeValue       Float
+
+  afterValue        Float
+
+  improvement       Float
+
+  createdAt         DateTime @default(now())
+}
+
+model AiConversation {
+  id                String   @id @default(cuid())
+
+  conversationCode  String   @unique
+
+  userMessage       String
+
+  aiResponse        String
+
+  agentType         String
+
+  createdAt         DateTime @default(now())
+}

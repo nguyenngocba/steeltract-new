@@ -1,0 +1,18 @@
+{
+  "save": "Save",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "search": "Search",
+  "filter": "Filter",
+  "advancedFilters": "Advanced Filters",
+  "loading": "Loading",
+  "close": "Close",
+  "approve": "Approve",
+  "reject": "Reject",
+  "create": "Create",
+  "edit": "Edit",
+  "delete": "Delete",
+  "details": "Details",
+  "status": "Status",
+  "overview": "Overview"
+}

@@ -760,4 +760,16 @@ export class YardService {
       },
     };
   }
+
+
+  async getYards() {
+
+  return []
+}
+
+  async getTrucks() {
+
+    return []
+  }
+
 }

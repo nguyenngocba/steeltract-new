@@ -653,4 +653,18 @@ export class WorkflowService {
   private toJson(value: Record<string, unknown> | undefined) {
     return value as Prisma.InputJsonValue | undefined;
   }
+
+
+  async getApprovals() {
+
+    return []
+  }
+
+  async createApproval(
+    body: any,
+  ) {
+
+    return body
+  }
+
 }

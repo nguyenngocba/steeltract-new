@@ -1,0 +1,21 @@
+{
+  "overview": {
+    "title": "Trung tâm vận hành bãi tập kết",
+    "subtitle": "Giám sát yard runtime và telemetry thời gian thực"
+  },
+
+  "tabs": {
+    "overview": "Tổng quan",
+    "map2d": "Bản đồ 2D",
+    "map3d": "Bản đồ 3D",
+    "inbound": "Yard nhập",
+    "outbound": "Yard xuất",
+    "movement": "Di chuyển",
+    "tracking": "Theo dõi vị trí",
+    "staging": "Tập kết hàng",
+    "heatmap": "Bản đồ nhiệt",
+    "crane": "Vận hành cẩu",
+    "history": "Lịch sử",
+    "analytics": "Phân tích"
+  }
+}

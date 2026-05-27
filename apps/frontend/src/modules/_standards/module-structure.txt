@@ -1,0 +1,26 @@
+STANDARD MODULE STRUCTURE
+
+module/
+  api/
+  hooks/
+  components/
+  pages/
+  store/
+  types/
+  config/
+  services/
+  widgets/
+  tabs/
+  index.ts
+
+OPTIONAL:
+  charts/
+  dialogs/
+  telemetry/
+
+NOT ALLOWED:
+  runtime-runtime
+  cockpit-runtime
+  engine-runtime
+  workspace-runtime
+  telemetry-runtime-runtime

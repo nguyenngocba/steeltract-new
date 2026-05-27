@@ -1,0 +1,21 @@
+{
+  "overview": {
+    "title": "Inventory Operations Center",
+    "subtitle": "Realtime warehouse telemetry and movement intelligence"
+  },
+
+  "tabs": {
+    "overview": "Overview",
+    "stock": "Stock",
+    "receiving": "Receiving",
+    "outbound": "Outbound",
+    "transfer": "Transfers",
+    "counting": "Counting",
+    "transactions": "Transactions",
+    "alerts": "Alerts",
+    "returns": "Returns",
+    "reservations": "Reservations",
+    "map": "Warehouse Map",
+    "analytics": "Analytics"
+  }
+}

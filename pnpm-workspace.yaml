@@ -9,5 +9,6 @@ allowBuilds:
   core-js: true
   esbuild: true
   prisma: true
+  sharp: true
   tesseract.js: true
   unrs-resolver: true

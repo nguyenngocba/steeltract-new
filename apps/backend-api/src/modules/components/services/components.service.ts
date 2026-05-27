@@ -272,4 +272,18 @@ export class ComponentsService {
       tx,
     );
   }
+
+
+  async getComponents() {
+
+    if (
+      typeof this.findAll === 'function'
+    ) {
+
+      return this.findAll({} as any)
+    }
+
+    return []
+  }
+
 }
