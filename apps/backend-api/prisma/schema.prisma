@@ -2356,3 +2356,129 @@ model ActivityLog {
 
   @@map("activity_logs")
 }
+
+# =========================================================
+# SUPPLIER
+# =========================================================
+
+model Supplier {
+
+  id          String   @id @default(uuid())
+
+  code        String   @unique
+
+  name        String
+
+  contact     String?
+
+  phone       String?
+
+  email       String?
+
+  address     String?
+
+  createdAt   DateTime @default(now())
+
+  updatedAt   DateTime @updatedAt
+}
+
+# =========================================================
+# PURCHASE RECEIVING
+# =========================================================
+
+model PurchaseReceiving {
+
+  id            String   @id @default(uuid())
+
+  receivingNo   String   @unique
+
+  supplierId    String
+
+  materialId    String
+
+  quantity      Float
+
+  status        String   @default("RECEIVED")
+
+  createdAt     DateTime @default(now())
+}
+
+# =========================================================
+# BOM
+# =========================================================
+
+model BOM {
+
+  id            String   @id @default(uuid())
+
+  bomNo         String   @unique
+
+  productCode   String
+
+  productName   String
+
+  version       String
+
+  status        String   @default("ACTIVE")
+
+  createdAt     DateTime @default(now())
+
+  items         BOMItem[]
+}
+
+model BOMItem {
+
+  id            String   @id @default(uuid())
+
+  bomId         String
+
+  materialId    String
+
+  quantity      Float
+
+  bom           BOM @relation(fields: [bomId], references: [id])
+}
+
+# =========================================================
+# WORK ORDER
+# =========================================================
+
+model WorkOrder {
+
+  id              String   @id @default(uuid())
+
+  workOrderNo     String   @unique
+
+  productCode     String
+
+  quantity         Float
+
+  plannedStart    DateTime?
+
+  plannedEnd      DateTime?
+
+  status          String   @default("PLANNED")
+
+  createdAt       DateTime @default(now())
+}
+
+# =========================================================
+# PRODUCTION SCHEDULE
+# =========================================================
+
+model ProductionSchedule {
+
+  id              String   @id @default(uuid())
+
+  scheduleNo      String   @unique
+
+  machine         String
+
+  shift           String
+
+  workOrderId     String
+
+  scheduledDate   DateTime
+
+  status          String   @default("SCHEDULED")
+}

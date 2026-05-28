@@ -1,0 +1,117 @@
+import {
+  useCallback,
+} from 'react'
+import type {
+  Graphics,
+} from 'pixi.js'
+
+import type {
+  YardMovement,
+} from '../../yard'
+import type {
+  YardRendererLayerProps,
+  YardWorldSlot,
+} from '../renderer/yard-visualization.types'
+
+interface YardMovementLayerProps
+  extends YardRendererLayerProps {
+  movements?: YardMovement[]
+}
+
+function center(slot: YardWorldSlot) {
+  return {
+    x: slot.x + slot.width / 2,
+    y: slot.y + slot.height / 2,
+  }
+}
+
+export function YardMovementLayer({
+  movements = [],
+  world,
+}: YardMovementLayerProps) {
+  const draw = useCallback(
+    (graphics: Graphics) => {
+      graphics.clear()
+
+      const byId = new Map(
+        world.slots.map((slot) => [
+          slot.id,
+          slot,
+        ]),
+      )
+
+      for (const movement of movements.slice(0, 40)) {
+        const from = movement.fromSlotId
+          ? byId.get(movement.fromSlotId)
+          : undefined
+        const to = movement.toSlotId
+          ? byId.get(movement.toSlotId)
+          : undefined
+
+        if (!from || !to) {
+          continue
+        }
+
+        const start = center(from)
+        const end = center(to)
+        const control = {
+          x: (start.x + end.x) / 2,
+          y:
+            (start.y + end.y) / 2 -
+            Math.min(
+              Math.abs(end.x - start.x),
+              80,
+            ) *
+              0.18,
+        }
+
+        for (const trail of [8, 5, 2]) {
+          graphics.setStrokeStyle({
+            color: 0x0e7490,
+            alpha: 0.08 * trail,
+            width: trail,
+          })
+          graphics.moveTo(start.x, start.y)
+          graphics.quadraticCurveTo(
+            control.x,
+            control.y,
+            end.x,
+            end.y,
+          )
+          graphics.stroke()
+        }
+
+        graphics.setStrokeStyle({
+          color: 0x38bdf8,
+          alpha: 0.58,
+          width: 2,
+        })
+        graphics.moveTo(start.x, start.y)
+        graphics.quadraticCurveTo(
+          control.x,
+          control.y,
+          end.x,
+          end.y,
+        )
+        graphics.stroke()
+
+        graphics.setFillStyle({
+          color: 0x67e8f9,
+          alpha: 0.78,
+        })
+        graphics.circle(end.x, end.y, 4)
+        graphics.fill()
+        graphics.setStrokeStyle({
+          color: 0x67e8f9,
+          alpha: 0.3,
+          width: 1,
+        })
+        graphics.circle(end.x, end.y, 10)
+        graphics.stroke()
+      }
+    },
+    [movements, world.slots],
+  )
+
+  return <pixiGraphics draw={draw} />
+}

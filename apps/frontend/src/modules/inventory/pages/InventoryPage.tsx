@@ -1,70 +1,86 @@
-import { useState }
-from 'react'
+import {
+  KpiCard,
+} from '../../../shared/ui/enterprise/KpiCard'
 
-import { MaterialTable }
-from '../components/material-table/MaterialTable'
+import {
+  RuntimePanel,
+} from '../../../shared/ui/enterprise/RuntimePanel'
 
-const tabs = [
-  'dashboard',
-  'materials',
-  'inbound',
-  'outbound',
-  'transfer',
-  'stocktake',
-  'yard',
-  'tracking',
-  'reports',
-  'settings',
-]
+import {
+  SectionHeader,
+} from '../../../shared/ui/enterprise/SectionHeader'
 
 export function InventoryPage() {
 
-  const [activeTab, setActiveTab] =
-    useState('materials')
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-zinc-950">
 
-      {/* HEADER */}
-      <div className="border-b border-zinc-800 px-6 py-5">
+    <div className="space-y-8 p-8">
 
-        <h1 className="text-3xl font-bold text-white">
-          Inventory Runtime
-        </h1>
+      <SectionHeader
+        title="Inventory Runtime"
+        description="Realtime warehouse management, stock analytics, material flow and logistics telemetry."
+      />
 
-        <p className="mt-1 text-sm text-zinc-500">
-          Warehouse + Yard + Material Management
-        </p>
+      <div className="grid gap-6 xl:grid-cols-4">
+
+        <KpiCard
+          title="Total Materials"
+          value="12,450"
+          trend="+4.2%"
+        />
+
+        <KpiCard
+          title="Inbound Today"
+          value="248"
+          trend="+12%"
+        />
+
+        <KpiCard
+          title="Outbound Today"
+          value="173"
+          trend="+7%"
+        />
+
+        <KpiCard
+          title="Warehouse Usage"
+          value="84%"
+          trend="+2%"
+        />
 
       </div>
 
-      {/* TABS */}
-      <div className="flex gap-2 overflow-auto border-b border-zinc-800 px-6 py-4">
+      <div className="grid gap-6 xl:grid-cols-3">
 
-        {tabs.map((tab) => (
+        <RuntimePanel
+          title="Material Flow"
+          className="xl:col-span-2"
+        >
 
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-              activeTab === tab
-                ? 'bg-cyan-600 text-white'
-                : 'bg-zinc-900 text-zinc-400'
-            }`}
-          >
-            {tab}
-          </button>
+          <div className="h-[420px] rounded-2xl bg-black" />
 
-        ))}
+        </RuntimePanel>
 
-      </div>
+        <RuntimePanel
+          title="Realtime Alerts"
+        >
 
-      {/* CONTENT */}
-      <div className="flex-1 overflow-auto p-6">
+          <div className="space-y-4">
 
-        {activeTab === 'materials' && (
-          <MaterialTable />
-        )}
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+              Rack B12 overload detected
+            </div>
+
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-300">
+              Material aging threshold warning
+            </div>
+
+            <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm text-cyan-300">
+              Dock telemetry synchronized
+            </div>
+
+          </div>
+
+        </RuntimePanel>
 
       </div>
 

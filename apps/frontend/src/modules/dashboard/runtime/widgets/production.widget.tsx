@@ -1,1 +1,11 @@
-export function production.widget() { return <div className="text-white p-4">production.widget</div> }
+export function ProductionWidget() {
+
+  return (
+
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-white">
+
+      Production Runtime Widget
+
+    </div>
+  )
+}

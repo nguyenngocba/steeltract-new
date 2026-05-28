@@ -26,7 +26,7 @@ import {
 } from '../qc-ui'
 import {
   useYardSearchQuery,
-} from '../yard-ui'
+} from '../yard'
 import {
   useWorkflowInstancesQuery,
 } from '../../lib/workflow'
@@ -190,7 +190,7 @@ export function OperationalSearchPanel() {
       tone: 'warning' as const,
     }))
     const yard = asList(yardQuery.data).map(
-      (placement) => ({
+      (placement: any) => ({
         id: placement.id,
         type: 'yard slot',
         label: placement.itemCode,

@@ -1,1 +1,1 @@
-export function cockpit-configs() { return <div /> }
+export function cockpitCONFIGS() { return <div /> }

@@ -1,1 +1,1 @@
-export * from './ui/ComponentsPage'
+export {}

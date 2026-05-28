@@ -1,0 +1,116 @@
+version: '3.9'
+
+services:
+
+  # =======================================================
+  # FRONTEND
+  # =======================================================
+
+  frontend:
+
+    build:
+      context: ../../apps/frontend
+
+    container_name:
+      steeltrack-frontend
+
+    restart:
+      unless-stopped
+
+    ports:
+      - "5173:80"
+
+    depends_on:
+      - backend
+
+  # =======================================================
+  # BACKEND
+  # =======================================================
+
+  backend:
+
+    build:
+      context: ../../backend-api
+
+    container_name:
+      steeltrack-backend
+
+    restart:
+      unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    environment:
+
+      DATABASE_URL:
+        "postgresql://postgres:postgres@postgres:5432/steeltrack"
+
+    depends_on:
+      - postgres
+
+  # =======================================================
+  # POSTGRES
+  # =======================================================
+
+  postgres:
+
+    image:
+      postgres:16-alpine
+
+    container_name:
+      steeltrack-postgres
+
+    restart:
+      unless-stopped
+
+    environment:
+
+      POSTGRES_DB:
+        steeltrack
+
+      POSTGRES_USER:
+        postgres
+
+      POSTGRES_PASSWORD:
+        postgres
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # =======================================================
+  # NGINX
+  # =======================================================
+
+  nginx:
+
+    image:
+      nginx:stable-alpine
+
+    container_name:
+      steeltrack-nginx
+
+    restart:
+      unless-stopped
+
+    ports:
+      - "80:80"
+
+    volumes:
+
+      - ../nginx/default.conf:/etc/nginx/conf.d/default.conf
+
+    depends_on:
+      - frontend
+      - backend
+
+# =========================================================
+# VOLUMES
+# =========================================================
+
+volumes:
+
+  postgres_data:

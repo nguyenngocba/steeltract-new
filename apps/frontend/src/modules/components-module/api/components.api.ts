@@ -1,15 +1,11 @@
-import { http } from '../../../shared/http/http-client'
+import { http }
+from '../../../shared/api/http'
 
-export async function getComponents() {
-  const response =
-    await http.get('/components')
+export async function getComponentsRuntime() {
 
-  return response.data
-}
-
-export async function getFabrication() {
-  const response =
-    await http.get('/fabrication')
+  const response = await http.get(
+    '/components',
+  )
 
   return response.data
 }

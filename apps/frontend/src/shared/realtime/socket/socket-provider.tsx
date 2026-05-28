@@ -1,1 +1,4 @@
-export function socket-provider() { return <div /> }
+export function SocketProvider() {
+
+  return null
+}

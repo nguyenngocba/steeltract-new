@@ -1,0 +1,3585 @@
+.
+├── apps
+│   ├── backend-api
+│   │   ├── apps
+│   │   │   └── backend-api
+│   │   │       └── prisma
+│   │   │           └── migrations
+│   │   │               └── 20260523123000_workflow_engine_foundation
+│   │   ├── eslint.config.mjs
+│   │   ├── nest-cli.json
+│   │   ├── package.json
+│   │   ├── prisma
+│   │   │   ├── migrations
+│   │   │   │   ├── 20260521023720_init
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522024309_add_minimum_stock
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522032531_component_tracking
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522043538_component_timeline
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522050214_component_coordinates
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522064649_component_schedule
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522080216_install_photo
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522082553_task_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522084126_attendance
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522090804_component_cost
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522091829_supplier_score
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522100357_equipment_booking
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522100845_worker_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522104637_warehouse_zones
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522105142_site_logs
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522105947_safety_inspection
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522110729_vehicle_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522111403_material_request
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522111832_approval_system
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522112250_purchase_order
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522112712_analytics_engine
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260522113225_worker_management
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523025546_schema_upgrade
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523025923_add_missing_statuses
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523110000_auth_rbac_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523123000_workflow_engine_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523133000_attachment_document_engine
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260523143000_scheduler_outbox_jobs
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260524103000_production_engine_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260524113000_yard_engine_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260524123000_qc_engine_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260524133000_analytics_engine_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260526100000_master_units_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260526110000_master_data_dictionary_foundation
+│   │   │   │   │   └── migration.sql
+│   │   │   │   ├── 20260526120000_inventory_transaction_return_engine
+│   │   │   │   │   └── migration.sql
+│   │   │   │   └── migration_lock.toml
+│   │   │   ├── schema.prisma
+│   │   │   ├── seed
+│   │   │   ├── seeds
+│   │   │   │   └── inventory.seed.ts
+│   │   │   └── seed.ts
+│   │   ├── README.md
+│   │   ├── src
+│   │   │   ├── app.controller.spec.ts
+│   │   │   ├── app.controller.ts
+│   │   │   ├── app.module.ts
+│   │   │   ├── app.service.ts
+│   │   │   ├── common
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── filter.dto.ts
+│   │   │   │   │   ├── pagination.dto.ts
+│   │   │   │   │   └── query.dto.ts
+│   │   │   │   ├── pipes
+│   │   │   │   │   └── zod-validation.pipe.ts
+│   │   │   │   └── utils
+│   │   │   │       └── activity-log.ts
+│   │   │   ├── core
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── permissions.decorator.ts
+│   │   │   │   │   └── roles.guard.ts
+│   │   │   │   ├── events
+│   │   │   │   │   ├── domain-event.interface.ts
+│   │   │   │   │   ├── event-bus.service.ts
+│   │   │   │   │   ├── event-handler.interface.ts
+│   │   │   │   │   └── events.module.ts
+│   │   │   │   ├── jobs
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── jobs.dto.ts
+│   │   │   │   │   ├── job-scheduler.service.ts
+│   │   │   │   │   ├── jobs.controller.ts
+│   │   │   │   │   ├── jobs.module.ts
+│   │   │   │   │   └── job-worker.service.ts
+│   │   │   │   ├── outbox
+│   │   │   │   │   ├── outbox.module.ts
+│   │   │   │   │   └── outbox.service.ts
+│   │   │   │   ├── performance
+│   │   │   │   │   ├── cache.service.ts
+│   │   │   │   │   ├── event-throttle.service.ts
+│   │   │   │   │   ├── performance.controller.ts
+│   │   │   │   │   ├── performance-metrics.service.ts
+│   │   │   │   │   ├── performance.module.ts
+│   │   │   │   │   └── websocket-room.service.ts
+│   │   │   │   ├── prisma
+│   │   │   │   │   ├── prisma.module.ts
+│   │   │   │   │   └── prisma.service.ts
+│   │   │   │   ├── storage
+│   │   │   │   │   ├── local-storage.service.ts
+│   │   │   │   │   ├── storage.module.ts
+│   │   │   │   │   └── storage.types.ts
+│   │   │   │   ├── telegram
+│   │   │   │   │   └── telegram.service.ts
+│   │   │   │   └── ws
+│   │   │   │       ├── events.gateway.ts
+│   │   │   │       ├── realtime.gateway.ts
+│   │   │   │       ├── websocket-event-mapper.ts
+│   │   │   │       ├── websocket-events.ts
+│   │   │   │       └── websocket.module.ts
+│   │   │   ├── main.ts
+│   │   │   ├── modules
+│   │   │   │   ├── analytics
+│   │   │   │   │   ├── analytics.controller.ts
+│   │   │   │   │   └── analytics.module.ts
+│   │   │   │   ├── analytics-engine
+│   │   │   │   │   ├── analytics-engine.controller.ts
+│   │   │   │   │   ├── analytics-engine.module.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── analytics-engine.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── analytics-engine.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── analytics-engine.service.ts
+│   │   │   │   ├── approvals
+│   │   │   │   │   ├── approvals.controller.ts
+│   │   │   │   │   └── approvals.module.ts
+│   │   │   │   ├── attachments
+│   │   │   │   │   ├── attachments.controller.ts
+│   │   │   │   │   ├── attachments.module.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── attachments.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── attachments.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── attachments.service.ts
+│   │   │   │   ├── attendance
+│   │   │   │   │   ├── attendance.controller.ts
+│   │   │   │   │   └── attendance.module.ts
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── auth.controller.ts
+│   │   │   │   │   ├── auth.module.ts
+│   │   │   │   │   ├── auth.service.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── auth.dto.ts
+│   │   │   │   │   ├── guards
+│   │   │   │   │   │   └── jwt-auth.guard.ts
+│   │   │   │   │   ├── jwt-auth.guard.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── auth.repository.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── token.service.ts
+│   │   │   │   │   │   └── websocket-auth.service.ts
+│   │   │   │   │   └── strategies
+│   │   │   │   │       └── jwt.strategy.ts
+│   │   │   │   ├── components
+│   │   │   │   │   ├── components.controller.ts
+│   │   │   │   │   ├── components.module.ts
+│   │   │   │   │   ├── controllers
+│   │   │   │   │   │   └── components.controller.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── components.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── components.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── components.service.ts
+│   │   │   │   ├── dashboard
+│   │   │   │   │   ├── dashboard.controller.ts
+│   │   │   │   │   └── dashboard.module.ts
+│   │   │   │   ├── equipment
+│   │   │   │   │   ├── equipment.controller.ts
+│   │   │   │   │   └── equipment.module.ts
+│   │   │   │   ├── inventory
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   ├── inventory.dto.ts
+│   │   │   │   │   │   └── return-workflow.dto.ts
+│   │   │   │   │   ├── inventory.controller.ts
+│   │   │   │   │   ├── inventory.module.ts
+│   │   │   │   │   ├── inventory.repository.ts
+│   │   │   │   │   ├── inventory.service.ts
+│   │   │   │   │   ├── return-workflow.controller.ts
+│   │   │   │   │   └── return-workflow.service.ts
+│   │   │   │   ├── master-data
+│   │   │   │   │   ├── dictionaries
+│   │   │   │   │   │   ├── dictionaries.controller.ts
+│   │   │   │   │   │   ├── dictionaries.module.ts
+│   │   │   │   │   │   ├── dictionaries.service.ts
+│   │   │   │   │   │   ├── dictionary.config.ts
+│   │   │   │   │   │   └── dto
+│   │   │   │   │   │       └── dictionary.dto.ts
+│   │   │   │   │   └── uom
+│   │   │   │   │       ├── dto
+│   │   │   │   │       │   └── uom.dto.ts
+│   │   │   │   │       ├── uom.controller.ts
+│   │   │   │   │       ├── uom.module.ts
+│   │   │   │   │       ├── uom.repository.ts
+│   │   │   │   │       └── uom.service.ts
+│   │   │   │   ├── material-requests
+│   │   │   │   │   ├── material-requests.controller.ts
+│   │   │   │   │   └── material-requests.module.ts
+│   │   │   │   ├── production
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── production.dto.ts
+│   │   │   │   │   ├── production.controller.ts
+│   │   │   │   │   ├── production.module.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── production.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       ├── bom.service.ts
+│   │   │   │   │       ├── production.service.ts
+│   │   │   │   │       └── workorder.service.ts
+│   │   │   │   ├── projects
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── projects.dto.ts
+│   │   │   │   │   ├── projects.controller.ts
+│   │   │   │   │   ├── projects.module.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── projects.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── projects.service.ts
+│   │   │   │   ├── purchase-orders
+│   │   │   │   │   ├── purchase-orders.controller.ts
+│   │   │   │   │   └── purchase-orders.module.ts
+│   │   │   │   ├── purchasing
+│   │   │   │   │   ├── controllers
+│   │   │   │   │   │   └── supplier.controller.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       ├── purchase-receiving.service.ts
+│   │   │   │   │       └── supplier.service.ts
+│   │   │   │   ├── qc
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── qc.dto.ts
+│   │   │   │   │   ├── qc.controller.ts
+│   │   │   │   │   ├── qc.module.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── qc.repository.ts
+│   │   │   │   │   └── services
+│   │   │   │   │       └── qc.service.ts
+│   │   │   │   ├── rbac
+│   │   │   │   │   ├── decorators
+│   │   │   │   │   │   └── permissions.decorator.ts
+│   │   │   │   │   ├── guards
+│   │   │   │   │   │   └── permissions.guard.ts
+│   │   │   │   │   ├── middleware
+│   │   │   │   │   │   └── permission-context.middleware.ts
+│   │   │   │   │   ├── rbac.module.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── rbac.repository.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── rbac.service.ts
+│   │   │   │   │   └── types
+│   │   │   │   │       └── auth-user.ts
+│   │   │   │   ├── safety
+│   │   │   │   │   ├── safety.controller.ts
+│   │   │   │   │   └── safety.module.ts
+│   │   │   │   ├── simulation
+│   │   │   │   │   ├── demo-data.seeder.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── simulation.dto.ts
+│   │   │   │   │   ├── simulation.controller.ts
+│   │   │   │   │   ├── simulation.module.ts
+│   │   │   │   │   ├── simulation-scenario-runner.service.ts
+│   │   │   │   │   ├── simulation.scheduler.ts
+│   │   │   │   │   ├── simulation.service.ts
+│   │   │   │   │   └── simulation.types.ts
+│   │   │   │   ├── site-logs
+│   │   │   │   │   ├── site-logs.controller.ts
+│   │   │   │   │   └── site-logs.module.ts
+│   │   │   │   ├── supplier-score
+│   │   │   │   │   ├── supplier-score.controller.ts
+│   │   │   │   │   └── supplier-score.module.ts
+│   │   │   │   ├── tasks
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── tasks.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── tasks.repository.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── tasks.service.ts
+│   │   │   │   │   ├── tasks.controller.ts
+│   │   │   │   │   └── tasks.module.ts
+│   │   │   │   ├── _template
+│   │   │   │   │   ├── controllers
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── entities
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   └── validators
+│   │   │   │   │       └── index.ts
+│   │   │   │   ├── transactions
+│   │   │   │   │   ├── transactions.controller.ts
+│   │   │   │   │   └── transactions.module.ts
+│   │   │   │   ├── vehicles
+│   │   │   │   │   ├── vehicles.controller.ts
+│   │   │   │   │   └── vehicles.module.ts
+│   │   │   │   ├── workers
+│   │   │   │   │   ├── workers.controller.ts
+│   │   │   │   │   └── workers.module.ts
+│   │   │   │   ├── workflow
+│   │   │   │   │   ├── controllers
+│   │   │   │   │   │   └── workflow.controller.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── workflow.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── workflow.repository.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── workflow-notification-subscriber.service.ts
+│   │   │   │   │   │   └── workflow.service.ts
+│   │   │   │   │   ├── workflow.controller.ts
+│   │   │   │   │   └── workflow.module.ts
+│   │   │   │   ├── yard
+│   │   │   │   │   ├── controllers
+│   │   │   │   │   │   └── yard.controller.ts
+│   │   │   │   │   ├── dto
+│   │   │   │   │   │   └── yard.dto.ts
+│   │   │   │   │   ├── repositories
+│   │   │   │   │   │   └── yard.repository.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── yard.service.ts
+│   │   │   │   │   ├── yard.controller.ts
+│   │   │   │   │   └── yard.module.ts
+│   │   │   │   └── zones
+│   │   │   │       ├── zones.controller.ts
+│   │   │   │       └── zones.module.ts
+│   │   │   └── RuntimeSecurityPage.tsx
+│   │   ├── test
+│   │   │   ├── app.e2e-spec.ts
+│   │   │   └── jest-e2e.json
+│   │   ├── tsconfig.build.json
+│   │   ├── tsconfig.json
+│   │   └── uploads
+│   │       ├── components
+│   │       └── timeline
+│   ├── backend-experimental
+│   │   ├── package.json
+│   │   ├── prisma
+│   │   │   ├── migrations
+│   │   │   │   ├── 20260521023720_init
+│   │   │   │   │   └── migration.sql
+│   │   │   │   └── migration_lock.toml
+│   │   │   ├── schema.prisma
+│   │   │   └── seed
+│   │   │       ├── ai-seed.ts
+│   │   │       ├── auth-seed.ts
+│   │   │       ├── cmms-seed.ts
+│   │   │       ├── erp-seed.ts
+│   │   │       ├── hrm-seed.ts
+│   │   │       ├── mes-seed.ts
+│   │   │       ├── qc-seed.ts
+│   │   │       ├── seed.ts
+│   │   │       ├── tracking-seed.ts
+│   │   │       └── workflow-seed.ts
+│   │   ├── prisma.config.ts
+│   │   ├── src
+│   │   │   ├── config
+│   │   │   ├── database
+│   │   │   │   └── prisma.ts
+│   │   │   ├── modules
+│   │   │   │   ├── ai
+│   │   │   │   │   ├── agents
+│   │   │   │   │   │   └── ai.engine.ts
+│   │   │   │   │   ├── ai.routes.ts
+│   │   │   │   │   ├── predictions
+│   │   │   │   │   ├── routes
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   └── services
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── auth.middleware.ts
+│   │   │   │   │   ├── auth.routes.ts
+│   │   │   │   │   └── jwt.ts
+│   │   │   │   ├── cmms
+│   │   │   │   │   ├── cmms.routes.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   └── services
+│   │   │   │   ├── components
+│   │   │   │   │   └── components.routes.ts
+│   │   │   │   ├── erp
+│   │   │   │   │   ├── erp.routes.ts
+│   │   │   │   │   ├── routes
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   └── services
+│   │   │   │   ├── hrm
+│   │   │   │   │   ├── hrm.routes.ts
+│   │   │   │   │   ├── routes
+│   │   │   │   │   └── services
+│   │   │   │   ├── inventory
+│   │   │   │   │   └── inventory.routes.ts
+│   │   │   │   ├── iot
+│   │   │   │   │   ├── gateways
+│   │   │   │   │   │   └── iot.gateway.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   └── mqtt.client.ts
+│   │   │   │   │   ├── sensors
+│   │   │   │   │   │   └── sensor.types.ts
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── telemetry.engine.ts
+│   │   │   │   ├── mes
+│   │   │   │   │   ├── mes.routes.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   └── services
+│   │   │   │   ├── qc
+│   │   │   │   │   ├── qc.routes.ts
+│   │   │   │   │   ├── routes
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   └── uploads
+│   │   │   │   ├── roles
+│   │   │   │   │   └── roles.routes.ts
+│   │   │   │   ├── tracking
+│   │   │   │   │   ├── generator
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   ├── services
+│   │   │   │   │   └── tracking.routes.ts
+│   │   │   │   ├── users
+│   │   │   │   │   └── users.routes.ts
+│   │   │   │   ├── workflow
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── workflow.engine.ts
+│   │   │   │   │   ├── routes
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   ├── services
+│   │   │   │   │   └── workflow.routes.ts
+│   │   │   │   └── yard
+│   │   │   │       └── yard.routes.ts
+│   │   │   ├── server.ts
+│   │   │   └── shared
+│   │   └── tsconfig.json
+│   ├── backups
+│   │   ├── frontend_before_deep_clean_20260527_132330.tar.gz
+│   │   ├── frontend_before_enterprise_purge_20260527_133426.tar.gz
+│   │   └── frontend_consolidation_20260527_132843.tar.gz
+│   ├── build-production.sh
+│   ├── frontend
+│   │   ├── audit
+│   │   ├── default.conf
+│   │   ├── docker-compose.yml
+│   │   ├── Dockerfile
+│   │   ├── ENTERPRISE_RUNTIME_STATUS.md
+│   │   ├── eslint.config.js
+│   │   ├── index.html
+│   │   ├── optimize-runtime.sh
+│   │   ├── package.json
+│   │   ├── public
+│   │   │   ├── favicon.svg
+│   │   │   ├── icons.svg
+│   │   │   └── manifest.json
+│   │   ├── README.md
+│   │   ├── src
+│   │   │   ├── ApiRuntimeStatus.tsx
+│   │   │   ├── app
+│   │   │   │   ├── AppProviders.tsx
+│   │   │   │   ├── AppShell.tsx
+│   │   │   │   ├── App.tsx
+│   │   │   │   ├── bootstrap
+│   │   │   │   │   └── bootstrap-app.ts
+│   │   │   │   ├── config
+│   │   │   │   │   └── navigation.config.ts
+│   │   │   │   ├── core
+│   │   │   │   │   ├── bootstrap.ts
+│   │   │   │   │   └── platform.ts
+│   │   │   │   ├── entry
+│   │   │   │   │   └── main.tsx
+│   │   │   │   ├── layouts
+│   │   │   │   │   ├── AppLayout.tsx
+│   │   │   │   │   ├── MainLayout.tsx
+│   │   │   │   │   ├── shell
+│   │   │   │   │   │   └── AppShell.tsx
+│   │   │   │   │   └── sidebar
+│   │   │   │   │       └── AppSidebar.tsx
+│   │   │   │   ├── navigation.ts
+│   │   │   │   ├── providers
+│   │   │   │   │   └── AppProviders.tsx
+│   │   │   │   ├── router
+│   │   │   │   │   └── AppRouter.tsx
+│   │   │   │   ├── runtime
+│   │   │   │   │   ├── bootstrap.ts
+│   │   │   │   │   └── runtime.ts
+│   │   │   │   ├── services
+│   │   │   │   │   └── app.service.ts
+│   │   │   │   └── shell
+│   │   │   │       ├── AppShell.tsx
+│   │   │   │       ├── insights
+│   │   │   │       │   └── InsightsPanel.tsx
+│   │   │   │       ├── layouts
+│   │   │   │       │   └── MainShellLayout.tsx
+│   │   │   │       ├── panels
+│   │   │   │       │   ├── BottomTelemetryPanel.tsx
+│   │   │   │       │   └── RightInsightPanel.tsx
+│   │   │   │       ├── sidebar
+│   │   │   │       │   ├── AppSidebar.tsx
+│   │   │   │       │   └── SidebarGroups.tsx
+│   │   │   │       ├── topbar
+│   │   │   │       │   └── AppTopbar.tsx
+│   │   │   │       └── workspace
+│   │   │   │           └── WorkspaceRenderer.tsx
+│   │   │   ├── App.css
+│   │   │   ├── application
+│   │   │   │   ├── boot
+│   │   │   │   │   └── bootstrap.ts
+│   │   │   │   ├── modules
+│   │   │   │   │   └── module-registry.ts
+│   │   │   │   └── runtime
+│   │   │   │       └── ApplicationRuntime.ts
+│   │   │   ├── App.tsx
+│   │   │   ├── _archived
+│   │   │   │   ├── components-legacy
+│   │   │   │   │   └── workspace-ui
+│   │   │   │   │       ├── ComponentsWorkspace.tsx
+│   │   │   │   │       ├── panels
+│   │   │   │   │       │   ├── FabricationInspector.tsx
+│   │   │   │   │       │   └── MachineTelemetryPanel.tsx
+│   │   │   │   │       ├── tabs
+│   │   │   │   │       │   ├── AssemblyTab.tsx
+│   │   │   │   │       │   ├── ComponentsOverviewTab.tsx
+│   │   │   │   │       │   ├── ConsumablesTab.tsx
+│   │   │   │   │       │   ├── FabricationTab.tsx
+│   │   │   │   │       │   ├── PaintingTab.tsx
+│   │   │   │   │       │   ├── QcTab.tsx
+│   │   │   │   │       │   └── ShippingTab.tsx
+│   │   │   │   │       └── widgets
+│   │   │   │   │           └── FabricationWidget.tsx
+│   │   │   │   ├── final-purge
+│   │   │   │   │   ├── actions
+│   │   │   │   │   │   └── commands
+│   │   │   │   │   │       ├── CreateCountingCommand.ts
+│   │   │   │   │   │       ├── CreateInboundCommand.ts
+│   │   │   │   │   │       ├── CreateOutboundCommand.ts
+│   │   │   │   │   │       └── CreateTransferCommand.ts
+│   │   │   │   │   ├── cockpit
+│   │   │   │   │   │   ├── layouts
+│   │   │   │   │   │   │   └── YardMapLayout.tsx
+│   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   ├── YardOccupancyPanel.tsx
+│   │   │   │   │   │   │   ├── YardTelemetryPanel.tsx
+│   │   │   │   │   │   │   └── YardZonePanel.tsx
+│   │   │   │   │   │   ├── widgets
+│   │   │   │   │   │   │   ├── CraneLoadWidget.tsx
+│   │   │   │   │   │   │   ├── ShipmentQueueWidget.tsx
+│   │   │   │   │   │   │   └── YardCapacityWidget.tsx
+│   │   │   │   │   │   └── YardCockpit.tsx
+│   │   │   │   │   ├── dashboards
+│   │   │   │   │   │   └── YardDashboard.tsx
+│   │   │   │   │   ├── data-tables
+│   │   │   │   │   │   ├── InventoryDataTable.tsx
+│   │   │   │   │   │   └── TransactionsDataTable.tsx
+│   │   │   │   │   ├── feeds
+│   │   │   │   │   │   └── InventoryFeed.tsx
+│   │   │   │   │   ├── heatmaps-runtime
+│   │   │   │   │   │   ├── processors
+│   │   │   │   │   │   │   └── occupancy.processor.ts
+│   │   │   │   │   │   └── yard-heatmap-engine.ts
+│   │   │   │   │   ├── layout-engine
+│   │   │   │   │   │   ├── grids
+│   │   │   │   │   │   │   └── YardGrid.tsx
+│   │   │   │   │   │   ├── maps
+│   │   │   │   │   │   │   └── YardSpatialLayout.tsx
+│   │   │   │   │   │   └── YardLayoutEngine.ts
+│   │   │   │   │   ├── machine-runtime
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── MachineRuntimeEvents.ts
+│   │   │   │   │   │   ├── MachineRuntime.ts
+│   │   │   │   │   │   └── streams
+│   │   │   │   │   │       └── MachineTelemetryStream.ts
+│   │   │   │   │   ├── pipeline
+│   │   │   │   │   │   ├── FabricationPipeline.ts
+│   │   │   │   │   │   ├── stages
+│   │   │   │   │   │   │   ├── CuttingStage.ts
+│   │   │   │   │   │   │   ├── PaintingStage.ts
+│   │   │   │   │   │   │   └── WeldingStage.ts
+│   │   │   │   │   │   └── telemetry
+│   │   │   │   │   │       └── PipelineTelemetry.ts
+│   │   │   │   │   ├── stack-visualization
+│   │   │   │   │   │   ├── renderers
+│   │   │   │   │   │   │   └── StackRenderer.tsx
+│   │   │   │   │   │   └── StackVisualizationEngine.ts
+│   │   │   │   │   ├── toolbars
+│   │   │   │   │   │   ├── InventoryActions.tsx
+│   │   │   │   │   │   ├── InventoryFilters.tsx
+│   │   │   │   │   │   └── InventoryToolbar.tsx
+│   │   │   │   │   ├── ui
+│   │   │   │   │   │   ├── controls
+│   │   │   │   │   │   │   └── YardControls.tsx
+│   │   │   │   │   │   ├── maps
+│   │   │   │   │   │   │   ├── Yard2DMap.tsx
+│   │   │   │   │   │   │   └── Yard3DMap.tsx
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── YardTelemetryBar.tsx
+│   │   │   │   │   │   └── YardPage.tsx
+│   │   │   │   │   └── visual-tabs
+│   │   │   │   │       ├── Yard2DVisual.tsx
+│   │   │   │   │       ├── Yard3DVisual.tsx
+│   │   │   │   │       ├── YardHeatmapVisual.tsx
+│   │   │   │   │       ├── YardHistoryVisual.tsx
+│   │   │   │   │       ├── YardInboundVisual.tsx
+│   │   │   │   │       ├── YardOutboundVisual.tsx
+│   │   │   │   │       ├── YardOverviewVisual.tsx
+│   │   │   │   │       ├── YardTrackingVisual.tsx
+│   │   │   │   │       └── YardTransferVisual.tsx
+│   │   │   │   ├── inventory-legacy
+│   │   │   │   │   ├── fullscreen
+│   │   │   │   │   │   ├── material
+│   │   │   │   │   │   │   ├── MaterialDetailWorkspace.tsx
+│   │   │   │   │   │   │   ├── MaterialMovementHistory.tsx
+│   │   │   │   │   │   │   ├── MaterialQcPanel.tsx
+│   │   │   │   │   │   │   └── MaterialSupplierPanel.tsx
+│   │   │   │   │   │   └── warehouse
+│   │   │   │   │   │       └── WarehouseFullscreenWorkspace.tsx
+│   │   │   │   │   ├── layout-engine
+│   │   │   │   │   │   ├── grids
+│   │   │   │   │   │   │   └── InventoryGrid.tsx
+│   │   │   │   │   │   ├── InventoryLayoutEngine.ts
+│   │   │   │   │   │   └── panels
+│   │   │   │   │   │       └── InventoryPanelEngine.tsx
+│   │   │   │   │   ├── ui
+│   │   │   │   │   │   ├── cards
+│   │   │   │   │   │   │   ├── InventoryCard.tsx
+│   │   │   │   │   │   │   └── StockCard.tsx
+│   │   │   │   │   │   ├── grids
+│   │   │   │   │   │   │   └── InventoryGrid.tsx
+│   │   │   │   │   │   ├── InventoryPage.tsx
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── InventoryTelemetryBar.tsx
+│   │   │   │   │   │   └── toolbars
+│   │   │   │   │   │       └── InventoryToolbar.tsx
+│   │   │   │   │   ├── visualization
+│   │   │   │   │   │   ├── 2d
+│   │   │   │   │   │   │   └── Warehouse2DView.tsx
+│   │   │   │   │   │   ├── 3d
+│   │   │   │   │   │   │   └── Warehouse3DView.tsx
+│   │   │   │   │   │   └── WarehouseVisualizationEngine.ts
+│   │   │   │   │   └── visual-tabs
+│   │   │   │   │       ├── InventoryAlertsVisual.tsx
+│   │   │   │   │       ├── InventoryCountingVisual.tsx
+│   │   │   │   │       ├── InventoryInboundVisual.tsx
+│   │   │   │   │       ├── InventoryOutboundVisual.tsx
+│   │   │   │   │       ├── InventoryOverviewVisual.tsx
+│   │   │   │   │       ├── InventoryStockVisual.tsx
+│   │   │   │   │       ├── InventoryTransactionsVisual.tsx
+│   │   │   │   │       ├── InventoryTransferVisual.tsx
+│   │   │   │   │       └── InventoryWarehouseMapVisual.tsx
+│   │   │   │   ├── legacy-pages
+│   │   │   │   ├── legacy-router
+│   │   │   │   │   └── router
+│   │   │   │   │       ├── AppRouter.tsx
+│   │   │   │   │       ├── guards
+│   │   │   │   │       │   ├── AuthGuard.tsx
+│   │   │   │   │       │   └── PermissionGuard.tsx
+│   │   │   │   │       ├── layouts
+│   │   │   │   │       │   ├── MainLayout.tsx
+│   │   │   │   │       │   └── MainRouterLayout.tsx
+│   │   │   │   │       └── runtime
+│   │   │   │   │           └── router-runtime.ts
+│   │   │   │   ├── prototype-layers
+│   │   │   │   │   ├── cockpit
+│   │   │   │   │   │   ├── ComponentsCockpit.tsx
+│   │   │   │   │   │   ├── layouts
+│   │   │   │   │   │   │   └── FabricationLayout.tsx
+│   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   ├── FabricationQueuePanel.tsx
+│   │   │   │   │   │   │   ├── MachineStatusPanel.tsx
+│   │   │   │   │   │   │   └── QcStatusPanel.tsx
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── ConsumablesWidget.tsx
+│   │   │   │   │   │       ├── DefectRateWidget.tsx
+│   │   │   │   │   │       └── FabricationProgressWidget.tsx
+│   │   │   │   │   ├── command-center
+│   │   │   │   │   │   ├── InventoryCommandCenter.tsx
+│   │   │   │   │   │   ├── layouts
+│   │   │   │   │   │   │   └── InventoryCockpitLayout.tsx
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── InboundQueueWidget.tsx
+│   │   │   │   │   │       ├── InventoryHealthWidget.tsx
+│   │   │   │   │   │       ├── OutboundQueueWidget.tsx
+│   │   │   │   │   │       └── StockPressureWidget.tsx
+│   │   │   │   │   ├── dashboards
+│   │   │   │   │   │   └── InventoryDashboard.tsx
+│   │   │   │   │   ├── digital-renderers
+│   │   │   │   │   │   ├── 2d
+│   │   │   │   │   │   │   ├── SlotRenderer2D.tsx
+│   │   │   │   │   │   │   └── ZoneRenderer2D.tsx
+│   │   │   │   │   │   └── 3d
+│   │   │   │   │   │       ├── StackRenderer3D.tsx
+│   │   │   │   │   │       └── ZoneRenderer3D.tsx
+│   │   │   │   │   ├── digital-runtime
+│   │   │   │   │   │   ├── 2d
+│   │   │   │   │   │   │   └── Yard2DRuntime.tsx
+│   │   │   │   │   │   ├── 3d
+│   │   │   │   │   │   │   └── Yard3DRuntime.tsx
+│   │   │   │   │   │   ├── renderers
+│   │   │   │   │   │   │   └── YardRuntimeRenderer.tsx
+│   │   │   │   │   │   └── YardDigitalRuntime.ts
+│   │   │   │   │   ├── fullscreen
+│   │   │   │   │   │   ├── ComponentFullscreen.tsx
+│   │   │   │   │   │   └── FabricationFullscreen.tsx
+│   │   │   │   │   ├── layout-engine
+│   │   │   │   │   │   ├── ComponentsLayoutEngine.ts
+│   │   │   │   │   │   └── fabrication
+│   │   │   │   │   │       └── FabricationLayout.tsx
+│   │   │   │   │   ├── machine-visualization
+│   │   │   │   │   │   ├── MachineVisualization.tsx
+│   │   │   │   │   │   └── renderers
+│   │   │   │   │   │       └── MachineRenderer.tsx
+│   │   │   │   │   ├── spatial-runtime
+│   │   │   │   │   │   ├── stacking
+│   │   │   │   │   │   │   └── StackRuntime.ts
+│   │   │   │   │   │   ├── YardSpatialEngine.ts
+│   │   │   │   │   │   └── zones
+│   │   │   │   │   │       └── ZoneRuntime.ts
+│   │   │   │   │   ├── ui
+│   │   │   │   │   │   ├── ComponentsPage.tsx
+│   │   │   │   │   │   ├── fabrication
+│   │   │   │   │   │   │   └── FabricationDashboard.tsx
+│   │   │   │   │   │   ├── qc
+│   │   │   │   │   │   │   └── QcDashboard.tsx
+│   │   │   │   │   │   └── telemetry
+│   │   │   │   │   │       └── FabricationTelemetryBar.tsx
+│   │   │   │   │   └── visual-tabs
+│   │   │   │   │       ├── AssemblyVisual.tsx
+│   │   │   │   │       ├── ComponentsOverviewVisual.tsx
+│   │   │   │   │       ├── ConsumablesVisual.tsx
+│   │   │   │   │       ├── FabricationVisual.tsx
+│   │   │   │   │       ├── PaintingVisual.tsx
+│   │   │   │   │       ├── QcVisual.tsx
+│   │   │   │   │       └── ShippingVisual.tsx
+│   │   │   │   ├── router
+│   │   │   │   │   └── AppRouter.tsx
+│   │   │   │   ├── routes
+│   │   │   │   │   └── routes
+│   │   │   │   │       ├── core
+│   │   │   │   │       │   ├── AppRoutes.tsx
+│   │   │   │   │       │   └── ProtectedRoutes.tsx
+│   │   │   │   │       ├── guards
+│   │   │   │   │       │   ├── AuthGuard.tsx
+│   │   │   │   │       │   └── PermissionGuard.tsx
+│   │   │   │   │       ├── index.tsx
+│   │   │   │   │       ├── modules
+│   │   │   │   │       │   ├── components
+│   │   │   │   │       │   │   └── components.routes.tsx
+│   │   │   │   │       │   ├── components.routes.tsx
+│   │   │   │   │       │   ├── dashboard.routes.tsx
+│   │   │   │   │       │   ├── inventory
+│   │   │   │   │       │   │   └── inventory.routes.tsx
+│   │   │   │   │       │   ├── inventory.routes.tsx
+│   │   │   │   │       │   ├── yard
+│   │   │   │   │       │   │   └── yard.routes.tsx
+│   │   │   │   │       │   └── yard.routes.tsx
+│   │   │   │   │       ├── ProtectedRoute.tsx
+│   │   │   │   │       └── registry
+│   │   │   │   │           └── module-registry.ts
+│   │   │   │   ├── yard-legacy
+│   │   │   │   │   ├── digital-twin
+│   │   │   │   │   │   ├── 2d
+│   │   │   │   │   │   │   └── Yard2DDigitalTwin.tsx
+│   │   │   │   │   │   ├── 3d
+│   │   │   │   │   │   │   └── Yard3DDigitalTwin.tsx
+│   │   │   │   │   │   ├── controls
+│   │   │   │   │   │   │   └── CameraControls.tsx
+│   │   │   │   │   │   ├── engine
+│   │   │   │   │   │   │   └── YardSpatialEngine.ts
+│   │   │   │   │   │   ├── entities
+│   │   │   │   │   │   │   ├── YardLevel.ts
+│   │   │   │   │   │   │   ├── YardSlot.ts
+│   │   │   │   │   │   │   └── YardZone.ts
+│   │   │   │   │   │   ├── layers
+│   │   │   │   │   │   │   ├── MovementLayer.tsx
+│   │   │   │   │   │   │   └── OccupancyLayer.tsx
+│   │   │   │   │   │   └── renderers
+│   │   │   │   │   │       ├── YardSlotRenderer.tsx
+│   │   │   │   │   │       └── YardZoneRenderer.tsx
+│   │   │   │   │   └── workspace-ui
+│   │   │   │   │       ├── panels
+│   │   │   │   │       │   ├── YardInspector.tsx
+│   │   │   │   │       │   └── YardOccupancyPanel.tsx
+│   │   │   │   │       ├── tabs
+│   │   │   │   │       │   ├── Yard2DTab.tsx
+│   │   │   │   │       │   ├── Yard3DTab.tsx
+│   │   │   │   │       │   ├── YardInboundTab.tsx
+│   │   │   │   │       │   ├── YardOutboundTab.tsx
+│   │   │   │   │       │   ├── YardOverviewTab.tsx
+│   │   │   │   │       │   ├── YardTrackingTab.tsx
+│   │   │   │   │       │   └── YardTransferTab.tsx
+│   │   │   │   │       ├── widgets
+│   │   │   │   │       │   └── YardTelemetryWidget.tsx
+│   │   │   │   │       └── YardWorkspace.tsx
+│   │   │   │   ├── yard-ui
+│   │   │   │   │   ├── CraneStatusPanel.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── MovementTimeline.tsx
+│   │   │   │   │   ├── SlotCard.tsx
+│   │   │   │   │   ├── UtilizationWidgets.tsx
+│   │   │   │   │   ├── yard-api.ts
+│   │   │   │   │   ├── YardHeatmap.tsx
+│   │   │   │   │   ├── yard-hooks.ts
+│   │   │   │   │   ├── YardMap.tsx
+│   │   │   │   │   ├── YardSearchPanel.tsx
+│   │   │   │   │   ├── YardSnapshotViewer.tsx
+│   │   │   │   │   ├── yard.types.ts
+│   │   │   │   │   ├── yard-utils.ts
+│   │   │   │   │   └── ZoneGrid.tsx
+│   │   │   │   └── yard-visualization
+│   │   │   │       ├── components
+│   │   │   │       │   ├── RealtimeMovementPulse.tsx
+│   │   │   │       │   ├── SelectionOverlay.tsx
+│   │   │   │       │   ├── YardMinimap.tsx
+│   │   │   │       │   ├── YardPixiCanvas.tsx
+│   │   │   │       │   └── YardViewport.tsx
+│   │   │   │       ├── hooks
+│   │   │   │       │   └── useYardPixiViewport.ts
+│   │   │   │       ├── index.ts
+│   │   │   │       ├── layers
+│   │   │   │       │   ├── CraneLayer.tsx
+│   │   │   │       │   ├── YardGridLayer.tsx
+│   │   │   │       │   ├── YardHeatmapLayer.tsx
+│   │   │   │       │   ├── YardMovementLayer.tsx
+│   │   │   │       │   └── YardSlotLayer.tsx
+│   │   │   │       └── renderer
+│   │   │   │           ├── coordinate-adapter.ts
+│   │   │   │           ├── interaction-controller.ts
+│   │   │   │           ├── layer-system.ts
+│   │   │   │           ├── viewport-manager.ts
+│   │   │   │           └── yard-visualization.types.ts
+│   │   │   ├── assets
+│   │   │   │   ├── hero.png
+│   │   │   │   ├── react.svg
+│   │   │   │   └── vite.svg
+│   │   │   ├── _backend_quarantine
+│   │   │   │   ├── controllers
+│   │   │   │   ├── database
+│   │   │   │   │   └── prisma.service.ts
+│   │   │   │   ├── machine.service.ts
+│   │   │   │   ├── material.service.ts
+│   │   │   │   ├── qc.service.ts
+│   │   │   │   ├── routing.service.ts
+│   │   │   │   ├── runtime
+│   │   │   │   └── src
+│   │   │   │       └── modules
+│   │   │   │           ├── machines
+│   │   │   │           │   └── services
+│   │   │   │           ├── production
+│   │   │   │           │   └── services
+│   │   │   │           └── qc
+│   │   │   │               ├── controllers
+│   │   │   │               └── services
+│   │   │   ├── components
+│   │   │   │   ├── dashboard
+│   │   │   │   │   ├── AiInsightSlotWidget.tsx
+│   │   │   │   │   ├── AttendanceSummaryWidget.tsx
+│   │   │   │   │   ├── dashboard-utils.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── InventoryAlertsWidget.tsx
+│   │   │   │   │   ├── KpiOverviewWidget.tsx
+│   │   │   │   │   ├── ProductionSummaryWidget.tsx
+│   │   │   │   │   ├── ProjectProgressWidget.tsx
+│   │   │   │   │   ├── RealtimeActivityWidget.tsx
+│   │   │   │   │   ├── RecentJobsWidget.tsx
+│   │   │   │   │   ├── RecentTransactionsWidget.tsx
+│   │   │   │   │   └── WorkflowApprovalsWidget.tsx
+│   │   │   │   ├── layout
+│   │   │   │   │   └── PageHeader
+│   │   │   │   │       ├── index.ts
+│   │   │   │   │       └── PageHeader.tsx
+│   │   │   │   ├── ui
+│   │   │   │   │   ├── Button
+│   │   │   │   │   │   ├── Button.tsx
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── Card
+│   │   │   │   │   │   ├── Card.tsx
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── ComponentStatusBadge.tsx
+│   │   │   │   │   ├── Drawer
+│   │   │   │   │   │   ├── Drawer.tsx
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── Input
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── Input.tsx
+│   │   │   │   │   ├── KpiCard
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── KpiCard.tsx
+│   │   │   │   │   ├── Modal
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── Modal.tsx
+│   │   │   │   │   ├── SearchBar
+│   │   │   │   │   │   └── SearchBar.tsx
+│   │   │   │   │   ├── Select
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── Select.tsx
+│   │   │   │   │   ├── StatusBadge
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── StatusBadge.tsx
+│   │   │   │   │   ├── Table
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── Table.tsx
+│   │   │   │   │   ├── Tabs
+│   │   │   │   │   │   └── Tabs.tsx
+│   │   │   │   │   └── Workspace
+│   │   │   │   │       └── Workspace.tsx
+│   │   │   │   └── ui-system
+│   │   │   │       ├── ActivityFeed.tsx
+│   │   │   │       ├── AppShell.tsx
+│   │   │   │       ├── ChartContainer.tsx
+│   │   │   │       ├── CommandPalette.tsx
+│   │   │   │       ├── ConfirmDialog.tsx
+│   │   │   │       ├── DataTable.tsx
+│   │   │   │       ├── DrawerShell.tsx
+│   │   │   │       ├── EmptyState.tsx
+│   │   │   │       ├── ErrorState.tsx
+│   │   │   │       ├── FilterBar.tsx
+│   │   │   │       ├── FormPattern.tsx
+│   │   │   │       ├── index.ts
+│   │   │   │       ├── LoadingState.tsx
+│   │   │   │       ├── ModalShell.tsx
+│   │   │   │       ├── PageLayout.tsx
+│   │   │   │       ├── SearchInput.tsx
+│   │   │   │       ├── SectionCard.tsx
+│   │   │   │       ├── StatCard.tsx
+│   │   │   │       ├── StatusBadge.tsx
+│   │   │   │       ├── Timeline.tsx
+│   │   │   │       ├── toast.ts
+│   │   │   │       └── types.ts
+│   │   │   ├── config
+│   │   │   │   ├── api
+│   │   │   │   │   └── api.config.ts
+│   │   │   │   ├── app.config.ts
+│   │   │   │   ├── layout.config.ts
+│   │   │   │   ├── layouts
+│   │   │   │   │   └── workspace.config.ts
+│   │   │   │   ├── modules
+│   │   │   │   │   └── modules.config.ts
+│   │   │   │   ├── platform
+│   │   │   │   │   ├── navigation.config.ts
+│   │   │   │   │   └── platform.config.ts
+│   │   │   │   ├── routes.config.ts
+│   │   │   │   ├── runtime
+│   │   │   │   │   └── runtime.config.ts
+│   │   │   │   ├── socket
+│   │   │   │   │   └── socket.config.ts
+│   │   │   │   └── telemetry.config.ts
+│   │   │   ├── core
+│   │   │   │   ├── application
+│   │   │   │   │   └── Application.ts
+│   │   │   │   ├── domain
+│   │   │   │   │   ├── AggregateRoot.ts
+│   │   │   │   │   ├── Entity.ts
+│   │   │   │   │   └── ValueObject.ts
+│   │   │   │   └── presentation
+│   │   │   │       └── Presentation.ts
+│   │   │   ├── docs
+│   │   │   │   ├── ARCHITECTURE_DECISION.md
+│   │   │   │   └── BUSINESS_PRIORITIES.md
+│   │   │   ├── engines
+│   │   │   │   ├── analytics
+│   │   │   │   ├── realtime
+│   │   │   │   ├── spatial
+│   │   │   │   ├── telemetry
+│   │   │   │   └── workflow
+│   │   │   ├── hooks
+│   │   │   │   └── query
+│   │   │   │       ├── useComponentQueries.ts
+│   │   │   │       ├── useDashboardQueries.ts
+│   │   │   │       ├── useInventoryQueries.ts
+│   │   │   │       ├── useProjectQueries.ts
+│   │   │   │       └── useTaskQueries.ts
+│   │   │   ├── index.css
+│   │   │   ├── layouts
+│   │   │   │   └── AppLayout.tsx
+│   │   │   ├── lib
+│   │   │   │   ├── api.ts
+│   │   │   │   ├── attachments
+│   │   │   │   │   ├── attachment-hooks.ts
+│   │   │   │   │   ├── AttachmentPreview.tsx
+│   │   │   │   │   ├── attachments-api.ts
+│   │   │   │   │   ├── AttachmentTimeline.tsx
+│   │   │   │   │   ├── attachment.types.ts
+│   │   │   │   │   ├── FileBadge.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   └── UploadDropzone.tsx
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── auth-api.ts
+│   │   │   │   │   ├── auth-interceptor.ts
+│   │   │   │   │   ├── auth.types.ts
+│   │   │   │   │   ├── token-storage.ts
+│   │   │   │   │   ├── useCurrentUser.ts
+│   │   │   │   │   ├── useLogout.ts
+│   │   │   │   │   └── usePermission.ts
+│   │   │   │   ├── i18n
+│   │   │   │   │   └── language.store.ts
+│   │   │   │   ├── jobs
+│   │   │   │   │   ├── BackgroundTaskStatus.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── job-hooks.ts
+│   │   │   │   │   ├── jobs-api.ts
+│   │   │   │   │   ├── JobStatusBadge.tsx
+│   │   │   │   │   ├── job.types.ts
+│   │   │   │   │   ├── RetryStatusBadge.tsx
+│   │   │   │   │   └── SchedulerTimeline.tsx
+│   │   │   │   ├── performance
+│   │   │   │   │   ├── event-batcher.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── SlowQueryWarning.tsx
+│   │   │   │   │   ├── useAdaptiveRefresh.ts
+│   │   │   │   │   ├── usePerformanceMonitor.ts
+│   │   │   │   │   └── visibility.ts
+│   │   │   │   ├── query
+│   │   │   │   │   ├── invalidation.ts
+│   │   │   │   │   ├── query-client.ts
+│   │   │   │   │   ├── query-keys.ts
+│   │   │   │   │   └── QueryProvider.tsx
+│   │   │   │   ├── realtime
+│   │   │   │   │   ├── event-handlers.ts
+│   │   │   │   │   ├── query-event-bridge.ts
+│   │   │   │   │   ├── realtime-provider.tsx
+│   │   │   │   │   └── socket-client.ts
+│   │   │   │   ├── socket.ts
+│   │   │   │   └── workflow
+│   │   │   │       ├── ApprovalActionModal.tsx
+│   │   │   │       ├── index.ts
+│   │   │   │       ├── workflow-api.ts
+│   │   │   │       ├── workflow-hooks.ts
+│   │   │   │       ├── WorkflowStatusBadge.tsx
+│   │   │   │       ├── WorkflowTimeline.tsx
+│   │   │   │       └── workflow.types.ts
+│   │   │   ├── locales
+│   │   │   │   ├── en
+│   │   │   │   │   ├── common.json
+│   │   │   │   │   ├── inventory.json
+│   │   │   │   │   ├── operational.json
+│   │   │   │   │   └── yard.json
+│   │   │   │   └── vi
+│   │   │   │       ├── common.json
+│   │   │   │       ├── inventory.json
+│   │   │   │       ├── operational.json
+│   │   │   │       └── yard.json
+│   │   │   ├── main.tsx
+│   │   │   ├── mock
+│   │   │   │   ├── operations
+│   │   │   │   │   └── inventory.ts
+│   │   │   │   ├── production
+│   │   │   │   ├── telemetry
+│   │   │   │   └── yard
+│   │   │   ├── modules
+│   │   │   │   ├── admin-module
+│   │   │   │   │   ├── layout
+│   │   │   │   │   │   └── AdminLayout.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       ├── AuditLogsPage.tsx
+│   │   │   │   │       ├── MonitoringPage.tsx
+│   │   │   │   │       ├── RoleMatrixPage.tsx
+│   │   │   │   │       ├── RolesPage.tsx
+│   │   │   │   │       ├── SystemSettingsPage.tsx
+│   │   │   │   │       └── UsersPage.tsx
+│   │   │   │   ├── ai
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── ai.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── AiAgentCard.tsx
+│   │   │   │   │   │   └── AiPredictionCard.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── AiPage.tsx
+│   │   │   │   ├── ai-assistant
+│   │   │   │   │   ├── chat
+│   │   │   │   │   │   └── AiChatPanel.tsx
+│   │   │   │   │   ├── command-center
+│   │   │   │   │   │   └── CommandCenter.tsx
+│   │   │   │   │   ├── mock-data
+│   │   │   │   │   │   └── search.data.ts
+│   │   │   │   │   ├── search
+│   │   │   │   │   │   └── useSmartSearch.ts
+│   │   │   │   │   └── store
+│   │   │   │   │       └── assistant.store.ts
+│   │   │   │   ├── AIForecastCard.tsx
+│   │   │   │   ├── ai-runtime
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── OCRUploadPanel.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── AIRuntimePage.tsx
+│   │   │   │   ├── analytics
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   ├── InventoryTrendChart.tsx
+│   │   │   │   │   │   ├── ProductionChart.tsx
+│   │   │   │   │   │   └── YardOccupancyChart.tsx
+│   │   │   │   │   ├── mock-data
+│   │   │   │   │   │   └── analytics.data.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── AnalyticsPage.tsx
+│   │   │   │   │   ├── reports
+│   │   │   │   │   │   └── export-report.ts
+│   │   │   │   │   └── widgets
+│   │   │   │   │       └── ExecutiveKpiWidget.tsx
+│   │   │   │   ├── analytics-module
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── AnalyticsDashboardPage.tsx
+│   │   │   │   ├── analytics-ui
+│   │   │   │   │   ├── AlertCenter.tsx
+│   │   │   │   │   ├── analytics-api.ts
+│   │   │   │   │   ├── AnalyticsDashboard.tsx
+│   │   │   │   │   ├── analytics-hooks.ts
+│   │   │   │   │   ├── analytics.types.ts
+│   │   │   │   │   ├── analytics-utils.ts
+│   │   │   │   │   ├── BottleneckPanel.tsx
+│   │   │   │   │   ├── HistoricalTimeline.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── PredictiveInsights.tsx
+│   │   │   │   │   ├── TrendCharts.tsx
+│   │   │   │   │   └── UtilizationHeatmap.tsx
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── login.api.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── LoginPage.tsx
+│   │   │   │   │   └── store
+│   │   │   │   │       └── auth.store.ts
+│   │   │   │   ├── backup
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── BackupEngine.ts
+│   │   │   │   │   ├── history
+│   │   │   │   │   │   └── BackupHistory.tsx
+│   │   │   │   │   ├── recovery
+│   │   │   │   │   │   └── RecoveryManager.tsx
+│   │   │   │   │   ├── restore
+│   │   │   │   │   │   └── RestoreManager.ts
+│   │   │   │   │   ├── snapshots
+│   │   │   │   │   │   └── SnapshotManager.ts
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── BackupWorkspace.tsx
+│   │   │   │   ├── cmms
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── cmms.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── MachineCard.tsx
+│   │   │   │   │   │   └── MaintenanceOrderCard.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── useMachines.ts
+│   │   │   │   │   │   └── useMaintenanceOrders.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── CmmsPage.tsx
+│   │   │   │   ├── command-center
+│   │   │   │   │   ├── AiCopilotPanel.tsx
+│   │   │   │   │   ├── AlertTicker.tsx
+│   │   │   │   │   ├── AnimatedMetricCard.tsx
+│   │   │   │   │   ├── CommandCenterLayout.tsx
+│   │   │   │   │   ├── command-center.types.ts
+│   │   │   │   │   ├── command-center-utils.ts
+│   │   │   │   │   ├── DigitalTwinReplayPanel.tsx
+│   │   │   │   │   ├── FullscreenTvMode.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── IndustrialMotionStrip.tsx
+│   │   │   │   │   ├── LiveKpiGrid.tsx
+│   │   │   │   │   ├── LiveNotificationStack.tsx
+│   │   │   │   │   ├── LiveProductionPulse.tsx
+│   │   │   │   │   ├── LiveQcPulse.tsx
+│   │   │   │   │   ├── OperationalSearchPanel.tsx
+│   │   │   │   │   ├── RealtimeActivityStream.tsx
+│   │   │   │   │   ├── SystemHealthPanel.tsx
+│   │   │   │   │   ├── TelemetryAtmosphere.tsx
+│   │   │   │   │   ├── useCommandCenterEvents.ts
+│   │   │   │   │   ├── WorkflowSlaWarnings.tsx
+│   │   │   │   │   └── YardCongestionPanel.tsx
+│   │   │   │   ├── communication
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── AlertQueuePanel.tsx
+│   │   │   │   │   │   └── NotificationRuntimeTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── CommunicationOverviewPage.tsx
+│   │   │   │   ├── components
+│   │   │   │   │   ├── actions
+│   │   │   │   │   │   └── commands
+│   │   │   │   │   │       ├── FabricationCommand.ts
+│   │   │   │   │   │       ├── QcCommand.ts
+│   │   │   │   │   │       └── ShippingCommand.ts
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   ├── engines
+│   │   │   │   │   │   │   └── ComponentsAnalyticsEngine.ts
+│   │   │   │   │   │   └── production
+│   │   │   │   │   │       └── FabricationAnalytics.ts
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── contracts
+│   │   │   │   │   │   │   └── components.contract.ts
+│   │   │   │   │   │   └── endpoints
+│   │   │   │   │   │       ├── components.endpoint.ts
+│   │   │   │   │   │       └── fabrication.endpoint.ts
+│   │   │   │   │   ├── application
+│   │   │   │   │   │   └── ComponentsApplicationService.ts
+│   │   │   │   │   ├── assembly
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   ├── ConsumablesChart.tsx
+│   │   │   │   │   │   ├── DonutChart.tsx
+│   │   │   │   │   │   └── FabricationProgressChart.tsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ComponentAnalytics.tsx
+│   │   │   │   │   │   ├── ComponentListTable.tsx
+│   │   │   │   │   │   ├── FabricationRuntime.tsx
+│   │   │   │   │   │   ├── LifecycleTimeline.tsx
+│   │   │   │   │   │   └── MaterialTraceabilityPanel.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   ├── components.config.ts
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   ├── consumables
+│   │   │   │   │   ├── dashboards
+│   │   │   │   │   │   └── ComponentsDashboard.tsx
+│   │   │   │   │   ├── data-tables
+│   │   │   │   │   │   └── FabricationTable.tsx
+│   │   │   │   │   ├── dialogs
+│   │   │   │   │   │   ├── FabricationDialog.tsx
+│   │   │   │   │   │   └── FullscreenComponentWorkspace.tsx
+│   │   │   │   │   ├── domain
+│   │   │   │   │   │   ├── entities
+│   │   │   │   │   │   │   ├── FabricationStep.ts
+│   │   │   │   │   │   │   └── SteelComponent.ts
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── ComponentFabricated.ts
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       └── FabricationWorkflow.ts
+│   │   │   │   │   ├── fabrication
+│   │   │   │   │   │   ├── machines
+│   │   │   │   │   │   │   └── MachineMonitor.tsx
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── FabricationTelemetry.tsx
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       ├── AssemblyWorkflow.ts
+│   │   │   │   │   │       ├── CuttingWorkflow.ts
+│   │   │   │   │   │       └── WeldingWorkflow.ts
+│   │   │   │   │   ├── features
+│   │   │   │   │   │   ├── assembly
+│   │   │   │   │   │   │   └── AssemblyView.tsx
+│   │   │   │   │   │   ├── consumables
+│   │   │   │   │   │   │   ├── ConsumablesView.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       └── ConsumablesUsagePanel.tsx
+│   │   │   │   │   │   ├── fabrication
+│   │   │   │   │   │   │   ├── FabricationView.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       ├── FabricationMachinePanel.tsx
+│   │   │   │   │   │   │       ├── FabricationQueuePanel.tsx
+│   │   │   │   │   │   │       └── FabricationStatusPanel.tsx
+│   │   │   │   │   │   ├── overview
+│   │   │   │   │   │   │   └── ComponentsOverviewView.tsx
+│   │   │   │   │   │   ├── painting
+│   │   │   │   │   │   │   └── PaintingView.tsx
+│   │   │   │   │   │   ├── qc
+│   │   │   │   │   │   │   ├── ComponentsQcView.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       ├── QcApprovalPanel.tsx
+│   │   │   │   │   │   │       └── QcDefectPanel.tsx
+│   │   │   │   │   │   ├── shipping
+│   │   │   │   │   │   │   └── ShippingView.tsx
+│   │   │   │   │   │   └── tracking
+│   │   │   │   │   │       └── TrackingView.tsx
+│   │   │   │   │   ├── feeds
+│   │   │   │   │   │   └── FabricationFeed.tsx
+│   │   │   │   │   ├── filters
+│   │   │   │   │   │   └── ComponentToolbar.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── queries
+│   │   │   │   │   │       └── useComponents.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── lib
+│   │   │   │   │   │   └── runtime.ts
+│   │   │   │   │   ├── locations
+│   │   │   │   │   ├── machines
+│   │   │   │   │   │   ├── Machine.ts
+│   │   │   │   │   │   ├── monitoring
+│   │   │   │   │   │   │   └── MachineMonitor.tsx
+│   │   │   │   │   │   └── telemetry
+│   │   │   │   │   │       └── MachineTelemetry.ts
+│   │   │   │   │   ├── machine-streams
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── MachineEvents.ts
+│   │   │   │   │   │   └── MachineTelemetryStream.ts
+│   │   │   │   │   ├── packaging
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── ComponentOverviewPage.tsx
+│   │   │   │   │   │   └── ComponentsWorkspacePage.tsx
+│   │   │   │   │   ├── painting
+│   │   │   │   │   ├── panels
+│   │   │   │   │   │   ├── ComponentsAlertPanel.tsx
+│   │   │   │   │   │   ├── ComponentsInsightPanel.tsx
+│   │   │   │   │   │   └── FabricationQueuePanel.tsx
+│   │   │   │   │   ├── qc
+│   │   │   │   │   ├── realtime
+│   │   │   │   │   ├── registry
+│   │   │   │   │   │   └── components-tabs.registry.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   ├── ComponentKpiCard.tsx
+│   │   │   │   │   │   ├── ComponentsRuntime.ts
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── ComponentsRuntimeEvents.ts
+│   │   │   │   │   │   ├── fabrication
+│   │   │   │   │   │   │   └── FabricationRuntime.ts
+│   │   │   │   │   │   └── SteelPreview.tsx
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── api
+│   │   │   │   │   │       └── components.api.ts
+│   │   │   │   │   ├── shipping
+│   │   │   │   │   ├── state
+│   │   │   │   │   │   └── stores
+│   │   │   │   │   │       ├── components.store.ts
+│   │   │   │   │   │       └── fabrication.store.ts
+│   │   │   │   │   ├── store
+│   │   │   │   │   │   ├── components.store.ts
+│   │   │   │   │   │   ├── fabrication
+│   │   │   │   │   │   │   └── fabrication.store.ts
+│   │   │   │   │   │   └── telemetry
+│   │   │   │   │   │       └── components-telemetry.store.ts
+│   │   │   │   │   ├── tables
+│   │   │   │   │   │   ├── ComponentDataTable.tsx
+│   │   │   │   │   │   └── ComponentsTable.tsx
+│   │   │   │   │   ├── tabs
+│   │   │   │   │   │   ├── AssemblyTab.tsx
+│   │   │   │   │   │   ├── ComponentsAnalyticsTab.tsx
+│   │   │   │   │   │   ├── ComponentsListTab.tsx
+│   │   │   │   │   │   ├── ComponentsOverviewTab.tsx
+│   │   │   │   │   │   ├── ComponentsQcTab.tsx
+│   │   │   │   │   │   ├── ConsumablesTab.tsx
+│   │   │   │   │   │   ├── FabricationTab.tsx
+│   │   │   │   │   │   ├── PackagingTab.tsx
+│   │   │   │   │   │   ├── PaintingTab.tsx
+│   │   │   │   │   │   ├── ProductionHistoryTab.tsx
+│   │   │   │   │   │   ├── ShippingTab.tsx
+│   │   │   │   │   │   └── TrackingTab.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── ComponentsTelemetry.tsx
+│   │   │   │   │   ├── tracking
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   └── entities
+│   │   │   │   │   │       └── component.ts
+│   │   │   │   │   ├── widgets
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── layouts
+│   │   │   │   │           └── ComponentsWorkspaceLayout.tsx
+│   │   │   │   ├── components-module
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── components.api.ts
+│   │   │   │   │   ├── charts
+│   │   │   │   │   ├── components
+│   │   │   │   │   ├── dialogs
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── layout
+│   │   │   │   │   │   └── ComponentsLayout.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── AssemblyPage.tsx
+│   │   │   │   │   │   ├── ComponentQcPage.tsx
+│   │   │   │   │   │   ├── ComponentsOverviewPage.tsx
+│   │   │   │   │   │   ├── ComponentsPage.tsx
+│   │   │   │   │   │   ├── ComponentsRuntimeGridPage.tsx
+│   │   │   │   │   │   ├── FabricationPage.tsx
+│   │   │   │   │   │   ├── PaintingPage.tsx
+│   │   │   │   │   │   ├── ShippingPage.tsx
+│   │   │   │   │   │   └── WeldingPage.tsx
+│   │   │   │   │   ├── services
+│   │   │   │   │   ├── store
+│   │   │   │   │   ├── tabs
+│   │   │   │   │   │   ├── assembly
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── consumables
+│   │   │   │   │   │   ├── cutting
+│   │   │   │   │   │   ├── dashboard
+│   │   │   │   │   │   │   └── ComponentsDashboardTab.tsx
+│   │   │   │   │   │   ├── fabrication
+│   │   │   │   │   │   ├── painting
+│   │   │   │   │   │   ├── qc
+│   │   │   │   │   │   ├── reports
+│   │   │   │   │   │   ├── settings
+│   │   │   │   │   │   ├── tracking
+│   │   │   │   │   │   └── welding
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   └── component.types.ts
+│   │   │   │   │   └── widgets
+│   │   │   │   ├── dashboard
+│   │   │   │   │   ├── alerts
+│   │   │   │   │   │   └── OperationalAlertCenter.tsx
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   └── ExecutiveAnalytics.tsx
+│   │   │   │   │   ├── analytics-runtime
+│   │   │   │   │   │   ├── AnalyticsDashboard.tsx
+│   │   │   │   │   │   ├── charts
+│   │   │   │   │   │   │   └── FactoryTrendChart.tsx
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── FactoryLoadWidget.tsx
+│   │   │   │   │   │       └── SystemHealthWidget.tsx
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   └── OperationalOverviewChart.tsx
+│   │   │   │   │   ├── command-center
+│   │   │   │   │   │   ├── ExecutiveCommandCenter.tsx
+│   │   │   │   │   │   ├── FactoryCommandCenter.tsx
+│   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   └── SystemAlertsPanel.tsx
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── FactoryTelemetryBar.tsx
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── InventoryPressureWidget.tsx
+│   │   │   │   │   │       ├── ProductionStatusWidget.tsx
+│   │   │   │   │   │       └── YardCapacityWidget.tsx
+│   │   │   │   │   ├── executive
+│   │   │   │   │   │   ├── analytics
+│   │   │   │   │   │   │   └── ExecutiveAnalyticsEngine.ts
+│   │   │   │   │   │   ├── charts
+│   │   │   │   │   │   │   └── ExecutiveAnalyticsChart.tsx
+│   │   │   │   │   │   ├── ExecutiveDashboard.tsx
+│   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   └── ExecutiveAlertsPanel.tsx
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── ExecutiveTelemetry.ts
+│   │   │   │   │   │   ├── ui
+│   │   │   │   │   │   │   └── ExecutiveOverview.tsx
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── FactoryStatusWidget.tsx
+│   │   │   │   │   │       ├── InventoryPressureWidget.tsx
+│   │   │   │   │   │       └── ProductionStatusWidget.tsx
+│   │   │   │   │   ├── grid
+│   │   │   │   │   │   └── DashboardGrid.tsx
+│   │   │   │   │   ├── layouts
+│   │   │   │   │   │   ├── DashboardLayout.tsx
+│   │   │   │   │   │   ├── ExecutiveLayout.tsx
+│   │   │   │   │   │   └── OperationsLayout.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── DashboardPage.tsx
+│   │   │   │   │   ├── panels
+│   │   │   │   │   │   ├── ExecutiveInsights.tsx
+│   │   │   │   │   │   └── SystemTelemetry.tsx
+│   │   │   │   │   ├── realtime
+│   │   │   │   │   │   └── RealtimeFactoryFeed.tsx
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   ├── dashboard-runtime.ts
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── dashboard-telemetry.ts
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── production.widget.tsx
+│   │   │   │   │   │       └── system-health.widget.tsx
+│   │   │   │   │   └── widgets
+│   │   │   │   │       ├── InventoryHealthWidget.tsx
+│   │   │   │   │       ├── ProductionStatusWidget.tsx
+│   │   │   │   │       ├── system
+│   │   │   │   │       │   └── SystemHealthWidget.tsx
+│   │   │   │   │       └── YardOccupancyWidget.tsx
+│   │   │   │   ├── digital-twin
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── FactoryFloor.tsx
+│   │   │   │   │   │   ├── LiveTelemetryPanel.tsx
+│   │   │   │   │   │   ├── MachineObject.tsx
+│   │   │   │   │   │   └── YardZoneObject.tsx
+│   │   │   │   │   ├── mock-data
+│   │   │   │   │   │   └── factory-layout.data.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── DigitalTwinPage.tsx
+│   │   │   │   │   ├── scene
+│   │   │   │   │   │   └── FactoryScene.tsx
+│   │   │   │   │   └── store
+│   │   │   │   │       └── digitalTwin.store.ts
+│   │   │   │   ├── digital-twin-module
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── DigitalTwinPage.tsx
+│   │   │   │   ├── documents
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── DocumentRuntimeTable.tsx
+│   │   │   │   │   │   └── StorageInsightPanel.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── DocumentOverviewPage.tsx
+│   │   │   │   ├── equipment
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── EquipmentPage.tsx
+│   │   │   │   ├── erp
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── erp.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── CostingCard.tsx
+│   │   │   │   │   │   ├── PurchaseOrderCard.tsx
+│   │   │   │   │   │   └── SupplierCard.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── ErpPage.tsx
+│   │   │   │   ├── executive
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ExecutiveAlertPanel.tsx
+│   │   │   │   │   │   └── FactoryRuntimePanel.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── ExecutiveOverviewPage.tsx
+│   │   │   │   ├── executive-module
+│   │   │   │   │   └── pages
+│   │   │   │   │       ├── ExecutiveCommandCenterPage.tsx
+│   │   │   │   │       └── InventoryTransactionsPage.tsx
+│   │   │   │   ├── hrm
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── hrm.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── EmployeeCard.tsx
+│   │   │   │   │   │   └── OperatorCard.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── HrmPage.tsx
+│   │   │   │   ├── inventory
+│   │   │   │   │   ├── alerts
+│   │   │   │   │   ├── allocations
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   ├── engines
+│   │   │   │   │   │   │   └── InventoryAnalyticsEngine.ts
+│   │   │   │   │   │   ├── forecasting
+│   │   │   │   │   │   │   └── StockForecastEngine.ts
+│   │   │   │   │   │   ├── kpi
+│   │   │   │   │   │   │   └── InventoryKpiEngine.ts
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── InventoryValueWidget.tsx
+│   │   │   │   │   │       ├── MovementWidget.tsx
+│   │   │   │   │   │       ├── OccupancyWidget.tsx
+│   │   │   │   │   │       └── StockPressureWidget.tsx
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── contracts
+│   │   │   │   │   │   │   └── inventory.contract.ts
+│   │   │   │   │   │   ├── endpoints
+│   │   │   │   │   │   │   ├── inventory.endpoint.ts
+│   │   │   │   │   │   │   ├── transactions.endpoint.ts
+│   │   │   │   │   │   │   └── warehouse.endpoint.ts
+│   │   │   │   │   │   ├── inventory.api.ts
+│   │   │   │   │   │   ├── mappers
+│   │   │   │   │   │   │   └── inventory.mapper.ts
+│   │   │   │   │   │   ├── materials.api.ts
+│   │   │   │   │   │   └── transactions.api.ts
+│   │   │   │   │   ├── application
+│   │   │   │   │   │   └── InventoryApplicationService.ts
+│   │   │   │   │   ├── approvals
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   ├── InventoryValueChart.tsx
+│   │   │   │   │   │   ├── MovementTrendChart.tsx
+│   │   │   │   │   │   ├── StockPressureChart.tsx
+│   │   │   │   │   │   └── WarehouseOccupancyChart.tsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── AiInsightPanel.tsx
+│   │   │   │   │   │   ├── CongestionPanel.tsx
+│   │   │   │   │   │   ├── DockTelemetryPanel.tsx
+│   │   │   │   │   │   ├── InventoryAgingChart.tsx
+│   │   │   │   │   │   ├── InventoryMaterialTable.tsx
+│   │   │   │   │   │   ├── InventoryToolbar.tsx
+│   │   │   │   │   │   ├── LiveTransactionFeed.tsx
+│   │   │   │   │   │   ├── LoadingLanePanel.tsx
+│   │   │   │   │   │   ├── material-table
+│   │   │   │   │   │   │   └── MaterialTable.tsx
+│   │   │   │   │   │   ├── MovementPathPanel.tsx
+│   │   │   │   │   │   ├── MovementTrendChart.tsx
+│   │   │   │   │   │   ├── OutboundShipmentTable.tsx
+│   │   │   │   │   │   ├── ReceivingQueueTable.tsx
+│   │   │   │   │   │   ├── SlotTrackingPanel.tsx
+│   │   │   │   │   │   ├── SpatialLegend.tsx
+│   │   │   │   │   │   ├── SupplierDependencyPanel.tsx
+│   │   │   │   │   │   ├── TransferMovementTable.tsx
+│   │   │   │   │   │   ├── WarehouseHeatmap.tsx
+│   │   │   │   │   │   └── WarehouseMapGrid.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   ├── inventory.config.ts
+│   │   │   │   │   │   ├── inventory-tabs.ts
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   ├── context
+│   │   │   │   │   │   └── useInventoryWorkspace.ts
+│   │   │   │   │   ├── counting
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   │   └── useInventoryCount.ts
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   │   └── inventoryCount.service.ts
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       └── InventoryCountWorkflow.ts
+│   │   │   │   │   ├── dialogs
+│   │   │   │   │   │   ├── IssueInventoryDialog.tsx
+│   │   │   │   │   │   ├── ReceiveInventoryDialog.tsx
+│   │   │   │   │   │   ├── StockCountDialog.tsx
+│   │   │   │   │   │   └── TransferInventoryDialog.tsx
+│   │   │   │   │   ├── domain
+│   │   │   │   │   │   ├── aggregates
+│   │   │   │   │   │   │   └── InventoryAggregate.ts
+│   │   │   │   │   │   ├── entities
+│   │   │   │   │   │   │   ├── InventoryItem.ts
+│   │   │   │   │   │   │   ├── InventoryMovement.ts
+│   │   │   │   │   │   │   ├── InventoryTransaction.ts
+│   │   │   │   │   │   │   ├── Material.ts
+│   │   │   │   │   │   │   ├── WarehouseLocation.ts
+│   │   │   │   │   │   │   ├── WarehouseSlot.ts
+│   │   │   │   │   │   │   └── Warehouse.ts
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   ├── InventoryEvents.ts
+│   │   │   │   │   │   │   ├── MaterialIssued.ts
+│   │   │   │   │   │   │   ├── MaterialReceived.ts
+│   │   │   │   │   │   │   └── MaterialTransferred.ts
+│   │   │   │   │   │   └── value-objects
+│   │   │   │   │   │       ├── Quantity.ts
+│   │   │   │   │   │       └── Uom.ts
+│   │   │   │   │   ├── features
+│   │   │   │   │   │   ├── alerts
+│   │   │   │   │   │   │   ├── AlertCards.tsx
+│   │   │   │   │   │   │   ├── AlertsView.tsx
+│   │   │   │   │   │   │   ├── LowStockTable.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       └── AlertInsightPanel.tsx
+│   │   │   │   │   │   ├── counting
+│   │   │   │   │   │   │   ├── CountingView.tsx
+│   │   │   │   │   │   │   ├── CountingWizard.tsx
+│   │   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   │   └── VarianceAnalysisPanel.tsx
+│   │   │   │   │   │   │   └── VarianceTable.tsx
+│   │   │   │   │   │   ├── inbound
+│   │   │   │   │   │   │   ├── InboundQueue.tsx
+│   │   │   │   │   │   │   ├── InboundTelemetry.tsx
+│   │   │   │   │   │   │   ├── InboundView.tsx
+│   │   │   │   │   │   │   ├── InboundWizard.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       └── InboundQueuePanel.tsx
+│   │   │   │   │   │   ├── outbound
+│   │   │   │   │   │   │   ├── OutboundQueue.tsx
+│   │   │   │   │   │   │   ├── OutboundTelemetry.tsx
+│   │   │   │   │   │   │   ├── OutboundView.tsx
+│   │   │   │   │   │   │   ├── OutboundWizard.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       └── OutboundQueuePanel.tsx
+│   │   │   │   │   │   ├── overview
+│   │   │   │   │   │   │   ├── charts
+│   │   │   │   │   │   │   │   ├── InventoryKpiChart.tsx
+│   │   │   │   │   │   │   │   ├── InventoryTrendChart.tsx
+│   │   │   │   │   │   │   │   └── StockFlowChart.tsx
+│   │   │   │   │   │   │   ├── OverviewCharts.tsx
+│   │   │   │   │   │   │   ├── OverviewTelemetry.tsx
+│   │   │   │   │   │   │   ├── OverviewView.tsx
+│   │   │   │   │   │   │   └── panels
+│   │   │   │   │   │   │       ├── InventoryHealthPanel.tsx
+│   │   │   │   │   │   │       ├── InventoryMovementPanel.tsx
+│   │   │   │   │   │   │       └── InventorySummaryPanel.tsx
+│   │   │   │   │   │   ├── stock
+│   │   │   │   │   │   │   ├── charts
+│   │   │   │   │   │   │   │   ├── OccupancyChart.tsx
+│   │   │   │   │   │   │   │   └── StockAgeChart.tsx
+│   │   │   │   │   │   │   ├── fullscreen
+│   │   │   │   │   │   │   │   ├── MaterialFullscreenWorkspace.tsx
+│   │   │   │   │   │   │   │   ├── MaterialLocationView.tsx
+│   │   │   │   │   │   │   │   ├── MaterialMovementTimeline.tsx
+│   │   │   │   │   │   │   │   └── MaterialQcView.tsx
+│   │   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   │   ├── StockAnalyticsPanel.tsx
+│   │   │   │   │   │   │   │   ├── StockDetailPanel.tsx
+│   │   │   │   │   │   │   │   └── StockFiltersPanel.tsx
+│   │   │   │   │   │   │   ├── StockFilters.tsx
+│   │   │   │   │   │   │   ├── StockFullscreen.tsx
+│   │   │   │   │   │   │   ├── StockTable.tsx
+│   │   │   │   │   │   │   └── StockView.tsx
+│   │   │   │   │   │   ├── transactions
+│   │   │   │   │   │   │   ├── charts
+│   │   │   │   │   │   │   │   ├── MovementVolumeChart.tsx
+│   │   │   │   │   │   │   │   └── TransactionTrendChart.tsx
+│   │   │   │   │   │   │   ├── TransactionsFilters.tsx
+│   │   │   │   │   │   │   ├── TransactionsTimeline.tsx
+│   │   │   │   │   │   │   └── TransactionsView.tsx
+│   │   │   │   │   │   ├── transfers
+│   │   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   │   └── TransferRoutePanel.tsx
+│   │   │   │   │   │   │   ├── TransferRoutes.tsx
+│   │   │   │   │   │   │   ├── TransferView.tsx
+│   │   │   │   │   │   │   └── TransferWizard.tsx
+│   │   │   │   │   │   └── warehouse-map
+│   │   │   │   │   │       ├── panels
+│   │   │   │   │   │       │   └── WarehouseSlotPanel.tsx
+│   │   │   │   │   │       ├── SlotInspector.tsx
+│   │   │   │   │   │       ├── WarehouseMap2D.tsx
+│   │   │   │   │   │       ├── WarehouseMap3D.tsx
+│   │   │   │   │   │       └── WarehouseMapView.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── mutations
+│   │   │   │   │   │   │   ├── useCreateInbound.ts
+│   │   │   │   │   │   │   ├── useCreateIssue.ts
+│   │   │   │   │   │   │   └── useCreateTransfer.ts
+│   │   │   │   │   │   ├── queries
+│   │   │   │   │   │   │   ├── useInventoryAlerts.ts
+│   │   │   │   │   │   │   ├── useInventoryTransactions.ts
+│   │   │   │   │   │   │   └── useInventory.ts
+│   │   │   │   │   │   ├── useMaterials.ts
+│   │   │   │   │   │   └── useTransactionEngineQueries.ts
+│   │   │   │   │   ├── inbound
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   │   └── useReceiveMaterial.ts
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   │   └── receiveMaterial.service.ts
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       └── ReceiveMaterialWorkflow.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── issue
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   │   └── useIssueMaterial.ts
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   │   └── issueMaterial.service.ts
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       └── IssueMaterialWorkflow.ts
+│   │   │   │   │   ├── kpi
+│   │   │   │   │   │   ├── InventoryKpiEngine.ts
+│   │   │   │   │   │   └── widgets
+│   │   │   │   │   │       ├── LowStockWidget.tsx
+│   │   │   │   │   │       ├── MovementWidget.tsx
+│   │   │   │   │   │       ├── OccupancyWidget.tsx
+│   │   │   │   │   │       └── StockValueWidget.tsx
+│   │   │   │   │   ├── maps
+│   │   │   │   │   │   ├── 2d
+│   │   │   │   │   │   │   └── WarehouseMap2D.tsx
+│   │   │   │   │   │   ├── 3d
+│   │   │   │   │   │   │   └── WarehouseMap3D.tsx
+│   │   │   │   │   │   ├── engine
+│   │   │   │   │   │   │   └── WarehouseMapEngine.ts
+│   │   │   │   │   │   ├── occupancy
+│   │   │   │   │   │   │   └── OccupancyHeatmap.tsx
+│   │   │   │   │   │   └── renderers
+│   │   │   │   │   │       ├── WarehouseRackRenderer.tsx
+│   │   │   │   │   │       └── WarehouseSlotRenderer.tsx
+│   │   │   │   │   ├── material-flow
+│   │   │   │   │   │   ├── analytics
+│   │   │   │   │   │   │   └── FlowAnalytics.ts
+│   │   │   │   │   │   ├── MaterialFlowEngine.ts
+│   │   │   │   │   │   └── routes
+│   │   │   │   │   │       └── FlowRoutes.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── InventoryOverviewPage.tsx
+│   │   │   │   │   │   ├── InventoryPage.tsx
+│   │   │   │   │   │   ├── InventoryRuntimeGridPage.tsx
+│   │   │   │   │   │   ├── InventoryTransactionsPage.tsx
+│   │   │   │   │   │   ├── InventoryWorkspacePage.tsx
+│   │   │   │   │   │   └── tabs
+│   │   │   │   │   │       ├── InventoryMaterialsPage.tsx
+│   │   │   │   │   │       └── InventoryTransactionsPage.tsx
+│   │   │   │   │   ├── panels
+│   │   │   │   │   │   ├── bottom
+│   │   │   │   │   │   │   └── RealtimeTransactionsPanel.tsx
+│   │   │   │   │   │   ├── InventoryActivityPanel.tsx
+│   │   │   │   │   │   ├── InventoryAlertPanel.tsx
+│   │   │   │   │   │   ├── InventoryInsightPanel.tsx
+│   │   │   │   │   │   ├── left
+│   │   │   │   │   │   │   └── WarehouseTreePanel.tsx
+│   │   │   │   │   │   └── right
+│   │   │   │   │   │       ├── InventoryInsightsPanel.tsx
+│   │   │   │   │   │       └── MaterialDetailPanel.tsx
+│   │   │   │   │   ├── popups
+│   │   │   │   │   │   ├── counting
+│   │   │   │   │   │   │   └── CountingPopup.tsx
+│   │   │   │   │   │   ├── inbound
+│   │   │   │   │   │   │   └── InboundPopup.tsx
+│   │   │   │   │   │   ├── InventoryCountPopup.tsx
+│   │   │   │   │   │   ├── IssueMaterialPopup.tsx
+│   │   │   │   │   │   ├── outbound
+│   │   │   │   │   │   │   └── OutboundPopup.tsx
+│   │   │   │   │   │   ├── ReceiveMaterialPopup.tsx
+│   │   │   │   │   │   ├── TransferMaterialPopup.tsx
+│   │   │   │   │   │   └── transfers
+│   │   │   │   │   │       └── TransferPopup.tsx
+│   │   │   │   │   ├── realtime
+│   │   │   │   │   │   ├── channels
+│   │   │   │   │   │   │   └── InventorySocketChannel.ts
+│   │   │   │   │   │   ├── InventoryRealtime.ts
+│   │   │   │   │   │   └── streams
+│   │   │   │   │   │       └── InventoryTelemetryStream.ts
+│   │   │   │   │   ├── registry
+│   │   │   │   │   │   ├── inventory-tabs.registry.ts
+│   │   │   │   │   │   └── inventory-widgets.registry.ts
+│   │   │   │   │   ├── reservations
+│   │   │   │   │   │   ├── engine
+│   │   │   │   │   │   │   └── ReservationEngine.ts
+│   │   │   │   │   │   └── rules
+│   │   │   │   │   │       └── AllocationRules.ts
+│   │   │   │   │   ├── returns
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── InventoryRuntimeEvents.ts
+│   │   │   │   │   │   ├── InventoryRuntime.ts
+│   │   │   │   │   │   └── telemetry
+│   │   │   │   │   │       └── InventoryTelemetryRuntime.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── adapters
+│   │   │   │   │   │   │   └── inventory.adapter.ts
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   │   ├── inventory.api.ts
+│   │   │   │   │   │   │   ├── reservations.api.ts
+│   │   │   │   │   │   │   ├── transactions.api.ts
+│   │   │   │   │   │   │   └── transfers.api.ts
+│   │   │   │   │   │   └── mappers
+│   │   │   │   │   │       └── inventory.mapper.ts
+│   │   │   │   │   ├── state
+│   │   │   │   │   │   └── stores
+│   │   │   │   │   │       ├── inventory-filter.store.ts
+│   │   │   │   │   │       ├── inventory-selection.store.ts
+│   │   │   │   │   │       └── inventory.store.ts
+│   │   │   │   │   ├── store
+│   │   │   │   │   │   ├── filters
+│   │   │   │   │   │   │   └── inventory-filter.store.ts
+│   │   │   │   │   │   ├── inventory.store.ts
+│   │   │   │   │   │   └── telemetry
+│   │   │   │   │   │       └── inventory-telemetry.store.ts
+│   │   │   │   │   ├── tables
+│   │   │   │   │   │   ├── InventoryTable.tsx
+│   │   │   │   │   │   ├── StockAlertTable.tsx
+│   │   │   │   │   │   └── TransactionTable.tsx
+│   │   │   │   │   ├── tabs
+│   │   │   │   │   │   ├── AlertsTab.tsx
+│   │   │   │   │   │   ├── CountingTab.tsx
+│   │   │   │   │   │   ├── dashboard
+│   │   │   │   │   │   │   └── InventoryDashboardTab.tsx
+│   │   │   │   │   │   ├── InboundTab.tsx
+│   │   │   │   │   │   ├── inventory-tabs.ts
+│   │   │   │   │   │   ├── materials
+│   │   │   │   │   │   │   └── MaterialsTab.tsx
+│   │   │   │   │   │   ├── OutboundTab.tsx
+│   │   │   │   │   │   ├── OverviewTab.tsx
+│   │   │   │   │   │   ├── StockTab.tsx
+│   │   │   │   │   │   ├── TransactionsTab.tsx
+│   │   │   │   │   │   ├── TransferTab.tsx
+│   │   │   │   │   │   └── WarehouseMapTab.tsx
+│   │   │   │   │   ├── transactions
+│   │   │   │   │   ├── transfer
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   │   └── useTransferMaterial.ts
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   │   └── transferMaterial.service.ts
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       └── TransferMaterialWorkflow.ts
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   │   └── inventory-api.ts
+│   │   │   │   │   │   ├── entities
+│   │   │   │   │   │   │   ├── inventory-item.ts
+│   │   │   │   │   │   │   ├── inventory-transaction.ts
+│   │   │   │   │   │   │   ├── warehouse-slot.ts
+│   │   │   │   │   │   │   └── warehouse.ts
+│   │   │   │   │   │   ├── inventory.types.ts
+│   │   │   │   │   │   ├── material.types.ts
+│   │   │   │   │   │   └── transaction-engine.types.ts
+│   │   │   │   │   ├── warehouse
+│   │   │   │   │   │   ├── levels
+│   │   │   │   │   │   │   └── WarehouseLevel.ts
+│   │   │   │   │   │   ├── racks
+│   │   │   │   │   │   │   └── WarehouseRack.ts
+│   │   │   │   │   │   └── slots
+│   │   │   │   │   │       └── WarehouseSlot.ts
+│   │   │   │   │   └── widgets
+│   │   │   │   ├── iot
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── TelemetryCard.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── IotPage.tsx
+│   │   │   │   │   └── store
+│   │   │   │   │       └── iot.store.ts
+│   │   │   │   ├── logistics
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── RouteInsightPanel.tsx
+│   │   │   │   │   │   └── ShipmentRuntimeTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── LogisticsEngine.ts
+│   │   │   │   │   │   ├── shipping
+│   │   │   │   │   │   │   └── ShipmentEngine.ts
+│   │   │   │   │   │   └── tracking
+│   │   │   │   │   │       └── FleetTracking.ts
+│   │   │   │   │   ├── fleet
+│   │   │   │   │   │   └── FleetTracking.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── LogisticsOverviewPage.tsx
+│   │   │   │   │   │   └── LogisticsWorkspacePage.tsx
+│   │   │   │   │   ├── shipping
+│   │   │   │   │   │   └── ShipmentTracking.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── LogisticsCockpit.tsx
+│   │   │   │   ├── logistics-module
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── logistics.api.ts
+│   │   │   │   │   ├── layout
+│   │   │   │   │   │   └── LogisticsLayout.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       ├── DispatchPage.tsx
+│   │   │   │   │       ├── FleetTrackingPage.tsx
+│   │   │   │   │       ├── LogisticsOverviewPage.tsx
+│   │   │   │   │       ├── PlanningPage.tsx
+│   │   │   │   │       ├── ShipmentsPage.tsx
+│   │   │   │   │       └── TruckRuntimePage.tsx
+│   │   │   │   ├── maintenance
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── MachineRuntimeTable.tsx
+│   │   │   │   │   │   └── MaintenanceAlertPanel.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── MaintenanceOverviewPage.tsx
+│   │   │   │   ├── master-data
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── master-data.api.ts
+│   │   │   │   │   ├── categories
+│   │   │   │   │   │   └── MaterialCategories.tsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── MasterDataRecordDrawer.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── useMasterDataQueries.ts
+│   │   │   │   │   │   ├── useMaterialCategories.ts
+│   │   │   │   │   │   ├── useTransactionTypes.ts
+│   │   │   │   │   │   ├── useUom.ts
+│   │   │   │   │   │   └── useWarehouses.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── material-categories
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── material-statuses
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── material-types
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── priorities
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── project-categories
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── qc-statuses
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── masterData.api.ts
+│   │   │   │   │   │   └── master-data-domains.ts
+│   │   │   │   │   ├── supplier-categories
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── transaction-types
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   ├── master-data.ts
+│   │   │   │   │   │   └── master-data.types.ts
+│   │   │   │   │   ├── uom
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   │   └── uom.api.ts
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   │   └── UomFormDrawer.tsx
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   │   └── useUomQueries.ts
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   │   └── uom.types.ts
+│   │   │   │   │   │   ├── UomManagement.tsx
+│   │   │   │   │   │   └── workspaces
+│   │   │   │   │   │       └── UomWorkspace.tsx
+│   │   │   │   │   ├── warehouses
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── workflow-statuses
+│   │   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── hooks
+│   │   │   │   │   │   ├── services
+│   │   │   │   │   │   ├── types
+│   │   │   │   │   │   └── workspace
+│   │   │   │   │   ├── workspaces
+│   │   │   │   │   │   ├── MasterDataCenter.tsx
+│   │   │   │   │   │   └── MasterDataWorkspace.tsx
+│   │   │   │   │   └── yard-zones
+│   │   │   │   │       ├── api
+│   │   │   │   │       ├── components
+│   │   │   │   │       ├── hooks
+│   │   │   │   │       ├── services
+│   │   │   │   │       ├── types
+│   │   │   │   │       └── workspace
+│   │   │   │   ├── master-runtime
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── MasterMaterialTable.tsx
+│   │   │   │   │   │   └── WorkflowInsightPanel.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── MasterRuntimeOverviewPage.tsx
+│   │   │   │   ├── mes
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── mes.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── WorkOrderCard.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useWorkOrders.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── MesPage.tsx
+│   │   │   │   ├── navigation
+│   │   │   │   │   ├── DynamicSidebar.tsx
+│   │   │   │   │   ├── FavoriteModulesPanel.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── LanguageSwitcher.tsx
+│   │   │   │   │   ├── navigation-registry.ts
+│   │   │   │   │   ├── navigation.service.ts
+│   │   │   │   │   ├── navigation-storage.ts
+│   │   │   │   │   ├── navigation.types.ts
+│   │   │   │   │   ├── NotificationCenter.tsx
+│   │   │   │   │   ├── QuickActionsPanel.tsx
+│   │   │   │   │   ├── RecentItemsPanel.tsx
+│   │   │   │   │   ├── SmartBreadcrumbs.tsx
+│   │   │   │   │   ├── workspace-registry.ts
+│   │   │   │   │   ├── WorkspaceShell.tsx
+│   │   │   │   │   └── WorkspaceSwitcher.tsx
+│   │   │   │   ├── navigation.config.ts
+│   │   │   │   ├── notifications
+│   │   │   │   │   ├── center
+│   │   │   │   │   │   └── NotificationCenter.tsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ActivityTimeline.tsx
+│   │   │   │   │   │   └── AlertCard.tsx
+│   │   │   │   │   ├── feeds
+│   │   │   │   │   │   └── RealtimeFeed.tsx
+│   │   │   │   │   ├── mock-data
+│   │   │   │   │   │   └── alerts.data.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── NotificationsPage.tsx
+│   │   │   │   │   ├── realtime
+│   │   │   │   │   │   └── RealtimeNotifications.tsx
+│   │   │   │   │   ├── store
+│   │   │   │   │   │   └── notification.store.ts
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── NotificationWorkspace.tsx
+│   │   │   │   ├── operational-cockpit
+│   │   │   │   │   ├── cockpit-configs.tsx
+│   │   │   │   │   └── OperationalCockpitPage.tsx
+│   │   │   │   ├── operations
+│   │   │   │   │   ├── context
+│   │   │   │   │   │   └── useOperationalWorkspaceState.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   ├── domain-event.types.ts
+│   │   │   │   │   │   ├── event-matchers.ts
+│   │   │   │   │   │   ├── operational-event-bus.ts
+│   │   │   │   │   │   └── useWorkspaceEvents.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── layouts
+│   │   │   │   │   │   ├── OperationalWorkspaceShell.tsx
+│   │   │   │   │   │   └── SplitWorkspaceLayout.tsx
+│   │   │   │   │   ├── orchestration
+│   │   │   │   │   │   └── useWorkspaceTelemetryEvents.ts
+│   │   │   │   │   ├── panels
+│   │   │   │   │   │   ├── ContextInsightPanel.tsx
+│   │   │   │   │   │   └── WorkspaceEventSurface.tsx
+│   │   │   │   │   ├── realtime
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── TelemetryStrip.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   ├── operator-actions
+│   │   │   │   │   ├── ContextualOperationDrawer.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── OperatorActionMenu.tsx
+│   │   │   │   │   ├── operator-action.types.ts
+│   │   │   │   │   ├── OperatorQuickActionsPanel.tsx
+│   │   │   │   │   └── useOperatorActions.tsx
+│   │   │   │   ├── permissions
+│   │   │   │   │   ├── policies
+│   │   │   │   │   │   └── PermissionPolicies.ts
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── PermissionWorkspace.tsx
+│   │   │   │   ├── planning
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── capacity
+│   │   │   │   │   │   │   └── CapacityPlanner.ts
+│   │   │   │   │   │   ├── PlanningEngine.ts
+│   │   │   │   │   │   └── resources
+│   │   │   │   │   │       └── ResourceAllocator.ts
+│   │   │   │   │   ├── features
+│   │   │   │   │   │   └── PlanningOverview.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── PlanningWorkspacePage.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── PlanningTelemetry.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── PlanningWorkspace.tsx
+│   │   │   │   ├── platform
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ServerHealthPanel.tsx
+│   │   │   │   │   │   └── UserRuntimeTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── PlatformOverviewPage.tsx
+│   │   │   │   ├── procurement
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── CostInsightPanel.tsx
+│   │   │   │   │   │   └── SupplierRuntimeTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── ProcurementOverviewPage.tsx
+│   │   │   │   ├── production
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── AIBottleneckPanel.tsx
+│   │   │   │   │   │   ├── MachineTelemetryPanel.tsx
+│   │   │   │   │   │   ├── ProductionOrderTable.tsx
+│   │   │   │   │   │   └── WorkCenterRuntime.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   ├── context
+│   │   │   │   │   │   └── useProductionWorkspace.ts
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── monitoring
+│   │   │   │   │   │   │   └── MachineMonitoring.tsx
+│   │   │   │   │   │   ├── ProductionEngine.ts
+│   │   │   │   │   │   └── workflows
+│   │   │   │   │   │       └── ProductionWorkflow.ts
+│   │   │   │   │   ├── features
+│   │   │   │   │   │   └── ProductionOverview.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── ProductionOverviewPage.tsx
+│   │   │   │   │   │   └── ProductionWorkspacePage.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── ProductionTelemetry.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── ProductionWorkspace.tsx
+│   │   │   │   ├── production-module
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── production.api.ts
+│   │   │   │   │   ├── layout
+│   │   │   │   │   │   └── ProductionLayout.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       ├── BOMRuntimePage.tsx
+│   │   │   │   │       ├── MachineRuntimePage.tsx
+│   │   │   │   │       ├── MachinesPage.tsx
+│   │   │   │   │       ├── OperatorsPage.tsx
+│   │   │   │   │       ├── ProductionOverviewPage.tsx
+│   │   │   │   │       ├── ProductionRuntimeGridPage.tsx
+│   │   │   │   │       ├── SchedulesPage.tsx
+│   │   │   │   │       ├── TelemetryPage.tsx
+│   │   │   │   │       ├── WorkOrderRuntimePage.tsx
+│   │   │   │   │       └── WorkOrdersPage.tsx
+│   │   │   │   ├── production-ui
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── MachineStatusWidgets.tsx
+│   │   │   │   │   ├── production-api.ts
+│   │   │   │   │   ├── ProductionBoard.tsx
+│   │   │   │   │   ├── production-hooks.ts
+│   │   │   │   │   ├── ProductionKpiCards.tsx
+│   │   │   │   │   ├── ProductionProgressVisualization.tsx
+│   │   │   │   │   ├── ProductionTaskTable.tsx
+│   │   │   │   │   ├── production.types.ts
+│   │   │   │   │   ├── production-utils.ts
+│   │   │   │   │   ├── StageTimeline.tsx
+│   │   │   │   │   └── WorkCenterCards.tsx
+│   │   │   │   ├── projects
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ProjectRiskPanel.tsx
+│   │   │   │   │   │   └── ProjectRuntimeTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       ├── ProjectOverviewPage.tsx
+│   │   │   │   │       └── ProjectsWorkspacePage.tsx
+│   │   │   │   ├── purchasing
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── PurchasingPage.tsx
+│   │   │   │   ├── qc
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── qc.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── DefectCard.tsx
+│   │   │   │   │   │   ├── InspectionCard.tsx
+│   │   │   │   │   │   ├── NCRPanel.tsx
+│   │   │   │   │   │   └── QCInspectionTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   ├── defects
+│   │   │   │   │   │   └── DefectAnalysis.tsx
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── defects
+│   │   │   │   │   │   │   └── DefectTracking.ts
+│   │   │   │   │   │   ├── inspection
+│   │   │   │   │   │   │   └── InspectionWorkflow.ts
+│   │   │   │   │   │   └── QcEngine.ts
+│   │   │   │   │   ├── inspection
+│   │   │   │   │   │   └── InspectionQueue.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── QCOverviewPage.tsx
+│   │   │   │   │   │   ├── QcPage.tsx
+│   │   │   │   │   │   └── QcWorkspacePage.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── QcTelemetry.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── QcCockpit.tsx
+│   │   │   │   ├── qc-module
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── qc.api.ts
+│   │   │   │   │   ├── layout
+│   │   │   │   │   │   └── QcLayout.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       ├── DefectsPage.tsx
+│   │   │   │   │       ├── IncomingQcPage.tsx
+│   │   │   │   │       ├── NcrPage.tsx
+│   │   │   │   │       ├── PaintingQcPage.tsx
+│   │   │   │   │       ├── QcApprovalsPage.tsx
+│   │   │   │   │       ├── QCRuntimePage.tsx
+│   │   │   │   │       └── WeldingQcPage.tsx
+│   │   │   │   ├── qc-ui
+│   │   │   │   │   ├── ChecklistViewer.tsx
+│   │   │   │   │   ├── EvidencePreviewPlaceholder.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── InspectionBoard.tsx
+│   │   │   │   │   ├── InspectionResultPanel.tsx
+│   │   │   │   │   ├── IssueTracker.tsx
+│   │   │   │   │   ├── NcrPanel.tsx
+│   │   │   │   │   ├── qc-api.ts
+│   │   │   │   │   ├── qc-hooks.ts
+│   │   │   │   │   ├── qc.types.ts
+│   │   │   │   │   ├── qc-utils.ts
+│   │   │   │   │   ├── QualityMetricsWidgets.tsx
+│   │   │   │   │   └── ReworkTimeline.tsx
+│   │   │   │   ├── reporting
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ExecutiveReportPanel.tsx
+│   │   │   │   │   │   └── KpiAnalyticsPanel.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── ReportingOverviewPage.tsx
+│   │   │   │   ├── roles
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── roles.api.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── RolesPage.tsx
+│   │   │   │   ├── settings
+│   │   │   │   │   ├── automation
+│   │   │   │   │   │   └── AutomationRules.ts
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── SettingsEngine.ts
+│   │   │   │   │   ├── integrations
+│   │   │   │   │   │   └── IntegrationSettings.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── SettingsPage.tsx
+│   │   │   │   │   ├── preferences
+│   │   │   │   │   │   ├── UserPreferences.ts
+│   │   │   │   │   │   └── UserPreferences.tsx
+│   │   │   │   │   ├── system
+│   │   │   │   │   │   └── SystemSettings.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── SettingsWorkspace.tsx
+│   │   │   │   ├── simulation-ui
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── LiveFactoryStatus.tsx
+│   │   │   │   │   ├── RealtimeScenarioTimeline.tsx
+│   │   │   │   │   ├── ScenarioRunner.tsx
+│   │   │   │   │   ├── simulation-api.ts
+│   │   │   │   │   ├── SimulationControlPanel.tsx
+│   │   │   │   │   ├── simulation-hooks.ts
+│   │   │   │   │   ├── SimulationMetrics.tsx
+│   │   │   │   │   └── simulation.types.ts
+│   │   │   │   ├── _standards
+│   │   │   │   │   └── module-structure.txt
+│   │   │   │   ├── suppliers
+│   │   │   │   ├── system-logs
+│   │   │   │   │   ├── audit
+│   │   │   │   │   │   └── AuditLogs.tsx
+│   │   │   │   │   ├── errors
+│   │   │   │   │   │   └── ErrorMonitoring.tsx
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── SystemEvents.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── SystemLogsWorkspace.tsx
+│   │   │   │   ├── _template
+│   │   │   │   │   ├── api
+│   │   │   │   │   ├── components
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   ├── pages
+│   │   │   │   │   ├── services
+│   │   │   │   │   ├── store
+│   │   │   │   │   ├── types
+│   │   │   │   │   └── utils
+│   │   │   │   ├── tracking
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── tracking.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── QrTagCard.tsx
+│   │   │   │   │   ├── mobile
+│   │   │   │   │   │   └── MobileScanner.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── TrackingPage.tsx
+│   │   │   │   ├── users
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── users.api.ts
+│   │   │   │   │   ├── management
+│   │   │   │   │   │   └── UserManagement.tsx
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   └── UsersPage.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── UserManagementWorkspace.tsx
+│   │   │   │   ├── workflow
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   └── workflow.api.ts
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ApprovalCard.tsx
+│   │   │   │   │   │   ├── AutomationRuleCard.tsx
+│   │   │   │   │   │   └── WorkflowCard.tsx
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── WorkflowPage.tsx
+│   │   │   │   ├── workforce
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── SafetyInsightPanel.tsx
+│   │   │   │   │   │   └── WorkforceRuntimeTable.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   └── tabs.ts
+│   │   │   │   │   └── pages
+│   │   │   │   │       └── WorkforceOverviewPage.tsx
+│   │   │   │   ├── yard
+│   │   │   │   │   ├── actions
+│   │   │   │   │   │   └── commands
+│   │   │   │   │   │       ├── YardInboundCommand.ts
+│   │   │   │   │   │       ├── YardOutboundCommand.ts
+│   │   │   │   │   │       └── YardTransferCommand.ts
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   ├── engines
+│   │   │   │   │   │   │   └── YardAnalyticsEngine.ts
+│   │   │   │   │   │   └── heatmaps
+│   │   │   │   │   │       └── OccupancyHeatmapEngine.ts
+│   │   │   │   │   ├── api
+│   │   │   │   │   │   ├── contracts
+│   │   │   │   │   │   │   └── yard.contract.ts
+│   │   │   │   │   │   └── endpoints
+│   │   │   │   │   │       ├── yard.endpoint.ts
+│   │   │   │   │   │       └── zones.endpoint.ts
+│   │   │   │   │   ├── application
+│   │   │   │   │   │   └── YardApplicationService.ts
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   ├── MovementHeatmapChart.tsx
+│   │   │   │   │   │   └── YardOccupancyChart.tsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── CraneOpsPanel.tsx
+│   │   │   │   │   │   ├── CraneRuntimeSurface.tsx
+│   │   │   │   │   │   ├── InboundYardTable.tsx
+│   │   │   │   │   │   ├── OutboundYardTable.tsx
+│   │   │   │   │   │   ├── ShipmentStagingPanel.tsx
+│   │   │   │   │   │   ├── TruckTrackingSurface.tsx
+│   │   │   │   │   │   ├── TruckTrafficPanel.tsx
+│   │   │   │   │   │   ├── YardAnalyticsPanel.tsx
+│   │   │   │   │   │   ├── YardHeatmapPanel.tsx
+│   │   │   │   │   │   ├── YardMap2D.tsx
+│   │   │   │   │   │   └── YardMovementTimeline.tsx
+│   │   │   │   │   ├── config
+│   │   │   │   │   │   ├── tabs.ts
+│   │   │   │   │   │   └── yard.config.ts
+│   │   │   │   │   ├── coordinates
+│   │   │   │   │   │   ├── factory-layout.constants.ts
+│   │   │   │   │   │   ├── yard-slot-engine.ts
+│   │   │   │   │   │   └── yard-zone.constants.ts
+│   │   │   │   │   ├── cranes
+│   │   │   │   │   ├── data-tables
+│   │   │   │   │   │   └── YardOccupancyTable.tsx
+│   │   │   │   │   ├── dialogs
+│   │   │   │   │   │   ├── YardInboundDialog.tsx
+│   │   │   │   │   │   └── YardTransferDialog.tsx
+│   │   │   │   │   ├── domain
+│   │   │   │   │   │   ├── entities
+│   │   │   │   │   │   │   └── YardMaterial.ts
+│   │   │   │   │   │   ├── levels
+│   │   │   │   │   │   │   └── YardLevel.ts
+│   │   │   │   │   │   ├── slots
+│   │   │   │   │   │   │   └── YardSlot.ts
+│   │   │   │   │   │   └── zones
+│   │   │   │   │   │       └── YardZone.ts
+│   │   │   │   │   ├── features
+│   │   │   │   │   │   ├── cranes
+│   │   │   │   │   │   │   └── CraneOperationsView.tsx
+│   │   │   │   │   │   ├── heatmaps
+│   │   │   │   │   │   │   └── YardHeatmapView.tsx
+│   │   │   │   │   │   ├── history
+│   │   │   │   │   │   │   └── YardHistoryView.tsx
+│   │   │   │   │   │   ├── inbound
+│   │   │   │   │   │   │   └── YardInboundView.tsx
+│   │   │   │   │   │   ├── maps2d
+│   │   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   │   ├── YardLegendPanel.tsx
+│   │   │   │   │   │   │   │   ├── YardOccupancyPanel.tsx
+│   │   │   │   │   │   │   │   └── YardSlotPanel.tsx
+│   │   │   │   │   │   │   └── Yard2DView.tsx
+│   │   │   │   │   │   ├── maps3d
+│   │   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   │   ├── Yard3DControls.tsx
+│   │   │   │   │   │   │   │   └── Yard3DInspector.tsx
+│   │   │   │   │   │   │   └── Yard3DView.tsx
+│   │   │   │   │   │   ├── outbound
+│   │   │   │   │   │   │   └── YardOutboundView.tsx
+│   │   │   │   │   │   ├── overview
+│   │   │   │   │   │   │   └── YardOverviewView.tsx
+│   │   │   │   │   │   ├── tracking
+│   │   │   │   │   │   │   ├── panels
+│   │   │   │   │   │   │   │   └── MovementTrackingPanel.tsx
+│   │   │   │   │   │   │   └── YardTrackingView.tsx
+│   │   │   │   │   │   └── transfers
+│   │   │   │   │   │       └── YardTransferView.tsx
+│   │   │   │   │   ├── feeds
+│   │   │   │   │   │   └── YardFeed.tsx
+│   │   │   │   │   ├── heatmaps
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── queries
+│   │   │   │   │   │       └── useYardOccupancy.ts
+│   │   │   │   │   ├── inbound
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── live-tracking
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── YardMovementEvents.ts
+│   │   │   │   │   │   ├── renderers
+│   │   │   │   │   │   │   └── YardMovementRenderer.tsx
+│   │   │   │   │   │   └── YardTrackingEngine.ts
+│   │   │   │   │   ├── logistics
+│   │   │   │   │   ├── maps2d
+│   │   │   │   │   │   └── YardOperationalMap2D.tsx
+│   │   │   │   │   ├── maps3d
+│   │   │   │   │   │   └── YardOperationalMap3D.tsx
+│   │   │   │   │   ├── mock-data
+│   │   │   │   │   │   └── yard-slots.ts
+│   │   │   │   │   ├── movements
+│   │   │   │   │   ├── occupancy
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── YardOverviewPage.tsx
+│   │   │   │   │   │   └── YardWorkspacePage.tsx
+│   │   │   │   │   ├── panels
+│   │   │   │   │   │   ├── YardAlertPanel.tsx
+│   │   │   │   │   │   ├── YardInsightPanel.tsx
+│   │   │   │   │   │   └── YardTelemetryPanel.tsx
+│   │   │   │   │   ├── popups
+│   │   │   │   │   │   ├── YardInboundPopup.tsx
+│   │   │   │   │   │   ├── YardOutboundPopup.tsx
+│   │   │   │   │   │   └── YardTransferPopup.tsx
+│   │   │   │   │   ├── realtime
+│   │   │   │   │   ├── registry
+│   │   │   │   │   │   └── yard-tabs.registry.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   ├── events
+│   │   │   │   │   │   │   └── YardRuntimeEvents.ts
+│   │   │   │   │   │   ├── spatial
+│   │   │   │   │   │   │   └── YardSpatialRuntime.ts
+│   │   │   │   │   │   └── YardRuntime.ts
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── api
+│   │   │   │   │   │       └── yard.api.ts
+│   │   │   │   │   ├── shipment-staging
+│   │   │   │   │   ├── spatial
+│   │   │   │   │   ├── stacking
+│   │   │   │   │   │   ├── engine
+│   │   │   │   │   │   │   └── StackingEngine.ts
+│   │   │   │   │   │   └── rules
+│   │   │   │   │   │       ├── HeightRules.ts
+│   │   │   │   │   │       └── WeightRules.ts
+│   │   │   │   │   ├── state
+│   │   │   │   │   │   └── stores
+│   │   │   │   │   │       ├── yard-map.store.ts
+│   │   │   │   │   │       ├── yard-selection.store.ts
+│   │   │   │   │   │       └── yard.store.ts
+│   │   │   │   │   ├── store
+│   │   │   │   │   │   ├── maps
+│   │   │   │   │   │   │   └── yard-map.store.ts
+│   │   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   │   └── yard-telemetry.store.ts
+│   │   │   │   │   │   └── yard.store.ts
+│   │   │   │   │   ├── tables
+│   │   │   │   │   │   └── YardOccupancyTable.tsx
+│   │   │   │   │   ├── tabs
+│   │   │   │   │   │   ├── Yard2DMapTab.tsx
+│   │   │   │   │   │   ├── Yard3DMapTab.tsx
+│   │   │   │   │   │   ├── YardAnalyticsTab.tsx
+│   │   │   │   │   │   ├── YardCraneTab.tsx
+│   │   │   │   │   │   ├── YardHeatmapTab.tsx
+│   │   │   │   │   │   ├── YardHistoryTab.tsx
+│   │   │   │   │   │   ├── YardInboundTab.tsx
+│   │   │   │   │   │   ├── YardOutboundTab.tsx
+│   │   │   │   │   │   ├── YardOverviewTab.tsx
+│   │   │   │   │   │   ├── YardShipmentTab.tsx
+│   │   │   │   │   │   ├── YardTrackingTab.tsx
+│   │   │   │   │   │   └── YardTransferTab.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── YardTelemetry.tsx
+│   │   │   │   │   ├── transfers
+│   │   │   │   │   ├── trucks
+│   │   │   │   │   ├── types
+│   │   │   │   │   │   └── entities
+│   │   │   │   │   │       └── yard-zone.ts
+│   │   │   │   │   ├── widgets
+│   │   │   │   │   ├── workspaces
+│   │   │   │   │   │   ├── cockpit
+│   │   │   │   │   │   │   └── YardCockpit.tsx
+│   │   │   │   │   │   ├── layouts
+│   │   │   │   │   │   │   └── YardWorkspaceLayout.tsx
+│   │   │   │   │   │   └── maps
+│   │   │   │   │   │       ├── Yard2DWorkspace.tsx
+│   │   │   │   │   │       └── Yard3DWorkspace.tsx
+│   │   │   │   │   ├── yard.types.ts
+│   │   │   │   │   └── zones
+│   │   │   │   │       ├── levels
+│   │   │   │   │       │   └── YardLevel.ts
+│   │   │   │   │       ├── slots
+│   │   │   │   │       │   └── YardSlot.ts
+│   │   │   │   │       └── YardZone.ts
+│   │   │   │   └── yard-module
+│   │   │   │       ├── api
+│   │   │   │       │   └── yard.api.ts
+│   │   │   │       ├── index.ts
+│   │   │   │       ├── pages
+│   │   │   │       │   └── YardPage.tsx
+│   │   │   │       ├── tabs
+│   │   │   │       │   └── dashboard
+│   │   │   │       │       └── YardDashboardTab.tsx
+│   │   │   │       └── types
+│   │   │   │           └── yard.types.ts
+│   │   │   ├── providers
+│   │   │   │   ├── AuthProvider.tsx
+│   │   │   │   ├── QueryProvider.tsx
+│   │   │   │   └── ThemeProvider.tsx
+│   │   │   ├── runtime
+│   │   │   │   ├── bootstrap
+│   │   │   │   │   └── bootstrap-runtime.ts
+│   │   │   │   ├── config
+│   │   │   │   │   └── runtime.config.ts
+│   │   │   │   ├── services
+│   │   │   │   │   └── runtime.service.ts
+│   │   │   │   └── state
+│   │   │   │       └── runtime.store.ts
+│   │   │   ├── RuntimeEventTimeline.tsx
+│   │   │   ├── RuntimeQuickActions.tsx
+│   │   │   ├── scripts
+│   │   │   │   ├── build-runtime
+│   │   │   │   │   ├── runtime-build.sh
+│   │   │   │   │   └── runtime-check.sh
+│   │   │   │   ├── clean-build.sh
+│   │   │   │   ├── fix-imports.sh
+│   │   │   │   ├── health
+│   │   │   │   │   ├── check-build-health.sh
+│   │   │   │   │   └── check-runtime-health.sh
+│   │   │   │   ├── reset-cache.sh
+│   │   │   │   ├── runtime
+│   │   │   │   │   ├── checks
+│   │   │   │   │   │   ├── check-runtime.sh
+│   │   │   │   │   │   └── check-telemetry.sh
+│   │   │   │   │   └── run-health-checks.sh
+│   │   │   │   ├── runtime-validation
+│   │   │   │   │   ├── check-runtime.sh
+│   │   │   │   │   ├── check-telemetry.sh
+│   │   │   │   │   └── check-workspaces.sh
+│   │   │   │   └── verification
+│   │   │   │       ├── check-aliases.sh
+│   │   │   │       ├── check-duplicates.sh
+│   │   │   │       └── check-imports.sh
+│   │   │   ├── services
+│   │   │   │   └── api
+│   │   │   │       ├── components.api.ts
+│   │   │   │       ├── dashboard.api.ts
+│   │   │   │       ├── inventory.api.ts
+│   │   │   │       ├── projects.api.ts
+│   │   │   │       ├── tasks.api.ts
+│   │   │   │       └── types.ts
+│   │   │   ├── shared
+│   │   │   │   ├── 3d
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── ThreeEngine.ts
+│   │   │   │   │   ├── renderers
+│   │   │   │   │   │   ├── Rack3DRenderer.tsx
+│   │   │   │   │   │   ├── Slot3DRenderer.tsx
+│   │   │   │   │   │   └── Zone3DRenderer.tsx
+│   │   │   │   │   └── scenes
+│   │   │   │   │       └── YardScene.tsx
+│   │   │   │   ├── action-center
+│   │   │   │   │   ├── ActionButton.tsx
+│   │   │   │   │   ├── ActionDock.tsx
+│   │   │   │   │   └── QuickActions.tsx
+│   │   │   │   ├── actions
+│   │   │   │   │   ├── quick-actions
+│   │   │   │   │   │   └── QuickActionPanel.tsx
+│   │   │   │   │   └── toolbar
+│   │   │   │   │       ├── InventoryActions.tsx
+│   │   │   │   │       ├── WorkspaceActions.tsx
+│   │   │   │   │       └── YardActions.tsx
+│   │   │   │   ├── activity-runtime
+│   │   │   │   │   ├── ActivityRuntime.ts
+│   │   │   │   │   ├── feeds
+│   │   │   │   │   │   └── RealtimeFeed.tsx
+│   │   │   │   │   └── timeline
+│   │   │   │   │       └── ActivityTimeline.tsx
+│   │   │   │   ├── ai
+│   │   │   │   │   ├── agents
+│   │   │   │   │   │   ├── InventoryAgent.ts
+│   │   │   │   │   │   └── YardAgent.ts
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   └── OperationalAnalytics.ts
+│   │   │   │   │   └── predictions
+│   │   │   │   │       └── StockPrediction.ts
+│   │   │   │   ├── ai-engine
+│   │   │   │   │   ├── predictions
+│   │   │   │   │   │   └── StockPrediction.ts
+│   │   │   │   │   └── recommendations
+│   │   │   │   │       └── AllocationRecommendation.ts
+│   │   │   │   ├── ai-runtime
+│   │   │   │   │   ├── factory-ai.ts
+│   │   │   │   │   └── openai.service.ts
+│   │   │   │   ├── alert-runtime
+│   │   │   │   │   ├── AlertRuntime.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── AlertRenderer.tsx
+│   │   │   │   ├── alerts
+│   │   │   │   │   ├── AlertBanner.tsx
+│   │   │   │   │   ├── AlertCard.tsx
+│   │   │   │   │   ├── AlertCenter.tsx
+│   │   │   │   │   └── AlertFeed.tsx
+│   │   │   │   ├── analytics
+│   │   │   │   │   ├── forecasting
+│   │   │   │   │   │   └── ForecastEngine.ts
+│   │   │   │   │   ├── kpi
+│   │   │   │   │   │   ├── KpiCalculator.ts
+│   │   │   │   │   │   └── KpiEngine.ts
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── TelemetryEngine.ts
+│   │   │   │   ├── api
+│   │   │   │   │   ├── client.ts
+│   │   │   │   │   ├── endpoints
+│   │   │   │   │   │   └── endpoints.ts
+│   │   │   │   │   ├── errors
+│   │   │   │   │   │   └── api-error.ts
+│   │   │   │   │   ├── http
+│   │   │   │   │   │   ├── httpClient.ts
+│   │   │   │   │   │   └── interceptors.ts
+│   │   │   │   │   ├── http.ts
+│   │   │   │   │   ├── interceptors
+│   │   │   │   │   │   ├── auth.interceptor.ts
+│   │   │   │   │   │   └── error.interceptor.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   └── api-runtime.ts
+│   │   │   │   │   └── types
+│   │   │   │   │       └── api-response.ts
+│   │   │   │   ├── audit
+│   │   │   │   │   ├── audit-engine.ts
+│   │   │   │   │   └── logs
+│   │   │   │   │       └── audit-log.service.ts
+│   │   │   │   ├── audit-runtime
+│   │   │   │   │   ├── AuditRuntime.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── AuditEvents.ts
+│   │   │   │   │   └── logs
+│   │   │   │   │       └── AuditLogger.ts
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── AuthGuard.tsx
+│   │   │   │   │   ├── auth.store.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useAuth.ts
+│   │   │   │   │   ├── PermissionGuard.tsx
+│   │   │   │   │   └── services
+│   │   │   │   │       └── auth.service.ts
+│   │   │   │   ├── build
+│   │   │   │   │   └── runtime
+│   │   │   │   │       ├── module-loader.ts
+│   │   │   │   │       └── runtime-loader.ts
+│   │   │   │   ├── cache-runtime
+│   │   │   │   │   ├── CacheRuntime.ts
+│   │   │   │   │   └── stores
+│   │   │   │   │       └── TelemetryCache.ts
+│   │   │   │   ├── chart-runtime
+│   │   │   │   │   ├── bar
+│   │   │   │   │   │   └── BarChart.tsx
+│   │   │   │   │   ├── ChartRuntime.tsx
+│   │   │   │   │   ├── heatmap
+│   │   │   │   │   │   └── HeatmapChart.tsx
+│   │   │   │   │   └── line
+│   │   │   │   │       └── LineChart.tsx
+│   │   │   │   ├── charts
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   └── AnalyticsTrendChart.tsx
+│   │   │   │   │   ├── BarChart.tsx
+│   │   │   │   │   ├── HeatmapChart.tsx
+│   │   │   │   │   ├── LineChart.tsx
+│   │   │   │   │   ├── operational
+│   │   │   │   │   │   ├── InventoryFlowChart.tsx
+│   │   │   │   │   │   ├── MovementTrendChart.tsx
+│   │   │   │   │   │   └── OccupancyChart.tsx
+│   │   │   │   │   ├── PieChart.tsx
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── RealtimeTelemetryChart.tsx
+│   │   │   │   ├── cockpit
+│   │   │   │   │   ├── KpiStrip.tsx
+│   │   │   │   │   ├── OperationalCockpitLayout.tsx
+│   │   │   │   │   └── OperationalTabs.tsx
+│   │   │   │   ├── command-center
+│   │   │   │   │   ├── alerts
+│   │   │   │   │   │   └── CommandAlerts.tsx
+│   │   │   │   │   ├── RealtimeCommandCenter.tsx
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── CommandTelemetry.tsx
+│   │   │   │   ├── command-palette
+│   │   │   │   │   ├── CommandPalette.tsx
+│   │   │   │   │   └── commands.ts
+│   │   │   │   ├── components
+│   │   │   │   │   └── LanguageSwitcher.tsx
+│   │   │   │   ├── cqrs
+│   │   │   │   │   ├── commands
+│   │   │   │   │   │   └── Command.ts
+│   │   │   │   │   ├── handlers
+│   │   │   │   │   │   ├── CommandHandler.ts
+│   │   │   │   │   │   └── QueryHandler.ts
+│   │   │   │   │   └── queries
+│   │   │   │   │       └── Query.ts
+│   │   │   │   ├── design-system
+│   │   │   │   │   ├── themes
+│   │   │   │   │   │   └── industrial-dark.ts
+│   │   │   │   │   └── tokens
+│   │   │   │   │       ├── colors.ts
+│   │   │   │   │       └── spacing.ts
+│   │   │   │   ├── dialogs
+│   │   │   │   │   ├── ConfirmationDialog.tsx
+│   │   │   │   │   ├── FullscreenDialog.tsx
+│   │   │   │   │   ├── WizardDialog.tsx
+│   │   │   │   │   └── wizards
+│   │   │   │   │       ├── ApprovalWizard.tsx
+│   │   │   │   │       ├── InboundWizard.tsx
+│   │   │   │   │       ├── OutboundWizard.tsx
+│   │   │   │   │       └── TransferWizard.tsx
+│   │   │   │   ├── digital-runtime
+│   │   │   │   │   ├── maps
+│   │   │   │   │   │   └── RuntimeMapEngine.ts
+│   │   │   │   │   ├── renderers
+│   │   │   │   │   │   └── RealtimeRenderer.tsx
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── DigitalTelemetry.ts
+│   │   │   │   ├── digital-twin
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── CoordinateEngine.ts
+│   │   │   │   │   │   └── SpatialEngine.ts
+│   │   │   │   │   ├── entities
+│   │   │   │   │   │   └── SpatialEntity.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       ├── FactoryRenderer.tsx
+│   │   │   │   │       └── YardRenderer.tsx
+│   │   │   │   ├── digital-twin-engine
+│   │   │   │   │   ├── DigitalTwinEngine.ts
+│   │   │   │   │   ├── renderers
+│   │   │   │   │   │   └── DigitalTwinRenderer.tsx
+│   │   │   │   │   └── scenes
+│   │   │   │   │       └── FactoryScene.tsx
+│   │   │   │   ├── domain
+│   │   │   │   │   ├── entities
+│   │   │   │   │   │   ├── BaseAggregate.ts
+│   │   │   │   │   │   └── BaseEntity.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── DomainEvent.ts
+│   │   │   │   │   └── value-objects
+│   │   │   │   │       ├── Identifier.ts
+│   │   │   │   │       └── Timestamp.ts
+│   │   │   │   ├── empty
+│   │   │   │   │   ├── EmptyState.tsx
+│   │   │   │   │   └── NoDataState.tsx
+│   │   │   │   ├── errors
+│   │   │   │   │   ├── ErrorBoundary.tsx
+│   │   │   │   │   ├── ErrorCard.tsx
+│   │   │   │   │   └── ErrorPage.tsx
+│   │   │   │   ├── error-system
+│   │   │   │   │   ├── ErrorBoundary.tsx
+│   │   │   │   │   └── runtime
+│   │   │   │   │       └── error-runtime.ts
+│   │   │   │   ├── error-tracking
+│   │   │   │   │   ├── ErrorTracker.ts
+│   │   │   │   │   ├── logging
+│   │   │   │   │   │   └── Logger.ts
+│   │   │   │   │   └── reporting
+│   │   │   │   │       └── ErrorReporter.ts
+│   │   │   │   ├── event-bus
+│   │   │   │   │   ├── EventBus.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── BaseEvent.ts
+│   │   │   │   │   └── handlers
+│   │   │   │   │       └── EventHandler.ts
+│   │   │   │   ├── event-streams
+│   │   │   │   │   ├── EventStreamEngine.ts
+│   │   │   │   │   ├── processors
+│   │   │   │   │   │   └── EventProcessor.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── EventRenderer.tsx
+│   │   │   │   ├── executive-kpi
+│   │   │   │   │   ├── KpiRuntime.ts
+│   │   │   │   │   └── widgets
+│   │   │   │   │       └── ExecutiveKpiWidget.tsx
+│   │   │   │   ├── factory-digital-twin
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── FactoryTwinEngine.ts
+│   │   │   │   │   ├── entities
+│   │   │   │   │   │   └── FactoryEntity.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── FactoryTwinRenderer.tsx
+│   │   │   │   ├── factory-grid
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── GridCoordinateEngine.ts
+│   │   │   │   │   │   └── GridOccupancyEngine.ts
+│   │   │   │   │   ├── factory-grid.constants.ts
+│   │   │   │   │   ├── factory-grid.types.ts
+│   │   │   │   │   ├── factory-grid.utils.ts
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useFactoryGrid.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       ├── ColumnRenderer.tsx
+│   │   │   │   │       ├── GridRenderer.tsx
+│   │   │   │   │       └── SlotHighlightRenderer.tsx
+│   │   │   │   ├── factory-layout
+│   │   │   │   │   ├── factory-dimensions.ts
+│   │   │   │   │   ├── factory-grid.ts
+│   │   │   │   │   └── factory-zones.ts
+│   │   │   │   ├── factory-map
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── FactoryMapEngine.ts
+│   │   │   │   │   ├── entities
+│   │   │   │   │   │   ├── FactorySlot.ts
+│   │   │   │   │   │   └── FactoryZone.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── FactoryRenderer.tsx
+│   │   │   │   ├── factory-monitoring
+│   │   │   │   │   ├── alerts
+│   │   │   │   │   │   └── FactoryAlerts.ts
+│   │   │   │   │   ├── FactoryMonitoringEngine.ts
+│   │   │   │   │   └── health
+│   │   │   │   │       └── FactoryHealth.ts
+│   │   │   │   ├── factory-zones
+│   │   │   │   │   ├── coordinates
+│   │   │   │   │   │   ├── CoordinateMapper.ts
+│   │   │   │   │   │   └── GridResolver.ts
+│   │   │   │   │   └── engine
+│   │   │   │   │       └── FactoryZoneEngine.ts
+│   │   │   │   ├── feature-flags
+│   │   │   │   │   ├── feature-flags.ts
+│   │   │   │   │   └── useFeatureFlag.ts
+│   │   │   │   ├── filter-engine
+│   │   │   │   │   ├── builders
+│   │   │   │   │   │   └── filter-builder.ts
+│   │   │   │   │   ├── filter-builder.ts
+│   │   │   │   │   ├── filter-engine.ts
+│   │   │   │   │   └── runtime
+│   │   │   │   │       └── filter-runtime.ts
+│   │   │   │   ├── filters
+│   │   │   │   │   └── components
+│   │   │   │   │       ├── DateFilter.tsx
+│   │   │   │   │       ├── FilterBar.tsx
+│   │   │   │   │       ├── StatusFilter.tsx
+│   │   │   │   │       └── WarehouseFilter.tsx
+│   │   │   │   ├── filter-toolbar
+│   │   │   │   │   ├── filters
+│   │   │   │   │   │   ├── DateFilter.tsx
+│   │   │   │   │   │   ├── SearchFilter.tsx
+│   │   │   │   │   │   └── StatusFilter.tsx
+│   │   │   │   │   └── FilterToolbar.tsx
+│   │   │   │   ├── forms
+│   │   │   │   │   ├── controls
+│   │   │   │   │   │   ├── DateField.tsx
+│   │   │   │   │   │   ├── SearchSelect.tsx
+│   │   │   │   │   │   ├── SelectField.tsx
+│   │   │   │   │   │   └── TextField.tsx
+│   │   │   │   │   ├── layouts
+│   │   │   │   │   │   ├── FormGrid.tsx
+│   │   │   │   │   │   └── FormSection.tsx
+│   │   │   │   │   └── validators
+│   │   │   │   │       └── commonValidators.ts
+│   │   │   │   ├── fullscreen
+│   │   │   │   │   ├── FullscreenManager.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       ├── ComponentWorkspace.tsx
+│   │   │   │   │       ├── MaterialWorkspace.tsx
+│   │   │   │   │       └── YardWorkspace.tsx
+│   │   │   │   ├── grid-engine
+│   │   │   │   │   ├── GridEngine.ts
+│   │   │   │   │   ├── layouts
+│   │   │   │   │   │   └── OperationalGridLayout.tsx
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── GridRenderer.tsx
+│   │   │   │   ├── heatmaps
+│   │   │   │   │   ├── engines
+│   │   │   │   │   │   └── HeatmapEngine.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── OccupancyHeatmapRenderer.tsx
+│   │   │   │   ├── heatmap-visualization
+│   │   │   │   │   ├── FactoryHeatmap.tsx
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── HeatmapRenderer.tsx
+│   │   │   │   ├── hooks
+│   │   │   │   │   ├── useLiveTelemetry.ts
+│   │   │   │   │   └── useRuntimeQuery.ts
+│   │   │   │   ├── http
+│   │   │   │   │   ├── http-client.ts
+│   │   │   │   │   ├── http-config.ts
+│   │   │   │   │   └── http-errors.ts
+│   │   │   │   ├── i18n
+│   │   │   │   │   └── index.ts
+│   │   │   │   ├── imports
+│   │   │   │   │   ├── charts.ts
+│   │   │   │   │   ├── dialogs.ts
+│   │   │   │   │   ├── layouts.ts
+│   │   │   │   │   └── widgets.ts
+│   │   │   │   ├── industrial-status
+│   │   │   │   │   ├── badges
+│   │   │   │   │   │   └── SystemBadge.tsx
+│   │   │   │   │   └── indicators
+│   │   │   │   │       ├── AlertIndicator.tsx
+│   │   │   │   │       └── OnlineIndicator.tsx
+│   │   │   │   ├── industrial-ui
+│   │   │   │   │   ├── cards
+│   │   │   │   │   │   ├── IndustrialCard.tsx
+│   │   │   │   │   │   ├── MetricCard.tsx
+│   │   │   │   │   │   └── TelemetryCard.tsx
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   └── IndustrialChartContainer.tsx
+│   │   │   │   │   ├── containers
+│   │   │   │   │   │   ├── GlassContainer.tsx
+│   │   │   │   │   │   └── IndustrialPanel.tsx
+│   │   │   │   │   ├── effects
+│   │   │   │   │   │   ├── GridGlow.tsx
+│   │   │   │   │   │   └── TelemetryGlow.tsx
+│   │   │   │   │   ├── glass
+│   │   │   │   │   │   └── GlassPanel.tsx
+│   │   │   │   │   └── status
+│   │   │   │   │       └── StatusIndicator.tsx
+│   │   │   │   ├── kpi
+│   │   │   │   │   ├── engines
+│   │   │   │   │   │   └── KpiCalculationEngine.ts
+│   │   │   │   │   ├── KpiGrid.tsx
+│   │   │   │   │   ├── KpiItem.tsx
+│   │   │   │   │   ├── KpiTrend.tsx
+│   │   │   │   │   └── widgets
+│   │   │   │   │       ├── KpiWidget.tsx
+│   │   │   │   │       └── TrendWidget.tsx
+│   │   │   │   ├── layout
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   ├── EnterpriseResponsiveShell.tsx
+│   │   │   │   │   │   └── EnterpriseRuntimeLayout.tsx
+│   │   │   │   │   └── sidebar
+│   │   │   │   │       └── EnterpriseSidebar.tsx
+│   │   │   │   ├── layouts
+│   │   │   │   │   ├── AppShell.tsx
+│   │   │   │   │   ├── InsightPanel.tsx
+│   │   │   │   │   ├── panels
+│   │   │   │   │   │   ├── AlertSidebar.tsx
+│   │   │   │   │   │   ├── InsightSidebar.tsx
+│   │   │   │   │   │   └── TelemetrySidebar.tsx
+│   │   │   │   │   ├── Sidebar.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   ├── KpiStrip.tsx
+│   │   │   │   │   │   └── OperationalHeader.tsx
+│   │   │   │   │   ├── Topbar.tsx
+│   │   │   │   │   ├── WorkspaceLayout.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       ├── FullscreenWorkspace.tsx
+│   │   │   │   │       ├── OperationalWorkspace.tsx
+│   │   │   │   │       └── SplitWorkspace.tsx
+│   │   │   │   ├── live-data
+│   │   │   │   │   ├── cache
+│   │   │   │   │   │   └── LiveCache.ts
+│   │   │   │   │   ├── LiveDataEngine.ts
+│   │   │   │   │   └── subscriptions
+│   │   │   │   │       └── RealtimeSubscription.ts
+│   │   │   │   ├── live-store
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   └── runtime.store.ts
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── telemetry.store.ts
+│   │   │   │   ├── live-telemetry
+│   │   │   │   │   ├── channels
+│   │   │   │   │   │   ├── InventoryTelemetryChannel.ts
+│   │   │   │   │   │   └── YardTelemetryChannel.ts
+│   │   │   │   │   ├── LiveTelemetryRuntime.ts
+│   │   │   │   │   └── processors
+│   │   │   │   │       └── TelemetryProcessor.ts
+│   │   │   │   ├── loading
+│   │   │   │   │   ├── ChartLoader.tsx
+│   │   │   │   │   ├── PageLoader.tsx
+│   │   │   │   │   └── TableLoader.tsx
+│   │   │   │   ├── loading-system
+│   │   │   │   │   ├── PageSkeleton.tsx
+│   │   │   │   │   └── skeletons
+│   │   │   │   │       ├── ChartSkeleton.tsx
+│   │   │   │   │       └── TableSkeleton.tsx
+│   │   │   │   ├── logging
+│   │   │   │   │   ├── formatters
+│   │   │   │   │   │   └── OperationalFormatter.ts
+│   │   │   │   │   ├── LoggerEngine.ts
+│   │   │   │   │   └── transport
+│   │   │   │   │       └── WebsocketTransport.ts
+│   │   │   │   ├── logging-runtime
+│   │   │   │   │   ├── LoggingRuntime.ts
+│   │   │   │   │   └── transports
+│   │   │   │   │       └── WebsocketLogger.ts
+│   │   │   │   ├── maps
+│   │   │   │   ├── modals
+│   │   │   │   │   ├── fullscreen
+│   │   │   │   │   │   └── FullscreenModal.tsx
+│   │   │   │   │   ├── ModalRoot.tsx
+│   │   │   │   │   └── wizards
+│   │   │   │   │       └── OperationalWizard.tsx
+│   │   │   │   ├── module-loader
+│   │   │   │   │   ├── ModuleLoader.ts
+│   │   │   │   │   ├── registry
+│   │   │   │   │   │   └── module-registry.ts
+│   │   │   │   │   └── runtime
+│   │   │   │   │       └── module-runtime.ts
+│   │   │   │   ├── monitoring
+│   │   │   │   │   ├── health
+│   │   │   │   │   │   └── SystemHealthRuntime.ts
+│   │   │   │   │   ├── MonitoringRuntime.ts
+│   │   │   │   │   └── runtime
+│   │   │   │   │       └── SystemRuntime.ts
+│   │   │   │   ├── navigation
+│   │   │   │   │   ├── breadcrumbs
+│   │   │   │   │   │   └── Breadcrumbs.tsx
+│   │   │   │   │   ├── sidebar
+│   │   │   │   │   │   ├── SidebarFooter.tsx
+│   │   │   │   │   │   ├── SidebarGroup.tsx
+│   │   │   │   │   │   ├── SidebarItem.tsx
+│   │   │   │   │   │   └── Sidebar.tsx
+│   │   │   │   │   ├── SidebarGroup.tsx
+│   │   │   │   │   ├── SidebarItem.tsx
+│   │   │   │   │   ├── SidebarSection.tsx
+│   │   │   │   │   └── topbar
+│   │   │   │   │       ├── TopbarNotifications.tsx
+│   │   │   │   │       ├── TopbarSearch.tsx
+│   │   │   │   │       └── Topbar.tsx
+│   │   │   │   ├── notifications
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useToast.ts
+│   │   │   │   │   ├── NotificationCenter.tsx
+│   │   │   │   │   ├── notification.store.tsx
+│   │   │   │   │   ├── RuntimeAlertListener.tsx
+│   │   │   │   │   └── ToastProvider.tsx
+│   │   │   │   ├── offline
+│   │   │   │   │   ├── cache
+│   │   │   │   │   │   └── OfflineCache.ts
+│   │   │   │   │   ├── OfflineEngine.ts
+│   │   │   │   │   └── sync
+│   │   │   │   │       └── SyncEngine.ts
+│   │   │   │   ├── offline-runtime
+│   │   │   │   │   ├── OfflineRuntime.ts
+│   │   │   │   │   └── sync
+│   │   │   │   │       └── SyncRuntime.ts
+│   │   │   │   ├── operational
+│   │   │   │   │   ├── ActivityFeed.tsx
+│   │   │   │   │   ├── grids
+│   │   │   │   │   │   └── OperationalGrid.tsx
+│   │   │   │   │   ├── metrics
+│   │   │   │   │   │   └── OperationalMetric.tsx
+│   │   │   │   │   └── workspaces
+│   │   │   │   │       └── OperationalWorkspace.tsx
+│   │   │   │   ├── operational-maps
+│   │   │   │   │   ├── 2d
+│   │   │   │   │   │   └── Operational2DMap.tsx
+│   │   │   │   │   ├── 3d
+│   │   │   │   │   │   └── Operational3DMap.tsx
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── OperationalRenderer.tsx
+│   │   │   │   ├── operational-table
+│   │   │   │   │   ├── cells
+│   │   │   │   │   │   ├── LocationCell.tsx
+│   │   │   │   │   │   ├── QuantityCell.tsx
+│   │   │   │   │   │   └── StatusCell.tsx
+│   │   │   │   │   ├── OperationalTable.tsx
+│   │   │   │   │   └── rows
+│   │   │   │   │       └── OperationalRow.tsx
+│   │   │   │   ├── panels
+│   │   │   │   │   ├── activity
+│   │   │   │   │   │   └── RealtimeActivityPanel.tsx
+│   │   │   │   │   ├── alerts
+│   │   │   │   │   │   ├── AlertPanel.tsx
+│   │   │   │   │   │   └── OperationalAlerts.tsx
+│   │   │   │   │   ├── insights
+│   │   │   │   │   │   └── InsightPanel.tsx
+│   │   │   │   │   ├── OperationalInsightPanel.tsx
+│   │   │   │   │   └── SurfaceCard.tsx
+│   │   │   │   ├── panel-system
+│   │   │   │   │   ├── containers
+│   │   │   │   │   │   └── PanelContainer.tsx
+│   │   │   │   │   └── layouts
+│   │   │   │   │       ├── PanelLayout.tsx
+│   │   │   │   │       └── SplitPanelLayout.tsx
+│   │   │   │   ├── performance
+│   │   │   │   │   ├── memo
+│   │   │   │   │   │   └── useDeepMemo.ts
+│   │   │   │   │   └── virtualization
+│   │   │   │   │       ├── VirtualizedGrid.tsx
+│   │   │   │   │       └── VirtualizedTable.tsx
+│   │   │   │   ├── performance-engine
+│   │   │   │   │   ├── cache
+│   │   │   │   │   │   └── CacheEngine.ts
+│   │   │   │   │   └── rendering
+│   │   │   │   │       └── RenderOptimizer.ts
+│   │   │   │   ├── permissions
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── RoleBadge.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── usePermission.ts
+│   │   │   │   │   └── PermissionGuard.tsx
+│   │   │   │   ├── providers
+│   │   │   │   │   └── RealtimeProvider.tsx
+│   │   │   │   ├── query-client
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useInvalidate.ts
+│   │   │   │   │   ├── providers
+│   │   │   │   │   │   └── QueryProvider.tsx
+│   │   │   │   │   └── query-client.ts
+│   │   │   │   ├── realtime
+│   │   │   │   │   ├── activity
+│   │   │   │   │   │   └── ActivityTimeline.tsx
+│   │   │   │   │   ├── channels
+│   │   │   │   │   │   └── telemetry.channel.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   ├── components.events.ts
+│   │   │   │   │   │   ├── event-bus.ts
+│   │   │   │   │   │   ├── inventory.events.ts
+│   │   │   │   │   │   └── yard.events.ts
+│   │   │   │   │   ├── feed
+│   │   │   │   │   │   └── RealtimeFeed.tsx
+│   │   │   │   │   ├── socket
+│   │   │   │   │   │   ├── socket-client.ts
+│   │   │   │   │   │   └── socket-provider.tsx
+│   │   │   │   │   ├── socket.ts
+│   │   │   │   │   ├── subscriptions
+│   │   │   │   │   │   ├── inventory.subscription.ts
+│   │   │   │   │   │   └── yard.subscription.ts
+│   │   │   │   │   ├── useRealtimeEvents.ts
+│   │   │   │   │   ├── useTelemetryStream.ts
+│   │   │   │   │   └── useWebsocket.ts
+│   │   │   │   ├── realtime-notifications
+│   │   │   │   │   ├── channels
+│   │   │   │   │   │   ├── InventoryNotificationChannel.ts
+│   │   │   │   │   │   └── YardNotificationChannel.ts
+│   │   │   │   │   └── RealtimeNotificationEngine.ts
+│   │   │   │   ├── recovery
+│   │   │   │   │   ├── checkpoints
+│   │   │   │   │   │   └── CheckpointManager.ts
+│   │   │   │   │   ├── RecoveryEngine.ts
+│   │   │   │   │   └── runtime
+│   │   │   │   │       └── RuntimeRecovery.ts
+│   │   │   │   ├── runtime
+│   │   │   │   │   ├── AIRuntimeStatus.tsx
+│   │   │   │   │   ├── EnterpriseDataGrid.tsx
+│   │   │   │   │   ├── InventoryAnalyticsChart.tsx
+│   │   │   │   │   ├── LazyRuntimeImports.tsx
+│   │   │   │   │   ├── LiveTelemetryPanel.tsx
+│   │   │   │   │   ├── ModulePlaceholder.tsx
+│   │   │   │   │   ├── RuntimeLineChart.tsx
+│   │   │   │   │   ├── RuntimeLoader.tsx
+│   │   │   │   │   ├── RuntimePerformanceCard.tsx
+│   │   │   │   │   └── SystemHealthCard.tsx
+│   │   │   │   ├── runtime-tabs
+│   │   │   │   │   ├── EnterpriseModulePage.tsx
+│   │   │   │   │   └── EnterpriseTabBar.tsx
+│   │   │   │   ├── search
+│   │   │   │   │   ├── CommandPalette.tsx
+│   │   │   │   │   ├── GlobalSearchBar.tsx
+│   │   │   │   │   ├── GlobalSearch.tsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useGlobalSearch.ts
+│   │   │   │   │   └── search.store.tsx
+│   │   │   │   ├── search-engine
+│   │   │   │   │   ├── search-engine.ts
+│   │   │   │   │   └── search-index.ts
+│   │   │   │   ├── search-runtime
+│   │   │   │   │   ├── indexes
+│   │   │   │   │   │   ├── components.index.ts
+│   │   │   │   │   │   └── materials.index.ts
+│   │   │   │   │   └── search-runtime.ts
+│   │   │   │   ├── security
+│   │   │   │   │   ├── auth
+│   │   │   │   │   │   └── AuthEngine.ts
+│   │   │   │   │   └── permissions
+│   │   │   │   │       └── PermissionEngine.ts
+│   │   │   │   ├── security-runtime
+│   │   │   │   │   ├── auth
+│   │   │   │   │   │   └── AuthRuntime.ts
+│   │   │   │   │   ├── permissions
+│   │   │   │   │   │   └── PermissionRuntime.ts
+│   │   │   │   │   └── SecurityRuntime.ts
+│   │   │   │   ├── sidebar
+│   │   │   │   │   ├── groups
+│   │   │   │   │   │   ├── OperationsGroup.tsx
+│   │   │   │   │   │   └── SystemGroup.tsx
+│   │   │   │   │   ├── items
+│   │   │   │   │   │   └── SidebarItem.tsx
+│   │   │   │   │   └── Sidebar.tsx
+│   │   │   │   ├── smart-factory
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   └── FactoryAnalytics.ts
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   └── FactoryRuntime.ts
+│   │   │   │   │   └── SmartFactoryEngine.ts
+│   │   │   │   ├── socket-events
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   └── components-events.ts
+│   │   │   │   │   ├── inventory
+│   │   │   │   │   │   └── inventory-events.ts
+│   │   │   │   │   └── yard
+│   │   │   │   │       └── yard-events.ts
+│   │   │   │   ├── socket-runtime
+│   │   │   │   │   ├── channels
+│   │   │   │   │   │   ├── components.channel.ts
+│   │   │   │   │   │   ├── inventory.channel.ts
+│   │   │   │   │   │   └── yard.channel.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── socket-events.ts
+│   │   │   │   │   └── socket-runtime.ts
+│   │   │   │   ├── spatial
+│   │   │   │   │   ├── 2d
+│   │   │   │   │   │   ├── Factory2DMap.tsx
+│   │   │   │   │   │   ├── Warehouse2DMap.tsx
+│   │   │   │   │   │   └── Yard2DMap.tsx
+│   │   │   │   │   ├── 3d
+│   │   │   │   │   │   ├── Factory3DMap.tsx
+│   │   │   │   │   │   └── Yard3DMap.tsx
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   ├── GridEngine.ts
+│   │   │   │   │   │   ├── MovementEngine.ts
+│   │   │   │   │   │   └── OccupancyEngine.ts
+│   │   │   │   │   ├── FactoryGrid.tsx
+│   │   │   │   │   ├── MovementLayer.tsx
+│   │   │   │   │   ├── OccupancyLayer.tsx
+│   │   │   │   │   ├── renderers
+│   │   │   │   │   │   ├── MovementRenderer.tsx
+│   │   │   │   │   │   ├── RackRenderer.tsx
+│   │   │   │   │   │   └── SlotRenderer.tsx
+│   │   │   │   │   ├── WarehouseGrid.tsx
+│   │   │   │   │   ├── YardMap2D.tsx
+│   │   │   │   │   └── YardMap3D.tsx
+│   │   │   │   ├── spatial-engine
+│   │   │   │   │   ├── coordinates
+│   │   │   │   │   │   └── Coordinate.ts
+│   │   │   │   │   ├── grid
+│   │   │   │   │   │   └── GridEngine.ts
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── SpatialRenderer.tsx
+│   │   │   │   ├── status-engine
+│   │   │   │   │   ├── badges
+│   │   │   │   │   │   └── PriorityBadge.tsx
+│   │   │   │   │   ├── chips
+│   │   │   │   │   │   └── StatusChip.tsx
+│   │   │   │   │   └── StatusEngine.ts
+│   │   │   │   ├── system-health
+│   │   │   │   │   ├── monitors
+│   │   │   │   │   │   ├── api.monitor.ts
+│   │   │   │   │   │   └── realtime.monitor.ts
+│   │   │   │   │   └── SystemHealthEngine.ts
+│   │   │   │   ├── system-monitoring
+│   │   │   │   │   ├── health
+│   │   │   │   │   │   └── SystemHealth.ts
+│   │   │   │   │   └── performance
+│   │   │   │   │       └── PerformanceMonitor.ts
+│   │   │   │   ├── table-engine
+│   │   │   │   │   ├── columns
+│   │   │   │   │   │   └── table-columns.ts
+│   │   │   │   │   ├── renderers
+│   │   │   │   │   │   └── cell-renderer.tsx
+│   │   │   │   │   └── table-engine.ts
+│   │   │   │   ├── table-runtime
+│   │   │   │   │   ├── cells
+│   │   │   │   │   │   ├── QuantityCell.tsx
+│   │   │   │   │   │   └── StatusCell.tsx
+│   │   │   │   │   ├── renderers
+│   │   │   │   │   │   └── TableRenderer.tsx
+│   │   │   │   │   └── TableRuntime.tsx
+│   │   │   │   ├── tables
+│   │   │   │   │   ├── cells
+│   │   │   │   │   │   ├── LocationCell.tsx
+│   │   │   │   │   │   ├── QuantityCell.tsx
+│   │   │   │   │   │   └── StatusCell.tsx
+│   │   │   │   │   ├── columns
+│   │   │   │   │   │   ├── InventoryColumns.tsx
+│   │   │   │   │   │   └── TransactionColumns.tsx
+│   │   │   │   │   ├── DenseTable.tsx
+│   │   │   │   │   ├── OperationalTable.tsx
+│   │   │   │   │   ├── rows
+│   │   │   │   │   │   └── OperationalRow.tsx
+│   │   │   │   │   ├── StickyTable.tsx
+│   │   │   │   │   └── VirtualizedTable.tsx
+│   │   │   │   ├── telemetry
+│   │   │   │   │   ├── cards
+│   │   │   │   │   │   ├── MetricCard.tsx
+│   │   │   │   │   │   ├── RealtimeMetricCard.tsx
+│   │   │   │   │   │   └── TelemetryCard.tsx
+│   │   │   │   │   ├── feeds
+│   │   │   │   │   │   ├── OperationalFeed.tsx
+│   │   │   │   │   │   └── RealtimeActivityFeed.tsx
+│   │   │   │   │   ├── KpiCard.tsx
+│   │   │   │   │   ├── live
+│   │   │   │   │   │   ├── LiveActivityFeed.tsx
+│   │   │   │   │   │   ├── OperationalEventFeed.tsx
+│   │   │   │   │   │   └── SystemHealthFeed.tsx
+│   │   │   │   │   ├── metrics
+│   │   │   │   │   │   ├── ComponentsMetrics.tsx
+│   │   │   │   │   │   ├── InventoryMetrics.tsx
+│   │   │   │   │   │   └── YardMetrics.tsx
+│   │   │   │   │   ├── TelemetryPanel.tsx
+│   │   │   │   │   └── TelemetryStrip.tsx
+│   │   │   │   ├── telemetry-dashboard
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   └── TelemetryChart.tsx
+│   │   │   │   │   ├── TelemetryDashboard.tsx
+│   │   │   │   │   └── widgets
+│   │   │   │   │       └── TelemetryWidget.tsx
+│   │   │   │   ├── telemetry-engine
+│   │   │   │   │   ├── processors
+│   │   │   │   │   │   └── TelemetryProcessor.ts
+│   │   │   │   │   ├── streams
+│   │   │   │   │   │   └── InventoryStream.ts
+│   │   │   │   │   └── TelemetryEngine.ts
+│   │   │   │   ├── telemetry-pipeline
+│   │   │   │   │   ├── processors
+│   │   │   │   │   │   └── TelemetryAggregator.ts
+│   │   │   │   │   ├── streams
+│   │   │   │   │   │   ├── InventoryTelemetryStream.ts
+│   │   │   │   │   │   └── YardTelemetryStream.ts
+│   │   │   │   │   └── TelemetryPipeline.ts
+│   │   │   │   ├── telemetry-renderers
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   └── TelemetryChart.tsx
+│   │   │   │   │   └── widgets
+│   │   │   │   │       └── TelemetryWidget.tsx
+│   │   │   │   ├── theme-engine
+│   │   │   │   │   ├── ThemeEngine.ts
+│   │   │   │   │   ├── themes
+│   │   │   │   │   │   └── industrial.ts
+│   │   │   │   │   └── tokens
+│   │   │   │   │       └── colors.ts
+│   │   │   │   ├── timeline
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── TimelineEvent.ts
+│   │   │   │   │   ├── OperationalTimeline.tsx
+│   │   │   │   │   └── renderers
+│   │   │   │   │       └── TimelineRenderer.tsx
+│   │   │   │   ├── toolbars
+│   │   │   │   │   ├── ActionToolbar.tsx
+│   │   │   │   │   ├── TelemetryToolbar.tsx
+│   │   │   │   │   └── WorkspaceToolbar.tsx
+│   │   │   │   ├── ui
+│   │   │   │   │   ├── Badge.tsx
+│   │   │   │   │   ├── buttons
+│   │   │   │   │   │   ├── DangerButton.tsx
+│   │   │   │   │   │   ├── PrimaryButton.tsx
+│   │   │   │   │   │   └── SecondaryButton.tsx
+│   │   │   │   │   ├── Button.tsx
+│   │   │   │   │   ├── cards
+│   │   │   │   │   │   ├── OperationalCard.tsx
+│   │   │   │   │   │   └── TelemetryCard.tsx
+│   │   │   │   │   ├── Card.tsx
+│   │   │   │   │   ├── chips
+│   │   │   │   │   │   ├── PriorityChip.tsx
+│   │   │   │   │   │   └── StatusChip.tsx
+│   │   │   │   │   ├── containers
+│   │   │   │   │   │   ├── GlassPanel.tsx
+│   │   │   │   │   │   └── WorkspaceContainer.tsx
+│   │   │   │   │   ├── enterprise
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   ├── KpiCard.tsx
+│   │   │   │   │   │   ├── RuntimePanel.tsx
+│   │   │   │   │   │   └── SectionHeader.tsx
+│   │   │   │   │   ├── inputs
+│   │   │   │   │   │   └── SearchInput.tsx
+│   │   │   │   │   ├── Input.tsx
+│   │   │   │   │   ├── navigation
+│   │   │   │   │   │   └── OperationalTabs.tsx
+│   │   │   │   │   ├── Panel.tsx
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   └── EmptyRuntimePanel.tsx
+│   │   │   │   │   ├── status
+│   │   │   │   │   │   └── RealtimeIndicator.tsx
+│   │   │   │   │   ├── Tabs.tsx
+│   │   │   │   │   └── toolbars
+│   │   │   │   │       └── OperationalToolbar.tsx
+│   │   │   │   ├── utils
+│   │   │   │   ├── visualization-engine
+│   │   │   │   │   ├── charts
+│   │   │   │   │   │   └── ChartRuntime.ts
+│   │   │   │   │   ├── maps
+│   │   │   │   │   │   └── MapVisualizationRuntime.ts
+│   │   │   │   │   └── VisualizationEngine.ts
+│   │   │   │   ├── websocket
+│   │   │   │   │   ├── channels
+│   │   │   │   │   │   ├── InventoryChannel.ts
+│   │   │   │   │   │   └── YardChannel.ts
+│   │   │   │   │   ├── gateways
+│   │   │   │   │   │   └── RealtimeGateway.ts
+│   │   │   │   │   └── WebsocketClient.ts
+│   │   │   │   ├── websocket-client
+│   │   │   │   │   ├── channels
+│   │   │   │   │   │   └── TelemetryChannel.ts
+│   │   │   │   │   └── WebsocketRuntime.ts
+│   │   │   │   ├── widgets
+│   │   │   │   │   ├── AlertWidget.tsx
+│   │   │   │   │   ├── analytics
+│   │   │   │   │   │   └── AnalyticsWidget.tsx
+│   │   │   │   │   ├── RealtimeFeed.tsx
+│   │   │   │   │   ├── system
+│   │   │   │   │   │   ├── RealtimeStatusWidget.tsx
+│   │   │   │   │   │   └── SystemHealthWidget.tsx
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── TelemetryWidget.tsx
+│   │   │   │   │   └── TelemetryWidget.tsx
+│   │   │   │   ├── workflows
+│   │   │   │   │   ├── engine
+│   │   │   │   │   │   └── WorkflowEngine.ts
+│   │   │   │   │   ├── events
+│   │   │   │   │   │   └── workflow-events.ts
+│   │   │   │   │   ├── orchestrators
+│   │   │   │   │   │   ├── InventoryWorkflowOrchestrator.ts
+│   │   │   │   │   │   └── YardWorkflowOrchestrator.ts
+│   │   │   │   │   └── states
+│   │   │   │   │       ├── ApprovalStateMachine.ts
+│   │   │   │   │       └── InventoryStateMachine.ts
+│   │   │   │   ├── workspace
+│   │   │   │   │   ├── grids
+│   │   │   │   │   │   └── OperationalGrid.tsx
+│   │   │   │   │   ├── sections
+│   │   │   │   │   ├── tabs
+│   │   │   │   │   │   └── TabNavigation.tsx
+│   │   │   │   │   ├── WorkspaceHeader.tsx
+│   │   │   │   │   ├── WorkspaceSection.tsx
+│   │   │   │   │   └── WorkspaceTabs.tsx
+│   │   │   │   ├── workspace-engine
+│   │   │   │   │   ├── layouts
+│   │   │   │   │   │   └── CockpitEngine.tsx
+│   │   │   │   │   ├── runtime
+│   │   │   │   │   │   └── WorkspaceRuntime.ts
+│   │   │   │   │   ├── telemetry
+│   │   │   │   │   │   └── WorkspaceTelemetryEngine.ts
+│   │   │   │   │   └── WorkspaceEngine.ts
+│   │   │   │   └── workspace-system
+│   │   │   │       ├── layouts
+│   │   │   │       │   ├── CockpitLayout.tsx
+│   │   │   │       │   └── FullscreenLayout.tsx
+│   │   │   │       └── telemetry
+│   │   │   │           └── WorkspaceTelemetry.tsx
+│   │   │   ├── store
+│   │   │   │   ├── auth
+│   │   │   │   │   └── auth.store.ts
+│   │   │   │   ├── auth.store.ts
+│   │   │   │   ├── layout
+│   │   │   │   │   └── layout.store.ts
+│   │   │   │   ├── notification.store.ts
+│   │   │   │   ├── telemetry
+│   │   │   │   │   └── telemetry.store.ts
+│   │   │   │   └── workspace
+│   │   │   │       └── workspace.store.ts
+│   │   │   ├── styles
+│   │   │   │   ├── global.css
+│   │   │   │   ├── industrial
+│   │   │   │   │   └── industrial-theme.css
+│   │   │   │   ├── layouts
+│   │   │   │   │   └── workspace.css
+│   │   │   │   ├── runtime
+│   │   │   │   │   ├── runtime-theme.css
+│   │   │   │   │   └── themes
+│   │   │   │   │       └── industrial-runtime.css
+│   │   │   │   ├── telemetry
+│   │   │   │   │   └── telemetry-theme.css
+│   │   │   │   ├── themes
+│   │   │   │   │   ├── dark-industrial.css
+│   │   │   │   │   ├── industrial
+│   │   │   │   │   │   └── industrial-dark.css
+│   │   │   │   │   └── telemetry
+│   │   │   │   │       └── telemetry-effects.css
+│   │   │   │   └── tokens
+│   │   │   │       ├── colors.css
+│   │   │   │       ├── radius.css
+│   │   │   │       ├── shadows.css
+│   │   │   │       └── spacing.css
+│   │   │   ├── theme
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── theme.css
+│   │   │   │   └── tokens.ts
+│   │   │   ├── types
+│   │   │   │   ├── api
+│   │   │   │   │   └── common.ts
+│   │   │   │   ├── domain
+│   │   │   │   │   ├── components.ts
+│   │   │   │   │   ├── inventory.ts
+│   │   │   │   │   └── yard.ts
+│   │   │   │   ├── env.d.ts
+│   │   │   │   └── ui
+│   │   │   │       └── layout.ts
+│   │   │   └── vite-env.d.ts
+│   │   ├── tsconfig.app.json
+│   │   ├── tsconfig.app.tsbuildinfo
+│   │   ├── tsconfig.json
+│   │   ├── tsconfig.node.json
+│   │   └── vite.config.ts
+│   └── healthcheck.sh
+├── backups
+│   └── full_before_architecture_split_20260527_135044.tar.gz
+├── deployment
+│   ├── docker
+│   └── nginx
+├── docker-compose.iot.yml
+├── docs
+│   ├── AI_CONTEXT.md
+│   ├── AI_RULES.md
+│   ├── api
+│   ├── architecture
+│   ├── backend
+│   ├── database
+│   ├── frontend
+│   ├── issues
+│   ├── KNOWN_ISSUES.md
+│   ├── modules
+│   ├── PROJECT_OVERVIEW.md
+│   ├── roadmap
+│   ├── ROADMAP.md
+│   ├── setup
+│   └── TREE_STRUCTURE.md
+├── iot-simulator
+│   └── simulator.js
+├── mock-socket-server
+│   └── server.js
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── scripts
+│   └── create-module-templates.sh
+└── structure.txt
+
+1500 directories, 2082 files

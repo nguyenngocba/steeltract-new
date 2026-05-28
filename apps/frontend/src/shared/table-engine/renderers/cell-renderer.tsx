@@ -1,1 +1,4 @@
-export function cell-renderer() { return <></> }
+export function CellRenderer() {
+
+  return null
+}

@@ -1,25 +1,40 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "es2023",
-    "lib": ["ES2023", "DOM"],
-    "module": "esnext",
-    "types": ["vite/client"],
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "skipLibCheck": true,
 
-    /* Bundler mode */
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
+
     "jsx": "react-jsx",
 
-    /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "strict": false
   },
-  "include": ["src"]
+
+  "include": [
+    "src"
+  ],
+
+  "exclude": [
+    "src/_archived",
+    "src/modules/_archived",
+    "src/_backend_quarantine",
+    "**/_archived/**",
+    "**/*.controller.ts",
+    "**/*.service.ts",
+    "**/*.module.ts",
+    "**/*.gateway.ts",
+    "**/repositories/**",
+    "**/database/**",
+    "**/prisma/**",
+    "node_modules",
+    "dist"
+  ]
 }

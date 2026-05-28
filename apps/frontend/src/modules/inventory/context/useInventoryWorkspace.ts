@@ -17,11 +17,11 @@ import {
   useYardMetricsQuery,
   useYardSlotsQuery,
   useYardZonesQuery,
-} from '../../yard-ui'
+} from '../../yard'
 
 import type {
   PaginatedYardResponse,
-} from '../../yard-ui/yard.types'
+} from '../../yard/yard.types'
 import type {
   InventoryItem,
 } from '../../../services/api/types'

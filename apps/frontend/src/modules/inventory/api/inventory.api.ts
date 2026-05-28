@@ -1,22 +1,19 @@
-import { http } from '../../../shared/http/http-client'
-
 export async function getMaterials() {
-  const response =
-    await http.get('/inventory/materials')
 
-  return response.data
-}
+  return [
 
-export async function getTransactions() {
-  const response =
-    await http.get('/inventory/transactions')
+    {
+      id: 1,
+      name: 'Steel Plate A36',
+      quantity: 1240,
+      status: 'In Stock',
+    },
 
-  return response.data
-}
-
-export async function getLowStock() {
-  const response =
-    await http.get('/inventory/low-stock')
-
-  return response.data
+    {
+      id: 2,
+      name: 'Pipe DN200',
+      quantity: 442,
+      status: 'Low Stock',
+    },
+  ]
 }

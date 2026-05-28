@@ -33,7 +33,7 @@ import {
 } from '../qc-ui'
 import {
   useMoveYardItemMutation,
-} from '../yard-ui'
+} from '../yard'
 
 import type {
   OperatorAction,

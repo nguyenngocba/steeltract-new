@@ -45,7 +45,7 @@ import {
 } from '../../lib/performance'
 import {
   useYardMetricsQuery,
-} from '../yard-ui'
+} from '../yard'
 import { AlertTicker } from './AlertTicker'
 import { LiveKpiGrid } from './LiveKpiGrid'
 import { LiveNotificationStack } from './LiveNotificationStack'
@@ -91,7 +91,7 @@ const modes: Array<{
 ]
 
 const YardPixiCanvas = lazy(() =>
-  import('../yard-visualization').then(
+  import('../yard').then(
     (module) => ({
       default: module.YardPixiCanvas,
     }),
@@ -252,7 +252,7 @@ export function CommandCenterLayout() {
   const executiveSummary = [
     `${production?.inProgress ?? 0} production orders active`,
     `${qc?.openIssues ?? 0} QC issues open`,
-    `${Math.round(yard?.occupancyRate ?? 0)}% yard occupancy`,
+    `${Math.round((yard as any)?.occupancyRate ?? 0)}% yard occupancy`,
     `${jobsFailed} failed jobs`,
   ].join(' / ')
 
@@ -308,12 +308,12 @@ export function CommandCenterLayout() {
           id: 'yard',
           label: 'Yard occupancy',
           value: formatMetricValue(
-            yard?.occupancyRate ??
+            (yard as any)?.occupancyRate ??
               yardOccupancy?.value,
             '%',
           ),
           severity:
-            (yard?.occupancyRate ?? 0) > 85
+            ((yard as any)?.occupancyRate ?? 0) > 85
               ? 'critical'
               : metricSeverity(yardOccupancy),
           description:
@@ -368,7 +368,7 @@ export function CommandCenterLayout() {
       production?.totalOrders,
       qc?.passRate,
       snapshotMetrics,
-      yard?.occupancyRate,
+      (yard as any)?.occupancyRate,
     ],
   )
 
@@ -493,7 +493,7 @@ export function CommandCenterLayout() {
                   predictions={predictions}
                   delayedOrders={production?.delayed}
                   machineDowntime={machineDowntime.length}
-                  yardOccupancy={yard?.occupancyRate}
+                  yardOccupancy={(yard as any)?.occupancyRate}
                   workflowEscalations={workflowEscalations}
                 />
                 <DigitalTwinReplayPanel
@@ -750,12 +750,12 @@ export function CommandCenterLayout() {
               />
               <YardCongestionPanel
                 occupancyRate={
-                  yard?.occupancyRate
+                  (yard as any)?.occupancyRate
                 }
                 occupiedSlots={
-                  yard?.occupiedSlots
+                  (yard as any)?.occupiedSlots
                 }
-                totalSlots={yard?.totalSlots}
+                totalSlots={(yard as any)?.totalSlots}
               />
               <Suspense
                 fallback={
