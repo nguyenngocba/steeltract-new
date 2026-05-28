@@ -70,7 +70,6 @@ const items = [
   },
 ]
 
-export function AppSidebar() {
   return (
     <div className="flex w-[280px] flex-col border-r border-zinc-800 bg-zinc-900">
 

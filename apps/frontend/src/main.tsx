@@ -1,23 +1,26 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 
-import './index.css'
-
-import { QueryClient }
-from '@tanstack/react-query'
+import {
+  BrowserRouter,
+} from 'react-router-dom'
 
 import {
+  QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query'
 
-import { AppShell }
-from './app/layouts/shell/AppShell'
+import './index.css'
+
+import {
+  AppRouter,
+} from './app/router/AppRouter'
 
 const queryClient =
   new QueryClient()
 
 ReactDOM.createRoot(
-  document.getElementById('root')!
+  document.getElementById('root')!,
 ).render(
 
   <React.StrictMode>
@@ -26,9 +29,13 @@ ReactDOM.createRoot(
       client={queryClient}
     >
 
-      <AppShell />
+      <BrowserRouter>
+
+        <AppRouter />
+
+      </BrowserRouter>
 
     </QueryClientProvider>
 
-  </React.StrictMode>
+  </React.StrictMode>,
 )

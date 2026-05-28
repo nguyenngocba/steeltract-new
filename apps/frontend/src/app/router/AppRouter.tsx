@@ -32,20 +32,47 @@ import {
   InventoryRuntimeGridPage,
 } from '../../modules/inventory/pages/InventoryRuntimeGridPage'
 
-/* YARD */
+
+
 import {
   YardPage,
-} from '../../modules/yard-module/pages/YardPage'
+} from '../../modules/yard/pages/YardPage'
+
 
 /* COMPONENTS */
-import {
-  ComponentsRuntimeGridPage,
-} from '../../modules/components-module/pages/ComponentsRuntimeGridPage'
+
 
 /* PRODUCTION */
+
+
+
+
 import {
-  ProductionRuntimeGridPage,
-} from '../../modules/production-module/pages/ProductionRuntimeGridPage'
+  ProjectsPage,
+} from '../../modules/projects/pages/ProjectsPage'
+
+import {
+  SuppliersPage,
+} from '../../modules/suppliers/pages/SuppliersPage'
+
+import {
+  MasterDataPage,
+} from '../../modules/master-data/pages/MasterDataPage'
+
+import {
+  SettingsPage,
+} from '../../modules/settings/pages/SettingsPage'
+
+
+
+
+import {
+  ComponentsPage,
+} from '../../modules/components/pages/ComponentsPage'
+
+import {
+} from '../../modules/yard/pages/YardPage'
+
 
 export function AppRouter() {
 
@@ -97,14 +124,13 @@ export function AppRouter() {
           }
         />
 
-        {/* COMPONENTS */}
+        {
+
+/* COMPONENTS */}
         <Route
           path="/components"
           element={
-            <ModulePlaceholder
-              title="COMPONENTS"
-              subtitle="Quản lý cấu kiện / Component Runtime"
-            />
+            <ComponentsPage />
           }
         />
 
@@ -135,20 +161,6 @@ export function AppRouter() {
           path="/runtime/inventory-grid"
           element={
             <InventoryRuntimeGridPage />
-          }
-        />
-
-        <Route
-          path="/runtime/components-grid"
-          element={
-            <ComponentsRuntimeGridPage />
-          }
-        />
-
-        <Route
-          path="/runtime/production-grid"
-          element={
-            <ProductionRuntimeGridPage />
           }
         />
 

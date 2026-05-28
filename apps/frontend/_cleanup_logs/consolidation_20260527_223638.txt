@@ -1,0 +1,14 @@
+START: Wed May 27 10:36:38 PM +07 2026
+[ARCHIVE] components-module
+[ARCHIVE] yard-module
+[ARCHIVE] production-module
+[ARCHIVE] qc-module
+[ARCHIVE] logistics-module
+[ARCHIVE] executive-module
+[ARCHIVE] digital-twin-module
+[ARCHIVE] admin-module
+[ARCHIVE] analytics-module
+[ARCHIVE] production-ui
+[ARCHIVE] qc-ui
+[ARCHIVE] analytics-ui
+[ARCHIVE] simulation-ui

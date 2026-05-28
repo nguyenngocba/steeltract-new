@@ -1,8 +1,8 @@
 import {
-  SystemCards,
-} from '../components/SystemCards'
+  ComponentsTable,
+} from '../components/ComponentsTable'
 
-export function SettingsPage() {
+export function ComponentsPage() {
 
   return (
 
@@ -11,16 +11,16 @@ export function SettingsPage() {
       <div className="mb-8">
 
         <h1 className="text-4xl font-black text-cyan-400">
-          Hệ Thống
+          Cấu Kiện
         </h1>
 
         <div className="mt-2 text-zinc-500">
-          Enterprise System Runtime
+          Component Lifecycle Runtime
         </div>
 
       </div>
 
-      <SystemCards />
+      <ComponentsTable />
 
     </div>
   )

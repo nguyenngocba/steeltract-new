@@ -3,21 +3,23 @@ import {
 } from 'react-router-dom'
 
 import {
-  EnterpriseResponsiveShell,
-}
-from './EnterpriseResponsiveShell'
+  EnterpriseSidebar,
+} from '../../../app/shell/sidebar/EnterpriseSidebar'
 
 export function EnterpriseRuntimeLayout() {
 
   return (
-    <EnterpriseResponsiveShell>
 
-      <div className="min-h-screen flex-1 overflow-auto bg-black">
+    <div className="flex h-screen overflow-hidden bg-black text-white">
+
+      <EnterpriseSidebar />
+
+      <main className="flex-1 overflow-auto">
 
         <Outlet />
 
-      </div>
+      </main>
 
-    </EnterpriseResponsiveShell>
+    </div>
   )
 }

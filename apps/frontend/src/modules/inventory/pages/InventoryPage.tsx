@@ -1,86 +1,50 @@
 import {
-  KpiCard,
-} from '../../../shared/ui/enterprise/KpiCard'
+  InventoryKpiStrip,
+} from '../components/InventoryKpiStrip'
 
 import {
-  RuntimePanel,
-} from '../../../shared/ui/enterprise/RuntimePanel'
-
-import {
-  SectionHeader,
-} from '../../../shared/ui/enterprise/SectionHeader'
+  InventoryTable,
+} from '../components/InventoryTable'
 
 export function InventoryPage() {
 
   return (
 
-    <div className="space-y-8 p-8">
+    <div className="min-h-screen bg-black p-8 text-white">
 
-      <SectionHeader
-        title="Inventory Runtime"
-        description="Realtime warehouse management, stock analytics, material flow and logistics telemetry."
-      />
+      <div className="mb-8 flex items-center justify-between">
 
-      <div className="grid gap-6 xl:grid-cols-4">
+        <div>
 
-        <KpiCard
-          title="Total Materials"
-          value="12,450"
-          trend="+4.2%"
-        />
+          <h1 className="text-4xl font-black text-cyan-400">
+            Kho Vật Tư
+          </h1>
 
-        <KpiCard
-          title="Inbound Today"
-          value="248"
-          trend="+12%"
-        />
+          <div className="mt-2 text-zinc-500">
+            Enterprise Inventory Runtime
+          </div>
 
-        <KpiCard
-          title="Outbound Today"
-          value="173"
-          trend="+7%"
-        />
+        </div>
 
-        <KpiCard
-          title="Warehouse Usage"
-          value="84%"
-          trend="+2%"
-        />
+        <div className="flex gap-3">
+
+          <button className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-5 py-3 text-sm font-bold text-cyan-300">
+            Nhập Kho
+          </button>
+
+          <button className="rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 text-sm font-bold text-white">
+            Xuất Kho
+          </button>
+
+        </div>
 
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="space-y-8">
 
-        <RuntimePanel
-          title="Material Flow"
-          className="xl:col-span-2"
-        >
+        <InventoryKpiStrip />
 
-          <div className="h-[420px] rounded-2xl bg-black" />
-
-        </RuntimePanel>
-
-        <RuntimePanel
-          title="Realtime Alerts"
-        >
-
-          <div className="space-y-4">
-
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
-              Rack B12 overload detected
-            </div>
-
-            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-300">
-              Material aging threshold warning
-            </div>
-
-            <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm text-cyan-300">
-              Dock telemetry synchronized
-            </div>
-
-          </div>
-
-        </RuntimePanel>
+        <InventoryTable />
 
       </div>
 
