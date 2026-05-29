@@ -13,6 +13,7 @@ import { ProjectsRepository } from '../repositories/projects.repository';
 
 @Injectable()
 export class ProjectsService {
+
   constructor(
     private readonly repository: ProjectsRepository,
     private readonly componentsService: ComponentsService,
@@ -127,6 +128,97 @@ export class ProjectsService {
   kpis(id: string) {
     return this.componentsService.kpisByProject(id);
   }
+
+  async runtimeDashboard() {
+  return [
+    {
+      id: 'PRJ-001',
+
+      name:
+        'SGN EAST STEEL PLANT',
+
+      status:
+        'ACTIVE',
+
+      progress: 68,
+
+      tonnage: 420,
+
+      delivered: 312,
+
+      pending: 108,
+
+      manpower: 54,
+
+      qcIssues: 2,
+
+      zone:
+        'HCM',
+
+      updatedAt:
+        new Date()
+          .toISOString(),
+    },
+
+    {
+      id: 'PRJ-002',
+
+      name:
+        'LONG AN LOGISTICS HUB',
+
+      status:
+        'DELAYED',
+
+      progress: 41,
+
+      tonnage: 220,
+
+      delivered: 97,
+
+      pending: 123,
+
+      manpower: 26,
+
+      qcIssues: 5,
+
+      zone:
+        'LONG AN',
+
+      updatedAt:
+        new Date()
+          .toISOString(),
+    },
+
+    {
+      id: 'PRJ-003',
+
+      name:
+        'VUNG TAU ENERGY CENTER',
+
+      status:
+        'ACTIVE',
+
+      progress: 82,
+
+      tonnage: 680,
+
+      delivered: 590,
+
+      pending: 90,
+
+      manpower: 73,
+
+      qcIssues: 1,
+
+      zone:
+        'VUNG TAU',
+
+      updatedAt:
+        new Date()
+          .toISOString(),
+    },
+  ]
+}
 
   private async assertExists(id: string, tx: Prisma.TransactionClient) {
     const project = await this.repository.findOne(id, tx);

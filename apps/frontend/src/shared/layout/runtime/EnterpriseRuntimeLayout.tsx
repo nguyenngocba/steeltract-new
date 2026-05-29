@@ -10,15 +10,15 @@ export function EnterpriseRuntimeLayout() {
 
   return (
 
-    <div className="flex h-screen overflow-hidden bg-black text-white">
+    <div className="flex h-screen overflow-hidden bg-black">
 
       <EnterpriseSidebar />
 
-      <main className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto">
 
         <Outlet />
 
-      </main>
+      </div>
 
     </div>
   )

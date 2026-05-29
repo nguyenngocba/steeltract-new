@@ -1,19 +1,22 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 
-import { RealtimeProvider } from '../../shared/providers/RealtimeProvider'
+import {
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
 
+type Props = {
+  children: ReactNode
+}
+
 export function AppProviders({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: Props) {
   return (
     <QueryClientProvider client={queryClient}>
-      <RealtimeProvider>
-        {children}
-      </RealtimeProvider>
+      {children}
     </QueryClientProvider>
   )
 }

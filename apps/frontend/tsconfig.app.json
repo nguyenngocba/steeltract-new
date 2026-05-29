@@ -1,40 +1,54 @@
 {
   "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
     "target": "ES2022",
+
     "useDefineForClassFields": true,
+
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
     "module": "ESNext",
+
     "skipLibCheck": true,
 
     "moduleResolution": "bundler",
+
     "allowImportingTsExtensions": false,
+
     "resolveJsonModule": true,
+
     "isolatedModules": true,
+
     "moduleDetection": "force",
+
     "noEmit": true,
 
     "jsx": "react-jsx",
 
-    "strict": false
+    "strict": false,
+
+    "noUnusedLocals": false,
+
+    "noUnusedParameters": false,
+
+    "noFallthroughCasesInSwitch": true,
+
+    "ignoreDeprecations": "6.0",
+
+    "baseUrl": ".",
+
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
 
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
 
   "exclude": [
     "src/_archived",
-    "src/modules/_archived",
-    "src/_backend_quarantine",
-    "**/_archived/**",
-    "**/*.controller.ts",
-    "**/*.service.ts",
-    "**/*.module.ts",
-    "**/*.gateway.ts",
-    "**/repositories/**",
-    "**/database/**",
-    "**/prisma/**",
-    "node_modules",
-    "dist"
+    "src/_experimental_archive",
+    "src/_legacy_modules",
+    "src/**/__tests__"
   ]
 }

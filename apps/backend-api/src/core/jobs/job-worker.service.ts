@@ -85,7 +85,16 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
     const events = await this.outboxService.claimDue(limit, this.workerId);
 
     for (const event of events) {
-      await this.dispatchOutboxEvent(event);
+      await this.dispatchOutboxEvent({
+        ...event,
+
+        payload:
+          JSON.parse(
+            JSON.stringify(
+              event.payload,
+            ),
+          ),
+      });
     }
 
     return events.length;

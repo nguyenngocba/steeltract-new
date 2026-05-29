@@ -7,7 +7,7 @@ const prisma =
 async function main() {
 
   const warehouse =
-    await prisma.warehouse.create({
+    await prisma.masterWarehouse.create({
 
       data: {
 
@@ -20,7 +20,7 @@ async function main() {
     })
 
   const unit =
-    await prisma.unit.create({
+    await prisma.masterUnit.create({
 
       data: {
 
@@ -32,11 +32,12 @@ async function main() {
 
         symbol:
           'pcs',
+        category: 'GENERAL',
       },
     })
 
   const category =
-    await prisma.category.create({
+    await prisma.inventoryCategory.create({
 
       data: {
 
@@ -48,7 +49,7 @@ async function main() {
       },
     })
 
-  await prisma.material.create({
+  await prisma.inventoryItem.create({
 
     data: {
 
@@ -60,12 +61,6 @@ async function main() {
 
       quantity:
         520,
-
-      minStock:
-        100,
-
-      warehouseId:
-        warehouse.id,
 
       unitId:
         unit.id,

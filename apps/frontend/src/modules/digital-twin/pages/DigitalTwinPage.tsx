@@ -1,73 +1,38 @@
-import { Canvas } from '@react-three/fiber'
+import { OperationalShell } from '@/shared/layouts/OperationalShell'
 
-import { FactoryScene } from '../scene/FactoryScene'
-
-import { LiveTelemetryPanel } from '../components/LiveTelemetryPanel'
+import { FactoryTopology } from '../components/FactoryTopology'
+import { MachineRuntimeMap } from '../components/MachineRuntimeMap'
+import { OperationalHeatmap } from '../components/OperationalHeatmap'
+import { TwinTelemetry } from '../components/TwinTelemetry'
 
 export function DigitalTwinPage() {
   return (
-    <div className="flex h-full overflow-hidden bg-zinc-950">
-
-      {/* LEFT */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-
-        {/* HEADER */}
-        <div className="border-b border-zinc-800 bg-zinc-900 px-6 py-5">
-
-          <div className="flex items-center justify-between">
-
-            <div>
-
-              <h1 className="text-3xl font-bold text-white">
-                Digital Twin Runtime
-              </h1>
-
-              <p className="mt-1 text-sm text-zinc-500">
-                Smart Factory 3D Operational Visualization
-              </p>
-
-            </div>
-
-            <div className="flex items-center gap-2 rounded-full bg-cyan-500/20 px-4 py-2">
-
-              <div className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-
-              <span className="text-xs font-medium text-cyan-400">
-                LIVE DIGITAL TWIN
-              </span>
-
-            </div>
-
+    <OperationalShell>
+      <div className="space-y-6 p-6">
+        <div>
+          <div className="text-xs uppercase tracking-[0.3em] text-indigo-400">
+            Digital Twin Runtime
           </div>
 
+          <h1 className="mt-2 text-4xl font-black text-white">
+            Industrial Visualization Engine
+          </h1>
+
+          <div className="mt-2 text-sm text-zinc-500">
+            Realtime operational topology & equipment intelligence
+          </div>
         </div>
 
-        {/* 3D */}
-        <div className="flex-1">
+        <TwinTelemetry />
 
-          <Canvas
-            shadows
-            camera={{
-              position: [18,16,18],
-              fov: 50,
-            }}
-          >
+        <div className="grid grid-cols-2 gap-6">
+          <FactoryTopology />
 
-            <FactoryScene />
-
-          </Canvas>
-
+          <MachineRuntimeMap />
         </div>
 
+        <OperationalHeatmap />
       </div>
-
-      {/* RIGHT */}
-      <div className="w-[420px] border-l border-zinc-800 bg-zinc-950 p-5">
-
-        <LiveTelemetryPanel />
-
-      </div>
-
-    </div>
+    </OperationalShell>
   )
 }

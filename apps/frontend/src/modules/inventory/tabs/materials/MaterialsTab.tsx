@@ -6,10 +6,11 @@ import {
 
 export function MaterialsTab() {
 
-  const {
-    data,
+ const {
+    data = [],
   } = useQuery({
     queryKey: ['materials'],
+
     queryFn: getMaterials,
   })
 

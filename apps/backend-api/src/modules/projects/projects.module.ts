@@ -1,15 +1,37 @@
-import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common'
 
-import { PrismaModule } from '../../core/prisma/prisma.module';
+import { PrismaModule }
+  from '../../core/prisma/prisma.module'
 
-import { ComponentsModule } from '../components/components.module';
-import { ProjectsRepository } from './repositories/projects.repository';
-import { ProjectsController } from './projects.controller';
-import { ProjectsService } from './services/projects.service';
+import { ProjectsController }
+  from './projects.controller'
+
+import { ProjectsService }
+  from './services/projects.service'
+
+import { ProjectsRepository }
+  from './repositories/projects.repository'
+
+import { ComponentsModule }
+  from '../components/components.module'
 
 @Module({
-  imports: [PrismaModule, ComponentsModule],
-  controllers: [ProjectsController],
-  providers: [ProjectsRepository, ProjectsService],
+  imports: [
+    PrismaModule,
+    ComponentsModule,
+  ],
+
+  controllers: [
+    ProjectsController,
+  ],
+
+  providers: [
+    ProjectsService,
+    ProjectsRepository,
+  ],
+
+  exports: [
+    ProjectsService,
+  ],
 })
 export class ProjectsModule {}

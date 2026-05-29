@@ -1,54 +1,35 @@
-export interface MaterialItem {
+export type InventoryItem = {
   id: string
 
-  materialCode: string
+  code: string
 
-  materialName: string
-
-  category: string
-
-  unit: string
-
-  quantity: number
-
-  reservedQuantity: number
-
-  availableQuantity: number
+  name: string
 
   warehouse: string
 
-  yard: string
+  quantity: number
 
-  location: string
+  unit: string
 
-  minStock: number
-
-  maxStock: number
-
-  status: string
-
-  createdAt: string
+  status:
+    | 'IN_STOCK'
+    | 'LOW_STOCK'
+    | 'CRITICAL'
 }
 
-export interface InventoryTransaction {
+export type InventoryTransaction = {
   id: string
 
-  transactionCode: string
-
-  transactionType:
+  type:
     | 'INBOUND'
     | 'OUTBOUND'
     | 'TRANSFER'
 
-  materialCode: string
+  itemCode: string
 
   quantity: number
 
-  sourceLocation?: string
-
-  destinationLocation?: string
-
-  operator: string
+  warehouse: string
 
   createdAt: string
 }

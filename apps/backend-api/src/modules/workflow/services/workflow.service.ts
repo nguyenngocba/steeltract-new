@@ -592,8 +592,8 @@ export class WorkflowService {
         message: `${instance.referenceModule}:${instance.referenceId}`,
         type: 'workflow',
         severity: this.notificationSeverity(instance.status),
-        link: `/workflow/${instance.id}`,
-        metadata: this.toEventPayload(instance),
+        link: () =>
+          `/workflow/${instance.id}`,        metadata: this.toEventPayload(instance),
       },
       {
         module: 'workflow',

@@ -1,12 +1,35 @@
-import { Global, Module } from '@nestjs/common';
+import { Module }
+  from '@nestjs/common'
 
-import { OutboxModule } from '../outbox/outbox.module';
-import { EventBusService } from './event-bus.service';
+import { OutboxModule }
+  from '../outbox/outbox.module'
 
-@Global()
+import { EventStoreService }
+  from './event-store.service'
+
+import { EventBusService }
+  from './event-bus.service'
+
+import { EventsController }
+  from './events.controller'
+
 @Module({
-  imports: [OutboxModule],
-  providers: [EventBusService],
-  exports: [EventBusService],
+  imports: [
+    OutboxModule,
+  ],
+
+  controllers: [
+    EventsController,
+  ],
+
+  providers: [
+    EventStoreService,
+    EventBusService,
+  ],
+
+  exports: [
+    EventStoreService,
+    EventBusService,
+  ],
 })
 export class EventsModule {}

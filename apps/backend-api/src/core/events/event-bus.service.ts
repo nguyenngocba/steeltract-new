@@ -39,7 +39,10 @@ export class EventBusService {
     };
   }
 
-  async emit<TPayload, TName extends string = string>(
+  async emit<
+  TPayload,
+  TName extends string = string,
+>(
     eventName: TName,
     payload: TPayload,
     metadata?: DomainEventMetadata,

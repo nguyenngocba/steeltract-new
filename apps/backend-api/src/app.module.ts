@@ -1,8 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-
-import { EventsModule } from './core/events/events.module';
 import { JobsModule } from './core/jobs/jobs.module';
-import { OutboxModule } from './core/outbox/outbox.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { PerformanceModule } from './core/performance/performance.module';
 import { WebsocketModule } from './core/ws/websocket.module';
@@ -37,10 +34,15 @@ import { YardModule } from './modules/yard/yard.module';
 import { SimulationModule } from './modules/simulation/simulation.module';
 import { DictionariesModule } from './modules/master-data/dictionaries/dictionaries.module';
 import { UomModule } from './modules/master-data/uom/uom.module';
+import { RuntimeWsModule } from './core/ws/runtime-ws.module'
+import { CqrsModule } from './core/cqrs/cqrs.module'
+import { EventsModule } from './core/events/events.module'
+import { TelemetryModule } from './core/telemetry/telemetry.module'
+import { MaterialMovementsModule } from './modules/material-movements/material-movements.module'
+import { RuntimeModule } from './modules/runtime/runtime.module'
 @Module({
   imports: [
     EventsModule,
-    OutboxModule,
     JobsModule,
     PerformanceModule,
     WebsocketModule,
@@ -74,8 +76,16 @@ import { UomModule } from './modules/master-data/uom/uom.module';
     SimulationModule,
     UomModule,
     DictionariesModule,
+    RuntimeWsModule,
+    CqrsModule,
+    EventsModule,
+    TelemetryModule,
+    MaterialMovementsModule,
+    RuntimeModule,
   ],
-  controllers: [AppController],
+  controllers: [
+  AppController,
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

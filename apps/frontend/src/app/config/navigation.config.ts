@@ -1,134 +1,314 @@
+import {
+
+  LayoutDashboard,
+  Package,
+  Boxes,
+  Map,
+  Building2,
+  Truck,
+  ShieldCheck,
+  Users,
+  Settings,
+
+} from 'lucide-react'
+
 export const navigation = [
 
   {
-    group: 'CORE',
+    title: 'TỔNG QUAN',
 
-    items: [
+    icon: LayoutDashboard,
+
+    children: [
 
       {
-        key: 'dashboard',
-        label: 'Dashboard',
-        vi: 'Tổng Quan',
+        title: 'Bảng KPI chính',
         path: '/',
+      },
+
+      {
+        title: 'Biểu đồ xu hướng',
+        path: '/dashboard/charts',
+      },
+
+      {
+        title: 'Hoạt động gần đây',
+        path: '/dashboard/activity',
       },
     ],
   },
 
   {
-    group: 'INVENTORY',
+    title: 'VẬT TƯ KHO',
 
-    items: [
+    icon: Package,
+
+    children: [
 
       {
-        key: 'inventory',
-        label: 'Inventory',
-        vi: 'Kho Vật Tư',
+        title: 'Tồn kho vật tư',
         path: '/inventory',
       },
 
       {
-        key: 'materials',
-        label: 'Materials',
-        vi: 'Vật Tư',
-        path: '/inventory/materials',
+        title: 'Nhập kho',
+        path: '/inventory/inbound',
       },
 
       {
-        key: 'transactions',
-        label: 'Transactions',
-        vi: 'Lịch Sử',
-        path: '/inventory/transactions',
+        title: 'Xuất kho',
+        path: '/inventory/outbound',
+      },
+
+      {
+        title: 'Điều chuyển nội bộ',
+        path: '/inventory/transfers',
+      },
+
+      {
+        title: 'Kiểm kê',
+        path: '/inventory/audit',
+      },
+
+      {
+        title: 'Cảnh báo tồn kho',
+        path: '/inventory/alerts',
+      },
+
+      {
+        title: 'Lịch sử giao dịch',
+        path: '/inventory/history',
+      },
+
+      {
+        title: 'Danh mục vật tư',
+        path: '/inventory/catalog',
+      },
+
+      {
+        label:
+          'Material Movements',
+
+        path:
+          '/material-movements',
       },
     ],
   },
 
   {
-    group: 'PROJECTS',
+    title: 'CẤU KIỆN',
 
-    items: [
+    icon: Boxes,
 
-      {
-        key: 'projects',
-        label: 'Projects',
-        vi: 'Công Trình',
-        path: '/projects',
-      },
-    ],
-  },
-
-  {
-    group: 'SUPPLIERS',
-
-    items: [
+    children: [
 
       {
-        key: 'suppliers',
-        label: 'Suppliers',
-        vi: 'Nhà Cung Cấp',
-        path: '/suppliers',
-      },
-    ],
-  },
-
-  {
-    group: 'COMPONENTS',
-
-    items: [
-
-      {
-        key: 'components',
-        label: 'Components',
-        vi: 'Cấu Kiện',
+        title: 'Danh sách cấu kiện',
         path: '/components',
       },
+
+      {
+        title: 'Sản xuất cấu kiện',
+        path: '/components/production',
+      },
+
+      {
+        title: 'Tồn kho cấu kiện',
+        path: '/components/stock',
+      },
+
+      {
+        title: 'Chuyển cấu kiện',
+        path: '/components/transfers',
+      },
+
+      {
+        title: 'QC nội bộ',
+        path: '/components/qc',
+      },
+
+      {
+        title: 'Lịch sử gia công',
+        path: '/components/history',
+      },
     ],
   },
 
   {
-    group: 'YARD',
+    title: 'BÃI TẬP KẾT',
 
-    items: [
+    icon: Map,
+
+    children: [
 
       {
-        key: 'yard',
-        label: 'Yard Runtime',
-        vi: 'Bãi Tập Kết',
+        title: 'Sơ đồ bãi 2D/3D',
         path: '/yard',
       },
+
+      {
+        title: 'Danh sách cấu kiện',
+        path: '/yard/components',
+      },
+
+      {
+        title: 'Nhập bãi',
+        path: '/yard/inbound',
+      },
+
+      {
+        title: 'Di chuyển nội bộ',
+        path: '/yard/movements',
+      },
+
+      {
+        title: 'Xuất bãi',
+        path: '/yard/outbound',
+      },
+
+      {
+        title: 'Lịch sử xuất nhập',
+        path: '/yard/history',
+      },
     ],
   },
 
   {
-    group: 'MASTER DATA',
+    title: 'CÔNG TRÌNH',
 
-    items: [
+    icon: Building2,
+
+    children: [
 
       {
-        key: 'master-data',
-        label: 'Master Data',
-        vi: 'Danh Mục',
-        path: '/master-data',
+        title: 'Danh sách công trình',
+        path: '/projects',
       },
 
       {
-        key: 'units',
-        label: 'Units',
-        vi: 'Đơn Vị',
-        path: '/master-data/units',
+        title: 'Kế hoạch lắp dựng',
+        path: '/projects/gantt',
+      },
+
+      {
+        title: 'Nhu cầu vật tư',
+        path: '/projects/materials',
+      },
+
+      {
+        title: 'QC hiện trường',
+        path: '/projects/qc',
+      },
+
+      {
+        title: 'Chi phí công trình',
+        path: '/projects/costs',
       },
     ],
   },
 
   {
-    group: 'SYSTEM',
+    title: 'NHÀ CUNG CẤP',
 
-    items: [
+    icon: Users,
+
+    children: [
 
       {
-        key: 'settings',
-        label: 'Settings',
-        vi: 'Cài Đặt',
+        title: 'Danh sách NCC',
+        path: '/suppliers',
+      },
+
+      {
+        title: 'Hợp đồng & báo giá',
+        path: '/suppliers/contracts',
+      },
+
+      {
+        title: 'Đánh giá NCC',
+        path: '/suppliers/reviews',
+      },
+
+      {
+        title: 'Lịch sử mua hàng',
+        path: '/suppliers/history',
+      },
+    ],
+  },
+
+  {
+    title: 'QC',
+
+    icon: ShieldCheck,
+
+    children: [
+
+      {
+        title: 'Kế hoạch kiểm tra',
+        path: '/qc',
+      },
+
+      {
+        title: 'NCR',
+        path: '/qc/ncr',
+      },
+
+      {
+        title: 'CO/CQ',
+        path: '/qc/certificates',
+      },
+    ],
+  },
+
+  {
+    title: 'VẬN CHUYỂN',
+
+    icon: Truck,
+
+    children: [
+
+      {
+        title: 'Danh sách xe',
+        path: '/logistics',
+      },
+
+      {
+        title: 'Lộ trình giao hàng',
+        path: '/logistics/routes',
+      },
+
+      {
+        title: 'GPS',
+        path: '/logistics/gps',
+      },
+    ],
+  },
+
+  {
+    title: 'CÀI ĐẶT',
+
+    icon: Settings,
+
+    children: [
+
+      {
+        title: 'Thông tin công ty',
         path: '/settings',
+      },
+
+      {
+        title: 'RBAC',
+        path: '/settings/rbac',
+      },
+
+      {
+        title: 'Danh mục',
+        path: '/settings/master-data',
+      },
+
+      {
+        title: 'Backup & Logs',
+        path: '/settings/logs',
       },
     ],
   },

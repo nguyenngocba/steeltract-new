@@ -1,19 +1,24 @@
-export async function getMaterials() {
+import axios from 'axios'
 
-  return [
+import { setupAuthInterceptor }
+  from '../../../lib/auth/auth-interceptor'
 
-    {
-      id: 1,
-      name: 'Steel Plate A36',
-      quantity: 1240,
-      status: 'In Stock',
-    },
+export const inventoryApi =
+  axios.create({
+    baseURL:
+      'http://172.168.53.116:3000',
+  })
 
-    {
-      id: 2,
-      name: 'Pipe DN200',
-      quantity: 442,
-      status: 'Low Stock',
-    },
-  ]
+setupAuthInterceptor(
+  inventoryApi,
+  'http://172.168.53.116:3000',
+)
+
+export async function getInventoryItems() {
+  const { data } =
+    await inventoryApi.get(
+      '/inventory/items',
+    )
+
+  return data
 }

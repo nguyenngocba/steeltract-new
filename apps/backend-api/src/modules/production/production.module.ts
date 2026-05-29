@@ -6,9 +6,9 @@ import { WorkflowModule } from '../workflow/workflow.module';
 import { ProductionController } from './production.controller';
 import { ProductionRepository } from './repositories/production.repository';
 import { ProductionService } from './services/production.service';
-
+import { EventsModule } from '../../core/events/events.module'
 @Module({
-  imports: [PrismaModule, WorkflowModule, AttachmentsModule],
+  imports: [PrismaModule, WorkflowModule, AttachmentsModule, EventsModule],
   controllers: [ProductionController],
   providers: [ProductionRepository, ProductionService],
   exports: [ProductionService],

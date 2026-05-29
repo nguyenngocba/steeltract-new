@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common'
 
 import { PrismaService }
-from '../../../core/database/prisma.service'
+from '../../../core/prisma/prisma.service'
 
 @Injectable()
 export class PurchaseReceivingService {

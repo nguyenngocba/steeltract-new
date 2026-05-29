@@ -1,30 +1,56 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+} from '@nestjs/common'
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard }
+  from '../auth/jwt-auth.guard'
 
-import type { CreateTransactionDto } from '../inventory/dto/inventory.dto';
+import { CommandBus }
+  from '../../core/cqrs/command.bus'
 
-import { createTransactionSchema } from '../inventory/dto/inventory.dto';
-
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { InventoryService } from '../inventory/inventory.service';
+import { QueryBus }
+  from '../../core/cqrs/query.bus'
 
 @Controller('transactions')
 export class TransactionsController {
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
-    return this.inventoryService.listTransactions();
+  async findAll() {
+
+    console.log(
+      'TRANSACTIONS GET HIT',
+    )
+
+    return this.queryBus.execute(
+      'inventory.list.transactions',
+    )
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(
-    @Body(new ZodValidationPipe(createTransactionSchema))
-    body: CreateTransactionDto,
+  async create(
+    @Body() body: any,
   ) {
-    return this.inventoryService.createTransaction(body);
+
+    console.log(
+      'TRANSACTIONS POST HIT',
+      body,
+    )
+
+    return this.commandBus.execute({
+      type:
+        'inventory.create.transaction',
+
+      payload: body,
+    })
   }
 }
