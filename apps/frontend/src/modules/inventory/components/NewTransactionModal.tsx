@@ -38,7 +38,7 @@ export function NewTransactionModal({
     useState('')
 
   const [type, setType] =
-    useState('INBOUND')
+    useState('IMPORT')
 
   if (!open) return null
 
@@ -54,29 +54,29 @@ export function NewTransactionModal({
     )
 
     pushEvent({
-      id:
-        crypto.randomUUID(),
+    id:
+      Date.now().toString(),
 
-      type,
+    type,
 
-      message:
-        `${type} transaction created for ${material}`,
+    message:
+      `${type} transaction created for ${material}`,
 
-      timestamp:
-        new Date().toLocaleTimeString(),
-    })
+    timestamp:
+      new Date().toLocaleTimeString(),
+  })
 
     addTransaction({
-      id:
-        crypto.randomUUID(),
+    id:
+      (Date.now() + 1).toString(),
 
-      type,
+    type,
 
-      material,
+    material,
 
-      timestamp:
-        'Just now',
-    })
+    timestamp:
+      'Just now',
+  })
 
     setMaterial('')
 
@@ -137,20 +137,24 @@ export function NewTransactionModal({
                 text-white
               "
             >
-              <option>
-                INBOUND
+              <option value="IMPORT">
+                IMPORT
               </option>
 
-              <option>
-                OUTBOUND
+              <option value="EXPORT">
+                EXPORT
               </option>
 
-              <option>
+              <option value="TRANSFER">
                 TRANSFER
               </option>
 
-              <option>
+              <option value="RETURN">
                 RETURN
+              </option>
+
+              <option value="ADJUSTMENT">
+                ADJUSTMENT
               </option>
             </select>
           </div>

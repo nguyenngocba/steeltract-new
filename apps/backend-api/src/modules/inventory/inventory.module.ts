@@ -9,6 +9,7 @@ import { RuntimeWsModule } from '../../core/ws/runtime-ws.module'
 import { EventsModule } from '../../core/events/events.module'
 import { TelemetryModule } from '../../core/telemetry/telemetry.module'
 import { ListTransactionsHandler } from './queries/list-transactions.handler'
+import { InventoryRepository } from './inventory.repository'
 @Module({
 imports: [
   PrismaModule,
@@ -22,6 +23,7 @@ imports: [
 
   providers: [
     InventoryService,
+    InventoryRepository,
     ReturnWorkflowService,
     InventoryGateway,
     CreateTransactionHandler,

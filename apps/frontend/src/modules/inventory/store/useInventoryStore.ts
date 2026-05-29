@@ -20,7 +20,7 @@ export const useInventoryStore =
     transactions: [
       {
         id: '1',
-        type: 'INBOUND',
+        type: 'IMPORT',
         material: 'Steel Beam H400',
         timestamp: 'Realtime',
       },

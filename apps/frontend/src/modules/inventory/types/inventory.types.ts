@@ -21,9 +21,11 @@ export type InventoryTransaction = {
   id: string
 
   type:
-    | 'INBOUND'
-    | 'OUTBOUND'
+    | 'IMPORT'
+    | 'EXPORT'
     | 'TRANSFER'
+    | 'RETURN'
+    | 'ADJUSTMENT'
 
   itemCode: string
 

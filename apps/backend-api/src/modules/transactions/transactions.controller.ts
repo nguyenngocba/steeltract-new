@@ -40,16 +40,13 @@ export class TransactionsController {
   async create(
     @Body() body: any,
   ) {
-
     console.log(
       'TRANSACTIONS POST HIT',
-      body,
+      JSON.stringify(body, null, 2),
     )
 
     return this.commandBus.execute({
-      type:
-        'inventory.create.transaction',
-
+      type: 'inventory.create.transaction',
       payload: body,
     })
   }

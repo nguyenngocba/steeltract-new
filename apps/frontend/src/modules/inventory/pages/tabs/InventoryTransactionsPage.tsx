@@ -15,28 +15,16 @@ import {
   SectionHeader,
 } from '../../../../shared/ui/enterprise'
 
-const logs = [
-
-  {
-    type: 'INBOUND',
-    material: 'Steel Beam',
-    qty: '+120',
-  },
-
-  {
-    type: 'OUTBOUND',
-    material: 'Bolt M20',
-    qty: '-40',
-  },
-
-  {
-    type: 'TRANSFER',
-    material: 'Pipe DN100',
-    qty: '60',
-  },
-]
+import {
+  useInventoryTransactions,
+} from '../../hooks/useInventoryTransactions'
 
 export function InventoryTransactionsPage() {
+
+  const {
+    data: logs = [],
+    isLoading,
+  } = useInventoryTransactions()
 
   return (
 
@@ -55,12 +43,18 @@ export function InventoryTransactionsPage() {
         title="Realtime Logs"
       >
 
+        {isLoading && (
+          <div className="text-zinc-400">
+            Loading transactions...
+          </div>
+        )}
+
         <div className="space-y-4">
 
-          {logs.map((item) => (
+          {logs.map((item: any) => (
 
             <div
-              key={item.material}
+              key={item.id}
               className="rounded-2xl border border-zinc-800 bg-black p-4"
             >
 
@@ -69,17 +63,31 @@ export function InventoryTransactionsPage() {
                 <div>
 
                   <div className="font-bold text-white">
-                    {item.material}
+                    {item.remarks || '-'}
                   </div>
 
                   <div className="mt-1 text-xs text-zinc-500">
                     {item.type}
                   </div>
 
+                  <div className="mt-1 text-xs text-zinc-600">
+                    {item.transactionNo}
+                  </div>
+
                 </div>
 
-                <div className="text-2xl font-black text-cyan-400">
-                  {item.qty}
+                <div className="text-right">
+
+                  <div className="text-lg font-bold text-cyan-400">
+                    {item.direction}
+                  </div>
+
+                  <div className="mt-1 text-xs text-zinc-500">
+                    {new Date(
+                      item.createdAt,
+                    ).toLocaleString()}
+                  </div>
+
                 </div>
 
               </div>

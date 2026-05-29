@@ -5,7 +5,7 @@ export async function getMaterials() {
 
   const response =
     await http.get(
-      '/inventory/materials'
+      '/inventory/items'
     )
 
   return response.data
