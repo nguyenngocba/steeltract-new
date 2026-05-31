@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import {
   EnterpriseModulePage,
 } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
@@ -12,17 +14,39 @@ import {
 
 import {
   SectionHeader,
-} from '../../../../shared/ui/enterprise'
-
-import {
   RuntimePanel,
 } from '../../../../shared/ui/enterprise'
 
+import {
+  MaterialTable,
+} from '../../components/material-table/MaterialTable'
+
+import {
+  MaterialDrawer,
+} from '../../components/material-table/MaterialDrawer'
+
 export function InventoryMaterialsPage() {
+
+  const [open, setOpen] =
+    useState(false)
+  const [selectedMaterial, setSelectedMaterial] =
+  useState<any | null>(null)
 
   return (
 
     <EnterpriseModulePage>
+
+      <MaterialDrawer
+        open={open}
+        material={selectedMaterial}
+        onClose={() => {
+
+          setOpen(false)
+
+          setSelectedMaterial(null)
+
+        }}
+      />
 
       <SectionHeader
         title="Materials Runtime"
@@ -33,85 +57,44 @@ export function InventoryMaterialsPage() {
         tabs={inventoryTabs}
       />
 
+      <div className="mb-4 flex justify-end">
+
+        <button
+          onClick={() => {
+
+            setSelectedMaterial(null)
+
+            setOpen(true)
+
+          }}
+          className="
+            rounded-xl
+            bg-cyan-500
+            px-4
+            py-3
+            text-sm
+            font-medium
+            text-black
+          "
+        >
+          Create Material
+        </button>
+
+      </div>
+
       <RuntimePanel
         title="Materials Inventory"
       >
 
-        <div className="overflow-hidden rounded-2xl border border-zinc-800">
+        <MaterialTable
+          onEdit={(item) => {
 
-          <table className="w-full text-sm">
+            setSelectedMaterial(item)
 
-            <thead className="bg-zinc-900">
+            setOpen(true)
 
-              <tr>
-
-                <th className="px-4 py-3 text-left">
-                  Material
-                </th>
-
-                <th className="px-4 py-3 text-left">
-                  Category
-                </th>
-
-                <th className="px-4 py-3 text-left">
-                  Quantity
-                </th>
-
-                <th className="px-4 py-3 text-left">
-                  Status
-                </th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              <tr className="border-t border-zinc-800">
-
-                <td className="px-4 py-4">
-                  Steel Plate A36
-                </td>
-
-                <td className="px-4 py-4">
-                  Steel
-                </td>
-
-                <td className="px-4 py-4">
-                  1240
-                </td>
-
-                <td className="px-4 py-4 text-emerald-400">
-                  In Stock
-                </td>
-
-              </tr>
-
-              <tr className="border-t border-zinc-800">
-
-                <td className="px-4 py-4">
-                  Pipe DN200
-                </td>
-
-                <td className="px-4 py-4">
-                  Pipe
-                </td>
-
-                <td className="px-4 py-4">
-                  442
-                </td>
-
-                <td className="px-4 py-4 text-yellow-400">
-                  Low Stock
-                </td>
-
-              </tr>
-
-            </tbody>
-
-          </table>
-
-        </div>
+          }}
+        />
 
       </RuntimePanel>
 

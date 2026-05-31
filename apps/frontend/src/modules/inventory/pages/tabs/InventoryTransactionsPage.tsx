@@ -40,7 +40,7 @@ export function InventoryTransactionsPage() {
       />
 
       <RuntimePanel
-        title="Realtime Logs"
+        title="Transaction History"
       >
 
         {isLoading && (
@@ -49,57 +49,92 @@ export function InventoryTransactionsPage() {
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-3xl border border-zinc-800">
 
-          {logs.map((item: any) => (
+          <table className="w-full">
 
-            <div
-              key={item.id}
-              className="rounded-2xl border border-zinc-800 bg-black p-4"
-            >
+            <thead className="bg-zinc-950">
 
-              <div className="flex items-center justify-between">
+              <tr>
 
-                <div>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                  Transaction No
+                </th>
 
-                  <div className="font-bold text-white">
-                    {item.remarks || '-'}
-                  </div>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                  Type
+                </th>
 
-                  <div className="mt-1 text-xs text-zinc-500">
-                    {item.type}
-                  </div>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                  Direction
+                </th>
 
-                  <div className="mt-1 text-xs text-zinc-600">
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                  Material
+                </th>
+
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-zinc-500">
+                  Date
+                </th>
+
+              </tr>
+
+            </thead>
+
+            <tbody>
+
+              {logs.map((item: any) => (
+
+                <tr
+                  key={item.id}
+                  className="border-t border-zinc-800 hover:bg-zinc-900"
+                >
+
+                  <td className="px-4 py-4 text-cyan-400">
                     {item.transactionNo}
-                  </div>
+                  </td>
 
-                </div>
+                  <td className="px-4 py-4 text-white">
+                    {item.type}
+                  </td>
 
-                <div className="text-right">
+                  <td className="px-4 py-4">
 
-                  <div className="text-lg font-bold text-cyan-400">
-                    {item.direction}
-                  </div>
+                    <span
+                      className={
+                        item.direction === 'OUT'
+                          ? 'text-red-400'
+                          : 'text-emerald-400'
+                      }
+                    >
+                      {item.direction}
+                    </span>
 
-                  <div className="mt-1 text-xs text-zinc-500">
+                  </td>
+
+                  <td className="px-4 py-4 text-zinc-300">
+                    {item.remarks}
+                  </td>
+
+                  <td className="px-4 py-4 text-zinc-500">
                     {new Date(
                       item.createdAt,
                     ).toLocaleString()}
-                  </div>
+                  </td>
 
-                </div>
+                </tr>
 
-              </div>
+              ))}
 
-            </div>
+            </tbody>
 
-          ))}
+          </table>
 
         </div>
 
       </RuntimePanel>
 
     </EnterpriseModulePage>
+
   )
 }

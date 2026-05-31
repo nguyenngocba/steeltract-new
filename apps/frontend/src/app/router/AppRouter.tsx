@@ -6,6 +6,8 @@ import {
 
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage'
 import { InventoryPage } from '@/modules/inventory/pages/InventoryPage'
+import { InventoryMaterialsPage } from '@/modules/inventory/pages/tabs/InventoryMaterialsPage'
+import { InventoryTransactionsPage } from '@/modules/inventory/pages/tabs/InventoryTransactionsPage'
 import { ProductionPage } from '@/modules/production/pages/ProductionPage'
 import { QcPage } from '@/modules/qc/pages/QcPage'
 import { ProjectsPage } from '@/modules/projects/pages/ProjectsPage'
@@ -24,6 +26,14 @@ import { SimulationUniversePage } from '@/modules/simulation-universe/pages/Simu
 import { NexusPage } from '@/modules/nexus/pages/NexusPage'
 import { MaterialMovementsPage } from '@/modules/material-movements/pages/MaterialMovementsPage'
 import { YardPage } from '@/modules/yard/pages/YardPage'
+import { InventoryInboundPage } from '@/modules/inventory/pages/tabs/InventoryInboundPage'
+import {
+  InventoryOutboundPage,
+} from '@/modules/inventory/pages/tabs/InventoryOutboundPage'
+import {
+  InventoryMasterDataPage,
+} from '@/modules/inventory/pages/tabs/InventoryMasterDataPage'
+
 export function AppRouter() {
   return (
     <Routes>
@@ -35,6 +45,41 @@ export function AppRouter() {
       <Route
         path="/inventory"
         element={<InventoryPage />}
+      />
+
+      <Route
+        path="/inventory/materials"
+        element={
+          <InventoryMaterialsPage />
+        }
+      />
+
+      <Route
+        path="/inventory/inbound"
+        element={
+          <InventoryInboundPage />
+        }
+      />
+
+      <Route
+        path="/inventory/transactions"
+        element={
+          <InventoryTransactionsPage />
+        }
+      />
+
+      <Route
+        path="/inventory/outbound"
+        element={
+          <InventoryOutboundPage />
+        }
+      />
+
+      <Route
+        path="/inventory/master-data"
+        element={
+          <InventoryMasterDataPage />
+        }
       />
 
       <Route

@@ -23,6 +23,7 @@ export class InventoryRepository {
       where,
       include: {
         category: true,
+        materialType: true,
         unitMaster: true,
         zone: true,
       },
@@ -47,6 +48,7 @@ export class InventoryRepository {
       },
       include: {
         category: true,
+        materialType: true,
         unitMaster: true,
         zone: true,
       },
@@ -118,6 +120,7 @@ export class InventoryRepository {
       data,
       include: {
         category: true,
+        materialType: true,
         unitMaster: true,
         zone: true,
       },
@@ -136,6 +139,7 @@ export class InventoryRepository {
       data,
       include: {
         category: true,
+        materialType: true,
         unitMaster: true,
         zone: true,
       },

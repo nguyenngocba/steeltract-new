@@ -1,7 +1,10 @@
-type Props = {
+import type { ReactNode } from 'react'
 
-  children:
-    React.ReactNode
+import { OperationalShell }
+  from '../layouts/OperationalShell'
+
+type Props = {
+  children: ReactNode
 }
 
 export function EnterpriseModulePage({
@@ -10,10 +13,15 @@ export function EnterpriseModulePage({
 
   return (
 
-    <div className="min-h-screen bg-black p-8 text-white">
+    <OperationalShell>
 
-      {children}
+      <div className="min-h-screen bg-black p-8 text-white">
 
-    </div>
+        {children}
+
+      </div>
+
+    </OperationalShell>
+
   )
 }

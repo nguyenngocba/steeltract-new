@@ -23,19 +23,21 @@ export function useInventoryMetrics() {
     let totalQuantity = 0
 
     data.forEach((item: any) => {
+
       totalQuantity +=
         item.quantity ?? 0
 
       if (
-        item.quantity <= 25
-      ) {
-        lowStock++
-      }
-
-      if (
         item.quantity <= 5
       ) {
+
         critical++
+
+      } else if (
+        item.quantity <= 25
+      ) {
+
+        lowStock++
       }
     })
 

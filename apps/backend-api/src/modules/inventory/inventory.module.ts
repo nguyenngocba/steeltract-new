@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from '../../core/prisma/prisma.module'
+
 import { InventoryGateway } from './inventory.gateway'
 import { InventoryController } from './inventory.controller'
 import { InventoryService } from './inventory.service'
@@ -10,6 +11,11 @@ import { EventsModule } from '../../core/events/events.module'
 import { TelemetryModule } from '../../core/telemetry/telemetry.module'
 import { ListTransactionsHandler } from './queries/list-transactions.handler'
 import { InventoryRepository } from './inventory.repository'
+
+import { ZonesController } from './zones.controller'
+import { InventoryCategoriesController } from './inventory-categories.controller'
+import { InventoryUnitsController } from './inventory-units.controller'
+import { MaterialTypesController } from './material-types.controller'
 @Module({
 imports: [
   PrismaModule,
@@ -17,9 +23,17 @@ imports: [
   EventsModule,
   TelemetryModule,
 ],
-  controllers: [
-    InventoryController,
-  ],
+controllers: [
+  InventoryController,
+
+  ZonesController,
+
+  InventoryCategoriesController,
+
+  InventoryUnitsController,
+
+  MaterialTypesController,
+],
 
   providers: [
     InventoryService,

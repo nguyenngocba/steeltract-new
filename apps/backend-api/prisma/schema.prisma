@@ -506,9 +506,8 @@ model MaterialType {
   updatedAt DateTime @updatedAt
   createdBy String?
   updatedBy String?
-
   category InventoryCategory @relation(fields: [categoryId], references: [id])
-
+  inventoryItems InventoryItem[]
   @@index([categoryId])
   @@index([active])
   @@map("material_types")
@@ -718,6 +717,8 @@ model InventoryItem {
 
   categoryId String
 
+  materialTypeId String?
+
   zoneId String?
 
   createdAt DateTime @default(now())
@@ -725,6 +726,8 @@ model InventoryItem {
   updatedAt DateTime @updatedAt
 
   category InventoryCategory @relation(fields: [categoryId], references: [id])
+
+  materialType MaterialType? @relation(fields: [materialTypeId], references: [id])
 
   unitMaster MasterUnit? @relation(fields: [unitId], references: [id])
 
@@ -736,6 +739,7 @@ model InventoryItem {
   @@index([code])
   @@index([name])
   @@index([unitId])
+  @@index([materialTypeId])
 
   @@map("inventory_items")
 }
@@ -801,6 +805,7 @@ model InventoryTransaction {
 }
 
 model InventoryTransactionItem {
+
   id String @id @default(cuid())
 
   transactionId String
@@ -808,6 +813,10 @@ model InventoryTransactionItem {
   inventoryItemId String
 
   quantity Float
+
+  unitPrice Float?
+
+  totalAmount Float?
 
   unitId String?
 

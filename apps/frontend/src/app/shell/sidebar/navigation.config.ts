@@ -41,16 +41,23 @@ export const navigation = [
 
     children: [
       {
-        title: 'Tồn kho vật tư',
+        title: 'Tổng quan kho',
         path: '/inventory',
       },
 
       {
-        title:
-          'Material Movements',
+        title: 'Danh mục vật tư',
+        path: '/inventory/materials',
+      },
 
-        path:
-          '/material-movements',
+      {
+        title: 'Lịch sử giao dịch',
+        path: '/inventory/transactions',
+      },
+
+      {
+        title: 'Material Movements',
+        path: '/material-movements',
       },
     ],
   },

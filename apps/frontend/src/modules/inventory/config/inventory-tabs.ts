@@ -36,6 +36,13 @@ export const inventoryTabs = [
   },
 
   {
+    key: 'master-data',
+    label: 'Master Data',
+    vi: 'Danh Mục',
+    path: '/inventory/master-data',
+  },
+
+  {
     key: 'analytics',
     label: 'Analytics',
     vi: 'Phân Tích',

@@ -32,7 +32,9 @@ export class InventoryController {
   async createItem(
     @Body() body: any,
   ) {
-    return this.inventoryService.createItem(body)
+    return this.inventoryService.createItem(
+      body,
+    )
   }
 
   @Put('items/:id')
@@ -50,6 +52,22 @@ export class InventoryController {
   async deleteItem(
     @Param('id') id: string,
   ) {
-    return this.inventoryService.deleteItem(id)
+    return this.inventoryService.deleteItem(
+      id,
+    )
+  }
+
+  @Get('transactions')
+  async getTransactions() {
+    return this.inventoryService.listTransactions()
+  }
+
+  @Post('transactions')
+  async createTransaction(
+    @Body() body: any,
+  ) {
+    return this.inventoryService.createTransaction(
+      body,
+    )
   }
 }

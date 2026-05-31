@@ -5,12 +5,12 @@ import {
   createTransaction,
 } from '../../api/createTransaction'
 
-type InboundPayload = {
+type OutboundPayload = {
   materialId: string
   quantity: number
 }
 
-export function useCreateInbound() {
+export function useCreateOutbound() {
 
   const queryClient =
     useQueryClient()
@@ -18,11 +18,11 @@ export function useCreateInbound() {
   return useMutation({
 
     mutationFn: (
-      payload: InboundPayload,
+      payload: OutboundPayload,
     ) =>
       createTransaction({
 
-        type: 'INBOUND',
+        type: 'OUTBOUND',
 
         materialId:
           payload.materialId,

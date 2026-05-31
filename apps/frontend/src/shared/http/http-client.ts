@@ -4,7 +4,7 @@ export const http =
   axios.create({
 
     baseURL:
-      'http://localhost:3000/api',
+      'http://172.168.53.116:3000',
 
     timeout: 30000,
   })

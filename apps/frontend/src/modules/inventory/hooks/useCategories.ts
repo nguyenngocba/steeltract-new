@@ -1,28 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
-
 import { inventoryApi } from '../api/inventory.api'
 
-async function fetchTransactions() {
+async function fetchCategories() {
 
   const response =
     await inventoryApi.get(
-      '/inventory/transactions',
+      '/inventory/categories',
     )
 
   return response.data
 }
 
-export function useInventoryTransactions() {
+export function useCategories() {
 
   return useQuery({
 
     queryKey: [
-      'inventory-transactions',
+      'inventory-categories',
     ],
 
     queryFn:
-      fetchTransactions,
-
-    refetchInterval: 4000,
+      fetchCategories,
   })
 }

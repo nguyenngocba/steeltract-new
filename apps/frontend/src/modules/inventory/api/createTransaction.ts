@@ -5,7 +5,7 @@ export async function createTransaction(
 ) {
   const response =
     await inventoryApi.post(
-      '/transactions',
+      '/inventory/transactions',
       payload,
     )
 

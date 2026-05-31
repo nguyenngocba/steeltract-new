@@ -25,29 +25,51 @@ export class InventoryService {
   ) {}
 
   async getItems() {
-    const items =
-      await this.prisma.inventoryItem.findMany({
-        take: 100,
 
-        orderBy: {
-          createdAt: 'desc',
-        },
+    const items =
+      await this.inventoryRepository.findItems({
+        take: 100,
       })
 
     return items.map((item) => ({
+
       id: item.id,
 
       code: item.code,
 
       name: item.name,
 
-      warehouse: 'MAIN-WH',
+      description:
+        item.description,
 
       quantity:
         item.quantity ?? 0,
 
+      minimumStock:
+        item.minimumStock ?? 0,
+
       unit:
-        item.unit ?? 'PCS',
+        item.unit ??
+        item.unitMaster?.code ??
+        'PCS',
+
+      categoryId:
+        item.categoryId,
+
+      category:
+        item.category?.name ?? '',
+
+      materialTypeId:
+        item.materialTypeId,
+
+      materialType:
+        item.materialType?.name ?? '',
+
+      zoneId:
+        item.zoneId,
+
+      zone:
+        item.zone?.name ?? '',
 
       status:
         (item.quantity ?? 0) <= 5
@@ -64,39 +86,65 @@ export class InventoryService {
     )
   }
 
-  async createItem(payload: any) {
-    if (!payload.categoryId) {
-      throw new Error(
-        'categoryId is required',
-      )
-    }
+async createItem(payload: any) {
 
-    return this.inventoryRepository.createItem({
-      code: payload.code,
-
-      name: payload.name,
-
-      description:
-        payload.description,
-
-      quantity:
-        payload.quantity ?? 0,
-
-      minimumStock:
-        payload.minimumStock ?? 0,
-
-      unit:
-        payload.unit ?? 'PCS',
-
-      category: {
-        connect: {
-          id:
-            payload.categoryId,
-        },
+  const defaultCategory =
+    await this.prisma.inventoryCategory.findFirst({
+      orderBy: {
+        createdAt: 'asc',
       },
     })
+
+  if (!defaultCategory) {
+    throw new Error(
+      'No inventory category found',
+    )
   }
 
+  return this.inventoryRepository.createItem({
+    code:
+      payload.code,
+
+    name:
+      payload.name,
+
+    description:
+      payload.description,
+
+    quantity:
+      payload.quantity ?? 0,
+
+    minimumStock:
+      payload.minimumStock ?? 0,
+
+    unit:
+      payload.unit ?? 'PCS',
+
+    category: {
+      connect: {
+        id:
+          payload.categoryId ??
+          defaultCategory.id,
+      },
+    },
+    ...(payload.zoneId && {
+        zone: {
+          connect: {
+            id:
+              payload.zoneId,
+          },
+        },
+      }),
+      ...(payload.materialTypeId && {
+          materialType: {
+            connect: {
+              id:
+                payload.materialTypeId,
+            },
+          },
+        }),
+  })
+}
   async updateItem(
     id: string,
     payload: any,
@@ -122,14 +170,31 @@ export class InventoryService {
         unit:
           payload.unit,
 
-        ...(payload.categoryId && {
-          category: {
-            connect: {
-              id:
-                payload.categoryId,
-            },
+      ...(payload.categoryId && {
+        category: {
+          connect: {
+            id:
+              payload.categoryId,
           },
-        }),
+        },
+      }),
+
+      ...(payload.zoneId && {
+        zone: {
+          connect: {
+            id:
+              payload.zoneId,
+          },
+        },
+      }),
+      ...(payload.materialTypeId && {
+        materialType: {
+          connect: {
+            id:
+              payload.materialTypeId,
+          },
+        },
+      }),
       },
     )
   }
@@ -150,105 +215,224 @@ export class InventoryService {
     })
   }
 
-  async createTransaction(
-    payload: any,
+ async createTransaction(
+  payload: any,
+) {
+
+  const typeMap: Record<
+    string,
+    any
+  > = {
+
+    INBOUND:
+      'IMPORT',
+
+    OUTBOUND:
+      'EXPORT',
+
+    IMPORT:
+      'IMPORT',
+
+    EXPORT:
+      'EXPORT',
+
+    TRANSFER:
+      'TRANSFER',
+
+    RETURN:
+      'RETURN',
+
+    ADJUSTMENT:
+      'ADJUSTMENT',
+  }
+
+  const quantity =
+  Number(
+    payload.quantity ?? 0,
+  )
+
+let materialName = ''
+
+if (
+  payload.materialId
+) {
+
+  const item =
+    await this.inventoryRepository
+      .findItemById(
+        payload.materialId,
+      )
+
+  if (!item) {
+
+    throw new Error(
+      'Material not found',
+    )
+  }
+
+  materialName =
+    item.name
+
+  if (
+    (
+      payload.type ===
+        'OUTBOUND' ||
+      payload.type ===
+        'EXPORT'
+    ) &&
+    (
+      item.quantity ?? 0
+    ) < quantity
   ) {
-    const typeMap: Record<
-      string,
-      any
-    > = {
-      INBOUND:
-        'IMPORT',
 
-      OUTBOUND:
-        'EXPORT',
+    throw new Error(
+      'Insufficient stock',
+    )
+  }
+}
 
-      IMPORT:
-        'IMPORT',
+  if (
+    payload.materialId &&
+    (
+      payload.type ===
+        'OUTBOUND' ||
+      payload.type ===
+        'EXPORT'
+    )
+  ) {
 
-      EXPORT:
-        'EXPORT',
+    const item =
+      await this.inventoryRepository
+        .findItemById(
+          payload.materialId,
+        )
 
-      TRANSFER:
-        'TRANSFER',
+    if (!item) {
 
-      RETURN:
-        'RETURN',
-
-      ADJUSTMENT:
-        'ADJUSTMENT',
+      throw new Error(
+        'Material not found',
+      )
     }
 
-    const transaction =
-      await this.prisma.inventoryTransaction.create({
-        data: {
-          code:
-            'TX-' +
-            Date.now(),
+    if (
+      (item.quantity ?? 0) <
+      quantity
+    ) {
 
-          transactionNo:
-            'INV-' +
-            Date.now(),
-
-          type:
-            typeMap[
-              payload.type
-            ] ?? 'IMPORT',
-
-          remarks:
-            payload.material ??
-            '',
-
-          direction:
-            payload.type ===
-              'OUTBOUND' ||
-            payload.type ===
-              'EXPORT'
-              ? 'OUT'
-              : 'IN',
-        },
-      })
-
-    const realtimeEvent = {
-      id:
-        transaction.id,
-
-      type:
-        transaction.type,
-
-      remarks:
-        transaction.remarks,
-
-      createdAt:
-        transaction.createdAt.toISOString(),
+      throw new Error(
+        'Insufficient stock',
+      )
     }
+  }
 
-    this.eventStore.append({
-      id:
-        Date.now().toString(),
+  const transaction =
+    await this.prisma.inventoryTransaction.create({
 
-      type:
-        'inventory.transaction.created',
+      data: {
 
-      payload:
-        realtimeEvent,
+        code:
+          'TX-' +
+          Date.now(),
 
-      createdAt:
-        new Date().toISOString(),
+        transactionNo:
+          'INV-' +
+          Date.now(),
+
+        type:
+          typeMap[
+            payload.type
+          ] ?? 'IMPORT',
+
+       remarks:
+        materialName ||
+        payload.material ||
+        '',
+        direction:
+          payload.type ===
+            'OUTBOUND' ||
+          payload.type ===
+            'EXPORT'
+            ? 'OUT'
+            : 'IN',
+      },
     })
 
-    this.gateway.emit(
-      'inventory.transaction.created',
-      realtimeEvent,
-    )
+  if (
+    payload.materialId &&
+    quantity > 0
+  ) {
 
-    this.telemetry.track(
-      'inventory.transactions',
-      1,
-    )
+    if (
+      payload.type ===
+        'INBOUND' ||
+      payload.type ===
+        'IMPORT'
+    ) {
 
-    return transaction
+      await this.inventoryRepository
+        .updateItemQuantitySnapshot(
+          payload.materialId,
+          quantity,
+        )
+    }
+
+    if (
+      payload.type ===
+        'OUTBOUND' ||
+      payload.type ===
+        'EXPORT'
+    ) {
+
+      await this.inventoryRepository
+        .updateItemQuantitySnapshot(
+          payload.materialId,
+          -quantity,
+        )
+    }
   }
+
+  const realtimeEvent = {
+
+    id:
+      transaction.id,
+
+    type:
+      transaction.type,
+
+    remarks:
+      transaction.remarks,
+
+    createdAt:
+      transaction.createdAt.toISOString(),
+  }
+
+  this.eventStore.append({
+
+    id:
+      Date.now().toString(),
+
+    type:
+      'inventory.transaction.created',
+
+    payload:
+      realtimeEvent,
+
+    createdAt:
+      new Date().toISOString(),
+  })
+
+  this.gateway.emit(
+    'inventory.transaction.created',
+    realtimeEvent,
+  )
+
+  this.telemetry.track(
+    'inventory.transactions',
+    1,
+  )
+
+  return transaction
+}
 
   async importStock(
     payload: any,
