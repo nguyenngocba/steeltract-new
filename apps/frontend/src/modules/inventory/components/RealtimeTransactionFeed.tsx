@@ -4,7 +4,7 @@ export function RealtimeTransactionFeed() {
   const {
     data,
     isLoading,
-  } = useInventoryTransactions()
+  } = useInventoryTransactions({})
 
   return (
     <div

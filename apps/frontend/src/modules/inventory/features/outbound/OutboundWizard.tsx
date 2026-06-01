@@ -7,25 +7,33 @@ import {
 import {
   useCreateOutbound,
 } from '../../hooks/mutations/useCreateOutbound'
+import { useProjects } from '../../hooks/useProjects'
 
 export function OutboundWizard() {
 
-  const [materialId, setMaterialId] =
+  const [inventoryItemId, setInventoryItemId] =
     useState('')
 
   const [quantity, setQuantity] =
     useState(1)
 
+  const [projectId, setProjectId] =
+    useState('')
+
   const {
     data: materials = [],
   } = useMaterials()
+
+  const {
+    data: projects = [],
+  } = useProjects()
 
   const outboundMutation =
     useCreateOutbound()
 
   async function handleIssue() {
 
-    if (!materialId) {
+    if (!inventoryItemId) {
 
       alert(
         'Please select material',
@@ -34,22 +42,26 @@ export function OutboundWizard() {
       return
     }
 
+    if (quantity <= 0) {
+      alert('Quantity must be greater than 0')
+      return
+    }
+
     try {
 
       await outboundMutation.mutateAsync({
-
-        materialId,
-
+        inventoryItemId,
         quantity,
-
+        projectId:
+          projectId || undefined,
       })
 
       alert(
         'Outbound created',
       )
 
-      setMaterialId('')
-
+      setInventoryItemId('')
+      setProjectId('')
       setQuantity(1)
 
     } catch (error) {
@@ -73,9 +85,9 @@ export function OutboundWizard() {
       <div className="space-y-4">
 
         <select
-          value={materialId}
+          value={inventoryItemId}
           onChange={(e) =>
-            setMaterialId(
+            setInventoryItemId(
               e.target.value,
             )
           }
@@ -107,6 +119,44 @@ export function OutboundWizard() {
                 {item.name}
               </option>
 
+            ),
+          )}
+
+        </select>
+
+        <select
+          value={projectId}
+          onChange={(e) =>
+            setProjectId(
+              e.target.value,
+            )
+          }
+          className="
+            w-full
+            rounded-xl
+            border
+            border-zinc-700
+            bg-zinc-950
+            px-4
+            py-3
+            text-white
+          "
+        >
+
+          <option value="">
+            Select Project
+          </option>
+
+          {projects.map(
+            (project: any) => (
+              <option
+                key={project.id}
+                value={project.id}
+              >
+                {project.code}
+                {' - '}
+                {project.name}
+              </option>
             ),
           )}
 

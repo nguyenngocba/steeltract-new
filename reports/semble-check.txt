@@ -1,0 +1,16 @@
+===== UV TOOLS =====
+semble v0.3.1
+- semble
+
+===== SEMBLE =====
+usage: semble [-h] {search,find-related,init,savings} ...
+
+positional arguments:
+  {search,find-related,init,savings}
+    search              Search a codebase.
+    find-related        Find code similar to a specific location.
+    init                Write a semble sub-agent file for your coding agent.
+    savings             Show token savings and usage stats.
+
+options:
+  -h, --help            show this help message and exit

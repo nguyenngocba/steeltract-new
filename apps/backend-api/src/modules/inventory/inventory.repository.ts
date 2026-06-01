@@ -177,8 +177,44 @@ export class InventoryRepository {
     });
   }
 
-  listTransactions(params: { skip?: number; take?: number }) {
+  listTransactions(params: {
+    skip?: number
+    take?: number
+    fromDate?: Date
+    toDate?: Date
+    supplierId?: string
+    projectId?: string
+    transactionTypes?: Array<'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'>
+  }) {
+    const where: Prisma.InventoryTransactionWhereInput = {}
+
+    if (params.fromDate || params.toDate) {
+      where.transactionDate = {
+        ...(params.fromDate && {
+          gte: params.fromDate,
+        }),
+        ...(params.toDate && {
+          lte: params.toDate,
+        }),
+      }
+    }
+
+    if (params.supplierId) {
+      where.supplierId = params.supplierId
+    }
+
+    if (params.projectId) {
+      where.projectId = params.projectId
+    }
+
+    if (params.transactionTypes?.length) {
+      where.type = {
+        in: params.transactionTypes,
+      }
+    }
+
     return this.prisma.inventoryTransaction.findMany({
+      where,
       include: {
         transactionType: true,
         warehouse: true,

@@ -5,9 +5,10 @@ import {
 } from 'react-router-dom'
 
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage'
-import { InventoryPage } from '@/modules/inventory/pages/InventoryPage'
+import { InventoryOverviewPage } from '@/modules/inventory/pages/tabs/InventoryOverviewPage'
 import { InventoryMaterialsPage } from '@/modules/inventory/pages/tabs/InventoryMaterialsPage'
 import { InventoryTransactionsPage } from '@/modules/inventory/pages/tabs/InventoryTransactionsPage'
+import { MaterialDetailPage } from '@/modules/inventory/pages/MaterialDetailPage'
 import { ProductionPage } from '@/modules/production/pages/ProductionPage'
 import { QcPage } from '@/modules/qc/pages/QcPage'
 import { ProjectsPage } from '@/modules/projects/pages/ProjectsPage'
@@ -26,6 +27,7 @@ import { SimulationUniversePage } from '@/modules/simulation-universe/pages/Simu
 import { NexusPage } from '@/modules/nexus/pages/NexusPage'
 import { MaterialMovementsPage } from '@/modules/material-movements/pages/MaterialMovementsPage'
 import { YardPage } from '@/modules/yard/pages/YardPage'
+import { SuppliersPage } from '@/modules/suppliers/pages/SuppliersPage'
 import { InventoryInboundPage } from '@/modules/inventory/pages/tabs/InventoryInboundPage'
 import {
   InventoryOutboundPage,
@@ -33,6 +35,21 @@ import {
 import {
   InventoryMasterDataPage,
 } from '@/modules/inventory/pages/tabs/InventoryMasterDataPage'
+import {
+  InventoryAuditPage,
+} from '@/modules/inventory/pages/tabs/InventoryAuditPage'
+import {
+  InventoryTransferPage,
+} from '@/modules/inventory/pages/tabs/InventoryTransferPage'
+import {
+  InventoryStockTakePage,
+} from '@/modules/inventory/pages/tabs/InventoryStockTakePage'
+import {
+  InventoryAdjustmentsPage,
+} from '@/modules/inventory/pages/tabs/InventoryAdjustmentsPage'
+import {
+  InventoryAlertsPage,
+} from '@/modules/inventory/pages/tabs/InventoryAlertsPage'
 
 export function AppRouter() {
   return (
@@ -44,7 +61,7 @@ export function AppRouter() {
 
       <Route
         path="/inventory"
-        element={<InventoryPage />}
+        element={<InventoryOverviewPage />}
       />
 
       <Route
@@ -52,6 +69,11 @@ export function AppRouter() {
         element={
           <InventoryMaterialsPage />
         }
+      />
+
+      <Route
+        path="/inventory/materials/:id"
+        element={<MaterialDetailPage />}
       />
 
       <Route
@@ -76,9 +98,44 @@ export function AppRouter() {
       />
 
       <Route
+        path="/inventory/transfer"
+        element={
+          <InventoryTransferPage />
+        }
+      />
+
+      <Route
+        path="/inventory/stock-take"
+        element={
+          <InventoryStockTakePage />
+        }
+      />
+
+      <Route
+        path="/inventory/adjustments"
+        element={
+          <InventoryAdjustmentsPage />
+        }
+      />
+
+      <Route
+        path="/inventory/alerts"
+        element={
+          <InventoryAlertsPage />
+        }
+      />
+
+      <Route
         path="/inventory/master-data"
         element={
           <InventoryMasterDataPage />
+        }
+      />
+
+      <Route
+        path="/inventory/audit"
+        element={
+          <InventoryAuditPage />
         }
       />
 
@@ -105,6 +162,11 @@ export function AppRouter() {
       <Route
         path="/yard"
         element={<YardPage />}
+      />
+
+      <Route
+        path="/suppliers"
+        element={<SuppliersPage />}
       />
 
       <Route

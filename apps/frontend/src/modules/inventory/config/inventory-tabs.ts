@@ -3,49 +3,57 @@ export const inventoryTabs = [
   {
     key: 'overview',
     label: 'Overview',
-    vi: 'Tổng Quan',
+    vi: 'Tổng quan',
     path: '/inventory',
   },
 
   {
-    key: 'materials',
-    label: 'Materials',
-    vi: 'Vật Tư',
+    key: 'stock',
+    label: 'Stock',
+    vi: 'Tồn kho',
     path: '/inventory/materials',
   },
 
   {
     key: 'inbound',
     label: 'Inbound',
-    vi: 'Nhập Kho',
+    vi: 'Nhập kho',
     path: '/inventory/inbound',
   },
 
   {
     key: 'outbound',
     label: 'Outbound',
-    vi: 'Xuất Kho',
+    vi: 'Xuất kho',
     path: '/inventory/outbound',
+  },
+
+  {
+    key: 'transfer',
+    label: 'Transfer',
+    vi: 'Điều chuyển',
+    path: '/inventory/transfer',
+  },
+
+  {
+    key: 'stock-take',
+    label: 'Stock Take',
+    vi: 'Kiểm kê',
+    path: '/inventory/stock-take',
   },
 
   {
     key: 'transactions',
     label: 'Transactions',
-    vi: 'Lịch Sử',
+    vi: 'Lịch sử giao dịch',
     path: '/inventory/transactions',
   },
 
   {
-    key: 'master-data',
-    label: 'Master Data',
-    vi: 'Danh Mục',
-    path: '/inventory/master-data',
+    key: 'alerts',
+    label: 'Alerts',
+    vi: 'Cảnh báo tồn kho',
+    path: '/inventory/alerts',
   },
 
-  {
-    key: 'analytics',
-    label: 'Analytics',
-    vi: 'Phân Tích',
-    path: '/inventory/analytics',
-  },
 ]

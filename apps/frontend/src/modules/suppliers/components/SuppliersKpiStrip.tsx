@@ -1,31 +1,38 @@
-const metrics = [
+type SuppliersKpiStripProps = {
+  total: number
+  withEmail: number
+  withPhone: number
+  newlyAdded: number
+}
 
-  {
-    label: 'Tổng NCC',
-    value: '84',
-    color: 'text-cyan-400',
-  },
-
-  {
-    label: 'Đang Hoạt Động',
-    value: '71',
-    color: 'text-emerald-400',
-  },
-
-  {
-    label: 'Pending',
-    value: '8',
-    color: 'text-yellow-400',
-  },
-
-  {
-    label: 'Blocked',
-    value: '5',
-    color: 'text-red-400',
-  },
-]
-
-export function SuppliersKpiStrip() {
+export function SuppliersKpiStrip({
+  total,
+  withEmail,
+  withPhone,
+  newlyAdded,
+}: SuppliersKpiStripProps) {
+  const metrics = [
+    {
+      label: 'Tổng NCC',
+      value: total.toLocaleString(),
+      color: 'text-cyan-400',
+    },
+    {
+      label: 'Có email',
+      value: withEmail.toLocaleString(),
+      color: 'text-emerald-400',
+    },
+    {
+      label: 'Có điện thoại',
+      value: withPhone.toLocaleString(),
+      color: 'text-blue-400',
+    },
+    {
+      label: 'Mới 30 ngày',
+      value: newlyAdded.toLocaleString(),
+      color: 'text-amber-400',
+    },
+  ]
 
   return (
 

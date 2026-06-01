@@ -24,9 +24,6 @@ export const createInventoryItemSchema = z.object({
   categoryId: optionalTextFilter,
   category: optionalTextFilter,
   zoneId: optionalTextFilter,
-
-  quantity: z.coerce.number().nonnegative().optional().default(0),
-
   minimumStock: z.coerce.number().nonnegative().optional().default(0),
 });
 
@@ -40,7 +37,6 @@ export const updateInventoryItemSchema = z.object({
   category: optionalTextFilter,
   zoneId: optionalTextFilter,
   minimumStock: z.coerce.number().nonnegative().optional(),
-  quantity: z.unknown().optional(),
 });
 
 export const stockItemSchema = z.object({

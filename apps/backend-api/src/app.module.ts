@@ -34,6 +34,7 @@ import { YardModule } from './modules/yard/yard.module';
 import { SimulationModule } from './modules/simulation/simulation.module';
 import { DictionariesModule } from './modules/master-data/dictionaries/dictionaries.module';
 import { UomModule } from './modules/master-data/uom/uom.module';
+import { SuppliersModule } from './modules/master-data/suppliers/suppliers.module';
 import { RuntimeWsModule } from './core/ws/runtime-ws.module'
 import { CqrsModule } from './core/cqrs/cqrs.module'
 import { EventsModule } from './core/events/events.module'
@@ -75,6 +76,7 @@ import { RuntimeModule } from './modules/runtime/runtime.module'
     YardModule,
     SimulationModule,
     UomModule,
+    SuppliersModule,
     DictionariesModule,
     RuntimeWsModule,
     CqrsModule,

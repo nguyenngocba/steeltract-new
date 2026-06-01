@@ -12,10 +12,6 @@ import {
 } from '../../hooks/useUpdateMaterial'
 
 import {
-  useZones,
-} from '../../hooks/useZones'
-
-import {
   useCategories,
 } from '../../hooks/useCategories'
 
@@ -48,16 +44,10 @@ export function MaterialDrawer({
   const [unit, setUnit] =
     useState('PCS')
 
-  const [quantity, setQuantity] =
-    useState(0)
-
   const [minimumStock, setMinimumStock] =
     useState(0)
 
   const [description, setDescription] =
-    useState('')
-
-  const [zoneId, setZoneId] =
     useState('')
 
   const [categoryId, setCategoryId] =
@@ -77,10 +67,6 @@ export function MaterialDrawer({
     useUpdateMaterial()
 
   const {
-    data: zones = [],
-  } = useZones()
-
-  const {
     data: categories = [],
   } = useCategories()
 
@@ -98,10 +84,8 @@ export function MaterialDrawer({
     setCode('')
     setName('')
     setUnit('PCS')
-    setQuantity(0)
     setMinimumStock(0)
     setDescription('')
-    setZoneId('')
     setCategoryId('')
     setMaterialTypeId('')
 
@@ -120,20 +104,12 @@ export function MaterialDrawer({
     material.unit ?? 'PCS',
   )
 
-  setQuantity(
-    material.quantity ?? 0,
-  )
-
   setMinimumStock(
     material.minimumStock ?? 0,
   )
 
   setDescription(
     material.description ?? '',
-  )
-
-  setZoneId(
-    material.zoneId ?? '',
   )
 
   setCategoryId(
@@ -167,8 +143,6 @@ export function MaterialDrawer({
         minimumStock,
 
         description,
-
-        zoneId,
 
         materialTypeId,
       }
@@ -413,21 +387,6 @@ export function MaterialDrawer({
           </select>
 
           <input
-  type="number"
-  value={quantity}
-  disabled
-  className="
-    rounded-xl
-    border
-    border-zinc-700
-    bg-zinc-800
-    px-4
-    py-3
-    text-zinc-500
-  "
-/>
-
-          <input
             type="number"
             value={minimumStock}
             onChange={(e) =>
@@ -448,42 +407,6 @@ export function MaterialDrawer({
               text-white
             "
           />
-
-          <select
-            value={zoneId}
-            onChange={(e) =>
-              setZoneId(
-                e.target.value,
-              )
-            }
-            className="
-              rounded-xl
-              border
-              border-zinc-700
-              bg-zinc-950
-              px-4
-              py-3
-              text-white
-            "
-          >
-
-            <option value="">
-              Select Zone
-            </option>
-
-            {zones.map(
-              (zone: any) => (
-
-                <option
-                  key={zone.id}
-                  value={zone.id}
-                >
-                  {zone.code}
-                </option>
-              ),
-            )}
-
-          </select>
 
           <textarea
             value={description}

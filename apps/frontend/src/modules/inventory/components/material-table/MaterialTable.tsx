@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 
 import { getMaterials } from '../../api/endpoints/inventory.endpoint'
 
@@ -258,10 +259,24 @@ type Props = {
                       "
                         onClick={() =>
                           onEdit(item)
-                        }                    
-                        >
-                      Edit
+                        }
+                      >
+                        Edit
                     </button>
+
+                    <Link
+                      to={`/inventory/materials/${item.id}`}
+                      className="
+                        rounded-lg
+                        bg-cyan-500/20
+                        px-3
+                        py-1
+                        text-xs
+                        text-cyan-300
+                      "
+                    >
+                      Detail
+                    </Link>
 
                     <button
                       className="

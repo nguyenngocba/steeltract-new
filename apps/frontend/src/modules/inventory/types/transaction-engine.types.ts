@@ -36,7 +36,14 @@ export interface InventoryTransaction {
 }
 
 export interface TransactionPayload {
-  type: 'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'
+  type:
+    | 'INBOUND'
+    | 'OUTBOUND'
+    | 'TRANSFER'
+    | 'RETURN'
+    | 'ADJUSTMENT'
+    | 'IMPORT'
+    | 'EXPORT'
   transactionTypeId?: string
   transactionTypeCode?: string
   warehouseId?: string

@@ -10,6 +10,7 @@ import {
   PurchaseOrderStatus,
   QcChecklistType,
   TaskPriority,
+  TransactionType,
   WorkflowDefinitionStatus,
   WorkflowStepType,
   WorkerStatus,
@@ -31,10 +32,17 @@ export class DemoDataSeeder {
     }
 
     const zones = await this.seedWarehouseZones();
+    const suppliers = await this.seedSuppliers();
     const category = await this.seedInventoryCategory();
     const inventoryItems = await this.seedInventory(category.id, zones[0]?.id);
     const workers = await this.seedWorkers();
     const projects = await this.seedProjects();
+    await this.seedInventoryTransactions(
+      inventoryItems,
+      suppliers,
+      projects,
+      zones[0]?.id,
+    );
     const components = await this.seedComponents(projects);
     await this.seedPurchaseOrders(projects);
     await this.seedSupplierScores();
@@ -163,9 +171,21 @@ export class DemoDataSeeder {
         where: { code: { startsWith: demoPrefix } },
       });
       await tx.inventoryItem.deleteMany({
-        where: { code: { startsWith: demoPrefix } },
+        where: {
+          OR: [
+            { code: { startsWith: demoPrefix } },
+            {
+              code: {
+                in: ['HB200', 'HB250', 'I200', 'PL12', 'PL20'],
+              },
+            },
+          ],
+        },
       });
       await tx.inventoryCategory.deleteMany({
+        where: { code: { startsWith: demoPrefix } },
+      });
+      await tx.supplier.deleteMany({
         where: { code: { startsWith: demoPrefix } },
       });
       await tx.warehouseZone.deleteMany({
@@ -221,29 +241,211 @@ export class DemoDataSeeder {
 
   private seedInventory(categoryId: string, zoneId?: string) {
     const items = [
-      ['DEMO-MAT-HB300', 'H-Beam 300x300', 'ton', 120, 25],
-      ['DEMO-MAT-PL12', 'Plate 12mm', 'sheet', 340, 60],
-      ['DEMO-MAT-BOLT-M20', 'Bolt M20 Grade 8.8', 'box', 95, 40],
-      ['DEMO-MAT-PAINT-ZN', 'Zinc Primer', 'drum', 28, 12],
+      ['HB200', 'HB200 H-Beam', 'ton', 18],
+      ['HB250', 'HB250 H-Beam', 'ton', 22],
+      ['I200', 'I200 I-Beam', 'ton', 15],
+      ['PL12', 'PL12 Steel Plate', 'sheet', 60],
+      ['PL20', 'PL20 Steel Plate', 'sheet', 45],
     ] as const;
 
     return Promise.all(
-      items.map(([code, name, unit, quantity, minimumStock]) =>
+      items.map(([code, name, unit, minimumStock]) =>
         this.prisma.inventoryItem.upsert({
           where: { code },
           create: {
             code,
             name,
             unit,
-            quantity,
+            quantity: 0,
             minimumStock,
             categoryId,
             zoneId,
           },
-          update: { quantity, minimumStock, zoneId },
+          update: { minimumStock, zoneId },
         }),
       ),
     );
+  }
+
+  private seedSuppliers() {
+    const suppliers = [
+      ['DEMO-SUP-STEEL-01', 'DEMO Hoa Phat Steel'],
+      ['DEMO-SUP-STEEL-02', 'DEMO Pomina Steel'],
+      ['DEMO-SUP-STEEL-03', 'DEMO Vina Kyoei'],
+    ] as const;
+
+    return Promise.all(
+      suppliers.map(([code, name], index) =>
+        this.prisma.supplier.upsert({
+          where: { code },
+          create: {
+            code,
+            name,
+            contact: `Demo Contact ${index + 1}`,
+            phone: `09000000${index + 1}`,
+            email: `demo-supplier-${index + 1}@steeltrack.local`,
+            address: `Demo steel district ${index + 1}`,
+          },
+          update: {},
+        }),
+      ),
+    );
+  }
+
+  private async seedInventoryTransactions(
+    inventoryItems: Array<{ id: string; code: string }>,
+    suppliers: Array<{ id: string }>,
+    projects: Array<{ id: string }>,
+    zoneId?: string,
+  ) {
+    const itemByCode = new Map(
+      inventoryItems.map((item) => [item.code, item]),
+    );
+
+    const inboundSeeds = [
+      ['HB200', 40, 15200000, 608000000, 0],
+      ['HB250', 35, 15800000, 553000000, 1],
+      ['I200', 30, 14900000, 447000000, 2],
+      ['PL12', 120, 4200000, 504000000, 0],
+      ['PL20', 90, 5300000, 477000000, 1],
+    ] as const;
+
+    const outboundSeeds = [
+      ['HB200', 12, 15200000, 182400000, 0],
+      ['HB250', 10, 15800000, 158000000, 1],
+      ['I200', 8, 14900000, 119200000, 0],
+      ['PL12', 30, 4200000, 126000000, 1],
+      ['PL20', 20, 5300000, 106000000, 0],
+    ] as const;
+
+    for (const [index, seed] of inboundSeeds.entries()) {
+      const [code, quantity, unitPrice, totalAmount, supplierIndex] = seed;
+      const item = itemByCode.get(code);
+      if (!item) continue;
+
+      await this.prisma.inventoryTransaction.upsert({
+        where: {
+          code: `DEMO-TXN-IN-${index + 1}`,
+        },
+        create: {
+          code: `DEMO-TXN-IN-${index + 1}`,
+          transactionNo: `DEMO-IN-${String(index + 1).padStart(3, '0')}`,
+          type: TransactionType.IMPORT,
+          direction: 'INBOUND',
+          supplierId: suppliers[supplierIndex % suppliers.length]?.id,
+          zoneId,
+          remarks: `Inbound steel receipt ${code}`,
+          items: {
+            create: [
+              {
+                inventoryItemId: item.id,
+                quantity,
+                unitPrice,
+                totalAmount,
+                zoneId,
+              },
+            ],
+          },
+        },
+        update: {
+          transactionNo: `DEMO-IN-${String(index + 1).padStart(3, '0')}`,
+          type: TransactionType.IMPORT,
+          direction: 'INBOUND',
+          supplierId: suppliers[supplierIndex % suppliers.length]?.id,
+          zoneId,
+          remarks: `Inbound steel receipt ${code}`,
+          items: {
+            deleteMany: {},
+            create: [
+              {
+                inventoryItemId: item.id,
+                quantity,
+                unitPrice,
+                totalAmount,
+                zoneId,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    for (const [index, seed] of outboundSeeds.entries()) {
+      const [code, quantity, unitPrice, totalAmount, projectIndex] = seed;
+      const item = itemByCode.get(code);
+      if (!item) continue;
+
+      await this.prisma.inventoryTransaction.upsert({
+        where: {
+          code: `DEMO-TXN-OUT-${index + 1}`,
+        },
+        create: {
+          code: `DEMO-TXN-OUT-${index + 1}`,
+          transactionNo: `DEMO-OUT-${String(index + 1).padStart(3, '0')}`,
+          type: TransactionType.EXPORT,
+          direction: 'OUTBOUND',
+          projectId: projects[projectIndex % projects.length]?.id,
+          zoneId,
+          remarks: `Outbound project issue ${code}`,
+          items: {
+            create: [
+              {
+                inventoryItemId: item.id,
+                quantity: -Math.abs(quantity),
+                unitPrice,
+                totalAmount: -Math.abs(totalAmount),
+                zoneId,
+              },
+            ],
+          },
+        },
+        update: {
+          transactionNo: `DEMO-OUT-${String(index + 1).padStart(3, '0')}`,
+          type: TransactionType.EXPORT,
+          direction: 'OUTBOUND',
+          projectId: projects[projectIndex % projects.length]?.id,
+          zoneId,
+          remarks: `Outbound project issue ${code}`,
+          items: {
+            deleteMany: {},
+            create: [
+              {
+                inventoryItemId: item.id,
+                quantity: -Math.abs(quantity),
+                unitPrice,
+                totalAmount: -Math.abs(totalAmount),
+                zoneId,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    // Keep legacy quantity snapshot in sync for existing modules.
+    for (const item of inventoryItems) {
+      const aggregate =
+        await this.prisma.inventoryTransactionItem.aggregate({
+          where: {
+            inventoryItemId: item.id,
+            transaction: {
+              code: {
+                startsWith: 'DEMO-TXN-',
+              },
+            },
+          },
+          _sum: {
+            quantity: true,
+          },
+        });
+
+      await this.prisma.inventoryItem.update({
+        where: { id: item.id },
+        data: {
+          quantity: Number(aggregate._sum.quantity ?? 0),
+        },
+      });
+    }
   }
 
   private seedWorkers() {

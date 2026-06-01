@@ -6,8 +6,11 @@ import {
 } from '../../api/createTransaction'
 
 type InboundPayload = {
-  materialId: string
+  inventoryItemId: string
   quantity: number
+  unitPrice?: number
+  supplierId?: string
+  invoiceNo?: string
 }
 
 export function useCreateInbound() {
@@ -23,12 +26,20 @@ export function useCreateInbound() {
       createTransaction({
 
         type: 'INBOUND',
-
-        materialId:
-          payload.materialId,
-
-        quantity:
-          payload.quantity,
+        supplierId:
+          payload.supplierId,
+        invoiceNo:
+          payload.invoiceNo,
+        items: [
+          {
+            inventoryItemId:
+              payload.inventoryItemId,
+            quantity:
+              payload.quantity,
+            unitPrice:
+              payload.unitPrice,
+          },
+        ],
       }),
 
     onSuccess() {

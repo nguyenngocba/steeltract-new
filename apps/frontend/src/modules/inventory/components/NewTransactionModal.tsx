@@ -38,7 +38,7 @@ export function NewTransactionModal({
     useState('')
 
   const [type, setType] =
-    useState('IMPORT')
+    useState('INBOUND')
 
   if (!open) return null
 
@@ -137,12 +137,12 @@ export function NewTransactionModal({
                 text-white
               "
             >
-              <option value="IMPORT">
-                IMPORT
+              <option value="INBOUND">
+                INBOUND
               </option>
 
-              <option value="EXPORT">
-                EXPORT
+              <option value="OUTBOUND">
+                OUTBOUND
               </option>
 
               <option value="TRANSFER">

@@ -44,3 +44,56 @@ export async function deleteMaterial(
 
   return response.data
 }
+
+export async function getSuppliers() {
+  const response =
+    await http.get(
+      '/suppliers',
+    )
+
+  return response.data
+}
+
+export async function getProjects() {
+  const response =
+    await http.get(
+      '/projects',
+    )
+
+  if (Array.isArray(response.data)) {
+    return response.data
+  }
+
+  return response.data?.data ?? []
+}
+
+export async function getMaterialDetail(
+  id: string,
+) {
+  const response =
+    await http.get(
+      `/inventory/items/${id}/detail`,
+    )
+
+  return response.data
+}
+
+export async function getInventoryAudit() {
+  const response =
+    await http.get(
+      '/inventory/audit',
+    )
+
+  return response.data
+}
+
+export async function getTransactionDetail(
+  id: string,
+) {
+  const response =
+    await http.get(
+      `/inventory/transactions/${id}`,
+    )
+
+  return response.data
+}
