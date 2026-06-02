@@ -92,6 +92,7 @@ export class InventoryService {
         },
         include: {
           project: true,
+          zone: true,
           items: {
             where: {
               inventoryItemId: id,
@@ -158,6 +159,7 @@ export class InventoryService {
             line.totalAmount != null
               ? Number(line.totalAmount)
               : null,
+          signedQuantity: Number(line.quantity),
           unit:
             line.unit?.code ??
             item.unit ??
@@ -168,6 +170,13 @@ export class InventoryService {
             ? supplierMap.get(tx.supplierId)?.name ??
               tx.supplierId
             : null,
+          zoneId: line.zoneId ?? tx.zoneId ?? null,
+          zoneName:
+            line.zone?.name ??
+            tx.zone?.name ??
+            item.zone?.name ??
+            null,
+          attachmentName: null,
           remarks: tx.remarks,
         })),
     )
@@ -182,6 +191,7 @@ export class InventoryService {
             tx.transactionNo ?? tx.code,
           transactionDate: tx.transactionDate,
           quantity: Math.abs(Number(line.quantity)),
+          signedQuantity: Number(line.quantity),
           unitPrice:
             line.unitPrice != null
               ? Number(line.unitPrice)
@@ -197,9 +207,59 @@ export class InventoryService {
             'PCS',
           projectId: tx.projectId,
           projectName: tx.project?.name ?? null,
+          zoneId: line.zoneId ?? tx.zoneId ?? null,
+          zoneName:
+            line.zone?.name ??
+            tx.zone?.name ??
+            item.zone?.name ??
+            null,
+          attachmentName: null,
           remarks: tx.remarks,
         })),
     )
+
+    const locationBalancesMap = new Map<
+      string,
+      {
+        zoneId: string | null
+        zoneName: string
+        quantity: number
+        updatedAt: Date | null
+      }
+    >()
+
+    for (const tx of transactions) {
+      for (const line of tx.items) {
+        const zoneId = line.zoneId ?? tx.zoneId ?? null
+        const zoneName =
+          line.zone?.name ??
+          tx.zone?.name ??
+          item.zone?.name ??
+          'KHU MẶC ĐỊNH'
+        const key = zoneId ?? zoneName
+        const current = locationBalancesMap.get(key) ?? {
+          zoneId,
+          zoneName,
+          quantity: 0,
+          updatedAt: null,
+        }
+        current.quantity += Number(line.quantity ?? 0)
+        if (
+          !current.updatedAt ||
+          tx.transactionDate.getTime() >
+            current.updatedAt.getTime()
+        ) {
+          current.updatedAt = tx.transactionDate
+        }
+        locationBalancesMap.set(key, current)
+      }
+    }
+
+    const locationBalances = Array.from(
+      locationBalancesMap.values(),
+    )
+      .filter((x) => x.quantity > 0)
+      .sort((a, b) => b.quantity - a.quantity)
 
     const inboundQuantity = inboundLines.reduce(
       (acc, line) => acc + line.quantity,
@@ -240,6 +300,12 @@ export class InventoryService {
       outboundHistory: outboundLines,
       supplierHistory: inboundLines,
       projectConsumptionHistory: outboundLines,
+      locationBalances: locationBalances.map((x) => ({
+        zoneId: x.zoneId,
+        zoneName: x.zoneName,
+        quantity: x.quantity,
+        updatedAt: x.updatedAt,
+      })),
     }
   }
 

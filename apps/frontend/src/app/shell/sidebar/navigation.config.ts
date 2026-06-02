@@ -46,18 +46,34 @@ export const navigation = [
       },
 
       {
-        title: 'Danh mục vật tư',
+        title: 'Tồn kho',
         path: '/inventory/materials',
       },
 
       {
-        title: 'Lịch sử giao dịch',
-        path: '/inventory/transactions',
+        title: 'Nhập kho',
+        path: '/inventory/inbound',
       },
 
       {
-        title: 'Material Movements',
-        path: '/material-movements',
+        title: 'Xuất kho',
+        path: '/inventory/outbound',
+      },
+      {
+        title: 'Điều chuyển',
+        path: '/inventory/transfer',
+      },
+      {
+        title: 'Kiểm kê',
+        path: '/inventory/stock-take',
+      },
+      {
+        title: 'Lịch sử giao dịch',
+        path: '/inventory/transactions',
+      },
+      {
+        title: 'Cảnh báo tồn kho',
+        path: '/inventory/alerts',
       },
     ],
   },
@@ -74,6 +90,42 @@ export const navigation = [
 
         path:
           '/components',
+      },
+      {
+        title:
+          'Sản xuất (Lệnh SX)',
+        path:
+          '/components/production',
+      },
+      {
+        title:
+          'Tồn kho cấu kiện',
+        path:
+          '/components/stock',
+      },
+      {
+        title:
+          'Kho vật tư SX',
+        path:
+          '/components/material-stock',
+      },
+      {
+        title:
+          'Chuyển cấu kiện',
+        path:
+          '/components/transfers',
+      },
+      {
+        title:
+          'QC nội bộ',
+        path:
+          '/components/qc',
+      },
+      {
+        title:
+          'Lịch sử gia công',
+        path:
+          '/components/history',
       },
     ],
   },

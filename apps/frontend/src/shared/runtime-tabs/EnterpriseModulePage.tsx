@@ -15,7 +15,7 @@ export function EnterpriseModulePage({
 
     <OperationalShell>
 
-      <div className="min-h-screen bg-black p-8 text-white">
+      <div className="min-h-screen bg-black p-5 text-white">
 
         {children}
 

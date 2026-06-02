@@ -2,861 +2,318 @@ import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { KpiCard, RuntimePanel, SectionHeader } from '../../../../shared/ui/enterprise'
+import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { inventoryTabs } from '../../config/inventory-tabs'
 import { useCreateTransaction } from '../../hooks/useCreateTransaction'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
+import { useZones } from '../../hooks/useZones'
 
-type CountRow = {
-  materialId: string
-  physicalQuantity: string
-  method?: string
+function num(v: any) {
+  const n = Number(v ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
+function formatCurrency(v: any) {
+  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+}
+
+type CountLine = {
+  inventoryItemId: string
+  physicalQty: string
+  zoneId: string
 }
 
 export function InventoryStockTakePage() {
-  const { data: materials = [] } =
-    useInventoryItems()
-  const {
-    data: adjustments = [],
-  } = useInventoryTransactions({
-    type: 'ADJUSTMENT',
-  })
-  const createMutation =
-    useCreateTransaction()
+  const { data: materials = [] } = useInventoryItems()
+  const { data: zones = [] } = useZones()
+  const { data: adjustments = [] } = useInventoryTransactions({ type: 'ADJUSTMENT' })
+  const createTx = useCreateTransaction()
 
-  const [sessionNo, setSessionNo] =
-    useState(
-      `CNT-${new Date()
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`,
-    )
-  const [sessionDate, setSessionDate] =
-    useState(
-      new Date()
-        .toISOString()
-        .slice(0, 10),
-    )
-  const [createdBy, setCreatedBy] =
-    useState('Warehouse Operator')
-  const [statusFilter, setStatusFilter] =
-    useState('')
-  const [rows, setRows] = useState<
-    CountRow[]
-  >([])
+  const [date, setDate] = useState('')
+  const [zoneFilter, setZoneFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [methodFilter, setMethodFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 10
 
-  function addRow() {
-    setRows((prev) => [
-      ...prev,
-      {
-        materialId: '',
-        physicalQuantity: '',
-        method: 'CYCLE_COUNT',
-      },
-    ])
-  }
+  const [sessionNo, setSessionNo] = useState(`KK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`)
+  const [countRows, setCountRows] = useState<CountLine[]>([])
 
-  function removeRow(index: number) {
-    setRows((prev) =>
-      prev.filter(
-        (_row, rowIndex) =>
-          rowIndex !== index,
-      ),
-    )
-  }
+  const rows = useMemo(() => {
+    return (adjustments as any[])
+      .filter((x: any) => {
+        const line = x.items?.[0]
+        if (date) {
+          const d = new Date(x.transactionDate ?? x.createdAt).toISOString().slice(0, 10)
+          if (d !== date) return false
+        }
+        if (zoneFilter && String(line?.zoneId ?? '') !== zoneFilter) return false
+        if (statusFilter && String(x.status ?? 'COMPLETED').toUpperCase() !== statusFilter) return false
+        if (methodFilter && String(x.referenceType ?? '') !== methodFilter) return false
+        return true
+      })
+      .sort((a: any, b: any) => +new Date(b.transactionDate ?? b.createdAt) - +new Date(a.transactionDate ?? a.createdAt))
+  }, [adjustments, date, zoneFilter, statusFilter, methodFilter])
 
-  async function submitCountSession() {
-    const adjustmentItems =
-      rows
-        .map((row) => {
-          const material =
-            materials.find(
-              (item: any) =>
-                item.id === row.materialId,
-            )
-          if (!material) {
-            return null
-          }
+  const metrics = useMemo(() => {
+    const total = rows.length
+    const mismatch = rows.filter((x: any) => Math.abs(num(x.items?.[0]?.quantity)) > 0).length
+    const matched = Math.max(0, total - mismatch)
+    const accuracy = total === 0 ? 100 : (matched / total) * 100
+    const varianceValue = rows.reduce((s: number, x: any) => s + Math.abs(num(x.items?.[0]?.totalAmount)), 0)
+    return { total, matched, mismatch, accuracy, varianceValue }
+  }, [rows])
 
-          const physicalQty = Number(
-            row.physicalQuantity,
-          )
-          const systemQty = Number(
-            material.quantity ?? 0,
-          )
-          const difference =
-            physicalQty - systemQty
-
-          if (
-            !Number.isFinite(
-              difference,
-            ) ||
-            difference === 0
-          ) {
-            return null
-          }
-
-          return {
-            inventoryItemId:
-              material.id,
-            quantity: difference,
-          }
-        })
-        .filter(
-          Boolean,
-        ) as Array<{
-        inventoryItemId: string
-        quantity: number
-      }>
-
-    if (
-      adjustmentItems.length === 0
-    ) {
-      return
-    }
-
-    await createMutation.mutateAsync({
-      type: 'ADJUSTMENT',
-      code: sessionNo,
-      transactionNo: sessionNo,
-      transactionDate: sessionDate,
-      performedBy: createdBy,
-      remarks: `Stock count session ${sessionNo}`,
-      items: adjustmentItems,
+  const discrepancyByZone = useMemo(() => {
+    const m = new Map<string, number>()
+    rows.forEach((x: any) => {
+      const key = x.items?.[0]?.zone?.code ?? 'NA'
+      m.set(key, (m.get(key) ?? 0) + Math.abs(num(x.items?.[0]?.quantity)))
     })
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  }, [rows])
 
-    setRows([])
-    setSessionNo(
-      `CNT-${new Date()
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`,
-    )
-  }
+  const methodDist = useMemo(() => {
+    const m = new Map<string, number>()
+    rows.forEach((x: any) => {
+      const key = x.referenceType ?? 'Định kỳ'
+      m.set(key, (m.get(key) ?? 0) + 1)
+    })
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [rows])
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, page])
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
 
   const countSheet = useMemo(() => {
-    return rows.map((row) => {
-      const material =
-        materials.find(
-          (item: any) =>
-            item.id === row.materialId,
-        )
-      const systemQuantity =
-        Number(
-          material?.quantity ?? 0,
-        )
-      const physicalQuantity =
-        Number(
-          row.physicalQuantity ?? 0,
-        )
-      const difference =
-        physicalQuantity -
-        systemQuantity
-
+    return countRows.map((row) => {
+      const item = materials.find((x: any) => x.id === row.inventoryItemId) as any
+      const systemQty = num(item?.quantity)
+      const physical = num(row.physicalQty)
       return {
-        row,
-        material,
-        systemQuantity,
-        physicalQuantity:
-          Number.isFinite(
-            physicalQuantity,
-          )
-            ? physicalQuantity
-            : 0,
-        difference:
-          Number.isFinite(difference)
-            ? difference
-            : 0,
+        ...row,
+        item,
+        systemQty,
+        difference: physical - systemQty,
       }
     })
-  }, [materials, rows])
+  }, [countRows, materials])
 
-  const sessionMetrics = useMemo(() => {
-    const now = new Date()
-    const today = now
-      .toISOString()
-      .slice(0, 10)
-    const weekAgo = new Date(
-      now.getTime() -
-        7 * 24 * 60 * 60 * 1000,
-    )
-    const monthStart = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-    )
-
-    const base =
-      statusFilter ===
-      'WITH_DIFFERENCE'
-        ? countSheet.filter(
-            (sheet) =>
-              sheet.difference !== 0,
-          )
-        : countSheet
-
-    const todayCount =
-      adjustments.filter(
-        (item: any) =>
-          new Date(
-            item.transactionDate ??
-              item.createdAt,
-          )
-            .toISOString()
-            .slice(0, 10) === today,
-      ).length
-    const weekCount =
-      adjustments.filter(
-        (item: any) =>
-          new Date(
-            item.transactionDate ??
-              item.createdAt,
-          ) >= weekAgo,
-      ).length
-    const monthCount =
-      adjustments.filter(
-        (item: any) =>
-          new Date(
-            item.transactionDate ??
-              item.createdAt,
-          ) >= monthStart,
-      ).length
-
-    return {
-      totalDocs: base.length,
-      today: todayCount,
-      thisWeek: weekCount,
-      thisMonth: monthCount,
-    }
-  }, [
-    countSheet,
-    adjustments,
-    statusFilter,
-  ])
+  async function submitCount() {
+    const items = countSheet
+      .filter((x) => x.item && x.difference !== 0)
+      .map((x) => ({
+        inventoryItemId: x.inventoryItemId,
+        zoneId: x.zoneId || undefined,
+        quantity: x.difference,
+      }))
+    if (items.length === 0) return
+    await createTx.mutateAsync({
+      type: 'ADJUSTMENT',
+      transactionNo: sessionNo,
+      referenceType: methodFilter || 'Định kỳ',
+      items,
+    })
+    setCountRows([])
+    setSessionNo(`KK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`)
+  }
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader
-        title="Kiểm Kê Kho"
-        description="Count session and count sheet for physical reconciliation."
-      />
+      <SectionHeader title="Kiểm kê kho vật tư" description="Đối soát số lượng thực tế với hệ thống và ghi nhận chênh lệch." />
+      <EnterpriseTabBar tabs={inventoryTabs} />
 
-      <EnterpriseTabBar
-        tabs={inventoryTabs}
-      />
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <KpiCard
-          title="Total Documents"
-          value={sessionMetrics.totalDocs.toLocaleString()}
-        />
-        <KpiCard
-          title="Today"
-          value={sessionMetrics.today.toLocaleString()}
-        />
-        <KpiCard
-          title="This Week"
-          value={sessionMetrics.thisWeek.toLocaleString()}
-        />
-        <KpiCard
-          title="This Month"
-          value={sessionMetrics.thisMonth.toLocaleString()}
-        />
-      </div>
-
-      <RuntimePanel title="Filter Bar">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <input
-            type="date"
-            value={sessionDate}
-            onChange={(event) =>
-              setSessionDate(
-                event.target.value,
-              )
-            }
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-          />
-          <select
-            value={rows[0]?.materialId ?? ''}
-            onChange={(event) => {
-              const value =
-                event.target.value
-              setRows((prev) =>
-                prev.length === 0
-                  ? [
-                      {
-                        materialId:
-                          value,
-                        physicalQuantity:
-                          '',
-                        method:
-                          'CYCLE_COUNT',
-                      },
-                    ]
-                  : prev.map(
-                      (
-                        row,
-                        index,
-                      ) =>
-                        index === 0
-                          ? {
-                              ...row,
-                              materialId:
-                                value,
-                            }
-                          : row,
-                    ),
-              )
-            }}
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-          >
-            <option value="">
-              Material
-            </option>
-            {materials.map((item: any) => (
-              <option
-                key={item.id}
-                value={item.id}
-              >
-                {item.code} - {item.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value=""
-            disabled
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-500"
-          >
-            <option>
-              Zone (via count sheet)
-            </option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value,
-              )
-            }
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-          >
-            <option value="">
-              Status
-            </option>
-            <option value="WITH_DIFFERENCE">
-              WITH_DIFFERENCE
-            </option>
-          </select>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
+          <KpiCard title="Phiếu kiểm kê" value={metrics.total.toLocaleString('vi-VN')} />
+          <KpiCard title="Khớp" value={metrics.matched.toLocaleString('vi-VN')} />
+          <KpiCard title="Chênh lệch" value={metrics.mismatch.toLocaleString('vi-VN')} />
+          <KpiCard title="Độ chính xác" value={`${metrics.accuracy.toFixed(2)}%`} />
+          <KpiCard title="Giá trị chênh lệch" value={formatCurrency(metrics.varianceValue)} className="xl:col-span-2" />
         </div>
-      </RuntimePanel>
 
-      <RuntimePanel title="Quick Actions">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            'Start Session',
-            'Scan Materials',
-            'Recount List',
-            'Approve Adjustments',
-          ].map((label) => (
-            <button
-              key={label}
-              className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-left text-sm text-zinc-200 hover:border-cyan-600"
-            >
-              {label}
-            </button>
-          ))}
+        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/80 p-3">
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100" />
+            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+              <option value="">Kho</option>
+              {zones.map((z: any) => (
+                <option key={z.id} value={z.id}>
+                  {z.code}
+                </option>
+              ))}
+            </select>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+              <option value="">Trạng thái</option>
+              <option value="COMPLETED">Hoàn thành</option>
+              <option value="PENDING">Đang thực hiện</option>
+            </select>
+            <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+              <option value="">Phương pháp</option>
+              <option value="Định kỳ">Định kỳ</option>
+              <option value="Bất thường">Bất thường</option>
+              <option value="Kiểm kê theo khu vực">Kiểm kê theo khu vực</option>
+            </select>
+          </div>
         </div>
-      </RuntimePanel>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <RuntimePanel title="Count Session">
-          <div className="space-y-3">
-            <input
-              value={sessionNo}
-              onChange={(event) =>
-                setSessionNo(
-                  event.target.value,
-                )
-              }
-              placeholder="Session No"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-            />
-            <input
-              type="date"
-              value={sessionDate}
-              onChange={(event) =>
-                setSessionDate(
-                  event.target.value,
-                )
-              }
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-            />
-            <input
-              value={createdBy}
-              onChange={(event) =>
-                setCreatedBy(
-                  event.target.value,
-                )
-              }
-              placeholder="Created By"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-            />
-
-            <button
-              onClick={addRow}
-              className="w-full rounded-lg border border-cyan-700 px-3 py-2 text-cyan-300"
-            >
-              + Add Count Row
-            </button>
-
-            <button
-              onClick={
-                submitCountSession
-              }
-              disabled={
-                createMutation.isPending
-              }
-              className="w-full rounded-lg bg-cyan-500 px-3 py-2 font-medium text-black disabled:opacity-60"
-            >
-              {createMutation.isPending
-                ? 'Đang ghi nhận...'
-                : 'Ghi nhận kiểm kê'}
-            </button>
-          </div>
-        </RuntimePanel>
-
-        <RuntimePanel title="Count Sheet">
-          <div className="space-y-3">
-            {rows.length === 0 && (
-              <div className="text-sm text-zinc-500">
-                Add rows to start count sheet.
-              </div>
-            )}
-
-            {rows.map((row, index) => (
-              <div
-                key={index}
-                className="rounded-lg border border-zinc-800 p-3"
-              >
-                <div className="grid grid-cols-1 gap-2">
-                  <select
-                    value={row.materialId}
-                    onChange={(event) =>
-                      setRows((prev) =>
-                        prev.map(
-                          (
-                            currentRow,
-                            rowIndex,
-                          ) =>
-                            rowIndex ===
-                            index
-                              ? {
-                              ...currentRow,
-                              materialId:
-                                event
-                                  .target
-                                  .value,
-                                }
-                              : currentRow,
-                        ),
-                      )
-                    }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-                  >
-                    <option value="">
-                      Material
-                    </option>
-                    {materials.map(
-                      (item: any) => (
-                        <option
-                          key={item.id}
-                          value={item.id}
-                        >
-                          {item.code} -{' '}
-                          {item.name}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                  <input
-                    type="number"
-                    min="0"
-                    value={
-                      row.physicalQuantity
-                    }
-                    onChange={(event) =>
-                      setRows((prev) =>
-                        prev.map(
-                          (
-                            currentRow,
-                            rowIndex,
-                          ) =>
-                            rowIndex ===
-                            index
-                              ? {
-                                  ...currentRow,
-                                  physicalQuantity:
-                                    event
-                                      .target
-                                      .value,
-                                }
-                              : currentRow,
-                        ),
-                      )
-                    }
-                    placeholder="Physical Quantity"
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-                  />
-                  <select
-                    value={
-                      row.method ??
-                      'CYCLE_COUNT'
-                    }
-                    onChange={(event) =>
-                      setRows((prev) =>
-                        prev.map(
-                          (
-                            currentRow,
-                            rowIndex,
-                          ) =>
-                            rowIndex ===
-                            index
-                              ? {
-                                  ...currentRow,
-                                  method:
-                                    event
-                                      .target
-                                      .value,
-                                }
-                              : currentRow,
-                        ),
-                      )
-                    }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-                  >
-                    <option value="CYCLE_COUNT">
-                      Cycle Count
-                    </option>
-                    <option value="FULL_COUNT">
-                      Full Count
-                    </option>
-                    <option value="SPOT_CHECK">
-                      Spot Check
-                    </option>
-                  </select>
-                  <button
-                    onClick={() =>
-                      removeRow(index)
-                    }
-                    className="rounded-lg border border-red-700 px-3 py-1.5 text-xs text-red-300"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </RuntimePanel>
-
-        <RuntimePanel title="Right Insight Panel">
-          <div className="space-y-2 text-sm">
-            {countSheet.map(
-              (
-                sheet,
-                index,
-              ) => (
-                <div
-                  key={index}
-                  className="rounded-lg border border-zinc-800 p-3"
-                >
-                  <div className="text-white">
-                    {sheet.material
-                      ? `${sheet.material.code} - ${sheet.material.name}`
-                      : 'Material chưa chọn'}
-                  </div>
-                  <div className="text-zinc-400">
-                    System Quantity:{' '}
-                    {sheet.systemQuantity}
-                  </div>
-                  <div className="text-zinc-400">
-                    Physical Quantity:{' '}
-                    {
-                      sheet.physicalQuantity
-                    }
-                  </div>
-                  <div
-                    className={
-                      sheet.difference > 0
-                        ? 'text-emerald-400'
-                        : sheet.difference < 0
-                          ? 'text-red-400'
-                          : 'text-zinc-400'
-                    }
-                  >
-                    Difference:{' '}
-                    {sheet.difference}
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        </RuntimePanel>
-      </div>
-
-      <RuntimePanel title="Main Table — Count Sheet">
-        <div className="overflow-hidden rounded-2xl border border-zinc-800">
-          <table className="w-full">
-            <thead className="bg-zinc-950">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Material
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  System Quantity
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Physical Quantity
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Difference
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {countSheet.map(
-                (sheet, index) => (
-                  <tr
-                    key={index}
-                    className="border-t border-zinc-800"
-                  >
-                    <td className="px-4 py-3 text-white">
-                      {sheet.material
-                        ? `${sheet.material.code} - ${sheet.material.name}`
-                        : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {sheet.systemQuantity}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {sheet.physicalQuantity}
-                    </td>
-                    <td
-                      className={`px-4 py-3 ${
-                        sheet.difference > 0
-                          ? 'text-emerald-400'
-                          : sheet.difference < 0
-                            ? 'text-red-400'
-                            : 'text-zinc-400'
-                      }`}
-                    >
-                      {sheet.difference}
-                    </td>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-9 rounded-2xl border border-slate-800/70 bg-[#071323]/85">
+            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold text-white">Danh sách phiếu kiểm kê</div>
+            <div className="overflow-auto">
+              <table className="w-full min-w-[1100px] text-sm">
+                <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
+                  <tr>
+                    {['Mã kiểm kê', 'Kho', 'Phương pháp', 'Ngày', 'Người tạo', 'Trạng thái', 'Chênh lệch', 'Độ chính xác'].map((h) => (
+                      <th key={h} className="px-3 py-3 text-left font-medium">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ),
-              )}
-            </tbody>
-          </table>
-        </div>
-      </RuntimePanel>
+                </thead>
+                <tbody>
+                  {paged.map((x: any) => (
+                    <tr key={x.id} className="border-t border-slate-800/80 text-slate-200">
+                      <td className="px-3 py-2 text-cyan-300">{x.transactionNo}</td>
+                      <td className="px-3 py-2">{x.items?.[0]?.zone?.code ?? '-'}</td>
+                      <td className="px-3 py-2">{x.referenceType ?? 'Định kỳ'}</td>
+                      <td className="px-3 py-2">{new Date(x.transactionDate ?? x.createdAt).toLocaleDateString('vi-VN')}</td>
+                      <td className="px-3 py-2">{x.createdBy ?? 'Admin'}</td>
+                      <td className="px-3 py-2">{String(x.status ?? 'COMPLETED')}</td>
+                      <td className={`px-3 py-2 ${num(x.items?.[0]?.quantity) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{num(x.items?.[0]?.quantity).toLocaleString('vi-VN')}</td>
+                      <td className="px-3 py-2">{metrics.accuracy.toFixed(2)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs text-slate-400">
+              <div>
+                Hiển thị {rows.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, rows.length)} / {rows.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                  Trước
+                </button>
+                <span>
+                  {page}/{pageCount}
+                </span>
+                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                  Sau
+                </button>
+              </div>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <RuntimePanel title="Count Session Table" className="xl:col-span-2">
-          <div className="overflow-hidden rounded-2xl border border-zinc-800">
-            <table className="w-full">
-              <thead className="bg-zinc-950">
+          <div className="space-y-4 xl:col-span-3">
+            <InsightPanel title="Giá trị chênh lệch theo kho">
+              {discrepancyByZone.map(([z, q]) => (
+                <div key={z} className="mb-2 flex items-center justify-between text-sm text-slate-300">
+                  <span>{z}</span>
+                  <span>{q.toLocaleString('vi-VN')}</span>
+                </div>
+              ))}
+            </InsightPanel>
+            <InsightPanel title="Phương pháp kiểm kê">
+              {methodDist.map(([m, c]) => (
+                <div key={m} className="mb-2 flex items-center justify-between text-sm text-slate-300">
+                  <span>{m}</span>
+                  <span>{c}</span>
+                </div>
+              ))}
+            </InsightPanel>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm font-semibold text-white">Chi tiết chênh lệch kiểm kê</div>
+            <button
+              onClick={() => setCountRows((prev) => [...prev, { inventoryItemId: '', physicalQty: '', zoneId: '' }])}
+              className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200"
+            >
+              + Thêm dòng
+            </button>
+          </div>
+
+          <div className="overflow-auto">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                    Session
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                    Material Count
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                    Difference Qty
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                    Status
-                  </th>
+                  {['Vật tư', 'Kho', 'Tồn hệ thống', 'Tồn thực tế', 'Chênh lệch', 'Hành động'].map((h) => (
+                    <th key={h} className="px-3 py-2 text-left font-medium">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {adjustments.slice(0, 8).map((tx: any) => (
-                  <tr
-                    key={tx.id}
-                    className="border-t border-zinc-800"
-                  >
-                    <td className="px-4 py-3 text-cyan-300">
-                      {tx.transactionNo ??
-                        tx.code}
+                {countSheet.map((line, idx) => (
+                  <tr key={`${idx}-${line.inventoryItemId}`} className="border-t border-slate-800/80">
+                    <td className="px-3 py-2">
+                      <select value={line.inventoryItemId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, inventoryItemId: e.target.value } : r)))} className="h-9 w-full rounded border border-slate-700 bg-[#050d18] px-2 text-slate-100">
+                        <option value="">Chọn vật tư</option>
+                        {materials.map((m: any) => (
+                          <option key={m.id} value={m.id}>
+                            {m.code} - {m.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {new Date(
-                        tx.transactionDate ??
-                          tx.createdAt,
-                      ).toLocaleDateString()}
+                    <td className="px-3 py-2">
+                      <select value={line.zoneId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, zoneId: e.target.value } : r)))} className="h-9 w-full rounded border border-slate-700 bg-[#050d18] px-2 text-slate-100">
+                        <option value="">Chọn kho</option>
+                        {zones.map((z: any) => (
+                          <option key={z.id} value={z.id}>
+                            {z.code}
+                          </option>
+                        ))}
+                      </select>
                     </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {tx.items?.length ?? 0}
+                    <td className="px-3 py-2 text-slate-200">{line.systemQty.toLocaleString('vi-VN')}</td>
+                    <td className="px-3 py-2">
+                      <input value={line.physicalQty} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: e.target.value } : r)))} className="h-9 w-32 rounded border border-slate-700 bg-[#050d18] px-2 text-slate-100" />
                     </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {Number(
-                        tx.items?.[0]
-                          ?.quantity ?? 0,
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded border border-cyan-700/50 px-2 py-1 text-xs text-cyan-300">
-                        Counted
-                      </span>
+                    <td className={`px-3 py-2 ${line.difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{line.difference.toLocaleString('vi-VN')}</td>
+                    <td className="px-3 py-2">
+                      <button onClick={() => setCountRows((prev) => prev.filter((_r, i) => i !== idx))} className="rounded border border-red-700/60 px-2 py-1 text-xs text-red-300">
+                        Xóa
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </RuntimePanel>
 
-        <RuntimePanel title="Difference Analysis Panel">
-          <div className="space-y-3 text-sm">
-            <div className="rounded-lg border border-zinc-800 p-3">
-              <div className="text-zinc-400">
-                Positive Difference
-              </div>
-              <div className="text-lg font-semibold text-emerald-400">
-                {
-                  countSheet.filter(
-                    (row) =>
-                      row.difference > 0,
-                  ).length
-                }
-              </div>
-            </div>
-            <div className="rounded-lg border border-zinc-800 p-3">
-              <div className="text-zinc-400">
-                Negative Difference
-              </div>
-              <div className="text-lg font-semibold text-red-400">
-                {
-                  countSheet.filter(
-                    (row) =>
-                      row.difference < 0,
-                  ).length
-                }
-              </div>
-            </div>
-            <div className="rounded-lg border border-zinc-800 p-3">
-              <div className="text-zinc-400">
-                Net Difference
-              </div>
-              <div className="text-lg font-semibold text-cyan-300">
-                {countSheet.reduce(
-                  (sum, row) =>
-                    sum +
-                    row.difference,
-                  0,
-                )}
-              </div>
-            </div>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-xs text-slate-400">Phiếu: {sessionNo}</div>
+            <button onClick={submitCount} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+              Tạo phiếu kiểm kê
+            </button>
           </div>
-        </RuntimePanel>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <RuntimePanel title="Accuracy Metrics" className="xl:col-span-2">
-          <div className="space-y-3">
-            {countSheet.map(
-              (row, index) => {
-                const base =
-                  row.systemQuantity <=
-                  0
-                    ? 1
-                    : row.systemQuantity
-                const accuracy =
-                  Math.max(
-                    0,
-                    100 -
-                      (Math.abs(
-                        row.difference,
-                      ) /
-                        base) *
-                        100,
-                  )
-                return (
-                  <div
-                    key={index}
-                    className="space-y-1"
-                  >
-                    <div className="flex items-center justify-between text-xs text-zinc-400">
-                      <span>
-                        {row.material
-                          ? row.material.code
-                          : 'N/A'}
-                      </span>
-                      <span>
-                        {accuracy.toFixed(
-                          1,
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <div className="h-2 rounded bg-zinc-800">
-                      <div
-                        className="h-2 rounded bg-emerald-500"
-                        style={{
-                          width: `${Math.min(100, accuracy)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              },
-            )}
-          </div>
-        </RuntimePanel>
-
-        <RuntimePanel title="Method Distribution Charts">
-          <div className="space-y-3 text-sm">
-            {[
-              'CYCLE_COUNT',
-              'FULL_COUNT',
-              'SPOT_CHECK',
-            ].map((method) => {
-              const count =
-                rows.filter(
-                  (row) =>
-                    (row.method ??
-                      'CYCLE_COUNT') ===
-                    method,
-                ).length
-              return (
-                <div
-                  key={method}
-                  className="space-y-1"
-                >
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span>
-                      {method}
-                    </span>
-                    <span>{count}</span>
-                  </div>
-                  <div className="h-2 rounded bg-zinc-800">
-                    <div
-                      className="h-2 rounded bg-cyan-500"
-                      style={{
-                        width: `${Math.min(100, count * 20)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </RuntimePanel>
+        </div>
       </div>
     </EnterpriseModulePage>
+  )
+}
+
+function KpiCard({ title, value, className = '' }: { title: string; value: string; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-slate-800/80 bg-[#071323]/80 p-4 ${className}`}>
+      <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
+      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
+    </div>
+  )
+}
+function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+      <div className="mb-3 text-sm font-semibold text-white">{title}</div>
+      {children}
+    </div>
   )
 }

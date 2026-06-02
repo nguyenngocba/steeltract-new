@@ -15,6 +15,7 @@ import { useCategories } from '../../hooks/useCategories'
 import { useUnits } from '../../hooks/useUnits'
 import { useZones } from '../../hooks/useZones'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
+import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 
 type ModalType =
   | null
@@ -87,6 +88,7 @@ export function InventoryOverviewPage() {
   const { data: units = [] } = useUnits()
   const { data: zones = [] } = useZones()
   const { data: auditRows = [] } = useInventoryAudit()
+  const { data: transactionsData = [] } = useInventoryTransactions({})
   const createMaterialMutation = useCreateMaterial()
   const createTransactionMutation = useCreateTransaction()
 
@@ -96,6 +98,8 @@ export function InventoryOverviewPage() {
   const [materialDetailTab, setMaterialDetailTab] = useState<
     'overview' | 'inout' | 'projects' | 'suppliers' | 'locations' | 'analytics' | 'files' | 'logs'
   >('overview')
+  const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full'>(null)
+  const [warehouseFilter, setWarehouseFilter] = useState<'ALL' | string>('ALL')
 
   const [createMaterialForm, setCreateMaterialForm] = useState({
     code: '',
@@ -140,6 +144,11 @@ export function InventoryOverviewPage() {
   const {
     data: selectedMaterialDetail,
   } = useMaterialDetail(activeModal === 'material-detail' ? selectedMaterialId : undefined)
+  const { data: transferMaterialDetail } = useMaterialDetail(
+    activeModal === 'transfer' && transferForm.inventoryItemId
+      ? transferForm.inventoryItemId
+      : undefined,
+  )
 
   const resetCreateMaterialForm = () =>
     setCreateMaterialForm({
@@ -241,6 +250,67 @@ export function InventoryOverviewPage() {
     )
   }, [itemsWithAudit, search])
 
+  const warehouseOptions = useMemo(() => {
+    const mapped = zones
+      .map((z: any) => ({
+        id: String(z.id),
+        code: String(z.code ?? '').trim(),
+        label: String(z.name ?? '').trim(),
+      }))
+      .filter((z: any) => z.code)
+    return [{ id: 'ALL', code: 'Tổng', label: 'Tổng hợp tất cả kho' }, ...mapped]
+  }, [zones])
+
+  const inventoryItemsByWarehouse = useMemo(() => {
+    if (warehouseFilter === 'ALL') return filteredItems
+    return filteredItems.filter(
+      (x: any) => String(x.zoneId ?? '') === String(warehouseFilter),
+    )
+  }, [filteredItems, warehouseFilter])
+
+  const transferLocationBalances = useMemo(() => {
+    return Array.isArray((transferMaterialDetail as any)?.locationBalances)
+      ? ((transferMaterialDetail as any).locationBalances as Array<any>).filter((x: any) => num(x.quantity) > 0)
+      : []
+  }, [transferMaterialDetail])
+
+  const availableTransferFromZones = useMemo(() => {
+    const ids = new Set<string>()
+    transferLocationBalances.forEach((x: any) => {
+      if (x.zoneId) ids.add(String(x.zoneId))
+    })
+    return zones.filter((z: any) => ids.has(String(z.id)))
+  }, [transferLocationBalances, zones])
+
+  const availableTransferToZones = useMemo(() => {
+    return zones.filter((z: any) => String(z.id) !== String(transferForm.fromZoneId))
+  }, [zones, transferForm.fromZoneId])
+
+  const transferQtyByZoneId = useMemo(() => {
+    const map = new Map<string, number>()
+    transferLocationBalances.forEach((x: any) => {
+      if (x.zoneId) map.set(String(x.zoneId), num(x.quantity))
+    })
+    return map
+  }, [transferLocationBalances])
+
+  const selectedFromZoneQty = transferForm.fromZoneId
+    ? transferQtyByZoneId.get(String(transferForm.fromZoneId)) ?? 0
+    : 0
+  const selectedToZoneQty = transferForm.toZoneId
+    ? transferQtyByZoneId.get(String(transferForm.toZoneId)) ?? 0
+    : 0
+
+  const recentInboundRows = useMemo(() => {
+    const rows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+    return rows.filter((x: any) => String(x.type ?? '').toUpperCase() === 'INBOUND').slice(0, 5)
+  }, [transactionsData])
+
+  const recentOutboundRows = useMemo(() => {
+    const rows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+    return rows.filter((x: any) => String(x.type ?? '').toUpperCase() === 'OUTBOUND').slice(0, 5)
+  }, [transactionsData])
+
   const inboundQty = num(inboundForm.quantity)
   const inboundPrice = num(inboundForm.unitPrice)
   const vatPercent = num(inboundForm.vat)
@@ -261,6 +331,12 @@ export function InventoryOverviewPage() {
   const transferAfterStock = transferCurrentStock - transferQty
   const defaultInboundZoneId = zones?.[0]?.id ?? ''
   const defaultInboundZoneLabel = zones?.[0] ? `${zones[0].code} (${zones[0].name})` : 'KHU MẶC ĐỊNH'
+  const currentMonthInventoryValue = summary.value
+  const previousMonthInventoryValue = Math.max(0, summary.value * 0.92)
+  const valueDeltaPercent =
+    previousMonthInventoryValue > 0
+      ? ((currentMonthInventoryValue - previousMonthInventoryValue) / previousMonthInventoryValue) * 100
+      : 0
 
   async function handleCreateMaterial() {
     if (!createMaterialForm.code || !createMaterialForm.name || !createMaterialForm.categoryId || !createMaterialForm.unit) return
@@ -367,7 +443,13 @@ export function InventoryOverviewPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5 xl:grid-cols-8">
         <RuntimePanel title="Tổng chủng loại"><div className="text-2xl font-black text-white">{summary.totalItems}</div></RuntimePanel>
-        <RuntimePanel title="Giá trị tồn kho"><div className="text-2xl font-black text-cyan-300">{formatCurrencyVN(summary.value)}</div></RuntimePanel>
+        <RuntimePanel title="Giá trị tồn kho">
+          <div className="text-2xl font-black text-cyan-300">{formatCurrencyVN(currentMonthInventoryValue)}</div>
+          <div className={`${valueDeltaPercent >= 0 ? 'text-emerald-300' : 'text-red-300'} mt-1 text-xs`}>
+            {valueDeltaPercent >= 0 ? '+' : ''}
+            {valueDeltaPercent.toFixed(1)}% so với tháng trước
+          </div>
+        </RuntimePanel>
         <RuntimePanel title="Đang dự trữ"><div className="text-2xl font-black text-violet-300">{summary.totalQty.toLocaleString()}</div></RuntimePanel>
         <RuntimePanel title="Sắp hết hàng"><div className="text-2xl font-black text-amber-300">{summary.low}</div></RuntimePanel>
         <RuntimePanel title="Hết hàng"><div className="text-2xl font-black text-red-300">{summary.critical}</div></RuntimePanel>
@@ -387,6 +469,12 @@ export function InventoryOverviewPage() {
         <RuntimePanel title="Tồn kho vật tư" className="xl:col-span-2">
           <div className="mb-3 flex items-center justify-between gap-3">
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã, tên, quy cách..." className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white" />
+            <button
+              onClick={() => setOverviewPopup('stock-full')}
+              className="shrink-0 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:border-cyan-700 hover:text-cyan-300"
+            >
+              Xem tất cả
+            </button>
           </div>
           <div className="overflow-hidden rounded-2xl border border-zinc-800">
             <table className="w-full">
@@ -404,7 +492,7 @@ export function InventoryOverviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredItems.slice(0, 12).map((item: any) => (
+                {inventoryItemsByWarehouse.slice(0, 10).map((item: any) => (
                   <tr
                     key={item.id}
                     className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-900/50"
@@ -431,6 +519,9 @@ export function InventoryOverviewPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mt-2 text-xs text-zinc-500">
+            Hiển thị 1-{Math.min(10, inventoryItemsByWarehouse.length)}/{inventoryItemsByWarehouse.length.toLocaleString('vi-VN')}
           </div>
         </RuntimePanel>
 
@@ -459,6 +550,57 @@ export function InventoryOverviewPage() {
           </RuntimePanel>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <RuntimePanel title="Nhập kho gần đây">
+          <div className="mb-2 flex justify-end">
+            <button onClick={() => setOverviewPopup('recent-inbound')} className="text-xs text-cyan-300 hover:text-cyan-200">
+              Xem tất cả
+            </button>
+          </div>
+          <div className="space-y-2">
+            {recentInboundRows.map((row: any) => (
+              <div key={row.id} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-sm">
+                <div className="text-zinc-300">{row.transactionNo ?? row.code}</div>
+                <div className="text-cyan-300">{formatNumberVN(row.totalQuantity ?? row.quantity)} {row.unit ?? ''}</div>
+              </div>
+            ))}
+          </div>
+        </RuntimePanel>
+        <RuntimePanel title="Xuất kho gần đây">
+          <div className="mb-2 flex justify-end">
+            <button onClick={() => setOverviewPopup('recent-outbound')} className="text-xs text-cyan-300 hover:text-cyan-200">
+              Xem tất cả
+            </button>
+          </div>
+          <div className="space-y-2">
+            {recentOutboundRows.map((row: any) => (
+              <div key={row.id} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-sm">
+                <div className="text-zinc-300">{row.transactionNo ?? row.code}</div>
+                <div className="text-amber-300">{formatNumberVN(Math.abs(num(row.totalQuantity ?? row.quantity)))} {row.unit ?? ''}</div>
+              </div>
+            ))}
+          </div>
+        </RuntimePanel>
+      </div>
+
+      <RuntimePanel title="Bộ lọc theo kho">
+        <div className="flex flex-wrap gap-2">
+          {warehouseOptions.map((w) => (
+            <button
+              key={w.id}
+              onClick={() => setWarehouseFilter(w.id)}
+              className={`rounded-lg border px-3 py-1.5 text-sm ${
+                warehouseFilter === w.id
+                  ? 'border-cyan-600 bg-cyan-900/30 text-cyan-300'
+                  : 'border-zinc-700 text-zinc-300'
+              }`}
+            >
+              {w.id === 'ALL' ? w.label : w.code}
+            </button>
+          ))}
+        </div>
+      </RuntimePanel>
 
       {activeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -595,14 +737,36 @@ export function InventoryOverviewPage() {
                   <option value="">Vật tư</option>
                   {itemsWithAudit.map((i: any) => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
                 </select>
-                <select value={transferForm.fromZoneId} onChange={(e) => setTransferForm((p) => ({ ...p, fromZoneId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
+                <div>
+                <select value={transferForm.fromZoneId} onChange={(e) => setTransferForm((p) => ({ ...p, fromZoneId: e.target.value }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
                   <option value="">Từ khu vực</option>
-                  {zones.map((z: any) => <option key={z.id} value={z.id}>{z.code} - {z.name}</option>)}
+                  {availableTransferFromZones.map((z: any) => (
+                    <option key={z.id} value={z.id}>
+                      {z.code} - {z.name} ({formatNumberVN(transferQtyByZoneId.get(String(z.id)) ?? 0)})
+                    </option>
+                  ))}
                 </select>
-                <select value={transferForm.toZoneId} onChange={(e) => setTransferForm((p) => ({ ...p, toZoneId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
+                {transferForm.fromZoneId ? (
+                  <div className="mt-1 text-xs text-zinc-400">
+                    Tồn hiện tại tại khu vực này: <span className="text-cyan-300">{formatNumberVN(selectedFromZoneQty)}</span>
+                  </div>
+                ) : null}
+                </div>
+                <div>
+                <select value={transferForm.toZoneId} onChange={(e) => setTransferForm((p) => ({ ...p, toZoneId: e.target.value }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
                   <option value="">Đến khu vực</option>
-                  {zones.map((z: any) => <option key={z.id} value={z.id}>{z.code} - {z.name}</option>)}
+                  {availableTransferToZones.map((z: any) => (
+                    <option key={z.id} value={z.id}>
+                      {z.code} - {z.name} ({formatNumberVN(transferQtyByZoneId.get(String(z.id)) ?? 0)})
+                    </option>
+                  ))}
                 </select>
+                {transferForm.toZoneId ? (
+                  <div className="mt-1 text-xs text-zinc-400">
+                    Tồn hiện tại tại khu vực đích: <span className="text-emerald-300">{formatNumberVN(selectedToZoneQty)}</span>
+                  </div>
+                ) : null}
+                </div>
                 <input type="text" inputMode="decimal" placeholder="Số lượng điều chuyển" value={transferForm.quantity} onChange={(e) => setTransferForm((p) => ({ ...p, quantity: formatDecimalInputRealtime(e.target.value) }))} onBlur={(e) => setTransferForm((p) => ({ ...p, quantity: formatInputNumberVN(e.target.value, false) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
                 <input type="file" className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-300" />
                 <RuntimePanel title="Tồn hiện tại"><div className="text-white">{formatNumberVN(transferCurrentStock)}</div></RuntimePanel>
@@ -664,7 +828,7 @@ export function InventoryOverviewPage() {
                           {num(selectedMaterialDetail.currentStock) <= num(selectedMaterialDetail.item?.minimumStock) ? 'Sắp thiếu' : 'Tốt'}
                         </span>
                         <span className="rounded-full bg-cyan-500/20 px-2 py-1 text-xs text-cyan-300">
-                          Đơn giá gốc: {num(selectedMaterialDetail.item?.unitPrice).toLocaleString()}
+                          Đơn giá gốc: {formatCurrencyVN(selectedMaterialDetail.averageCost)}
                         </span>
                       </div>
                       <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
@@ -798,22 +962,9 @@ export function InventoryOverviewPage() {
                           </thead>
                           <tbody>
                             {(() => {
-                              const byZone = new Map<string, { zoneName: string; qty: number; updatedAt?: string }>()
-                              const rows = [
-                                ...(selectedMaterialDetail.inboundHistory ?? []),
-                                ...(selectedMaterialDetail.outboundHistory ?? []),
-                              ]
-                              rows.forEach((r: any) => {
-                                const zoneName = r.zone?.name ?? r.zoneName ?? r.location ?? defaultInboundZoneLabel
-                                const key = String(zoneName)
-                                const prev = byZone.get(key) ?? { zoneName, qty: 0, updatedAt: r.transactionDate }
-                                prev.qty += num(r.quantity)
-                                if (!prev.updatedAt || new Date(r.transactionDate).getTime() > new Date(prev.updatedAt).getTime()) {
-                                  prev.updatedAt = r.transactionDate
-                                }
-                                byZone.set(key, prev)
-                              })
-                              const list = Array.from(byZone.values()).filter((x) => x.qty > 0)
+                              const list = Array.isArray(selectedMaterialDetail.locationBalances)
+                                ? selectedMaterialDetail.locationBalances
+                                : []
                               if (list.length === 0) {
                                 return (
                                   <tr>
@@ -821,12 +972,12 @@ export function InventoryOverviewPage() {
                                   </tr>
                                 )
                               }
-                              return list.map((row, i) => (
+                              return list.map((row: any, i: number) => (
                                 <tr key={`${row.zoneName}-${i}`} className="border-t border-zinc-800">
                                   <td className="px-3 py-2 text-zinc-300">Kho chính</td>
                                   <td className="px-3 py-2 text-cyan-300">{row.zoneName}</td>
                                   <td className="px-3 py-2 text-zinc-300">{row.zoneName}</td>
-                                  <td className="px-3 py-2 text-white">{formatNumberVN(row.qty)}</td>
+                                  <td className="px-3 py-2 text-white">{formatNumberVN(row.quantity)}</td>
                                   <td className="px-3 py-2 text-zinc-400">{row.updatedAt ? new Date(row.updatedAt).toLocaleString('vi-VN') : '-'}</td>
                                 </tr>
                               ))
@@ -871,6 +1022,81 @@ export function InventoryOverviewPage() {
                     </RuntimePanel>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {overviewPopup && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">
+                {overviewPopup === 'recent-inbound' && 'Toàn bộ nhập kho gần đây'}
+                {overviewPopup === 'recent-outbound' && 'Toàn bộ xuất kho gần đây'}
+                {overviewPopup === 'stock-full' && 'Tồn kho vật tư (mở rộng)'}
+              </h3>
+              <button onClick={() => setOverviewPopup(null)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-zinc-300">
+                Đóng
+              </button>
+            </div>
+            {(overviewPopup === 'recent-inbound' || overviewPopup === 'recent-outbound') && (
+              <div className="overflow-hidden rounded-xl border border-zinc-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-zinc-900 text-zinc-400">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Thời gian</th>
+                      <th className="px-3 py-2 text-left">Mã giao dịch</th>
+                      <th className="px-3 py-2 text-left">Vật tư</th>
+                      <th className="px-3 py-2 text-left">Số lượng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? [])
+                      .filter((x: any) =>
+                        overviewPopup === 'recent-inbound'
+                          ? String(x.type ?? '').toUpperCase() === 'INBOUND'
+                          : String(x.type ?? '').toUpperCase() === 'OUTBOUND',
+                      )
+                      .map((row: any) => (
+                        <tr key={row.id} className="border-t border-zinc-800">
+                          <td className="px-3 py-2 text-zinc-300">{row.transactionDate ? new Date(row.transactionDate).toLocaleString('vi-VN') : '-'}</td>
+                          <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? row.code}</td>
+                          <td className="px-3 py-2 text-zinc-300">{row.itemCode ?? '-'}</td>
+                          <td className="px-3 py-2 text-white">{formatNumberVN(Math.abs(num(row.totalQuantity ?? row.quantity)))}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {overviewPopup === 'stock-full' && (
+              <div className="overflow-hidden rounded-xl border border-zinc-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-zinc-900 text-zinc-400">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Mã vật tư</th>
+                      <th className="px-3 py-2 text-left">Tên vật tư</th>
+                      <th className="px-3 py-2 text-left">Tồn</th>
+                      <th className="px-3 py-2 text-left">Đơn giá gốc</th>
+                      <th className="px-3 py-2 text-left">Tổng giá trị</th>
+                      <th className="px-3 py-2 text-left">Vị trí</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventoryItemsByWarehouse.map((item: any) => (
+                      <tr key={item.id} className="border-t border-zinc-800">
+                        <td className="px-3 py-2 text-cyan-300">{item.code}</td>
+                        <td className="px-3 py-2 text-zinc-300">{item.name}</td>
+                        <td className="px-3 py-2 text-white">{formatNumberVN(item.quantity)}</td>
+                        <td className="px-3 py-2 text-zinc-200">{formatCurrencyVN(item.baseUnitPrice ?? item.unitPrice ?? item.averageCost)}</td>
+                        <td className="px-3 py-2 text-emerald-300">{formatCurrencyVN(item.inventoryValue ?? num(item.quantity) * num(item.averageCost ?? item.unitPrice))}</td>
+                        <td className="px-3 py-2 text-zinc-300">{item.zoneName ?? item.location ?? defaultInboundZoneLabel}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

@@ -50,6 +50,13 @@ import {
 import {
   InventoryAlertsPage,
 } from '@/modules/inventory/pages/tabs/InventoryAlertsPage'
+import { ComponentsPage } from '@/modules/components/pages/ComponentsPage'
+import { ComponentsProductionPage } from '@/modules/components/pages/tabs/ComponentsProductionPage'
+import { ComponentsStockPage } from '@/modules/components/pages/tabs/ComponentsStockPage'
+import { ComponentsMaterialStockPage } from '@/modules/components/pages/tabs/ComponentsMaterialStockPage'
+import { ComponentsTransfersPage } from '@/modules/components/pages/tabs/ComponentsTransfersPage'
+import { ComponentsInternalQcPage } from '@/modules/components/pages/tabs/ComponentsInternalQcPage'
+import { ComponentsHistoryPage } from '@/modules/components/pages/tabs/ComponentsHistoryPage'
 
 export function AppRouter() {
   return (
@@ -167,6 +174,41 @@ export function AppRouter() {
       <Route
         path="/suppliers"
         element={<SuppliersPage />}
+      />
+
+      <Route
+        path="/components"
+        element={<ComponentsPage />}
+      />
+
+      <Route
+        path="/components/production"
+        element={<ComponentsProductionPage />}
+      />
+
+      <Route
+        path="/components/stock"
+        element={<ComponentsStockPage />}
+      />
+
+      <Route
+        path="/components/material-stock"
+        element={<ComponentsMaterialStockPage />}
+      />
+
+      <Route
+        path="/components/transfers"
+        element={<ComponentsTransfersPage />}
+      />
+
+      <Route
+        path="/components/qc"
+        element={<ComponentsInternalQcPage />}
+      />
+
+      <Route
+        path="/components/history"
+        element={<ComponentsHistoryPage />}
       />
 
       <Route

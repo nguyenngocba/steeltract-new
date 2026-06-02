@@ -10,7 +10,7 @@ export function AppSidebar() {
       className="
         flex
         h-screen
-        w-[320px]
+        w-[280px]
         flex-col
         border-r
         border-zinc-800
@@ -21,20 +21,20 @@ export function AppSidebar() {
         className="
           border-b
           border-zinc-800
-          px-6
-          py-6
+          px-5
+          py-4
         "
       >
-        <div className="text-xs uppercase tracking-[0.4em] text-cyan-400">
+        <div className="text-[11px] uppercase tracking-[0.32em] text-cyan-400">
           SteelTrack
         </div>
 
-        <div className="mt-3 text-3xl font-black text-white">
-          Industrial Runtime
+        <div className="mt-2 text-2xl font-black text-white">
+          ERP Platform
         </div>
 
-        <div className="mt-2 text-sm text-zinc-500">
-          MES / WMS Operational Cockpit
+        <div className="mt-1 text-xs text-zinc-500">
+          Smart Factory Operations
         </div>
       </div>
 
@@ -43,7 +43,7 @@ export function AppSidebar() {
           flex-1
           space-y-8
           overflow-y-auto
-          p-4
+          p-3
         "
       >
         {navigation.map((group) => (
@@ -60,7 +60,7 @@ export function AppSidebar() {
         className="
           border-t
           border-zinc-800
-          p-4
+          p-3
         "
       >
         <div

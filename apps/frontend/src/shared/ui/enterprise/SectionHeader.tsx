@@ -12,19 +12,15 @@ export function SectionHeader({
 
   return (
 
-    <div className="mb-8">
+    <div className="mb-5">
 
-      <div className="text-xs uppercase tracking-[0.35em] text-cyan-400">
-        STEELTRACK ENTERPRISE
-      </div>
-
-      <h1 className="mt-3 text-5xl font-black tracking-tight text-white">
+      <h1 className="mt-1 text-4xl font-black tracking-tight text-white">
         {title}
       </h1>
 
       {description && (
 
-        <div className="mt-4 max-w-3xl text-sm leading-7 text-zinc-500">
+        <div className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
 
           {description}
 
