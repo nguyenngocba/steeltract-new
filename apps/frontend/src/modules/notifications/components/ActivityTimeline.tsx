@@ -1,27 +1,45 @@
-const activities = [
-  {
-    title: 'Xuất kho vật tư',
-    description: 'Beam H400 → Xưởng',
-    time: '08:20',
-  },
-  {
-    title: 'Di chuyển cấu kiện',
-    description: 'Zone A2 → Zone D1',
-    time: '08:12',
-  },
-  {
-    title: 'QC hoàn thành',
-    description: 'CK-220 đạt chuẩn',
-    time: '08:05',
-  },
-  {
-    title: 'Robot hàn active',
-    description: 'Machine MC-03 online',
-    time: '07:58',
-  },
-]
+import { useInventoryTransactions } from '@/modules/inventory/hooks/useInventoryTransactions'
+
+type TransactionRow = {
+  id: string
+  direction?: string
+  type: string
+  transactionDate?: string
+  createdAt?: string
+  items?: Array<{
+    quantity?: number
+    inventoryItem?: {
+      code: string
+      name: string
+    }
+  }>
+}
+
+function toRows(value: TransactionRow[] | { data?: TransactionRow[] }) {
+  return Array.isArray(value) ? value : value.data ?? []
+}
 
 export function ActivityTimeline() {
+  const { data } =
+    useInventoryTransactions({})
+  const activities =
+    toRows(data ?? [])
+      .slice(0, 8)
+      .map((row) => {
+        const item =
+          row.items?.[0]?.inventoryItem
+
+        return {
+          id: row.id,
+          title:
+            row.direction ?? row.type,
+          description:
+            `${item?.code ?? 'Inventory'} ${item?.name ?? ''}`.trim(),
+          time:
+            new Date(row.transactionDate ?? row.createdAt ?? Date.now()).toLocaleTimeString(),
+        }
+      })
+
   return (
     <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-6">
 
@@ -55,7 +73,7 @@ export function ActivityTimeline() {
 
         {activities.map((activity, index) => (
           <div
-            key={index}
+            key={activity.id}
             className="flex gap-4"
           >
 

@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from 'react'
+
 import { navigation }
   from './navigation.config'
 
@@ -5,6 +7,16 @@ import { SidebarGroup }
   from './SidebarGroup'
 
 export function AppSidebar() {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+
+    const saved = Number(window.sessionStorage.getItem('steeltrack-app-sidebar-scroll') ?? 0)
+    if (Number.isFinite(saved)) element.scrollTop = saved
+  }, [])
+
   return (
     <aside
       className="
@@ -18,6 +30,10 @@ export function AppSidebar() {
       "
     >
       <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          window.sessionStorage.setItem('steeltrack-app-sidebar-scroll', String(event.currentTarget.scrollTop))
+        }}
         className="
           border-b
           border-zinc-800

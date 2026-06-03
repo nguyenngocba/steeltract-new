@@ -1,34 +1,36 @@
-const alerts = [
-  {
-    severity: 'CRITICAL',
-    message: 'Low stock detected in Warehouse A',
-  },
+import { useQuery } from '@tanstack/react-query'
 
-  {
-    severity: 'HIGH',
-    message: 'Supplier delivery delayed',
-  },
+import { api } from '@/lib/api'
 
-  {
-    severity: 'MEDIUM',
-    message: 'QC anomaly pattern detected',
-  },
+type AnalyticsAlert = {
+  id: string
+  severity: 'INFO' | 'WARNING' | 'CRITICAL'
+  message: string
+}
 
-  {
-    severity: 'LOW',
-    message: 'Machine utilization dropping',
-  },
-]
+async function getAlerts() {
+  const response =
+    await api.get<{ data: AnalyticsAlert[] }>(
+      '/analytics-engine/alerts',
+      {
+        params: {
+          limit: 8,
+        },
+      },
+    )
+
+  return response.data.data
+}
 
 function getColor(level: string) {
   switch (level) {
     case 'CRITICAL':
       return 'bg-red-500'
 
-    case 'HIGH':
+    case 'WARNING':
       return 'bg-orange-500'
 
-    case 'MEDIUM':
+    case 'INFO':
       return 'bg-cyan-500'
 
     default:
@@ -37,6 +39,13 @@ function getColor(level: string) {
 }
 
 export function GlobalAlertPanel() {
+  const { data: alerts = [] } =
+    useQuery({
+      queryKey: ['command-center', 'alerts'],
+      queryFn: getAlerts,
+      refetchInterval: 5000,
+    })
+
   return (
     <div
       className="
@@ -58,9 +67,9 @@ export function GlobalAlertPanel() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {alerts.map((alert, index) => (
+        {alerts.map((alert) => (
           <div
-            key={index}
+            key={alert.id}
             className="
               rounded-xl
               border

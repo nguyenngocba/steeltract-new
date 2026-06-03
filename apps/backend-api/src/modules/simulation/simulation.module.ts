@@ -8,7 +8,7 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { ProductionModule } from '../production/production.module';
 import { QcModule } from '../qc/qc.module';
 import { YardModule } from '../yard/yard.module';
-import { DemoDataSeeder } from './demo-data.seeder';
+import { OperationalSampleDataSeeder } from './operational-sample-data.seeder';
 import { SimulationController } from './simulation.controller';
 import { SimulationScenarioRunner } from './simulation-scenario-runner.service';
 import { SimulationScheduler } from './simulation.scheduler';
@@ -27,7 +27,7 @@ import { SimulationService } from './simulation.service';
   ],
   controllers: [SimulationController],
   providers: [
-    DemoDataSeeder,
+    OperationalSampleDataSeeder,
     SimulationScenarioRunner,
     SimulationScheduler,
     SimulationService,

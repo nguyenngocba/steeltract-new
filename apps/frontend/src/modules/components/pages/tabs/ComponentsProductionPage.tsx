@@ -23,6 +23,7 @@ export function ComponentsProductionPage() {
   const { data: productionOrders = [], isLoading } = useProductionOrders()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
 
   const rows = useMemo(() => {
     return productionOrders.filter((order) => {
@@ -78,7 +79,7 @@ export function ComponentsProductionPage() {
                     {isLoading ? (
                       <tr><td colSpan={10} className="px-2 py-6 text-center text-slate-400">Đang tải lệnh sản xuất...</td></tr>
                     ) : rows.map((row) => (
-                      <tr key={row.id} className="border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
+                      <tr key={row.id} onClick={() => setSelectedOrder(row)} className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
                         <td className="px-2 py-2 text-cyan-300">{row.orderNo}</td>
                         <td className="px-2 py-2">{row.title}</td>
                         <td className="px-2 py-2">{row.metadata?.workshop ?? '-'}</td>
@@ -120,6 +121,40 @@ export function ComponentsProductionPage() {
           </div>
         </div>
       </div>
+
+      {selectedOrder ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-4xl rounded-xl border border-slate-700 bg-[#071323] p-5">
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.16em] text-cyan-400">Lệnh sản xuất cấu kiện</div>
+                <h3 className="mt-1 text-xl font-semibold text-white">{selectedOrder.orderNo} · {selectedOrder.title}</h3>
+                <p className="mt-1 text-sm text-slate-400">Trạng thái: {statusLabel[selectedOrder.status] ?? selectedOrder.status}</p>
+              </div>
+              <button onClick={() => setSelectedOrder(null)} className="rounded border border-slate-700 px-3 py-1 text-sm text-slate-300">Đóng</button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <ComponentsKpiCard title="Số lượng" value={selectedOrder.quantity?.toLocaleString('vi-VN') ?? '0'} />
+              <ComponentsKpiCard title="Công đoạn hiện tại" value={selectedOrder.currentStageCode ?? 'Hoàn tất'} />
+              <ComponentsKpiCard title="Bắt đầu" value={date(selectedOrder.plannedStartAt)} />
+              <ComponentsKpiCard title="Dự kiến HT" value={date(selectedOrder.plannedEndAt)} />
+            </div>
+            <div className="mt-4 rounded border border-slate-800 bg-[#050d18] p-4">
+              <div className="mb-3 text-sm font-semibold text-white">Tiến độ công đoạn</div>
+              <div className="grid gap-2 md:grid-cols-4">
+                {(selectedOrder.stages ?? []).map((stage: any) => (
+                  <div key={stage.id} className="rounded border border-slate-800 p-3">
+                    <div className="text-xs text-slate-500">Bước {stage.sequence}</div>
+                    <div className="mt-1 text-sm text-slate-100">{stage.name}</div>
+                    <div className="mt-2 text-xs text-cyan-300">{stage.status}</div>
+                  </div>
+                ))}
+                {!(selectedOrder.stages ?? []).length ? <p className="text-sm text-slate-400">Lệnh chưa có dữ liệu stage chi tiết.</p> : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </EnterpriseModulePage>
   )
 }

@@ -7,6 +7,7 @@ import {
 import {
   createComponent,
   createProductionOrder,
+  deleteComponent,
   getComponents,
   getProductionOrders,
 } from '../../services/api/components.api'
@@ -27,6 +28,22 @@ export function useCreateComponent() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['components'],
+      })
+    },
+  })
+}
+
+export function useDeleteComponent() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteComponent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['components'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['production', 'components'],
       })
     },
   })

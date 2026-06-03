@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -91,6 +92,14 @@ export class YardController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.yardService.updateZone(id, body, request.user?.id);
+  }
+
+  @Delete('zones/:id')
+  deleteZone(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.yardService.deleteZone(id, request.user?.id);
   }
 
   @Post('zones/:zoneId/rows')

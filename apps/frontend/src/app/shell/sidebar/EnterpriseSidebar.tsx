@@ -12,6 +12,9 @@ import {
 
 import {
 
+  useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 
 } from 'react'
@@ -23,15 +26,36 @@ import {
 } from '../../config/navigation.config'
 
 export function EnterpriseSidebar() {
+  const navRef = useRef<HTMLDivElement>(null)
 
   const [opened, setOpened] = useState<
     Record<string, boolean>
-  >({
+  >(() => {
+    try {
+      const saved = window.localStorage.getItem('steeltrack-sidebar-opened')
+      if (saved) return JSON.parse(saved)
+    } catch {
+      // Ignore unavailable storage and use defaults.
+    }
 
-    'TỔNG QUAN': true,
-    'VẬT TƯ KHO': true,
-    'CẤU KIỆN': true,
+    return {
+      'TỔNG QUAN': true,
+      'VẬT TƯ KHO': true,
+      'CẤU KIỆN': true,
+    }
   })
+
+  useEffect(() => {
+    window.localStorage.setItem('steeltrack-sidebar-opened', JSON.stringify(opened))
+  }, [opened])
+
+  useLayoutEffect(() => {
+    const element = navRef.current
+    if (!element) return
+
+    const saved = Number(window.sessionStorage.getItem('steeltrack-sidebar-scroll') ?? 0)
+    if (Number.isFinite(saved)) element.scrollTop = saved
+  }, [])
 
   return (
 
@@ -57,7 +81,13 @@ export function EnterpriseSidebar() {
 
       {/* NAVIGATION */}
 
-      <div className="flex-1 overflow-auto px-4 py-5">
+      <div
+        ref={navRef}
+        onScroll={(event) => {
+          window.sessionStorage.setItem('steeltrack-sidebar-scroll', String(event.currentTarget.scrollTop))
+        }}
+        className="flex-1 overflow-auto px-4 py-5"
+      >
 
         <div className="space-y-4">
 
@@ -130,6 +160,18 @@ export function EnterpriseSidebar() {
                         key={item.path}
 
                         to={item.path}
+                        onMouseDown={(event) => {
+                          event.currentTarget.blur()
+                        }}
+                        onFocus={(event) => {
+                          event.currentTarget.blur()
+                        }}
+                        onClick={() => {
+                          const element = navRef.current
+                          if (element) {
+                            window.sessionStorage.setItem('steeltrack-sidebar-scroll', String(element.scrollTop))
+                          }
+                        }}
 
                         className={({ isActive }) => `block rounded-xl px-4 py-3 text-sm transition ${
                           isActive

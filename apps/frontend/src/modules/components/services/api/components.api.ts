@@ -23,6 +23,10 @@ export async function createComponent(payload: CreateComponentPayload) {
   return response.data
 }
 
+export async function deleteComponent(id: string) {
+  await api.delete(`/components/${id}`)
+}
+
 export async function getProductionOrders() {
   const response = await api.get<
     ProductionOrderRecord[] | { data: ProductionOrderRecord[] }

@@ -7,11 +7,55 @@ import {
   CartesianGrid,
 } from 'recharts'
 
-import {
-  inventoryTrend,
-} from '../mock-data/analytics.data'
+import { useInventoryTransactions } from '@/modules/inventory/hooks/useInventoryTransactions'
+
+type TransactionRow = {
+  transactionDate?: string
+  createdAt?: string
+  items?: Array<{
+    quantity?: number
+  }>
+}
+
+function monthLabel(value?: string) {
+  if (!value) return 'Unknown'
+
+  return new Date(value).toLocaleString('en-US', {
+    month: 'short',
+  })
+}
+
+function toRows(value: TransactionRow[] | { data?: TransactionRow[] }) {
+  return Array.isArray(value) ? value : value.data ?? []
+}
 
 export function InventoryTrendChart() {
+  const { data } =
+    useInventoryTransactions({})
+  const rows =
+    toRows(data ?? [])
+  const inventoryTrend =
+    Object.entries(
+      rows.reduce<Record<string, number>>((acc, row) => {
+        const label =
+          monthLabel(row.transactionDate ?? row.createdAt)
+        const total =
+          row.items?.reduce(
+            (sum, item) =>
+              sum + Math.abs(Number(item.quantity ?? 0)),
+            0,
+          ) ?? 0
+
+        acc[label] =
+          (acc[label] ?? 0) + total
+
+        return acc
+      }, {}),
+    ).map(([month, value]) => ({
+      month,
+      value,
+    }))
+
   return (
     <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5">
 

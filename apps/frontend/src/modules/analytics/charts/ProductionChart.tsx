@@ -7,11 +7,26 @@ import {
   CartesianGrid,
 } from 'recharts'
 
-import {
-  productionTrend,
-} from '../mock-data/analytics.data'
+import { useProductionOrders } from '@/modules/production/hooks/useProductionCockpit'
 
 export function ProductionChart() {
+  const { data: orders = [] } =
+    useProductionOrders()
+  const productionTrend =
+    Object.entries(
+      orders.reduce<Record<string, number>>((acc, order) => {
+        const label =
+          order.status
+        acc[label] =
+          (acc[label] ?? 0) + 1
+
+        return acc
+      }, {}),
+    ).map(([month, value]) => ({
+      month,
+      value,
+    }))
+
   return (
     <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5">
 

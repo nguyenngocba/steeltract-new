@@ -43,6 +43,7 @@ export type ProductionBom = {
   projectId?: string
   unit?: string
   estimatedWeight: number
+  version: string
   status: string
   createdAt: string
   items: Array<{
@@ -54,6 +55,31 @@ export type ProductionBom = {
   }>
   routingSteps: Array<{
     id: string
+    stepNo: number
+    stepName: string
+    workshop?: string
+    expectedHours: number
+    qcRequired: boolean
+  }>
+}
+
+export type ProductionBomInput = {
+  bomNo?: string
+  productCode: string
+  productName: string
+  structureType?: string
+  projectId?: string
+  unit?: string
+  estimatedWeight: number
+  version: string
+  status: string
+  items: Array<{
+    materialId: string
+    quantity: number
+    wastePercent: number
+    category: 'MAIN_MATERIAL' | 'SECONDARY_MATERIAL' | 'CONSUMABLE'
+  }>
+  routingSteps: Array<{
     stepNo: number
     stepName: string
     workshop?: string
@@ -86,6 +112,19 @@ export type ProductionLog = {
   stage?: { name: string }
 }
 
+export type ProductionMachine = {
+  id: string
+  code: string
+  name: string
+  status: string
+  utilization: number
+  workCenter?: {
+    id: string
+    code: string
+    name: string
+  }
+}
+
 export type MaterialRequirement = {
   materialId: string
   materialCode: string
@@ -101,12 +140,19 @@ export const productionApi = {
   orders: () => api.get<ProductionOrder[]>('/production').then((res) => res.data),
   order: (id: string) => api.get<ProductionOrder>(`/production/${id}`).then((res) => res.data),
   boms: () => api.get<ProductionBom[]>('/production/boms').then((res) => res.data),
+  createBom: (payload: ProductionBomInput) =>
+    api.post<ProductionBom>('/production/boms', payload).then((res) => res.data),
+  cloneBom: (id: string) =>
+    api.post<ProductionBom>(`/production/boms/${id}/clone`, {}).then((res) => res.data),
+  archiveBom: (id: string) =>
+    api.post<ProductionBom>(`/production/boms/${id}/archive`, {}).then((res) => res.data),
   components: () => api.get<ProductionComponent[] | { data: ProductionComponent[] }>('/components')
     .then((res) => Array.isArray(res.data) ? res.data : res.data.data),
   yardSlots: () => api.get<YardSlot[] | { data: YardSlot[] }>('/yard/slots')
     .then((res) => Array.isArray(res.data) ? res.data : res.data.data),
   issues: () => api.get<ProductionMaterialIssue[]>('/production/material-issues').then((res) => res.data),
   logs: () => api.get<ProductionLog[]>('/production/logs').then((res) => res.data),
+  machines: () => api.get<ProductionMachine[]>('/production/machines').then((res) => res.data),
   requirements: (id: string) =>
     api.get<MaterialRequirement[]>(`/production/${id}/requirements`).then((res) => res.data),
   createOrder: (payload: Record<string, unknown>) =>

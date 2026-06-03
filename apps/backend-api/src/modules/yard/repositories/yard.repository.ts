@@ -33,6 +33,12 @@ export class YardRepository {
     });
   }
 
+  deleteZone(id: string, tx: YardTx = this.prisma) {
+    return tx.yardZone.delete({
+      where: { id },
+    });
+  }
+
   findZoneById(id: string, tx: YardTx = this.prisma) {
     return tx.yardZone.findUnique({
       where: { id },

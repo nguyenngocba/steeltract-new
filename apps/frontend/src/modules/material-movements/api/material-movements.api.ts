@@ -1,10 +1,4 @@
-import axios from 'axios'
-
-const api =
-  axios.create({
-    baseURL:
-      'http://172.168.53.116:3000',
-  })
+import { api } from '@/lib/api'
 
 export async function getMaterialMovements() {
   const response =

@@ -1,34 +1,12 @@
-const machines = [
-  {
-    id: 'MC-01',
-    status: 'RUNNING',
-    utilization: 92,
-  },
-
-  {
-    id: 'MC-02',
-    status: 'IDLE',
-    utilization: 24,
-  },
-
-  {
-    id: 'MC-03',
-    status: 'MAINTENANCE',
-    utilization: 0,
-  },
-
-  {
-    id: 'MC-04',
-    status: 'RUNNING',
-    utilization: 74,
-  },
-]
+import { useProductionMachines } from '../hooks/useProductionCockpit'
 
 function getColor(status: string) {
   switch (status) {
+    case 'AVAILABLE':
     case 'RUNNING':
       return 'bg-emerald-500'
 
+    case 'OFFLINE':
     case 'IDLE':
       return 'bg-orange-500'
 
@@ -38,6 +16,9 @@ function getColor(status: string) {
 }
 
 export function WorkCenterRuntime() {
+  const { data: machines = [] } =
+    useProductionMachines()
+
   return (
     <div
       className="
@@ -73,11 +54,11 @@ export function WorkCenterRuntime() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-lg font-bold text-white">
-                  {machine.id}
+                  {machine.code}
                 </div>
 
                 <div className="mt-1 text-xs text-zinc-500">
-                  Utilization Runtime
+                  {machine.workCenter?.name ?? machine.name}
                 </div>
               </div>
 

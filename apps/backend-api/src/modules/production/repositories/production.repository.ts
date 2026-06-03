@@ -40,6 +40,25 @@ export class ProductionRepository {
     });
   }
 
+  findBomById(id: string, tx: ProductionTx = this.prisma) {
+    return tx.bOM.findUnique({
+      where: { id },
+      include: {
+        routingSteps: {
+          orderBy: {
+            stepNo: 'asc',
+          },
+        },
+      },
+    });
+  }
+
+  findComponentById(id: string, tx: ProductionTx = this.prisma) {
+    return tx.component.findUnique({
+      where: { id },
+    });
+  }
+
   findOrders(params: {
     search?: string;
     status?: Prisma.EnumProductionOrderStatusFilter['equals'];

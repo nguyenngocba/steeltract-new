@@ -17,14 +17,7 @@ type InventoryState = {
 
 export const useInventoryStore =
   create<InventoryState>((set) => ({
-    transactions: [
-      {
-        id: '1',
-        type: 'INBOUND',
-        material: 'Steel Beam H400',
-        timestamp: 'Realtime',
-      },
-    ],
+    transactions: [],
 
     addTransaction: (transaction) =>
       set((state) => ({

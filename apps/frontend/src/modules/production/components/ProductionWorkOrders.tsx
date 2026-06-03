@@ -1,24 +1,26 @@
-const orders = [
-  {
-    id: 'WO-2026-001',
-    component: 'Steel Column C1',
-    progress: 82,
-  },
+import { useProductionOrders } from '../hooks/useProductionCockpit'
 
-  {
-    id: 'WO-2026-002',
-    component: 'Beam H400',
-    progress: 46,
-  },
-
-  {
-    id: 'WO-2026-003',
-    component: 'Plate Assembly',
-    progress: 12,
-  },
-]
+function orderProgress(status: string) {
+  switch (status) {
+    case 'COMPLETED':
+      return 100
+    case 'IN_PROGRESS':
+      return 55
+    case 'DELAYED':
+      return 35
+    case 'PLANNED':
+      return 10
+    default:
+      return 0
+  }
+}
 
 export function ProductionWorkOrders() {
+  const { data: orders = [] } =
+    useProductionOrders()
+  const visibleOrders =
+    orders.slice(0, 6)
+
   return (
     <div
       className="
@@ -40,7 +42,7 @@ export function ProductionWorkOrders() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {orders.map((order) => (
+        {visibleOrders.map((order) => (
           <div
             key={order.id}
             className="
@@ -54,23 +56,23 @@ export function ProductionWorkOrders() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-bold text-white">
-                  {order.id}
+                  {order.orderNo}
                 </div>
 
                 <div className="mt-1 text-sm text-zinc-500">
-                  {order.component}
+                  {order.component?.code ?? order.title}
                 </div>
               </div>
 
               <div className="text-sm text-orange-400">
-                {order.progress}%
+                {orderProgress(order.status)}%
               </div>
             </div>
 
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-zinc-800">
               <div
                 style={{
-                  width: `${order.progress}%`,
+                  width: `${orderProgress(order.status)}%`,
                 }}
                 className="
                   h-full

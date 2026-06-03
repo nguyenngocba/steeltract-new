@@ -134,6 +134,31 @@ export class YardService {
     return zone;
   }
 
+  async deleteZone(id: string, actorId?: string) {
+    const zone = await this.repository.transaction(async (tx) => {
+      const existing = await this.getZoneOrThrow(id, tx);
+
+      if (existing.slots.length > 0) {
+        throw new BadRequestException(
+          'Cannot delete a yard zone that still has slots or active placements',
+        );
+      }
+
+      const deleted = await this.repository.deleteZone(id, tx);
+
+      await this.logActivity(tx, 'YARD_ZONE_DELETED', 'YardZone', id, {
+        actorId,
+        metadata: { code: existing.code },
+      });
+
+      return deleted;
+    });
+
+    await this.emitYardEvent('yard.zone.updated', zone, actorId);
+
+    return zone;
+  }
+
   async createRow(zoneId: string, dto: CreateYardRowDto, actorId?: string) {
     return this.repository.transaction(async (tx) => {
       await this.getZoneOrThrow(zoneId, tx);

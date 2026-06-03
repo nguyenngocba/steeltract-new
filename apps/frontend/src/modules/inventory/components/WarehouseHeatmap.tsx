@@ -1,16 +1,15 @@
-const slots = Array.from({
-  length: 48,
-}).map((_, index) => {
-  const value =
-    Math.floor(
-      Math.random() * 100,
-    )
+import { useInventoryItems } from '../hooks/useInventoryItems'
 
-  return {
-    id: index,
-    value,
-  }
-})
+type InventoryItem = {
+  id: string
+  code: string
+  quantity: number
+  minimumStock: number
+}
+
+function toItems(value: InventoryItem[] | { data?: InventoryItem[] }) {
+  return Array.isArray(value) ? value : value.data ?? []
+}
 
 function getColor(value: number) {
   if (value >= 80) {
@@ -29,6 +28,20 @@ function getColor(value: number) {
 }
 
 export function WarehouseHeatmap() {
+  const { data } =
+    useInventoryItems()
+  const items =
+    toItems(data ?? [])
+  const slots =
+    items.map((item) => ({
+      id: item.id,
+      label: item.code,
+      value:
+        item.minimumStock > 0
+          ? Math.min(100, Math.round((item.quantity / item.minimumStock) * 100))
+          : 0,
+    }))
+
   return (
     <div
       className="
@@ -65,7 +78,9 @@ export function WarehouseHeatmap() {
               ${getColor(slot.value)}
             `}
           >
-            {slot.value}%
+            <span title={slot.label}>
+              {slot.value}%
+            </span>
           </div>
         ))}
       </div>

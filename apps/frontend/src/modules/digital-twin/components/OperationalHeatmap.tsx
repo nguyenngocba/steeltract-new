@@ -1,16 +1,9 @@
-const rows = 8
-const cols = 24
+import { useQuery } from '@tanstack/react-query'
 
-const cells = Array.from({
-  length: rows * cols,
-}).map(() => {
-  const value =
-    Math.floor(
-      Math.random() * 100,
-    )
+import { productionApi } from '@/modules/production/api/production.api'
+import { yardApi } from '@/modules/yard/services/api/yard.api'
 
-  return value
-})
+const cellCount = 48
 
 function getColor(value: number) {
   if (value > 80) {
@@ -29,6 +22,29 @@ function getColor(value: number) {
 }
 
 export function OperationalHeatmap() {
+  const { data: machines = [] } =
+    useQuery({
+      queryKey: ['digital-twin', 'heatmap-machines'],
+      queryFn: productionApi.machines,
+      refetchInterval: 5000,
+    })
+  const { data: yardMetrics } =
+    useQuery({
+      queryKey: ['digital-twin', 'heatmap-yard'],
+      queryFn: yardApi.metrics,
+      refetchInterval: 5000,
+    })
+  const values = [
+    ...machines.map((machine) => machine.utilization),
+    ...(yardMetrics?.zoneUtilization.map((zone) => zone.occupancyRate) ?? []),
+  ]
+  const cells =
+    Array.from({ length: cellCount }, (_, index) =>
+      values.length
+        ? Math.round(values[index % values.length])
+        : 0,
+    )
+
   return (
     <div
       className="

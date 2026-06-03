@@ -1,79 +1,107 @@
 import { Injectable }
   from '@nestjs/common'
 
+import { PrismaService }
+  from '../../core/prisma/prisma.service'
+
 @Injectable()
 export class MaterialMovementsService {
-  private movements = [
-    {
-      id: 'MOV-001',
+  constructor(
+    private readonly prisma:
+      PrismaService,
+  ) {}
 
-      type: 'INBOUND',
+  async list() {
+    const rows =
+      await this.prisma.inventoryTransactionItem.findMany({
+        take: 50,
+        include: {
+          inventoryItem: true,
+          transaction: {
+            include: {
+              zone: true,
+              warehouse: true,
+            },
+          },
+          zone: true,
+          warehouse: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      })
 
+    return rows.map((row) => ({
+      id: row.id,
+      type:
+        row.transaction.direction ??
+        row.transaction.type,
       material:
-        'Steel Beam H400',
-
-      quantity: 120,
-
+        row.inventoryItem.code,
+      materialName:
+        row.inventoryItem.name,
+      quantity:
+        row.quantity,
       warehouse:
-        'MAIN-WH',
-
+        row.warehouse?.name ??
+        row.transaction.warehouse?.name ??
+        row.zone?.name ??
+        row.transaction.zone?.name ??
+        'Unassigned',
       createdAt:
-        new Date()
-          .toISOString(),
-    },
-
-    {
-      id: 'MOV-002',
-
-      type: 'OUTBOUND',
-
-      material:
-        'Steel Plate 12mm',
-
-      quantity: 45,
-
-      warehouse:
-        'YARD-B',
-
-      createdAt:
-        new Date()
-          .toISOString(),
-    },
-  ]
-
-  list() {
-    return this.movements
+        row.createdAt.toISOString(),
+    }))
   }
 
-  create(
+  async create(
     payload: any,
   ) {
-    const movement = {
-      id:
-        'MOV-' +
-        Date.now(),
+    const item =
+      await this.prisma.inventoryItem.findFirst({
+        where: {
+          OR: [
+            { id: payload.inventoryItemId },
+            { code: payload.material },
+          ],
+        },
+      })
 
-      type:
-        payload.type,
-
-      material:
-        payload.material,
-
-      quantity:
-        payload.quantity,
-
-      warehouse:
-        payload.warehouse,
-
-      createdAt:
-        new Date()
-          .toISOString(),
+    if (!item) {
+      throw new Error('Inventory item not found')
     }
 
-    this.movements.unshift(
-      movement,
-    )
+    const transaction =
+      await this.prisma.inventoryTransaction.create({
+        data: {
+          code:
+            `ST-MOV-${Date.now()}`,
+          type:
+            payload.type ?? 'TRANSFER',
+          direction:
+            payload.type ?? 'INTERNAL',
+          remarks:
+            payload.remarks ??
+            'Material movement created from runtime page',
+          items: {
+            create: [
+              {
+                inventoryItemId:
+                  item.id,
+                quantity:
+                  Number(payload.quantity ?? 0),
+              },
+            ],
+          },
+        },
+        include: {
+          items: {
+            include: {
+              inventoryItem: true,
+            },
+          },
+        },
+      })
 
-    return movement
+    return transaction.items[0]
   }
 }

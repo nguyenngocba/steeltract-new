@@ -23,6 +23,12 @@ export function useDeleteMaterial() {
       queryClient.invalidateQueries({
         queryKey: ['materials'],
       })
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-items'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-audit'],
+      })
     },
   })
 }

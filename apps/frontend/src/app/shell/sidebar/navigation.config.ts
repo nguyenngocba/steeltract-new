@@ -151,13 +151,14 @@ export const navigation = [
     icon: Map,
 
     children: [
-      {
-        title:
-          'Sơ đồ bãi',
-
-        path:
-          '/yard',
-      },
+      { title: 'Tổng quan bãi', path: '/yard#overview' },
+      { title: 'Sơ đồ 2D', path: '/yard#map-2d' },
+      { title: 'Sơ đồ 3D', path: '/yard#map-3d' },
+      { title: 'Nhập bãi', path: '/yard#inbound' },
+      { title: 'Xuất bãi', path: '/yard#outbound' },
+      { title: 'Chuyển nội bộ', path: '/yard#transfer' },
+      { title: 'QC nội bộ', path: '/yard#qc' },
+      { title: 'Lịch sử bãi', path: '/yard#history' },
     ],
   },
 

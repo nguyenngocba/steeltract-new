@@ -26,6 +26,8 @@ import type {
   SimulationScenarioId,
 } from './dto/simulation.dto';
 
+const operationalPrefix = 'ST';
+
 @Injectable()
 export class SimulationScenarioRunner {
   constructor(
@@ -67,7 +69,7 @@ export class SimulationScenarioRunner {
     await this.importInventory(tick, Math.round(8 + random * 10));
     await this.progressProduction();
     await this.progressQc(false);
-    await this.moveYardItem('Normal simulation movement');
+    await this.moveYardItem('Normal operational movement');
     await this.refreshAnalytics('normal-operations');
 
     return 'simulation.normal.tick';
@@ -76,11 +78,11 @@ export class SimulationScenarioRunner {
   private async runCongestion(tick: number, random: number) {
     await this.placeAdditionalYardItem(tick, random);
     await this.yardService.generateSnapshot({
-      name: `DEMO congestion snapshot ${tick}`,
+      name: `ST congestion snapshot ${tick}`,
       metadata: { scenario: 'congestion' },
     });
     await this.eventBus.emit('analytics.threshold.exceeded', {
-      id: `demo-yard-${tick}`,
+      id: `steeltrack-yard-${tick}`,
       domain: 'yard',
       metric: 'occupancy',
     });
@@ -93,16 +95,16 @@ export class SimulationScenarioRunner {
     await this.prisma.analyticsAlert.create({
       data: {
         domain: AnalyticsDomain.QC,
-        key: `demo.qc.failure.${tick}`,
-        title: 'Demo QC failure spike',
-        message: 'Simulated welding defects exceeded threshold.',
+        key: `steeltrack.qc.failure.${tick}`,
+        title: 'QC failure spike',
+        message: 'Welding defects exceeded operational threshold.',
         severity: random > 0.5 ? 'CRITICAL' : 'WARNING',
         threshold: 5,
         actualValue: 8 + Math.round(random * 4),
       },
     });
     await this.eventBus.emit('analytics.alert.created', {
-      id: `demo-qc-${tick}`,
+      id: `steeltrack-qc-${tick}`,
       domain: 'qc',
       severity: 'warning',
     });
@@ -113,7 +115,7 @@ export class SimulationScenarioRunner {
   private async runDelayedProduction(tick: number) {
     const order = await this.prisma.productionOrder.findFirst({
       where: {
-        orderNo: { startsWith: 'DEMO-' },
+        orderNo: { startsWith: `${operationalPrefix}-` },
         status: { in: ['PLANNED', 'IN_PROGRESS'] },
       },
       orderBy: { updatedAt: 'asc' },
@@ -125,7 +127,7 @@ export class SimulationScenarioRunner {
         data: {
           status: ProductionOrderStatus.DELAYED,
           delayedAt: new Date(),
-          delayReason: 'Demo material staging delay',
+          delayReason: 'Material staging delay',
         },
       });
       await this.eventBus.emit('production.delayed', {
@@ -135,10 +137,10 @@ export class SimulationScenarioRunner {
     }
 
     await this.jobScheduler.schedule({
-      name: 'DEMO-workflow-timeout-check',
+      name: 'ST-workflow-timeout-check',
       queue: 'workflow',
       payload: { scenario: 'delayed-production', tick },
-      idempotencyKey: `demo-delay-job-${tick}`,
+      idempotencyKey: `steeltrack-delay-job-${tick}`,
       delaySeconds: 30,
     });
 
@@ -156,7 +158,7 @@ export class SimulationScenarioRunner {
 
   private async runMachineDowntime() {
     const machine = await this.prisma.machine.findFirst({
-      where: { code: { startsWith: 'DEMO-' } },
+      where: { code: { startsWith: `${operationalPrefix}-` } },
       orderBy: { updatedAt: 'asc' },
     });
 
@@ -182,18 +184,18 @@ export class SimulationScenarioRunner {
 
   private async importInventory(tick: number, quantity: number) {
     const item = await this.prisma.inventoryItem.findFirst({
-      where: { code: { startsWith: 'DEMO-MAT-' } },
+      where: { code: { startsWith: `${operationalPrefix}-MAT-` } },
       orderBy: { updatedAt: 'asc' },
     });
 
     if (!item) return;
 
     await this.inventoryService.importStock({
-      code: `DEMO-IMP-${Date.now()}-${tick}`,
-      note: 'Simulation PO to inventory import',
+      code: `ST-IMP-${Date.now()}-${tick}`,
+      note: 'Operational PO to inventory import',
       performedBy: 'simulation',
       referenceModule: 'simulation',
-      referenceId: `DEMO-TICK-${tick}`,
+      referenceId: `ST-TICK-${tick}`,
       items: [{ inventoryItemId: item.id, quantity }],
     });
   }
@@ -201,7 +203,7 @@ export class SimulationScenarioRunner {
   private async progressProduction() {
     const order = await this.prisma.productionOrder.findFirst({
       where: {
-        orderNo: { startsWith: 'DEMO-' },
+        orderNo: { startsWith: `${operationalPrefix}-` },
         status: { in: ['PLANNED', 'IN_PROGRESS'] },
       },
       include: { stages: { orderBy: { sequence: 'asc' } } },
@@ -212,7 +214,7 @@ export class SimulationScenarioRunner {
 
     if (order.status === ProductionOrderStatus.PLANNED) {
       await this.productionService.start(order.id, {
-        message: 'Simulation production start',
+        message: 'Operational production start',
       });
       return;
     }
@@ -221,7 +223,7 @@ export class SimulationScenarioRunner {
 
     if (stage) {
       await this.productionService.completeStage(stage.id, {
-        message: 'Simulation stage completed',
+        message: 'Operational stage completed',
         qualityStatus: 'READY_FOR_QC',
         attachmentIds: [],
       });
@@ -231,7 +233,7 @@ export class SimulationScenarioRunner {
   private async progressQc(createFailure: boolean) {
     const inspection = await this.prisma.qcInspection.findFirst({
       where: {
-        inspectionNo: { startsWith: 'DEMO-' },
+        inspectionNo: { startsWith: `${operationalPrefix}-` },
         status: { in: ['READY', 'IN_PROGRESS'] },
       },
       include: { checklist: { include: { items: true } } },
@@ -253,16 +255,16 @@ export class SimulationScenarioRunner {
       status: createFailure ? QcResultStatus.FAIL : QcResultStatus.PASS,
       measuredValue: createFailure ? 'OUT_OF_TOLERANCE' : 'OK',
       expectedValue: 'PASS',
-      notes: 'Simulation QC result',
+      notes: 'Operational QC result',
       attachmentIds: [],
     });
 
     if (createFailure) {
       const issue = await this.qcService.createIssue(inspection.id, {
         resultId: result.id,
-        code: `DEMO-QC-ISSUE-${Date.now()}`,
-        title: 'Demo weld defect',
-        description: 'Simulated porosity detected during weld inspection.',
+        code: `ST-QC-ISSUE-${Date.now()}`,
+        title: 'Weld porosity defect',
+        description: 'Porosity detected during weld inspection.',
         severity: QcIssueSeverity.HIGH,
         status: QcIssueStatus.OPEN,
         correctiveAction: 'Rework weld bead and reinspect.',
@@ -272,7 +274,7 @@ export class SimulationScenarioRunner {
 
       await this.qcService.createNcr(inspection.id, {
         issueId: issue.id,
-        title: 'Demo NCR welding failure',
+        title: 'NCR welding failure',
         description: 'Generated by QC failure spike scenario.',
         status: NcrStatus.OPEN,
         severity: QcIssueSeverity.HIGH,
@@ -285,14 +287,14 @@ export class SimulationScenarioRunner {
       status: createFailure
         ? QcInspectionStatus.REWORK_REQUIRED
         : QcInspectionStatus.PASSED,
-      notes: 'Simulation inspection lifecycle completed',
+      notes: 'Operational inspection lifecycle completed',
     });
   }
 
   private async moveYardItem(reason: string) {
     const placement = await this.prisma.yardItemPlacement.findFirst({
       where: {
-        itemCode: { startsWith: 'DEMO-' },
+        itemCode: { startsWith: `${operationalPrefix}-` },
         removedAt: null,
       },
       include: { slot: true },
@@ -300,7 +302,7 @@ export class SimulationScenarioRunner {
     });
     const target = await this.prisma.yardSlot.findFirst({
       where: {
-        code: { startsWith: 'DEMO-' },
+        code: { startsWith: `${operationalPrefix}-` },
         status: 'AVAILABLE',
       },
       orderBy: { updatedAt: 'asc' },
@@ -313,19 +315,19 @@ export class SimulationScenarioRunner {
       reason,
     });
     await this.yardService.generateSnapshot({
-      name: `DEMO yard movement ${new Date().toISOString()}`,
+      name: `ST yard movement ${new Date().toISOString()}`,
       metadata: { reason },
     });
   }
 
   private async placeAdditionalYardItem(tick: number, random: number) {
     const component = await this.prisma.component.findFirst({
-      where: { code: { startsWith: 'DEMO-' } },
+      where: { code: { startsWith: `${operationalPrefix}-` } },
       orderBy: { updatedAt: 'asc' },
     });
     const slot = await this.prisma.yardSlot.findFirst({
       where: {
-        code: { startsWith: 'DEMO-' },
+        code: { startsWith: `${operationalPrefix}-` },
         currentStackLevel: { lt: 4 },
       },
       orderBy: { currentStackLevel: 'asc' },
@@ -342,7 +344,7 @@ export class SimulationScenarioRunner {
       quantity: 1,
       stackLevel: Math.min(slot.currentStackLevel + 1, 4),
       weight: 2.4 + random,
-      reason: 'Simulation congestion placement',
+      reason: 'Operational congestion placement',
       attachmentIds: [],
     });
   }
@@ -350,7 +352,7 @@ export class SimulationScenarioRunner {
   private async refreshAnalytics(scenario: string) {
     await this.analyticsService.generateSnapshot({
       domain: AnalyticsDomain.ERP,
-      snapshotType: `demo.${scenario}`,
+      snapshotType: `steeltrack.${scenario}`,
       periodStart: undefined,
       periodEnd: undefined,
       metadata: { scenario },

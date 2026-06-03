@@ -1,32 +1,14 @@
-const machines = Array.from({
-  length: 20,
-}).map((_, index) => {
-  const states = [
-    'RUNNING',
-    'IDLE',
-    'WARNING',
-  ]
+import { useQuery } from '@tanstack/react-query'
 
-  const status =
-    states[
-      Math.floor(
-        Math.random() *
-          states.length,
-      )
-    ]
-
-  return {
-    id: `MC-${index + 1}`,
-
-    status,
-  }
-})
+import { productionApi } from '@/modules/production/api/production.api'
 
 function getColor(status: string) {
   switch (status) {
+    case 'AVAILABLE':
     case 'RUNNING':
       return 'bg-emerald-500'
 
+    case 'OFFLINE':
     case 'IDLE':
       return 'bg-orange-500'
 
@@ -36,6 +18,13 @@ function getColor(status: string) {
 }
 
 export function MachineRuntimeMap() {
+  const { data: machines = [] } =
+    useQuery({
+      queryKey: ['digital-twin', 'machine-runtime-map'],
+      queryFn: productionApi.machines,
+      refetchInterval: 5000,
+    })
+
   return (
     <div
       className="
@@ -73,7 +62,7 @@ export function MachineRuntimeMap() {
               ${getColor(machine.status)}
             `}
           >
-            <div>{machine.id}</div>
+            <div>{machine.code}</div>
 
             <div className="mt-1 text-[10px]">
               {machine.status}

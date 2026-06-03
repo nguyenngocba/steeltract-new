@@ -7,6 +7,7 @@ import { inventoryTabs } from '../../config/inventory-tabs'
 import { useCreateTransaction } from '../../hooks/useCreateTransaction'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
+import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useProjects } from '../../hooks/useProjects'
 import { useZones } from '../../hooks/useZones'
 
@@ -41,6 +42,7 @@ export function InventoryOutboundPage() {
     quantity: '',
     remark: '',
   })
+  const { data: selectedMaterialDetail } = useMaterialDetail(form.inventoryItemId || undefined)
 
   const rows = useMemo(() => {
     return (tx as any[])
@@ -107,17 +109,44 @@ export function InventoryOutboundPage() {
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const currentStock = num(selectedMaterial?.quantity)
   const quantity = num(form.quantity)
+  const locationBalances = useMemo(() => {
+    return Array.isArray((selectedMaterialDetail as any)?.locationBalances)
+      ? ((selectedMaterialDetail as any).locationBalances as any[]).filter((balance) => num(balance.quantity) > 0)
+      : []
+  }, [selectedMaterialDetail])
+  const qtyByZoneId = useMemo(() => {
+    const map = new Map<string, number>()
+    locationBalances.forEach((balance) => {
+      if (balance.zoneId) map.set(String(balance.zoneId), num(balance.quantity))
+    })
+    return map
+  }, [locationBalances])
+  const availableZones = useMemo(() => {
+    const ids = new Set(locationBalances.map((balance) => String(balance.zoneId ?? '')).filter(Boolean))
+    return zones.filter((zone: any) => ids.has(String(zone.id)))
+  }, [locationBalances, zones])
+  const selectedZoneStock = form.zoneId ? qtyByZoneId.get(String(form.zoneId)) ?? 0 : 0
+  const selectedZoneAfterStock = selectedZoneStock - quantity
+  const canSubmit =
+    Boolean(form.inventoryItemId) &&
+    Boolean(form.zoneId) &&
+    quantity > 0 &&
+    selectedZoneAfterStock >= 0
 
   async function submit() {
-    if (!form.inventoryItemId || quantity <= 0) return
+    if (!canSubmit) return
     const no = `XK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+    const targetTag = form.target === 'COMPONENT_PRODUCTION'
+      ? '[COMPONENT_PRODUCTION]'
+      : '[PROJECT]'
     await createTransaction.mutateAsync({
       type: 'OUTBOUND',
       transactionNo: no,
       transactionDate: new Date().toISOString(),
       projectId: form.projectId || undefined,
       projectName: projects.find((x: any) => x.id === form.projectId)?.name,
-      remarks: form.remark || undefined,
+      zoneId: form.zoneId,
+      remarks: `${targetTag} ${form.remark}`.trim(),
       items: [
         {
           inventoryItemId: form.inventoryItemId,
@@ -250,11 +279,11 @@ export function InventoryOutboundPage() {
         <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
           <div className="mb-3 text-sm font-semibold text-white">Xuất kho vật tư</div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
-            <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
               <option value="PROJECT">Xuất cho công trình</option>
-              <option value="PRODUCTION">Xuất cho sản xuất cấu kiện</option>
+              <option value="COMPONENT_PRODUCTION">Xuất cho sản xuất cấu kiện</option>
             </select>
-            <select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
               <option value="">Đơn vị nhận</option>
               {projects.map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -262,7 +291,7 @@ export function InventoryOutboundPage() {
                 </option>
               ))}
             </select>
-            <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
                 <option key={m.id} value={m.id}>
@@ -271,10 +300,10 @@ export function InventoryOutboundPage() {
               ))}
             </select>
             <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
-              <option value="">Kho xuất</option>
-              {zones.map((z: any) => (
+              <option value="">Vị trí lấy vật tư</option>
+              {availableZones.map((z: any) => (
                 <option key={z.id} value={z.id}>
-                  {z.code}
+                  {z.code} - {z.name} · tồn {(qtyByZoneId.get(String(z.id)) ?? 0).toLocaleString('vi-VN')}
                 </option>
               ))}
             </select>
@@ -284,10 +313,12 @@ export function InventoryOutboundPage() {
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm xl:grid-cols-3">
             <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
             <MetricBox title="Tồn sau xuất" value={Math.max(0, currentStock - quantity).toLocaleString('vi-VN')} />
+            <MetricBox title="Tồn tại vị trí" value={selectedZoneStock.toLocaleString('vi-VN')} />
+            <MetricBox title="Vị trí sau xuất" value={Math.max(0, selectedZoneAfterStock).toLocaleString('vi-VN')} />
             <MetricBox title="Giá trị xuất dự kiến" value={formatCurrency(quantity * num(selectedMaterial?.unitPrice))} />
           </div>
           <div className="mt-4 flex justify-end">
-            <button onClick={submit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+            <button disabled={!canSubmit} onClick={submit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">
               Xác nhận xuất kho
             </button>
           </div>

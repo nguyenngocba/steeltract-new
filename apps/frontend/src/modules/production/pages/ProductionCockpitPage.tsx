@@ -8,9 +8,12 @@ import { OperationalShell } from '@/shared/layouts/OperationalShell'
 import type { ProductionBom, ProductionOrder } from '../api/production.api'
 import { Meter, ProductionKpi, ProductionPanel, StatusChip } from '../components/ProductionCockpitShared'
 import { ManufacturingOrderModal } from '../components/ManufacturingOrderModal'
+import { ProductionBomModal } from '../components/ProductionBomModal'
 import { productionTabs } from '../config/production-tabs'
 import {
   useMaterialRequirements,
+  useArchiveProductionBom,
+  useCloneProductionBom,
   useCompleteProductionStage,
   useProductionBoms,
   useProductionComponents,
@@ -32,6 +35,7 @@ export function ProductionCockpitPage() {
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder>()
   const [selectedBom, setSelectedBom] = useState<ProductionBom>()
   const [createOrderOpen, setCreateOrderOpen] = useState(false)
+  const [createBomOpen, setCreateBomOpen] = useState(false)
   const { data: orders = [] } = useProductionOrders()
   const { data: boms = [] } = useProductionBoms()
   const { data: issues = [] } = useProductionIssues()
@@ -90,7 +94,7 @@ export function ProductionCockpitPage() {
       </div>
 
       {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} onOpen={setSelectedOrder} />}
-      {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} />}
+      {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
       {mode === 'orders' && <Orders rows={filteredOrders} onOpen={setSelectedOrder} />}
       {mode === 'material-issues' && <Issues rows={issues} />}
       {mode === 'logs' && <Logs rows={logs} />}
@@ -98,6 +102,7 @@ export function ProductionCockpitPage() {
       {selectedOrder && <OrderWorkspace order={selectedOrder} onClose={() => setSelectedOrder(undefined)} />}
       {selectedBom && <BomWorkspace bom={selectedBom} onClose={() => setSelectedBom(undefined)} />}
       {createOrderOpen && <ManufacturingOrderModal components={components} boms={boms} onClose={() => setCreateOrderOpen(false)} />}
+      {createBomOpen && <ProductionBomModal components={components} onClose={() => setCreateBomOpen(false)} />}
     </main>
   </OperationalShell>
 }
@@ -147,10 +152,31 @@ function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; o
   </ProductionPanel>
 }
 
-function Boms({ rows, onOpen }: { rows: ProductionBom[]; onOpen: (row: ProductionBom) => void }) {
-  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Production BOM Registry" action={<button className="text-xs text-cyan-300">+ Tạo BOM</button>}>
+function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row: ProductionBom) => void; onCreate: () => void }) {
+  const clone = useCloneProductionBom()
+  const archive = useArchiveProductionBom()
+
+  async function cloneBom(id: string) {
+    try {
+      await clone.mutateAsync(id)
+      toast.success('Đã nhân bản Production BOM')
+    } catch {
+      toast.error('Không thể nhân bản Production BOM')
+    }
+  }
+
+  async function archiveBom(id: string) {
+    try {
+      await archive.mutateAsync(id)
+      toast.success('Đã lưu trữ Production BOM')
+    } catch {
+      toast.error('Không thể lưu trữ Production BOM')
+    }
+  }
+
+  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Production BOM Registry" action={<button onClick={onCreate} className="text-xs text-cyan-300">+ Tạo BOM</button>}>
     <div className="overflow-x-auto"><table className="w-full min-w-[950px] text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="pb-3 pr-3" key={x}>{x}</th>)}</tr></thead>
-    <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className="cursor-pointer border-t border-slate-800 hover:bg-cyan-950/30"><td className="py-3">{index+1}</td><td className="text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td>{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td className="text-cyan-300">Xem · Clone</td></tr>)}</tbody></table></div>
+    <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className="cursor-pointer border-t border-slate-800 hover:bg-cyan-950/30"><td className="py-3">{index+1}</td><td className="text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td>{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td><div className="flex gap-2 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td></tr>)}</tbody></table></div>
   </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM">{['Dầm chính','Cột thép','Bản mã','Giằng'].map((x,i)=><div className="mb-4" key={x}><div className="mb-1 flex justify-between text-xs"><span>{x}</span><span>{[42,28,18,12][i]}%</span></div><Meter value={[42,28,18,12][i]}/></div>)}</ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
 }
 
@@ -172,12 +198,14 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const [slotId, setSlotId] = useState('')
   const [stackLevel, setStackLevel] = useState('1')
   const activeStage = latest.stages?.find((item) => item.status === 'IN_PROGRESS' || item.status === 'READY')
+  const allStagesCompleted = Boolean(latest.stages?.length) && latest.stages!.every((item) => item.status === 'COMPLETED')
+  const canStageToYard = latest.status === 'COMPLETED' || allStagesCompleted
 
   async function run(action: () => Promise<unknown>, message: string) {
     try { await action(); toast.success(message) } catch { toast.error('Không thể cập nhật lệnh sản xuất') }
   }
 
-  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"><div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#04101d] shadow-2xl"><header className="flex items-start justify-between border-b border-slate-800 p-5"><div><p className="text-xs text-cyan-300">{latest.orderNo}</p><h2 className="mt-1 text-2xl font-semibold">{latest.title}</h2><div className="mt-2"><StatusChip status={latest.status}/></div></div><button onClick={onClose}><X/></button></header><div className="grid gap-3 p-5 xl:grid-cols-[1fr_340px]"><div className="space-y-3"><ProductionPanel title="Tiến độ công đoạn"><div className="grid gap-2 md:grid-cols-4">{(latest.stages??[]).map(item=><div key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3"><div className="text-xs text-slate-400">Bước {item.sequence}</div><div className="mt-1 text-sm">{item.name}</div><div className="mt-2"><StatusChip status={item.status}/></div></div>)}</div></ProductionPanel><ProductionPanel title="Nhu cầu vật tư theo BOM"><table className="w-full text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Material','Required','Available','Issued','Shortage','Unit'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr></thead><tbody>{requirements.map(row=><tr className="border-t border-slate-800" key={row.materialId}><td className="py-3 text-cyan-300">{row.materialCode} · {row.materialName}</td><td>{number(row.requiredQty)}</td><td>{number(row.availableQty)}</td><td>{number(row.issuedQty)}</td><td className={row.shortageQty?'text-red-300':'text-emerald-300'}>{number(row.shortageQty)}</td><td>{row.unit}</td></tr>)}</tbody></table></ProductionPanel></div><aside className="space-y-3"><ProductionPanel title="Thông tin MO"><div className="space-y-3 text-xs"><Info k="Cấu kiện" v={latest.component ? `${latest.component.code} · ${latest.component.name}` : '-'}/><Info k="BOM" v={latest.bom?.bomNo??'-'}/><Info k="Số lượng" v={number(latest.quantity)}/><Info k="Ưu tiên" v={latest.priority}/><Info k="Bắt đầu" v={date(latest.plannedStartAt)}/><Info k="Đến hạn" v={date(latest.plannedEndAt)}/></div></ProductionPanel><ProductionPanel title="Thao tác thực thi"><div className="space-y-2">{latest.status !== 'IN_PROGRESS' && latest.status !== 'COMPLETED' && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}{latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}<p className="text-xs text-slate-400">Mỗi lần hoàn tất sẽ chuyển trạng thái cấu kiện sang công đoạn kế tiếp.</p></div></ProductionPanel>{latest.status === 'COMPLETED' && <ProductionPanel title="Chuyển thành phẩm ra bãi"><div className="space-y-2 text-xs"><select value={slotId} onChange={(e)=>setSlotId(e.target.value)} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2"><option value="">Chọn zone / slot</option>{slots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng {slot.currentStackLevel}/{slot.maxStackLevel}</option>)}</select><input value={stackLevel} onChange={(e)=>setStackLevel(e.target.value)} type="number" min="1" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Tầng xếp"/><button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, stackLevel: Number(stackLevel) } }), 'Đã chuyển thành phẩm ra bãi')} disabled={!slotId} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button></div></ProductionPanel>}</aside></div></div></div>
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"><div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#04101d] shadow-2xl"><header className="flex items-start justify-between border-b border-slate-800 p-5"><div><p className="text-xs text-cyan-300">{latest.orderNo}</p><h2 className="mt-1 text-2xl font-semibold">{latest.title}</h2><div className="mt-2"><StatusChip status={canStageToYard ? 'COMPLETED' : latest.status}/></div></div><button onClick={onClose}><X/></button></header><div className="grid gap-3 p-5 xl:grid-cols-[1fr_340px]"><div className="space-y-3"><ProductionPanel title="Tiến độ công đoạn"><div className="grid gap-2 md:grid-cols-4">{(latest.stages??[]).map(item=><div key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3"><div className="text-xs text-slate-400">Bước {item.sequence}</div><div className="mt-1 text-sm">{item.name}</div><div className="mt-2"><StatusChip status={item.status}/></div></div>)}</div></ProductionPanel><ProductionPanel title="Nhu cầu vật tư theo BOM"><table className="w-full text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Material','Required','Available SX','Issued','Shortage','Unit'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr></thead><tbody>{requirements.map(row=><tr className="border-t border-slate-800" key={row.materialId}><td className="py-3 text-cyan-300">{row.materialCode} · {row.materialName}</td><td>{number(row.requiredQty)}</td><td>{number(row.availableQty)}</td><td>{number(row.issuedQty)}</td><td className={row.shortageQty?'text-red-300':'text-emerald-300'}>{number(row.shortageQty)}</td><td>{row.unit}</td></tr>)}</tbody></table></ProductionPanel></div><aside className="space-y-3"><ProductionPanel title="Thông tin MO"><div className="space-y-3 text-xs"><Info k="Cấu kiện" v={latest.component ? `${latest.component.code} · ${latest.component.name}` : '-'}/><Info k="BOM" v={latest.bom?.bomNo??'-'}/><Info k="Số lượng" v={number(latest.quantity)}/><Info k="Ưu tiên" v={latest.priority}/><Info k="Bắt đầu" v={date(latest.plannedStartAt)}/><Info k="Đến hạn" v={date(latest.plannedEndAt)}/></div></ProductionPanel><ProductionPanel title="Thao tác thực thi"><div className="space-y-2">{latest.status !== 'IN_PROGRESS' && !canStageToYard && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}{latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}{canStageToYard && <p className="rounded border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-300">Tất cả công đoạn đã hoàn tất. Có thể chuyển thành phẩm ra bãi.</p>}<p className="text-xs text-slate-400">Mỗi lần hoàn tất sẽ chuyển trạng thái cấu kiện sang công đoạn kế tiếp.</p></div></ProductionPanel>{canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi"><div className="space-y-2 text-xs"><select value={slotId} onChange={(e)=>setSlotId(e.target.value)} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2"><option value="">Chọn zone / slot</option>{slots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng {slot.currentStackLevel}/{slot.maxStackLevel}</option>)}</select><input value={stackLevel} onChange={(e)=>setStackLevel(e.target.value)} type="number" min="1" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Tầng xếp"/><button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, stackLevel: Number(stackLevel) } }), 'Đã chuyển thành phẩm ra bãi')} disabled={!slotId} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button></div></ProductionPanel>}</aside></div></div></div>
 }
 
 function BomWorkspace({ bom, onClose }: { bom: ProductionBom; onClose: () => void }) {

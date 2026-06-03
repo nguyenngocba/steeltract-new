@@ -110,6 +110,44 @@ export class ProductionService {
 
   async create(dto: CreateProductionOrderDto, actorId?: string) {
     const order = await this.repository.transaction(async (tx) => {
+      const [component, bom] = await Promise.all([
+        dto.componentId
+          ? this.repository.findComponentById(dto.componentId, tx)
+          : undefined,
+        dto.bomId ? this.repository.findBomById(dto.bomId, tx) : undefined,
+      ]);
+
+      if (dto.componentId && !component) {
+        throw new NotFoundException('Component not found');
+      }
+
+      if (dto.bomId && !bom) {
+        throw new NotFoundException('BOM not found');
+      }
+
+      if (component && bom && bom.productCode !== component.code) {
+        throw new BadRequestException(
+          'Selected BOM does not belong to the selected component',
+        );
+      }
+
+      const routingStages =
+        bom?.routingSteps.map((step, index) => ({
+          code: this.stageCodeForRouting(step.stepName),
+          name: step.stepName,
+          sequence: step.stepNo,
+          status:
+            index === 0
+              ? ProductionStageStatus.READY
+              : ProductionStageStatus.PENDING,
+          metadata: this.toJson({
+            workshop: step.workshop,
+            expectedHours: step.expectedHours,
+            qcRequired: step.qcRequired,
+            source: 'BOM_ROUTING',
+          }),
+        })) ?? [];
+
       const stageInputs =
         dto.stages && dto.stages.length > 0
           ? dto.stages.map((stage, index) => ({
@@ -127,6 +165,8 @@ export class ProductionService {
               plannedEndAt: stage.plannedEndAt,
               metadata: this.toJson(stage.metadata),
             }))
+          : routingStages.length > 0
+            ? routingStages
           : defaultStages.map((stage) => ({
               ...stage,
               status:
@@ -733,11 +773,75 @@ export class ProductionService {
 
   async materialRequirements(id: string) {
     const order = await this.getOrderOrThrow(id);
+    const materialIds = (order.bom?.items ?? []).map((item) => item.materialId);
+    const productionStockByMaterialId = new Map<string, number>();
+
+    if (materialIds.length > 0) {
+      const transactions = await this.prisma.inventoryTransaction.findMany({
+        where: {
+          items: {
+            some: {
+              inventoryItemId: {
+                in: materialIds,
+              },
+            },
+          },
+          OR: [
+            {
+              remarks: {
+                contains: '[COMPONENT_PRODUCTION]',
+              },
+            },
+            {
+              note: {
+                contains: '[COMPONENT_PRODUCTION]',
+              },
+            },
+          ],
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      for (const transaction of transactions) {
+        const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
+        const isReturn = text.includes('[COMPONENT_PRODUCTION_RETURN]');
+
+        for (const line of transaction.items) {
+          if (!materialIds.includes(line.inventoryItemId)) continue;
+
+          const quantity = Math.abs(Number(line.quantity ?? 0));
+          productionStockByMaterialId.set(
+            line.inventoryItemId,
+            (productionStockByMaterialId.get(line.inventoryItemId) ?? 0) +
+              (isReturn ? -quantity : quantity),
+          );
+        }
+      }
+
+      const issuedMaterials = await this.prisma.productionMaterialIssue.findMany({
+        where: {
+          inventoryItemId: {
+            in: materialIds,
+          },
+          status: 'ISSUED',
+        },
+      });
+
+      for (const issue of issuedMaterials) {
+        productionStockByMaterialId.set(
+          issue.inventoryItemId,
+          (productionStockByMaterialId.get(issue.inventoryItemId) ?? 0) -
+            Number(issue.issuedQty ?? 0),
+        );
+      }
+    }
 
     return (order.bom?.items ?? []).map((item) => {
       const requiredQty =
         item.quantity * (1 + item.wastePercent / 100) * order.quantity;
-      const availableQty = item.material.quantity;
+      const availableQty = productionStockByMaterialId.get(item.materialId) ?? 0;
       const issuedQty = order.materialIssues
         .filter((issue) => issue.inventoryItemId === item.materialId)
         .reduce((total, issue) => total + issue.issuedQty, 0);
@@ -750,7 +854,7 @@ export class ProductionService {
         requiredQty,
         availableQty,
         issuedQty,
-        shortageQty: Math.max(requiredQty - availableQty, 0),
+        shortageQty: Math.max(requiredQty - issuedQty - availableQty, 0),
       };
     });
   }
@@ -866,6 +970,31 @@ export class ProductionService {
     return code
       .toLowerCase()
       .replace(/^\w/, (character) => character.toUpperCase());
+  }
+
+  private stageCodeForRouting(name: string) {
+    const normalized = name.toUpperCase();
+
+    if (normalized.includes('CUT') || normalized.includes('CẮT')) {
+      return ProductionStageCode.CUTTING;
+    }
+    if (normalized.includes('DRILL') || normalized.includes('KHOAN')) {
+      return ProductionStageCode.DRILLING;
+    }
+    if (normalized.includes('ASSEMB') || normalized.includes('LẮP')) {
+      return ProductionStageCode.ASSEMBLY;
+    }
+    if (normalized.includes('WELD') || normalized.includes('HÀN')) {
+      return ProductionStageCode.WELDING;
+    }
+    if (normalized.includes('PAINT') || normalized.includes('SƠN')) {
+      return ProductionStageCode.PAINTING;
+    }
+    if (normalized.includes('GALV') || normalized.includes('MẠ')) {
+      return ProductionStageCode.GALVANIZING;
+    }
+
+    return ProductionStageCode.PACKING;
   }
 
   private toJson(value: Record<string, unknown> | undefined) {

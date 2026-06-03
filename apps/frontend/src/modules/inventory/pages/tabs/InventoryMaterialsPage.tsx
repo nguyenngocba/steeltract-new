@@ -22,6 +22,7 @@ export function InventoryMaterialsPage() {
 
   const [open, setOpen] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null)
+  const [detailMaterial, setDetailMaterial] = useState<any | null>(null)
   const [search, setSearch] = useState('')
   const [zoneFilter, setZoneFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -76,6 +77,23 @@ export function InventoryMaterialsPage() {
   async function handleDelete(id: string) {
     if (!window.confirm('Xóa vật tư này?')) return
     await deleteMaterialMutation.mutateAsync(id)
+  }
+
+  function openMaterial(item: any) {
+    setDetailMaterial(item)
+  }
+
+  function editMaterial(item: any) {
+    setSelectedMaterial({
+      id: item.materialId ?? item.inventoryItemId ?? item.id,
+      code: item.materialCode ?? item.code,
+      name: item.materialName ?? item.name,
+      unit: item.unit ?? item.unitCode ?? 'PCS',
+      minimumStock: item.minimumStock ?? 0,
+      categoryId: item.categoryId ?? '',
+      description: item.description ?? '',
+    })
+    setOpen(true)
   }
 
   const zoneDistribution = useMemo(() => {
@@ -155,7 +173,7 @@ export function InventoryMaterialsPage() {
             }}
             className="rounded-lg border border-cyan-600 bg-cyan-900/30 px-3 py-2 text-cyan-300"
           >
-            + Thêm vật tư
+            + Thêm vật tư mới
           </button>
         </div>
       </RuntimePanel>
@@ -180,7 +198,7 @@ export function InventoryMaterialsPage() {
               </thead>
               <tbody>
                 {pagedRows.map((item: any) => (
-                  <tr key={item.id} className="border-t border-zinc-800">
+                  <tr key={item.id} onClick={() => openMaterial(item)} className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-900/50">
                     <td className="px-3 py-2 text-cyan-300">{item.materialCode}</td>
                     <td className="px-3 py-2 text-zinc-100">{item.materialName}</td>
                     <td className="px-3 py-2 text-zinc-200">{Number(item.currentStock ?? 0).toLocaleString('vi-VN')}</td>
@@ -189,8 +207,8 @@ export function InventoryMaterialsPage() {
                     <td className="px-3 py-2 text-zinc-300">{item.position ?? item.zone ?? '-'}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
-                        <button onClick={() => { setSelectedMaterial(item); setOpen(true) }} className="rounded border border-amber-700/40 px-2 py-1 text-xs text-amber-300">Sửa</button>
-                        <button onClick={() => handleDelete(item.id)} className="rounded border border-red-700/40 px-2 py-1 text-xs text-red-300">Xóa</button>
+                        <button onClick={(event) => { event.stopPropagation(); editMaterial(item) }} className="rounded border border-amber-700/40 px-2 py-1 text-xs text-amber-300">Sửa</button>
+                        <button onClick={(event) => { event.stopPropagation(); handleDelete(item.materialId ?? item.inventoryItemId ?? item.id) }} className="rounded border border-red-700/40 px-2 py-1 text-xs text-red-300">Xóa</button>
                       </div>
                     </td>
                   </tr>
@@ -267,7 +285,7 @@ export function InventoryMaterialsPage() {
                 </thead>
                 <tbody>
                   {filteredRows.map((item: any) => (
-                    <tr key={item.id} className="border-t border-zinc-800">
+                    <tr key={item.id} onClick={() => openMaterial(item)} className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-900/50">
                       <td className="px-3 py-2 text-cyan-300">{item.materialCode}</td>
                       <td className="px-3 py-2 text-zinc-100">{item.materialName}</td>
                       <td className="px-3 py-2 text-zinc-200">{Number(item.currentStock ?? 0).toLocaleString('vi-VN')}</td>
@@ -281,7 +299,30 @@ export function InventoryMaterialsPage() {
           </div>
         </div>
       )}
+
+      {detailMaterial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-cyan-400">Chi tiết vật tư</div>
+                <h3 className="mt-1 text-xl font-semibold text-white">{detailMaterial.materialCode} · {detailMaterial.materialName}</h3>
+                <p className="mt-1 text-sm text-zinc-400">{detailMaterial.position ?? detailMaterial.zone ?? 'Chưa có vị trí'}</p>
+              </div>
+              <button onClick={() => setDetailMaterial(null)} className="rounded border border-zinc-700 px-3 py-1 text-sm text-zinc-300">Đóng</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <KpiCard title="Tồn hiện tại" value={Number(detailMaterial.currentStock ?? 0).toLocaleString('vi-VN')} />
+              <KpiCard title="Giá trung bình" value={money(Number(detailMaterial.averageCost ?? 0))} />
+              <KpiCard title="Giá trị tồn" value={money(Number(detailMaterial.inventoryValue ?? 0))} />
+              <KpiCard title="Trạng thái" value={Number(detailMaterial.currentStock ?? 0) <= 5 ? 'Cảnh báo' : 'Bình thường'} />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => { editMaterial(detailMaterial); setDetailMaterial(null) }} className="rounded border border-amber-700 px-4 py-2 text-sm text-amber-300">Sửa vật tư</button>
+            </div>
+          </div>
+        </div>
+      )}
     </EnterpriseModulePage>
   )
 }
-

@@ -15,7 +15,7 @@ export interface SimulationStatus {
   updatedAt?: string;
 }
 
-export interface DemoSeedResult {
+export interface OperationalSeedResult {
   projects: number;
   components: number;
   inventoryItems: number;

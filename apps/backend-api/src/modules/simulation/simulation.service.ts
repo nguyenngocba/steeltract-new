@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { EventBusService } from '../../core/events/event-bus.service';
-import { DemoDataSeeder } from './demo-data.seeder';
+import { OperationalSampleDataSeeder } from './operational-sample-data.seeder';
 import { SimulationScheduler } from './simulation.scheduler';
 import { SimulationScenarioRunner } from './simulation-scenario-runner.service';
 
@@ -24,7 +24,7 @@ export class SimulationService {
   };
 
   constructor(
-    private readonly seeder: DemoDataSeeder,
+    private readonly seeder: OperationalSampleDataSeeder,
     private readonly runner: SimulationScenarioRunner,
     private readonly scheduler: SimulationScheduler,
     private readonly eventBus: EventBusService,

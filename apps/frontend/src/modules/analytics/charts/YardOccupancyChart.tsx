@@ -5,10 +5,9 @@ import {
   Cell,
   Tooltip,
 } from 'recharts'
+import { useQuery } from '@tanstack/react-query'
 
-import {
-  yardOccupancy,
-} from '../mock-data/analytics.data'
+import { yardApi } from '@/modules/yard/services/api/yard.api'
 
 const colors = [
   '#38bdf8',
@@ -19,6 +18,18 @@ const colors = [
 ]
 
 export function YardOccupancyChart() {
+  const { data: metrics } =
+    useQuery({
+      queryKey: ['yard', 'metrics'],
+      queryFn: yardApi.metrics,
+      refetchInterval: 5000,
+    })
+  const yardOccupancy =
+    metrics?.zoneUtilization.map((zone) => ({
+      zone: zone.code,
+      value: zone.occupancyRate,
+    })) ?? []
+
   return (
     <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5">
 

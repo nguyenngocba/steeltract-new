@@ -1,9 +1,65 @@
-import { alerts } from '../mock-data/alerts.data'
+import { useQuery } from '@tanstack/react-query'
+
+import { api } from '@/lib/api'
 
 import { AlertCard } from '../components/AlertCard'
 import { ActivityTimeline } from '../components/ActivityTimeline'
 
+type AnalyticsAlert = {
+  id: string
+  domain: string
+  title: string
+  message: string
+  severity: 'INFO' | 'WARNING' | 'CRITICAL'
+  createdAt: string
+}
+
+function alertTone(severity: AnalyticsAlert['severity']) {
+  switch (severity) {
+    case 'CRITICAL':
+      return 'danger'
+    case 'WARNING':
+      return 'warning'
+    default:
+      return 'info'
+  }
+}
+
+async function getAlerts() {
+  const response =
+    await api.get<{ data: AnalyticsAlert[] }>(
+      '/analytics-engine/alerts',
+      {
+        params: {
+          limit: 12,
+        },
+      },
+    )
+
+  return response.data.data
+}
+
 export function NotificationsPage() {
+  const { data: analyticsAlerts = [] } =
+    useQuery({
+      queryKey: ['analytics-engine', 'alerts'],
+      queryFn: getAlerts,
+      refetchInterval: 5000,
+    })
+  const alerts =
+    analyticsAlerts.map((alert) => ({
+      id: alert.id,
+      type: alertTone(alert.severity),
+      title: alert.title,
+      description: alert.message,
+      module: alert.domain,
+      time: new Date(alert.createdAt).toLocaleTimeString(),
+    }))
+  const criticalCount =
+    analyticsAlerts.filter((alert) => alert.severity === 'CRITICAL').length
+  const warningCount =
+    analyticsAlerts.filter((alert) => alert.severity === 'WARNING').length
+
   return (
     <div className="flex h-full flex-col overflow-auto bg-zinc-950 p-6">
 
@@ -46,7 +102,7 @@ export function NotificationsPage() {
           </p>
 
           <h2 className="mt-4 text-5xl font-bold text-red-400">
-            12
+            {alerts.length}
           </h2>
 
         </div>
@@ -58,7 +114,7 @@ export function NotificationsPage() {
           </p>
 
           <h2 className="mt-4 text-5xl font-bold text-orange-400">
-            7
+            {warningCount}
           </h2>
 
         </div>
@@ -70,7 +126,7 @@ export function NotificationsPage() {
           </p>
 
           <h2 className="mt-4 text-5xl font-bold text-red-500">
-            2
+            {criticalCount}
           </h2>
 
         </div>
@@ -82,7 +138,7 @@ export function NotificationsPage() {
           </p>
 
           <h2 className="mt-4 text-5xl font-bold text-cyan-400">
-            284
+            {analyticsAlerts.length}
           </h2>
 
         </div>

@@ -18,6 +18,12 @@ export function SidebarItem({
   return (
     <Link
       to={path}
+      onMouseDown={(event) => {
+        event.currentTarget.blur()
+      }}
+      onFocus={(event) => {
+        event.currentTarget.blur()
+      }}
       className={`
         flex
         items-center

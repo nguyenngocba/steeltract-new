@@ -4,13 +4,15 @@ import toast from 'react-hot-toast'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { SectionHeader } from '../../../../shared/ui/enterprise'
-import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
 import { useProjects } from '../../../inventory/hooks/useProjects'
+import { ManufacturingOrderModal } from '../../../production/components/ManufacturingOrderModal'
+import { ProductionBomModal } from '../../../production/components/ProductionBomModal'
+import { useProductionBoms } from '../../../production/hooks/useProductionCockpit'
 import { componentsTabs } from '../../config/components-tabs'
 import {
   useComponents,
   useCreateComponent,
-  useCreateProductionOrder,
+  useDeleteComponent,
   useProductionOrders,
 } from '../../hooks/queries/useComponents'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel, ComponentsSelect } from './ComponentsCockpitShared'
@@ -27,7 +29,6 @@ type ComponentRow = {
   qty: number
   qc: number
   createdAt: string
-  bomMaterials: Array<{ material: string; qty: number; uom: string }>
 }
 
 type ComponentMetadata = {
@@ -35,16 +36,15 @@ type ComponentMetadata = {
   profile?: string
   quantity?: number
   qcQuantity?: number
-  bomMaterials?: ComponentRow['bomMaterials']
 }
 
 export function ComponentsListPage() {
   const { data: componentRecords = [], isLoading } = useComponents()
   const { data: productionOrders = [] } = useProductionOrders()
   const { data: projects = [] } = useProjects()
-  const { data: inventoryItems = [] } = useInventoryItems()
+  const { data: productionBoms = [] } = useProductionBoms()
   const createComponent = useCreateComponent()
-  const createProductionOrder = useCreateProductionOrder()
+  const deleteComponent = useDeleteComponent()
   const [project, setProject] = useState('')
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')
@@ -54,6 +54,9 @@ export function ComponentsListPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [productionOpen, setProductionOpen] = useState(false)
+  const [productionComponentId, setProductionComponentId] = useState('')
+  const [bomOpen, setBomOpen] = useState(false)
+  const [bomComponentId, setBomComponentId] = useState('')
   const [selected, setSelected] = useState<ComponentRow | null>(null)
 
   const [createForm, setCreateForm] = useState({
@@ -64,22 +67,8 @@ export function ComponentsListPage() {
     qty: '1',
     location: 'Kho cấu kiện',
   })
-  const [productionForm, setProductionForm] = useState({
-    componentId: '',
-    quantity: '1',
-    workshop: 'Workshop A',
-    startDate: '',
-    dueDate: '',
-    destinationYard: 'Bãi số 1',
-    destinationZone: 'A',
-    destinationSlot: 'A-01',
-    destinationLevel: 'L1',
-  })
-  const [bomDraft, setBomDraft] = useState<Array<{ material: string; qty: string; uom: string }>>([])
-
   function closeCreateModal() {
     setCreateOpen(false)
-    setBomDraft([])
     setCreateForm({
       name: '',
       type: 'Dầm (Beam)',
@@ -92,17 +81,7 @@ export function ComponentsListPage() {
 
   function closeProductionModal() {
     setProductionOpen(false)
-    setProductionForm({
-      componentId: '',
-      quantity: '1',
-      workshop: 'Workshop A',
-      startDate: '',
-      dueDate: '',
-      destinationYard: 'Bãi số 1',
-      destinationZone: 'A',
-      destinationSlot: 'A-01',
-      destinationLevel: 'L1',
-    })
+    setProductionComponentId('')
   }
 
   const rows = useMemo<ComponentRow[]>(() => {
@@ -140,7 +119,6 @@ export function ComponentsListPage() {
         createdAt: record.createdAt
           ? new Date(record.createdAt).toLocaleDateString('vi-VN')
           : '-',
-        bomMaterials: metadata.bomMaterials ?? [],
       }
     })
   }, [componentRecords])
@@ -164,11 +142,15 @@ export function ComponentsListPage() {
   function openProductionFor(row?: ComponentRow) {
     const target = row ?? selected
     setDetailOpen(false)
-    setProductionForm((prev) => ({
-      ...prev,
-      componentId: target?.id ?? '',
-    }))
+    setProductionComponentId(target?.id ?? '')
     setProductionOpen(true)
+  }
+
+  function openBomFor(row?: ComponentRow) {
+    const target = row ?? selected
+    setDetailOpen(false)
+    setBomComponentId(target?.id ?? '')
+    setBomOpen(true)
   }
 
   async function submitCreate() {
@@ -178,13 +160,6 @@ export function ComponentsListPage() {
       profile: createForm.profile || 'N/A',
       quantity: Number(createForm.qty || 0),
       qcQuantity: 0,
-      bomMaterials: bomDraft
-        .filter((item) => item.material && Number(item.qty) > 0)
-        .map((item) => ({
-          material: item.material,
-          qty: Number(item.qty),
-          uom: item.uom,
-        })),
     }
 
     try {
@@ -205,42 +180,32 @@ export function ComponentsListPage() {
     closeCreateModal()
   }
 
-  async function submitProductionOrder() {
-    const component = rows.find((row) => row.id === productionForm.componentId)
-
-    if (!component) return
-
-    const orderNo = `SX-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+  async function handleDelete(row: ComponentRow) {
+    if (!window.confirm(`Xóa cấu kiện ${row.code}?`)) return
 
     try {
-      await createProductionOrder.mutateAsync({
-        orderNo,
-        componentId: component.id,
-        projectId: componentRecords.find((record) => record.id === component.id)?.projectId ?? undefined,
-        title: `Sản xuất ${component.name}`,
-        description: `Lệnh sản xuất cấu kiện ${component.code}`,
-        quantity: Number(productionForm.quantity || 0),
-        status: 'PLANNED',
-        plannedStartAt: productionForm.startDate || undefined,
-        plannedEndAt: productionForm.dueDate || undefined,
-        metadata: {
-          workshop: productionForm.workshop,
-          destinationYard: productionForm.destinationYard,
-          destinationZone: productionForm.destinationZone,
-          destinationSlot: productionForm.destinationSlot,
-          destinationLevel: productionForm.destinationLevel,
-        },
-      })
-      toast.success(`Đã tạo lệnh sản xuất ${orderNo}`)
+      await deleteComponent.mutateAsync(row.id)
+      toast.success(`Đã xóa cấu kiện ${row.code}`)
+      if (selected?.id === row.id) {
+        setSelected(null)
+        setDetailOpen(false)
+      }
     } catch {
-      toast.error('Không thể tạo lệnh sản xuất')
-      return
+      toast.error('Không thể xóa cấu kiện')
     }
-
-    closeProductionModal()
   }
 
   const recentOrders = productionOrders.slice(0, 4)
+  const productionComponents = componentRecords.map((record) => ({
+    id: record.id,
+    code: record.code,
+    name: record.name,
+    projectId: record.projectId,
+    project: record.project,
+  }))
+  const selectedBoms = selected
+    ? productionBoms.filter((bom) => bom.productCode === selected.code && bom.status !== 'ARCHIVED')
+    : []
 
   return (
     <EnterpriseModulePage>
@@ -298,6 +263,9 @@ export function ComponentsListPage() {
           <button onClick={() => openProductionFor()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
             + Tạo lệnh sản xuất
           </button>
+          <button onClick={() => openBomFor()} className="rounded-lg border border-cyan-700 px-4 py-2 text-sm font-medium text-cyan-200">
+            + Tạo Production BOM
+          </button>
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -307,7 +275,7 @@ export function ComponentsListPage() {
                 <table className="w-full min-w-[1080px] text-sm">
                   <thead className="text-xs uppercase text-slate-400">
                     <tr>
-                      {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Vị trí hiện tại', 'Trạng thái', 'SL', 'Đã QC', 'Ngày tạo'].map((h) => (
+                      {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Vị trí hiện tại', 'Trạng thái', 'SL', 'Đã QC', 'Ngày tạo', 'Thao tác'].map((h) => (
                         <th key={h} className="px-2 py-2 text-left font-medium">
                           {h}
                         </th>
@@ -317,7 +285,7 @@ export function ComponentsListPage() {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={10} className="px-2 py-6 text-center text-slate-400">
+                        <td colSpan={11} className="px-2 py-6 text-center text-slate-400">
                           Đang tải dữ liệu cấu kiện...
                         </td>
                       </tr>
@@ -337,6 +305,17 @@ export function ComponentsListPage() {
                         <td className="px-2 py-2">{row.qty.toLocaleString('vi-VN')}</td>
                         <td className="px-2 py-2">{row.qc.toLocaleString('vi-VN')}</td>
                         <td className="px-2 py-2">{row.createdAt}</td>
+                        <td className="px-2 py-2">
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void handleDelete(row)
+                            }}
+                            className="rounded border border-red-700/50 px-2 py-1 text-xs text-red-300 hover:bg-red-950/40"
+                          >
+                            Xóa
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -397,56 +376,8 @@ export function ComponentsListPage() {
               </select>
               <input value={createForm.qty} onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))} placeholder="Số lượng" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
             </div>
-            <div className="mt-4 rounded-xl border border-slate-800 bg-[#050d18] p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-semibold text-white">BOM vật tư từ kho vật tư SX</div>
-                  <div className="text-xs text-slate-400">Chọn vật tư đầu vào và định mức cho một cấu kiện.</div>
-                </div>
-                <button
-                  onClick={() => setBomDraft((items) => [...items, { material: '', qty: '1', uom: '' }])}
-                  className="rounded-lg border border-blue-700 px-3 py-2 text-xs text-blue-200"
-                >
-                  + Thêm vật tư BOM
-                </button>
-              </div>
-              {bomDraft.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
-                  Chưa có vật tư BOM.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {bomDraft.map((item, index) => (
-                    <div key={`${item.material}-${index}`} className="grid grid-cols-12 gap-2">
-                      <select
-                        value={item.material}
-                        onChange={(event) => {
-                          const selectedItem = (inventoryItems as any[]).find((inventoryItem) => inventoryItem.code === event.target.value)
-                          setBomDraft((items) => items.map((draft, draftIndex) => draftIndex === index
-                            ? { ...draft, material: event.target.value, uom: selectedItem?.unitMaster?.symbol ?? selectedItem?.unit ?? '-' }
-                            : draft))
-                        }}
-                        className="h-10 rounded-lg border border-slate-700 bg-[#071323] px-3 text-sm text-white col-span-7"
-                      >
-                        <option value="">Chọn vật tư kho SX</option>
-                        {(inventoryItems as any[]).map((inventoryItem) => (
-                          <option key={inventoryItem.id} value={inventoryItem.code}>
-                            {inventoryItem.code} - {inventoryItem.name}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        value={item.qty}
-                        onChange={(event) => setBomDraft((items) => items.map((draft, draftIndex) => draftIndex === index ? { ...draft, qty: event.target.value } : draft))}
-                        placeholder="Định mức"
-                        className="h-10 rounded-lg border border-slate-700 bg-[#071323] px-3 text-sm text-white col-span-2"
-                      />
-                      <div className="flex h-10 items-center rounded-lg border border-slate-800 px-3 text-sm text-slate-300 col-span-2">{item.uom || '-'}</div>
-                      <button onClick={() => setBomDraft((items) => items.filter((_, draftIndex) => draftIndex !== index))} className="h-10 rounded-lg border border-red-900 text-sm text-red-300 col-span-1">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="mt-4 rounded-xl border border-cyan-900/60 bg-cyan-950/10 p-3 text-xs text-cyan-100">
+              Vật tư không khai báo tại đây. Sau khi tạo cấu kiện, tạo Production BOM riêng để quản lý định mức và routing sản xuất.
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={closeCreateModal} className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200">Hủy</button>
@@ -456,60 +387,8 @@ export function ComponentsListPage() {
         </div>
       ) : null}
 
-      {productionOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-slate-700 bg-[#071323] p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Tạo lệnh sản xuất cấu kiện</h3>
-              <button onClick={closeProductionModal} className="text-slate-300">✕</button>
-            </div>
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <select value={productionForm.componentId} onChange={(e) => setProductionForm((f) => ({ ...f, componentId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white xl:col-span-2">
-                <option value="">Chọn cấu kiện</option>
-                {rows.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.code} - {row.name}
-                  </option>
-                ))}
-              </select>
-              <input value={productionForm.quantity} onChange={(e) => setProductionForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng SX" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
-              <select value={productionForm.workshop} onChange={(e) => setProductionForm((f) => ({ ...f, workshop: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white">
-                <option>Workshop A</option>
-                <option>Workshop B</option>
-                <option>Workshop C</option>
-              </select>
-              <input type="date" value={productionForm.startDate} onChange={(e) => setProductionForm((f) => ({ ...f, startDate: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
-              <input type="date" value={productionForm.dueDate} onChange={(e) => setProductionForm((f) => ({ ...f, dueDate: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
-
-              <div className="xl:col-span-2 mt-1 rounded-lg border border-blue-900/50 bg-blue-950/20 p-3 text-xs text-blue-200">
-                Sau khi hoàn thành sản xuất, cấu kiện sẽ tự động chuyển ra bãi tập kết theo vị trí đích bên dưới.
-              </div>
-
-              <select value={productionForm.destinationYard} onChange={(e) => setProductionForm((f) => ({ ...f, destinationYard: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white">
-                <option>Bãi số 1</option>
-                <option>Bãi số 2</option>
-                <option>Bãi số 3</option>
-              </select>
-              <select value={productionForm.destinationZone} onChange={(e) => setProductionForm((f) => ({ ...f, destinationZone: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white">
-                <option>A</option>
-                <option>B</option>
-                <option>C</option>
-              </select>
-              <input value={productionForm.destinationSlot} onChange={(e) => setProductionForm((f) => ({ ...f, destinationSlot: e.target.value }))} placeholder="Vị trí (slot) đích" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
-              <select value={productionForm.destinationLevel} onChange={(e) => setProductionForm((f) => ({ ...f, destinationLevel: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white">
-                <option>L1</option>
-                <option>L2</option>
-                <option>L3</option>
-                <option>L4</option>
-              </select>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={closeProductionModal} className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200">Hủy</button>
-              <button onClick={submitProductionOrder} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">Tạo lệnh SX</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {productionOpen ? <ManufacturingOrderModal components={productionComponents} boms={productionBoms} initialComponentId={productionComponentId} onClose={closeProductionModal} /> : null}
+      {bomOpen ? <ProductionBomModal components={productionComponents} initialComponentId={bomComponentId} onClose={() => { setBomOpen(false); setBomComponentId('') }} /> : null}
 
       {detailOpen && selected ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -520,7 +399,9 @@ export function ComponentsListPage() {
                 <div className="text-sm text-slate-400">{selected.code} · {selected.profile} · {selected.project}</div>
               </div>
               <div className="flex items-center gap-2">
+                <button onClick={() => openBomFor(selected)} className="rounded-lg border border-cyan-700 px-3 py-2 text-sm text-cyan-100">Tạo BOM</button>
                 <button onClick={() => openProductionFor(selected)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white">Sản xuất</button>
+                <button onClick={() => void handleDelete(selected)} className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-300">Xóa</button>
                 <button onClick={() => setDetailOpen(false)} className="text-slate-300">✕</button>
               </div>
             </div>
@@ -541,25 +422,37 @@ export function ComponentsListPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-800 bg-[#050d18] p-4">
-              <div className="mb-3 text-sm font-semibold text-white">BOM vật tư lấy từ kho vật tư SX</div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-white">Production BOM liên kết</div>
+                  <div className="mt-1 text-xs text-slate-500">Định mức vật tư và routing dùng khi phát hành lệnh sản xuất.</div>
+                </div>
+                <button onClick={() => openBomFor(selected)} className="rounded-lg border border-cyan-800 px-3 py-2 text-xs text-cyan-200">+ Tạo BOM</button>
+              </div>
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase text-slate-400">
                   <tr>
+                    <th className="px-2 py-2 text-left">Mã BOM</th>
+                    <th className="px-2 py-2 text-left">Phiên bản</th>
                     <th className="px-2 py-2 text-left">Vật tư</th>
-                    <th className="px-2 py-2 text-left">Định mức</th>
-                    <th className="px-2 py-2 text-left">Đơn vị</th>
+                    <th className="px-2 py-2 text-left">Routing</th>
+                    <th className="px-2 py-2 text-left">KL ước tính</th>
+                    <th className="px-2 py-2 text-left">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selected.bomMaterials.length === 0 ? (
+                  {selectedBoms.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-2 py-5 text-center text-slate-500">Chưa khai báo BOM vật tư.</td>
+                      <td colSpan={6} className="px-2 py-5 text-center text-slate-500">Chưa có Production BOM. Tạo BOM trước khi phát hành lệnh sản xuất.</td>
                     </tr>
-                  ) : selected.bomMaterials.map((b) => (
-                    <tr key={b.material} className="border-t border-slate-800 text-slate-200">
-                      <td className="px-2 py-2">{b.material}</td>
-                      <td className="px-2 py-2">{b.qty.toLocaleString('vi-VN')}</td>
-                      <td className="px-2 py-2">{b.uom}</td>
+                  ) : selectedBoms.map((bom) => (
+                    <tr key={bom.id} className="border-t border-slate-800 text-slate-200">
+                      <td className="px-2 py-2 text-cyan-300">{bom.bomNo}</td>
+                      <td className="px-2 py-2">{bom.version}</td>
+                      <td className="px-2 py-2">{bom.items.length}</td>
+                      <td className="px-2 py-2">{bom.routingSteps.length} bước</td>
+                      <td className="px-2 py-2">{bom.estimatedWeight.toLocaleString('vi-VN')} kg</td>
+                      <td className="px-2 py-2"><span className="rounded bg-emerald-950 px-2 py-1 text-xs text-emerald-300">{bom.status}</span></td>
                     </tr>
                   ))}
                 </tbody>

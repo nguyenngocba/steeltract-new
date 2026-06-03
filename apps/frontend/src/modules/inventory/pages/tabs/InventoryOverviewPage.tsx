@@ -128,6 +128,7 @@ export function InventoryOverviewPage() {
     projectId: '',
     target: 'PROJECT',
     inventoryItemId: '',
+    sourceZoneId: '',
     quantity: '',
     remark: '',
   })
@@ -147,6 +148,11 @@ export function InventoryOverviewPage() {
   const { data: transferMaterialDetail } = useMaterialDetail(
     activeModal === 'transfer' && transferForm.inventoryItemId
       ? transferForm.inventoryItemId
+      : undefined,
+  )
+  const { data: outboundMaterialDetail } = useMaterialDetail(
+    activeModal === 'outbound' && outboundForm.inventoryItemId
+      ? outboundForm.inventoryItemId
       : undefined,
   )
 
@@ -180,6 +186,7 @@ export function InventoryOverviewPage() {
       projectId: '',
       target: 'PROJECT',
       inventoryItemId: '',
+      sourceZoneId: '',
       quantity: '',
       remark: '',
     })
@@ -274,6 +281,12 @@ export function InventoryOverviewPage() {
       : []
   }, [transferMaterialDetail])
 
+  const outboundLocationBalances = useMemo(() => {
+    return Array.isArray((outboundMaterialDetail as any)?.locationBalances)
+      ? ((outboundMaterialDetail as any).locationBalances as Array<any>).filter((x: any) => num(x.quantity) > 0)
+      : []
+  }, [outboundMaterialDetail])
+
   const availableTransferFromZones = useMemo(() => {
     const ids = new Set<string>()
     transferLocationBalances.forEach((x: any) => {
@@ -286,6 +299,14 @@ export function InventoryOverviewPage() {
     return zones.filter((z: any) => String(z.id) !== String(transferForm.fromZoneId))
   }, [zones, transferForm.fromZoneId])
 
+  const availableOutboundZones = useMemo(() => {
+    const ids = new Set<string>()
+    outboundLocationBalances.forEach((x: any) => {
+      if (x.zoneId) ids.add(String(x.zoneId))
+    })
+    return zones.filter((z: any) => ids.has(String(z.id)))
+  }, [outboundLocationBalances, zones])
+
   const transferQtyByZoneId = useMemo(() => {
     const map = new Map<string, number>()
     transferLocationBalances.forEach((x: any) => {
@@ -293,6 +314,14 @@ export function InventoryOverviewPage() {
     })
     return map
   }, [transferLocationBalances])
+
+  const outboundQtyByZoneId = useMemo(() => {
+    const map = new Map<string, number>()
+    outboundLocationBalances.forEach((x: any) => {
+      if (x.zoneId) map.set(String(x.zoneId), num(x.quantity))
+    })
+    return map
+  }, [outboundLocationBalances])
 
   const selectedFromZoneQty = transferForm.fromZoneId
     ? transferQtyByZoneId.get(String(transferForm.fromZoneId)) ?? 0
@@ -325,7 +354,16 @@ export function InventoryOverviewPage() {
 
   const outboundQty = num(outboundForm.quantity)
   const outboundCurrentStock = num(selectedOutboundMaterial?.quantity)
+  const selectedOutboundZoneQty = outboundForm.sourceZoneId
+    ? outboundQtyByZoneId.get(String(outboundForm.sourceZoneId)) ?? 0
+    : 0
   const outboundAfterStock = outboundCurrentStock - outboundQty
+  const outboundZoneAfterStock = selectedOutboundZoneQty - outboundQty
+  const canSubmitOutbound =
+    Boolean(outboundForm.inventoryItemId) &&
+    Boolean(outboundForm.sourceZoneId) &&
+    outboundQty > 0 &&
+    outboundZoneAfterStock >= 0
   const transferQty = num(transferForm.quantity)
   const transferCurrentStock = num(selectedTransferMaterial?.quantity)
   const transferAfterStock = transferCurrentStock - transferQty
@@ -395,16 +433,18 @@ export function InventoryOverviewPage() {
   }
 
   async function handleOutbound() {
-    if (!outboundForm.inventoryItemId || outboundQty <= 0) return
+    if (!canSubmitOutbound) return
     await createTransactionMutation.mutateAsync({
       type: 'OUTBOUND',
       projectId: outboundForm.projectId || undefined,
+      zoneId: outboundForm.sourceZoneId,
       transactionDate: outboundForm.transactionDate,
       remarks: `[${outboundForm.target}] ${outboundForm.remark}`,
       items: [
         {
           inventoryItemId: outboundForm.inventoryItemId,
           quantity: -Math.abs(outboundQty),
+          zoneId: outboundForm.sourceZoneId,
           unitPrice: Math.round(num(selectedOutboundMaterial?.averageCost ?? selectedOutboundMaterial?.unitPrice)),
           totalAmount: Math.round(Math.abs(outboundQty) * num(selectedOutboundMaterial?.averageCost ?? selectedOutboundMaterial?.unitPrice)),
         },
@@ -698,27 +738,36 @@ export function InventoryOverviewPage() {
                   </div>
                 </div>
                 <input type="datetime-local" value={outboundForm.transactionDate} onChange={(e) => setOutboundForm((p) => ({ ...p, transactionDate: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <select value={outboundForm.projectId} onChange={(e) => setOutboundForm((p) => ({ ...p, projectId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
+                <select disabled={outboundForm.target === 'COMPONENT_PRODUCTION'} value={outboundForm.projectId} onChange={(e) => setOutboundForm((p) => ({ ...p, projectId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50">
                   <option value="">Công trình / Bộ phận</option>
                   {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <select value={outboundForm.target} onChange={(e) => setOutboundForm((p) => ({ ...p, target: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
+                <select value={outboundForm.target} onChange={(e) => setOutboundForm((p) => ({ ...p, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : p.projectId }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
                   <option value="PROJECT">Xuất công trình</option>
                   <option value="COMPONENT_PRODUCTION">Xuất sản xuất cấu kiện</option>
                 </select>
-                <select value={outboundForm.inventoryItemId} onChange={(e) => setOutboundForm((p) => ({ ...p, inventoryItemId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
+                <select value={outboundForm.inventoryItemId} onChange={(e) => setOutboundForm((p) => ({ ...p, inventoryItemId: e.target.value, sourceZoneId: '' }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
                   <option value="">Vật tư</option>
                   {itemsWithAudit.map((i: any) => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
                 </select>
+                <select value={outboundForm.sourceZoneId} onChange={(e) => setOutboundForm((p) => ({ ...p, sourceZoneId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
+                  <option value="">Vị trí lấy vật tư</option>
+                  {availableOutboundZones.map((z: any) => (
+                    <option key={z.id} value={z.id}>
+                      {z.code} - {z.name} · tồn {formatNumberVN(outboundQtyByZoneId.get(String(z.id)) ?? 0)}
+                    </option>
+                  ))}
+                </select>
                 <input type="text" inputMode="decimal" placeholder="Số lượng xuất" value={outboundForm.quantity} onChange={(e) => setOutboundForm((p) => ({ ...p, quantity: formatDecimalInputRealtime(e.target.value) }))} onBlur={(e) => setOutboundForm((p) => ({ ...p, quantity: formatInputNumberVN(e.target.value, false) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <div />
                 <RuntimePanel title="Tồn hiện tại"><div className="text-white">{formatNumberVN(outboundCurrentStock)}</div></RuntimePanel>
                 <RuntimePanel title="Tồn sau xuất"><div className={outboundAfterStock < 0 ? 'text-red-300' : 'text-cyan-300'}>{formatNumberVN(outboundAfterStock)}</div></RuntimePanel>
+                <RuntimePanel title="Tồn tại vị trí"><div className="text-white">{formatNumberVN(selectedOutboundZoneQty)}</div></RuntimePanel>
+                <RuntimePanel title="Vị trí sau xuất"><div className={outboundZoneAfterStock < 0 ? 'text-red-300' : 'text-cyan-300'}>{formatNumberVN(outboundZoneAfterStock)}</div></RuntimePanel>
                 <input type="file" className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-300" />
                 <textarea placeholder="Ghi chú" value={outboundForm.remark} onChange={(e) => setOutboundForm((p) => ({ ...p, remark: e.target.value }))} rows={3} className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
                 <div className="md:col-span-2 flex justify-end gap-2">
                   <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-4 py-2 text-zinc-300">Hủy</button>
-                  <button onClick={handleOutbound} className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-black">Xác nhận xuất kho</button>
+                  <button disabled={!canSubmitOutbound} onClick={handleOutbound} className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-black disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400">Xác nhận xuất kho</button>
                 </div>
               </div>
             )}

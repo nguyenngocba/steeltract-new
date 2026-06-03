@@ -226,8 +226,8 @@ export function MaterialDrawer({
         >
           {
             isEditMode
-              ? 'Edit Material'
-              : 'Create Material'
+              ? 'Sửa vật tư'
+              : 'Thêm vật tư mới'
           }
         </h2>
 

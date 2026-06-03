@@ -29,6 +29,12 @@ export function useUpdateMaterial() {
       queryClient.invalidateQueries({
         queryKey: ['materials'],
       })
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-items'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-audit'],
+      })
     },
   })
 }

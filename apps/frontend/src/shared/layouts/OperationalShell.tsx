@@ -11,7 +11,7 @@ export function OperationalShell({
   children,
 }: Props) {
   return (
-    <div className="flex min-h-screen bg-black">
+    <div className="flex h-screen overflow-hidden bg-black">
       <AppSidebar />
 
       <main className="flex-1 overflow-auto">

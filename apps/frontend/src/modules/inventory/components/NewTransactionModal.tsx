@@ -171,7 +171,7 @@ export function NewTransactionModal({
                   e.target.value,
                 )
               }
-              placeholder="Steel Beam H400"
+              placeholder="ST-MAT-HB200"
               className="
                 w-full
                 rounded-xl
