@@ -57,6 +57,10 @@ import { ComponentsMaterialStockPage } from '@/modules/components/pages/tabs/Com
 import { ComponentsTransfersPage } from '@/modules/components/pages/tabs/ComponentsTransfersPage'
 import { ComponentsInternalQcPage } from '@/modules/components/pages/tabs/ComponentsInternalQcPage'
 import { ComponentsHistoryPage } from '@/modules/components/pages/tabs/ComponentsHistoryPage'
+import { SettingsPage } from '@/modules/settings/pages/SettingsPage'
+import { UsersPage } from '@/modules/users/pages/UsersPage'
+import { RolesPage } from '@/modules/roles/pages/RolesPage'
+import { SystemLogsWorkspace } from '@/modules/system-logs/workspaces/SystemLogsWorkspace'
 
 export function AppRouter() {
   return (
@@ -281,6 +285,26 @@ export function AppRouter() {
         element={
           <MaterialMovementsPage />
         }
+      />
+
+      <Route
+        path="/settings"
+        element={<SettingsPage />}
+      />
+
+      <Route
+        path="/users"
+        element={<UsersPage />}
+      />
+
+      <Route
+        path="/roles"
+        element={<RolesPage />}
+      />
+
+      <Route
+        path="/system-logs"
+        element={<SystemLogsWorkspace />}
       />
 
       <Route

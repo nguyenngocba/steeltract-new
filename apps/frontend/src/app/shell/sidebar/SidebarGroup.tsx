@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { SidebarItem }
   from './SidebarItem'
@@ -24,7 +24,19 @@ export function SidebarGroup({
   icon: Icon,
   items,
 }: Props) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem(`steeltrack-app-sidebar-group:${title}`)
+      if (saved !== null) return saved === 'true'
+    } catch {
+      // Ignore storage errors and keep the default open state.
+    }
+    return true
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem(`steeltrack-app-sidebar-group:${title}`, String(open))
+  }, [open, title])
 
   return (
     <div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Activity, Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench, X } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
@@ -196,16 +196,88 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const complete = useCompleteProductionStage()
   const stage = useStageProductionToYard()
   const [slotId, setSlotId] = useState('')
-  const [stackLevel, setStackLevel] = useState('1')
+  const [quantity, setQuantity] = useState('1')
+  const [weight, setWeight] = useState('1')
   const activeStage = latest.stages?.find((item) => item.status === 'IN_PROGRESS' || item.status === 'READY')
   const allStagesCompleted = Boolean(latest.stages?.length) && latest.stages!.every((item) => item.status === 'COMPLETED')
   const canStageToYard = latest.status === 'COMPLETED' || allStagesCompleted
+  const availableSlots = slots.filter((slot) => slot.status !== 'BLOCKED' && slot.currentStackLevel < slot.maxStackLevel)
+  const targetSlot = availableSlots.find((slot) => slot.id === slotId)
+  const stagedQuantity = slots
+    .flatMap((slot) => slot.placements ?? [])
+    .filter((placement) => placement.itemId === latest.component?.id)
+    .reduce((sum, placement) => sum + Number(placement.quantity ?? 0), 0)
+  const remainingQuantity = Math.max(0, Number(latest.quantity ?? 0) - stagedQuantity)
+  const stageQuantity = Number(quantity) || 0
+  const stageInvalid = !slotId || stageQuantity <= 0 || stageQuantity > remainingQuantity
+
+  useEffect(() => {
+    if (remainingQuantity > 0 && Number(quantity) > remainingQuantity) {
+      setQuantity(String(remainingQuantity))
+    }
+  }, [quantity, remainingQuantity])
 
   async function run(action: () => Promise<unknown>, message: string) {
     try { await action(); toast.success(message) } catch { toast.error('Không thể cập nhật lệnh sản xuất') }
   }
 
-  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"><div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#04101d] shadow-2xl"><header className="flex items-start justify-between border-b border-slate-800 p-5"><div><p className="text-xs text-cyan-300">{latest.orderNo}</p><h2 className="mt-1 text-2xl font-semibold">{latest.title}</h2><div className="mt-2"><StatusChip status={canStageToYard ? 'COMPLETED' : latest.status}/></div></div><button onClick={onClose}><X/></button></header><div className="grid gap-3 p-5 xl:grid-cols-[1fr_340px]"><div className="space-y-3"><ProductionPanel title="Tiến độ công đoạn"><div className="grid gap-2 md:grid-cols-4">{(latest.stages??[]).map(item=><div key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3"><div className="text-xs text-slate-400">Bước {item.sequence}</div><div className="mt-1 text-sm">{item.name}</div><div className="mt-2"><StatusChip status={item.status}/></div></div>)}</div></ProductionPanel><ProductionPanel title="Nhu cầu vật tư theo BOM"><table className="w-full text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Material','Required','Available SX','Issued','Shortage','Unit'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr></thead><tbody>{requirements.map(row=><tr className="border-t border-slate-800" key={row.materialId}><td className="py-3 text-cyan-300">{row.materialCode} · {row.materialName}</td><td>{number(row.requiredQty)}</td><td>{number(row.availableQty)}</td><td>{number(row.issuedQty)}</td><td className={row.shortageQty?'text-red-300':'text-emerald-300'}>{number(row.shortageQty)}</td><td>{row.unit}</td></tr>)}</tbody></table></ProductionPanel></div><aside className="space-y-3"><ProductionPanel title="Thông tin MO"><div className="space-y-3 text-xs"><Info k="Cấu kiện" v={latest.component ? `${latest.component.code} · ${latest.component.name}` : '-'}/><Info k="BOM" v={latest.bom?.bomNo??'-'}/><Info k="Số lượng" v={number(latest.quantity)}/><Info k="Ưu tiên" v={latest.priority}/><Info k="Bắt đầu" v={date(latest.plannedStartAt)}/><Info k="Đến hạn" v={date(latest.plannedEndAt)}/></div></ProductionPanel><ProductionPanel title="Thao tác thực thi"><div className="space-y-2">{latest.status !== 'IN_PROGRESS' && !canStageToYard && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}{latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}{canStageToYard && <p className="rounded border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-300">Tất cả công đoạn đã hoàn tất. Có thể chuyển thành phẩm ra bãi.</p>}<p className="text-xs text-slate-400">Mỗi lần hoàn tất sẽ chuyển trạng thái cấu kiện sang công đoạn kế tiếp.</p></div></ProductionPanel>{canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi"><div className="space-y-2 text-xs"><select value={slotId} onChange={(e)=>setSlotId(e.target.value)} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2"><option value="">Chọn zone / slot</option>{slots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng {slot.currentStackLevel}/{slot.maxStackLevel}</option>)}</select><input value={stackLevel} onChange={(e)=>setStackLevel(e.target.value)} type="number" min="1" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Tầng xếp"/><button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, stackLevel: Number(stackLevel) } }), 'Đã chuyển thành phẩm ra bãi')} disabled={!slotId} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button></div></ProductionPanel>}</aside></div></div></div>
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4">
+    <div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#04101d] shadow-2xl">
+      <header className="flex items-start justify-between border-b border-slate-800 p-5">
+        <div><p className="text-xs text-cyan-300">{latest.orderNo}</p><h2 className="mt-1 text-2xl font-semibold">{latest.title}</h2><div className="mt-2"><StatusChip status={canStageToYard ? 'COMPLETED' : latest.status}/></div></div>
+        <button onClick={onClose}><X/></button>
+      </header>
+      <div className="grid gap-3 p-5 xl:grid-cols-[1fr_340px]">
+        <div className="space-y-3">
+          <ProductionPanel title="Tiến độ công đoạn">
+            <div className="grid gap-2 md:grid-cols-4">{(latest.stages??[]).map(item=><div key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3"><div className="text-xs text-slate-400">Bước {item.sequence}</div><div className="mt-1 text-sm">{item.name}</div><div className="mt-2"><StatusChip status={item.status}/></div></div>)}</div>
+          </ProductionPanel>
+          <ProductionPanel title="Nhu cầu vật tư theo BOM">
+            <table className="w-full text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Material','Required','Available SX','Issued','Shortage','Unit'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr></thead><tbody>{requirements.map(row=><tr className="border-t border-slate-800" key={row.materialId}><td className="py-3 text-cyan-300">{row.materialCode} · {row.materialName}</td><td>{number(row.requiredQty)}</td><td>{number(row.availableQty)}</td><td>{number(row.issuedQty)}</td><td className={row.shortageQty?'text-red-300':'text-emerald-300'}>{number(row.shortageQty)}</td><td>{row.unit}</td></tr>)}</tbody></table>
+          </ProductionPanel>
+        </div>
+        <aside className="space-y-3">
+          <ProductionPanel title="Thông tin MO">
+            <div className="space-y-3 text-xs">
+              <Info k="Cấu kiện" v={latest.component ? `${latest.component.code} · ${latest.component.name}` : '-'}/>
+              <Info k="BOM" v={latest.bom?.bomNo??'-'}/>
+              <Info k="Số lượng MO" v={number(latest.quantity)}/>
+              <Info k="Đã nhập bãi" v={number(stagedQuantity)}/>
+              <Info k="Còn được nhập" v={number(remainingQuantity)}/>
+              <Info k="Ưu tiên" v={latest.priority}/>
+              <Info k="Bắt đầu" v={date(latest.plannedStartAt)}/>
+              <Info k="Đến hạn" v={date(latest.plannedEndAt)}/>
+            </div>
+          </ProductionPanel>
+          <ProductionPanel title="Thao tác thực thi">
+            <div className="space-y-2">
+              {latest.status !== 'IN_PROGRESS' && !canStageToYard && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}
+              {latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}
+              {canStageToYard && <p className="rounded border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-300">Tất cả công đoạn đã hoàn tất. Có thể chuyển thành phẩm ra bãi.</p>}
+              <p className="text-xs text-slate-400">Mỗi lần hoàn tất sẽ chuyển trạng thái cấu kiện sang công đoạn kế tiếp.</p>
+            </div>
+          </ProductionPanel>
+          {canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi">
+            <div className="space-y-2 text-xs">
+              <select value={slotId} onChange={(e)=>setSlotId(e.target.value)} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2">
+                <option value="">Chọn slot còn tầng trống</option>
+                {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
+              </select>
+              {!availableSlots.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">Bãi không còn slot có tầng trống.</p> : null}
+              <input value={quantity} onChange={(e)=>setQuantity(e.target.value)} type="number" min="0.01" max={remainingQuantity || undefined} step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
+              <input value={weight} onChange={(e)=>setWeight(e.target.value)} type="number" min="0" step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
+              <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
+                <div>Slot đích: <b className="text-cyan-300">{targetSlot ? `${targetSlot.zone.code}/${targetSlot.code}` : '--'}</b></div>
+                <div className="mt-1">Tầng xếp tự động: <b className="text-cyan-300">L{targetSlot ? targetSlot.currentStackLevel + 1 : '--'}</b></div>
+                <div className="mt-1">Còn được nhập bãi: <b className={stageInvalid ? 'text-red-300' : 'text-emerald-300'}>{number(remainingQuantity)}</b></div>
+              </div>
+              <button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: Number(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button>
+            </div>
+          </ProductionPanel>}
+        </aside>
+      </div>
+    </div>
+  </div>
 }
 
 function BomWorkspace({ bom, onClose }: { bom: ProductionBom; onClose: () => void }) {

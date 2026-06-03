@@ -23,6 +23,23 @@ export class SuppliersController {
     return this.suppliersService.list(search)
   }
 
+  @Get('cockpit/summary')
+  async cockpitSummary() {
+    return this.suppliersService.getCockpitSummary()
+  }
+
+  @Get('cockpit/evaluations')
+  async cockpitEvaluations() {
+    return this.suppliersService.getCockpitEvaluations()
+  }
+
+  @Get(':id/cockpit')
+  async cockpitDetail(
+    @Param('id') id: string,
+  ) {
+    return this.suppliersService.getCockpitDetail(id)
+  }
+
   @Get(':id')
   async getById(
     @Param('id') id: string,

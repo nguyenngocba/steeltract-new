@@ -227,14 +227,42 @@ export const navigation = [
   },
 
   {
-    title: 'CÀI ĐẶT',
+    title: 'HỆ THỐNG',
 
     icon: Settings,
 
     children: [
       {
         title:
-          'Thông tin công ty',
+          'Người dùng',
+
+        path:
+          '/users',
+      },
+      {
+        title:
+          'Vai trò & Phân quyền',
+
+        path:
+          '/roles',
+      },
+      {
+        title:
+          'Nhật ký hệ thống',
+
+        path:
+          '/system-logs',
+      },
+      {
+        title:
+          'Cài đặt',
+
+        path:
+          '/settings',
+      },
+      {
+        title:
+          'Sao lưu dữ liệu',
 
         path:
           '/settings',

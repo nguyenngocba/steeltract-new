@@ -127,6 +127,34 @@ Never finish a task without updating AI state files.
 
 ---
 
+After every completed task:
+
+1. Update CHANGELOG_AI.md
+2. Update PROJECT_STATUS.md
+3. Update NEXT_TASKS.md
+4. Update CURRENT_MODULES.md (if status changed)
+
+For any module reaching 20%+ completion:
+
+Create or update:
+--------------------------------
+docs/ai-state/MODULE_<MODULE>.md
+
+Example:
+
+MODULE_SUPPLIERS.md
+MODULE_YARD.md
+MODULE_PRODUCTION.md
+
+This file must contain:
+
+- Scope
+- Implemented Features
+- Database Models
+- API Endpoints
+- Routes
+- Remaining Tasks
+--------------------------------
 ## CHANGELOG FORMAT
 
 Example:

@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 
 import { EventBusService } from '../../../core/events/event-bus.service';
+import { PrismaService } from '../../../core/prisma/prisma.service';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import {
@@ -47,6 +48,7 @@ export class QcService {
     private readonly eventBus: EventBusService,
     private readonly attachmentsService: AttachmentsService,
     private readonly workflowService: WorkflowService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async listChecklists(query: ListQcChecklistsDto) {
@@ -680,6 +682,168 @@ export class QcService {
 
   metrics() {
     return this.repository.metrics();
+  }
+
+  async cockpit() {
+    const [metrics, inspections, checklists, ncrs, productionOrders, components, projects] =
+      await Promise.all([
+        this.metrics(),
+        this.repository.findInspections({ take: 200 }),
+        this.repository.findChecklists({ take: 100 }),
+        this.repository.findNcrs({ take: 100 }),
+        this.prisma.productionOrder.findMany({
+          where: {
+            status: 'COMPLETED',
+          },
+          include: {
+            component: true,
+            stages: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 200,
+        }),
+        this.prisma.component.findMany({
+          include: {
+            project: true,
+          },
+        }),
+        this.prisma.project.findMany(),
+      ]);
+
+    const componentMap = new Map(components.map((component) => [component.id, component]));
+    const projectMap = new Map(projects.map((project) => [project.id, project]));
+    const orderMap = new Map(productionOrders.map((order) => [order.id, order]));
+    const inspectionsByOrder = new Map<string, typeof inspections>();
+    const inspectionsByComponent = new Map<string, typeof inspections>();
+
+    inspections.forEach((inspection) => {
+      if (inspection.productionOrderId) {
+        inspectionsByOrder.set(inspection.productionOrderId, [
+          ...(inspectionsByOrder.get(inspection.productionOrderId) ?? []),
+          inspection,
+        ]);
+      }
+      if (inspection.componentId) {
+        inspectionsByComponent.set(inspection.componentId, [
+          ...(inspectionsByComponent.get(inspection.componentId) ?? []),
+          inspection,
+        ]);
+      }
+    });
+
+    const inspectionRows = inspections.map((inspection) => {
+      const order = inspection.productionOrderId
+        ? orderMap.get(inspection.productionOrderId)
+        : undefined;
+      const component = inspection.componentId
+        ? componentMap.get(inspection.componentId)
+        : order?.componentId
+          ? componentMap.get(order.componentId)
+          : undefined;
+      const project = inspection.projectId
+        ? projectMap.get(inspection.projectId)
+        : component?.projectId
+          ? projectMap.get(component.projectId)
+          : order?.projectId
+            ? projectMap.get(order.projectId)
+            : undefined;
+      const failedResults = inspection.results.filter((result) => result.status === 'FAIL').length;
+      const passResults = inspection.results.filter((result) => result.status === 'PASS').length;
+      const totalResults = inspection.results.length;
+
+      return {
+        id: inspection.id,
+        inspectionNo: inspection.inspectionNo,
+        date: inspection.completedAt ?? inspection.updatedAt,
+        projectId: project?.id ?? inspection.projectId,
+        projectName: project?.name ?? '-',
+        componentId: component?.id ?? inspection.componentId,
+        componentCode: component?.code ?? '-',
+        componentName: component?.name ?? '-',
+        productionOrderId: order?.id ?? inspection.productionOrderId,
+        productionOrderNo: order?.orderNo ?? '-',
+        category: inspection.checklist?.type ?? 'FINAL',
+        checklistName: inspection.checklist?.name ?? '-',
+        result:
+          inspection.status === QcInspectionStatus.APPROVED ||
+          inspection.status === QcInspectionStatus.PASSED
+            ? 'PASS'
+            : inspection.status === QcInspectionStatus.FAILED ||
+                inspection.status === QcInspectionStatus.REWORK_REQUIRED ||
+                failedResults > 0
+              ? 'FAIL'
+              : 'PENDING',
+        status: inspection.status,
+        inspectorId: inspection.inspectorId,
+        passRate: totalResults ? Math.round((passResults / totalResults) * 100) : 0,
+        issueCount: inspection.issues.length,
+        ncrCount: inspection.ncrs.length,
+      };
+    });
+
+    const productionQueue = productionOrders.map((order) => {
+      const orderInspections = [
+        ...(inspectionsByOrder.get(order.id) ?? []),
+        ...(order.componentId ? inspectionsByComponent.get(order.componentId) ?? [] : []),
+      ];
+      const approved = orderInspections.some(
+        (inspection) =>
+          inspection.status === QcInspectionStatus.APPROVED ||
+          inspection.status === QcInspectionStatus.PASSED,
+      );
+      const failed = orderInspections.some(
+        (inspection) =>
+          inspection.status === QcInspectionStatus.FAILED ||
+          inspection.status === QcInspectionStatus.REWORK_REQUIRED ||
+          inspection.status === QcInspectionStatus.REJECTED,
+      );
+
+      return {
+        id: order.id,
+        orderNo: order.orderNo,
+        title: order.title,
+        componentId: order.componentId,
+        componentCode: order.component?.code ?? '-',
+        componentName: order.component?.name ?? '-',
+        projectId: order.projectId,
+        status: order.status,
+        qcStatus: approved ? 'APPROVED' : failed ? 'REWORK_REQUIRED' : 'WAITING_QC',
+        inspectionCount: orderInspections.length,
+        completedAt: order.completedAt ?? order.updatedAt,
+      };
+    });
+
+    const byCategory = Array.from(
+      inspectionRows.reduce((map, row) => {
+        map.set(row.category, (map.get(row.category) ?? 0) + 1);
+        return map;
+      }, new Map<string, number>()),
+    ).map(([category, count]) => ({ category, count }));
+
+    return {
+      metrics,
+      inspections: inspectionRows,
+      productionQueue,
+      checklists,
+      ncrs,
+      byCategory,
+      byProject: Array.from(
+        inspectionRows.reduce((map, row) => {
+          const current = map.get(row.projectName) ?? { total: 0, passed: 0 };
+          current.total += 1;
+          if (row.result === 'PASS') current.passed += 1;
+          map.set(row.projectName, current);
+          return map;
+        }, new Map<string, { total: number; passed: number }>()),
+      ).map(([projectName, value]) => ({
+        projectName,
+        total: value.total,
+        passed: value.passed,
+        passRate: value.total ? Math.round((value.passed / value.total) * 100) : 0,
+      })),
+    };
   }
 
   private async getChecklistOrThrow(id: string, tx?: QcTx) {

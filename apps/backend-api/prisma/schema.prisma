@@ -2272,7 +2272,9 @@ model YardItemPlacement {
   metadata       Json?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  stagedQuantity Float @default(0)
 
+  remainingQuantity Float @default(0)
   slot      YardSlot       @relation(fields: [slotId], references: [id], onDelete: Restrict)
   movements YardMovement[]
 

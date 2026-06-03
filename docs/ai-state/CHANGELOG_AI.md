@@ -49,6 +49,43 @@ Completed:
 * Added explicit zone detail popup buttons in Yard 2D zones and stronger selected-zone visual styling.
 * Added clickable component detail cards inside the Yard zone detail popup with an "Xuất bãi" action that exports from the known current placement without asking the user to reselect a position.
 * Enlarged Yard 3D crane GLB scale so the cranes render closer to zone size.
+* Fixed Production-to-Yard staging rules in both Production MO popup and Yard inbound workflow:
+  slots now remain selectable when they already contain lower stack levels as long as `currentStackLevel < maxStackLevel`;
+  the next stack level is derived automatically instead of manually entered;
+  inbound quantity is capped by completed MO quantity minus active Yard placements;
+  Yard inbound now stages from completed MOs through the production `stage-to-yard` API instead of creating unlimited direct placements.
+* Fixed another sidebar jump source by moving the AppSidebar scroll ref from the header to the actual scrollable menu area and persisting AppSidebar group open state.
+* Completed Supplier Phase S1 Supplier Master Cockpit:
+  replaced the simple CRUD supplier page with KPI strip, filter bar, main supplier table, right insight panel, and slide-over detail workspace;
+  added supplier detail tabs for Overview, Materials, Inbound History, Ratings, and Files;
+  added backend supplier cockpit summary/detail endpoints that derive inventory usage, inbound history, material history, and supplier-score ratings without schema changes;
+  retained existing Supplier CRUD and `/suppliers` route without adding Procurement, Purchase Order, Contract, or Approval Workflow scope.
+* Added two top-level Supplier module tabs matching the requested reference:
+  `Danh sách nhà cung cấp` and `Đánh giá nhà cung cấp`;
+  added `GET /suppliers/cockpit/evaluations` to connect Supplier Master, SupplierScore, and Inventory usage;
+  added evaluation KPI strip, filters, evaluation table, selected supplier score detail panel, score trend, supplier classification, and recent evaluation cards.
+* Built Projects/Công trình operational cockpit from real linked data:
+  replaced the static Projects card page with five tabs: Tổng quan, Danh sách công trình, Tiến độ công trình, Vật tư theo công trình, and Báo cáo công trình;
+  changed `/projects/runtime` from hardcoded project samples to data derived from Project, Component, ProductionOrder, and InventoryTransaction;
+  added project KPI strips, filters, main project table, progress views, material-by-project table, report panels, and project detail popup.
+* Removed a stray `production.service.ts` code fragment outside any method so backend build can pass.
+* Built QC/Chất lượng operational cockpit:
+  replaced the active `/qc` page with seven tabs: Tổng quan, Phiếu kiểm tra, Kế hoạch QC, Tiêu chuẩn, Không phù hợp (NCR), Hiệu chuẩn thiết bị, and Báo cáo;
+  added `GET /qc/cockpit` to connect QC inspections, checklists, NCR, completed Production Orders, Components, and Projects;
+  added QC KPI strip, filters, inspection table, latest inspection detail, production queue waiting for QC, checklist cards, NCR table, calibration placeholders, and report panels;
+  added inspection detail and completed-MO popups so QC can create inspections and mark production/component checks as passed or rework-required;
+  enforced the Yard staging gate in Production so a completed MO/component can only be staged to Yard after a linked QC inspection is `PASSED` or `APPROVED`;
+  removed unused QC stub/static frontend files that could be confused with active data.
+* Added operational workflow verification before System Settings work:
+  added `GET /runtime/operational-workflow` to verify Supplier inbound, main Inventory stock, Project outbound, Production material outbound/return, BOM/MO, QC gate, Yard staging, Yard outbound, project return, and QC failure readiness from real database records;
+  hardened Inventory outbound validation so server-side stock checks can enforce selected `zoneId` location balance, not only total item balance;
+  backfilled 9 historical QC release records for active Yard component placements that existed before the QC gate was added, using current Yard placement and completed Production Order history;
+  verified the current DB after backfill: supplier inbound 8, inventory items 8, project outbound 5, production outbound 4, production returns 3, BOMs 7, production orders 12, completed orders 10, approved QC 9, active Yard placements 23, removed Yard placements 15, staged components without QC 0.
+* Built System cockpit foundation without adding schema duplicates:
+  added `GET /system/overview`, `GET /system/users`, `GET /system/roles`, and `GET /system/activity-logs` using existing User, Role, Permission, ActivityLog, Inventory, Supplier, Project, Component, QC, and Yard tables;
+  replaced Settings page with tabs matching the requested reference: Tổng quan, Cấu hình chung, Phân quyền, Danh mục, Tích hợp, Thông báo, Sao lưu & Phục hồi, and Nhật ký cấu hình;
+  added workflow health panel inside Settings so the material-to-yard operational chain is visible as OK/WARN/BLOCKED;
+  replaced Users, Roles, and System Logs pages with API-backed cockpit layouts and added active routes/sidebar entries for `/settings`, `/users`, `/roles`, and `/system-logs`.
 
 Modified:
 
@@ -80,7 +117,7 @@ Notes:
 * Active frontend module scan no longer finds `mock-data` folders under `apps/frontend/src/modules`; remaining `demo.` strings in the Simulation seeder are retained only to clean old legacy records.
 * Current operational bootstrap result: 5 inventory materials, 10 inventory transactions, 12 components, 6 production orders, 6 yard zones, 72 yard slots, 2 QC checklists, 4 workers.
 * Production material warehouse now includes real `[COMPONENT_PRODUCTION]` outbound transactions, but still needs a backend balance/receipt model if it must behave as a fully independent warehouse instead of an issued-material view.
-* Latest verification: `pnpm -C apps/frontend build` passes after the latest UI/runtime changes; previous backend build passed and backend was not changed in the latest batch. Vite still reports the existing NODE_ENV and large chunk warnings.
+* Latest verification: `pnpm -C apps/backend-api build` and `pnpm -C apps/frontend build` pass after System cockpit foundation. Vite still reports the existing NODE_ENV and large chunk warnings.
 
 ## 2026-06-02
 

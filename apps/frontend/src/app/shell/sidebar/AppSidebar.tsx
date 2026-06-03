@@ -30,10 +30,6 @@ export function AppSidebar() {
       "
     >
       <div
-        ref={scrollRef}
-        onScroll={(event) => {
-          window.sessionStorage.setItem('steeltrack-app-sidebar-scroll', String(event.currentTarget.scrollTop))
-        }}
         className="
           border-b
           border-zinc-800
@@ -55,6 +51,10 @@ export function AppSidebar() {
       </div>
 
       <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          window.sessionStorage.setItem('steeltrack-app-sidebar-scroll', String(event.currentTarget.scrollTop))
+        }}
         className="
           flex-1
           space-y-8

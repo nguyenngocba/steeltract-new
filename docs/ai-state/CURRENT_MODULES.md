@@ -11,11 +11,12 @@
 🚧 Production
 🚧 Yard
 🚧 Settings
+🚧 Suppliers
+🚧 Projects
+🚧 QC
+🚧 Users / Roles / System Logs
 
 ## Not Started
 
-❌ Projects
-❌ Suppliers
 ❌ Organizations
-❌ QC
 ❌ Logistics

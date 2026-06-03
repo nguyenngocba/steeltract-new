@@ -1,15 +1,5 @@
-import { http } from '../../../shared/http/http-client'
+import { systemApi } from '@/modules/system/api/system.api'
 
 export async function getRoles() {
-  const token =
-    localStorage.getItem('token')
-
-  const response =
-    await http.get('/roles', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-  return response.data
+  return systemApi.roles()
 }

@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { ComponentsService } from '../../components/services/components.service';
+import { PrismaService } from '../../../core/prisma/prisma.service';
 import {
   CreateProjectDto,
   ListProjectsDto,
@@ -17,6 +18,7 @@ export class ProjectsService {
   constructor(
     private readonly repository: ProjectsRepository,
     private readonly componentsService: ComponentsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async findAll(query: ListProjectsDto) {
@@ -130,95 +132,219 @@ export class ProjectsService {
   }
 
   async runtimeDashboard() {
-  return [
-    {
-      id: 'PRJ-001',
+    const [projects, components, inventoryTransactions, productionOrders] =
+      await Promise.all([
+        this.prisma.project.findMany({
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+        this.prisma.component.findMany({
+          include: {
+            project: true,
+          },
+        }),
+        this.prisma.inventoryTransaction.findMany({
+          include: {
+            items: {
+              include: {
+                inventoryItem: true,
+                unit: true,
+              },
+            },
+          },
+          orderBy: {
+            transactionDate: 'desc',
+          },
+          take: 500,
+        }),
+        this.prisma.productionOrder.findMany({
+          include: {
+            stages: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+      ]);
 
-      name:
-        'SGN EAST STEEL PLANT',
+    const projectRows = projects.map((project) => {
+      const projectComponents = components.filter(
+        (component) => component.projectId === project.id,
+      );
+      const completedComponents = projectComponents.filter((component) =>
+        ['INSTALLED', 'READY', 'STOCK'].includes(component.status),
+      );
+      const projectTransactions = inventoryTransactions.filter(
+        (transaction) => transaction.projectId === project.id,
+      );
+      const projectOrders = productionOrders.filter(
+        (order) => order.projectId === project.id,
+      );
+      const componentProgress = projectComponents.length
+        ? (completedComponents.length / projectComponents.length) * 100
+        : project.status === 'COMPLETED'
+          ? 100
+          : project.status === 'ACTIVE'
+            ? 60
+            : 0;
+      const orderProgress = projectOrders.length
+        ? (projectOrders.filter((order) => order.status === 'COMPLETED').length /
+            projectOrders.length) *
+          100
+        : componentProgress;
+      const progress = Math.round((componentProgress + orderProgress) / 2);
+      const contractValue =
+        projectComponents.reduce(
+          (sum, component) => sum + Number(component.estimatedCost ?? 0),
+          0,
+        ) ||
+        projectTransactions.reduce(
+          (sum, transaction) =>
+            sum +
+            transaction.items.reduce(
+              (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+              0,
+            ),
+          0,
+        );
+      const actualValue =
+        projectComponents.reduce(
+          (sum, component) => sum + Number(component.actualCost ?? 0),
+          0,
+        ) ||
+        projectTransactions.reduce(
+          (sum, transaction) =>
+            sum +
+            transaction.items.reduce(
+              (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+              0,
+            ),
+          0,
+        );
+      const tonnage =
+        projectOrders.reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) ||
+        projectComponents.length;
+      const delivered = projectComponents.filter((component) =>
+        ['READY', 'STOCK', 'INSTALLED'].includes(component.status),
+      ).length;
+      const delayedOrders = projectOrders.filter((order) => order.status === 'DELAYED')
+        .length;
 
-      status:
-        'ACTIVE',
+      return {
+        ...project,
+        progress,
+        type: this.projectType(project.name),
+        location: this.projectLocation(project.description),
+        owner: this.projectOwner(project.description),
+        contractValue,
+        actualValue,
+        tonnage,
+        delivered,
+        pending: Math.max(0, projectComponents.length - delivered),
+        delayedOrders,
+        componentCount: projectComponents.length,
+        orderCount: projectOrders.length,
+        materialTransactions: projectTransactions.length,
+        startedAt: project.createdAt,
+        plannedEndAt: project.updatedAt,
+      };
+    });
 
-      progress: 68,
+    const totalContractValue = projectRows.reduce(
+      (sum, row) => sum + row.contractValue,
+      0,
+    );
+    const totalActualValue = projectRows.reduce(
+      (sum, row) => sum + row.actualValue,
+      0,
+    );
+    const totalProgress = projectRows.length
+      ? projectRows.reduce((sum, row) => sum + row.progress, 0) / projectRows.length
+      : 0;
+    const materialRows = inventoryTransactions.flatMap((transaction) =>
+      transaction.items.map((item) => {
+        const project = projects.find((row) => row.id === transaction.projectId);
+        return {
+          id: item.id,
+          projectId: transaction.projectId,
+          projectCode: project?.code ?? '-',
+          projectName: project?.name ?? '-',
+          materialCode: item.inventoryItem.code,
+          materialName: item.inventoryItem.name,
+          unit: item.unit?.symbol ?? item.inventoryItem.unit,
+          quantity: Number(item.quantity ?? 0),
+          unitPrice: Number(item.unitPrice ?? 0),
+          totalAmount: Number(item.totalAmount ?? 0),
+          type: transaction.type,
+          date: transaction.transactionDate,
+        };
+      }),
+    );
 
-      tonnage: 420,
+    return {
+      metrics: {
+        totalProjects: projectRows.length,
+        activeProjects: projectRows.filter((row) => row.status === 'ACTIVE').length,
+        planningProjects: projectRows.filter((row) => row.status === 'PLANNING').length,
+        completedProjects: projectRows.filter((row) => row.status === 'COMPLETED').length,
+        contractValue: totalContractValue,
+        actualValue: totalActualValue,
+        averageProgress: totalProgress,
+      },
+      projects: projectRows,
+      progress: projectRows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        progress: row.progress,
+        status: row.status,
+        tonnage: row.tonnage,
+        componentCount: row.componentCount,
+        delayedOrders: row.delayedOrders,
+        startedAt: row.startedAt,
+        plannedEndAt: row.plannedEndAt,
+      })),
+      materials: materialRows,
+      reports: {
+        byStatus: [
+          { status: 'ACTIVE', count: projectRows.filter((row) => row.status === 'ACTIVE').length },
+          { status: 'PLANNING', count: projectRows.filter((row) => row.status === 'PLANNING').length },
+          { status: 'COMPLETED', count: projectRows.filter((row) => row.status === 'COMPLETED').length },
+        ],
+        byType: Array.from(
+          projectRows.reduce((map, row) => {
+            map.set(row.type, (map.get(row.type) ?? 0) + row.contractValue);
+            return map;
+          }, new Map<string, number>()),
+        ).map(([type, value]) => ({ type, value })),
+        topByContract: [...projectRows]
+          .sort((a, b) => b.contractValue - a.contractValue)
+          .slice(0, 5),
+      },
+    };
+  }
 
-      delivered: 312,
+  private projectType(name: string) {
+    const value = name.toLowerCase();
+    if (value.includes('kho') || value.includes('logistics')) return 'Kho bãi';
+    if (value.includes('cầu') || value.includes('hạ tầng')) return 'Hạ tầng';
+    if (value.includes('văn phòng')) return 'Văn phòng';
+    if (value.includes('trung tâm')) return 'Tòa nhà';
+    return 'Nhà xưởng';
+  }
 
-      pending: 108,
+  private projectLocation(description?: string | null) {
+    if (!description) return '-';
+    const match = description.match(/(?:địa điểm|location)\s*:\s*([^;]+)/i);
+    return match?.[1]?.trim() ?? '-';
+  }
 
-      manpower: 54,
-
-      qcIssues: 2,
-
-      zone:
-        'HCM',
-
-      updatedAt:
-        new Date()
-          .toISOString(),
-    },
-
-    {
-      id: 'PRJ-002',
-
-      name:
-        'LONG AN LOGISTICS HUB',
-
-      status:
-        'DELAYED',
-
-      progress: 41,
-
-      tonnage: 220,
-
-      delivered: 97,
-
-      pending: 123,
-
-      manpower: 26,
-
-      qcIssues: 5,
-
-      zone:
-        'LONG AN',
-
-      updatedAt:
-        new Date()
-          .toISOString(),
-    },
-
-    {
-      id: 'PRJ-003',
-
-      name:
-        'VUNG TAU ENERGY CENTER',
-
-      status:
-        'ACTIVE',
-
-      progress: 82,
-
-      tonnage: 680,
-
-      delivered: 590,
-
-      pending: 90,
-
-      manpower: 73,
-
-      qcIssues: 1,
-
-      zone:
-        'VUNG TAU',
-
-      updatedAt:
-        new Date()
-          .toISOString(),
-    },
-  ]
-}
+  private projectOwner(description?: string | null) {
+    if (!description) return '-';
+    const match = description.match(/(?:chủ đầu tư|owner)\s*:\s*([^;]+)/i);
+    return match?.[1]?.trim() ?? '-';
+  }
 
   private async assertExists(id: string, tx: Prisma.TransactionClient) {
     const project = await this.repository.findOne(id, tx);

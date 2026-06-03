@@ -12,6 +12,7 @@ import {
   ProductionStageCode,
   ProductionStageStatus,
   ProductionTaskStatus,
+  QcInspectionStatus,
   YardItemType,
 } from '@prisma/client';
 
@@ -459,17 +460,24 @@ export class ProductionService {
       );
     }
 
-    const existingPlacement = await this.prisma.yardItemPlacement.findFirst({
+    const approvedQc = await this.prisma.qcInspection.findFirst({
       where: {
-        itemType: YardItemType.COMPONENT,
-        itemId: order.component.id,
-        removedAt: null,
+        OR: [
+          { productionOrderId: order.id },
+          { componentId: order.component.id },
+        ],
+        status: {
+          in: [
+            QcInspectionStatus.PASSED,
+            QcInspectionStatus.APPROVED,
+          ],
+        },
       },
     });
 
-    if (existingPlacement) {
+    if (!approvedQc) {
       throw new BadRequestException(
-        'Component already has an active yard placement',
+        'QC inspection must be passed or approved before staging finished component to yard',
       );
     }
 
@@ -482,6 +490,29 @@ export class ProductionService {
       throw new NotFoundException('Yard slot not found');
     }
 
+    const placements = await this.prisma.yardItemPlacement.findMany({
+      where: {
+        itemType: YardItemType.COMPONENT,
+        itemId: order.component.id,
+        removedAt: null,
+      },
+    });
+
+    const stagedQuantity = placements.reduce(
+      (sum, row) => sum + Number(row.quantity ?? 0),
+      0,
+    );
+    const remainingQuantity = Number(order.quantity) - stagedQuantity;
+    const quantity = Number(dto.quantity ?? remainingQuantity);
+
+    if (quantity <= 0) {
+      throw new BadRequestException('Invalid quantity');
+    }
+
+    if (quantity > remainingQuantity) {
+      throw new BadRequestException(`Only ${remainingQuantity} remaining`);
+    }
+
     const placement = await this.yardService.placeItem(
       {
         slotId: dto.slotId,
@@ -489,7 +520,7 @@ export class ProductionService {
         itemId: order.component.id,
         itemCode: order.component.code,
         itemName: order.component.name,
-        quantity: dto.quantity ?? order.quantity,
+        quantity,
         stackLevel: dto.stackLevel,
         weight: dto.weight,
         length: dto.length,
@@ -539,6 +570,16 @@ export class ProductionService {
         },
       }),
     ]);
+    const totalStaged = stagedQuantity + quantity;
+
+    if (totalStaged >= Number(order.quantity)) {
+      await this.prisma.productionOrder.update({
+        where: { id: order.id },
+        data: {
+          status: ProductionOrderStatus.COMPLETED,
+        },
+      });
+    }
 
     await this.eventBus.emit(
       'production.staged.to-yard',

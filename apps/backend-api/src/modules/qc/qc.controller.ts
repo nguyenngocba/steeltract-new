@@ -211,4 +211,9 @@ export class QcController {
   metrics() {
     return this.qcService.metrics();
   }
+
+  @Get('cockpit')
+  cockpit() {
+    return this.qcService.cockpit();
+  }
 }

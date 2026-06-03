@@ -682,13 +682,18 @@ export class InventoryService {
 
           if (line.quantity < 0) {
             const currentStock =
-              await this.getCurrentStock(
-                line.inventoryItemId,
-                tx,
-              )
+              line.zoneId
+                ? await this.getCurrentStockAtLocation(
+                    line.inventoryItemId,
+                    line.zoneId,
+                    tx,
+                  )
+                : await this.getCurrentStock(line.inventoryItemId, tx)
             if (currentStock + line.quantity < 0) {
               throw new Error(
-                `Insufficient stock for ${item.code}`,
+                line.zoneId
+                  ? `Insufficient stock for ${item.code} at selected location`
+                  : `Insufficient stock for ${item.code}`,
               )
             }
           }
@@ -972,6 +977,31 @@ export class InventoryService {
         tx,
       )
     return Number(item?.quantity ?? 0)
+  }
+
+  private async getCurrentStockAtLocation(
+    inventoryItemId: string,
+    zoneId: string,
+    tx: any = this.prisma,
+  ) {
+    const aggregate =
+      await tx.inventoryTransactionItem.aggregate({
+        where: {
+          inventoryItemId,
+          OR: [
+            { zoneId },
+            {
+              zoneId: null,
+              transaction: {
+                zoneId,
+              },
+            },
+          ],
+        },
+        _sum: { quantity: true },
+      })
+
+    return Number(aggregate._sum.quantity ?? 0)
   }
 
   private async getStockMap(itemIds: string[]) {
