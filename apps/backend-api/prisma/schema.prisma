@@ -735,6 +735,8 @@ model InventoryItem {
 
   transactionItems InventoryTransactionItem[]
   returnItems ReturnRequestItem[]
+  bomItems BOMItem[]
+  productionMaterialIssues ProductionMaterialIssue[]
 
   @@index([code])
   @@index([name])
@@ -968,6 +970,8 @@ model Component {
   timelines ComponentTimeline[]
 
   tasks Task[]
+
+  productionOrders ProductionOrder[]
 
   @@index([status])
   @@index([projectId])
@@ -1834,6 +1838,7 @@ model ProductionOrder {
   description     String?
   projectId       String?
   componentId     String?
+  bomId           String?
   quantity        Float                 @default(1)
   priority        TaskPriority          @default(MEDIUM)
   status          ProductionOrderStatus @default(DRAFT)
@@ -1853,10 +1858,14 @@ model ProductionOrder {
   tasks     ProductionTask[]
   schedules ProductionSchedule[]
   logs      ProductionLog[]
+  bom       BOM?                  @relation(fields: [bomId], references: [id], onDelete: SetNull)
+  component Component?            @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  materialIssues ProductionMaterialIssue[]
 
   @@index([status])
   @@index([projectId])
   @@index([componentId])
+  @@index([bomId])
   @@index([currentStageCode])
   @@map("production_orders")
 }
@@ -2426,13 +2435,27 @@ model BOM {
 
   productName   String
 
+  structureType String?
+
+  projectId     String?
+
+  unit          String?
+
+  estimatedWeight Float @default(0)
+
   version       String
 
   status        String   @default("ACTIVE")
 
   createdAt     DateTime @default(now())
 
+  updatedAt     DateTime @updatedAt
+
   items         BOMItem[]
+
+  routingSteps  BOMRoutingStep[]
+
+  productionOrders ProductionOrder[]
 }
 
 model BOMItem {
@@ -2445,7 +2468,71 @@ model BOMItem {
 
   quantity      Float
 
+  wastePercent  Float @default(0)
+
+  category      String @default("MAIN_MATERIAL")
+
   bom           BOM @relation(fields: [bomId], references: [id])
+
+  material      InventoryItem @relation(fields: [materialId], references: [id])
+
+  @@index([bomId])
+  @@index([materialId])
+}
+
+model BOMRoutingStep {
+
+  id            String   @id @default(uuid())
+
+  bomId         String
+
+  stepNo        Int
+
+  stepName      String
+
+  workshop      String?
+
+  expectedHours Float @default(0)
+
+  qcRequired    Boolean @default(false)
+
+  bom           BOM @relation(fields: [bomId], references: [id], onDelete: Cascade)
+
+  @@unique([bomId, stepNo])
+  @@index([bomId])
+}
+
+model ProductionMaterialIssue {
+
+  id                String   @id @default(uuid())
+
+  issueNo           String   @unique
+
+  productionOrderId String
+
+  inventoryItemId   String
+
+  warehouseId       String?
+
+  zoneId            String?
+
+  issuedQty         Float
+
+  issuedBy          String?
+
+  issuedDate        DateTime @default(now())
+
+  status            String   @default("DRAFT")
+
+  remarks           String?
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([productionOrderId])
+  @@index([inventoryItemId])
+  @@index([issuedDate])
 }
 
 // =========================================================

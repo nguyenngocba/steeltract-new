@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Users,
   Settings,
+  Factory,
 } from 'lucide-react'
 
 export const navigation = [
@@ -127,6 +128,20 @@ export const navigation = [
         path:
           '/components/history',
       },
+    ],
+  },
+
+  {
+    title: 'SẢN XUẤT',
+
+    icon: Factory,
+
+    children: [
+      { title: 'Tổng quan sản xuất', path: '/production' },
+      { title: 'Production BOM', path: '/production/boms' },
+      { title: 'Lệnh sản xuất (MO)', path: '/production/orders' },
+      { title: 'Cấp phát vật tư', path: '/production/material-issues' },
+      { title: 'Nhật ký sản xuất', path: '/production/logs' },
     ],
   },
 

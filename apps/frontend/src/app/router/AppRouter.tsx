@@ -151,6 +151,11 @@ export function AppRouter() {
         element={<ProductionPage />}
       />
 
+      <Route path="/production/boms" element={<ProductionPage />} />
+      <Route path="/production/orders" element={<ProductionPage />} />
+      <Route path="/production/material-issues" element={<ProductionPage />} />
+      <Route path="/production/logs" element={<ProductionPage />} />
+
       <Route
         path="/qc"
         element={<QcPage />}

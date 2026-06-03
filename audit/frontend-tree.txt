@@ -1,0 +1,1426 @@
+apps/frontend/src
+├── ApiRuntimeStatus.tsx
+├── app
+│   ├── AppProviders.tsx
+│   ├── AppRoot.tsx
+│   ├── AppShell.tsx
+│   ├── App.tsx
+│   ├── bootstrap
+│   │   └── bootstrap-app.ts
+│   ├── config
+│   │   └── navigation.config.ts
+│   ├── core
+│   │   ├── bootstrap.ts
+│   │   └── platform.ts
+│   ├── entry
+│   │   └── main.tsx
+│   ├── navigation.ts
+│   ├── providers
+│   │   └── AppProviders.tsx
+│   ├── router
+│   │   └── AppRouter.tsx
+│   ├── runtime
+│   │   ├── bootstrap.ts
+│   │   └── runtime.ts
+│   ├── services
+│   │   └── app.service.ts
+│   └── shell
+│       ├── AppShell.tsx
+│       ├── insights
+│       ├── layout
+│       ├── layouts
+│       ├── panels
+│       ├── sidebar
+│       ├── topbar
+│       └── workspace
+├── App.css
+├── application
+│   ├── boot
+│   │   └── bootstrap.ts
+│   ├── modules
+│   │   └── module-registry.ts
+│   └── runtime
+│       └── ApplicationRuntime.ts
+├── App.tsx
+├── _archived
+│   ├── components-legacy
+│   │   └── workspace-ui
+│   ├── _deprecated_modules
+│   │   ├── admin-module
+│   │   ├── analytics-module
+│   │   ├── analytics-ui
+│   │   ├── components-module
+│   │   ├── digital-twin-module
+│   │   ├── executive-module
+│   │   ├── logistics-module
+│   │   ├── production-module
+│   │   ├── production-ui
+│   │   ├── qc-module
+│   │   ├── qc-ui
+│   │   ├── simulation-ui
+│   │   └── yard-module
+│   ├── final-purge
+│   │   ├── actions
+│   │   ├── cockpit
+│   │   ├── dashboards
+│   │   ├── data-tables
+│   │   ├── feeds
+│   │   ├── heatmaps-runtime
+│   │   ├── layout-engine
+│   │   ├── machine-runtime
+│   │   ├── pipeline
+│   │   ├── stack-visualization
+│   │   ├── toolbars
+│   │   ├── ui
+│   │   └── visual-tabs
+│   ├── inventory-legacy
+│   │   ├── fullscreen
+│   │   ├── layout-engine
+│   │   ├── ui
+│   │   ├── visualization
+│   │   └── visual-tabs
+│   ├── layout-system
+│   │   ├── app-layouts
+│   │   └── shared-layouts
+│   ├── legacy-pages
+│   ├── legacy-router
+│   │   └── router
+│   ├── prototype-layers
+│   │   ├── cockpit
+│   │   ├── command-center
+│   │   ├── dashboards
+│   │   ├── digital-renderers
+│   │   ├── digital-runtime
+│   │   ├── fullscreen
+│   │   ├── layout-engine
+│   │   ├── machine-visualization
+│   │   ├── spatial-runtime
+│   │   ├── ui
+│   │   └── visual-tabs
+│   ├── router
+│   │   └── AppRouter.tsx
+│   ├── routes
+│   │   └── routes
+│   ├── yard-legacy
+│   │   ├── digital-twin
+│   │   └── workspace-ui
+│   ├── yard-ui
+│   │   ├── CraneStatusPanel.tsx
+│   │   ├── index.ts
+│   │   ├── MovementTimeline.tsx
+│   │   ├── SlotCard.tsx
+│   │   ├── UtilizationWidgets.tsx
+│   │   ├── yard-api.ts
+│   │   ├── YardHeatmap.tsx
+│   │   ├── yard-hooks.ts
+│   │   ├── YardMap.tsx
+│   │   ├── YardSearchPanel.tsx
+│   │   ├── YardSnapshotViewer.tsx
+│   │   ├── yard.types.ts
+│   │   ├── yard-utils.ts
+│   │   └── ZoneGrid.tsx
+│   └── yard-visualization
+│       ├── components
+│       ├── hooks
+│       ├── index.ts
+│       ├── layers
+│       └── renderer
+├── assets
+│   ├── hero.png
+│   ├── react.svg
+│   └── vite.svg
+├── autonomous
+│   ├── engine
+│   │   └── autonomous.engine.ts
+│   └── runtime
+│       ├── decision.types.ts
+│       └── runtime.bootstrap.ts
+├── components
+│   ├── dashboard
+│   │   ├── AiInsightSlotWidget.tsx
+│   │   ├── AttendanceSummaryWidget.tsx
+│   │   ├── dashboard-utils.ts
+│   │   ├── index.ts
+│   │   ├── InventoryAlertsWidget.tsx
+│   │   ├── KpiOverviewWidget.tsx
+│   │   ├── ProductionSummaryWidget.tsx
+│   │   ├── ProjectProgressWidget.tsx
+│   │   ├── RealtimeActivityWidget.tsx
+│   │   ├── RecentJobsWidget.tsx
+│   │   ├── RecentTransactionsWidget.tsx
+│   │   └── WorkflowApprovalsWidget.tsx
+│   ├── layout
+│   │   └── PageHeader
+│   ├── ui
+│   │   ├── Button
+│   │   ├── Card
+│   │   ├── ComponentStatusBadge.tsx
+│   │   ├── Drawer
+│   │   ├── index.ts
+│   │   ├── Input
+│   │   ├── KpiCard
+│   │   ├── Modal
+│   │   ├── SearchBar
+│   │   ├── Select
+│   │   ├── StatusBadge
+│   │   ├── Table
+│   │   ├── Tabs
+│   │   └── Workspace
+│   └── ui-system
+│       ├── ActivityFeed.tsx
+│       ├── AppShell.tsx
+│       ├── ChartContainer.tsx
+│       ├── CommandPalette.tsx
+│       ├── ConfirmDialog.tsx
+│       ├── DataTable.tsx
+│       ├── DrawerShell.tsx
+│       ├── EmptyState.tsx
+│       ├── ErrorState.tsx
+│       ├── FilterBar.tsx
+│       ├── FormPattern.tsx
+│       ├── index.ts
+│       ├── LoadingState.tsx
+│       ├── ModalShell.tsx
+│       ├── PageLayout.tsx
+│       ├── SearchInput.tsx
+│       ├── SectionCard.tsx
+│       ├── StatCard.tsx
+│       ├── StatusBadge.tsx
+│       ├── Timeline.tsx
+│       ├── toast.ts
+│       └── types.ts
+├── config
+│   ├── api
+│   │   └── api.config.ts
+│   ├── app.config.ts
+│   ├── layout.config.ts
+│   ├── layouts
+│   │   └── workspace.config.ts
+│   ├── modules
+│   │   └── modules.config.ts
+│   ├── platform
+│   │   ├── navigation.config.ts
+│   │   └── platform.config.ts
+│   ├── routes.config.ts
+│   ├── runtime
+│   │   └── runtime.config.ts
+│   ├── socket
+│   │   └── socket.config.ts
+│   └── telemetry.config.ts
+├── core
+│   ├── application
+│   │   └── Application.ts
+│   ├── domain
+│   │   ├── AggregateRoot.ts
+│   │   ├── Entity.ts
+│   │   └── ValueObject.ts
+│   ├── infrastructure
+│   │   └── Infrastructure.ts
+│   ├── presentation
+│   │   └── Presentation.ts
+│   ├── realtime
+│   │   ├── runtime.socket.ts
+│   │   └── runtime.store.ts
+│   └── socket
+│       ├── runtime.listeners.ts
+│       └── runtime.socket.ts
+├── docs
+│   ├── ARCHITECTURE_DECISION.md
+│   └── BUSINESS_PRIORITIES.md
+├── engines
+│   ├── analytics
+│   ├── realtime
+│   ├── spatial
+│   ├── telemetry
+│   └── workflow
+├── hooks
+│   └── query
+│       ├── useComponentQueries.ts
+│       ├── useDashboardQueries.ts
+│       ├── useInventoryQueries.ts
+│       ├── useProjectQueries.ts
+│       └── useTaskQueries.ts
+├── index.css
+├── infrastructure
+│   └── realtime
+│       └── socket.ts
+├── intelligence
+│   ├── lake
+│   │   ├── data-lake.ts
+│   │   └── event.types.ts
+│   └── mesh
+│       ├── intelligence.mesh.ts
+│       └── mesh.bootstrap.ts
+├── kernel
+│   ├── registry
+│   │   └── runtime.registry.ts
+│   ├── runtime
+│   │   ├── kernel.bootstrap.ts
+│   │   └── runtime.scheduler.ts
+│   └── services
+│       └── kernel.services.ts
+├── _legacy_modules
+│   ├── command-center
+│   │   ├── AiCopilotPanel.tsx
+│   │   ├── AlertTicker.tsx
+│   │   ├── AnimatedMetricCard.tsx
+│   │   ├── CommandCenterLayout.tsx
+│   │   ├── command-center.types.ts
+│   │   ├── command-center-utils.ts
+│   │   ├── DigitalTwinReplayPanel.tsx
+│   │   ├── FullscreenTvMode.tsx
+│   │   ├── index.ts
+│   │   ├── IndustrialMotionStrip.tsx
+│   │   ├── LiveKpiGrid.tsx
+│   │   ├── LiveNotificationStack.tsx
+│   │   ├── LiveProductionPulse.tsx
+│   │   ├── LiveQcPulse.tsx
+│   │   ├── OperationalSearchPanel.tsx
+│   │   ├── RealtimeActivityStream.tsx
+│   │   ├── SystemHealthPanel.tsx
+│   │   ├── TelemetryAtmosphere.tsx
+│   │   ├── useCommandCenterEvents.ts
+│   │   ├── WorkflowSlaWarnings.tsx
+│   │   └── YardCongestionPanel.tsx
+│   ├── inventory
+│   │   └── InventoryRuntimeGridPage.tsx
+│   ├── layouts
+│   │   └── sidebar
+│   ├── navigation
+│   │   ├── DynamicSidebar.tsx
+│   │   ├── FavoriteModulesPanel.tsx
+│   │   ├── index.ts
+│   │   ├── LanguageSwitcher.tsx
+│   │   ├── navigation-registry.ts
+│   │   ├── navigation.service.ts
+│   │   ├── navigation-storage.ts
+│   │   ├── navigation.types.ts
+│   │   ├── NotificationCenter.tsx
+│   │   ├── QuickActionsPanel.tsx
+│   │   ├── RecentItemsPanel.tsx
+│   │   ├── SmartBreadcrumbs.tsx
+│   │   ├── workspace-registry.ts
+│   │   ├── WorkspaceShell.tsx
+│   │   └── WorkspaceSwitcher.tsx
+│   ├── operator-actions
+│   │   ├── ContextualOperationDrawer.tsx
+│   │   ├── index.ts
+│   │   ├── OperatorActionMenu.tsx
+│   │   ├── operator-action.types.ts
+│   │   ├── OperatorQuickActionsPanel.tsx
+│   │   └── useOperatorActions.tsx
+│   ├── production
+│   │   └── context
+│   └── runtime
+│       └── runtime
+├── lib
+│   ├── api.ts
+│   ├── attachments
+│   │   ├── attachment-hooks.ts
+│   │   ├── AttachmentPreview.tsx
+│   │   ├── attachments-api.ts
+│   │   ├── AttachmentTimeline.tsx
+│   │   ├── attachment.types.ts
+│   │   ├── FileBadge.tsx
+│   │   ├── index.ts
+│   │   └── UploadDropzone.tsx
+│   ├── auth
+│   │   ├── auth-api.ts
+│   │   ├── auth-interceptor.ts
+│   │   ├── auth.types.ts
+│   │   ├── token-storage.ts
+│   │   ├── useCurrentUser.ts
+│   │   ├── useLogout.ts
+│   │   └── usePermission.ts
+│   ├── i18n
+│   │   └── language.store.ts
+│   ├── jobs
+│   │   ├── BackgroundTaskStatus.tsx
+│   │   ├── index.ts
+│   │   ├── job-hooks.ts
+│   │   ├── jobs-api.ts
+│   │   ├── JobStatusBadge.tsx
+│   │   ├── job.types.ts
+│   │   ├── RetryStatusBadge.tsx
+│   │   └── SchedulerTimeline.tsx
+│   ├── performance
+│   │   ├── event-batcher.ts
+│   │   ├── index.ts
+│   │   ├── SlowQueryWarning.tsx
+│   │   ├── useAdaptiveRefresh.ts
+│   │   ├── usePerformanceMonitor.ts
+│   │   └── visibility.ts
+│   ├── query
+│   │   ├── invalidation.ts
+│   │   ├── query-client.ts
+│   │   ├── query-keys.ts
+│   │   └── QueryProvider.tsx
+│   ├── realtime
+│   │   ├── event-handlers.ts
+│   │   ├── query-event-bridge.ts
+│   │   ├── realtime-provider.tsx
+│   │   └── socket-client.ts
+│   ├── socket.ts
+│   └── workflow
+│       ├── ApprovalActionModal.tsx
+│       ├── index.ts
+│       ├── workflow-api.ts
+│       ├── workflow-hooks.ts
+│       ├── WorkflowStatusBadge.tsx
+│       ├── WorkflowTimeline.tsx
+│       └── workflow.types.ts
+├── locales
+│   ├── en
+│   │   ├── common.json
+│   │   ├── inventory.json
+│   │   ├── operational.json
+│   │   └── yard.json
+│   └── vi
+│       ├── common.json
+│       ├── inventory.json
+│       ├── operational.json
+│       └── yard.json
+├── main.tsx
+├── marketplace
+│   ├── registry
+│   │   └── plugin.registry.ts
+│   └── runtime
+│       ├── plugin.bootstrap.ts
+│       └── plugin.types.ts
+├── mock
+│   ├── operations
+│   │   └── inventory.ts
+│   ├── production
+│   ├── telemetry
+│   └── yard
+├── modules
+│   ├── ai
+│   │   ├── api
+│   │   ├── components
+│   │   └── pages
+│   ├── ai-assistant
+│   │   ├── chat
+│   │   ├── command-center
+│   │   ├── mock-data
+│   │   ├── search
+│   │   └── store
+│   ├── AIForecastCard.tsx
+│   ├── ai-runtime
+│   │   ├── components
+│   │   └── pages
+│   ├── analytics
+│   │   ├── charts
+│   │   ├── components
+│   │   ├── mock-data
+│   │   ├── pages
+│   │   ├── reports
+│   │   └── widgets
+│   ├── auth
+│   │   ├── login.api.ts
+│   │   ├── pages
+│   │   └── store
+│   ├── autonomous
+│   │   ├── components
+│   │   └── pages
+│   ├── backup
+│   │   ├── engine
+│   │   ├── history
+│   │   ├── recovery
+│   │   ├── restore
+│   │   ├── snapshots
+│   │   └── workspaces
+│   ├── cmms
+│   │   ├── api
+│   │   ├── components
+│   │   ├── hooks
+│   │   └── pages
+│   ├── command-center
+│   │   ├── components
+│   │   └── pages
+│   ├── communication
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── components
+│   │   ├── actions
+│   │   ├── analytics
+│   │   ├── api
+│   │   ├── application
+│   │   ├── charts
+│   │   ├── components
+│   │   ├── config
+│   │   ├── dashboards
+│   │   ├── data-tables
+│   │   ├── dialogs
+│   │   ├── domain
+│   │   ├── fabrication
+│   │   ├── features
+│   │   ├── feeds
+│   │   ├── filters
+│   │   ├── hooks
+│   │   ├── index.ts
+│   │   ├── lib
+│   │   ├── machines
+│   │   ├── machine-streams
+│   │   ├── pages
+│   │   ├── panels
+│   │   ├── registry
+│   │   ├── runtime
+│   │   ├── services
+│   │   ├── state
+│   │   ├── store
+│   │   ├── tables
+│   │   ├── tabs
+│   │   ├── telemetry
+│   │   ├── types
+│   │   └── workspaces
+│   ├── copilot
+│   │   ├── components
+│   │   └── pages
+│   ├── dashboard
+│   │   ├── alerts
+│   │   ├── analytics
+│   │   ├── analytics-runtime
+│   │   ├── api
+│   │   ├── charts
+│   │   ├── command-center
+│   │   ├── components
+│   │   ├── executive
+│   │   ├── grid
+│   │   ├── hooks
+│   │   ├── layouts
+│   │   ├── pages
+│   │   ├── panels
+│   │   ├── realtime
+│   │   ├── runtime
+│   │   ├── services
+│   │   ├── store
+│   │   ├── types
+│   │   └── widgets
+│   ├── digital-twin
+│   │   ├── components
+│   │   ├── mock-data
+│   │   ├── pages
+│   │   ├── scene
+│   │   └── store
+│   ├── documents
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── equipment
+│   │   └── pages
+│   ├── erp
+│   │   ├── api
+│   │   ├── components
+│   │   └── pages
+│   ├── executive
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── federation
+│   │   ├── components
+│   │   └── pages
+│   ├── hrm
+│   │   ├── api
+│   │   ├── components
+│   │   └── pages
+│   ├── intelligence
+│   │   ├── components
+│   │   └── pages
+│   ├── inventory
+│   │   ├── analytics
+│   │   ├── api
+│   │   ├── application
+│   │   ├── charts
+│   │   ├── components
+│   │   ├── config
+│   │   ├── context
+│   │   ├── counting
+│   │   ├── dialogs
+│   │   ├── domain
+│   │   ├── features
+│   │   ├── hooks
+│   │   ├── inbound
+│   │   ├── index.ts
+│   │   ├── issue
+│   │   ├── kpi
+│   │   ├── maps
+│   │   ├── material-flow
+│   │   ├── pages
+│   │   ├── panels
+│   │   ├── popups
+│   │   ├── realtime
+│   │   ├── registry
+│   │   ├── reservations
+│   │   ├── runtime
+│   │   ├── services
+│   │   ├── state
+│   │   ├── store
+│   │   ├── tables
+│   │   ├── tabs
+│   │   ├── telemetry
+│   │   ├── transfer
+│   │   ├── types
+│   │   ├── warehouse
+│   │   ├── websocket
+│   │   └── widgets
+│   ├── iot
+│   │   ├── components
+│   │   ├── pages
+│   │   └── store
+│   ├── kernel
+│   │   ├── components
+│   │   └── pages
+│   ├── logistics
+│   │   ├── components
+│   │   ├── config
+│   │   ├── engine
+│   │   ├── fleet
+│   │   ├── pages
+│   │   ├── shipping
+│   │   └── workspaces
+│   ├── maintenance
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── marketplace
+│   │   ├── components
+│   │   └── pages
+│   ├── master-data
+│   │   ├── api
+│   │   ├── categories
+│   │   ├── components
+│   │   ├── hooks
+│   │   ├── index.ts
+│   │   ├── material-categories
+│   │   ├── material-statuses
+│   │   ├── material-types
+│   │   ├── pages
+│   │   ├── priorities
+│   │   ├── project-categories
+│   │   ├── qc-statuses
+│   │   ├── services
+│   │   ├── store
+│   │   ├── supplier-categories
+│   │   ├── transaction-types
+│   │   ├── types
+│   │   ├── uom
+│   │   ├── warehouses
+│   │   ├── workflow-statuses
+│   │   ├── workspaces
+│   │   └── yard-zones
+│   ├── master-runtime
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── material-movements
+│   │   ├── api
+│   │   └── pages
+│   ├── mes
+│   │   ├── api
+│   │   ├── components
+│   │   ├── hooks
+│   │   └── pages
+│   ├── navigation.config.ts
+│   ├── nexus
+│   │   ├── components
+│   │   └── pages
+│   ├── notifications
+│   │   ├── center
+│   │   ├── components
+│   │   ├── feeds
+│   │   ├── mock-data
+│   │   ├── pages
+│   │   ├── realtime
+│   │   ├── store
+│   │   └── workspaces
+│   ├── operational-cockpit
+│   │   ├── cockpit-configs.tsx
+│   │   └── OperationalCockpitPage.tsx
+│   ├── operations
+│   │   ├── context
+│   │   ├── events
+│   │   ├── index.ts
+│   │   ├── layouts
+│   │   ├── orchestration
+│   │   ├── panels
+│   │   └── telemetry
+│   ├── permissions
+│   │   ├── policies
+│   │   └── workspaces
+│   ├── planning
+│   │   ├── engine
+│   │   ├── features
+│   │   ├── pages
+│   │   ├── telemetry
+│   │   └── workspaces
+│   ├── platform
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── procurement
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── production
+│   │   ├── api
+│   │   ├── components
+│   │   ├── config
+│   │   ├── engine
+│   │   ├── features
+│   │   ├── hooks
+│   │   ├── index.ts
+│   │   ├── pages
+│   │   ├── store
+│   │   ├── telemetry
+│   │   └── workspaces
+│   ├── projects
+│   │   ├── api
+│   │   ├── components
+│   │   ├── config
+│   │   ├── hooks
+│   │   ├── pages
+│   │   ├── services
+│   │   ├── store
+│   │   └── types
+│   ├── purchasing
+│   │   └── pages
+│   ├── qc
+│   │   ├── api
+│   │   ├── components
+│   │   ├── config
+│   │   ├── defects
+│   │   ├── engine
+│   │   ├── inspection
+│   │   ├── pages
+│   │   ├── telemetry
+│   │   └── workspaces
+│   ├── reporting
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   ├── roles
+│   │   ├── api
+│   │   └── pages
+│   ├── settings
+│   │   ├── api
+│   │   ├── automation
+│   │   ├── components
+│   │   ├── engine
+│   │   ├── hooks
+│   │   ├── integrations
+│   │   ├── pages
+│   │   ├── preferences
+│   │   ├── services
+│   │   ├── store
+│   │   ├── system
+│   │   ├── types
+│   │   └── workspaces
+│   ├── simulation-universe
+│   │   ├── components
+│   │   └── pages
+│   ├── _standards
+│   │   └── module-structure.txt
+│   ├── suppliers
+│   │   ├── api
+│   │   ├── components
+│   │   ├── hooks
+│   │   ├── pages
+│   │   ├── services
+│   │   ├── store
+│   │   └── types
+│   ├── system-logs
+│   │   ├── audit
+│   │   ├── errors
+│   │   ├── events
+│   │   └── workspaces
+│   ├── _template
+│   │   └── components
+│   ├── tracking
+│   │   ├── api
+│   │   ├── components
+│   │   ├── mobile
+│   │   └── pages
+│   ├── users
+│   │   ├── api
+│   │   ├── management
+│   │   ├── pages
+│   │   └── workspaces
+│   ├── workflow
+│   │   ├── api
+│   │   ├── components
+│   │   └── pages
+│   ├── workforce
+│   │   ├── components
+│   │   ├── config
+│   │   └── pages
+│   └── yard
+│       ├── actions
+│       ├── analytics
+│       ├── api
+│       ├── application
+│       ├── charts
+│       ├── components
+│       ├── config
+│       ├── coordinates
+│       ├── data-tables
+│       ├── dialogs
+│       ├── domain
+│       ├── features
+│       ├── feeds
+│       ├── hooks
+│       ├── index.ts
+│       ├── live-tracking
+│       ├── maps2d
+│       ├── maps3d
+│       ├── mock-data
+│       ├── pages
+│       ├── panels
+│       ├── popups
+│       ├── registry
+│       ├── runtime
+│       ├── services
+│       ├── stacking
+│       ├── state
+│       ├── store
+│       ├── tables
+│       ├── tabs
+│       ├── telemetry
+│       ├── types
+│       ├── workspaces
+│       ├── yard.types.ts
+│       └── zones
+├── nexus
+│   ├── brain
+│   │   └── neural.brain.ts
+│   └── runtime
+│       ├── cognition.types.ts
+│       └── runtime.bootstrap.ts
+├── providers
+│   ├── AuthProvider.tsx
+│   ├── QueryProvider.tsx
+│   └── ThemeProvider.tsx
+├── runtime
+│   ├── bootstrap
+│   │   └── bootstrap-runtime.ts
+│   ├── config
+│   │   └── runtime.config.ts
+│   ├── events
+│   │   ├── event.types.ts
+│   │   ├── runtime-event.bus.ts
+│   │   ├── runtime-event.listener.ts
+│   │   └── runtime-event.store.ts
+│   ├── services
+│   │   └── runtime.service.ts
+│   └── state
+│       └── runtime.store.ts
+├── RuntimeEventTimeline.tsx
+├── RuntimeQuickActions.tsx
+├── scripts
+│   ├── build-runtime
+│   │   ├── runtime-build.sh
+│   │   └── runtime-check.sh
+│   ├── clean-build.sh
+│   ├── fix-imports.sh
+│   ├── health
+│   │   ├── check-build-health.sh
+│   │   └── check-runtime-health.sh
+│   ├── reset-cache.sh
+│   ├── runtime
+│   │   ├── checks
+│   │   └── run-health-checks.sh
+│   ├── runtime-validation
+│   │   ├── check-runtime.sh
+│   │   ├── check-telemetry.sh
+│   │   └── check-workspaces.sh
+│   └── verification
+│       ├── check-aliases.sh
+│       ├── check-duplicates.sh
+│       └── check-imports.sh
+├── services
+│   └── api
+│       ├── components.api.ts
+│       ├── dashboard.api.ts
+│       ├── inventory.api.ts
+│       ├── projects.api.ts
+│       ├── tasks.api.ts
+│       └── types.ts
+├── shared
+│   ├── 3d
+│   │   ├── engine
+│   │   ├── renderers
+│   │   └── scenes
+│   ├── action-center
+│   │   ├── ActionButton.tsx
+│   │   ├── ActionDock.tsx
+│   │   └── QuickActions.tsx
+│   ├── actions
+│   │   ├── quick-actions
+│   │   └── toolbar
+│   ├── activity-runtime
+│   │   ├── ActivityRuntime.ts
+│   │   ├── feeds
+│   │   └── timeline
+│   ├── ai
+│   │   ├── agents
+│   │   ├── analytics
+│   │   └── predictions
+│   ├── ai-engine
+│   │   ├── predictions
+│   │   └── recommendations
+│   ├── ai-runtime
+│   │   ├── factory-ai.ts
+│   │   └── openai.service.ts
+│   ├── alert-runtime
+│   │   ├── AlertRuntime.ts
+│   │   └── renderers
+│   ├── alerts
+│   │   ├── AlertBanner.tsx
+│   │   ├── AlertCard.tsx
+│   │   ├── AlertCenter.tsx
+│   │   └── AlertFeed.tsx
+│   ├── analytics
+│   │   ├── forecasting
+│   │   ├── kpi
+│   │   └── telemetry
+│   ├── api
+│   │   ├── client.ts
+│   │   ├── endpoints
+│   │   ├── errors
+│   │   ├── http
+│   │   ├── http.ts
+│   │   ├── interceptors
+│   │   ├── runtime
+│   │   └── types
+│   ├── audit
+│   │   ├── audit-engine.ts
+│   │   └── logs
+│   ├── audit-runtime
+│   │   ├── AuditRuntime.ts
+│   │   ├── events
+│   │   └── logs
+│   ├── auth
+│   │   ├── AuthGuard.tsx
+│   │   ├── auth.store.tsx
+│   │   ├── hooks
+│   │   ├── PermissionGuard.tsx
+│   │   └── services
+│   ├── build
+│   │   └── runtime
+│   ├── cache-runtime
+│   │   ├── CacheRuntime.ts
+│   │   └── stores
+│   ├── chart-runtime
+│   │   ├── bar
+│   │   ├── ChartRuntime.tsx
+│   │   ├── heatmap
+│   │   └── line
+│   ├── charts
+│   │   ├── analytics
+│   │   ├── BarChart.tsx
+│   │   ├── HeatmapChart.tsx
+│   │   ├── LineChart.tsx
+│   │   ├── operational
+│   │   ├── PieChart.tsx
+│   │   └── telemetry
+│   ├── cockpit
+│   │   ├── KpiStrip.tsx
+│   │   ├── OperationalCockpitLayout.tsx
+│   │   └── OperationalTabs.tsx
+│   ├── command-center
+│   │   ├── alerts
+│   │   ├── RealtimeCommandCenter.tsx
+│   │   └── telemetry
+│   ├── command-palette
+│   │   ├── CommandPalette.tsx
+│   │   └── commands.ts
+│   ├── components
+│   │   └── LanguageSwitcher.tsx
+│   ├── cqrs
+│   │   ├── commands
+│   │   ├── handlers
+│   │   └── queries
+│   ├── design-system
+│   │   ├── themes
+│   │   └── tokens
+│   ├── dialogs
+│   │   ├── ConfirmationDialog.tsx
+│   │   ├── FullscreenDialog.tsx
+│   │   ├── WizardDialog.tsx
+│   │   └── wizards
+│   ├── digital-runtime
+│   │   ├── maps
+│   │   ├── renderers
+│   │   └── telemetry
+│   ├── digital-twin
+│   │   ├── engine
+│   │   ├── entities
+│   │   └── renderers
+│   ├── digital-twin-engine
+│   │   ├── DigitalTwinEngine.ts
+│   │   ├── renderers
+│   │   └── scenes
+│   ├── domain
+│   │   ├── entities
+│   │   ├── events
+│   │   └── value-objects
+│   ├── empty
+│   │   ├── EmptyState.tsx
+│   │   └── NoDataState.tsx
+│   ├── errors
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── ErrorCard.tsx
+│   │   └── ErrorPage.tsx
+│   ├── error-system
+│   │   ├── ErrorBoundary.tsx
+│   │   └── runtime
+│   ├── error-tracking
+│   │   ├── ErrorTracker.ts
+│   │   ├── logging
+│   │   └── reporting
+│   ├── event-bus
+│   │   ├── EventBus.ts
+│   │   ├── events
+│   │   └── handlers
+│   ├── event-streams
+│   │   ├── EventStreamEngine.ts
+│   │   ├── processors
+│   │   └── renderers
+│   ├── executive-kpi
+│   │   ├── KpiRuntime.ts
+│   │   └── widgets
+│   ├── factory-digital-twin
+│   │   ├── engine
+│   │   ├── entities
+│   │   └── renderers
+│   ├── factory-grid
+│   │   ├── engine
+│   │   ├── factory-grid.constants.ts
+│   │   ├── factory-grid.types.ts
+│   │   ├── factory-grid.utils.ts
+│   │   ├── hooks
+│   │   └── renderers
+│   ├── factory-layout
+│   │   ├── factory-dimensions.ts
+│   │   ├── factory-grid.ts
+│   │   └── factory-zones.ts
+│   ├── factory-map
+│   │   ├── engine
+│   │   ├── entities
+│   │   └── renderers
+│   ├── factory-monitoring
+│   │   ├── alerts
+│   │   ├── FactoryMonitoringEngine.ts
+│   │   └── health
+│   ├── factory-zones
+│   │   ├── coordinates
+│   │   └── engine
+│   ├── feature-flags
+│   │   ├── feature-flags.ts
+│   │   └── useFeatureFlag.ts
+│   ├── filter-engine
+│   │   ├── builders
+│   │   ├── filter-builder.ts
+│   │   ├── filter-engine.ts
+│   │   └── runtime
+│   ├── filters
+│   │   └── components
+│   ├── filter-toolbar
+│   │   ├── filters
+│   │   └── FilterToolbar.tsx
+│   ├── forms
+│   │   ├── controls
+│   │   ├── layouts
+│   │   └── validators
+│   ├── fullscreen
+│   │   ├── FullscreenManager.tsx
+│   │   └── workspaces
+│   ├── grid-engine
+│   │   ├── GridEngine.ts
+│   │   ├── layouts
+│   │   └── renderers
+│   ├── heatmaps
+│   │   ├── engines
+│   │   └── renderers
+│   ├── heatmap-visualization
+│   │   ├── FactoryHeatmap.tsx
+│   │   └── renderers
+│   ├── hooks
+│   │   ├── useLiveTelemetry.ts
+│   │   └── useRuntimeQuery.ts
+│   ├── http
+│   │   ├── http-client.ts
+│   │   ├── http-config.ts
+│   │   └── http-errors.ts
+│   ├── i18n
+│   │   └── index.ts
+│   ├── imports
+│   │   ├── charts.ts
+│   │   ├── dialogs.ts
+│   │   ├── layouts.ts
+│   │   └── widgets.ts
+│   ├── industrial-status
+│   │   ├── badges
+│   │   └── indicators
+│   ├── industrial-ui
+│   │   ├── cards
+│   │   ├── charts
+│   │   ├── containers
+│   │   ├── effects
+│   │   ├── glass
+│   │   └── status
+│   ├── kpi
+│   │   ├── engines
+│   │   ├── KpiGrid.tsx
+│   │   ├── KpiItem.tsx
+│   │   ├── KpiTrend.tsx
+│   │   └── widgets
+│   ├── layout
+│   │   └── runtime
+│   ├── layouts
+│   │   └── OperationalShell.tsx
+│   ├── live-data
+│   │   ├── cache
+│   │   ├── LiveDataEngine.ts
+│   │   └── subscriptions
+│   ├── live-store
+│   │   ├── runtime
+│   │   └── telemetry
+│   ├── live-telemetry
+│   │   ├── channels
+│   │   ├── LiveTelemetryRuntime.ts
+│   │   └── processors
+│   ├── loading
+│   │   ├── ChartLoader.tsx
+│   │   ├── PageLoader.tsx
+│   │   └── TableLoader.tsx
+│   ├── loading-system
+│   │   ├── PageSkeleton.tsx
+│   │   └── skeletons
+│   ├── logging
+│   │   ├── formatters
+│   │   ├── LoggerEngine.ts
+│   │   └── transport
+│   ├── logging-runtime
+│   │   ├── LoggingRuntime.ts
+│   │   └── transports
+│   ├── maps
+│   ├── modals
+│   │   ├── fullscreen
+│   │   ├── ModalRoot.tsx
+│   │   └── wizards
+│   ├── module-loader
+│   │   ├── ModuleLoader.ts
+│   │   ├── registry
+│   │   └── runtime
+│   ├── monitoring
+│   │   ├── health
+│   │   ├── MonitoringRuntime.ts
+│   │   └── runtime
+│   ├── navigation
+│   │   ├── breadcrumbs
+│   │   ├── sidebar
+│   │   ├── SidebarGroup.tsx
+│   │   ├── SidebarItem.tsx
+│   │   ├── SidebarSection.tsx
+│   │   └── topbar
+│   ├── notifications
+│   │   ├── hooks
+│   │   ├── NotificationCenter.tsx
+│   │   ├── notification.store.tsx
+│   │   ├── RuntimeAlertListener.tsx
+│   │   └── ToastProvider.tsx
+│   ├── offline
+│   │   ├── cache
+│   │   ├── OfflineEngine.ts
+│   │   └── sync
+│   ├── offline-runtime
+│   │   ├── OfflineRuntime.ts
+│   │   └── sync
+│   ├── operational
+│   │   ├── ActivityFeed.tsx
+│   │   ├── grids
+│   │   ├── metrics
+│   │   └── workspaces
+│   ├── operational-maps
+│   │   ├── 2d
+│   │   ├── 3d
+│   │   └── renderers
+│   ├── operational-table
+│   │   ├── cells
+│   │   ├── OperationalTable.tsx
+│   │   └── rows
+│   ├── panels
+│   │   ├── activity
+│   │   ├── alerts
+│   │   ├── insights
+│   │   ├── OperationalInsightPanel.tsx
+│   │   └── SurfaceCard.tsx
+│   ├── panel-system
+│   │   ├── containers
+│   │   └── layouts
+│   ├── performance
+│   │   ├── memo
+│   │   └── virtualization
+│   ├── performance-engine
+│   │   ├── cache
+│   │   └── rendering
+│   ├── permissions
+│   │   ├── components
+│   │   ├── hooks
+│   │   └── PermissionGuard.tsx
+│   ├── providers
+│   │   └── RealtimeProvider.tsx
+│   ├── query-client
+│   │   ├── hooks
+│   │   ├── providers
+│   │   └── query-client.ts
+│   ├── realtime
+│   │   ├── activity
+│   │   ├── channels
+│   │   ├── events
+│   │   ├── feed
+│   │   ├── socket
+│   │   ├── socket.ts
+│   │   ├── subscriptions
+│   │   ├── useRealtimeEvents.ts
+│   │   ├── useTelemetryStream.ts
+│   │   └── useWebsocket.ts
+│   ├── realtime-notifications
+│   │   ├── channels
+│   │   └── RealtimeNotificationEngine.ts
+│   ├── recovery
+│   │   ├── checkpoints
+│   │   ├── RecoveryEngine.ts
+│   │   └── runtime
+│   ├── runtime
+│   │   └── ModulePlaceholder.tsx
+│   ├── runtime-tabs
+│   │   ├── EnterpriseModulePage.tsx
+│   │   └── EnterpriseTabBar.tsx
+│   ├── search
+│   │   ├── CommandPalette.tsx
+│   │   ├── GlobalSearchBar.tsx
+│   │   ├── GlobalSearch.tsx
+│   │   ├── hooks
+│   │   └── search.store.tsx
+│   ├── search-engine
+│   │   ├── search-engine.ts
+│   │   └── search-index.ts
+│   ├── search-runtime
+│   │   ├── indexes
+│   │   └── search-runtime.ts
+│   ├── security
+│   │   ├── auth
+│   │   └── permissions
+│   ├── security-runtime
+│   │   ├── auth
+│   │   ├── permissions
+│   │   └── SecurityRuntime.ts
+│   ├── smart-factory
+│   │   ├── analytics
+│   │   ├── runtime
+│   │   └── SmartFactoryEngine.ts
+│   ├── socket-events
+│   │   ├── components
+│   │   ├── inventory
+│   │   └── yard
+│   ├── socket-runtime
+│   │   ├── channels
+│   │   ├── events
+│   │   └── socket-runtime.ts
+│   ├── spatial
+│   │   ├── 2d
+│   │   ├── 3d
+│   │   ├── engine
+│   │   ├── FactoryGrid.tsx
+│   │   ├── MovementLayer.tsx
+│   │   ├── OccupancyLayer.tsx
+│   │   ├── renderers
+│   │   ├── WarehouseGrid.tsx
+│   │   ├── YardMap2D.tsx
+│   │   └── YardMap3D.tsx
+│   ├── spatial-engine
+│   │   ├── coordinates
+│   │   ├── grid
+│   │   └── renderers
+│   ├── status-engine
+│   │   ├── badges
+│   │   ├── chips
+│   │   └── StatusEngine.ts
+│   ├── system-health
+│   │   ├── monitors
+│   │   └── SystemHealthEngine.ts
+│   ├── system-monitoring
+│   │   ├── health
+│   │   └── performance
+│   ├── table-engine
+│   │   ├── columns
+│   │   ├── renderers
+│   │   └── table-engine.ts
+│   ├── table-runtime
+│   │   ├── cells
+│   │   ├── renderers
+│   │   └── TableRuntime.tsx
+│   ├── tables
+│   │   ├── cells
+│   │   ├── columns
+│   │   ├── DenseTable.tsx
+│   │   ├── OperationalTable.tsx
+│   │   ├── rows
+│   │   ├── StickyTable.tsx
+│   │   └── VirtualizedTable.tsx
+│   ├── telemetry
+│   │   ├── cards
+│   │   ├── feeds
+│   │   ├── KpiCard.tsx
+│   │   ├── live
+│   │   ├── metrics
+│   │   ├── TelemetryPanel.tsx
+│   │   └── TelemetryStrip.tsx
+│   ├── telemetry-dashboard
+│   │   ├── charts
+│   │   ├── TelemetryDashboard.tsx
+│   │   └── widgets
+│   ├── telemetry-engine
+│   │   ├── processors
+│   │   ├── streams
+│   │   └── TelemetryEngine.ts
+│   ├── telemetry-pipeline
+│   │   ├── processors
+│   │   ├── streams
+│   │   └── TelemetryPipeline.ts
+│   ├── telemetry-renderers
+│   │   ├── charts
+│   │   └── widgets
+│   ├── theme-engine
+│   │   ├── ThemeEngine.ts
+│   │   ├── themes
+│   │   └── tokens
+│   ├── timeline
+│   │   ├── events
+│   │   ├── OperationalTimeline.tsx
+│   │   └── renderers
+│   ├── toolbars
+│   │   ├── ActionToolbar.tsx
+│   │   ├── TelemetryToolbar.tsx
+│   │   └── WorkspaceToolbar.tsx
+│   ├── ui
+│   │   ├── Badge.tsx
+│   │   ├── buttons
+│   │   ├── Button.tsx
+│   │   ├── cards
+│   │   ├── Card.tsx
+│   │   ├── charts
+│   │   ├── chips
+│   │   ├── containers
+│   │   ├── enterprise
+│   │   ├── forms
+│   │   ├── inputs
+│   │   ├── Input.tsx
+│   │   ├── layout
+│   │   ├── modals
+│   │   ├── navigation
+│   │   ├── Panel.tsx
+│   │   ├── runtime
+│   │   ├── status
+│   │   ├── tables
+│   │   ├── Tabs.tsx
+│   │   └── toolbars
+│   ├── utils
+│   ├── visualization-engine
+│   │   ├── charts
+│   │   ├── maps
+│   │   └── VisualizationEngine.ts
+│   ├── websocket
+│   │   ├── channels
+│   │   ├── gateways
+│   │   └── WebsocketClient.ts
+│   ├── websocket-client
+│   │   ├── channels
+│   │   └── WebsocketRuntime.ts
+│   ├── widgets
+│   │   ├── AlertWidget.tsx
+│   │   ├── analytics
+│   │   ├── RealtimeFeed.tsx
+│   │   ├── system
+│   │   ├── telemetry
+│   │   └── TelemetryWidget.tsx
+│   ├── workflows
+│   │   ├── engine
+│   │   ├── events
+│   │   ├── orchestrators
+│   │   └── states
+│   ├── workspace
+│   │   ├── dock
+│   │   ├── grids
+│   │   ├── header
+│   │   ├── sections
+│   │   ├── sidebar
+│   │   ├── tabs
+│   │   ├── widgets
+│   │   ├── WorkspaceHeader.tsx
+│   │   ├── WorkspaceSection.tsx
+│   │   └── WorkspaceTabs.tsx
+│   ├── workspace-engine
+│   │   ├── layouts
+│   │   ├── runtime
+│   │   ├── telemetry
+│   │   └── WorkspaceEngine.ts
+│   └── workspace-system
+│       ├── layouts
+│       └── telemetry
+├── simulation
+│   ├── engine
+│   │   └── simulation.engine.ts
+│   └── runtime
+│       ├── runtime.bootstrap.ts
+│       └── scenario.types.ts
+├── store
+│   ├── auth
+│   │   └── auth.store.ts
+│   ├── auth.store.ts
+│   ├── layout
+│   │   └── layout.store.ts
+│   ├── notification.store.ts
+│   ├── telemetry
+│   │   └── telemetry.store.ts
+│   └── workspace
+│       └── workspace.store.ts
+├── styles
+│   ├── global.css
+│   ├── industrial
+│   │   └── industrial-theme.css
+│   ├── layouts
+│   │   └── workspace.css
+│   ├── runtime
+│   │   ├── runtime-theme.css
+│   │   └── themes
+│   ├── telemetry
+│   │   └── telemetry-theme.css
+│   ├── themes
+│   │   ├── dark-industrial.css
+│   │   ├── industrial
+│   │   └── telemetry
+│   └── tokens
+│       ├── colors.css
+│       ├── radius.css
+│       ├── shadows.css
+│       └── spacing.css
+├── theme
+│   ├── index.ts
+│   ├── theme.css
+│   └── tokens.ts
+├── types
+│   ├── api
+│   │   └── common.ts
+│   ├── domain
+│   │   ├── components.ts
+│   │   ├── inventory.ts
+│   │   └── yard.ts
+│   ├── env.d.ts
+│   └── ui
+│       └── layout.ts
+└── vite-env.d.ts
+
+963 directories, 460 files

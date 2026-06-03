@@ -1,0 +1,239 @@
+apps/backend-api/src
+├── app.controller.spec.ts
+├── app.controller.ts
+├── app.module.ts
+├── app.service.ts
+├── common
+│   ├── dto
+│   │   ├── filter.dto.ts
+│   │   ├── pagination.dto.ts
+│   │   └── query.dto.ts
+│   ├── pipes
+│   │   └── zod-validation.pipe.ts
+│   └── utils
+│       └── activity-log.ts
+├── core
+│   ├── auth
+│   │   ├── permissions.decorator.ts
+│   │   └── roles.guard.ts
+│   ├── cqrs
+│   │   ├── command.bus.ts
+│   │   ├── command.types.ts
+│   │   ├── cqrs.module.ts
+│   │   └── query.bus.ts
+│   ├── events
+│   │   ├── domain-event.interface.ts
+│   │   ├── domain-event.ts
+│   │   ├── event-bus.service.ts
+│   │   ├── event-handler.interface.ts
+│   │   ├── events.controller.ts
+│   │   ├── events.module.ts
+│   │   └── event-store.service.ts
+│   ├── jobs
+│   │   ├── dto
+│   │   ├── job-scheduler.service.ts
+│   │   ├── jobs.controller.ts
+│   │   ├── jobs.module.ts
+│   │   └── job-worker.service.ts
+│   ├── outbox
+│   │   ├── outbox.module.ts
+│   │   └── outbox.service.ts
+│   ├── performance
+│   │   ├── cache.service.ts
+│   │   ├── event-throttle.service.ts
+│   │   ├── performance.controller.ts
+│   │   ├── performance-metrics.service.ts
+│   │   ├── performance.module.ts
+│   │   └── websocket-room.service.ts
+│   ├── prisma
+│   │   ├── prisma.module.ts
+│   │   └── prisma.service.ts
+│   ├── storage
+│   │   ├── local-storage.service.ts
+│   │   ├── storage.module.ts
+│   │   └── storage.types.ts
+│   ├── telegram
+│   │   └── telegram.service.ts
+│   ├── telemetry
+│   │   ├── telemetry.controller.ts
+│   │   ├── telemetry-metric.ts
+│   │   ├── telemetry.module.ts
+│   │   └── telemetry.service.ts
+│   └── ws
+│       ├── events.gateway.ts
+│       ├── realtime.gateway.ts
+│       ├── runtime.gateway.ts
+│       ├── runtime-ws.module.ts
+│       ├── websocket-event-mapper.ts
+│       ├── websocket-events.ts
+│       └── websocket.module.ts
+├── main.ts
+└── modules
+    ├── analytics
+    │   ├── analytics.controller.ts
+    │   └── analytics.module.ts
+    ├── analytics-engine
+    │   ├── analytics-engine.controller.ts
+    │   ├── analytics-engine.module.ts
+    │   ├── dto
+    │   ├── repositories
+    │   └── services
+    ├── approvals
+    │   ├── approvals.controller.ts
+    │   └── approvals.module.ts
+    ├── attachments
+    │   ├── attachments.controller.ts
+    │   ├── attachments.module.ts
+    │   ├── dto
+    │   ├── repositories
+    │   └── services
+    ├── attendance
+    │   ├── attendance.controller.ts
+    │   └── attendance.module.ts
+    ├── auth
+    │   ├── auth.controller.ts
+    │   ├── auth.module.ts
+    │   ├── auth.service.ts
+    │   ├── dto
+    │   ├── guards
+    │   ├── jwt-auth.guard.ts
+    │   ├── repositories
+    │   ├── services
+    │   └── strategies
+    ├── components
+    │   ├── components.controller.ts
+    │   ├── components.module.ts
+    │   ├── controllers
+    │   ├── dto
+    │   ├── repositories
+    │   └── services
+    ├── dashboard
+    │   ├── dashboard.controller.ts
+    │   └── dashboard.module.ts
+    ├── equipment
+    │   ├── equipment.controller.ts
+    │   └── equipment.module.ts
+    ├── inventory
+    │   ├── commands
+    │   ├── dto
+    │   ├── inventory-categories.controller.ts
+    │   ├── inventory.controller.ts
+    │   ├── inventory.gateway.ts
+    │   ├── inventory.module.ts
+    │   ├── inventory.repository.ts
+    │   ├── inventory.runtime.ts
+    │   ├── inventory.service.ts
+    │   ├── inventory-units.controller.ts
+    │   ├── material-types.controller.ts
+    │   ├── queries
+    │   ├── return-workflow.controller.ts
+    │   ├── return-workflow.service.ts
+    │   └── zones.controller.ts
+    ├── master-data
+    │   ├── dictionaries
+    │   ├── suppliers
+    │   └── uom
+    ├── material-movements
+    │   ├── material-movements.controller.ts
+    │   ├── material-movements.module.ts
+    │   └── material-movements.service.ts
+    ├── material-requests
+    │   ├── material-requests.controller.ts
+    │   └── material-requests.module.ts
+    ├── production
+    │   ├── dto
+    │   ├── production.controller.ts
+    │   ├── production.module.ts
+    │   ├── repositories
+    │   └── services
+    ├── projects
+    │   ├── dto
+    │   ├── projects.controller.ts
+    │   ├── projects.module.ts
+    │   ├── repositories
+    │   └── services
+    ├── purchase-orders
+    │   ├── purchase-orders.controller.ts
+    │   └── purchase-orders.module.ts
+    ├── purchasing
+    │   ├── controllers
+    │   └── services
+    ├── qc
+    │   ├── dto
+    │   ├── qc.controller.ts
+    │   ├── qc.module.ts
+    │   ├── repositories
+    │   └── services
+    ├── rbac
+    │   ├── decorators
+    │   ├── guards
+    │   ├── middleware
+    │   ├── rbac.module.ts
+    │   ├── repositories
+    │   ├── services
+    │   └── types
+    ├── runtime
+    │   ├── runtime.controller.ts
+    │   └── runtime.module.ts
+    ├── safety
+    │   ├── safety.controller.ts
+    │   └── safety.module.ts
+    ├── simulation
+    │   ├── demo-data.seeder.ts
+    │   ├── dto
+    │   ├── simulation.controller.ts
+    │   ├── simulation.module.ts
+    │   ├── simulation-scenario-runner.service.ts
+    │   ├── simulation.scheduler.ts
+    │   ├── simulation.service.ts
+    │   └── simulation.types.ts
+    ├── site-logs
+    │   ├── site-logs.controller.ts
+    │   └── site-logs.module.ts
+    ├── supplier-score
+    │   ├── supplier-score.controller.ts
+    │   └── supplier-score.module.ts
+    ├── tasks
+    │   ├── dto
+    │   ├── repositories
+    │   ├── services
+    │   ├── tasks.controller.ts
+    │   └── tasks.module.ts
+    ├── _template
+    │   ├── controllers
+    │   ├── dto
+    │   ├── entities
+    │   ├── events
+    │   ├── index.ts
+    │   ├── repositories
+    │   ├── services
+    │   ├── types
+    │   └── validators
+    ├── transactions
+    │   ├── transactions.controller.ts
+    │   └── transactions.module.ts
+    ├── vehicles
+    │   ├── vehicles.controller.ts
+    │   └── vehicles.module.ts
+    ├── workers
+    │   ├── workers.controller.ts
+    │   └── workers.module.ts
+    ├── workflow
+    │   ├── controllers
+    │   ├── dto
+    │   ├── repositories
+    │   ├── services
+    │   ├── workflow.controller.ts
+    │   └── workflow.module.ts
+    ├── yard
+    │   ├── controllers
+    │   ├── dto
+    │   ├── repositories
+    │   ├── services
+    │   ├── yard.controller.ts
+    │   └── yard.module.ts
+    └── zones
+        ├── zones.controller.ts
+        └── zones.module.ts
+
+108 directories, 128 files

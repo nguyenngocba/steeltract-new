@@ -1,0 +1,11 @@
+docs/AI_CONTEXT.md
+docs/AI_RULES.md
+docs/architecture/ARCHITECTURE_FREEZE.md
+docs/architecture/EVENT_NAMING.md
+docs/architecture/INVENTORY_TRANSACTION_RULES.md
+docs/architecture/REFACTOR_MASTER_PLAN.md
+docs/inventory/inventory-phase1-migration-plan.md
+docs/KNOWN_ISSUES.md
+docs/PROJECT_OVERVIEW.md
+docs/ROADMAP.md
+docs/TREE_STRUCTURE.md

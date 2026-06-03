@@ -19,31 +19,43 @@ import {
   assignProductionTaskSchema,
   completeStageSchema,
   createMachineSchema,
+  createBomSchema,
+  createMaterialIssueSchema,
   createProductionLogSchema,
   createProductionOrderSchema,
   createProductionScheduleSchema,
   createProductionTaskSchema,
   createWorkCenterSchema,
   listProductionOrdersSchema,
+  stageProductionToYardSchema,
   startProductionSchema,
   updateProductionOrderSchema,
   updateProductionTaskSchema,
+  updateBomSchema,
+  updateMaterialIssueSchema,
 } from './dto/production.dto';
+import { BOMService } from './services/bom.service';
+import { MaterialIssueService } from './services/material-issue.service';
 import { ProductionService } from './services/production.service';
 
 import type {
   AssignProductionTaskDto,
   CompleteStageDto,
   CreateMachineDto,
+  CreateBomDto,
+  CreateMaterialIssueDto,
   CreateProductionLogDto,
   CreateProductionOrderDto,
   CreateProductionScheduleDto,
   CreateProductionTaskDto,
   CreateWorkCenterDto,
   ListProductionOrdersDto,
+  StageProductionToYardDto,
   StartProductionDto,
   UpdateProductionOrderDto,
   UpdateProductionTaskDto,
+  UpdateBomDto,
+  UpdateMaterialIssueDto,
 } from './dto/production.dto';
 
 type AuthenticatedRequest = Request & {
@@ -53,7 +65,11 @@ type AuthenticatedRequest = Request & {
 @UseGuards(JwtAuthGuard)
 @Controller('production')
 export class ProductionController {
-  constructor(private readonly productionService: ProductionService) {}
+  constructor(
+    private readonly productionService: ProductionService,
+    private readonly bomService: BOMService,
+    private readonly materialIssueService: MaterialIssueService,
+  ) {}
 
   @Get()
   findAll(
@@ -106,9 +122,80 @@ export class ProductionController {
     return this.productionService.createSchedule(body);
   }
 
+  @Get('boms')
+  listBoms() {
+    return this.bomService.findAll();
+  }
+
+  @Post('boms')
+  createBom(
+    @Body(new ZodValidationPipe(createBomSchema)) body: CreateBomDto,
+  ) {
+    return this.bomService.create(body);
+  }
+
+  @Get('boms/:id')
+  findBom(@Param('id') id: string) {
+    return this.bomService.findOne(id);
+  }
+
+  @Patch('boms/:id')
+  updateBom(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateBomSchema)) body: UpdateBomDto,
+  ) {
+    return this.bomService.update(id, body);
+  }
+
+  @Post('boms/:id/clone')
+  cloneBom(@Param('id') id: string) {
+    return this.bomService.clone(id);
+  }
+
+  @Post('boms/:id/archive')
+  archiveBom(@Param('id') id: string) {
+    return this.bomService.archive(id);
+  }
+
+  @Get('material-issues')
+  listMaterialIssues(
+    @Query('productionOrderId') productionOrderId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.materialIssueService.findAll(productionOrderId, status);
+  }
+
+  @Post('material-issues')
+  createMaterialIssue(
+    @Body(new ZodValidationPipe(createMaterialIssueSchema))
+    body: CreateMaterialIssueDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.materialIssueService.create(body, request.user?.id);
+  }
+
+  @Patch('material-issues/:id')
+  updateMaterialIssue(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateMaterialIssueSchema))
+    body: UpdateMaterialIssueDto,
+  ) {
+    return this.materialIssueService.update(id, body);
+  }
+
+  @Get('logs')
+  listLogs() {
+    return this.productionService.listLogs();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productionService.findOne(id);
+  }
+
+  @Get(':id/requirements')
+  requirements(@Param('id') id: string) {
+    return this.productionService.materialRequirements(id);
   }
 
   @Post()
@@ -138,6 +225,16 @@ export class ProductionController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.productionService.start(id, body, request.user?.id);
+  }
+
+  @Post(':id/stage-to-yard')
+  stageToYard(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(stageProductionToYardSchema))
+    body: StageProductionToYardDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.stageToYard(id, body, request.user?.id);
   }
 
   @Post(':id/tasks')

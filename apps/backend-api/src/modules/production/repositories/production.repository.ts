@@ -175,6 +175,19 @@ export class ProductionRepository {
     });
   }
 
+  listLogs() {
+    return this.prisma.productionLog.findMany({
+      include: {
+        productionOrder: true,
+        stage: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 200,
+    });
+  }
+
   createActivityLog(
     data: Prisma.ActivityLogCreateInput,
     tx: ProductionTx = this.prisma,
@@ -242,6 +255,38 @@ export class ProductionRepository {
           createdAt: 'desc' as const,
         },
         take: 20,
+      },
+      bom: {
+        include: {
+          items: {
+            include: {
+              material: {
+                include: {
+                  category: true,
+                  unitMaster: true,
+                },
+              },
+            },
+          },
+          routingSteps: {
+            orderBy: {
+              stepNo: 'asc' as const,
+            },
+          },
+        },
+      },
+      component: {
+        include: {
+          project: true,
+        },
+      },
+      materialIssues: {
+        include: {
+          inventoryItem: true,
+        },
+        orderBy: {
+          issuedDate: 'desc' as const,
+        },
       },
     };
   }

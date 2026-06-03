@@ -35,6 +35,7 @@ export const createProductionOrderSchema = z.object({
   description: z.string().optional(),
   projectId: z.string().optional(),
   componentId: z.string().optional(),
+  bomId: z.string().optional(),
   quantity: z.coerce.number().positive().default(1),
   priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),
   status: z
@@ -51,6 +52,7 @@ export const createProductionOrderSchema = z.object({
 export const updateProductionOrderSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
+  bomId: z.string().optional(),
   quantity: z.coerce.number().positive().optional(),
   priority: z.nativeEnum(TaskPriority).optional(),
   status: z.nativeEnum(ProductionOrderStatus).optional(),
@@ -80,6 +82,19 @@ export const completeStageSchema = z.object({
   qualityStatus: z.string().optional(),
   quantity: z.coerce.number().nonnegative().optional(),
   attachmentIds: z.array(z.string()).optional().default([]),
+  metadata: metadataSchema,
+});
+
+export const stageProductionToYardSchema = z.object({
+  slotId: z.string().min(1),
+  quantity: z.coerce.number().positive().optional(),
+  stackLevel: z.coerce.number().int().positive().optional(),
+  weight: z.coerce.number().nonnegative().optional(),
+  length: z.coerce.number().nonnegative().optional(),
+  width: z.coerce.number().nonnegative().optional(),
+  height: z.coerce.number().nonnegative().optional(),
+  craneId: z.string().optional(),
+  reason: z.string().optional(),
   metadata: metadataSchema,
 });
 
@@ -152,6 +167,59 @@ export const createProductionScheduleSchema = z.object({
   metadata: metadataSchema,
 });
 
+const bomItemSchema = z.object({
+  materialId: z.string().min(1),
+  quantity: z.coerce.number().positive(),
+  wastePercent: z.coerce.number().min(0).max(100).default(0),
+  category: z
+    .enum(['MAIN_MATERIAL', 'SECONDARY_MATERIAL', 'CONSUMABLE'])
+    .default('MAIN_MATERIAL'),
+});
+
+const bomRoutingStepSchema = z.object({
+  stepNo: z.coerce.number().int().positive(),
+  stepName: z.string().min(1),
+  workshop: z.string().optional(),
+  expectedHours: z.coerce.number().nonnegative().default(0),
+  qcRequired: z.coerce.boolean().default(false),
+});
+
+export const createBomSchema = z.object({
+  bomNo: z.string().min(1).optional(),
+  productCode: z.string().min(1),
+  productName: z.string().min(1),
+  structureType: z.string().optional(),
+  projectId: z.string().optional(),
+  unit: z.string().optional(),
+  estimatedWeight: z.coerce.number().nonnegative().default(0),
+  version: z.string().min(1).default('V1'),
+  status: z.string().min(1).default('ACTIVE'),
+  items: z.array(bomItemSchema).default([]),
+  routingSteps: z.array(bomRoutingStepSchema).default([]),
+});
+
+export const updateBomSchema = createBomSchema.partial();
+
+export const createMaterialIssueSchema = z.object({
+  issueNo: z.string().min(1).optional(),
+  productionOrderId: z.string().min(1),
+  inventoryItemId: z.string().min(1),
+  warehouseId: z.string().optional(),
+  zoneId: z.string().optional(),
+  issuedQty: z.coerce.number().positive(),
+  issuedDate: z
+    .union([z.string(), z.date()])
+    .optional()
+    .transform((value) => (value ? new Date(value) : undefined)),
+  status: z.enum(['DRAFT', 'ISSUED', 'RETURNED']).default('DRAFT'),
+  remarks: z.string().optional(),
+});
+
+export const updateMaterialIssueSchema = z.object({
+  status: z.enum(['DRAFT', 'ISSUED', 'RETURNED']),
+  remarks: z.string().optional(),
+});
+
 export type CreateProductionOrderDto = z.infer<
   typeof createProductionOrderSchema
 >;
@@ -163,6 +231,9 @@ export type ListProductionOrdersDto = z.infer<
 >;
 export type StartProductionDto = z.infer<typeof startProductionSchema>;
 export type CompleteStageDto = z.infer<typeof completeStageSchema>;
+export type StageProductionToYardDto = z.infer<
+  typeof stageProductionToYardSchema
+>;
 export type CreateProductionTaskDto = z.infer<
   typeof createProductionTaskSchema
 >;
@@ -178,3 +249,7 @@ export type CreateMachineDto = z.infer<typeof createMachineSchema>;
 export type CreateProductionScheduleDto = z.infer<
   typeof createProductionScheduleSchema
 >;
+export type CreateBomDto = z.infer<typeof createBomSchema>;
+export type UpdateBomDto = z.infer<typeof updateBomSchema>;
+export type CreateMaterialIssueDto = z.infer<typeof createMaterialIssueSchema>;
+export type UpdateMaterialIssueDto = z.infer<typeof updateMaterialIssueSchema>;

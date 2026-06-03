@@ -5,16 +5,20 @@ import {
 } from '@nestjs/common';
 
 import {
+  ComponentStatus,
   Prisma,
   ProductionLogType,
   ProductionOrderStatus,
   ProductionStageCode,
   ProductionStageStatus,
   ProductionTaskStatus,
+  YardItemType,
 } from '@prisma/client';
 
 import { EventBusService } from '../../../core/events/event-bus.service';
+import { PrismaService } from '../../../core/prisma/prisma.service';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
+import { YardService } from '../../yard/services/yard.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import {
   AssignProductionTaskDto,
@@ -26,6 +30,7 @@ import {
   CreateProductionTaskDto,
   CreateWorkCenterDto,
   ListProductionOrdersDto,
+  StageProductionToYardDto,
   StartProductionDto,
   UpdateProductionOrderDto,
   UpdateProductionTaskDto,
@@ -60,6 +65,8 @@ export class ProductionService {
     private readonly eventBus: EventBusService,
     private readonly workflowService: WorkflowService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly prisma: PrismaService,
+    private readonly yardService: YardService,
   ) {}
 
   async findAll(query: ListProductionOrdersDto) {
@@ -134,7 +141,10 @@ export class ProductionService {
           title: dto.title,
           description: dto.description,
           projectId: dto.projectId,
-          componentId: dto.componentId,
+          component: dto.componentId
+            ? { connect: { id: dto.componentId } }
+            : undefined,
+          bom: dto.bomId ? { connect: { id: dto.bomId } } : undefined,
           quantity: dto.quantity,
           priority: dto.priority,
           status: dto.status,
@@ -201,6 +211,7 @@ export class ProductionService {
         {
           title: dto.title,
           description: dto.description,
+          bom: dto.bomId ? { connect: { id: dto.bomId } } : undefined,
           quantity: dto.quantity,
           priority: dto.priority,
           status: dto.status,
@@ -255,6 +266,13 @@ export class ProductionService {
         },
         tx,
       );
+
+      if (existing.componentId) {
+        await tx.component.update({
+          where: { id: existing.componentId },
+          data: { status: ComponentStatus.CUTTING },
+        });
+      }
 
       await this.createLog(
         id,
@@ -337,6 +355,17 @@ export class ProductionService {
         );
       }
 
+      if (order.componentId) {
+        await tx.component.update({
+          where: { id: order.componentId },
+          data: {
+            status: nextStage
+              ? this.componentStatusForStage(nextStage.code)
+              : ComponentStatus.READY,
+          },
+        });
+      }
+
       await this.createLog(
         order.id,
         {
@@ -369,6 +398,144 @@ export class ProductionService {
     }
 
     return order;
+  }
+
+  async stageToYard(
+    id: string,
+    dto: StageProductionToYardDto,
+    actorId?: string,
+  ) {
+    const order = await this.getOrderOrThrow(id);
+
+    if (order.status !== ProductionOrderStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Production order must be completed before yard staging',
+      );
+    }
+
+    if (!order.component) {
+      throw new BadRequestException(
+        'Production order must reference a component before yard staging',
+      );
+    }
+
+    const existingPlacement = await this.prisma.yardItemPlacement.findFirst({
+      where: {
+        itemType: YardItemType.COMPONENT,
+        itemId: order.component.id,
+        removedAt: null,
+      },
+    });
+
+    if (existingPlacement) {
+      throw new BadRequestException(
+        'Component already has an active yard placement',
+      );
+    }
+
+    const slot = await this.prisma.yardSlot.findUnique({
+      where: { id: dto.slotId },
+      include: { zone: true },
+    });
+
+    if (!slot) {
+      throw new NotFoundException('Yard slot not found');
+    }
+
+    const placement = await this.yardService.placeItem(
+      {
+        slotId: dto.slotId,
+        itemType: YardItemType.COMPONENT,
+        itemId: order.component.id,
+        itemCode: order.component.code,
+        itemName: order.component.name,
+        quantity: dto.quantity ?? order.quantity,
+        stackLevel: dto.stackLevel,
+        weight: dto.weight,
+        length: dto.length,
+        width: dto.width,
+        height: dto.height,
+        craneId: dto.craneId,
+        reason: dto.reason ?? `Staged from production order ${order.orderNo}`,
+        attachmentIds: [],
+        metadata: {
+          ...(dto.metadata ?? {}),
+          productionOrderId: order.id,
+          productionOrderNo: order.orderNo,
+        },
+      },
+      actorId,
+    );
+
+    await this.prisma.$transaction([
+      this.prisma.component.update({
+        where: { id: order.component.id },
+        data: {
+          status: ComponentStatus.STOCK,
+          floor: `L${placement.stackLevel}`,
+          zone: slot.zone.code,
+          position: slot.code,
+          x: slot.x,
+          y: slot.y,
+        },
+      }),
+      this.prisma.componentTimeline.create({
+        data: {
+          componentId: order.component.id,
+          action: 'MOVED_TO_YARD',
+          note: `${order.orderNo} completed and staged at ${slot.zone.code}/${slot.code}/L${placement.stackLevel}`,
+        },
+      }),
+      this.prisma.productionLog.create({
+        data: {
+          productionOrderId: order.id,
+          type: ProductionLogType.NOTE,
+          message: `Finished component staged at ${slot.zone.code}/${slot.code}/L${placement.stackLevel}`,
+          workerId: actorId,
+          metadata: {
+            yardPlacementId: placement.id,
+            yardSlotId: slot.id,
+          },
+        },
+      }),
+    ]);
+
+    await this.eventBus.emit(
+      'production.staged.to-yard',
+      {
+        productionOrderId: order.id,
+        productionOrderNo: order.orderNo,
+        componentId: order.component.id,
+        componentCode: order.component.code,
+        placementId: placement.id,
+        slotId: slot.id,
+        slotCode: slot.code,
+        zoneCode: slot.zone.code,
+      },
+      {
+        module: 'production',
+        persistToOutbox: true,
+        idempotencyKey: `production.staged.to-yard:${placement.id}`,
+      },
+    );
+
+    return placement;
+  }
+
+  private componentStatusForStage(stage: ProductionStageCode) {
+    if (stage === ProductionStageCode.WELDING) {
+      return ComponentStatus.WELDING;
+    }
+
+    if (
+      stage === ProductionStageCode.PAINTING ||
+      stage === ProductionStageCode.GALVANIZING ||
+      stage === ProductionStageCode.PACKING
+    ) {
+      return ComponentStatus.PAINTING;
+    }
+
+    return ComponentStatus.CUTTING;
   }
 
   async createTask(
@@ -558,6 +725,34 @@ export class ProductionService {
 
   listSchedules() {
     return this.repository.listSchedules();
+  }
+
+  listLogs() {
+    return this.repository.listLogs();
+  }
+
+  async materialRequirements(id: string) {
+    const order = await this.getOrderOrThrow(id);
+
+    return (order.bom?.items ?? []).map((item) => {
+      const requiredQty =
+        item.quantity * (1 + item.wastePercent / 100) * order.quantity;
+      const availableQty = item.material.quantity;
+      const issuedQty = order.materialIssues
+        .filter((issue) => issue.inventoryItemId === item.materialId)
+        .reduce((total, issue) => total + issue.issuedQty, 0);
+
+      return {
+        materialId: item.materialId,
+        materialCode: item.material.code,
+        materialName: item.material.name,
+        unit: item.material.unitMaster?.symbol ?? item.material.unit,
+        requiredQty,
+        availableQty,
+        issuedQty,
+        shortageQty: Math.max(requiredQty - availableQty, 0),
+      };
+    });
   }
 
   async metrics() {

@@ -1,0 +1,993 @@
+
+================================================
+docs/AI_CONTEXT.md
+================================================
+# STEELTRACK AI CONTEXT
+
+## Project Type
+
+STEELTRACK is an enterprise ERP platform for steel structure fabrication factories.
+
+The system manages:
+
+- Inventory
+- Production
+- Planning
+- QC
+- Logistics
+- Material Yard
+- Projects
+- Users & Permissions
+- Reports
+- Realtime Tracking
+
+---
+
+# Architecture
+
+Architecture Style:
+- Modular Monolith
+- Domain-driven structure
+- Event-driven internal communication
+- Future microservices-ready
+
+Frontend:
+- React
+- Vite
+- TypeScript
+- TailwindCSS
+- Zustand
+- TanStack Query
+- shadcn/ui
+
+Backend:
+- Node.js
+- Fastify
+- Prisma
+- PostgreSQL
+- Zod validation
+
+Realtime:
+- Socket.io
+- Delta update strategy
+- Lightweight websocket payload
+
+---
+
+# Business Workflow
+
+Main Workflow:
+
+Project
+→ Planning
+→ Production
+→ QC
+→ Warehouse
+→ Transport
+→ Installation
+
+---
+
+# Current System Phase
+
+Current phase:
+- ERP Foundation
+- Module Scaffolding
+- Shared Component System
+- Architecture Stabilization
+
+NOT in optimization phase yet.
+
+Priority:
+- clean architecture
+- modular structure
+- reusable systems
+- enterprise workflow
+
+---
+
+# Important Rules
+
+1. Keep modules isolated.
+
+2. Never query another module tables directly.
+
+3. Use:
+Controller
+→ Service
+→ Repository
+→ Prisma
+
+4. Inventory system must be transaction-based.
+
+5. Never emit full objects over websocket.
+
+6. Use shared components whenever possible.
+
+7. Avoid giant files.
+
+8. Keep future scalability in mind.
+
+---
+
+# Long-term Vision
+
+Future goals:
+- AI forecasting
+- BIM integration
+- GPS tracking
+- Mobile warehouse app
+- IoT integration
+- Realtime factory dashboard
+- Multi-company ERP
+- Offline warehouse mode
+================================================
+docs/AI_RULES.md
+================================================
+# STEELTRACK AI RULES
+
+# 1. Architecture Rules
+
+- Use Modular Monolith Architecture.
+- Keep modules isolated.
+- Never tightly couple modules.
+- Never create giant files.
+
+---
+
+# 2. Backend Rules
+
+Controllers:
+- validate request
+- call services only
+- no business logic
+- no Prisma queries
+
+Correct Flow:
+
+Controller
+→ Service
+→ Repository
+→ Prisma
+
+---
+
+# 3. Service Rules
+
+Services:
+- contain business logic
+- coordinate workflows
+- emit events
+- call repositories
+
+Services MUST NOT:
+- manipulate HTTP response directly
+
+---
+
+# 4. Repository Rules
+
+Repositories:
+- contain database queries only
+- reusable query logic
+- no business logic
+
+---
+
+# 5. Inventory Rules
+
+Inventory system is transaction-based.
+
+NEVER:
+quantity += x
+
+ALWAYS:
+create InventoryTransaction
+
+InventoryTransaction is source of truth.
+
+InventoryItem.quantity is cache/snapshot only.
+
+---
+
+# 6. Event Rules
+
+Modules communicate via:
+- Events
+- Service Interfaces
+
+Avoid direct cross-module logic.
+
+---
+
+# 7. Realtime Rules
+
+Never emit full object payloads.
+
+Correct:
+socket.emit({
+  id,
+  changedFields,
+})
+
+Frontend must refetch data using TanStack Query.
+
+---
+
+# 8. Frontend Rules
+
+Use:
+- shared components
+- shared layouts
+- shared tables
+
+Avoid duplicated UI.
+
+---
+
+# 9. State Management Rules
+
+Use Zustand for:
+- auth
+- theme
+- sidebar
+- UI state
+
+Use TanStack Query for:
+- server state
+- API cache
+- realtime refetch
+- optimistic updates
+
+---
+
+# 10. Type Safety Rules
+
+Avoid any.
+
+Use:
+- DTO
+- interfaces
+- Zod
+- ValidationPipe
+
+---
+
+# 11. Database Rules
+
+Every table should contain:
+- id
+- createdAt
+- updatedAt
+
+Future-ready:
+- createdBy
+- updatedBy
+- deletedAt
+
+---
+
+# 12. Logging Rules
+
+Critical actions must create logs:
+- CREATE
+- UPDATE
+- DELETE
+- APPROVE
+- LOGIN
+- EXPORT
+
+---
+
+# 13. Performance Rules
+
+Use:
+- pagination
+- lazy loading
+- virtualization
+- caching
+
+Avoid:
+- huge raw queries
+- unnecessary rerenders
+
+---
+
+# 14. Security Rules
+
+Never hardcode secrets.
+
+Use:
+process.env
+
+Validate:
+- uploads
+- permissions
+- JWT
+- request input
+================================================
+docs/KNOWN_ISSUES.md
+================================================
+# STEELTRACK KNOWN ISSUES
+
+# 1. Duplicate Imports
+
+Issue:
+Duplicate React/page/icon imports causing build errors.
+
+Fix:
+Remove duplicated imports.
+
+---
+
+# 2. Prisma Duplicate Fields
+
+Issue:
+Duplicate schema fields.
+
+Fix:
+Check schema carefully before migration.
+
+---
+
+# 3. Large Component Files
+
+Issue:
+Pages becoming too large.
+
+Fix:
+Extract:
+- shared components
+- hooks
+- services
+
+---
+
+# 4. Weak Type Safety
+
+Issue:
+Too many any types.
+
+Fix:
+Use:
+- DTO
+- interfaces
+- Zod validation
+
+---
+
+# 5. Direct Prisma Usage
+
+Issue:
+Controllers querying Prisma directly.
+
+Fix:
+Use:
+Controller
+→ Service
+→ Repository
+→ Prisma
+
+---
+
+# 6. Realtime Payload Size
+
+Issue:
+Sending huge objects over websocket.
+
+Fix:
+Send delta updates only.
+
+---
+
+# 7. UI Inconsistency
+
+Issue:
+Different page layouts/styles.
+
+Fix:
+Use shared components:
+- PageHeader
+- DashboardCard
+- SectionCard
+- StatusBadge
+
+---
+
+# 8. Technical Debt Risk
+
+Issue:
+Rapid feature expansion.
+
+Fix:
+Maintain:
+- modular structure
+- docs
+- shared systems
+- architecture discipline
+================================================
+docs/PROJECT_OVERVIEW.md
+================================================
+# STEELTRACK ERP
+
+## Overview
+
+STEELTRACK is an enterprise ERP platform for steel fabrication factories.
+
+The system manages:
+
+- Inventory
+- Production
+- Planning
+- QC
+- Logistics
+- Projects
+- Material Yard
+- Users & Permissions
+- Reports
+- Backup & Audit
+
+---
+
+# Core Philosophy
+
+- Modular
+- Scalable
+- Event-driven
+- Realtime
+- Audit-ready
+- AI-ready
+
+---
+
+# Technology Stack
+
+Frontend:
+- React
+- Vite
+- TypeScript
+- Zustand
+- Tailwind
+- shadcn/ui
+
+Backend:
+- Node.js
+- Fastify
+- Prisma
+- PostgreSQL
+
+---
+
+# Key Design Decisions
+
+1. Modular Monolith
+2. Event-based interaction
+3. Strict module boundary
+4. Transaction-safe inventory
+5. Realtime dashboards
+6. Future microservices ready
+
+---
+
+# Future Expansion
+
+- AI prediction
+- Factory IoT
+- GPS tracking
+- Mobile app
+- Multi-company ERP
+- Offline warehouse mode
+================================================
+docs/ROADMAP.md
+================================================
+# STEELTRACK ROADMAP
+
+# PHASE 1
+ERP Foundation
+
+Status:
+IN PROGRESS
+
+Focus:
+- modular architecture
+- shared components
+- database foundation
+- enterprise layout
+- workflow structure
+
+---
+
+# PHASE 2
+Workflow Stabilization
+
+Goals:
+- service layer
+- repository layer
+- transaction engine
+- validation system
+- audit logging
+
+---
+
+# PHASE 3
+Realtime Infrastructure
+
+Goals:
+- websocket
+- realtime dashboard
+- realtime notifications
+- realtime inventory tracking
+
+---
+
+# PHASE 4
+Advanced ERP Features
+
+Goals:
+- OCR BOM
+- AI forecasting
+- advanced analytics
+- production optimization
+
+---
+
+# PHASE 5
+Factory Intelligence
+
+Goals:
+- GPS tracking
+- IoT integration
+- machine monitoring
+- smart factory
+
+---
+
+# PHASE 6
+Enterprise Scaling
+
+Goals:
+- multi-company
+- multi-factory
+- microservice migration
+- distributed infrastructure
+================================================
+docs/TREE_STRUCTURE.md
+================================================
+# STEELTRACK TREE STRUCTURE
+
+# Root Structure
+
+```txt
+steeltrack/
+├── apps/
+├── docs/
+├── packages/
+├── infrastructure/
+├── scripts/
+└── backups/
+
+Frontend Structure
+
+apps/frontend/src/
+├── components/
+│   ├── shared/
+│   ├── dashboard/
+│   ├── tables/
+│   └── charts/
+│
+├── layouts/
+│
+├── modules/
+│   ├── inventory/
+│   ├── production/
+│   ├── planning/
+│   ├── qc/
+│   ├── projects/
+│   ├── transport/
+│   ├── users/
+│   └── _template/
+│
+├── hooks/
+├── stores/
+├── lib/
+├── services/
+├── types/
+├── routes/
+└── pages/
+
+Frontend Module Standard
+
+module/
+├── api/
+├── components/
+├── hooks/
+├── pages/
+├── services/
+├── store/
+├── types/
+├── utils/
+└── index.ts
+
+Backend Structure
+
+apps/backend-api/src/
+├── modules/
+├── gateways/
+├── websocket/
+├── queues/
+├── middleware/
+├── services/
+├── utils/
+├── prisma/
+└── config/
+
+Backend Module Standard
+
+module/
+├── controllers/
+├── services/
+├── repositories/
+├── dto/
+├── events/
+├── entities/
+├── validators/
+├── types/
+└── index.ts
+
+Docs Structure
+
+docs/
+├── AI_CONTEXT.md
+├── AI_RULES.md
+├── TREE_STRUCTURE.md
+├── PROJECT_OVERVIEW.md
+├── ROADMAP.md
+└── KNOWN_ISSUES.md
+
+Important Rules
+Shared UI goes to:
+components/shared/
+Business logic belongs in:
+services/
+Database queries belong in:
+repositories/
+Reusable hooks go to:
+hooks/
+Avoid placing huge logic inside pages.
+Every module must stay isolated.
+
+
+---
+
+# 4. `docs/PROJECT_OVERVIEW.md`
+
+```md
+# STEELTRACK ERP
+
+# Overview
+
+STEELTRACK is an enterprise ERP platform designed for steel structure fabrication factories.
+
+The platform manages:
+
+- Inventory
+- Production
+- Planning
+- QC
+- Logistics
+- Material Yard
+- Projects
+- Reports
+- Users & Permissions
+
+---
+
+# Core Philosophy
+
+- Modular
+- Scalable
+- Event-driven
+- Realtime-ready
+- Audit-ready
+- AI-ready
+
+---
+
+# Main Goals
+
+1. Manage entire steel fabrication workflow.
+
+2. Track production realtime.
+
+3. Manage warehouse and materials.
+
+4. Improve factory visibility.
+
+5. Prepare future AI integration.
+
+---
+
+# Technology Stack
+
+Frontend:
+- React
+- Vite
+- TypeScript
+- Zustand
+- TanStack Query
+- TailwindCSS
+
+Backend:
+- Node.js
+- Fastify
+- Prisma
+- PostgreSQL
+
+Realtime:
+- Socket.io
+
+---
+
+# Main Modules
+
+- Dashboard
+- Inventory
+- Production
+- Planning
+- QC
+- Projects
+- Transport
+- Users
+- Notifications
+- Reports
+
+---
+
+# Long-term Vision
+
+Future expansion:
+- AI Forecasting
+- BIM Integration
+- GPS Tracking
+- Mobile Warehouse App
+- IoT Smart Factory
+- Multi-company ERP
+- Offline Mode
+================================================
+docs/architecture/ARCHITECTURE_FREEZE.md
+================================================
+# STEELTRACK ARCHITECTURE FREEZE
+
+STATUS:
+ACTIVE
+
+GOALS:
+- stabilize architecture
+- consolidate runtime systems
+- remove duplicate abstractions
+- standardize workflows
+- standardize events
+- standardize transactions
+
+CORE PRINCIPLES:
+- Modular Monolith
+- Domain Driven
+- Transaction Based Inventory
+- Event Driven
+- Realtime Ready
+- Workflow Oriented
+
+STRICT RULES:
+- no duplicate runtimes
+- no duplicate workspace systems
+- no direct prisma usage in controllers
+- no giant components
+- no experimental abstractions in core
+
+OFFICIAL FRONTEND ROOTS:
+- core/
+- shared/
+- modules/
+- infrastructure/
+
+OFFICIAL BACKEND ROOTS:
+- modules/
+- core/
+- shared/
+
+DEPRECATED:
+- cockpit-runtime
+- workspace-runtime
+- telemetry-runtime
+- duplicated engine layers
+
+
+================================================
+docs/architecture/EVENT_NAMING.md
+================================================
+# EVENT NAMING STANDARD
+
+FORMAT:
+domain.entity.action
+
+EXAMPLES:
+
+inventory.item.received
+inventory.item.issued
+inventory.item.returned
+
+production.order.started
+production.order.completed
+
+qc.inspection.failed
+qc.inspection.passed
+
+yard.slot.assigned
+yard.component.moved
+
+project.delivery.completed
+
+RULES:
+- lowercase only
+- dot notation
+- no spaces
+- no generic names
+- event payloads must be lightweight
+
+
+================================================
+docs/architecture/INVENTORY_TRANSACTION_RULES.md
+================================================
+# INVENTORY TRANSACTION RULES
+
+InventoryTransaction is the source of truth.
+
+NEVER:
+quantity += x
+
+ALWAYS:
+create InventoryTransaction
+
+TRANSACTION TYPES:
+- RECEIVE
+- ISSUE
+- TRANSFER
+- RETURN
+- RESERVE
+- ADJUSTMENT
+- CONSUME
+- PRODUCTION_OUTPUT
+
+RULES:
+- all stock changes create transactions
+- transactions are immutable
+- stock quantity is cached snapshot only
+- transactions drive audit logs
+- transactions drive realtime updates
+
+
+================================================
+docs/architecture/REFACTOR_MASTER_PLAN.md
+================================================
+# STEELTRACK REFACTOR MASTER PLAN
+
+PHASE 1
+- architecture stabilization
+- runtime consolidation
+- workspace consolidation
+- event standardization
+- transaction foundation
+
+PHASE 2
+- inventory transaction engine
+- workflow engine integration
+- audit log system
+- websocket stabilization
+
+PHASE 3
+- components + production
+- BOM system
+- work orders
+- WIP tracking
+
+PHASE 4
+- yard runtime
+- realtime telemetry
+- slot engine
+
+PHASE 5
+- project execution
+- logistics
+- returns
+- approvals
+
+
+================================================
+docs/inventory/inventory-phase1-migration-plan.md
+================================================
+# SteelTrack Inventory Phase 1 Migration Plan
+
+## Scope
+Phase 1 keeps current entities:
+- `InventoryItem`
+- `InventoryTransaction`
+- `InventoryTransactionItem`
+
+Out of scope:
+- `InventoryLedgerEntry`
+- `InventoryBalance`
+- Lot tracking / batch costing redesign
+
+## Goals
+1. Remove manual stock editing from material master flow.
+2. Enforce stock mutation through transactions only.
+3. Track transaction cost with `unitPrice` and `totalAmount`.
+4. Support `supplierId` on inbound transactions.
+5. Support `projectId` on outbound transactions.
+6. Ship inbound and outbound operation pages.
+7. Ship material detail page with current stock, inbound/outbound history, average cost.
+8. Keep backward compatibility with existing repository and consumers.
+
+## Data Compatibility Strategy
+No Prisma schema change is required for this phase.
+
+Existing fields reused:
+- `inventory_transaction_items.unitPrice`
+- `inventory_transaction_items.totalAmount`
+- `inventory_transactions.supplierId`
+- `inventory_transactions.projectId`
+
+Compatibility bridge:
+- `InventoryItem.quantity` remains as legacy snapshot for existing modules.
+- Snapshot is no longer editable from UI item master.
+- Snapshot is updated only inside transaction creation flow.
+- Read paths in inventory module now prioritize transaction history aggregates.
+
+## Transaction Rules (Phase 1)
+- Inbound (`IMPORT`): positive quantity.
+- Outbound (`EXPORT`): negative quantity.
+- Cost fields:
+  - `unitPrice`: optional.
+  - `totalAmount`: if absent and `unitPrice` present, computed as `unitPrice * quantity`.
+- Outbound validation checks available stock before posting.
+
+## API Changes
+- Existing route remains: `POST /inventory/transactions`
+- Existing route remains: `GET /inventory/transactions`
+- New route: `GET /inventory/items/:id/detail`
+
+`GET /inventory/items/:id/detail` returns:
+- current stock (from transaction item aggregate)
+- inbound history
+- outbound history
+- average cost (weighted by inbound value / inbound quantity)
+- supplier history
+- project consumption history
+
+## Frontend Changes
+- `MaterialDrawer`:
+  - Remove quantity edit field.
+  - Keep master-data fields only.
+- Inbound page:
+  - Material, quantity, supplier, invoiceNo, unitPrice.
+- Outbound page:
+  - Material, quantity, project.
+- Material detail page:
+  - Current stock
+  - Average cost
+  - Inbound history
+  - Outbound history
+
+## Rollout Sequence
+1. Deploy backend transaction-first logic.
+2. Deploy UI changes (material drawer + inbound/outbound + detail page).
+3. Monitor transaction creation and compare item snapshot vs aggregated stock.
+4. After stable period, proceed to Phase 2 ledger/balance architecture.
+
+## Risks and Mitigations
+- Legacy modules still reading `InventoryItem.quantity`:
+  - Mitigation: keep snapshot auto-sync in transaction service.
+- Historical transactions without items:
+  - Mitigation: stock now reflects transactions going forward; legacy baseline remains in snapshot.
+- Supplier relation not enforced by FK:
+  - Mitigation: preserve existing compatibility, validate IDs at service layer in next phase.
