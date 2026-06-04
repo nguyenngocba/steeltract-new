@@ -178,10 +178,10 @@ export function InventoryOutboundPage() {
           <KpiCard title="Chờ duyệt" value={kpis.pending.toLocaleString('vi-VN')} />
         </div>
 
-        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/80 p-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-3">
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100" />
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100" />
+            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Đơn vị nhận</option>
               {projects.map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -189,7 +189,7 @@ export function InventoryOutboundPage() {
                 </option>
               ))}
             </select>
-            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Kho xuất</option>
               {zones.map((z: any) => (
                 <option key={z.id} value={z.id}>
@@ -197,16 +197,16 @@ export function InventoryOutboundPage() {
                 </option>
               ))}
             </select>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã phiếu, vật tư, đơn vị nhận..." className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 xl:col-span-3" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã phiếu, vật tư, đơn vị nhận..." className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 xl:col-span-3" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9 rounded-2xl border border-slate-800/70 bg-[#071323]/85">
-            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold text-white">Danh sách phiếu xuất</div>
+          <div className="xl:col-span-9 rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+            <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Danh sách phiếu xuất</div>
             <div className="overflow-auto">
               <table className="w-full min-w-[1100px] text-sm">
-                <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
+                <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
                   <tr>
                     {['Mã phiếu xuất', 'Ngày xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Tổng khối lượng', 'Giá trị', 'Trạng thái', 'Người tạo'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left font-medium">
@@ -220,7 +220,7 @@ export function InventoryOutboundPage() {
                     paged.map((x: any) => {
                       const line = x.items?.[0]
                       return (
-                        <tr key={x.id} className="border-t border-slate-800/80 text-slate-200">
+                        <tr key={x.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06]">
                           <td className="px-3 py-2 text-cyan-300">{x.transactionNo}</td>
                           <td className="px-3 py-2">{new Date(x.transactionDate ?? x.createdAt).toLocaleDateString('vi-VN')}</td>
                           <td className="px-3 py-2">{x.referenceType ?? 'Xuất kho'}</td>
@@ -238,18 +238,18 @@ export function InventoryOutboundPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs text-slate-400">
+            <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-xs text-slate-400">
               <div>
                 Hiển thị {rows.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, rows.length)} / {rows.length}
               </div>
               <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Trước
                 </button>
                 <span>
                   {page}/{pageCount}
                 </span>
-                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Sau
                 </button>
               </div>
@@ -276,14 +276,14 @@ export function InventoryOutboundPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
           <div className="mb-3 text-sm font-semibold text-white">Xuất kho vật tư</div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
-            <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="PROJECT">Xuất cho công trình</option>
               <option value="COMPONENT_PRODUCTION">Xuất cho sản xuất cấu kiện</option>
             </select>
-            <select disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+            <select disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
               <option value="">Đơn vị nhận</option>
               {projects.map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -291,7 +291,7 @@ export function InventoryOutboundPage() {
                 </option>
               ))}
             </select>
-            <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
                 <option key={m.id} value={m.id}>
@@ -299,7 +299,7 @@ export function InventoryOutboundPage() {
                 </option>
               ))}
             </select>
-            <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Vị trí lấy vật tư</option>
               {availableZones.map((z: any) => (
                 <option key={z.id} value={z.id}>
@@ -307,8 +307,8 @@ export function InventoryOutboundPage() {
                 </option>
               ))}
             </select>
-            <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 xl:col-span-2" />
-            <input value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 xl:col-span-2" />
+            <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 xl:col-span-2" />
+            <input value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 xl:col-span-2" />
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm xl:grid-cols-3">
             <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
@@ -330,7 +330,7 @@ export function InventoryOutboundPage() {
 
 function KpiCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-800/80 bg-[#071323]/80 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
       <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
       <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
     </div>
@@ -339,7 +339,7 @@ function KpiCard({ title, value }: { title: string; value: string }) {
 
 function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
       <div className="mb-3 text-sm font-semibold text-white">{title}</div>
       {children}
     </div>
@@ -348,7 +348,7 @@ function InsightPanel({ title, children }: { title: string; children: React.Reac
 
 function MetricBox({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800/80 bg-[#050d18] p-3">
+    <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
       <div className="text-xs text-slate-400">{title}</div>
       <div className="mt-1 text-base font-semibold text-white">{value}</div>
     </div>

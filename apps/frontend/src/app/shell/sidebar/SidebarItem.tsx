@@ -12,8 +12,11 @@ export function SidebarItem({
   const location =
     useLocation()
 
+  const currentPath =
+    `${location.pathname}${location.hash}`
+
   const active =
-    location.pathname === path
+    currentPath === path || (!path.includes('#') && location.pathname === path)
 
   return (
     <Link
@@ -28,16 +31,18 @@ export function SidebarItem({
         flex
         items-center
         justify-between
-        rounded-xl
-        px-4
-        py-3
+        rounded-lg
+        px-3
+        py-2.5
         text-sm
+        font-medium
         transition-all
+        ring-1
 
         ${
           active
-            ? 'bg-cyan-500 text-black'
-            : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+            ? 'bg-blue-600/95 text-white shadow-[0_10px_24px_rgba(37,99,235,0.25)] ring-blue-300/30'
+            : 'text-slate-400 ring-transparent hover:bg-white/[0.07] hover:text-white'
         }
       `}
     >
@@ -49,7 +54,8 @@ export function SidebarItem({
             h-2
             w-2
             rounded-full
-            bg-black
+            bg-cyan-200
+            shadow-[0_0_12px_rgba(103,232,249,0.8)]
           "
         />
       )}

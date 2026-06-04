@@ -1,112 +1,93 @@
-import {
-  EnterpriseModulePage,
-} from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import {
-  EnterpriseTabBar,
-} from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import {
-  RuntimePanel,
-  SectionHeader,
-} from '../../../../shared/ui/enterprise'
-import {
-  inventoryTabs,
-} from '../../config/inventory-tabs'
-import {
-  useInventoryAudit,
-} from '../../hooks/useInventoryAudit'
+import { useMemo, useState } from 'react'
+
+import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
+import { SectionHeader } from '../../../../shared/ui/enterprise'
+import { inventoryTabs } from '../../config/inventory-tabs'
+import { HorizontalBars, InventoryKpi, InventoryPanel, inventoryInput, MiniBars } from '../../components/InventoryVisuals'
+import { useInventoryAudit } from '../../hooks/useInventoryAudit'
+
+function num(value: unknown) {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
+
+function money(value: unknown) {
+  return `${Math.round(num(value)).toLocaleString('vi-VN')} đ`
+}
 
 export function InventoryAuditPage() {
-  const {
-    data = [],
-    isLoading,
-  } = useInventoryAudit()
+  const { data = [], isLoading } = useInventoryAudit()
+  const [query, setQuery] = useState('')
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return (data as any[]).filter((row) => !q || `${row.materialCode} ${row.materialName}`.toLowerCase().includes(q))
+  }, [data, query])
+  const summary = useMemo(() => {
+    const stock = rows.reduce((sum, row) => sum + num(row.currentStock), 0)
+    const value = rows.reduce((sum, row) => sum + num(row.inventoryValue), 0)
+    const avg = rows.length ? value / rows.length : 0
+    const stale = rows.filter((row) => !row.lastMovementDate).length
+    return { stock, value, avg, stale }
+  }, [rows])
+  const valueLeaders = useMemo<Array<[string, number]>>(() => rows.map((row) => [row.materialCode, num(row.inventoryValue)] as [string, number]).sort((a, b) => b[1] - a[1]).slice(0, 6), [rows])
+  const stockBars = useMemo(() => rows.slice(0, 12).map((row) => Math.max(1, num(row.currentStock))), [rows])
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader
-        title="Inventory Audit"
-        description="Current stock, average cost, inventory value and last movement per material."
-      />
-
+      <SectionHeader title="Audit tồn kho" description="Đối soát tồn hiện tại, giá bình quân, giá trị tồn và thời điểm phát sinh cuối cùng theo vật tư." />
       <EnterpriseTabBar tabs={inventoryTabs} />
 
-      <RuntimePanel title="Inventory Audit Table">
-        <div className="overflow-hidden rounded-2xl border border-zinc-800">
-          <table className="w-full">
-            <thead className="bg-zinc-950">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Material Code
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Material Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Current Stock
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Average Cost
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Inventory Value
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-zinc-500">
-                  Last Movement Date
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-zinc-400"
-                  >
-                    Loading audit data...
-                  </td>
-                </tr>
-              )}
+      <div className="grid gap-3 md:grid-cols-4">
+        <InventoryKpi title="Tổng tồn" value={summary.stock.toLocaleString('vi-VN')} note="Theo audit transaction" tone="blue" />
+        <InventoryKpi title="Giá trị tồn" value={money(summary.value)} note="Theo giá bình quân" tone="emerald" />
+        <InventoryKpi title="Giá trị TB / mã" value={money(summary.avg)} note="Bình quân danh mục" tone="cyan" />
+        <InventoryKpi title="Chưa có phát sinh" value={summary.stale.toLocaleString('vi-VN')} note="Cần rà soát" tone="amber" />
+      </div>
 
-              {!isLoading &&
-                data.map((row: any) => (
-                  <tr
-                    key={row.materialId}
-                    className="border-t border-zinc-800 hover:bg-zinc-900/40"
-                  >
-                    <td className="px-4 py-3 text-cyan-400">
-                      {row.materialCode}
-                    </td>
-                    <td className="px-4 py-3 text-white">
-                      {row.materialName}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-200">
-                      {Number(
-                        row.currentStock ?? 0,
-                      ).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-200">
-                      {Number(
-                        row.averageCost ?? 0,
-                      ).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-200">
-                      {Number(
-                        row.inventoryValue ?? 0,
-                      ).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-400">
-                      {row.lastMovementDate
-                        ? new Date(
-                            row.lastMovementDate,
-                          ).toLocaleString()
-                        : '-'}
-                    </td>
+      <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_360px]">
+        <InventoryPanel title="Bảng audit tồn kho">
+          <div className="mb-3">
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm mã hoặc tên vật tư..." className={`${inventoryInput} w-full md:w-96`} />
+          </div>
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 text-left">Mã vật tư</th>
+                  <th className="px-4 py-3 text-left">Tên vật tư</th>
+                  <th className="px-4 py-3 text-left">Tồn hiện tại</th>
+                  <th className="px-4 py-3 text-left">Giá bình quân</th>
+                  <th className="px-4 py-3 text-left">Giá trị tồn</th>
+                  <th className="px-4 py-3 text-left">Phát sinh cuối</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">Đang tải dữ liệu audit...</td></tr>}
+                {!isLoading && rows.map((row: any) => (
+                  <tr key={row.materialId} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06] hover:bg-white/[0.06]">
+                    <td className="px-4 py-3 font-medium text-cyan-300">{row.materialCode}</td>
+                    <td className="px-4 py-3 text-white">{row.materialName}</td>
+                    <td className="px-4 py-3">{num(row.currentStock).toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-3">{money(row.averageCost)}</td>
+                    <td className="px-4 py-3 font-medium text-cyan-300">{money(row.inventoryValue)}</td>
+                    <td className="px-4 py-3 text-slate-500">{row.lastMovementDate ? new Date(row.lastMovementDate).toLocaleString('vi-VN') : '-'}</td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+        </InventoryPanel>
+
+        <div className="space-y-4">
+          <InventoryPanel title="Top giá trị tồn">
+            <HorizontalBars rows={valueLeaders} valueFormatter={money} />
+          </InventoryPanel>
+          <InventoryPanel title="Phân bổ tồn nhanh">
+            <MiniBars values={stockBars.length ? stockBars : [1, 1, 1]} />
+          </InventoryPanel>
         </div>
-      </RuntimePanel>
+      </div>
     </EnterpriseModulePage>
   )
 }

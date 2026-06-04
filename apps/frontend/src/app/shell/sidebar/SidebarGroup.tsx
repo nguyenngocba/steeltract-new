@@ -44,38 +44,41 @@ export function SidebarGroup({
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className="
-          mb-3
+          mb-2
           flex
           items-center
           justify-between
           gap-2
           w-full
-          rounded-lg
-          px-2 py-1
+          rounded-xl
+          px-3 py-2
           text-xs
+          font-semibold
           uppercase
-          tracking-[0.25em]
-          text-zinc-500
-          hover:bg-zinc-900
+          tracking-[0.18em]
+          text-slate-500
+          transition
+          hover:bg-white/[0.06]
+          hover:text-slate-300
         "
       >
         <div className="flex items-center gap-2">
           {Icon && (
             <Icon
               size={14}
-              className="text-cyan-500"
+              className="text-cyan-400"
             />
           )}
           <span>{title}</span>
         </div>
         <ChevronDown
           size={14}
-          className={`transition ${open ? 'rotate-180 text-cyan-400' : 'text-zinc-600'}`}
+          className={`transition ${open ? 'rotate-180 text-cyan-300' : 'text-slate-600'}`}
         />
       </button>
 
       {open && (
-        <div className="space-y-1">
+        <div className="space-y-1 border-l border-white/10 pl-2">
           {items.map((item) => (
             <SidebarItem
               key={item.path}

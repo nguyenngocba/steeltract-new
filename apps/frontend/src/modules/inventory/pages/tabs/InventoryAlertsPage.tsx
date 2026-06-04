@@ -92,14 +92,14 @@ export function InventoryAlertsPage() {
           <KpiCard title="Đã xử lý hôm nay" value={kpi.processed.toLocaleString('vi-VN')} tone="text-emerald-300" />
         </div>
 
-        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/80 p-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-3">
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Mức độ cảnh báo</option>
               <option value="Nghiêm trọng">Nghiêm trọng</option>
               <option value="Thấp">Thấp</option>
             </select>
-            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Kho</option>
               {[...new Set(alerts.map((a: any) => a.zoneCode))].map((z) => (
                 <option key={z} value={z}>
@@ -107,16 +107,16 @@ export function InventoryAlertsPage() {
                 </option>
               ))}
             </select>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã vật tư, tên vật tư..." className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 xl:col-span-4" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã vật tư, tên vật tư..." className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 xl:col-span-4" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9 rounded-2xl border border-slate-800/70 bg-[#071323]/85">
-            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold text-white">Danh sách cảnh báo tồn kho</div>
+          <div className="xl:col-span-9 rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+            <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Danh sách cảnh báo tồn kho</div>
             <div className="overflow-auto">
               <table className="w-full min-w-[1180px] text-sm">
-                <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
+                <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
                   <tr>
                     {['Mức độ', 'Loại cảnh báo', 'Mã vật tư', 'Tên vật tư', 'Kho', 'Tồn hiện tại', 'Ngưỡng cảnh báo', 'Đơn vị', 'Trạng thái', 'Hành động'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left font-medium">
@@ -127,7 +127,7 @@ export function InventoryAlertsPage() {
                 </thead>
                 <tbody>
                   {paged.map((x: any) => (
-                    <tr key={x.id} className="border-t border-slate-800/80 text-slate-200">
+                    <tr key={x.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06]">
                       <td className={`px-3 py-2 ${x.level === 'Nghiêm trọng' ? 'text-red-300' : 'text-amber-300'}`}>{x.level}</td>
                       <td className="px-3 py-2">{x.alertType}</td>
                       <td className="px-3 py-2 text-cyan-300">{x.code}</td>
@@ -143,18 +143,18 @@ export function InventoryAlertsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs text-slate-400">
+            <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-xs text-slate-400">
               <div>
                 Hiển thị {alerts.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, alerts.length)} / {alerts.length}
               </div>
               <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Trước
                 </button>
                 <span>
                   {page}/{pageCount}
                 </span>
-                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Sau
                 </button>
               </div>
@@ -180,7 +180,7 @@ export function InventoryAlertsPage() {
             </InsightPanel>
             <InsightPanel title="Cảnh báo nghiêm trọng">
               {criticalList.map((x: any) => (
-                <div key={x.id} className="mb-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
+                <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-red-300">
                     {x.code} - {x.name}
                   </div>
@@ -197,7 +197,7 @@ export function InventoryAlertsPage() {
 
 function KpiCard({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {
   return (
-    <div className="rounded-xl border border-slate-800/80 bg-[#071323]/80 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
       <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
       <div className={`mt-2 text-2xl font-semibold ${tone}`}>{value}</div>
     </div>
@@ -205,7 +205,7 @@ function KpiCard({ title, value, tone = 'text-white' }: { title: string; value: 
 }
 function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
       <div className="mb-3 text-sm font-semibold text-white">{title}</div>
       {children}
     </div>

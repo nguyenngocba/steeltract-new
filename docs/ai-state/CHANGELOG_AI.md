@@ -86,6 +86,23 @@ Completed:
   replaced Settings page with tabs matching the requested reference: Tổng quan, Cấu hình chung, Phân quyền, Danh mục, Tích hợp, Thông báo, Sao lưu & Phục hồi, and Nhật ký cấu hình;
   added workflow health panel inside Settings so the material-to-yard operational chain is visible as OK/WARN/BLOCKED;
   replaced Users, Roles, and System Logs pages with API-backed cockpit layouts and added active routes/sidebar entries for `/settings`, `/users`, `/roles`, and `/system-logs`.
+* Optimized Inventory/Vật tư kho UI consistency:
+  updated shared Inventory module shell, tab bar, KPI cards, section header, and runtime panels to a macOS-style glass surface with tighter typography, lighter shadows, and cleaner spacing;
+  added shared Inventory visual components for KPI cards, glass panels, horizontal bar charts, mini bar charts, and consistent inputs;
+  rebuilt Inventory > Tồn kho KPI/filter/table/insight panels with the new visual system, added smarter stock distribution, top inventory value, and stock health charts;
+  changed the material detail popup to the same glass theme and kept row click as read-only detail while the `Sửa vật tư` action opens the edit form;
+  rebuilt the material create/edit drawer in Vietnamese with the same Inventory glass visual language so editing from Tồn kho no longer feels like a different page;
+  rebuilt Inventory > Audit with Vietnamese labels, macOS-style table, KPI strip, top value chart, and stock distribution mini chart;
+  normalized active secondary Inventory tab panels/tables for Nhập kho, Xuất kho, Điều chuyển, Kiểm kê, Lịch sử giao dịch, and Cảnh báo tồn kho to the same glass surface treatment.
+* Completed an additional Inventory dark cockpit cleanup pass:
+  removed remaining light-mode/white surfaces from the Inventory module shell, tab bar, material drawer, material detail popup, Inventory > Tồn kho table, "Xem tất cả" modal, and secondary Inventory tabs;
+  added a shared donut summary chart for professional stock-health composition and wired it into Inventory > Tồn kho alongside top value, location distribution, and stock rhythm visuals;
+  kept add/edit material actions on the same Vietnamese cockpit drawer as the overview so Tồn kho no longer opens a mismatched material form.
+* Completed Inventory Foundation Phase A UI consolidation:
+  removed the duplicate create-material form and handler from Inventory Overview;
+  wired the Overview "Thêm vật tư mới" action to the shared `MaterialDrawer`;
+  preserved the no-schema/no-migration boundary for Phase A and did not touch the Supplier module;
+  refreshed the app sidebar dark theme and active child-tab styling, including hash-aware active matching for submenu tabs.
 
 Modified:
 
@@ -117,7 +134,7 @@ Notes:
 * Active frontend module scan no longer finds `mock-data` folders under `apps/frontend/src/modules`; remaining `demo.` strings in the Simulation seeder are retained only to clean old legacy records.
 * Current operational bootstrap result: 5 inventory materials, 10 inventory transactions, 12 components, 6 production orders, 6 yard zones, 72 yard slots, 2 QC checklists, 4 workers.
 * Production material warehouse now includes real `[COMPONENT_PRODUCTION]` outbound transactions, but still needs a backend balance/receipt model if it must behave as a fully independent warehouse instead of an issued-material view.
-* Latest verification: `pnpm -C apps/backend-api build` and `pnpm -C apps/frontend build` pass after System cockpit foundation. Vite still reports the existing NODE_ENV and large chunk warnings.
+* Latest verification: `pnpm -C apps/backend-api build` and `pnpm -C apps/frontend build` pass after Inventory UI optimization. Vite still reports the existing NODE_ENV and large chunk warnings.
 
 ## 2026-06-02
 

@@ -1,25 +1,21 @@
 import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { inventoryTabs } from '../../config/inventory-tabs'
 import { RuntimePanel, SectionHeader } from '../../../../shared/ui/enterprise'
+import { MaterialDrawer } from '../../components/material-table/MaterialDrawer'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
-import { useCreateMaterial } from '../../hooks/useCreateMaterial'
 import { useCreateTransaction } from '../../hooks/useCreateTransaction'
 import { useSuppliers } from '../../hooks/useSuppliers'
 import { useProjects } from '../../hooks/useProjects'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
-import { useCategories } from '../../hooks/useCategories'
-import { useUnits } from '../../hooks/useUnits'
 import { useZones } from '../../hooks/useZones'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 
 type ModalType =
   | null
-  | 'create-material'
   | 'inbound'
   | 'outbound'
   | 'transfer'
@@ -80,19 +76,16 @@ function formatDecimalInputRealtime(v: string) {
 }
 
 export function InventoryOverviewPage() {
-  const queryClient = useQueryClient()
   const { data: items = [] } = useInventoryItems()
   const { data: suppliers = [] } = useSuppliers()
   const { data: projects = [] } = useProjects()
-  const { data: categories = [] } = useCategories()
-  const { data: units = [] } = useUnits()
   const { data: zones = [] } = useZones()
   const { data: auditRows = [] } = useInventoryAudit()
   const { data: transactionsData = [] } = useInventoryTransactions({})
-  const createMaterialMutation = useCreateMaterial()
   const createTransactionMutation = useCreateTransaction()
 
   const [activeModal, setActiveModal] = useState<ModalType>(null)
+  const [materialDrawerOpen, setMaterialDrawerOpen] = useState(false)
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [materialDetailTab, setMaterialDetailTab] = useState<
@@ -100,17 +93,6 @@ export function InventoryOverviewPage() {
   >('overview')
   const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full'>(null)
   const [warehouseFilter, setWarehouseFilter] = useState<'ALL' | string>('ALL')
-
-  const [createMaterialForm, setCreateMaterialForm] = useState({
-    code: '',
-    name: '',
-    categoryId: '',
-    unit: '',
-    firstInboundQty: '',
-    unitPrice: '',
-    minimumStock: '',
-    note: '',
-  })
 
   const [inboundForm, setInboundForm] = useState({
     transactionDate: new Date().toISOString().slice(0, 16),
@@ -156,18 +138,6 @@ export function InventoryOverviewPage() {
       : undefined,
   )
 
-  const resetCreateMaterialForm = () =>
-    setCreateMaterialForm({
-      code: '',
-      name: '',
-      categoryId: '',
-      unit: '',
-      firstInboundQty: '',
-      unitPrice: '',
-      minimumStock: '',
-      note: '',
-    })
-
   const resetInboundForm = () =>
     setInboundForm({
       transactionDate: new Date().toISOString().slice(0, 16),
@@ -203,7 +173,6 @@ export function InventoryOverviewPage() {
 
   const closeModal = () => {
     setActiveModal(null)
-    resetCreateMaterialForm()
     resetInboundForm()
     resetOutboundForm()
     resetTransferForm()
@@ -376,42 +345,6 @@ export function InventoryOverviewPage() {
       ? ((currentMonthInventoryValue - previousMonthInventoryValue) / previousMonthInventoryValue) * 100
       : 0
 
-  async function handleCreateMaterial() {
-    if (!createMaterialForm.code || !createMaterialForm.name || !createMaterialForm.categoryId || !createMaterialForm.unit) return
-    const payload = {
-      code: createMaterialForm.code,
-      name: createMaterialForm.name,
-      categoryId: createMaterialForm.categoryId,
-      unit: createMaterialForm.unit,
-      unitPrice: Math.round(num(createMaterialForm.unitPrice)),
-      minimumStock: num(createMaterialForm.minimumStock),
-      description: createMaterialForm.note,
-    }
-
-    const created = await createMaterialMutation.mutateAsync(payload)
-
-    if (num(createMaterialForm.firstInboundQty) > 0) {
-      await createTransactionMutation.mutateAsync({
-        type: 'INBOUND',
-        transactionDate: new Date().toISOString(),
-        remarks: `Initial inbound for ${createMaterialForm.code}`,
-        items: [
-          {
-            inventoryItemId: created?.id ?? created?.data?.id,
-            quantity: num(createMaterialForm.firstInboundQty),
-            unitPrice: Math.round(num(createMaterialForm.unitPrice)),
-            totalAmount: Math.round(num(createMaterialForm.firstInboundQty) * num(createMaterialForm.unitPrice)),
-            zoneId: defaultInboundZoneId || undefined,
-          },
-        ],
-      })
-    }
-
-    await queryClient.invalidateQueries({ queryKey: ['inventory-items'] })
-    await queryClient.invalidateQueries({ queryKey: ['materials'] })
-    closeModal()
-  }
-
   async function handleInbound() {
     if (!inboundForm.inventoryItemId || inboundQty <= 0) return
     await createTransactionMutation.mutateAsync({
@@ -478,6 +411,12 @@ export function InventoryOverviewPage() {
 
   return (
     <EnterpriseModulePage>
+      <MaterialDrawer
+        open={materialDrawerOpen}
+        material={null}
+        onClose={() => setMaterialDrawerOpen(false)}
+      />
+
       <SectionHeader title="KHO VẬT TƯ" description="Quản lý tồn kho vật tư, thép tấm, thép hình, phụ kiện và vật tư tiêu hao" />
       <EnterpriseTabBar tabs={inventoryTabs} />
 
@@ -501,7 +440,7 @@ export function InventoryOverviewPage() {
           <button onClick={() => { resetOutboundForm(); setActiveModal('outbound') }} className="rounded-xl border border-emerald-700 bg-zinc-900 px-3 py-3 text-emerald-300">Xuất kho</button>
           <button onClick={() => { resetTransferForm(); setActiveModal('transfer') }} className="rounded-xl border border-violet-700 bg-zinc-900 px-3 py-3 text-violet-300">Điều chuyển</button>
           <button onClick={() => setActiveModal('stock-take')} className="rounded-xl border border-amber-700 bg-zinc-900 px-3 py-3 text-amber-300">Kiểm kê</button>
-          <button onClick={() => { resetCreateMaterialForm(); setActiveModal('create-material') }} className="rounded-xl border border-blue-700 bg-zinc-900 px-3 py-3 text-blue-300">Thêm vật tư vào phiếu nhập</button>
+          <button onClick={() => setMaterialDrawerOpen(true)} className="rounded-xl border border-blue-700 bg-zinc-900 px-3 py-3 text-blue-300">Thêm vật tư mới</button>
         </div>
       </RuntimePanel>
 
@@ -647,7 +586,6 @@ export function InventoryOverviewPage() {
           <div className="max-h-[92vh] w-full max-w-6xl overflow-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-xl font-semibold text-white">
-                {activeModal === 'create-material' && 'Thêm vật tư mới'}
                 {activeModal === 'inbound' && 'Nhập kho (Có VAT & Hóa đơn)'}
                 {activeModal === 'outbound' && 'Xuất kho'}
                 {activeModal === 'transfer' && 'Điều chuyển kho'}
@@ -656,29 +594,6 @@ export function InventoryOverviewPage() {
               </h3>
               <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">Đóng</button>
             </div>
-
-            {activeModal === 'create-material' && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <input placeholder="Mã vật tư" value={createMaterialForm.code} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, code: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <input placeholder="Tên vật tư" value={createMaterialForm.name} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, name: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <select value={createMaterialForm.categoryId} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, categoryId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Danh mục</option>
-                  {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <select value={createMaterialForm.unit} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, unit: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Đơn vị tính</option>
-                  {units.map((u: any) => <option key={u.id} value={u.code}>{u.code}</option>)}
-                </select>
-                <input type="text" inputMode="decimal" placeholder="Số lượng nhập đầu" value={createMaterialForm.firstInboundQty} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, firstInboundQty: formatDecimalInputRealtime(e.target.value) }))} onBlur={(e) => setCreateMaterialForm((p) => ({ ...p, firstInboundQty: formatInputNumberVN(e.target.value, false) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <input type="text" inputMode="numeric" placeholder="Đơn giá" value={createMaterialForm.unitPrice} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, unitPrice: formatMoneyInputRealtime(e.target.value) }))} onBlur={(e) => setCreateMaterialForm((p) => ({ ...p, unitPrice: formatInputNumberVN(e.target.value, true) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <input type="number" placeholder="Ngưỡng cảnh báo tồn" value={createMaterialForm.minimumStock} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, minimumStock: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <textarea placeholder="Ghi chú" value={createMaterialForm.note} onChange={(e) => setCreateMaterialForm((p) => ({ ...p, note: e.target.value }))} rows={3} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white md:col-span-2" />
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-4 py-2 text-zinc-300">Hủy</button>
-                  <button onClick={handleCreateMaterial} className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-black">Lưu vật tư</button>
-                </div>
-              </div>
-            )}
 
             {activeModal === 'inbound' && (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

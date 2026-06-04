@@ -125,11 +125,11 @@ export function InventoryTransactionsPage() {
           <KpiCard title="Kiểm kê" value={kpis.stockTake.toLocaleString('vi-VN')} />
         </div>
 
-        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/80 p-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-3">
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-7">
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100" />
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100" />
-            <select value={type} onChange={(e) => setType(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100" />
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100" />
+            <select value={type} onChange={(e) => setType(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Loại giao dịch</option>
               <option value="INBOUND">INBOUND</option>
               <option value="OUTBOUND">OUTBOUND</option>
@@ -137,7 +137,7 @@ export function InventoryTransactionsPage() {
               <option value="ADJUSTMENT">ADJUSTMENT</option>
               <option value="RETURN">RETURN</option>
             </select>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Nhà cung cấp</option>
               {suppliers.map((s: any) => (
                 <option key={s.id} value={s.id}>
@@ -145,7 +145,7 @@ export function InventoryTransactionsPage() {
                 </option>
               ))}
             </select>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Công trình</option>
               {projects.map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -153,7 +153,7 @@ export function InventoryTransactionsPage() {
                 </option>
               ))}
             </select>
-            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Kho</option>
               {zones.map((z: any) => (
                 <option key={z.id} value={z.id}>
@@ -168,11 +168,11 @@ export function InventoryTransactionsPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9 rounded-2xl border border-slate-800/70 bg-[#071323]/85">
-            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold text-white">Lịch sử giao dịch</div>
+          <div className="xl:col-span-9 rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+            <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Lịch sử giao dịch</div>
             <div className="overflow-auto">
               <table className="w-full min-w-[1280px] text-sm">
-                <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
+                <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
                   <tr>
                     {['Thời gian', 'Loại', 'Số chứng từ', 'Mã vật tư', 'Tên vật tư', 'Kho', 'Số lượng', 'Đơn giá', 'Giá trị', 'Đối tượng', 'Người tạo', 'Trạng thái'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left font-medium">
@@ -186,7 +186,7 @@ export function InventoryTransactionsPage() {
                     paged.map((x: any) => {
                       const line = x.items?.[0]
                       return (
-                        <tr key={x.id} className="border-t border-slate-800/80 text-slate-200">
+                        <tr key={x.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06]">
                           <td className="px-3 py-2">{new Date(x.transactionDate ?? x.createdAt).toLocaleString('vi-VN')}</td>
                           <td className="px-3 py-2">{x.type}</td>
                           <td className="px-3 py-2 text-cyan-300">{x.transactionNo}</td>
@@ -205,18 +205,18 @@ export function InventoryTransactionsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs text-slate-400">
+            <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-xs text-slate-400">
               <div>
                 Hiển thị {rows.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, rows.length)} / {rows.length}
               </div>
               <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Trước
                 </button>
                 <span>
                   {page}/{Math.max(1, pageCount)}
                 </span>
-                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Sau
                 </button>
               </div>
@@ -244,7 +244,7 @@ export function InventoryTransactionsPage() {
             </InsightPanel>
             <InsightPanel title="Giao dịch gần đây">
               {recent.map((x: any) => (
-                <div key={x.id} className="mb-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
+                <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-cyan-300">{x.transactionNo}</div>
                   <div>{x.type}</div>
                 </div>
@@ -259,7 +259,7 @@ export function InventoryTransactionsPage() {
 
 function KpiCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-800/80 bg-[#071323]/80 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
       <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
       <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
     </div>
@@ -267,7 +267,7 @@ function KpiCard({ title, value }: { title: string; value: string }) {
 }
 function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
       <div className="mb-3 text-sm font-semibold text-white">{title}</div>
       {children}
     </div>

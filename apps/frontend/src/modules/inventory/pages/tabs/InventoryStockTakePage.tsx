@@ -135,10 +135,10 @@ export function InventoryStockTakePage() {
           <KpiCard title="Giá trị chênh lệch" value={formatCurrency(metrics.varianceValue)} className="xl:col-span-2" />
         </div>
 
-        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/80 p-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-3">
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100" />
-            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100" />
+            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Kho</option>
               {zones.map((z: any) => (
                 <option key={z.id} value={z.id}>
@@ -146,12 +146,12 @@ export function InventoryStockTakePage() {
                 </option>
               ))}
             </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Trạng thái</option>
               <option value="COMPLETED">Hoàn thành</option>
               <option value="PENDING">Đang thực hiện</option>
             </select>
-            <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100">
+            <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
               <option value="">Phương pháp</option>
               <option value="Định kỳ">Định kỳ</option>
               <option value="Bất thường">Bất thường</option>
@@ -161,11 +161,11 @@ export function InventoryStockTakePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9 rounded-2xl border border-slate-800/70 bg-[#071323]/85">
-            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold text-white">Danh sách phiếu kiểm kê</div>
+          <div className="xl:col-span-9 rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+            <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Danh sách phiếu kiểm kê</div>
             <div className="overflow-auto">
               <table className="w-full min-w-[1100px] text-sm">
-                <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
+                <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
                   <tr>
                     {['Mã kiểm kê', 'Kho', 'Phương pháp', 'Ngày', 'Người tạo', 'Trạng thái', 'Chênh lệch', 'Độ chính xác'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left font-medium">
@@ -176,7 +176,7 @@ export function InventoryStockTakePage() {
                 </thead>
                 <tbody>
                   {paged.map((x: any) => (
-                    <tr key={x.id} className="border-t border-slate-800/80 text-slate-200">
+                    <tr key={x.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06]">
                       <td className="px-3 py-2 text-cyan-300">{x.transactionNo}</td>
                       <td className="px-3 py-2">{x.items?.[0]?.zone?.code ?? '-'}</td>
                       <td className="px-3 py-2">{x.referenceType ?? 'Định kỳ'}</td>
@@ -190,18 +190,18 @@ export function InventoryStockTakePage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs text-slate-400">
+            <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-xs text-slate-400">
               <div>
                 Hiển thị {rows.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, rows.length)} / {rows.length}
               </div>
               <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Trước
                 </button>
                 <span>
                   {page}/{pageCount}
                 </span>
-                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">
+                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
                   Sau
                 </button>
               </div>
@@ -228,12 +228,12 @@ export function InventoryStockTakePage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-sm font-semibold text-white">Chi tiết chênh lệch kiểm kê</div>
             <button
               onClick={() => setCountRows((prev) => [...prev, { inventoryItemId: '', physicalQty: '', zoneId: '' }])}
-              className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200"
+              className="rounded border border-white/10 px-3 py-1.5 text-xs text-slate-200"
             >
               + Thêm dòng
             </button>
@@ -241,7 +241,7 @@ export function InventoryStockTakePage() {
 
           <div className="overflow-auto">
             <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-[#081b31] text-xs uppercase text-slate-400">
+              <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
                 <tr>
                   {['Vật tư', 'Kho', 'Tồn hệ thống', 'Tồn thực tế', 'Chênh lệch', 'Hành động'].map((h) => (
                     <th key={h} className="px-3 py-2 text-left font-medium">
@@ -252,9 +252,9 @@ export function InventoryStockTakePage() {
               </thead>
               <tbody>
                 {countSheet.map((line, idx) => (
-                  <tr key={`${idx}-${line.inventoryItemId}`} className="border-t border-slate-800/80">
+                  <tr key={`${idx}-${line.inventoryItemId}`} className="border-t border-white/10/80">
                     <td className="px-3 py-2">
-                      <select value={line.inventoryItemId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, inventoryItemId: e.target.value } : r)))} className="h-9 w-full rounded border border-slate-700 bg-[#050d18] px-2 text-slate-100">
+                      <select value={line.inventoryItemId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, inventoryItemId: e.target.value } : r)))} className="h-9 w-full rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100">
                         <option value="">Chọn vật tư</option>
                         {materials.map((m: any) => (
                           <option key={m.id} value={m.id}>
@@ -264,7 +264,7 @@ export function InventoryStockTakePage() {
                       </select>
                     </td>
                     <td className="px-3 py-2">
-                      <select value={line.zoneId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, zoneId: e.target.value } : r)))} className="h-9 w-full rounded border border-slate-700 bg-[#050d18] px-2 text-slate-100">
+                      <select value={line.zoneId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, zoneId: e.target.value } : r)))} className="h-9 w-full rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100">
                         <option value="">Chọn kho</option>
                         {zones.map((z: any) => (
                           <option key={z.id} value={z.id}>
@@ -275,7 +275,7 @@ export function InventoryStockTakePage() {
                     </td>
                     <td className="px-3 py-2 text-slate-200">{line.systemQty.toLocaleString('vi-VN')}</td>
                     <td className="px-3 py-2">
-                      <input value={line.physicalQty} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: e.target.value } : r)))} className="h-9 w-32 rounded border border-slate-700 bg-[#050d18] px-2 text-slate-100" />
+                      <input value={line.physicalQty} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: e.target.value } : r)))} className="h-9 w-32 rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
                     </td>
                     <td className={`px-3 py-2 ${line.difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{line.difference.toLocaleString('vi-VN')}</td>
                     <td className="px-3 py-2">
@@ -303,7 +303,7 @@ export function InventoryStockTakePage() {
 
 function KpiCard({ title, value, className = '' }: { title: string; value: string; className?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-800/80 bg-[#071323]/80 p-4 ${className}`}>
+    <div className={`rounded-xl border border-white/10 bg-white/[0.045] p-4 ${className}`}>
       <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
       <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
     </div>
@@ -311,7 +311,7 @@ function KpiCard({ title, value, className = '' }: { title: string; value: strin
 }
 function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-800/70 bg-[#071323]/85 p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
       <div className="mb-3 text-sm font-semibold text-white">{title}</div>
       {children}
     </div>

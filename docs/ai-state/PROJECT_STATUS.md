@@ -13,3 +13,5 @@ Settings         55%
 Dashboard        22%
 
 Percentages represent implemented operational foundations and visible workflows, not final polish.
+
+Latest Inventory UI polish pass completed on 2026-06-03; follow-up dark cockpit cleanup removed remaining white/light surfaces and added stock-health donut analytics. Operational percentage remains 100%.
