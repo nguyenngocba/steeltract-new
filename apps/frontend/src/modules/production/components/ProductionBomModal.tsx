@@ -32,6 +32,28 @@ type RoutingDraft = {
   qcRequired: boolean
 }
 
+type ProductionMaterialOption = {
+  id: string
+  code: string
+  name: string
+  unit?: string
+  unitMaster?: { symbol?: string }
+  materialUsageType?: 'PRIMARY' | 'SECONDARY' | 'CONSUMABLE'
+  sxQty?: number
+}
+
+function usageToBomCategory(usage?: string): MaterialDraft['category'] {
+  if (usage === 'SECONDARY') return 'SECONDARY_MATERIAL'
+  if (usage === 'CONSUMABLE') return 'CONSUMABLE'
+  return 'MAIN_MATERIAL'
+}
+
+function bomCategoryLabel(category: MaterialDraft['category']) {
+  if (category === 'SECONDARY_MATERIAL') return 'Vật tư phụ'
+  if (category === 'CONSUMABLE') return 'Tiêu hao'
+  return 'Vật tư chính'
+}
+
 export function ProductionBomModal({
   components,
   initialComponentId = '',
@@ -100,10 +122,29 @@ export function ProductionBomModal({
       .map(([id, qty]) => ({ ...(itemById.get(id) ?? { id, code: id, name: id }), sxQty: qty }))
       .filter((item) => Number(item.sxQty ?? 0) > 0)
       .sort((a, b) => String(a.code).localeCompare(String(b.code)))
-  }, [inventoryItems, materialIssues, transactionsData])
+  }, [inventoryItems, materialIssues, transactionsData]) as ProductionMaterialOption[]
+
+  const productionMaterialsByCategory = useMemo(() => {
+    return productionMaterials.reduce<Record<MaterialDraft['category'], ProductionMaterialOption[]>>((groups, item) => {
+      groups[usageToBomCategory(item.materialUsageType)].push(item)
+      return groups
+    }, {
+      MAIN_MATERIAL: [],
+      SECONDARY_MATERIAL: [],
+      CONSUMABLE: [],
+    })
+  }, [productionMaterials])
 
   function updateMaterial(index: number, patch: Partial<MaterialDraft>) {
     setMaterials((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
+  }
+
+  function selectMaterial(index: number, materialId: string) {
+    const material = productionMaterials.find((row) => row.id === materialId)
+    updateMaterial(index, {
+      materialId,
+      category: usageToBomCategory(material?.materialUsageType),
+    })
   }
 
   function updateRouting(index: number, patch: Partial<RoutingDraft>) {
@@ -189,10 +230,27 @@ export function ProductionBomModal({
             <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs">
               <thead className="text-[10px] uppercase text-slate-500"><tr>{['Vật tư', 'Danh mục', 'Định mức', 'Hao hụt %', 'ĐVT', ''].map((item) => <th key={item} className="pb-2 pr-2">{item}</th>)}</tr></thead>
               <tbody>{materials.map((item, index) => {
-                const material = (productionMaterials as Array<{ id: string; code: string; name: string; unit?: string; unitMaster?: { symbol?: string } }>).find((row) => row.id === item.materialId)
+                const material = productionMaterials.find((row) => row.id === item.materialId)
+                const groupOptions = productionMaterialsByCategory[item.category]
                 return <tr key={index} className="border-t border-slate-800">
-                  <td className="py-2 pr-2"><select value={item.materialId} onChange={(event) => updateMaterial(index, { materialId: event.target.value })} className={inputClass}><option value="">Chọn vật tư kho SX</option>{(productionMaterials as Array<{ id: string; code: string; name: string; sxQty?: number }>).map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · tồn SX {Number(row.sxQty ?? 0).toLocaleString('vi-VN')}</option>)}</select></td>
-                  <td className="pr-2"><select value={item.category} onChange={(event) => updateMaterial(index, { category: event.target.value as MaterialDraft['category'] })} className={inputClass}><option value="MAIN_MATERIAL">Vật tư chính</option><option value="SECONDARY_MATERIAL">Vật tư phụ</option><option value="CONSUMABLE">Tiêu hao</option></select></td>
+                  <td className="py-2 pr-2">
+                    <select value={item.materialId} onChange={(event) => selectMaterial(index, event.target.value)} className={inputClass}>
+                      <option value="">Chọn {bomCategoryLabel(item.category).toLowerCase()} từ kho SX</option>
+                      {groupOptions.length === 0 ? <option value="" disabled>Không có {bomCategoryLabel(item.category).toLowerCase()} trong kho SX</option> : null}
+                      {groupOptions.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · tồn SX {Number(row.sxQty ?? 0).toLocaleString('vi-VN')}</option>)}
+                    </select>
+                  </td>
+                  <td className="pr-2">
+                    <select
+                      value={item.category}
+                      onChange={(event) => updateMaterial(index, { category: event.target.value as MaterialDraft['category'], materialId: '' })}
+                      className={inputClass}
+                    >
+                      <option value="MAIN_MATERIAL">Vật tư chính ({productionMaterialsByCategory.MAIN_MATERIAL.length})</option>
+                      <option value="SECONDARY_MATERIAL">Vật tư phụ ({productionMaterialsByCategory.SECONDARY_MATERIAL.length})</option>
+                      <option value="CONSUMABLE">Tiêu hao ({productionMaterialsByCategory.CONSUMABLE.length})</option>
+                    </select>
+                  </td>
                   <td className="pr-2"><input value={item.quantity} onChange={(event) => updateMaterial(index, { quantity: event.target.value })} type="number" min="0.01" step="0.01" className={inputClass} /></td>
                   <td className="pr-2"><input value={item.wastePercent} onChange={(event) => updateMaterial(index, { wastePercent: event.target.value })} type="number" min="0" max="100" step="0.01" className={inputClass} /></td>
                   <td className="pt-2 text-slate-300">{material?.unitMaster?.symbol ?? material?.unit ?? '-'}</td>
@@ -224,7 +282,16 @@ export function ProductionBomModal({
             <div className="mt-4 text-slate-500">Vật tư BOM</div><div className="mt-2 text-xl font-semibold text-white">{materials.filter((item) => item.materialId).length}</div>
             <div className="mt-4 text-slate-500">Công đoạn routing</div><div className="mt-2 text-xl font-semibold text-white">{routing.filter((item) => item.stepName).length}</div>
           </div>
-          <div className="rounded border border-amber-900/70 bg-amber-950/20 p-4 text-xs text-amber-100">Production BOM chỉ chọn vật tư đã được xuất sang kho vật tư SX. Nếu thiếu vật tư, hãy xuất kho với đối tượng "Xuất sản xuất cấu kiện" trước.</div>
+          <div className="rounded border border-amber-900/70 bg-amber-950/20 p-4 text-xs text-amber-100">Production BOM chỉ chọn vật tư đã được xuất sang kho vật tư SX. Danh sách được tách theo Loại vật tư trong Material Master: chính, phụ, tiêu hao.</div>
+          <div className="rounded border border-slate-800 bg-slate-950 p-4 text-xs">
+            <div className="mb-3 font-semibold text-slate-100">Kho vật tư SX theo nhóm</div>
+            {(['MAIN_MATERIAL', 'SECONDARY_MATERIAL', 'CONSUMABLE'] as MaterialDraft['category'][]).map((category) => (
+              <div key={category} className="mb-2 flex items-center justify-between text-slate-300">
+                <span>{bomCategoryLabel(category)}</span>
+                <span className="font-semibold text-cyan-300">{productionMaterialsByCategory[category].length}</span>
+              </div>
+            ))}
+          </div>
         </aside>
       </div>
 

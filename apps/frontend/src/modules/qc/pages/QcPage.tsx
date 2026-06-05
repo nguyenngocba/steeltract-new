@@ -27,6 +27,8 @@ export function QcPage() {
   const [status, setStatus] = useState('all')
   const [selectedInspection, setSelectedInspection] = useState<QcInspectionRow | null>(null)
   const [selectedQueue, setSelectedQueue] = useState<QcProductionQueueRow | null>(null)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['qc-cockpit'], queryFn: getQcCockpit, refetchInterval: 5000 })
   const runtime = data ?? emptyRuntime()
@@ -35,51 +37,113 @@ export function QcPage() {
     return `${row.inspectionNo} ${row.projectName} ${row.componentCode} ${row.productionOrderNo}`.toLowerCase().includes(query.toLowerCase())
   }), [query, runtime.inspections, status])
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['qc-cockpit'] })
-  const createMutation = useMutation({
-    mutationFn: async (row: QcProductionQueueRow) => createInspection({
-      productionOrderId: row.id,
-      componentId: row.componentId,
-      projectId: row.projectId,
-      status: 'READY',
-      metadata: { source: 'qc-cockpit', orderNo: row.orderNo },
-    }),
-    onSuccess: invalidate,
+  const inspectionPayload = (row: QcProductionQueueRow) => ({
+    productionOrderId: row.id,
+    componentId: row.componentId,
+    projectId: row.projectId,
+    status: 'READY',
+    metadata: { source: 'qc-cockpit', orderNo: row.orderNo },
   })
-  const startMutation = useMutation({ mutationFn: startInspection, onSuccess: invalidate })
+  const qcErrorMessage = (value: unknown) => {
+    const raw = (value as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
+    return Array.isArray(raw) ? raw.join(', ') : raw || 'Không thể cập nhật QC.'
+  }
+  const createMutation = useMutation({
+    mutationFn: async (row: QcProductionQueueRow) => createInspection(inspectionPayload(row)),
+    onSuccess: async (_, row) => {
+      setError('')
+      setNotice(`Đã tạo phiếu QC cho ${row.orderNo}.`)
+      setTab('inspections')
+      await invalidate()
+    },
+    onError: (err) => {
+      setNotice('')
+      setError(qcErrorMessage(err))
+    },
+  })
+  const startMutation = useMutation({
+    mutationFn: startInspection,
+    onSuccess: async () => {
+      setError('')
+      setNotice('Đã bắt đầu kiểm tra QC.')
+      await invalidate()
+    },
+    onError: (err) => setError(qcErrorMessage(err)),
+  })
   const passMutation = useMutation({
     mutationFn: async (id: string) => {
       await startInspection(id).catch(() => undefined)
       await completeInspection(id, 'PASSED')
       return approveInspection(id)
     },
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      setError('')
+      setNotice('Phiếu QC đã đạt và được duyệt. Có thể chuyển thành phẩm ra bãi.')
+      await invalidate()
+    },
+    onError: (err) => {
+      setNotice('')
+      setError(qcErrorMessage(err))
+    },
   })
   const failMutation = useMutation({
     mutationFn: async (id: string) => {
       await startInspection(id).catch(() => undefined)
       return completeInspection(id, 'REWORK_REQUIRED')
     },
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      setError('')
+      setNotice('Đã ghi nhận QC không đạt / cần xử lý NCR.')
+      await invalidate()
+    },
+    onError: (err) => {
+      setNotice('')
+      setError(qcErrorMessage(err))
+    },
+  })
+  const quickApproveMutation = useMutation({
+    mutationFn: async (row: QcProductionQueueRow) => {
+      const existing = runtime.inspections.find((inspection) =>
+        inspection.status !== 'APPROVED' &&
+        inspection.status !== 'PASSED' &&
+        (inspection.productionOrderId === row.id || Boolean(row.componentId && inspection.componentId === row.componentId)),
+      )
+      const inspection = existing ?? await createInspection(inspectionPayload(row)) as QcInspectionRow
+      await startInspection(inspection.id).catch(() => undefined)
+      await completeInspection(inspection.id, 'PASSED')
+      return approveInspection(inspection.id)
+    },
+    onSuccess: async (_, row) => {
+      setError('')
+      setNotice(`QC của ${row.orderNo} đã đạt/duyệt. Quay lại Sản xuất để chuyển thành phẩm ra bãi.`)
+      await invalidate()
+    },
+    onError: (err) => {
+      setNotice('')
+      setError(qcErrorMessage(err))
+    },
   })
 
   return <OperationalShell>
     <main className="min-h-screen bg-[#020811] p-4 text-slate-100">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-3">
         <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Chất lượng (QC)</p><h1 className="mt-1 text-2xl font-semibold">Chất lượng (QC)</h1><p className="mt-1 text-xs text-slate-500">QC móc nối sản xuất và cấu kiện. Thành phẩm chỉ được chuyển bãi khi QC đạt hoặc đã duyệt.</p></div>
-        <div className="flex gap-2"><button onClick={() => setTab('inspections')} className="rounded bg-blue-600 px-4 py-2 text-xs font-semibold">+ Tạo phiếu kiểm tra</button><button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs">Xuất Excel</button><button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs">Báo cáo</button></div>
+        <div className="flex gap-2"><button onClick={() => setTab('plan')} className="rounded bg-blue-600 px-4 py-2 text-xs font-semibold">+ Tạo phiếu kiểm tra</button><button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs">Xuất Excel</button><button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs">Báo cáo</button></div>
       </header>
       <nav className="my-3 flex gap-1 overflow-x-auto rounded bg-[#06101b] p-1">{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded px-3 py-2 text-xs ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>{label}</button>)}</nav>
       <FilterBar query={query} status={status} onQuery={setQuery} onStatus={setStatus} />
+      {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
+      {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
       {isLoading ? <div className={`${panel} mt-3 p-6 text-center text-sm text-slate-500`}>Đang tải QC cockpit...</div> : null}
-      {tab === 'overview' && <Overview runtime={runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} />}
-      {tab === 'inspections' && <Inspections rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
-      {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} />}
+      {tab === 'overview' && <Overview runtime={runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
+      {tab === 'inspections' && <Inspections rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
+      {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'standards' && <Standards runtime={runtime} />}
       {tab === 'ncr' && <Ncr runtime={runtime} />}
       {tab === 'calibration' && <Calibration />}
       {tab === 'reports' && <Reports runtime={runtime} />}
       <InspectionDetail inspection={selectedInspection} onClose={() => setSelectedInspection(null)} onStart={(id) => startMutation.mutate(id)} onPass={(id) => passMutation.mutate(id)} onFail={(id) => failMutation.mutate(id)} />
-      <QueueDetail row={selectedQueue} onClose={() => setSelectedQueue(null)} onCreate={(row) => createMutation.mutate(row)} />
+      <QueueDetail row={selectedQueue} onClose={() => setSelectedQueue(null)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
     </main>
   </OperationalShell>
 }
@@ -92,13 +156,13 @@ function FilterBar({ query, status, onQuery, onStatus }: { query: string; status
   </div>
 }
 
-function Overview({ runtime, rows, queue, onOpen, onQueue, onCreate }: { runtime: QcCockpit; rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void }) {
+function Overview({ runtime, rows, queue, onOpen, onQueue, onCreate, onQuickApprove }: { runtime: QcCockpit; rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
   const m = runtime.metrics
   return <div className="mt-3 space-y-4">
     <KpiStrip runtime={runtime} />
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows.slice(0, 10)} onOpen={onOpen} /><aside className="space-y-4"><Latest rows={rows} onOpen={onOpen} /><Donut title="Thống kê theo loại kiểm tra" center={fmt(m.total)} rows={runtime.byCategory.map((r, i) => [r.category, r.count, ['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500'][i % 4]]) as any} /><NcrSummary runtime={runtime} /></aside></div>
     <div className="grid gap-4 xl:grid-cols-2"><Trend rows={rows} /><ByProject rows={runtime.byProject} /></div>
-    <ProductionQueue rows={queue.slice(0, 8)} onOpen={onQueue} onCreate={onCreate} />
+    <ProductionQueue rows={queue.slice(0, 8)} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} />
   </div>
 }
 
@@ -107,20 +171,20 @@ function KpiStrip({ runtime }: { runtime: QcCockpit }) {
   return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Tổng phiếu kiểm tra" value={fmt(m.total)} note="Trong hệ thống" /><Kpi icon={CheckCircle2} title="Đạt" value={fmt(m.passed)} note={`${fmt(m.passRate)}%`} tone="emerald" /><Kpi icon={XCircle} title="Không đạt" value={fmt(m.failed + m.rework)} note="Rework/Failed" tone="red" /><Kpi icon={CalendarClock} title="Chờ xử lý" value={fmt(runtime.inspections.filter((i) => ['READY', 'DRAFT'].includes(i.status)).length)} note="Phiếu" tone="amber" /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note="Trong tổng số" tone="purple" /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(runtime.productionQueue.filter((q) => q.qcStatus !== 'APPROVED').length)} note="Chặn xuất bãi" tone="cyan" /></div>
 }
 
-function Inspections({ rows, queue, onOpen, onQueue, onCreate, onPass, onFail }: { rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onPass: (row: QcInspectionRow) => void; onFail: (row: QcInspectionRow) => void }) {
-  return <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows} onOpen={onOpen} onPass={onPass} onFail={onFail} /><aside className="space-y-4"><ProductionQueue rows={queue} onOpen={onQueue} onCreate={onCreate} compact /></aside></div>
+function Inspections({ rows, queue, onOpen, onQueue, onCreate, onQuickApprove, onPass, onFail }: { rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; onPass: (row: QcInspectionRow) => void; onFail: (row: QcInspectionRow) => void }) {
+  return <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows} onOpen={onOpen} onPass={onPass} onFail={onFail} /><aside className="space-y-4"><ProductionQueue rows={queue} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} compact /></aside></div>
 }
 
 function InspectionTable({ rows, onOpen, onPass, onFail }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void; onPass?: (row: QcInspectionRow) => void; onFail?: (row: QcInspectionRow) => void }) {
   return <div className={`${panel} overflow-hidden`}><div className="flex justify-between border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách phiếu kiểm tra</h2><span className="text-xs text-slate-500">{rows.length} phiếu</span></div><div className="overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500"><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className="cursor-pointer border-t border-slate-800 text-slate-200 hover:bg-cyan-950/20"><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}</tbody></table></div>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</div>
 }
 
-function ProductionQueue({ rows, onOpen, onCreate, compact = false }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; compact?: boolean }) {
-  return <div className={`${panel} overflow-hidden`}><div className="border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">MO hoàn thành chờ QC</h2></div><div className={`${compact ? 'max-h-[520px]' : 'max-h-80'} overflow-auto`}>{rows.map((row) => <div key={row.id} onClick={() => onOpen(row)} className="grid cursor-pointer grid-cols-[1fr_auto] gap-3 border-b border-slate-800 px-4 py-3 text-xs hover:bg-cyan-950/20"><span><b className="text-cyan-300">{row.orderNo}</b><span className="mt-1 block text-slate-300">{row.componentCode} · {row.componentName}</span><span className="mt-1 block text-slate-500">{row.title}</span></span><span className="space-y-2 text-right"><StatusBadge value={row.qcStatus === 'APPROVED' ? 'APPROVED' : row.qcStatus === 'REWORK_REQUIRED' ? 'REWORK_REQUIRED' : 'READY'} />{row.qcStatus !== 'APPROVED' ? <button onClick={(e) => { e.stopPropagation(); onCreate(row) }} className="block rounded bg-blue-600 px-3 py-1 text-[10px] text-white">Tạo QC</button> : null}</span></div>)}{!rows.length ? <Empty title="Chưa có MO hoàn thành chờ QC." /> : null}</div></div>
+function ProductionQueue({ rows, onOpen, onCreate, onQuickApprove, compact = false }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; compact?: boolean }) {
+  return <div className={`${panel} overflow-hidden`}><div className="border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">MO hoàn thành chờ QC</h2></div><div className={`${compact ? 'max-h-[520px]' : 'max-h-80'} overflow-auto`}>{rows.map((row) => <div key={row.id} onClick={() => onOpen(row)} className="grid cursor-pointer grid-cols-[1fr_auto] gap-3 border-b border-slate-800 px-4 py-3 text-xs hover:bg-cyan-950/20"><span><b className="text-cyan-300">{row.orderNo}</b><span className="mt-1 block text-slate-300">{row.componentCode} · {row.componentName}</span><span className="mt-1 block text-slate-500">{row.title}</span><span className="mt-1 block text-slate-500">{row.inspectionCount} phiếu QC</span></span><span className="space-y-2 text-right"><StatusBadge value={row.qcStatus === 'APPROVED' ? 'APPROVED' : row.qcStatus === 'REWORK_REQUIRED' ? 'REWORK_REQUIRED' : 'READY'} />{row.qcStatus !== 'APPROVED' ? <><button onClick={(e) => { e.stopPropagation(); onCreate(row) }} className="block w-full rounded border border-blue-700 px-3 py-1 text-[10px] text-blue-200">Tạo QC</button><button onClick={(e) => { e.stopPropagation(); onQuickApprove(row) }} className="block w-full rounded bg-emerald-600 px-3 py-1 text-[10px] text-white">Tạo & duyệt đạt</button></> : <span className="block rounded border border-emerald-700 px-3 py-1 text-[10px] text-emerald-300">Cho phép xuất bãi</span>}</span></div>)}{!rows.length ? <Empty title="Chưa có MO hoàn thành chờ QC." /> : null}</div></div>
 }
 
-function Plan({ queue, onCreate }: { queue: QcProductionQueueRow[]; onCreate: (row: QcProductionQueueRow) => void }) {
-  return <div className="mt-3"><ProductionQueue rows={queue} onOpen={() => undefined} onCreate={onCreate} /></div>
+function Plan({ queue, onCreate, onQuickApprove }: { queue: QcProductionQueueRow[]; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
+  return <div className="mt-3"><ProductionQueue rows={queue} onOpen={() => undefined} onCreate={onCreate} onQuickApprove={onQuickApprove} /></div>
 }
 
 function Standards({ runtime }: { runtime: QcCockpit }) {
@@ -172,9 +236,9 @@ function InspectionDetail({ inspection, onClose, onStart, onPass, onFail }: { in
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><section className="w-full max-w-4xl rounded border border-cyan-900 bg-[#061321] p-5"><div className="flex justify-between"><div><p className="text-xs text-cyan-300">{inspection.inspectionNo}</p><h2 className="mt-1 text-xl font-semibold">{inspection.componentCode} · {inspection.componentName}</h2></div><button onClick={onClose}><XCircle /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2"><Info k="Dự án" v={inspection.projectName} /><Info k="MO" v={inspection.productionOrderNo} /><Info k="Loại kiểm tra" v={inspection.category} /><Info k="Checklist" v={inspection.checklistName} /><Info k="Kết quả" v={inspection.result} /><Info k="Trạng thái" v={inspection.status} /></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => onStart(inspection.id)} className="rounded border border-slate-700 px-4 py-2 text-xs">Bắt đầu</button><button onClick={() => onFail(inspection.id)} className="rounded bg-red-600 px-4 py-2 text-xs">Không đạt / NCR</button><button onClick={() => onPass(inspection.id)} className="rounded bg-emerald-600 px-4 py-2 text-xs">Chấm đạt & duyệt</button></div></section></div>
 }
 
-function QueueDetail({ row, onClose, onCreate }: { row: QcProductionQueueRow | null; onClose: () => void; onCreate: (row: QcProductionQueueRow) => void }) {
+function QueueDetail({ row, onClose, onCreate, onQuickApprove }: { row: QcProductionQueueRow | null; onClose: () => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
   if (!row) return null
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><section className="w-full max-w-3xl rounded border border-cyan-900 bg-[#061321] p-5"><div className="flex justify-between"><div><p className="text-xs text-cyan-300">{row.orderNo}</p><h2 className="mt-1 text-xl font-semibold">{row.componentCode} · {row.componentName}</h2></div><button onClick={onClose}><XCircle /></button></div><div className="mt-5 space-y-2 text-sm"><Info k="Lệnh sản xuất" v={row.title} /><Info k="Trạng thái sản xuất" v={row.status} /><Info k="Trạng thái QC" v={row.qcStatus} /><Info k="Số phiếu QC" v={fmt(row.inspectionCount)} /></div><div className="mt-5 flex justify-end"><button onClick={() => onCreate(row)} className="rounded bg-blue-600 px-4 py-2 text-xs">Tạo phiếu QC</button></div></section></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><section className="w-full max-w-3xl rounded border border-cyan-900 bg-[#061321] p-5"><div className="flex justify-between"><div><p className="text-xs text-cyan-300">{row.orderNo}</p><h2 className="mt-1 text-xl font-semibold">{row.componentCode} · {row.componentName}</h2></div><button onClick={onClose}><XCircle /></button></div><div className="mt-5 space-y-2 text-sm"><Info k="Lệnh sản xuất" v={row.title} /><Info k="Trạng thái sản xuất" v={row.status} /><Info k="Trạng thái QC" v={row.qcStatus} /><Info k="Số phiếu QC" v={fmt(row.inspectionCount)} /></div><div className="mt-5 rounded border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-400">Khi QC đạt/đã duyệt, lệnh sản xuất này sẽ được mở khóa bước chuyển thành phẩm ra bãi tập kết.</div><div className="mt-5 flex justify-end gap-2"><button onClick={() => onCreate(row)} className="rounded border border-blue-700 px-4 py-2 text-xs text-blue-200">Tạo phiếu QC</button><button onClick={() => onQuickApprove(row)} className="rounded bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">Tạo & duyệt đạt</button></div></section></div>
 }
 
 function StatusBadge({ value }: { value: string }) {

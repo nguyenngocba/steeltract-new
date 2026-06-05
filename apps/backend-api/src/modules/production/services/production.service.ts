@@ -495,6 +495,10 @@ export class ProductionService {
         itemType: YardItemType.COMPONENT,
         itemId: order.component.id,
         removedAt: null,
+        metadata: {
+          path: ['productionOrderId'],
+          equals: order.id,
+        },
       },
     });
 

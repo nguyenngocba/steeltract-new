@@ -9,11 +9,12 @@ type Tab = {
 
 type Props = {
   tabs: Tab[]
+  variant?: 'default' | 'embedded'
 }
 
-export function EnterpriseTabBar({ tabs }: Props) {
+export function EnterpriseTabBar({ tabs, variant = 'default' }: Props) {
   return (
-    <div className="mb-4 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+    <div className={variant === 'embedded' ? 'overflow-auto' : 'mb-4 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl'}>
       <div className="flex min-w-max gap-1">
         {tabs.map((tab) => (
           <NavLink

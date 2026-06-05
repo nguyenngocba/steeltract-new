@@ -1,10 +1,29 @@
 import type { ReactNode } from 'react'
 
 export const inventoryPanel =
-  'rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl'
+  'rounded-2xl border border-white/10 bg-slate-950/45 shadow-[0_22px_70px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-2xl'
 
 export const inventoryInput =
-  'h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400'
+  'h-10 rounded-xl border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+
+export const inventoryPageStack = 'space-y-3'
+
+export const inventoryGridGap = 'gap-3'
+
+export const inventoryTableShell =
+  'overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35'
+
+export const inventoryTable =
+  'w-full text-sm'
+
+export const inventoryTableHead =
+  'bg-white/[0.055] text-xs uppercase tracking-[0.08em] text-slate-400'
+
+export const inventoryTableRow =
+  'border-t border-white/10 text-slate-200 transition hover:bg-white/[0.055]'
+
+export const inventoryMutedButton =
+  'rounded-xl border border-white/10 bg-white/[0.055] px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40'
 
 export function InventoryKpi({
   title,
@@ -26,10 +45,10 @@ export function InventoryKpi({
     cyan: 'from-cyan-500 to-blue-400',
   }[tone]
   return (
-    <section className={`${inventoryPanel} p-4`}>
-      <div className={`mb-3 h-1.5 w-16 rounded-full bg-gradient-to-r ${toneClass}`} />
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{title}</p>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{value}</h2>
+    <section className={`${inventoryPanel} p-3`}>
+      <div className={`mb-2 h-1 w-14 rounded-full bg-gradient-to-r ${toneClass}`} />
+      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400">{title}</p>
+      <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">{value}</h2>
       {note && <p className="mt-1 text-xs text-slate-500">{note}</p>}
     </section>
   )
@@ -46,9 +65,80 @@ export function InventoryPanel({
 }) {
   return (
     <section className={`${inventoryPanel} overflow-hidden ${className}`}>
-      {title && <h3 className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">{title}</h3>}
-      <div className="p-4">{children}</div>
+      {title && <h3 className="border-b border-white/10 bg-white/[0.025] px-4 py-2.5 text-sm font-semibold text-white">{title}</h3>}
+      <div className="p-3">{children}</div>
     </section>
+  )
+}
+
+export function InventoryInsightPanel({
+  title,
+  children,
+  className = '',
+}: {
+  title: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <InventoryPanel title={title} className={className}>
+      <div className="space-y-3">{children}</div>
+    </InventoryPanel>
+  )
+}
+
+export function InventoryPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const safePageCount = Math.max(1, pageCount)
+  const safePage = Math.min(Math.max(1, page), safePageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  const windowSize = 5
+  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
+  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
+
+  return (
+    <div className="grid grid-cols-1 items-center gap-3 border-t border-white/10 px-5 py-4 text-xs text-slate-400 md:grid-cols-3">
+      <div>
+        Hiển thị {start}-{end}/{total.toLocaleString('vi-VN')} kết quả
+      </div>
+      <div className="flex justify-center gap-2">
+        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
+        {pages.map((pageNo) => (
+          <button
+            key={pageNo}
+            onClick={() => onPageChange(pageNo)}
+            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
+              safePage === pageNo
+                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
+            }`}
+          >
+            {pageNo}
+          </button>
+        ))}
+        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
+      </div>
+      <div className="flex justify-start gap-2 md:justify-end">
+        <button disabled={safePage <= 1} onClick={() => onPageChange(Math.max(1, safePage - 1))} className={inventoryMutedButton}>
+          Trước
+        </button>
+        <button disabled={safePage >= safePageCount} onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))} className={inventoryMutedButton}>
+          Sau
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -121,9 +211,9 @@ export function DonutSummary({
     .join(', ')
 
   return (
-    <div className="grid items-center gap-4 sm:grid-cols-[150px_1fr]">
-      <div className="relative mx-auto h-36 w-36 rounded-full" style={{ background: `conic-gradient(${gradient})` }}>
-        <div className="absolute inset-4 rounded-full bg-[#0b1424]" />
+    <div className="grid items-center gap-5 2xl:grid-cols-[160px_1fr]">
+      <div className="relative mx-auto h-40 w-40 rounded-full shadow-[0_20px_55px_rgba(0,0,0,0.18)]" style={{ background: `conic-gradient(${gradient})` }}>
+        <div className="absolute inset-4 rounded-full bg-[#08111f]" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           <div className="text-2xl font-semibold text-white">{centerValue}</div>
           <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">{centerLabel}</div>

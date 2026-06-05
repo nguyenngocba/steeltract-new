@@ -6,7 +6,7 @@ import {
   Search,
 } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuthStore } from '../../../modules/auth/store/auth.store'
 
@@ -15,6 +15,8 @@ export function AppTopbar() {
   const logout = useAuthStore((s) => s.logout)
   const [openUserMenu, setOpenUserMenu] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const title = getRouteTitle(location.pathname)
 
   function handleLogout() {
     logout()
@@ -24,15 +26,20 @@ export function AppTopbar() {
 
   return (
     <div className="flex h-[64px] items-center justify-between border-b border-zinc-800 bg-zinc-900 px-5">
-      <div className="flex items-center gap-3 rounded-2xl border border-zinc-700 bg-zinc-950 px-4">
-        <Search size={18} className="text-zinc-500" />
-        <input
-          placeholder="Tìm kiếm nhanh..."
-          className="h-10 w-[300px] bg-transparent text-sm text-white outline-none"
-        />
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300">SteelTrack ERP</p>
+        <h1 className="mt-0.5 truncate text-lg font-semibold tracking-tight text-white">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <div className="hidden items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-3 lg:flex">
+          <Search size={16} className="text-zinc-500" />
+          <input
+            placeholder="Tìm kiếm nhanh..."
+            className="h-9 w-[260px] bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+          />
+        </div>
+
         <div className="flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2">
           <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
           <span className="text-xs font-medium text-emerald-400">
@@ -98,3 +105,27 @@ export function AppTopbar() {
   )
 }
 
+function getRouteTitle(pathname: string) {
+  if (pathname === '/' || pathname.startsWith('/dashboard')) return 'Tổng quan'
+  if (pathname.startsWith('/inventory')) return 'Kho vật tư'
+  if (pathname.startsWith('/components')) return 'Cấu kiện'
+  if (pathname.startsWith('/production')) return 'Sản xuất'
+  if (pathname.startsWith('/yard')) return 'Bãi tập kết'
+  if (pathname.startsWith('/projects')) return 'Công trình'
+  if (pathname.startsWith('/suppliers')) return 'Nhà cung cấp'
+  if (pathname.startsWith('/qc')) return 'Chất lượng QC'
+  if (pathname.startsWith('/logistics')) return 'Vận chuyển'
+  if (pathname.startsWith('/procurement')) return 'Mua hàng'
+  if (pathname.startsWith('/documents')) return 'Chứng từ'
+  if (pathname.startsWith('/analytics')) return 'Phân tích'
+  if (pathname.startsWith('/reports') || pathname.startsWith('/reporting')) return 'Báo cáo'
+  if (pathname.startsWith('/notifications')) return 'Thông báo'
+  if (pathname.startsWith('/master-data')) return 'Danh mục hệ thống'
+  if (pathname.startsWith('/ai') || pathname.startsWith('/copilot')) return 'AI Assistant'
+  if (pathname.startsWith('/settings')) return 'Cài đặt hệ thống'
+  if (pathname.startsWith('/users')) return 'Người dùng'
+  if (pathname.startsWith('/roles')) return 'Vai trò & phân quyền'
+  if (pathname.startsWith('/system-logs')) return 'Nhật ký hệ thống'
+  if (pathname.startsWith('/backup')) return 'Sao lưu dữ liệu'
+  return 'Tổng quan'
+}

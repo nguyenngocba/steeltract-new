@@ -1,26 +1,25 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { inventoryTabs } from '../../config/inventory-tabs'
-import { RuntimePanel, SectionHeader } from '../../../../shared/ui/enterprise'
-import { MaterialDrawer } from '../../components/material-table/MaterialDrawer'
+import { RuntimePanel } from '../../../../shared/ui/enterprise'
+import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
+import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import {
+  InventoryKpi,
+  InventoryPanel,
+  inventoryGridGap,
+  inventoryInput,
+  inventoryMutedButton,
+  inventoryPageStack,
+  inventoryTableHead,
+  inventoryTableRow,
+  inventoryTableShell,
+} from '../../components/InventoryVisuals'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
-import { useCreateTransaction } from '../../hooks/useCreateTransaction'
-import { useSuppliers } from '../../hooks/useSuppliers'
-import { useProjects } from '../../hooks/useProjects'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
-
-type ModalType =
-  | null
-  | 'inbound'
-  | 'outbound'
-  | 'transfer'
-  | 'stock-take'
-  | 'material-detail'
 
 function parseLocaleNumber(v: any) {
   if (typeof v === 'number') return v
@@ -46,46 +45,21 @@ function formatNumberVN(v: any, maxFractionDigits = 3) {
   })
 }
 
-function formatInputNumberVN(v: any, isMoney = false) {
-  if (v === '' || v === null || v === undefined) return ''
-  const n = isMoney ? Math.round(num(v)) : num(v)
-  return n.toLocaleString('vi-VN', { maximumFractionDigits: isMoney ? 0 : 3 })
-}
-
-function formatMoneyInputRealtime(v: string) {
-  const digits = String(v ?? '').replace(/[^\d]/g, '')
-  if (!digits) return ''
-  return Number(digits).toLocaleString('vi-VN', { maximumFractionDigits: 0 })
-}
-
-function formatDecimalInputRealtime(v: string) {
-  const clean = String(v ?? '').replace(/[^\d,]/g, '')
-  if (!clean) return ''
-  if (clean === ',') return '0,'
-  if (clean.endsWith(',') && clean.indexOf(',') === clean.length - 1) {
-    const intPart = clean.slice(0, -1)
-    const intDigits = intPart.replace(/^0+(?=\d)/, '')
-    const intFormatted = (intDigits ? Number(intDigits) : 0).toLocaleString('vi-VN', { maximumFractionDigits: 0 })
-    return `${intFormatted},`
+function materialUsageLabel(value: string | undefined) {
+  const map: Record<string, string> = {
+    PRIMARY: 'Vật tư chính',
+    SECONDARY: 'Vật tư phụ',
+    CONSUMABLE: 'Vật tư tiêu hao',
   }
-  const [intRaw = '', ...rest] = clean.split(',')
-  const decRaw = rest.join('').slice(0, 3)
-  const intDigits = intRaw.replace(/^0+(?=\d)/, '')
-  const intFormatted = (intDigits ? Number(intDigits) : 0).toLocaleString('vi-VN', { maximumFractionDigits: 0 })
-  return decRaw ? `${intFormatted},${decRaw}` : intFormatted
+  return map[String(value ?? 'PRIMARY')] ?? 'Vật tư chính'
 }
 
 export function InventoryOverviewPage() {
   const { data: items = [] } = useInventoryItems()
-  const { data: suppliers = [] } = useSuppliers()
-  const { data: projects = [] } = useProjects()
   const { data: zones = [] } = useZones()
   const { data: auditRows = [] } = useInventoryAudit()
   const { data: transactionsData = [] } = useInventoryTransactions({})
-  const createTransactionMutation = useCreateTransaction()
 
-  const [activeModal, setActiveModal] = useState<ModalType>(null)
-  const [materialDrawerOpen, setMaterialDrawerOpen] = useState(false)
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [materialDetailTab, setMaterialDetailTab] = useState<
@@ -94,89 +68,9 @@ export function InventoryOverviewPage() {
   const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full'>(null)
   const [warehouseFilter, setWarehouseFilter] = useState<'ALL' | string>('ALL')
 
-  const [inboundForm, setInboundForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
-    supplierId: '',
-    inventoryItemId: '',
-    zoneId: '',
-    quantity: '',
-    unitPrice: '',
-    vat: '10',
-    remark: '',
-  })
-
-  const [outboundForm, setOutboundForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
-    projectId: '',
-    target: 'PROJECT',
-    inventoryItemId: '',
-    sourceZoneId: '',
-    quantity: '',
-    remark: '',
-  })
-
-  const [transferForm, setTransferForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
-    fromZoneId: '',
-    toZoneId: '',
-    inventoryItemId: '',
-    quantity: '',
-    remark: '',
-  })
-
   const {
     data: selectedMaterialDetail,
-  } = useMaterialDetail(activeModal === 'material-detail' ? selectedMaterialId : undefined)
-  const { data: transferMaterialDetail } = useMaterialDetail(
-    activeModal === 'transfer' && transferForm.inventoryItemId
-      ? transferForm.inventoryItemId
-      : undefined,
-  )
-  const { data: outboundMaterialDetail } = useMaterialDetail(
-    activeModal === 'outbound' && outboundForm.inventoryItemId
-      ? outboundForm.inventoryItemId
-      : undefined,
-  )
-
-  const resetInboundForm = () =>
-    setInboundForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
-      supplierId: '',
-      inventoryItemId: '',
-      zoneId: '',
-      quantity: '',
-      unitPrice: '',
-      vat: '10',
-      remark: '',
-    })
-
-  const resetOutboundForm = () =>
-    setOutboundForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
-      projectId: '',
-      target: 'PROJECT',
-      inventoryItemId: '',
-      sourceZoneId: '',
-      quantity: '',
-      remark: '',
-    })
-
-  const resetTransferForm = () =>
-    setTransferForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
-      fromZoneId: '',
-      toZoneId: '',
-      inventoryItemId: '',
-      quantity: '',
-      remark: '',
-    })
-
-  const closeModal = () => {
-    setActiveModal(null)
-    resetInboundForm()
-    resetOutboundForm()
-    resetTransferForm()
-  }
+  } = useMaterialDetail(selectedMaterialId || undefined)
 
   const itemsWithAudit = useMemo(() => {
     const byId = new Map((auditRows as any[]).map((r: any) => [r.materialId, r]))
@@ -195,19 +89,6 @@ export function InventoryOverviewPage() {
       }
     })
   }, [items, auditRows])
-
-  const selectedInboundMaterial = useMemo(
-    () => itemsWithAudit.find((x: any) => x.id === inboundForm.inventoryItemId),
-    [itemsWithAudit, inboundForm.inventoryItemId],
-  )
-  const selectedOutboundMaterial = useMemo(
-    () => itemsWithAudit.find((x: any) => x.id === outboundForm.inventoryItemId),
-    [itemsWithAudit, outboundForm.inventoryItemId],
-  )
-  const selectedTransferMaterial = useMemo(
-    () => itemsWithAudit.find((x: any) => x.id === transferForm.inventoryItemId),
-    [itemsWithAudit, transferForm.inventoryItemId],
-  )
 
   const summary = useMemo(() => {
     const totalItems = itemsWithAudit.length
@@ -244,61 +125,6 @@ export function InventoryOverviewPage() {
     )
   }, [filteredItems, warehouseFilter])
 
-  const transferLocationBalances = useMemo(() => {
-    return Array.isArray((transferMaterialDetail as any)?.locationBalances)
-      ? ((transferMaterialDetail as any).locationBalances as Array<any>).filter((x: any) => num(x.quantity) > 0)
-      : []
-  }, [transferMaterialDetail])
-
-  const outboundLocationBalances = useMemo(() => {
-    return Array.isArray((outboundMaterialDetail as any)?.locationBalances)
-      ? ((outboundMaterialDetail as any).locationBalances as Array<any>).filter((x: any) => num(x.quantity) > 0)
-      : []
-  }, [outboundMaterialDetail])
-
-  const availableTransferFromZones = useMemo(() => {
-    const ids = new Set<string>()
-    transferLocationBalances.forEach((x: any) => {
-      if (x.zoneId) ids.add(String(x.zoneId))
-    })
-    return zones.filter((z: any) => ids.has(String(z.id)))
-  }, [transferLocationBalances, zones])
-
-  const availableTransferToZones = useMemo(() => {
-    return zones.filter((z: any) => String(z.id) !== String(transferForm.fromZoneId))
-  }, [zones, transferForm.fromZoneId])
-
-  const availableOutboundZones = useMemo(() => {
-    const ids = new Set<string>()
-    outboundLocationBalances.forEach((x: any) => {
-      if (x.zoneId) ids.add(String(x.zoneId))
-    })
-    return zones.filter((z: any) => ids.has(String(z.id)))
-  }, [outboundLocationBalances, zones])
-
-  const transferQtyByZoneId = useMemo(() => {
-    const map = new Map<string, number>()
-    transferLocationBalances.forEach((x: any) => {
-      if (x.zoneId) map.set(String(x.zoneId), num(x.quantity))
-    })
-    return map
-  }, [transferLocationBalances])
-
-  const outboundQtyByZoneId = useMemo(() => {
-    const map = new Map<string, number>()
-    outboundLocationBalances.forEach((x: any) => {
-      if (x.zoneId) map.set(String(x.zoneId), num(x.quantity))
-    })
-    return map
-  }, [outboundLocationBalances])
-
-  const selectedFromZoneQty = transferForm.fromZoneId
-    ? transferQtyByZoneId.get(String(transferForm.fromZoneId)) ?? 0
-    : 0
-  const selectedToZoneQty = transferForm.toZoneId
-    ? transferQtyByZoneId.get(String(transferForm.toZoneId)) ?? 0
-    : 0
-
   const recentInboundRows = useMemo(() => {
     const rows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
     return rows.filter((x: any) => String(x.type ?? '').toUpperCase() === 'INBOUND').slice(0, 5)
@@ -309,34 +135,6 @@ export function InventoryOverviewPage() {
     return rows.filter((x: any) => String(x.type ?? '').toUpperCase() === 'OUTBOUND').slice(0, 5)
   }, [transactionsData])
 
-  const inboundQty = num(inboundForm.quantity)
-  const inboundPrice = num(inboundForm.unitPrice)
-  const vatPercent = num(inboundForm.vat)
-  const inboundSubTotal = Math.round(inboundQty * inboundPrice)
-  const inboundVatAmount = (inboundSubTotal * vatPercent) / 100
-  const inboundGrandTotal = Math.round(inboundSubTotal + inboundVatAmount)
-  const inboundCurrentStock = num(selectedInboundMaterial?.quantity)
-  const inboundAfterStock = inboundCurrentStock + inboundQty
-  const inboundAvgCost = inboundAfterStock > 0
-    ? ((inboundCurrentStock * num(selectedInboundMaterial?.averageCost ?? selectedInboundMaterial?.unitPrice)) + inboundSubTotal) / inboundAfterStock
-    : inboundPrice
-
-  const outboundQty = num(outboundForm.quantity)
-  const outboundCurrentStock = num(selectedOutboundMaterial?.quantity)
-  const selectedOutboundZoneQty = outboundForm.sourceZoneId
-    ? outboundQtyByZoneId.get(String(outboundForm.sourceZoneId)) ?? 0
-    : 0
-  const outboundAfterStock = outboundCurrentStock - outboundQty
-  const outboundZoneAfterStock = selectedOutboundZoneQty - outboundQty
-  const canSubmitOutbound =
-    Boolean(outboundForm.inventoryItemId) &&
-    Boolean(outboundForm.sourceZoneId) &&
-    outboundQty > 0 &&
-    outboundZoneAfterStock >= 0
-  const transferQty = num(transferForm.quantity)
-  const transferCurrentStock = num(selectedTransferMaterial?.quantity)
-  const transferAfterStock = transferCurrentStock - transferQty
-  const defaultInboundZoneId = zones?.[0]?.id ?? ''
   const defaultInboundZoneLabel = zones?.[0] ? `${zones[0].code} (${zones[0].name})` : 'KHU MẶC ĐỊNH'
   const currentMonthInventoryValue = summary.value
   const previousMonthInventoryValue = Math.max(0, summary.value * 0.92)
@@ -345,152 +143,69 @@ export function InventoryOverviewPage() {
       ? ((currentMonthInventoryValue - previousMonthInventoryValue) / previousMonthInventoryValue) * 100
       : 0
 
-  async function handleInbound() {
-    if (!inboundForm.inventoryItemId || inboundQty <= 0) return
-    await createTransactionMutation.mutateAsync({
-      type: 'INBOUND',
-      supplierId: inboundForm.supplierId || undefined,
-      transactionDate: inboundForm.transactionDate,
-      remarks: inboundForm.remark,
-      items: [
-        {
-          inventoryItemId: inboundForm.inventoryItemId,
-          quantity: inboundQty,
-          zoneId: inboundForm.zoneId || defaultInboundZoneId || undefined,
-          unitPrice: Math.round(inboundPrice),
-          totalAmount: inboundSubTotal,
-        },
-      ],
-    })
-    closeModal()
-  }
-
-  async function handleOutbound() {
-    if (!canSubmitOutbound) return
-    await createTransactionMutation.mutateAsync({
-      type: 'OUTBOUND',
-      projectId: outboundForm.projectId || undefined,
-      zoneId: outboundForm.sourceZoneId,
-      transactionDate: outboundForm.transactionDate,
-      remarks: `[${outboundForm.target}] ${outboundForm.remark}`,
-      items: [
-        {
-          inventoryItemId: outboundForm.inventoryItemId,
-          quantity: -Math.abs(outboundQty),
-          zoneId: outboundForm.sourceZoneId,
-          unitPrice: Math.round(num(selectedOutboundMaterial?.averageCost ?? selectedOutboundMaterial?.unitPrice)),
-          totalAmount: Math.round(Math.abs(outboundQty) * num(selectedOutboundMaterial?.averageCost ?? selectedOutboundMaterial?.unitPrice)),
-        },
-      ],
-    })
-    closeModal()
-  }
-
-  async function handleTransfer() {
-    if (!transferForm.inventoryItemId || transferQty <= 0 || !transferForm.fromZoneId || !transferForm.toZoneId) return
-    if (transferForm.fromZoneId === transferForm.toZoneId) return
-    await createTransactionMutation.mutateAsync({
-      type: 'TRANSFER',
-      transactionDate: transferForm.transactionDate,
-      remarks: transferForm.remark,
-      items: [
-        {
-          inventoryItemId: transferForm.inventoryItemId,
-          quantity: -Math.abs(transferQty),
-          zoneId: transferForm.fromZoneId,
-        },
-        {
-          inventoryItemId: transferForm.inventoryItemId,
-          quantity: Math.abs(transferQty),
-          zoneId: transferForm.toZoneId,
-        },
-      ],
-    })
-    closeModal()
-  }
-
   return (
     <EnterpriseModulePage>
-      <MaterialDrawer
-        open={materialDrawerOpen}
-        material={null}
-        onClose={() => setMaterialDrawerOpen(false)}
-      />
+      <InventoryTabWorkspace />
 
-      <SectionHeader title="KHO VẬT TƯ" description="Quản lý tồn kho vật tư, thép tấm, thép hình, phụ kiện và vật tư tiêu hao" />
-      <EnterpriseTabBar tabs={inventoryTabs} />
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-5 xl:grid-cols-8">
-        <RuntimePanel title="Tổng chủng loại"><div className="text-2xl font-black text-white">{summary.totalItems}</div></RuntimePanel>
-        <RuntimePanel title="Giá trị tồn kho">
-          <div className="text-2xl font-black text-cyan-300">{formatCurrencyVN(currentMonthInventoryValue)}</div>
-          <div className={`${valueDeltaPercent >= 0 ? 'text-emerald-300' : 'text-red-300'} mt-1 text-xs`}>
-            {valueDeltaPercent >= 0 ? '+' : ''}
-            {valueDeltaPercent.toFixed(1)}% so với tháng trước
-          </div>
-        </RuntimePanel>
-        <RuntimePanel title="Đang dự trữ"><div className="text-2xl font-black text-violet-300">{summary.totalQty.toLocaleString()}</div></RuntimePanel>
-        <RuntimePanel title="Sắp hết hàng"><div className="text-2xl font-black text-amber-300">{summary.low}</div></RuntimePanel>
-        <RuntimePanel title="Hết hàng"><div className="text-2xl font-black text-red-300">{summary.critical}</div></RuntimePanel>
-      </div>
-
-      <RuntimePanel title="Thao tác nhanh">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <button onClick={() => { resetInboundForm(); setActiveModal('inbound') }} className="rounded-xl border border-cyan-700 bg-zinc-900 px-3 py-3 text-cyan-300">Nhập kho</button>
-          <button onClick={() => { resetOutboundForm(); setActiveModal('outbound') }} className="rounded-xl border border-emerald-700 bg-zinc-900 px-3 py-3 text-emerald-300">Xuất kho</button>
-          <button onClick={() => { resetTransferForm(); setActiveModal('transfer') }} className="rounded-xl border border-violet-700 bg-zinc-900 px-3 py-3 text-violet-300">Điều chuyển</button>
-          <button onClick={() => setActiveModal('stock-take')} className="rounded-xl border border-amber-700 bg-zinc-900 px-3 py-3 text-amber-300">Kiểm kê</button>
-          <button onClick={() => setMaterialDrawerOpen(true)} className="rounded-xl border border-blue-700 bg-zinc-900 px-3 py-3 text-blue-300">Thêm vật tư mới</button>
+      <div className={inventoryPageStack}>
+        <div className={`grid grid-cols-1 md:grid-cols-5 ${inventoryGridGap}`}>
+          <InventoryKpi title="Tổng chủng loại" value={summary.totalItems.toLocaleString('vi-VN')} note="Mã vật tư" tone="blue" />
+          <InventoryKpi
+            title="Giá trị tồn kho"
+            value={formatCurrencyVN(currentMonthInventoryValue)}
+            note={`${valueDeltaPercent >= 0 ? '+' : ''}${valueDeltaPercent.toFixed(1)}% so với tháng trước`}
+            tone={valueDeltaPercent >= 0 ? 'emerald' : 'red'}
+          />
+          <InventoryKpi title="Đang dự trữ" value={summary.totalQty.toLocaleString('vi-VN')} note="Tồn khả dụng" tone="purple" />
+          <InventoryKpi title="Sắp hết hàng" value={summary.low.toLocaleString('vi-VN')} note="Cần bổ sung" tone="amber" />
+          <InventoryKpi title="Hết hàng" value={summary.critical.toLocaleString('vi-VN')} note="Rủi ro cao" tone="red" />
         </div>
-      </RuntimePanel>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <RuntimePanel title="Tồn kho vật tư" className="xl:col-span-2">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã, tên, quy cách..." className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white" />
-            <button
-              onClick={() => setOverviewPopup('stock-full')}
-              className="shrink-0 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:border-cyan-700 hover:text-cyan-300"
-            >
+        <div className={`grid grid-cols-1 xl:grid-cols-12 ${inventoryGridGap}`}>
+          <InventoryPanel title="Tồn kho vật tư" className="xl:col-span-8">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã, tên, quy cách..." className={`${inventoryInput} h-9 w-full text-xs`} />
+            <button onClick={() => setOverviewPopup('stock-full')} className={`${inventoryMutedButton} h-10 shrink-0`}>
               Xem tất cả
             </button>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-zinc-800">
-            <table className="w-full">
-              <thead className="bg-zinc-950">
+          <div className={`${inventoryTableShell} overflow-auto`}>
+            <table className="w-full text-xs">
+              <thead className={inventoryTableHead}>
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Mã vật tư</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Tên vật tư</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Danh mục</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">ĐVT</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Tồn khả dụng</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Đơn giá gốc</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Tổng giá trị</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Vị trí</th>
-                  <th className="px-3 py-2 text-left text-xs text-zinc-500">Trạng thái</th>
+                  <th className="px-2 py-2 text-left font-medium">Mã</th>
+                  <th className="px-2 py-2 text-left font-medium">Tên vật tư</th>
+                  <th className="px-2 py-2 text-left font-medium">Loại</th>
+                  <th className="px-2 py-2 text-left font-medium">Danh mục</th>
+                  <th className="px-2 py-2 text-left font-medium">ĐVT</th>
+                  <th className="px-2 py-2 text-left font-medium">Tồn</th>
+                  <th className="px-2 py-2 text-left font-medium">Đơn giá</th>
+                  <th className="px-2 py-2 text-left font-medium">Giá trị</th>
+                  <th className="px-2 py-2 text-left font-medium">Vị trí</th>
+                  <th className="px-2 py-2 text-left font-medium">TT</th>
                 </tr>
               </thead>
               <tbody>
                 {inventoryItemsByWarehouse.slice(0, 10).map((item: any) => (
                   <tr
                     key={item.id}
-                    className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-900/50"
+                    className={`cursor-pointer ${inventoryTableRow}`}
                     onClick={() => {
                       setSelectedMaterialId(item.id)
                       setMaterialDetailTab('overview')
-                      setActiveModal('material-detail')
                     }}
                   >
-                    <td className="px-3 py-2 text-cyan-300">{item.code}</td>
-                    <td className="px-3 py-2 text-white">{item.name}</td>
-                    <td className="px-3 py-2 text-zinc-300">{item.category ?? '-'}</td>
-                    <td className="px-3 py-2 text-zinc-300">{item.unit}</td>
-                    <td className="px-3 py-2 text-zinc-200">{formatNumberVN(item.quantity)}</td>
-                    <td className="px-3 py-2 text-zinc-200">{formatCurrencyVN(item.baseUnitPrice ?? item.unitPrice ?? item.averageCost)}</td>
-                    <td className="px-3 py-2 font-medium text-cyan-300">{formatCurrencyVN(item.inventoryValue ?? num(item.quantity) * num(item.averageCost ?? item.unitPrice))}</td>
-                    <td className="px-3 py-2 text-zinc-300">{item.zoneName ?? item.location ?? defaultInboundZoneLabel}</td>
-                    <td className="px-3 py-2">
-                      <span className={item.status === 'CRITICAL' ? 'rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-300' : item.status === 'LOW_STOCK' ? 'rounded-full bg-amber-500/20 px-2 py-1 text-xs text-amber-300' : 'rounded-full bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300'}>
+                    <td className="px-2 py-1.5 text-cyan-300">{item.code}</td>
+                    <td className="max-w-[190px] truncate px-2 py-1.5 text-white">{item.name}</td>
+                    <td className="px-2 py-1.5 text-slate-300">{materialUsageLabel(item.materialUsageType)}</td>
+                    <td className="max-w-[130px] truncate px-2 py-1.5 text-slate-300">{item.category ?? '-'}</td>
+                    <td className="px-2 py-1.5 text-slate-300">{item.unit}</td>
+                    <td className="px-2 py-1.5 text-slate-200">{formatNumberVN(item.quantity)}</td>
+                    <td className="px-2 py-1.5 text-slate-200">{formatCurrencyVN(item.baseUnitPrice ?? item.unitPrice ?? item.averageCost)}</td>
+                    <td className="px-2 py-1.5 font-medium text-cyan-300">{formatCurrencyVN(item.inventoryValue ?? num(item.quantity) * num(item.averageCost ?? item.unitPrice))}</td>
+                    <td className="max-w-[130px] truncate px-2 py-1.5 text-slate-300">{item.zoneName ?? item.location ?? defaultInboundZoneLabel}</td>
+                    <td className="px-2 py-1.5">
+                      <span className={item.status === 'CRITICAL' ? 'rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-300' : item.status === 'LOW_STOCK' ? 'rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300' : 'rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300'}>
                         {item.status ?? 'NORMAL'}
                       </span>
                     </td>
@@ -499,252 +214,105 @@ export function InventoryOverviewPage() {
               </tbody>
             </table>
           </div>
-          <div className="mt-2 text-xs text-zinc-500">
-            Hiển thị 1-{Math.min(10, inventoryItemsByWarehouse.length)}/{inventoryItemsByWarehouse.length.toLocaleString('vi-VN')}
+          <div className="mt-2 text-[11px] text-slate-400">
+            Hiển thị 1-{Math.min(10, inventoryItemsByWarehouse.length)}/{inventoryItemsByWarehouse.length.toLocaleString('vi-VN')} kết quả
           </div>
-        </RuntimePanel>
+          </InventoryPanel>
 
-        <div className="space-y-6">
-          <RuntimePanel title="Tổng quan tồn kho">
-            <div className="space-y-2 text-sm text-zinc-300">
+          <div className="space-y-5 xl:col-span-4">
+          <InventoryPanel title="Tổng quan tồn kho">
+          <div className="space-y-2 text-xs text-slate-300">
               <div className="flex justify-between"><span>Tổng số lượng</span><span className="text-cyan-300">{summary.totalQty.toLocaleString()}</span></div>
               <div className="flex justify-between"><span>Vật tư sắp hết</span><span className="text-amber-300">{summary.low}</span></div>
               <div className="flex justify-between"><span>Hết hàng</span><span className="text-red-300">{summary.critical}</span></div>
             </div>
-          </RuntimePanel>
-          <RuntimePanel title="Cảnh báo tồn kho">
-            <div className="space-y-2 text-sm">
+          </InventoryPanel>
+          <InventoryPanel title="Cảnh báo tồn kho">
+            <div className="space-y-2 text-xs">
               {itemsWithAudit
                 .filter((x: any) => x.status === 'LOW_STOCK' || x.status === 'CRITICAL')
                 .slice(0, 8)
                 .map((x: any) => (
-                  <div key={x.id} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2">
-                    <span className="text-zinc-200">{x.code}</span>
+                  <div key={x.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
+                    <span className="text-slate-200">{x.code}</span>
                     <span className={x.status === 'CRITICAL' ? 'text-red-300' : 'text-amber-300'}>
                       {num(x.quantity)} {x.unit}
                     </span>
                   </div>
                 ))}
             </div>
-          </RuntimePanel>
+          </InventoryPanel>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <RuntimePanel title="Nhập kho gần đây">
-          <div className="mb-2 flex justify-end">
+        <div className={`grid grid-cols-1 xl:grid-cols-2 ${inventoryGridGap}`}>
+        <InventoryPanel title="Nhập kho gần đây">
+          <div className="mb-1 flex justify-end">
             <button onClick={() => setOverviewPopup('recent-inbound')} className="text-xs text-cyan-300 hover:text-cyan-200">
               Xem tất cả
             </button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {recentInboundRows.map((row: any) => (
-              <div key={row.id} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-sm">
-                <div className="text-zinc-300">{row.transactionNo ?? row.code}</div>
+              <div key={row.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs">
+                <div className="truncate text-slate-300">{row.transactionNo ?? row.code}</div>
                 <div className="text-cyan-300">{formatNumberVN(row.totalQuantity ?? row.quantity)} {row.unit ?? ''}</div>
               </div>
             ))}
           </div>
-        </RuntimePanel>
-        <RuntimePanel title="Xuất kho gần đây">
-          <div className="mb-2 flex justify-end">
+        </InventoryPanel>
+        <InventoryPanel title="Xuất kho gần đây">
+          <div className="mb-1 flex justify-end">
             <button onClick={() => setOverviewPopup('recent-outbound')} className="text-xs text-cyan-300 hover:text-cyan-200">
               Xem tất cả
             </button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {recentOutboundRows.map((row: any) => (
-              <div key={row.id} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-sm">
-                <div className="text-zinc-300">{row.transactionNo ?? row.code}</div>
+              <div key={row.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs">
+                <div className="truncate text-slate-300">{row.transactionNo ?? row.code}</div>
                 <div className="text-amber-300">{formatNumberVN(Math.abs(num(row.totalQuantity ?? row.quantity)))} {row.unit ?? ''}</div>
               </div>
             ))}
           </div>
-        </RuntimePanel>
-      </div>
+        </InventoryPanel>
+        </div>
 
-      <RuntimePanel title="Bộ lọc theo kho">
-        <div className="flex flex-wrap gap-2">
+      <InventoryPanel title="Bộ lọc theo kho">
+        <div className="flex flex-wrap gap-1.5">
           {warehouseOptions.map((w) => (
             <button
               key={w.id}
               onClick={() => setWarehouseFilter(w.id)}
-              className={`rounded-lg border px-3 py-1.5 text-sm ${
+              className={`rounded-lg border px-2.5 py-1 text-xs transition ${
                 warehouseFilter === w.id
-                  ? 'border-cyan-600 bg-cyan-900/30 text-cyan-300'
-                  : 'border-zinc-700 text-zinc-300'
+                  ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-200'
+                  : 'border-white/10 bg-white/[0.035] text-slate-300 hover:border-cyan-400/30 hover:text-cyan-200'
               }`}
             >
               {w.id === 'ALL' ? w.label : w.code}
             </button>
           ))}
         </div>
-      </RuntimePanel>
+      </InventoryPanel>
+      </div>
 
-      {activeModal && (
+      <InventoryMaterialDetailModal
+        open={Boolean(selectedMaterialId && selectedMaterialDetail)}
+        detail={selectedMaterialDetail}
+        onClose={() => setSelectedMaterialId('')}
+      />
+
+      {false && selectedMaterialId && selectedMaterialDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-h-[92vh] w-full max-w-6xl overflow-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-xl font-semibold text-white">
-                {activeModal === 'inbound' && 'Nhập kho (Có VAT & Hóa đơn)'}
-                {activeModal === 'outbound' && 'Xuất kho'}
-                {activeModal === 'transfer' && 'Điều chuyển kho'}
-                {activeModal === 'stock-take' && 'Kiểm kê nhanh'}
-                {activeModal === 'material-detail' && 'Chi tiết vật tư'}
+                Chi tiết vật tư
               </h3>
-              <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">Đóng</button>
+              <button onClick={() => setSelectedMaterialId('')} className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">Đóng</button>
             </div>
 
-            {activeModal === 'inbound' && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="md:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg border border-cyan-700 bg-cyan-900/20 px-3 py-2 text-cyan-300">1. Thông tin nhập</div>
-                    <div className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">2. Chọn vật tư & khu vực</div>
-                    <div className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">3. Xác nhận & lưu</div>
-                  </div>
-                </div>
-                <input type="datetime-local" value={inboundForm.transactionDate} onChange={(e) => setInboundForm((p) => ({ ...p, transactionDate: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <select value={inboundForm.supplierId} onChange={(e) => setInboundForm((p) => ({ ...p, supplierId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Nhà cung cấp</option>
-                  {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <select value={inboundForm.inventoryItemId} onChange={(e) => setInboundForm((p) => ({ ...p, inventoryItemId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Vật tư</option>
-                  {itemsWithAudit.map((i: any) => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
-                </select>
-                <input type="text" inputMode="decimal" placeholder="Số lượng" value={inboundForm.quantity} onChange={(e) => setInboundForm((p) => ({ ...p, quantity: formatDecimalInputRealtime(e.target.value) }))} onBlur={(e) => setInboundForm((p) => ({ ...p, quantity: formatInputNumberVN(e.target.value, false) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <input type="text" inputMode="numeric" placeholder="Đơn giá nhập" value={inboundForm.unitPrice} onChange={(e) => setInboundForm((p) => ({ ...p, unitPrice: formatMoneyInputRealtime(e.target.value) }))} onBlur={(e) => setInboundForm((p) => ({ ...p, unitPrice: formatInputNumberVN(e.target.value, true) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-zinc-300">
-                  Vị trí mặc định lần nhập đầu: <span className="font-medium text-cyan-300">{defaultInboundZoneLabel}</span>
-                </div>
-                <select value={inboundForm.zoneId} onChange={(e) => setInboundForm((p) => ({ ...p, zoneId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Khu vực nhập (sau nhập)</option>
-                  {zones.map((z: any) => <option key={z.id} value={z.id}>{z.code} - {z.name}</option>)}
-                </select>
-                <input type="number" placeholder="Thuế VAT (%)" value={inboundForm.vat} onChange={(e) => setInboundForm((p) => ({ ...p, vat: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <div className="md:col-span-2 grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <RuntimePanel title="Tồn hiện tại"><div className="text-white">{formatNumberVN(inboundCurrentStock)}</div></RuntimePanel>
-                  <RuntimePanel title="Sau nhập"><div className="text-cyan-300">{formatNumberVN(inboundAfterStock)}</div></RuntimePanel>
-                  <RuntimePanel title="Đơn giá TB mới"><div className="text-emerald-300">{formatCurrencyVN(inboundAvgCost)}</div></RuntimePanel>
-                  <RuntimePanel title="Giá nhập gần nhất"><div className="text-zinc-200">{formatCurrencyVN(selectedInboundMaterial?.unitPrice ?? selectedInboundMaterial?.averageCost)}</div></RuntimePanel>
-                </div>
-                <div className="md:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-zinc-200">
-                  <div>Thành tiền trước VAT: <span className="text-cyan-300">{formatCurrencyVN(inboundSubTotal)}</span></div>
-                  <div>Tiền VAT: <span className="text-amber-300">{formatCurrencyVN(inboundVatAmount)}</span></div>
-                  <div className="text-xl font-bold">Tổng thanh toán: <span className="text-white">{formatCurrencyVN(inboundGrandTotal)}</span></div>
-                </div>
-                <input type="file" className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-300" />
-                <textarea placeholder="Ghi chú" value={inboundForm.remark} onChange={(e) => setInboundForm((p) => ({ ...p, remark: e.target.value }))} rows={3} className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-4 py-2 text-zinc-300">Hủy</button>
-                  <button onClick={handleInbound} className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-black">Xác nhận nhập kho</button>
-                </div>
-              </div>
-            )}
-
-            {activeModal === 'outbound' && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="md:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg border border-cyan-700 bg-cyan-900/20 px-3 py-2 text-cyan-300">1. Đối tượng xuất</div>
-                    <div className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">2. Chọn vật tư & số lượng</div>
-                    <div className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">3. Xác nhận xuất</div>
-                  </div>
-                </div>
-                <input type="datetime-local" value={outboundForm.transactionDate} onChange={(e) => setOutboundForm((p) => ({ ...p, transactionDate: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <select disabled={outboundForm.target === 'COMPONENT_PRODUCTION'} value={outboundForm.projectId} onChange={(e) => setOutboundForm((p) => ({ ...p, projectId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50">
-                  <option value="">Công trình / Bộ phận</option>
-                  {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <select value={outboundForm.target} onChange={(e) => setOutboundForm((p) => ({ ...p, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : p.projectId }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="PROJECT">Xuất công trình</option>
-                  <option value="COMPONENT_PRODUCTION">Xuất sản xuất cấu kiện</option>
-                </select>
-                <select value={outboundForm.inventoryItemId} onChange={(e) => setOutboundForm((p) => ({ ...p, inventoryItemId: e.target.value, sourceZoneId: '' }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Vật tư</option>
-                  {itemsWithAudit.map((i: any) => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
-                </select>
-                <select value={outboundForm.sourceZoneId} onChange={(e) => setOutboundForm((p) => ({ ...p, sourceZoneId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Vị trí lấy vật tư</option>
-                  {availableOutboundZones.map((z: any) => (
-                    <option key={z.id} value={z.id}>
-                      {z.code} - {z.name} · tồn {formatNumberVN(outboundQtyByZoneId.get(String(z.id)) ?? 0)}
-                    </option>
-                  ))}
-                </select>
-                <input type="text" inputMode="decimal" placeholder="Số lượng xuất" value={outboundForm.quantity} onChange={(e) => setOutboundForm((p) => ({ ...p, quantity: formatDecimalInputRealtime(e.target.value) }))} onBlur={(e) => setOutboundForm((p) => ({ ...p, quantity: formatInputNumberVN(e.target.value, false) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <RuntimePanel title="Tồn hiện tại"><div className="text-white">{formatNumberVN(outboundCurrentStock)}</div></RuntimePanel>
-                <RuntimePanel title="Tồn sau xuất"><div className={outboundAfterStock < 0 ? 'text-red-300' : 'text-cyan-300'}>{formatNumberVN(outboundAfterStock)}</div></RuntimePanel>
-                <RuntimePanel title="Tồn tại vị trí"><div className="text-white">{formatNumberVN(selectedOutboundZoneQty)}</div></RuntimePanel>
-                <RuntimePanel title="Vị trí sau xuất"><div className={outboundZoneAfterStock < 0 ? 'text-red-300' : 'text-cyan-300'}>{formatNumberVN(outboundZoneAfterStock)}</div></RuntimePanel>
-                <input type="file" className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-300" />
-                <textarea placeholder="Ghi chú" value={outboundForm.remark} onChange={(e) => setOutboundForm((p) => ({ ...p, remark: e.target.value }))} rows={3} className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-4 py-2 text-zinc-300">Hủy</button>
-                  <button disabled={!canSubmitOutbound} onClick={handleOutbound} className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-black disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400">Xác nhận xuất kho</button>
-                </div>
-              </div>
-            )}
-
-            {activeModal === 'transfer' && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="md:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg border border-cyan-700 bg-cyan-900/20 px-3 py-2 text-cyan-300">1. Chọn nguồn/đích</div>
-                    <div className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">2. Số lượng & tuyến</div>
-                    <div className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300">3. Xác nhận điều chuyển</div>
-                  </div>
-                </div>
-                <input type="datetime-local" value={transferForm.transactionDate} onChange={(e) => setTransferForm((p) => ({ ...p, transactionDate: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <select value={transferForm.inventoryItemId} onChange={(e) => setTransferForm((p) => ({ ...p, inventoryItemId: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Vật tư</option>
-                  {itemsWithAudit.map((i: any) => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
-                </select>
-                <div>
-                <select value={transferForm.fromZoneId} onChange={(e) => setTransferForm((p) => ({ ...p, fromZoneId: e.target.value }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Từ khu vực</option>
-                  {availableTransferFromZones.map((z: any) => (
-                    <option key={z.id} value={z.id}>
-                      {z.code} - {z.name} ({formatNumberVN(transferQtyByZoneId.get(String(z.id)) ?? 0)})
-                    </option>
-                  ))}
-                </select>
-                {transferForm.fromZoneId ? (
-                  <div className="mt-1 text-xs text-zinc-400">
-                    Tồn hiện tại tại khu vực này: <span className="text-cyan-300">{formatNumberVN(selectedFromZoneQty)}</span>
-                  </div>
-                ) : null}
-                </div>
-                <div>
-                <select value={transferForm.toZoneId} onChange={(e) => setTransferForm((p) => ({ ...p, toZoneId: e.target.value }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white">
-                  <option value="">Đến khu vực</option>
-                  {availableTransferToZones.map((z: any) => (
-                    <option key={z.id} value={z.id}>
-                      {z.code} - {z.name} ({formatNumberVN(transferQtyByZoneId.get(String(z.id)) ?? 0)})
-                    </option>
-                  ))}
-                </select>
-                {transferForm.toZoneId ? (
-                  <div className="mt-1 text-xs text-zinc-400">
-                    Tồn hiện tại tại khu vực đích: <span className="text-emerald-300">{formatNumberVN(selectedToZoneQty)}</span>
-                  </div>
-                ) : null}
-                </div>
-                <input type="text" inputMode="decimal" placeholder="Số lượng điều chuyển" value={transferForm.quantity} onChange={(e) => setTransferForm((p) => ({ ...p, quantity: formatDecimalInputRealtime(e.target.value) }))} onBlur={(e) => setTransferForm((p) => ({ ...p, quantity: formatInputNumberVN(e.target.value, false) }))} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <input type="file" className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-300" />
-                <RuntimePanel title="Tồn hiện tại"><div className="text-white">{formatNumberVN(transferCurrentStock)}</div></RuntimePanel>
-                <RuntimePanel title="Sau điều chuyển"><div className={transferAfterStock < 0 ? 'text-red-300' : 'text-cyan-300'}>{formatNumberVN(transferAfterStock)}</div></RuntimePanel>
-                <textarea placeholder="Lý do điều chuyển" value={transferForm.remark} onChange={(e) => setTransferForm((p) => ({ ...p, remark: e.target.value }))} rows={3} className="md:col-span-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" />
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <button onClick={closeModal} className="rounded-lg border border-zinc-700 px-4 py-2 text-zinc-300">Hủy</button>
-                  <button onClick={handleTransfer} className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-black">Xác nhận điều chuyển</button>
-                </div>
-              </div>
-            )}
-            {activeModal === 'stock-take' && <div className="text-zinc-300">Dùng tab Kiểm kê để thao tác phiên kiểm kê chi tiết.</div>}
-
-            {activeModal === 'material-detail' && selectedMaterialDetail && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr]">
                 <RuntimePanel title="Danh mục chi tiết">
                   <div className="space-y-2 text-sm text-zinc-300">
@@ -888,7 +456,7 @@ export function InventoryOverviewPage() {
                             <tr>
                               <th className="px-3 py-2 text-left">Tên nhà cung cấp</th>
                               <th className="px-3 py-2 text-left">Số lượng nhập</th>
-                              <th className="px-3 py-2 text-left">Tổng nhập</th>
+                              <th className="px-3 py-2 text-left">Đơn giá nhập</th>
                               <th className="px-3 py-2 text-left">Giá trị nhập gần nhất</th>
                               <th className="px-3 py-2 text-left">Tổng giá trị</th>
                               <th className="px-3 py-2 text-left">File đính kèm</th>
@@ -899,7 +467,7 @@ export function InventoryOverviewPage() {
                               <tr key={`${x.supplierName}-${i}`} className="border-t border-zinc-800">
                                 <td className="px-3 py-2 text-zinc-300">{x.supplierName ?? 'Không rõ'}</td>
                                 <td className="px-3 py-2 text-white">{num(x.quantity).toLocaleString()}</td>
-                                <td className="px-3 py-2 text-cyan-300">{num(x.totalInboundQty ?? x.quantity).toLocaleString()}</td>
+                                <td className="px-3 py-2 text-cyan-300">{num(x.unitPrice ?? x.latestUnitPrice ?? selectedMaterialDetail.averageCost).toLocaleString()}</td>
                                 <td className="px-3 py-2 text-amber-300">{num(x.latestInboundValue ?? x.totalAmount).toLocaleString()}</td>
                                 <td className="px-3 py-2 text-emerald-300">{num(x.totalValue ?? x.totalAmount ?? num(x.quantity) * num(x.unitPrice ?? selectedMaterialDetail.averageCost)).toLocaleString()}</td>
                                 <td className="px-3 py-2 text-zinc-400">{x.attachmentName ?? '—'}</td>
@@ -987,7 +555,6 @@ export function InventoryOverviewPage() {
                   )}
                 </div>
               </div>
-            )}
           </div>
         </div>
       )}
@@ -1042,6 +609,7 @@ export function InventoryOverviewPage() {
                     <tr>
                       <th className="px-3 py-2 text-left">Mã vật tư</th>
                       <th className="px-3 py-2 text-left">Tên vật tư</th>
+                      <th className="px-3 py-2 text-left">Loại vật tư</th>
                       <th className="px-3 py-2 text-left">Tồn</th>
                       <th className="px-3 py-2 text-left">Đơn giá gốc</th>
                       <th className="px-3 py-2 text-left">Tổng giá trị</th>
@@ -1053,6 +621,7 @@ export function InventoryOverviewPage() {
                       <tr key={item.id} className="border-t border-zinc-800">
                         <td className="px-3 py-2 text-cyan-300">{item.code}</td>
                         <td className="px-3 py-2 text-zinc-300">{item.name}</td>
+                        <td className="px-3 py-2 text-zinc-300">{materialUsageLabel(item.materialUsageType)}</td>
                         <td className="px-3 py-2 text-white">{formatNumberVN(item.quantity)}</td>
                         <td className="px-3 py-2 text-zinc-200">{formatCurrencyVN(item.baseUnitPrice ?? item.unitPrice ?? item.averageCost)}</td>
                         <td className="px-3 py-2 text-emerald-300">{formatCurrencyVN(item.inventoryValue ?? num(item.quantity) * num(item.averageCost ?? item.unitPrice))}</td>

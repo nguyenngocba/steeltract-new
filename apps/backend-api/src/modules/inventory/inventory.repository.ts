@@ -147,9 +147,12 @@ export class InventoryRepository {
   }
 
   deleteItem(id: string, db: DbClient = this.prisma) {
-    return db.inventoryItem.delete({
+    return db.inventoryItem.update({
       where: {
         id,
+      },
+      data: {
+        deletedAt: new Date(),
       },
     });
   }
@@ -265,10 +268,14 @@ export class InventoryRepository {
 
   private buildItemWhere(search?: string): Prisma.InventoryItemWhereInput {
     const value = search?.trim();
+    const base: Prisma.InventoryItemWhereInput = {
+      deletedAt: null,
+    };
 
-    if (!value) return {};
+    if (!value) return base;
 
     return {
+      ...base,
       OR: [
         {
           code: {

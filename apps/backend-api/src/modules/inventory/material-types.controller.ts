@@ -23,6 +23,9 @@ export class MaterialTypesController {
   async getMaterialTypes() {
 
     return this.prisma.materialType.findMany({
+      where: {
+        active: true,
+      },
 
       include: {
         category: true,
@@ -55,6 +58,12 @@ export class MaterialTypesController {
               body.categoryId,
           },
         },
+        description:
+          body.description ??
+          null,
+        color:
+          body.color ??
+          null,
       },
     })
   }
@@ -85,6 +94,15 @@ export class MaterialTypesController {
               body.categoryId,
           },
         },
+        description:
+          body.description ??
+          null,
+        active:
+          body.active ??
+          true,
+        color:
+          body.color ??
+          null,
       },
     })
   }
@@ -94,10 +112,13 @@ export class MaterialTypesController {
     @Param('id') id: string,
   ) {
 
-    return this.prisma.materialType.delete({
+    return this.prisma.materialType.update({
 
       where: {
         id,
+      },
+      data: {
+        active: false,
       },
     })
   }

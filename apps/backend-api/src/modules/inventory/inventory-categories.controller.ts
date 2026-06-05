@@ -23,6 +23,9 @@ export class InventoryCategoriesController {
   async getCategories() {
 
     return this.prisma.inventoryCategory.findMany({
+      where: {
+        active: true,
+      },
 
       orderBy: {
         name: 'asc',
@@ -47,6 +50,9 @@ export class InventoryCategoriesController {
 
         description:
           body.description ??
+          null,
+        color:
+          body.color ??
           null,
       },
     })
@@ -75,6 +81,12 @@ export class InventoryCategoriesController {
         description:
           body.description ??
           null,
+        active:
+          body.active ??
+          true,
+        color:
+          body.color ??
+          null,
       },
     })
   }
@@ -84,10 +96,13 @@ export class InventoryCategoriesController {
     @Param('id') id: string,
   ) {
 
-    return this.prisma.inventoryCategory.delete({
+    return this.prisma.inventoryCategory.update({
 
       where: {
         id,
+      },
+      data: {
+        active: false,
       },
     })
   }

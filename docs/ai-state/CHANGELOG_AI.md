@@ -4,6 +4,26 @@
 
 Completed:
 
+* Added Material Master v1 usage classification:
+  added Prisma enum `MaterialUsageType` with `PRIMARY`, `SECONDARY`, and `CONSUMABLE`;
+  added `InventoryItem.materialUsageType` with default `PRIMARY` and applied migration `20260604214339_add_material_usage_type`;
+  updated Inventory item create/update/list/detail/audit flows to persist and return usage type plus clearer zone code/name fields;
+  changed the MaterialDrawer `Loại vật tư` field to Vietnamese usage options `Vật tư chính`, `Vật tư phụ`, `Vật tư tiêu hao`;
+  renamed the old technical type selector to `Quy cách / nhóm kỹ thuật`;
+  added default warehouse zone selection to the MaterialDrawer;
+  added `Loại vật tư` columns to Inventory Overview, Stock list, and Stock full-list modal;
+  updated the material detail popup to show `Loại vật tư`.
+* Reworked the MaterialDrawer create/edit form to match the Inventory inbound modal layout with two-column fields, summary boxes, a business note panel, full-width description, and clearer footer actions.
+* Fixed material deletion by adding soft delete:
+  added `InventoryItem.deletedAt` and migration `20260604224726_inventory_item_soft_delete`;
+  changed Inventory repository delete to mark records deleted instead of hard-deleting rows referenced by transactions/BOM/history;
+  active Inventory item queries now hide deleted materials while preserving old operational history.
+* Fixed Material Detail supplier tab:
+  renamed supplier column `Tổng nhập` to `Đơn giá nhập`;
+  changed the displayed value to inbound unit price with average cost fallback.
+* Fixed Inventory outbound material location dropdown:
+  material detail now falls back to the material default zone when legacy transaction lines have stock but no zone;
+  outbound modal now builds selectable source locations from balances and falls back to the material default zone/current stock when no balance rows are returned.
 * Replaced secondary frontend static fallback panels with API-backed runtime data:
   Analytics charts now read Inventory transactions, Production orders, and Yard metrics.
   Notifications and Command Center alerts now read Analytics Engine alerts.
@@ -103,6 +123,24 @@ Completed:
   wired the Overview "Thêm vật tư mới" action to the shared `MaterialDrawer`;
   preserved the no-schema/no-migration boundary for Phase A and did not touch the Supplier module;
   refreshed the app sidebar dark theme and active child-tab styling, including hash-aware active matching for submenu tabs.
+* Completed Sprint A.5 Inventory cleanup:
+  removed inbound, outbound, transfer, and stock-take modal forms from Inventory Overview;
+  removed Overview transaction modal state and submit handlers;
+  changed Overview quick actions to navigate to dedicated Inventory transaction pages while keeping MaterialDrawer and material detail in Overview;
+  did not modify Inventory transaction pages or backend code.
+* Refined Inventory > Tồn kho analytics:
+  stock table pagination now defaults to a bottom-left `Hiển thị 1-10/xxx kết quả` label with centered clickable page numbers;
+  warehouse/location stock distribution uses a donut chart;
+  added a monthly stock movement trend chart from Inventory transactions;
+  removed the older stock-health and stock-rhythm charts;
+  rewired stock alerts from current stock/minimum stock thresholds;
+  added a bottom quick-stat strip for today's inbound, outbound, transfer, current-month stock-take, and stock variance indicators.
+* Standardized Inventory tab visuals using the Stock tab as the baseline:
+  promoted shared Inventory panel/KPI/insight/pagination/table primitives;
+  widened and spaced the Stock table/chart layout so analytics blocks no longer stick together;
+  applied the same shell, KPI, filter, table, side-panel, and pagination treatment to Overview, Inbound, Outbound, Transfer, Stock Take, Transactions, Alerts, and Audit tabs;
+  reworked the Overview main screen so its KPI strip, stock table, recent inbound/outbound lists, warehouse filter, and buttons match the rest of the Inventory cockpit;
+  removed local duplicate KPI/insight helper components from the normalized tabs without changing backend, API, Prisma, or mutation logic.
 
 Modified:
 
@@ -127,6 +165,41 @@ Modified:
 
 Notes:
 
+* Added `Danh mục / Đơn vị` management to `Hệ thống > Cài đặt`, reusing the same Inventory category/type/unit APIs used by Material Master.
+* Settings now supports create/edit/deactivate for material categories, material type/specification groups, and units of measure, with active Material Master usage counters.
+* Settings displays fixed material usage groups `PRIMARY`, `SECONDARY`, and `CONSUMABLE` with linked material counts; dynamic custom usage groups would require a later DB phase.
+* Frontend build passes after Settings catalog/unit management.
+* Applied compact section headers globally through shared `SectionHeader`, removing the large repeated `SteelTrack ERP` eyebrow and reducing module header height across tabs/modules.
+* Expanded route-aware topbar titles for Inventory, Components, Production, Yard, Projects, Suppliers, QC, Logistics, Procurement, Documents, Analytics, Reporting, Notifications, Master Data, AI, Settings, Users, Roles, Logs, and Backup.
+* Frontend build passes after the global module header density pass.
+* Moved app quick search to the right side of the topbar next to `LIVE` and added route-aware compact module titles on the left, including `Kho vật tư`.
+* Removed the duplicate large Inventory Overview header and tightened Inventory KPI/panel/table/recent-transaction spacing for a denser one-screen cockpit layout.
+* Inventory Overview stock table stays capped at 10 rows and recent inbound/outbound panels stay capped at 5 transactions with smaller typography.
+* Frontend build passes after the shell header and Inventory Overview density pass.
+* Rebuilt Inventory master-data workspace for material categories, material type/specification groups, and units of measure with create/edit/deactivate actions and Material Master usage counts.
+* Added Inventory unit CRUD on `/inventory/units` while keeping existing schema unchanged.
+* Standardized steel-structure dictionary data: 8 active categories, 24 active material type/specification groups, and 14 active units; unused demo/duplicate records were deactivated instead of hard-deleted.
+* Production BOM material selection now groups production-warehouse materials by `materialUsageType` and auto-derives BOM item category from the selected material.
+* Backend and frontend builds pass after Inventory master-data and BOM grouping changes.
+* Fixed Inventory location validation mismatch for material `001`: detail showed stock at default zone `B01` by falling back to `InventoryItem.zoneId`, while backend selected-location validation counted only line/header zone and returned zero for legacy no-zone inbound lines.
+* Backend `getCurrentStockAtLocation` now counts legacy no-zone lines for the selected material default zone, matching material detail `locationBalances`.
+* Inbound modal now auto-selects the selected material default zone so new normal UI inbound transactions persist a real `zoneId`.
+* SQL verification for material `001`: total stock `1,567`, effective stock at `B01` `1,567`, previous strict line/header-zone stock `0`.
+* Backend and frontend builds pass after the location validation fix.
+* Fixed Inventory outbound and transfer modal submit locking by auto-selecting valid stock source/destination zones from material location balances or material default zone fallback.
+* Fixed outbound expected issue value display to calculate from material detail average cost with material list fallback.
+* Added outbound validation messages for missing source stock location and quantity exceeding selected source-zone stock.
+* Frontend build passes after the Inventory outbound/transfer modal fix.
+* Added transfer transaction time and moved MaterialDrawer to a portal with a cleaner modal-style layout.
+* Fixed Inventory `Khác` action menu clipping by rendering the dropdown through a portal.
+* Refined inbound/outbound modal layout and added side tabs to the shared material detail modal.
+* Unified Inventory material detail display between Overview and Stock using a shared material detail modal.
+* Improved transaction modal controls so primary create buttons and native select dropdowns are clearer in the dark UI.
+* Restored Inventory transaction modal workflow for inbound, outbound, transfer, and stock-take actions from the global action bar.
+* Dedicated Inventory transaction tabs now serve as history/analytics pages, while existing form and mutation logic lives in reusable modal components.
+* Updated Inventory transaction page layout order to Form -> KPI -> Filter -> Table for inbound, outbound, transfer, and stock-take pages.
+* Completed Inventory Global Action Bar: shared right-aligned action bar beside Inventory tabs, route-based transaction actions, and `MaterialDrawer` create action.
+* Removed duplicate Inventory Overview quick actions and the Stock tab create-material filter button while preserving specialized transaction forms.
 * Backend and frontend builds pass after API-backed fallback replacement.
 * Remaining `Math.random` usages in active modules are for generated document/reference suffixes or randomized simulation mode, not seeded fake operational records.
 * Frontend Inventory, Components, Production, and Yard surfaces now use runtime/API data for the touched workflows.
@@ -135,6 +208,19 @@ Notes:
 * Current operational bootstrap result: 5 inventory materials, 10 inventory transactions, 12 components, 6 production orders, 6 yard zones, 72 yard slots, 2 QC checklists, 4 workers.
 * Production material warehouse now includes real `[COMPONENT_PRODUCTION]` outbound transactions, but still needs a backend balance/receipt model if it must behave as a fully independent warehouse instead of an issued-material view.
 * Latest verification: `pnpm -C apps/backend-api build` and `pnpm -C apps/frontend build` pass after Inventory UI optimization. Vite still reports the existing NODE_ENV and large chunk warnings.
+* Yard runtime UI now fetches zones separately from slots, so zones can render on Yard Overview and the 2D map even before slot cards are populated.
+* Added Yard cockpit create-zone and create-slot modals backed by the existing Yard APIs; new slots are immediately available to the production finished-goods staging dropdown when they have stack capacity.
+* Moved Yard 2D zoom controls into the top location toolbar and added `+ Zone`, global `+ Slot`, and per-zone `+ Slot` actions to avoid covering the map canvas.
+* Fixed the actual `/yard/slots` 500 error caused by missing `yard_item_placements.stagedQuantity` and `remainingQuantity` columns in the database; migration `20260605050000_add_yard_placement_quantities` has been applied.
+* Authenticated verification now returns 75 Yard slots and 73 stack-available slots, so production finished-goods staging can select slots again.
+* Production staging now surfaces backend errors inline instead of appearing unresponsive; QC gate failures are translated with the required action.
+* Fixed Production-to-Yard remaining quantity calculation to count placements by `metadata.productionOrderId`, not by shared `componentId`.
+* Verified successful staging for `MO-20260603-11563` into `ST-YARD-07/07-08/L1`; `/yard/slots` now returns the new placement.
+* QC cockpit now includes a fast production-gate workflow: completed MOs can use `Tạo QC` or `Tạo & duyệt đạt`; the fast path creates/reuses an inspection, starts it, completes it as `PASSED`, and approves it.
+* Verified QC gate end-to-end for `MO-20260605-36058`: QC inspection `QC-20260605-1780639947783` was approved, then Production staged `CPL-33167708` to `ST-YARD-C/ST-C-03/L2`.
+* Database was reset for a clean end-to-end workflow test. Backup saved at `backups/steeltrack_before_clean_workflow_20260605_132345.dump`; reusable script added at `scripts/reset-clean-workflow.sql`.
+* Operational data is now clean: inventory materials/transactions, returns, projects, components, BOMs, production orders, QC inspections, yard placements/movements, activity logs and outbox events are zeroed. Master dictionaries, suppliers, QC checklists, yard zones and yard slots were preserved; all yard slots are `AVAILABLE`.
+* Frontend and backend builds pass after the Yard zone/slot runtime fix.
 
 ## 2026-06-02
 

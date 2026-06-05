@@ -1,4 +1,4 @@
-import { TransactionType } from '@prisma/client';
+import { MaterialUsageType, TransactionType } from '@prisma/client';
 
 import { z } from 'zod';
 
@@ -23,6 +23,8 @@ export const createInventoryItemSchema = z.object({
   unitId: optionalTextFilter,
   categoryId: optionalTextFilter,
   category: optionalTextFilter,
+  materialTypeId: optionalTextFilter,
+  materialUsageType: z.nativeEnum(MaterialUsageType).optional().default(MaterialUsageType.PRIMARY),
   zoneId: optionalTextFilter,
   minimumStock: z.coerce.number().nonnegative().optional().default(0),
 });
@@ -35,6 +37,8 @@ export const updateInventoryItemSchema = z.object({
   unitId: optionalTextFilter,
   categoryId: optionalTextFilter,
   category: optionalTextFilter,
+  materialTypeId: optionalTextFilter,
+  materialUsageType: z.nativeEnum(MaterialUsageType).optional(),
   zoneId: optionalTextFilter,
   minimumStock: z.coerce.number().nonnegative().optional(),
 });

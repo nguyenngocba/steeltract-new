@@ -4,7 +4,7 @@ import type { YardTab } from '../config/yard-tabs'
 import type { YardOperationMode } from '../dialogs/YardOperationDialog'
 import { YardOperationalMap2D } from '../maps2d/YardOperationalMap2D'
 import { YardOperationalMap3D } from '../maps3d/YardOperationalMap3D'
-import type { YardCrane, YardMetrics, YardMovement, YardSlotRuntime } from '../services/api/yard.api'
+import type { YardCrane, YardMetrics, YardMovement, YardSlotRuntime, YardZoneRuntime } from '../services/api/yard.api'
 
 const panel = 'rounded border border-slate-800 bg-[#071321]'
 
@@ -148,6 +148,7 @@ function RecentActivities({ movements }: { movements: YardMovement[] }) {
 }
 
 function YardOverviewTab({
+  zones,
   slots,
   metrics,
   movements,
@@ -158,7 +159,10 @@ function YardOverviewTab({
   onOpenZoneDetail,
   onEditZone,
   onDeleteZone,
+  onCreateZone,
+  onCreateSlot,
 }: {
+  zones: YardZoneRuntime[]
   slots: YardSlotRuntime[]
   metrics?: YardMetrics
   movements: YardMovement[]
@@ -169,6 +173,8 @@ function YardOverviewTab({
   onOpenZoneDetail?: (id: string) => void
   onEditZone?: (zone: { id: string; code: string; name: string }) => void
   onDeleteZone?: (zone: { id: string; code: string; name: string }) => void
+  onCreateZone?: () => void
+  onCreateSlot?: (zoneId?: string) => void
 }) {
   const placements = slots.flatMap((slot) => slot.placements)
   const inbound = movements.filter((movement) => movement.type === 'PLACE')
@@ -203,7 +209,7 @@ function YardOverviewTab({
           <span className="rounded border border-cyan-700 px-2 py-1 text-[10px] text-cyan-300">Occupancy {metrics?.occupancyRate ?? 0}%</span>
         </div>
         <div className="max-h-[470px] overflow-hidden rounded border border-slate-800">
-          <YardOperationalMap2D slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} />
+          <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
         </div>
       </div>
 
@@ -368,6 +374,7 @@ function HistoryTab({ movements, metrics }: { movements: YardMovement[]; metrics
 
 export function YardTabWorkspace({
   tab,
+  zones,
   slots,
   metrics,
   movements,
@@ -379,9 +386,12 @@ export function YardTabWorkspace({
   onOpenZoneDetail,
   onEditZone,
   onDeleteZone,
+  onCreateZone,
+  onCreateSlot,
   onOpenOperation,
 }: {
   tab: YardTab
+  zones: YardZoneRuntime[]
   slots: YardSlotRuntime[]
   metrics?: YardMetrics
   movements: YardMovement[]
@@ -393,6 +403,8 @@ export function YardTabWorkspace({
   onOpenZoneDetail?: (id: string) => void
   onEditZone?: (zone: { id: string; code: string; name: string }) => void
   onDeleteZone?: (zone: { id: string; code: string; name: string }) => void
+  onCreateZone?: () => void
+  onCreateSlot?: (zoneId?: string) => void
   onOpenOperation: (mode: YardOperationMode) => void
 }) {
   if (tab === 'inbound' || tab === 'outbound' || tab === 'transfer') {
@@ -402,6 +414,7 @@ export function YardTabWorkspace({
   if (tab === 'overview') {
     return <YardOverviewTab
       slots={slots}
+      zones={zones}
       metrics={metrics}
       movements={movements}
       cranes={cranes}
@@ -411,6 +424,8 @@ export function YardTabWorkspace({
       onOpenZoneDetail={onOpenZoneDetail}
       onEditZone={onEditZone}
       onDeleteZone={onDeleteZone}
+      onCreateZone={onCreateZone}
+      onCreateSlot={onCreateSlot}
     />
   }
 
@@ -433,7 +448,7 @@ export function YardTabWorkspace({
         <div><h2 className="text-sm font-semibold">Sơ đồ zone vận hành</h2><p className="mt-1 text-[11px] text-slate-500">Cụm zone → ô vị trí → tầng chứa cấu kiện.</p></div>
         <span className="text-xs text-cyan-300">{slots.length} vị trí</span>
       </div>
-      <YardOperationalMap2D slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} />
+      <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
     </div>
     <div className="grid gap-3 lg:grid-cols-3">
       <SelectedZoneInsight slots={slots} zoneId={selectedZoneId} />

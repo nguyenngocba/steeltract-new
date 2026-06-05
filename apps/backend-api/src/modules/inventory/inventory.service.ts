@@ -51,8 +51,13 @@ export class InventoryService {
         materialTypeId: item.materialTypeId,
         materialType:
           item.materialType?.name ?? '',
+        materialUsageType: item.materialUsageType,
         zoneId: item.zoneId,
-        zone: item.zone?.name ?? '',
+        zone: item.zone
+          ? `${item.zone.code} - ${item.zone.name}`
+          : '',
+        zoneCode: item.zone?.code ?? '',
+        zoneName: item.zone?.name ?? '',
         status:
           quantity <= 5
             ? 'CRITICAL'
@@ -170,8 +175,22 @@ export class InventoryService {
             ? supplierMap.get(tx.supplierId)?.name ??
               tx.supplierId
             : null,
-          zoneId: line.zoneId ?? tx.zoneId ?? null,
+          zoneId:
+            line.zoneId ?? tx.zoneId ?? item.zoneId ?? null,
+          zoneCode:
+            line.zone?.code ??
+            tx.zone?.code ??
+            item.zone?.code ??
+            null,
           zoneName:
+            line.zone
+              ? `${line.zone.code} - ${line.zone.name}`
+              : tx.zone
+                ? `${tx.zone.code} - ${tx.zone.name}`
+                : item.zone
+                  ? `${item.zone.code} - ${item.zone.name}`
+                  : null,
+          zoneRawName:
             line.zone?.name ??
             tx.zone?.name ??
             item.zone?.name ??
@@ -207,8 +226,22 @@ export class InventoryService {
             'PCS',
           projectId: tx.projectId,
           projectName: tx.project?.name ?? null,
-          zoneId: line.zoneId ?? tx.zoneId ?? null,
+          zoneId:
+            line.zoneId ?? tx.zoneId ?? item.zoneId ?? null,
+          zoneCode:
+            line.zone?.code ??
+            tx.zone?.code ??
+            item.zone?.code ??
+            null,
           zoneName:
+            line.zone
+              ? `${line.zone.code} - ${line.zone.name}`
+              : tx.zone
+                ? `${tx.zone.code} - ${tx.zone.name}`
+                : item.zone
+                  ? `${item.zone.code} - ${item.zone.name}`
+                  : null,
+          zoneRawName:
             line.zone?.name ??
             tx.zone?.name ??
             item.zone?.name ??
@@ -222,6 +255,7 @@ export class InventoryService {
       string,
       {
         zoneId: string | null
+        zoneCode: string | null
         zoneName: string
         quantity: number
         updatedAt: Date | null
@@ -230,16 +264,29 @@ export class InventoryService {
 
     for (const tx of transactions) {
       for (const line of tx.items) {
-        const zoneId = line.zoneId ?? tx.zoneId ?? null
+        const zoneId =
+          line.zoneId ?? tx.zoneId ?? item.zoneId ?? null
         const zoneName =
-          line.zone?.name ??
-          tx.zone?.name ??
-          item.zone?.name ??
+          line.zone
+            ? `${line.zone.code} - ${line.zone.name}`
+            : tx.zone
+              ? `${tx.zone.code} - ${tx.zone.name}`
+              : item.zone
+                ? `${item.zone.code} - ${item.zone.name}`
+                : null
+        const fallbackZoneName =
+          zoneName ??
           'KHU MẶC ĐỊNH'
-        const key = zoneId ?? zoneName
+        const zoneCode =
+          line.zone?.code ??
+          tx.zone?.code ??
+          item.zone?.code ??
+          null
+        const key = zoneId ?? fallbackZoneName
         const current = locationBalancesMap.get(key) ?? {
           zoneId,
-          zoneName,
+          zoneCode,
+          zoneName: fallbackZoneName,
           quantity: 0,
           updatedAt: null,
         }
@@ -288,8 +335,16 @@ export class InventoryService {
         name: item.name,
         description: item.description,
         category: item.category?.name ?? '',
+        categoryId: item.categoryId,
+        materialTypeId: item.materialTypeId,
         materialType:
           item.materialType?.name ?? '',
+        materialUsageType: item.materialUsageType,
+        zoneId: item.zoneId,
+        zoneCode: item.zone?.code ?? '',
+        zoneName: item.zone
+          ? `${item.zone.code} - ${item.zone.name}`
+          : '',
         minimumStock: item.minimumStock ?? 0,
         unit:
           item.unit ?? item.unitMaster?.code ?? 'PCS',
@@ -302,6 +357,7 @@ export class InventoryService {
       projectConsumptionHistory: outboundLines,
       locationBalances: locationBalances.map((x) => ({
         zoneId: x.zoneId,
+        zoneCode: x.zoneCode,
         zoneName: x.zoneName,
         quantity: x.quantity,
         updatedAt: x.updatedAt,
@@ -398,6 +454,24 @@ export class InventoryService {
         materialId: item.id,
         materialCode: item.code,
         materialName: item.name,
+        categoryId: item.categoryId,
+        category: item.category?.name ?? '',
+        materialTypeId: item.materialTypeId,
+        materialType:
+          item.materialType?.name ?? '',
+        materialUsageType: item.materialUsageType,
+        minimumStock: item.minimumStock ?? 0,
+        unit:
+          item.unit ?? item.unitMaster?.code ?? 'PCS',
+        zoneId: item.zoneId,
+        zoneCode: item.zone?.code ?? '',
+        zoneName: item.zone?.name ?? '',
+        zone: item.zone
+          ? `${item.zone.code} - ${item.zone.name}`
+          : '',
+        position: item.zone
+          ? `${item.zone.code} - ${item.zone.name}`
+          : '',
         currentStock,
         averageCost,
         inventoryValue,
@@ -428,6 +502,8 @@ export class InventoryService {
       description: payload.description,
       minimumStock:
         payload.minimumStock ?? 0,
+      materialUsageType:
+        payload.materialUsageType ?? 'PRIMARY',
       unit: payload.unit ?? 'PCS',
       category: {
         connect: {
@@ -470,6 +546,9 @@ export class InventoryService {
 
         minimumStock:
           payload.minimumStock,
+
+        materialUsageType:
+          payload.materialUsageType,
 
         unit:
           payload.unit,
@@ -984,19 +1063,34 @@ export class InventoryService {
     zoneId: string,
     tx: any = this.prisma,
   ) {
+    const item = await tx.inventoryItem.findUnique({
+      where: { id: inventoryItemId },
+      select: { zoneId: true },
+    })
+    const locationFilters: any[] = [
+      { zoneId },
+      {
+        zoneId: null,
+        transaction: {
+          zoneId,
+        },
+      },
+    ]
+
+    if (item?.zoneId === zoneId) {
+      locationFilters.push({
+        zoneId: null,
+        transaction: {
+          zoneId: null,
+        },
+      })
+    }
+
     const aggregate =
       await tx.inventoryTransactionItem.aggregate({
         where: {
           inventoryItemId,
-          OR: [
-            { zoneId },
-            {
-              zoneId: null,
-              transaction: {
-                zoneId,
-              },
-            },
-          ],
+          OR: locationFilters,
         },
         _sum: { quantity: true },
       })

@@ -1,17 +1,33 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
-import { inventoryInput } from '../InventoryVisuals'
 import { useCreateMaterial } from '../../hooks/useCreateMaterial'
 import { useUpdateMaterial } from '../../hooks/useUpdateMaterial'
 import { useCategories } from '../../hooks/useCategories'
 import { useUnits } from '../../hooks/useUnits'
 import { useMaterialTypes } from '../../hooks/useMaterialTypes'
+import { useZones } from '../../hooks/useZones'
 
 type Props = {
   open: boolean
   material?: any | null
   onClose: () => void
+}
+
+const drawerInput =
+  'h-11 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-100 placeholder:text-slate-500'
+const drawerTextarea =
+  'min-h-24 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500'
+
+const MATERIAL_USAGE_OPTIONS = [
+  { value: 'PRIMARY', label: 'Vật tư chính' },
+  { value: 'SECONDARY', label: 'Vật tư phụ' },
+  { value: 'CONSUMABLE', label: 'Vật tư tiêu hao' },
+]
+
+function usageLabel(value: string) {
+  return MATERIAL_USAGE_OPTIONS.find((item) => item.value === value)?.label ?? 'Vật tư chính'
 }
 
 export function MaterialDrawer({ open, material, onClose }: Props) {
@@ -22,10 +38,13 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [materialTypeId, setMaterialTypeId] = useState('')
+  const [materialUsageType, setMaterialUsageType] = useState('PRIMARY')
+  const [zoneId, setZoneId] = useState('')
   const [error, setError] = useState('')
   const { data: materialTypes = [] } = useMaterialTypes()
   const { data: categories = [] } = useCategories()
   const { data: units = [] } = useUnits()
+  const { data: zones = [] } = useZones()
   const createMaterialMutation = useCreateMaterial()
   const updateMaterialMutation = useUpdateMaterial()
   const isEditMode = Boolean(material)
@@ -40,6 +59,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setDescription('')
       setCategoryId('')
       setMaterialTypeId('')
+      setMaterialUsageType('PRIMARY')
+      setZoneId('')
       return
     }
     setCode(material.code ?? '')
@@ -49,6 +70,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     setDescription(material.description ?? '')
     setCategoryId(material.categoryId ?? '')
     setMaterialTypeId(material.materialTypeId ?? '')
+    setMaterialUsageType(material.materialUsageType ?? 'PRIMARY')
+    setZoneId(material.zoneId ?? '')
   }, [material])
 
   if (!open) return null
@@ -75,6 +98,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       minimumStock,
       description,
       materialTypeId,
+      materialUsageType,
+      zoneId,
     }
 
     try {
@@ -90,10 +115,11 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
-      <section className="w-full max-w-3xl overflow-hidden rounded-xl border border-white/10 bg-[#0b1424]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-        <header className="flex items-start justify-between border-b border-white/10 px-5 py-4">
+  return createPortal(
+    <div className="inventory-material-drawer fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-950/75 p-4 py-8 backdrop-blur-md">
+      <style>{'.inventory-material-drawer select option{background:#0f172a;color:#e2e8f0}.inventory-material-drawer select:focus,.inventory-material-drawer input:focus,.inventory-material-drawer textarea:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
+      <section className="w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <header className="flex items-start justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300">Vật tư kho</p>
             <h2 className="mt-1 text-xl font-semibold text-white">{isEditMode ? 'Sửa vật tư' : 'Thêm vật tư mới'}</h2>
@@ -104,54 +130,63 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
           </button>
         </header>
 
-        <div className="grid gap-4 p-5 md:grid-cols-2">
-          <Field label="Mã vật tư">
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="VD: VT-TH-001" className={inventoryInput} />
-          </Field>
-          <Field label="Tên vật tư">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên vật tư" className={inventoryInput} />
-          </Field>
-          <Field label="Danh mục">
-            <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setMaterialTypeId('') }} className={inventoryInput}>
-              <option value="">Chọn danh mục</option>
+        <div className="p-6">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã vật tư" className={drawerInput} />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên vật tư" className={drawerInput} />
+            <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setMaterialTypeId('') }} className={drawerInput}>
+              <option value="">Danh mục vật tư</option>
               {categories.map((category: any) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
-          </Field>
-          <Field label="Loại vật tư">
-            <select value={materialTypeId} onChange={(e) => setMaterialTypeId(e.target.value)} className={inventoryInput}>
-              <option value="">Chọn loại vật tư</option>
+            <select value={materialUsageType} onChange={(e) => setMaterialUsageType(e.target.value)} className={drawerInput}>
+              {MATERIAL_USAGE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+            <select value={materialTypeId} onChange={(e) => setMaterialTypeId(e.target.value)} className={drawerInput}>
+              <option value="">Quy cách / nhóm kỹ thuật</option>
               {materialTypes.filter((item: any) => !categoryId || item.categoryId === categoryId).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
-          </Field>
-          <Field label="Đơn vị">
-            <select value={unit} onChange={(e) => setUnit(e.target.value)} className={inventoryInput}>
+            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className={drawerInput}>
+              <option value="">Vị trí kho mặc định</option>
+              {zones.map((zone: any) => <option key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
+            </select>
+            <select value={unit} onChange={(e) => setUnit(e.target.value)} className={drawerInput}>
+              <option value="">Đơn vị tính</option>
               {units.map((item: any) => <option key={item.id} value={item.code}>{item.name} ({item.code})</option>)}
             </select>
-          </Field>
-          <Field label="Tồn tối thiểu">
-            <input type="number" value={minimumStock} onChange={(e) => setMinimumStock(Number(e.target.value))} placeholder="0" className={inventoryInput} />
-          </Field>
-          <Field label="Mô tả" className="md:col-span-2">
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ghi chú quy cách, tiêu chuẩn, nguồn cung..." className={`${inventoryInput} h-24 py-3`} />
-          </Field>
+            <input type="number" value={minimumStock} onChange={(e) => setMinimumStock(Number(e.target.value))} placeholder="Tồn tối thiểu" className={drawerInput} />
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
+            <MetricBox title="Loại vật tư" value={usageLabel(materialUsageType)} />
+            <MetricBox title="Tồn tối thiểu" value={Number(minimumStock || 0).toLocaleString('vi-VN')} />
+            <MetricBox title="Vị trí mặc định" value={zones.find((zone: any) => zone.id === zoneId)?.code ?? 'Chưa gán'} />
+            <MetricBox title="Trạng thái" value={isEditMode ? 'Đang chỉnh sửa' : 'Tạo mới'} />
+          </div>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+            Mã vật tư và loại vật tư sẽ được dùng xuyên suốt tồn kho, nhập xuất, BOM và sản xuất. Vị trí mặc định chỉ là nơi gợi ý khi nhập lần đầu, giao dịch thực tế vẫn có thể chọn zone khác.
+          </div>
+
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ghi chú quy cách, tiêu chuẩn, nguồn cung..." className={`${drawerTextarea} mt-3 w-full`} />
         </div>
 
         {error && <div className="mx-5 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</div>}
 
-        <footer className="flex justify-end gap-2 px-5 py-4">
-          <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 hover:text-white">Hủy</button>
-          <button onClick={handleSave} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20">{isEditMode ? 'Lưu thay đổi' : 'Tạo vật tư'}</button>
+        <footer className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10">Hủy</button>
+          <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500">{isEditMode ? 'Lưu thay đổi' : 'Tạo vật tư'}</button>
         </footer>
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
-function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
+function MetricBox({ title, value }: { title: string; value: string }) {
   return (
-    <label className={`space-y-1.5 ${className}`}>
-      <span className="text-xs font-medium text-slate-400">{label}</span>
-      {children}
-    </label>
+    <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
+      <div className="text-xs text-slate-400">{title}</div>
+      <div className="mt-1 truncate text-base font-semibold text-white">{value}</div>
+    </div>
   )
 }

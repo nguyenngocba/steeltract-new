@@ -198,6 +198,8 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const [slotId, setSlotId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [weight, setWeight] = useState('1')
+  const [actionError, setActionError] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
   const activeStage = latest.stages?.find((item) => item.status === 'IN_PROGRESS' || item.status === 'READY')
   const allStagesCompleted = Boolean(latest.stages?.length) && latest.stages!.every((item) => item.status === 'COMPLETED')
   const canStageToYard = latest.status === 'COMPLETED' || allStagesCompleted
@@ -205,11 +207,18 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const targetSlot = availableSlots.find((slot) => slot.id === slotId)
   const stagedQuantity = slots
     .flatMap((slot) => slot.placements ?? [])
-    .filter((placement) => placement.itemId === latest.component?.id)
+    .filter((placement) => placement.itemId === latest.component?.id && placement.metadata?.productionOrderId === latest.id)
     .reduce((sum, placement) => sum + Number(placement.quantity ?? 0), 0)
   const remainingQuantity = Math.max(0, Number(latest.quantity ?? 0) - stagedQuantity)
   const stageQuantity = Number(quantity) || 0
   const stageInvalid = !slotId || stageQuantity <= 0 || stageQuantity > remainingQuantity
+  const stageDisabledReason = !slotId
+    ? 'Chọn slot còn tầng trống trước khi chuyển bãi.'
+    : stageQuantity <= 0
+      ? 'Nhập số lượng chuyển bãi lớn hơn 0.'
+      : stageQuantity > remainingQuantity
+        ? `Số lượng chuyển bãi vượt quá số lượng còn lại (${number(remainingQuantity)}).`
+        : ''
 
   useEffect(() => {
     if (remainingQuantity > 0 && Number(quantity) > remainingQuantity) {
@@ -217,8 +226,36 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
     }
   }, [quantity, remainingQuantity])
 
+  function productionErrorMessage(error: unknown) {
+    const data = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data
+    const raw = Array.isArray(data?.message) ? data?.message.join(', ') : data?.message
+    if (raw === 'QC inspection must be passed or approved before staging finished component to yard') {
+      return 'Chưa có phiếu QC đạt/đã duyệt cho lệnh sản xuất hoặc cấu kiện này. Vào Chất lượng (QC), tạo phiếu kiểm tra và chấm Đạt/Duyệt trước khi chuyển ra bãi.'
+    }
+    if (raw === 'Production order must be completed before yard staging') {
+      return 'Lệnh sản xuất chưa hoàn tất toàn bộ công đoạn nên chưa được chuyển ra bãi.'
+    }
+    if (raw === 'Yard slot not found') {
+      return 'Slot bãi không tồn tại hoặc vừa bị thay đổi. Chọn lại slot khác.'
+    }
+    if (raw?.startsWith('Only ')) {
+      return `Số lượng còn được nhập bãi không đủ. Backend trả về: ${raw}.`
+    }
+    return raw || 'Không thể cập nhật lệnh sản xuất.'
+  }
+
   async function run(action: () => Promise<unknown>, message: string) {
-    try { await action(); toast.success(message) } catch { toast.error('Không thể cập nhật lệnh sản xuất') }
+    setActionError('')
+    setActionMessage('')
+    try {
+      await action()
+      setActionMessage(message)
+      toast.success(message)
+    } catch (error) {
+      const message = productionErrorMessage(error)
+      setActionError(message)
+      toast.error(message)
+    }
   }
 
   return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4">
@@ -259,18 +296,21 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
           </ProductionPanel>
           {canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi">
             <div className="space-y-2 text-xs">
-              <select value={slotId} onChange={(e)=>setSlotId(e.target.value)} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2">
+              <select value={slotId} onChange={(e)=>{ setSlotId(e.target.value); setActionError(''); setActionMessage('') }} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2">
                 <option value="">Chọn slot còn tầng trống</option>
                 {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
               </select>
               {!availableSlots.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">Bãi không còn slot có tầng trống.</p> : null}
-              <input value={quantity} onChange={(e)=>setQuantity(e.target.value)} type="number" min="0.01" max={remainingQuantity || undefined} step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
+              <input value={quantity} onChange={(e)=>{ setQuantity(e.target.value); setActionError(''); setActionMessage('') }} type="number" min="0.01" max={remainingQuantity || undefined} step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
               <input value={weight} onChange={(e)=>setWeight(e.target.value)} type="number" min="0" step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
               <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
                 <div>Slot đích: <b className="text-cyan-300">{targetSlot ? `${targetSlot.zone.code}/${targetSlot.code}` : '--'}</b></div>
                 <div className="mt-1">Tầng xếp tự động: <b className="text-cyan-300">L{targetSlot ? targetSlot.currentStackLevel + 1 : '--'}</b></div>
                 <div className="mt-1">Còn được nhập bãi: <b className={stageInvalid ? 'text-red-300' : 'text-emerald-300'}>{number(remainingQuantity)}</b></div>
               </div>
+              {stageDisabledReason ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">{stageDisabledReason}</p> : null}
+              {actionError ? <p className="rounded border border-red-900 bg-red-950/40 p-2 text-red-200">{actionError}</p> : null}
+              {actionMessage ? <p className="rounded border border-emerald-900 bg-emerald-950/40 p-2 text-emerald-200">{actionMessage}</p> : null}
               <button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: Number(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button>
             </div>
           </ProductionPanel>}

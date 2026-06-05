@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { SectionHeader } from '../../../../shared/ui/enterprise'
-import { inventoryTabs } from '../../config/inventory-tabs'
+import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import {
+  InventoryInsightPanel,
+  InventoryKpi,
+  InventoryPagination,
+  InventoryPanel,
+  inventoryGridGap,
+  inventoryInput,
+  inventoryPageStack,
+  inventoryTableHead,
+  inventoryTableRow,
+  inventoryTableShell,
+} from '../../components/InventoryVisuals'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useZones } from '../../hooks/useZones'
 
@@ -80,26 +91,26 @@ export function InventoryAlertsPage() {
   return (
     <EnterpriseModulePage>
       <SectionHeader title="Cảnh báo tồn kho" description="Trung tâm cảnh báo vận hành tồn kho theo mức độ rủi ro." />
-      <EnterpriseTabBar tabs={inventoryTabs} />
+      <InventoryTabWorkspace />
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
-          <KpiCard title="Cảnh báo nghiêm trọng" value={kpi.critical.toLocaleString('vi-VN')} tone="text-red-300" />
-          <KpiCard title="Cảnh báo thấp tồn" value={kpi.low.toLocaleString('vi-VN')} tone="text-orange-300" />
-          <KpiCard title="Sắp hết hạn" value={kpi.warning.toLocaleString('vi-VN')} tone="text-amber-300" />
-          <KpiCard title="Vượt mức tồn" value={kpi.over.toLocaleString('vi-VN')} tone="text-cyan-300" />
-          <KpiCard title="Tổng cảnh báo" value={kpi.total.toLocaleString('vi-VN')} />
-          <KpiCard title="Đã xử lý hôm nay" value={kpi.processed.toLocaleString('vi-VN')} tone="text-emerald-300" />
+      <div className={inventoryPageStack}>
+        <div className={`grid grid-cols-1 xl:grid-cols-6 ${inventoryGridGap}`}>
+          <InventoryKpi title="Cảnh báo nghiêm trọng" value={kpi.critical.toLocaleString('vi-VN')} note="Hết hàng" tone="red" />
+          <InventoryKpi title="Cảnh báo thấp tồn" value={kpi.low.toLocaleString('vi-VN')} note="Dưới ngưỡng" tone="amber" />
+          <InventoryKpi title="Sắp hết hạn" value={kpi.warning.toLocaleString('vi-VN')} note="Theo hạn dùng" tone="purple" />
+          <InventoryKpi title="Vượt mức tồn" value={kpi.over.toLocaleString('vi-VN')} note="Tồn quá cao" tone="cyan" />
+          <InventoryKpi title="Tổng cảnh báo" value={kpi.total.toLocaleString('vi-VN')} note="Đang theo dõi" tone="blue" />
+          <InventoryKpi title="Đã xử lý hôm nay" value={kpi.processed.toLocaleString('vi-VN')} note="Đã đóng" tone="emerald" />
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-3">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+        <InventoryPanel title="Bộ lọc cảnh báo">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
+            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className={inventoryInput}>
               <option value="">Mức độ cảnh báo</option>
               <option value="Nghiêm trọng">Nghiêm trọng</option>
               <option value="Thấp">Thấp</option>
             </select>
-            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className={inventoryInput}>
               <option value="">Kho</option>
               {[...new Set(alerts.map((a: any) => a.zoneCode))].map((z) => (
                 <option key={z} value={z}>
@@ -107,16 +118,15 @@ export function InventoryAlertsPage() {
                 </option>
               ))}
             </select>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã vật tư, tên vật tư..." className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100 xl:col-span-4" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã vật tư, tên vật tư..." className={`${inventoryInput} xl:col-span-4`} />
           </div>
-        </div>
+        </InventoryPanel>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9 rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-            <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Danh sách cảnh báo tồn kho</div>
-            <div className="overflow-auto">
+        <div className={`grid grid-cols-1 xl:grid-cols-12 ${inventoryGridGap}`}>
+          <InventoryPanel title="Danh sách cảnh báo tồn kho" className="xl:col-span-9">
+            <div className={`${inventoryTableShell} overflow-auto`}>
               <table className="w-full min-w-[1180px] text-sm">
-                <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
+                <thead className={inventoryTableHead}>
                   <tr>
                     {['Mức độ', 'Loại cảnh báo', 'Mã vật tư', 'Tên vật tư', 'Kho', 'Tồn hiện tại', 'Ngưỡng cảnh báo', 'Đơn vị', 'Trạng thái', 'Hành động'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left font-medium">
@@ -127,8 +137,10 @@ export function InventoryAlertsPage() {
                 </thead>
                 <tbody>
                   {paged.map((x: any) => (
-                    <tr key={x.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06]">
-                      <td className={`px-3 py-2 ${x.level === 'Nghiêm trọng' ? 'text-red-300' : 'text-amber-300'}`}>{x.level}</td>
+                    <tr key={x.id} className={inventoryTableRow}>
+                      <td className="px-3 py-2">
+                        <span className={`rounded-lg border px-2 py-1 text-xs ${x.level === 'Nghiêm trọng' ? 'border-red-400/40 bg-red-500/10 text-red-300' : 'border-amber-400/40 bg-amber-500/10 text-amber-300'}`}>{x.level}</span>
+                      </td>
                       <td className="px-3 py-2">{x.alertType}</td>
                       <td className="px-3 py-2 text-cyan-300">{x.code}</td>
                       <td className="px-3 py-2">{x.name}</td>
@@ -143,42 +155,27 @@ export function InventoryAlertsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-xs text-slate-400">
-              <div>
-                Hiển thị {alerts.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, alerts.length)} / {alerts.length}
-              </div>
-              <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
-                  Trước
-                </button>
-                <span>
-                  {page}/{pageCount}
-                </span>
-                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
-                  Sau
-                </button>
-              </div>
-            </div>
-          </div>
+            <InventoryPagination page={page} pageCount={pageCount} total={alerts.length} pageSize={pageSize} onPageChange={setPage} />
+          </InventoryPanel>
 
-          <div className="space-y-4 xl:col-span-3">
-            <InsightPanel title="Phân bổ cảnh báo theo mức độ">
+          <div className="space-y-5 xl:col-span-3">
+            <InventoryInsightPanel title="Phân bổ cảnh báo theo mức độ">
               {byLevel.map(([level, count]) => (
                 <div key={level} className="mb-2 flex items-center justify-between text-sm text-slate-300">
                   <span>{level}</span>
                   <span>{count}</span>
                 </div>
               ))}
-            </InsightPanel>
-            <InsightPanel title="Cảnh báo theo loại">
+            </InventoryInsightPanel>
+            <InventoryInsightPanel title="Cảnh báo theo loại">
               {byType.map(([typeName, count]) => (
                 <div key={typeName} className="mb-2 flex items-center justify-between text-sm text-slate-300">
                   <span>{typeName}</span>
                   <span>{count}</span>
                 </div>
               ))}
-            </InsightPanel>
-            <InsightPanel title="Cảnh báo nghiêm trọng">
+            </InventoryInsightPanel>
+            <InventoryInsightPanel title="Cảnh báo nghiêm trọng">
               {criticalList.map((x: any) => (
                 <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-red-300">
@@ -187,27 +184,10 @@ export function InventoryAlertsPage() {
                   <div>{x.zoneCode}</div>
                 </div>
               ))}
-            </InsightPanel>
+            </InventoryInsightPanel>
           </div>
         </div>
       </div>
     </EnterpriseModulePage>
-  )
-}
-
-function KpiCard({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
-      <div className={`mt-2 text-2xl font-semibold ${tone}`}>{value}</div>
-    </div>
-  )
-}
-function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
-      <div className="mb-3 text-sm font-semibold text-white">{title}</div>
-      {children}
-    </div>
   )
 }

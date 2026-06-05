@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { SectionHeader } from '../../../../shared/ui/enterprise'
-import { inventoryTabs } from '../../config/inventory-tabs'
+import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import {
+  InventoryInsightPanel,
+  InventoryKpi,
+  InventoryPagination,
+  InventoryPanel,
+  inventoryGridGap,
+  inventoryInput,
+  inventoryPageStack,
+  inventoryTableHead,
+  inventoryTableRow,
+  inventoryTableShell,
+} from '../../components/InventoryVisuals'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useProjects } from '../../hooks/useProjects'
@@ -114,22 +125,22 @@ export function InventoryTransactionsPage() {
   return (
     <EnterpriseModulePage>
       <SectionHeader title="Lịch sử giao dịch" description="Toàn bộ luồng nhập/xuất/điều chuyển/kiểm kê theo thời gian thực." />
-      <EnterpriseTabBar tabs={inventoryTabs} />
+      <InventoryTabWorkspace />
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
-          <KpiCard title="Tổng giao dịch" value={kpis.total.toLocaleString('vi-VN')} />
-          <KpiCard title="Nhập kho" value={kpis.inbound.toLocaleString('vi-VN')} />
-          <KpiCard title="Xuất kho" value={kpis.outbound.toLocaleString('vi-VN')} />
-          <KpiCard title="Điều chuyển" value={kpis.transfer.toLocaleString('vi-VN')} />
-          <KpiCard title="Kiểm kê" value={kpis.stockTake.toLocaleString('vi-VN')} />
+      <div className={inventoryPageStack}>
+        <div className={`grid grid-cols-1 xl:grid-cols-5 ${inventoryGridGap}`}>
+          <InventoryKpi title="Tổng giao dịch" value={kpis.total.toLocaleString('vi-VN')} note="Theo bộ lọc" tone="blue" />
+          <InventoryKpi title="Nhập kho" value={kpis.inbound.toLocaleString('vi-VN')} note="Phiếu nhập" tone="emerald" />
+          <InventoryKpi title="Xuất kho" value={kpis.outbound.toLocaleString('vi-VN')} note="Phiếu xuất" tone="amber" />
+          <InventoryKpi title="Điều chuyển" value={kpis.transfer.toLocaleString('vi-VN')} note="Nội bộ kho" tone="cyan" />
+          <InventoryKpi title="Kiểm kê" value={kpis.stockTake.toLocaleString('vi-VN')} note="Điều chỉnh tồn" tone="purple" />
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-3">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-7">
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100" />
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100" />
-            <select value={type} onChange={(e) => setType(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+        <InventoryPanel title="Bộ lọc giao dịch">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-7">
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={inventoryInput} />
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className={inventoryInput} />
+            <select value={type} onChange={(e) => setType(e.target.value)} className={inventoryInput}>
               <option value="">Loại giao dịch</option>
               <option value="INBOUND">INBOUND</option>
               <option value="OUTBOUND">OUTBOUND</option>
@@ -137,7 +148,7 @@ export function InventoryTransactionsPage() {
               <option value="ADJUSTMENT">ADJUSTMENT</option>
               <option value="RETURN">RETURN</option>
             </select>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inventoryInput}>
               <option value="">Nhà cung cấp</option>
               {suppliers.map((s: any) => (
                 <option key={s.id} value={s.id}>
@@ -145,7 +156,7 @@ export function InventoryTransactionsPage() {
                 </option>
               ))}
             </select>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inventoryInput}>
               <option value="">Công trình</option>
               {projects.map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -153,7 +164,7 @@ export function InventoryTransactionsPage() {
                 </option>
               ))}
             </select>
-            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className={inventoryInput}>
               <option value="">Kho</option>
               {zones.map((z: any) => (
                 <option key={z.id} value={z.id}>
@@ -165,14 +176,13 @@ export function InventoryTransactionsPage() {
               Xuất CSV
             </button>
           </div>
-        </div>
+        </InventoryPanel>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9 rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-            <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Lịch sử giao dịch</div>
-            <div className="overflow-auto">
+        <div className={`grid grid-cols-1 xl:grid-cols-12 ${inventoryGridGap}`}>
+          <InventoryPanel title="Lịch sử giao dịch" className="xl:col-span-9">
+            <div className={`${inventoryTableShell} overflow-auto`}>
               <table className="w-full min-w-[1280px] text-sm">
-                <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
+                <thead className={inventoryTableHead}>
                   <tr>
                     {['Thời gian', 'Loại', 'Số chứng từ', 'Mã vật tư', 'Tên vật tư', 'Kho', 'Số lượng', 'Đơn giá', 'Giá trị', 'Đối tượng', 'Người tạo', 'Trạng thái'].map((h) => (
                       <th key={h} className="px-3 py-3 text-left font-medium">
@@ -186,7 +196,7 @@ export function InventoryTransactionsPage() {
                     paged.map((x: any) => {
                       const line = x.items?.[0]
                       return (
-                        <tr key={x.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06]">
+                        <tr key={x.id} className={inventoryTableRow}>
                           <td className="px-3 py-2">{new Date(x.transactionDate ?? x.createdAt).toLocaleString('vi-VN')}</td>
                           <td className="px-3 py-2">{x.type}</td>
                           <td className="px-3 py-2 text-cyan-300">{x.transactionNo}</td>
@@ -205,34 +215,19 @@ export function InventoryTransactionsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-xs text-slate-400">
-              <div>
-                Hiển thị {rows.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, rows.length)} / {rows.length}
-              </div>
-              <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
-                  Trước
-                </button>
-                <span>
-                  {page}/{Math.max(1, pageCount)}
-                </span>
-                <button disabled={page >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-40">
-                  Sau
-                </button>
-              </div>
-            </div>
-          </div>
+            <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
+          </InventoryPanel>
 
-          <div className="space-y-4 xl:col-span-3">
-            <InsightPanel title="Thống kê giao dịch">
+          <div className="space-y-5 xl:col-span-3">
+            <InventoryInsightPanel title="Thống kê giao dịch">
               {byType.map(([t, c]) => (
                 <div key={t} className="mb-2 flex items-center justify-between text-sm text-slate-300">
                   <span>{t}</span>
                   <span>{c}</span>
                 </div>
               ))}
-            </InsightPanel>
-            <InsightPanel title="Giao dịch theo ngày">
+            </InventoryInsightPanel>
+            <InventoryInsightPanel title="Giao dịch theo ngày">
               <div className="space-y-2">
                 {dailyLoad.map(([d, c]) => (
                   <div key={d} className="grid grid-cols-[1fr_auto] items-center gap-2 text-xs text-slate-300">
@@ -241,35 +236,18 @@ export function InventoryTransactionsPage() {
                   </div>
                 ))}
               </div>
-            </InsightPanel>
-            <InsightPanel title="Giao dịch gần đây">
+            </InventoryInsightPanel>
+            <InventoryInsightPanel title="Giao dịch gần đây">
               {recent.map((x: any) => (
                 <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-cyan-300">{x.transactionNo}</div>
                   <div>{x.type}</div>
                 </div>
               ))}
-            </InsightPanel>
+            </InventoryInsightPanel>
           </div>
         </div>
       </div>
     </EnterpriseModulePage>
-  )
-}
-
-function KpiCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
-      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
-    </div>
-  )
-}
-function InsightPanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl p-4">
-      <div className="mb-3 text-sm font-semibold text-white">{title}</div>
-      {children}
-    </div>
   )
 }

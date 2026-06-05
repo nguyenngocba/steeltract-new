@@ -1,9 +1,14 @@
 import { type ReactNode, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Bell, Building2, CheckCircle2, DatabaseBackup, FileDigit, Globe2, Link2, Save, Settings, ShieldCheck, SlidersHorizontal, Workflow, XCircle } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Bell, Building2, CheckCircle2, DatabaseBackup, Edit3, FileDigit, Globe2, Link2, Plus, Save, Settings, ShieldCheck, SlidersHorizontal, Trash2, Workflow, XCircle } from 'lucide-react'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
 import { systemApi, type WorkflowCheck } from '@/modules/system/api/system.api'
+import { inventoryApi } from '@/modules/inventory/api/inventory.api'
+import { useCategories } from '@/modules/inventory/hooks/useCategories'
+import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
+import { useMaterialTypes } from '@/modules/inventory/hooks/useMaterialTypes'
+import { useUnits } from '@/modules/inventory/hooks/useUnits'
 
 type Tab = 'overview' | 'general' | 'permissions' | 'master' | 'integrations' | 'notifications' | 'backup' | 'logs'
 
@@ -11,15 +16,43 @@ const tabs: Array<[Tab, string]> = [
   ['overview', 'Tổng quan'],
   ['general', 'Cấu hình chung'],
   ['permissions', 'Phân quyền'],
-  ['master', 'Danh mục'],
+  ['master', 'Danh mục / Đơn vị'],
   ['integrations', 'Tích hợp'],
   ['notifications', 'Thông báo'],
   ['backup', 'Sao lưu & Phục hồi'],
   ['logs', 'Nhật ký cấu hình'],
 ]
 const panel = 'rounded border border-slate-800 bg-[#071321]'
+const input = 'h-10 rounded border border-slate-800 bg-slate-950/60 px-3 text-sm text-slate-100 outline-none focus:border-cyan-500'
+const textarea = 'min-h-20 rounded border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500'
+const actionButton = 'inline-flex items-center gap-2 rounded border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800'
+const primaryButton = 'inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50'
 const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
 const date = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '-'
+
+type CategoryForm = {
+  id?: string
+  code: string
+  name: string
+  description: string
+}
+
+type MaterialTypeForm = CategoryForm & {
+  categoryId: string
+}
+
+type UnitForm = {
+  id?: string
+  code: string
+  name: string
+  symbol: string
+  category: string
+  precision: string
+}
+
+const emptyCategory: CategoryForm = { code: '', name: '', description: '' }
+const emptyMaterialType: MaterialTypeForm = { code: '', name: '', description: '', categoryId: '' }
+const emptyUnit: UnitForm = { code: '', name: '', symbol: '', category: 'WEIGHT', precision: '0' }
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('overview')
@@ -49,7 +82,7 @@ export function SettingsPage() {
       {tab === 'overview' && <Overview data={data} workflow={workflow} category={category} stats={stats} />}
       {tab === 'general' && <ConfigGrid title="Cấu hình chung" values={data?.system} />}
       {tab === 'permissions' && <ConfigGrid title="Tổng quan phân quyền" values={{ users: fmt(stats.totalUsers), activeUsers: fmt(stats.activeUsers), roles: fmt(stats.roles), permissions: fmt(stats.permissions) }} />}
-      {tab === 'master' && <ConfigGrid title="Danh mục dữ liệu" values={{ inventoryItems: fmt(stats.masterDataTotal), operationalRecords: fmt(stats.operationalRecords) }} />}
+      {tab === 'master' && <SettingsCatalogs />}
       {tab === 'integrations' && <Integrations rows={data?.integrations ?? []} />}
       {tab === 'notifications' && <Toggles rows={data?.notifications ?? {}} />}
       {tab === 'backup' && <ConfigGrid title="Sao lưu dữ liệu" values={data?.backup} />}
@@ -75,6 +108,238 @@ function Overview({ data, workflow, category, stats }: { data: any; workflow?: W
 function WorkflowPanel({ workflow }: { workflow?: WorkflowCheck }) {
   if (!workflow) return <p className="text-sm text-slate-500">Đang kiểm tra workflow...</p>
   return <div className="space-y-2">{workflow.steps.map((step) => <div key={step.code} className="grid grid-cols-[22px_1fr] gap-2 rounded border border-slate-800 bg-slate-950/40 p-2 text-xs"><span className={step.status === 'OK' ? 'text-emerald-400' : step.status === 'WARN' ? 'text-amber-400' : 'text-red-400'}>{step.status === 'OK' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}</span><span><b className="block text-slate-200">{step.name}</b><span className="text-slate-500">{step.detail}</span></span></div>)}</div>
+}
+
+function SettingsCatalogs() {
+  const queryClient = useQueryClient()
+  const { data: categories = [] } = useCategories()
+  const { data: materialTypes = [] } = useMaterialTypes()
+  const { data: units = [] } = useUnits()
+  const { data: materials = [] } = useInventoryItems()
+  const [categoryForm, setCategoryForm] = useState<CategoryForm>(emptyCategory)
+  const [materialTypeForm, setMaterialTypeForm] = useState<MaterialTypeForm>(emptyMaterialType)
+  const [unitForm, setUnitForm] = useState<UnitForm>(emptyUnit)
+
+  const categoryMutation = useMutation({
+    mutationFn: async (payload: CategoryForm) => {
+      const body = {
+        code: payload.code.trim().toUpperCase(),
+        name: payload.name.trim(),
+        description: payload.description.trim() || undefined,
+      }
+      if (payload.id) return inventoryApi.put(`/inventory/categories/${payload.id}`, body).then((res) => res.data)
+      return inventoryApi.post('/inventory/categories', body).then((res) => res.data)
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['inventory-categories'] })
+      setCategoryForm(emptyCategory)
+    },
+  })
+
+  const materialTypeMutation = useMutation({
+    mutationFn: async (payload: MaterialTypeForm) => {
+      const body = {
+        code: payload.code.trim().toUpperCase(),
+        name: payload.name.trim(),
+        description: payload.description.trim() || undefined,
+        categoryId: payload.categoryId,
+      }
+      if (payload.id) return inventoryApi.put(`/inventory/material-types/${payload.id}`, body).then((res) => res.data)
+      return inventoryApi.post('/inventory/material-types', body).then((res) => res.data)
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['inventory-material-types'] })
+      setMaterialTypeForm(emptyMaterialType)
+    },
+  })
+
+  const unitMutation = useMutation({
+    mutationFn: async (payload: UnitForm) => {
+      const body = {
+        code: payload.code.trim().toUpperCase(),
+        name: payload.name.trim(),
+        symbol: payload.symbol.trim() || payload.code.trim(),
+        category: payload.category.trim().toUpperCase(),
+        precision: Number(payload.precision || 0),
+      }
+      if (payload.id) return inventoryApi.put(`/inventory/units/${payload.id}`, body).then((res) => res.data)
+      return inventoryApi.post('/inventory/units', body).then((res) => res.data)
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['inventory-units'] })
+      setUnitForm(emptyUnit)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ type, id }: { type: 'category' | 'materialType' | 'unit'; id: string }) => {
+      const path = type === 'category'
+        ? `/inventory/categories/${id}`
+        : type === 'materialType'
+          ? `/inventory/material-types/${id}`
+          : `/inventory/units/${id}`
+      return inventoryApi.delete(path).then((res) => res.data)
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inventory-categories'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-material-types'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-units'] }),
+      ])
+    },
+  })
+
+  const usageRows = [
+    ['PRIMARY', 'Vật tư chính', 'Dùng cho kết cấu chính, BOM và định mức sản xuất.'],
+    ['SECONDARY', 'Vật tư phụ', 'Dùng cho liên kết, phụ kiện và chi tiết phụ trợ.'],
+    ['CONSUMABLE', 'Vật tư tiêu hao', 'Dùng cho hàn, sơn, đá mài, mũi khoan và vật tư xưởng.'],
+  ] as const
+
+  function countBy(key: string, value: string) {
+    return (materials as any[]).filter((row) => String(row?.[key] ?? '') === String(value)).length
+  }
+
+  function saveCategory() {
+    if (!categoryForm.code.trim() || !categoryForm.name.trim()) return
+    categoryMutation.mutate(categoryForm)
+  }
+
+  function saveMaterialType() {
+    if (!materialTypeForm.code.trim() || !materialTypeForm.name.trim() || !materialTypeForm.categoryId) return
+    materialTypeMutation.mutate(materialTypeForm)
+  }
+
+  function saveUnit() {
+    if (!unitForm.code.trim() || !unitForm.name.trim()) return
+    unitMutation.mutate(unitForm)
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-4">
+        <MiniKpi label="Danh mục vật tư" value={fmt(categories.length)} />
+        <MiniKpi label="Nhóm sử dụng" value="3" />
+        <MiniKpi label="Quy cách / loại" value={fmt(materialTypes.length)} />
+        <MiniKpi label="Đơn vị" value={fmt(units.length)} />
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <section className={`${panel} p-4`}>
+          <HeaderLine title="Danh mục vật tư" editing={Boolean(categoryForm.id)} onReset={() => setCategoryForm(emptyCategory)} onSave={saveCategory} loading={categoryMutation.isPending} />
+          <div className="grid gap-2 md:grid-cols-2">
+            <input value={categoryForm.code} onChange={(event) => setCategoryForm((prev) => ({ ...prev, code: event.target.value }))} className={input} placeholder="Mã danh mục, VD: STEEL_PROFILE" />
+            <input value={categoryForm.name} onChange={(event) => setCategoryForm((prev) => ({ ...prev, name: event.target.value }))} className={input} placeholder="Tên danh mục" />
+            <textarea value={categoryForm.description} onChange={(event) => setCategoryForm((prev) => ({ ...prev, description: event.target.value }))} className={`${textarea} md:col-span-2`} placeholder="Mô tả" />
+          </div>
+          <RecordList
+            rows={categories}
+            meta={(row) => `${countBy('categoryId', row.id)} vật tư đang dùng`}
+            onEdit={(row) => setCategoryForm({ id: row.id, code: row.code ?? '', name: row.name ?? '', description: row.description ?? '' })}
+            onDelete={(row) => deleteMutation.mutate({ type: 'category', id: row.id })}
+          />
+        </section>
+
+        <section className={`${panel} p-4`}>
+          <h2 className="mb-3 text-sm font-semibold">Nhóm sử dụng vật tư</h2>
+          <div className="grid gap-2">
+            {usageRows.map(([code, name, note]) => (
+              <div key={code} className="rounded border border-slate-800 bg-slate-950/50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-100">{name}</div>
+                    <div className="mt-1 text-xs text-cyan-300">{code}</div>
+                    <div className="mt-1 text-xs text-slate-500">{note}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-semibold text-white">{fmt(countBy('materialUsageType', code))}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-500">vật tư</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 rounded border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-100">
+            Ba nhóm này là chuẩn hệ thống đang liên kết BOM và sản xuất. Nếu cần tạo thêm nhóm ngoài chính/phụ/tiêu hao thì cần Phase DB mở rộng enum thành bảng danh mục động.
+          </p>
+        </section>
+
+        <section className={`${panel} p-4`}>
+          <HeaderLine title="Quy cách / loại vật tư" editing={Boolean(materialTypeForm.id)} onReset={() => setMaterialTypeForm(emptyMaterialType)} onSave={saveMaterialType} loading={materialTypeMutation.isPending} />
+          <div className="grid gap-2 md:grid-cols-2">
+            <input value={materialTypeForm.code} onChange={(event) => setMaterialTypeForm((prev) => ({ ...prev, code: event.target.value }))} className={input} placeholder="Mã quy cách, VD: H_BEAM" />
+            <input value={materialTypeForm.name} onChange={(event) => setMaterialTypeForm((prev) => ({ ...prev, name: event.target.value }))} className={input} placeholder="Tên quy cách" />
+            <select value={materialTypeForm.categoryId} onChange={(event) => setMaterialTypeForm((prev) => ({ ...prev, categoryId: event.target.value }))} className={input}>
+              <option value="">Chọn danh mục vật tư</option>
+              {(categories as any[]).map((category) => <option key={category.id} value={category.id}>{category.code} - {category.name}</option>)}
+            </select>
+            <textarea value={materialTypeForm.description} onChange={(event) => setMaterialTypeForm((prev) => ({ ...prev, description: event.target.value }))} className={textarea} placeholder="Mô tả" />
+          </div>
+          <RecordList
+            rows={materialTypes}
+            meta={(row) => `${row.category?.name ?? 'Chưa gán danh mục'} · ${countBy('materialTypeId', row.id)} vật tư`}
+            onEdit={(row) => setMaterialTypeForm({ id: row.id, code: row.code ?? '', name: row.name ?? '', description: row.description ?? '', categoryId: row.categoryId ?? row.category?.id ?? '' })}
+            onDelete={(row) => deleteMutation.mutate({ type: 'materialType', id: row.id })}
+          />
+        </section>
+
+        <section className={`${panel} p-4`}>
+          <HeaderLine title="Đơn vị tính" editing={Boolean(unitForm.id)} onReset={() => setUnitForm(emptyUnit)} onSave={saveUnit} loading={unitMutation.isPending} />
+          <div className="grid gap-2 md:grid-cols-2">
+            <input value={unitForm.code} onChange={(event) => setUnitForm((prev) => ({ ...prev, code: event.target.value }))} className={input} placeholder="Mã đơn vị, VD: KG" />
+            <input value={unitForm.name} onChange={(event) => setUnitForm((prev) => ({ ...prev, name: event.target.value }))} className={input} placeholder="Tên đơn vị" />
+            <input value={unitForm.symbol} onChange={(event) => setUnitForm((prev) => ({ ...prev, symbol: event.target.value }))} className={input} placeholder="Ký hiệu" />
+            <input value={unitForm.precision} onChange={(event) => setUnitForm((prev) => ({ ...prev, precision: event.target.value }))} className={input} type="number" min="0" max="6" placeholder="Số lẻ" />
+            <select value={unitForm.category} onChange={(event) => setUnitForm((prev) => ({ ...prev, category: event.target.value }))} className={`${input} md:col-span-2`}>
+              <option value="WEIGHT">Khối lượng</option>
+              <option value="LENGTH">Chiều dài</option>
+              <option value="AREA">Diện tích</option>
+              <option value="VOLUME">Thể tích</option>
+              <option value="COUNT">Số lượng</option>
+              <option value="OTHER">Khác</option>
+            </select>
+          </div>
+          <RecordList
+            rows={units}
+            meta={(row) => `${row.symbol ?? row.code} · ${row.category} · ${countBy('unitId', row.id)} vật tư`}
+            onEdit={(row) => setUnitForm({ id: row.id, code: row.code ?? '', name: row.name ?? '', symbol: row.symbol ?? '', category: String(row.category ?? 'OTHER').toUpperCase(), precision: String(row.precision ?? 0) })}
+            onDelete={(row) => deleteMutation.mutate({ type: 'unit', id: row.id })}
+          />
+        </section>
+      </div>
+    </section>
+  )
+}
+
+function MiniKpi({ label, value }: { label: string; value: string }) {
+  return <div className={`${panel} p-3`}><div className="text-[10px] uppercase tracking-[0.14em] text-slate-500">{label}</div><div className="mt-1 text-xl font-semibold text-white">{value}</div></div>
+}
+
+function HeaderLine({ title, editing, loading, onReset, onSave }: { title: string; editing: boolean; loading: boolean; onReset: () => void; onSave: () => void }) {
+  return <div className="mb-3 flex items-center justify-between gap-2">
+    <h2 className="text-sm font-semibold">{title}</h2>
+    <div className="flex gap-2">
+      {editing ? <button onClick={onReset} className={actionButton}>Hủy</button> : null}
+      <button disabled={loading} onClick={onSave} className={primaryButton}>{editing ? <Save size={14} /> : <Plus size={14} />}{editing ? 'Lưu' : 'Tạo'}</button>
+    </div>
+  </div>
+}
+
+function RecordList({ rows, meta, onEdit, onDelete }: { rows: any[]; meta: (row: any) => string; onEdit: (row: any) => void; onDelete: (row: any) => void }) {
+  return <div className="mt-3 max-h-[360px] space-y-2 overflow-auto pr-1">
+    {rows.map((row) => <div key={row.id} className="rounded border border-slate-800 bg-slate-950/50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-100">{row.name}</div>
+          <div className="mt-1 text-xs text-cyan-300">{row.code}</div>
+          <div className="mt-1 text-xs text-slate-500">{meta(row)}</div>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <button onClick={() => onEdit(row)} className="rounded border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Sửa"><Edit3 size={14} /></button>
+          <button onClick={() => onDelete(row)} className="rounded border border-red-700/50 p-2 text-red-300 hover:bg-red-900/20" aria-label="Xóa"><Trash2 size={14} /></button>
+        </div>
+      </div>
+    </div>)}
+  </div>
 }
 
 function Card({ title, icon: Icon, children }: { title: string; icon: any; children: ReactNode }) {

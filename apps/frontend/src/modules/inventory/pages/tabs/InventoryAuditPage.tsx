@@ -1,10 +1,20 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { SectionHeader } from '../../../../shared/ui/enterprise'
-import { inventoryTabs } from '../../config/inventory-tabs'
-import { HorizontalBars, InventoryKpi, InventoryPanel, inventoryInput, MiniBars } from '../../components/InventoryVisuals'
+import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import {
+  HorizontalBars,
+  InventoryKpi,
+  InventoryPanel,
+  inventoryGridGap,
+  inventoryInput,
+  inventoryPageStack,
+  inventoryTableHead,
+  inventoryTableRow,
+  inventoryTableShell,
+  MiniBars,
+} from '../../components/InventoryVisuals'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 
 function num(value: unknown) {
@@ -36,23 +46,24 @@ export function InventoryAuditPage() {
   return (
     <EnterpriseModulePage>
       <SectionHeader title="Audit tồn kho" description="Đối soát tồn hiện tại, giá bình quân, giá trị tồn và thời điểm phát sinh cuối cùng theo vật tư." />
-      <EnterpriseTabBar tabs={inventoryTabs} />
+      <InventoryTabWorkspace />
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <InventoryKpi title="Tổng tồn" value={summary.stock.toLocaleString('vi-VN')} note="Theo audit transaction" tone="blue" />
-        <InventoryKpi title="Giá trị tồn" value={money(summary.value)} note="Theo giá bình quân" tone="emerald" />
-        <InventoryKpi title="Giá trị TB / mã" value={money(summary.avg)} note="Bình quân danh mục" tone="cyan" />
-        <InventoryKpi title="Chưa có phát sinh" value={summary.stale.toLocaleString('vi-VN')} note="Cần rà soát" tone="amber" />
-      </div>
+      <div className={inventoryPageStack}>
+        <div className={`grid md:grid-cols-4 ${inventoryGridGap}`}>
+          <InventoryKpi title="Tổng tồn" value={summary.stock.toLocaleString('vi-VN')} note="Theo audit transaction" tone="blue" />
+          <InventoryKpi title="Giá trị tồn" value={money(summary.value)} note="Theo giá bình quân" tone="emerald" />
+          <InventoryKpi title="Giá trị TB / mã" value={money(summary.avg)} note="Bình quân danh mục" tone="cyan" />
+          <InventoryKpi title="Chưa có phát sinh" value={summary.stale.toLocaleString('vi-VN')} note="Cần rà soát" tone="amber" />
+        </div>
 
-      <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_360px]">
-        <InventoryPanel title="Bảng audit tồn kho">
-          <div className="mb-3">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm mã hoặc tên vật tư..." className={`${inventoryInput} w-full md:w-96`} />
-          </div>
-          <div className="overflow-hidden rounded-xl border border-white/10">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
+        <div className={`grid xl:grid-cols-[1fr_380px] ${inventoryGridGap}`}>
+          <InventoryPanel title="Bảng audit tồn kho">
+            <div className="mb-4">
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm mã hoặc tên vật tư..." className={`${inventoryInput} w-full md:w-96`} />
+            </div>
+            <div className={`${inventoryTableShell} overflow-auto`}>
+              <table className="w-full min-w-[980px] text-sm">
+                <thead className={inventoryTableHead}>
                 <tr>
                   <th className="px-4 py-3 text-left">Mã vật tư</th>
                   <th className="px-4 py-3 text-left">Tên vật tư</th>
@@ -65,7 +76,7 @@ export function InventoryAuditPage() {
               <tbody>
                 {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">Đang tải dữ liệu audit...</td></tr>}
                 {!isLoading && rows.map((row: any) => (
-                  <tr key={row.materialId} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.06] hover:bg-white/[0.06]">
+                  <tr key={row.materialId} className={inventoryTableRow}>
                     <td className="px-4 py-3 font-medium text-cyan-300">{row.materialCode}</td>
                     <td className="px-4 py-3 text-white">{row.materialName}</td>
                     <td className="px-4 py-3">{num(row.currentStock).toLocaleString('vi-VN')}</td>
@@ -76,16 +87,17 @@ export function InventoryAuditPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </InventoryPanel>
+            </div>
+          </InventoryPanel>
 
-        <div className="space-y-4">
-          <InventoryPanel title="Top giá trị tồn">
-            <HorizontalBars rows={valueLeaders} valueFormatter={money} />
-          </InventoryPanel>
-          <InventoryPanel title="Phân bổ tồn nhanh">
-            <MiniBars values={stockBars.length ? stockBars : [1, 1, 1]} />
-          </InventoryPanel>
+          <div className="space-y-5">
+            <InventoryPanel title="Top giá trị tồn">
+              <HorizontalBars rows={valueLeaders} valueFormatter={money} />
+            </InventoryPanel>
+            <InventoryPanel title="Phân bổ tồn nhanh">
+              <MiniBars values={stockBars.length ? stockBars : [1, 1, 1]} />
+            </InventoryPanel>
+          </div>
         </div>
       </div>
     </EnterpriseModulePage>

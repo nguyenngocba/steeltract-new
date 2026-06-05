@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { KpiCard, RuntimePanel, SectionHeader } from '../../../../shared/ui/enterprise'
-import { inventoryTabs } from '../../config/inventory-tabs'
+import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { useCreateTransaction } from '../../hooks/useCreateTransaction'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
@@ -261,9 +260,7 @@ export function InventoryAdjustmentsPage() {
         description="Manual stock difference adjustment using transaction-driven update."
       />
 
-      <EnterpriseTabBar
-        tabs={inventoryTabs}
-      />
+      <InventoryTabWorkspace />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <KpiCard

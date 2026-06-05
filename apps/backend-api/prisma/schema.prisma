@@ -719,11 +719,15 @@ model InventoryItem {
 
   materialTypeId String?
 
+  materialUsageType MaterialUsageType @default(PRIMARY)
+
   zoneId String?
 
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+
+  deletedAt DateTime?
 
   category InventoryCategory @relation(fields: [categoryId], references: [id])
 
@@ -742,8 +746,16 @@ model InventoryItem {
   @@index([name])
   @@index([unitId])
   @@index([materialTypeId])
+  @@index([materialUsageType])
+  @@index([deletedAt])
 
   @@map("inventory_items")
+}
+
+enum MaterialUsageType {
+  PRIMARY
+  SECONDARY
+  CONSUMABLE
 }
 
 model InventoryTransaction {

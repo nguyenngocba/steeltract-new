@@ -32,7 +32,7 @@ export type YardSlot = {
   currentStackLevel: number
   maxStackLevel: number
   zone: { id: string; code: string; name: string }
-  placements?: Array<{ id: string; itemId?: string; quantity?: number; stackLevel?: number }>
+  placements?: Array<{ id: string; itemId?: string; quantity?: number; stackLevel?: number; metadata?: { productionOrderId?: string } | null }>
 }
 
 export type ProductionBom = {
