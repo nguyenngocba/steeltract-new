@@ -97,7 +97,11 @@ export class InventoryService {
         },
         include: {
           project: true,
-          zone: true,
+          zone: {
+            include: {
+              warehouse: true,
+            },
+          },
           items: {
             where: {
               inventoryItemId: id,
@@ -105,7 +109,11 @@ export class InventoryService {
             include: {
               unit: true,
               warehouse: true,
-              zone: true,
+              zone: {
+                include: {
+                  warehouse: true,
+                },
+              },
             },
           },
         },
@@ -257,6 +265,11 @@ export class InventoryService {
         zoneId: string | null
         zoneCode: string | null
         zoneName: string
+        row: string | null
+        column: string | null
+        level: string | null
+        warehouseName: string | null
+        warehouseCode: string | null
         quantity: number
         updatedAt: Date | null
       }
@@ -282,11 +295,21 @@ export class InventoryService {
           tx.zone?.code ??
           item.zone?.code ??
           null
+        const sourceZone =
+          line.zone ??
+          tx.zone ??
+          item.zone ??
+          null
         const key = zoneId ?? fallbackZoneName
         const current = locationBalancesMap.get(key) ?? {
           zoneId,
           zoneCode,
           zoneName: fallbackZoneName,
+          row: sourceZone?.row ?? null,
+          column: sourceZone?.column ?? null,
+          level: sourceZone?.level ?? null,
+          warehouseName: sourceZone?.warehouse?.name ?? null,
+          warehouseCode: sourceZone?.warehouse?.code ?? null,
           quantity: 0,
           updatedAt: null,
         }
@@ -341,6 +364,8 @@ export class InventoryService {
           item.materialType?.name ?? '',
         materialUsageType: item.materialUsageType,
         zoneId: item.zoneId,
+        slotId: item.slotId,
+        level: item.level,
         zoneCode: item.zone?.code ?? '',
         zoneName: item.zone
           ? `${item.zone.code} - ${item.zone.name}`
@@ -359,6 +384,11 @@ export class InventoryService {
         zoneId: x.zoneId,
         zoneCode: x.zoneCode,
         zoneName: x.zoneName,
+        row: x.row,
+        column: x.column,
+        level: x.level,
+        warehouseName: x.warehouseName,
+        warehouseCode: x.warehouseCode,
         quantity: x.quantity,
         updatedAt: x.updatedAt,
       })),
@@ -387,6 +417,39 @@ export class InventoryService {
           transaction: {
             select: {
               transactionDate: true,
+              zoneId: true,
+              zone: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  row: true,
+                  column: true,
+                  level: true,
+                  warehouse: {
+                    select: {
+                      code: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          zone: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              row: true,
+              column: true,
+              level: true,
+              warehouse: {
+                select: {
+                  code: true,
+                  name: true,
+                },
+              },
             },
           },
         },
@@ -400,6 +463,23 @@ export class InventoryService {
         inboundValue: number
         lastMovementDate: Date | null
       }
+    >()
+    const locationBalancesByItem = new Map<
+      string,
+      Map<
+        string,
+        {
+          zoneId: string | null
+          zoneCode: string | null
+          zoneName: string
+          warehouseCode: string | null
+          warehouseName: string | null
+          row: string | null
+          column: string | null
+          level: string | null
+          quantity: number
+        }
+      >
     >()
 
     for (const line of transactionLines) {
@@ -436,6 +516,40 @@ export class InventoryService {
       }
 
       metricsByItem.set(line.inventoryItemId, state)
+
+      const zone =
+        line.zone ??
+        line.transaction?.zone ??
+        null
+      const zoneId =
+        line.zoneId ??
+        line.transaction?.zoneId ??
+        null
+      const fallbackKey =
+        zoneId ?? 'UNASSIGNED'
+      const byLocation =
+        locationBalancesByItem.get(line.inventoryItemId) ??
+        new Map()
+      const current =
+        byLocation.get(fallbackKey) ?? {
+          zoneId,
+          zoneCode: zone?.code ?? null,
+          zoneName: zone
+            ? `${zone.code} - ${zone.name}`
+            : 'KHU MẶC ĐỊNH',
+          warehouseCode: zone?.warehouse?.code ?? null,
+          warehouseName: zone?.warehouse?.name ?? null,
+          row: zone?.row ?? null,
+          column: zone?.column ?? null,
+          level: zone?.level ?? null,
+          quantity: 0,
+        }
+      current.quantity += qty
+      byLocation.set(fallbackKey, current)
+      locationBalancesByItem.set(
+        line.inventoryItemId,
+        byLocation,
+      )
     }
 
     return items.map((item) => {
@@ -449,6 +563,30 @@ export class InventoryService {
             Number(metrics?.inboundQty ?? 1)
           : 0
       const inventoryValue = currentStock * averageCost
+      const locationBalances = Array.from(
+        locationBalancesByItem.get(item.id)?.values() ?? [],
+      )
+        .filter((location) => location.quantity > 0)
+        .sort((a, b) => b.quantity - a.quantity)
+      const fallbackLocation = item.zone
+        ? {
+            zoneId: item.zoneId,
+            zoneCode: item.zone.code,
+            zoneName: `${item.zone.code} - ${item.zone.name}`,
+            warehouseCode: item.zone.warehouse?.code ?? null,
+            warehouseName: item.zone.warehouse?.name ?? null,
+            row: item.zone.row ?? null,
+            column: item.zone.column ?? null,
+            level: item.zone.level ?? null,
+            quantity: currentStock,
+          }
+        : null
+      const displayLocations =
+        locationBalances.length > 0
+          ? locationBalances
+          : fallbackLocation
+            ? [fallbackLocation]
+            : []
 
       return {
         materialId: item.id,
@@ -464,6 +602,8 @@ export class InventoryService {
         unit:
           item.unit ?? item.unitMaster?.code ?? 'PCS',
         zoneId: item.zoneId,
+        slotId: item.slotId,
+        level: item.level,
         zoneCode: item.zone?.code ?? '',
         zoneName: item.zone?.name ?? '',
         zone: item.zone
@@ -472,6 +612,7 @@ export class InventoryService {
         position: item.zone
           ? `${item.zone.code} - ${item.zone.name}`
           : '',
+        locationBalances: displayLocations,
         currentStock,
         averageCost,
         inventoryValue,
@@ -519,6 +660,8 @@ export class InventoryService {
           },
         },
       }),
+      slotId: payload.slotId ?? null,
+      level: payload.level ?? null,
       ...(payload.materialTypeId && {
         materialType: {
           connect: {
@@ -570,6 +713,11 @@ export class InventoryService {
           },
         },
       }),
+        slotId:
+          payload.slotId,
+
+        level:
+          payload.level,
       ...(payload.materialTypeId && {
         materialType: {
           connect: {

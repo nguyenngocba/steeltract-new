@@ -723,6 +723,10 @@ model InventoryItem {
 
   zoneId String?
 
+  slotId String?
+
+  level String?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -747,6 +751,8 @@ model InventoryItem {
   @@index([unitId])
   @@index([materialTypeId])
   @@index([materialUsageType])
+  @@index([slotId])
+  @@index([level])
   @@index([deletedAt])
 
   @@map("inventory_items")
@@ -1286,6 +1292,14 @@ model WarehouseZone {
 
   active Boolean @default(true)
 
+  row String?
+
+  column String?
+
+  level String?
+
+  capacity Float @default(0)
+
   warehouseId String?
 
   createdBy String?
@@ -1305,6 +1319,9 @@ model WarehouseZone {
 
   @@index([warehouseId])
   @@index([active])
+  @@index([row])
+  @@index([column])
+  @@index([level])
 
   @@map("warehouse_zones")
 }

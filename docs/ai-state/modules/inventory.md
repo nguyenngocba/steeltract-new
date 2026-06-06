@@ -2,14 +2,104 @@
 
 ## Current Sprint
 
-SteelTrack Sprint A - Inventory Foundation Implementation
+SteelTrack Sprint B - Warehouse Locations
 
 Scope:
 
-- Phase A only: UI consolidation.
-- No Prisma schema changes.
-- No migrations.
-- No Supplier module changes.
+- Add Inventory location management before Supplier module work continues.
+- Manage `warehouse_zones` as warehouse storage locations.
+- Prepare row/column/level data for future 2D warehouse map.
+- No Redis, caching, or performance optimization in this sprint.
+- Do not build warehouse map UI yet.
+
+## Implemented In Sprint B
+
+### Warehouse Location Management
+
+Inventory now has a dedicated `Vị trí kho` tab.
+
+Route:
+
+- `/inventory/locations`
+
+Navigation:
+
+- Sidebar Inventory submenu includes `Vị trí kho`.
+- Inventory no longer renders the horizontal in-page tab strip; users switch Inventory tabs from the sidebar.
+- Inventory actions `Nhập kho`, `Xuất kho`, and `Khác` are shown in the topbar on Inventory routes.
+
+Database:
+
+- `WarehouseZone` now stores:
+  - `code`;
+  - `name`;
+  - `row`;
+  - `column`;
+  - `level`;
+  - `capacity`;
+  - `active`.
+
+Migration:
+
+- `20260605063000_inventory_warehouse_location_fields`
+
+API:
+
+- `GET /inventory/zones`
+- `GET /inventory/zones/:id`
+- `POST /inventory/zones`
+- `PUT /inventory/zones/:id`
+- `PATCH /inventory/zones/:id/activate`
+- `PATCH /inventory/zones/:id/deactivate`
+- `DELETE /inventory/zones/:id`
+
+Behavior:
+
+- Create warehouse location.
+- Edit warehouse location.
+- Assign warehouse location to a parent warehouse.
+- Activate/deactivate warehouse location.
+- Soft delete by setting `active = false`.
+- Location list calculates:
+  - number of active material records stored in each location;
+  - total stock quantity by location.
+- Location detail drawer shows materials stored in the selected location.
+- Location detail drawer shows row/slot/floor and a read-only 2D preview.
+- Material Master create/edit uses `Kho chính` locations only and warns when a selected slot/floor is full.
+- Inventory inbound uses `Kho chính` locations only and warns when a selected slot/floor is full.
+- Material detail `Vị trí` tab can open a focused 2D preview for the selected slot/floor.
+
+Parent warehouses:
+
+- `MAIN` = Kho chính
+- `PRODUCTION` = Kho sản xuất
+
+Warehouse zone audit:
+
+- Deleted demo records:
+  - `DEMO-WH-FAB`;
+  - `DEMO-WH-RAW`.
+- Deleted orphan warehouse-like records:
+  - `ST-WH-FAB`;
+  - `ST-WH-RAW`.
+- Real storage locations:
+  - `A01`;
+  - `A02`;
+  - `B01`;
+  - `C01`.
+
+Boundary:
+
+- `PRODUCTION` exists as the parent warehouse for future production-material/component integration.
+- Production warehouse balances are not yet persisted independently in this sprint.
+- Drag-drop warehouse map is not implemented yet.
+
+Build:
+
+- Prisma migration deploy passed.
+- Prisma generate passed.
+- Backend build passed.
+- Frontend build passed.
 
 ## Implemented In Phase A
 
@@ -42,7 +132,7 @@ Implemented:
 Current data:
 
 - Existing local steel materials are classified as `PRIMARY`.
-- Existing material zones are already assigned to `A01` or `ST-WH-RAW`.
+- Storage should resolve to real locations such as `A01`, `A02`, `B01`, and `C01`; orphan `ST-WH-*` warehouse-like records have been removed.
 
 Build:
 
@@ -154,17 +244,17 @@ Boundaries:
 
 ### Inventory Global Action Bar
 
-Inventory now uses a shared module action bar next to the Inventory tab strip.
+Inventory uses a shared module action bar in the global topbar on Inventory routes.
 
 Changes:
 
 - Primary actions: `Nhập kho`, `Xuất kho`.
 - More menu actions: `Điều chuyển`, `Kiểm kê`, `Điều chỉnh tồn kho`, `Tạo vật tư mới`.
-- Transaction actions route to their dedicated Inventory pages.
+- Transaction actions open their existing modal workflows.
 - `Tạo vật tư mới` opens the shared `MaterialDrawer`.
 - The old Overview quick-action panel was removed.
 - The Stock tab no longer has its own duplicate create-material button.
-- Existing specialized transaction forms remain inside their pages.
+- The in-page Inventory tab strip was removed; sidebar navigation is now the single tab switcher.
 
 ### Inventory UX Fix - Transaction Form Priority
 
@@ -322,6 +412,31 @@ The app sidebar was adjusted to better match the Inventory cockpit theme:
 - Cleaner child tab indentation.
 - Blue active state with subtle glow.
 - Hash-aware active state for sub-tabs.
+
+### Inventory Overview Chart Synchronization
+
+`InventoryOverviewPage` now follows the same visual and data pattern as the Stock tab.
+
+Changes:
+
+- Overview stock table and charts now use Inventory Audit stock rows as the source of truth.
+- Filter bar matches the Stock tab pattern:
+  warehouse, material group, usage type, status, manual search, search, and reset.
+- Stock table is capped to 10 rows with shared pagination.
+- Right-side analytics now includes:
+  stock overview donut, inventory value trend, stock alerts, and material group donut.
+- Stock alerts match the Stock tab visual treatment and include a full `Xem tất cả` modal.
+- Recent inbound and outbound cards show the latest 5 transactions with code, material, date, and quantity.
+- Shared chart-card, compact donut, and compact trend primitives were added for consistent Inventory analytics surfaces.
+
+Latest polish:
+
+- Overview now has a `Thao tác nhanh` block below the filter bar.
+- Quick actions open the existing inbound, outbound, transfer, and stock-take modals.
+- `Nhập kho hôm nay` and `Xuất kho hôm nay` are shown beside quick actions above the stock table.
+- Recent inbound/outbound cards use column-style rows with code, material/target, date, quantity, and status.
+- Warehouse filtering is presented as a compact status bar with a warehouse dropdown.
+- Stock tab inventory list includes a `Trạng thái` column.
 
 ## Boundaries Preserved
 

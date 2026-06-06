@@ -7,6 +7,7 @@ import {
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage'
 import { InventoryOverviewPage } from '@/modules/inventory/pages/tabs/InventoryOverviewPage'
 import { InventoryMaterialsPage } from '@/modules/inventory/pages/tabs/InventoryMaterialsPage'
+import { InventoryLocationsPage } from '@/modules/inventory/pages/tabs/InventoryLocationsPage'
 import { InventoryTransactionsPage } from '@/modules/inventory/pages/tabs/InventoryTransactionsPage'
 import { MaterialDetailPage } from '@/modules/inventory/pages/MaterialDetailPage'
 import { ProductionPage } from '@/modules/production/pages/ProductionPage'
@@ -85,6 +86,13 @@ export function AppRouter() {
       <Route
         path="/inventory/materials/:id"
         element={<MaterialDetailPage />}
+      />
+
+      <Route
+        path="/inventory/locations"
+        element={
+          <InventoryLocationsPage />
+        }
       />
 
       <Route

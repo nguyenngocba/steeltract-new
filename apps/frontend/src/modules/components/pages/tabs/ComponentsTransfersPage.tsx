@@ -2,7 +2,6 @@ import { useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { useYardMovementsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
 import { componentsTabs } from '../../config/components-tabs'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
@@ -19,7 +18,6 @@ export function ComponentsTransfersPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Cấu kiện > Chuyển cấu kiện" description="Điều phối cấu kiện theo movement thực tế trong bãi tập kết." />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">

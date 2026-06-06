@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   InventoryInsightPanel,
@@ -113,7 +112,6 @@ export function InventoryInboundPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Nhập kho vật tư" description="Tiếp nhận vật tư theo nhà cung cấp và vị trí lưu kho." />
       <InventoryTabWorkspace />
 
       <div className={inventoryPageStack}>

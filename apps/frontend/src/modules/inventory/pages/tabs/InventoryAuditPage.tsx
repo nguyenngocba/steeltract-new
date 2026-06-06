@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   HorizontalBars,
@@ -45,7 +44,6 @@ export function InventoryAuditPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Audit tồn kho" description="Đối soát tồn hiện tại, giá bình quân, giá trị tồn và thời điểm phát sinh cuối cùng theo vật tư." />
       <InventoryTabWorkspace />
 
       <div className={inventoryPageStack}>

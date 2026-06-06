@@ -15,6 +15,13 @@ export const inventoryTabs = [
   },
 
   {
+    key: 'locations',
+    label: 'Locations',
+    vi: 'Vị trí kho',
+    path: '/inventory/locations',
+  },
+
+  {
     key: 'inbound',
     label: 'Inbound',
     vi: 'Nhập kho',

@@ -91,13 +91,13 @@ export function InventoryGlobalActionBar() {
       <div className="flex shrink-0 items-center gap-2">
         <button
           onClick={() => setTransactionModal('inbound')}
-          className="h-12 rounded-lg border border-blue-400/30 bg-blue-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          className="h-10 rounded-lg border border-blue-400/30 bg-blue-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
         >
           Nhập kho
         </button>
         <button
           onClick={() => setTransactionModal('outbound')}
-          className="h-12 rounded-lg border border-cyan-300/25 bg-slate-900/80 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-black/20 transition hover:border-cyan-300/50 hover:bg-slate-800"
+          className="h-10 rounded-lg border border-cyan-300/25 bg-slate-900/80 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-black/20 transition hover:border-cyan-300/50 hover:bg-slate-800"
         >
           Xuất kho
         </button>
@@ -105,7 +105,7 @@ export function InventoryGlobalActionBar() {
           <button
             ref={moreButtonRef}
             onClick={toggleMoreMenu}
-            className="h-12 rounded-lg border border-white/15 bg-slate-900/80 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-black/20 transition hover:border-white/25 hover:bg-slate-800"
+            className="h-10 rounded-lg border border-white/15 bg-slate-900/80 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-black/20 transition hover:border-white/25 hover:bg-slate-800"
           >
             Khác
           </button>

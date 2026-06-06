@@ -52,6 +52,11 @@ export const navigation = [
       },
 
       {
+        title: 'Vị trí kho',
+        path: '/inventory/locations',
+      },
+
+      {
         title: 'Nhập kho',
         path: '/inventory/inbound',
       },

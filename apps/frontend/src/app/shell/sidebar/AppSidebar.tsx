@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { navigation }
   from './navigation.config'
@@ -6,7 +7,12 @@ import { navigation }
 import { SidebarGroup }
   from './SidebarGroup'
 
-export function AppSidebar() {
+type Props = {
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
+}
+
+export function AppSidebar({ collapsed = false, onToggleCollapsed }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -16,6 +22,25 @@ export function AppSidebar() {
     const saved = Number(window.sessionStorage.getItem('steeltrack-app-sidebar-scroll') ?? 0)
     if (Number.isFinite(saved)) element.scrollTop = saved
   }, [])
+
+  if (collapsed) {
+    return (
+      <aside className="flex h-screen w-12 flex-col items-center border-r border-white/10 bg-[#07111f] py-3 shadow-[12px_0_34px_rgba(0,0,0,0.22)]">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          title="Hiện sidebar"
+          className="rounded-xl border border-white/10 bg-white/[0.06] p-2 text-cyan-300 transition hover:bg-white/10 hover:text-cyan-100"
+        >
+          <PanelLeftOpen size={18} />
+        </button>
+        <div className="mt-4 h-px w-7 bg-white/10" />
+        <div className="mt-4 rotate-90 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+          Menu
+        </div>
+      </aside>
+    )
+  }
 
   return (
     <aside
@@ -92,6 +117,14 @@ export function AppSidebar() {
             backdrop-blur-xl
           "
         >
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-200"
+          >
+            <PanelLeftClose size={15} />
+            Ẩn sidebar
+          </button>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
             Runtime Status
           </div>

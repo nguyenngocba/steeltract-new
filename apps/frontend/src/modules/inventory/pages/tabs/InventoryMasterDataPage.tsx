@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import { Edit3, Plus, Save, Trash2, X } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { InventoryKpi, InventoryPanel, inventoryInput } from '../../components/InventoryVisuals'
 import { inventoryApi } from '../../api/inventory.api'
@@ -152,10 +151,6 @@ export function InventoryMasterDataPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader
-        title="Danh mục vật tư"
-        description="Quản lý danh mục, loại/quy cách kỹ thuật, đơn vị tính và liên kết đang dùng trong Material Master."
-      />
       <InventoryTabWorkspace />
       <div className="grid gap-3 md:grid-cols-4">
         <InventoryKpi title="Danh mục vật tư" value={stats.categories.toLocaleString('vi-VN')} tone="cyan" note="nhóm quản trị" />

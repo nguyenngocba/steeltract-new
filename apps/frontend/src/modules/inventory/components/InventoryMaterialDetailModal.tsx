@@ -55,6 +55,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState('overview')
+  const [focusedLocation, setFocusedLocation] = useState<any | null>(null)
 
   if (!open) return null
 
@@ -184,16 +185,15 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
             )}
 
             {activeTab === 'locations' && (
-              <DetailTable
-                title="Vị trí tồn"
-                headers={['Kho / Khu vực', 'Số lượng', 'Cập nhật']}
-                rows={locationRows.length > 0
-                  ? locationRows.slice(0, 12).map((row: any) => [
-                    row.zoneName ?? 'Kho',
-                    num(row.quantity).toLocaleString('vi-VN'),
-                    row.updatedAt ? new Date(row.updatedAt).toLocaleString('vi-VN') : '-',
-                  ])
-                  : [[position, currentStock.toLocaleString('vi-VN'), '-']]}
+              <LocationBalancePanel
+                rows={locationRows.length > 0 ? locationRows : [{
+                  zoneName: position,
+                  quantity: currentStock,
+                  row: fallback?.row,
+                  column: fallback?.column,
+                  level: fallback?.level,
+                }]}
+                onFocus={setFocusedLocation}
               />
             )}
 
@@ -226,9 +226,97 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           </div>
         </div>
       </div>
+      {focusedLocation ? <LocationFocusPreview location={focusedLocation} onClose={() => setFocusedLocation(null)} /> : null}
     </div>,
     document.body,
   )
+}
+
+function LocationBalancePanel({ rows, onFocus }: { rows: any[]; onFocus: (row: any) => void }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.045]">
+      <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-cyan-300">Vị trí tồn</div>
+      <div className="overflow-auto">
+        <table className="w-full min-w-[820px] text-sm">
+          <thead className="bg-white/[0.05] text-xs uppercase text-slate-400">
+            <tr>
+              {['Kho', 'Vị trí', 'Row', 'Slot', 'Tầng', 'Số lượng', 'Cập nhật', '2D'].map((header) => <th key={header} className="px-3 py-3 text-left">{header}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.zoneId ?? row.zoneName}-${index}`} className="border-t border-white/10 text-slate-200">
+                <td className="px-3 py-2">{row.warehouseName ?? '-'}</td>
+                <td className="px-3 py-2 text-cyan-300">{row.zoneName ?? '-'}</td>
+                <td className="px-3 py-2">{row.row ?? '-'}</td>
+                <td className="px-3 py-2">{row.column ?? '-'}</td>
+                <td className="px-3 py-2">{row.level ?? '-'}</td>
+                <td className="px-3 py-2">{num(row.quantity).toLocaleString('vi-VN')}</td>
+                <td className="px-3 py-2">{row.updatedAt ? new Date(row.updatedAt).toLocaleString('vi-VN') : '-'}</td>
+                <td className="px-3 py-2">
+                  <button onClick={() => onFocus(row)} className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/15">Xem 2D</button>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">Chưa có dữ liệu vị trí.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function LocationFocusPreview({ location, onClose }: { location: any; onClose: () => void }) {
+  const rows = buildFocusRows(location.row)
+  const columns = buildFocusColumns(location.column)
+  const selectedKey = `${location.row ?? ''}-${location.column ?? ''}`
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-slate-950 p-5 shadow-2xl shadow-black/50">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">Focus vị trí 2D</div>
+            <h3 className="mt-1 text-xl font-semibold text-white">{location.zoneName ?? 'Vị trí kho'}</h3>
+            <p className="mt-1 text-sm text-slate-400">Slot {location.column ?? '-'} · Tầng {location.level ?? '-'} · {num(location.quantity).toLocaleString('vi-VN')}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10">Đóng</button>
+        </div>
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: `44px repeat(${columns.length}, minmax(56px, 1fr))` }}>
+          <div />
+          {columns.map((column) => <div key={column} className="rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-1.5 text-center text-xs text-slate-400">{column}</div>)}
+          {rows.map((row) => [
+            <div key={`${row}-label`} className="rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-3 text-center text-xs text-slate-400">{row}</div>,
+            ...columns.map((column) => {
+              const active = selectedKey === `${row}-${column}`
+              return <div key={`${row}-${column}`} className={`min-h-[58px] rounded-lg border p-2 ${active ? 'border-cyan-300 bg-cyan-400/20 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.35)]' : 'border-slate-800 bg-slate-900/25 text-slate-700 opacity-40'}`}>
+                <div className="text-xs font-semibold">{row}{column}</div>
+                <div className="mt-3 text-[10px] uppercase tracking-[0.12em]">{active ? 'Focused' : 'Dimmed'}</div>
+              </div>
+            }),
+          ])}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function buildFocusRows(current?: string | null) {
+  const base = ['A', 'B', 'C', 'D', 'E', 'F']
+  const row = String(current ?? '').trim().toUpperCase()
+  if (!row || base.includes(row)) return base
+  return [row, ...base].slice(0, 6)
+}
+
+function buildFocusColumns(current?: string | null) {
+  const base = ['01', '02', '03', '04', '05', '06']
+  const column = String(current ?? '').trim().padStart(2, '0')
+  if (!column || base.includes(column)) return base
+  return [column, ...base].slice(0, 6)
 }
 
 function DetailTable({ title, headers, rows }: { title: string; headers: string[]; rows: string[][] }) {

@@ -25,7 +25,11 @@ export class InventoryRepository {
         category: true,
         materialType: true,
         unitMaster: true,
-        zone: true,
+        zone: {
+          include: {
+            warehouse: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -50,7 +54,11 @@ export class InventoryRepository {
         category: true,
         materialType: true,
         unitMaster: true,
-        zone: true,
+        zone: {
+          include: {
+            warehouse: true,
+          },
+        },
       },
     });
   }

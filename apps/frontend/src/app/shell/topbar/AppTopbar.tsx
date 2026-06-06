@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuthStore } from '../../../modules/auth/store/auth.store'
+import { InventoryGlobalActionBar } from '../../../modules/inventory/components/InventoryGlobalActionBar'
 
 export function AppTopbar() {
   const user = useAuthStore((s) => s.user)
@@ -17,6 +18,7 @@ export function AppTopbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const title = getRouteTitle(location.pathname)
+  const isInventoryRoute = location.pathname.startsWith('/inventory')
 
   function handleLogout() {
     logout()
@@ -32,6 +34,8 @@ export function AppTopbar() {
       </div>
 
       <div className="flex items-center gap-3">
+        {isInventoryRoute ? <InventoryGlobalActionBar /> : null}
+
         <div className="hidden items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-3 lg:flex">
           <Search size={16} className="text-zinc-500" />
           <input

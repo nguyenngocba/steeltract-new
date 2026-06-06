@@ -3,7 +3,6 @@ import toast from 'react-hot-toast'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { useProjects } from '../../../inventory/hooks/useProjects'
 import { ManufacturingOrderModal } from '../../../production/components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../../../production/components/ProductionBomModal'
@@ -209,7 +208,6 @@ export function ComponentsListPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Cấu kiện" description="Kho cấu kiện là nơi lưu các cấu kiện sau sản xuất; vật tư đầu vào lấy từ kho vật tư SX." />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">

@@ -1,13 +1,11 @@
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { componentsTabs } from '../../config/components-tabs'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
 
 export function ComponentsInternalQcPage() {
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Cấu kiện > QC nội bộ" description="Kiểm soát chất lượng cấu kiện trong kho cấu kiện và dây chuyền gia công." />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">

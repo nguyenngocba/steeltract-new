@@ -1,13 +1,11 @@
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { componentsTabs } from '../../config/components-tabs'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
 
 export function ComponentsHistoryPage() {
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Cấu kiện > Lịch sử gia công" description="Theo dõi lịch sử công đoạn gia công, QC và kết quả cuối của từng cấu kiện." />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { useCreateTransaction } from '../../../inventory/hooks/useCreateTransaction'
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
@@ -16,9 +15,10 @@ type MaterialStockRow = {
   inventoryItemId: string
   code: string
   name: string
+  materialUsageType: string
   unit: string
   warehouse: string
-  zone: string
+  location: string
   currentStock: number
   reserved: number
   available: number
@@ -28,6 +28,24 @@ type MaterialStockRow = {
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString('vi-VN')} đ`
+
+function materialUsageLabel(value: string | undefined) {
+  const map: Record<string, string> = {
+    PRIMARY: 'Vật tư chính',
+    SECONDARY: 'Vật tư phụ',
+    CONSUMABLE: 'Vật tư tiêu hao',
+  }
+  return map[String(value ?? 'PRIMARY')] ?? 'Vật tư chính'
+}
+
+function productionLocationLabel(line: any, transaction: any) {
+  const zone = line.zone ?? transaction.zone
+  const slot = String(line.slotId ?? '').trim()
+  const zoneLabel = zone
+    ? `${zone.code ?? 'ZONE'} - ${zone.name ?? 'Vị trí'}`
+    : 'Vị trí SX chưa gán'
+  return slot ? `${zoneLabel} / ${slot}` : zoneLabel
+}
 
 export function ComponentsMaterialStockPage() {
   const { data: inventoryItems = [], isLoading } = useInventoryItems()
@@ -46,7 +64,7 @@ export function ComponentsMaterialStockPage() {
     )
     const itemById = new Map((inventoryItems as any[]).map((item) => [String(item.id), item]))
     const issuedByItem = new Map<string, number>()
-    const sourceByItem = new Map<string, { warehouse?: string; zone?: string }>()
+    const sourceByItem = new Map<string, { warehouse?: string; location?: string }>()
     const transactionRows = Array.isArray(transactionsData)
       ? transactionsData
       : (transactionsData as any)?.data ?? []
@@ -57,7 +75,7 @@ export function ComponentsMaterialStockPage() {
       issuedByItem.set(key, (issuedByItem.get(key) ?? 0) - Number(issue.issuedQty ?? 0))
       sourceByItem.set(key, {
         warehouse: issue.inventoryItem?.zone?.warehouse?.name,
-        zone: issue.inventoryItem?.zone?.name,
+        location: issue.inventoryItem?.zone?.name,
       })
     })
 
@@ -69,13 +87,15 @@ export function ComponentsMaterialStockPage() {
 
       ;(transaction.items ?? []).forEach((line: any) => {
         const key = String(line.inventoryItemId ?? line.inventoryItem?.id ?? '')
-        const qty = Math.abs(Number(line.quantity ?? 0))
+        const rawQty = Number(line.quantity ?? 0)
+        if (isProductionReceipt && rawQty <= 0) return
+        const qty = Math.abs(rawQty)
         if (!key || qty <= 0) return
 
         issuedByItem.set(key, (issuedByItem.get(key) ?? 0) + (isReturnToMain ? -qty : qty))
         sourceByItem.set(key, {
           warehouse: line.warehouse?.name ?? transaction.warehouse?.name,
-          zone: line.zone?.name ?? transaction.zone?.name,
+          location: productionLocationLabel(line, transaction),
         })
       })
     })
@@ -96,9 +116,10 @@ export function ComponentsMaterialStockPage() {
         inventoryItemId: item.id,
         code: item.code,
         name: item.name,
+        materialUsageType: item.materialUsageType ?? 'PRIMARY',
         unit: item.unitMaster?.symbol ?? item.unit ?? '-',
         warehouse: source?.warehouse ?? item.zone?.warehouse?.name ?? item.warehouse ?? 'Kho vật tư SX',
-        zone: source?.zone ?? item.zone?.name ?? item.zoneName ?? 'Khu SX mặc định',
+        location: source?.location ?? item.zone?.name ?? item.zoneName ?? 'Vị trí SX mặc định',
         currentStock,
         reserved,
         available,
@@ -159,10 +180,6 @@ export function ComponentsMaterialStockPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader
-        title="Cấu kiện > Kho vật tư SX"
-        description="Kho trung gian nhận vật tư từ kho chính trước khi cấp BOM để sản xuất cấu kiện."
-      />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">
@@ -200,21 +217,22 @@ export function ComponentsMaterialStockPage() {
                 <table className="w-full min-w-[1100px] text-sm">
                   <thead className="text-xs uppercase text-slate-400">
                     <tr>
-                      {['Mã vật tư', 'Tên vật tư', 'ĐVT', 'Kho nguồn', 'Khu vực', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
+                      {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho nhận', 'Vị trí kho SX', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
                         <th key={heading} className="px-2 py-2 text-left font-medium">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading || isTransactionsLoading ? (
-                      <tr><td colSpan={11} className="px-2 py-6 text-center text-slate-400">Đang tải tồn kho vật tư...</td></tr>
+                      <tr><td colSpan={12} className="px-2 py-6 text-center text-slate-400">Đang tải tồn kho vật tư...</td></tr>
                     ) : filtered.map((row) => (
                       <tr key={row.id} onClick={() => setSelectedRow(row)} className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
                         <td className="px-2 py-2 text-cyan-300">{row.code}</td>
                         <td className="px-2 py-2">{row.name}</td>
+                        <td className="px-2 py-2"><span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-200">{materialUsageLabel(row.materialUsageType)}</span></td>
                         <td className="px-2 py-2">{row.unit}</td>
                         <td className="px-2 py-2">{row.warehouse}</td>
-                        <td className="px-2 py-2">{row.zone}</td>
+                        <td className="px-2 py-2">{row.location}</td>
                         <td className="px-2 py-2">{row.currentStock.toLocaleString('vi-VN')}</td>
                         <td className="px-2 py-2">{row.reserved.toLocaleString('vi-VN')}</td>
                         <td className="px-2 py-2">{row.available.toLocaleString('vi-VN')}</td>
@@ -257,7 +275,7 @@ export function ComponentsMaterialStockPage() {
               <div>
                 <div className="text-xs uppercase tracking-[0.16em] text-cyan-400">Kho vật tư SX</div>
                 <h3 className="mt-1 text-xl font-semibold text-white">{selectedRow.code} · {selectedRow.name}</h3>
-                <div className="mt-1 text-sm text-slate-400">{selectedRow.warehouse} / {selectedRow.zone}</div>
+                <div className="mt-1 text-sm text-slate-400">{selectedRow.warehouse} / {selectedRow.location}</div>
               </div>
               <button onClick={() => setSelectedRow(null)} className="text-slate-300">Đóng</button>
             </div>

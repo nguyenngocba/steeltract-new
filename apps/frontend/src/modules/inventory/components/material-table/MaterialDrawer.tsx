@@ -26,8 +26,56 @@ const MATERIAL_USAGE_OPTIONS = [
   { value: 'CONSUMABLE', label: 'Vật tư tiêu hao' },
 ]
 
+const INTERNAL_CELLS = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((row) =>
+  ['01', '02', '03', '04', '05', '06'].map((column) => `${row}${column}`),
+)
+
+const INTERNAL_LEVELS = ['L1', 'L2', 'L3', 'L4']
+
 function usageLabel(value: string) {
   return MATERIAL_USAGE_OPTIONS.find((item) => item.value === value)?.label ?? 'Vật tư chính'
+}
+
+function isMainWarehouseZone(zone: any) {
+  return zone?.active !== false && zone?.warehouse?.code === 'MAIN' && !String(zone?.code ?? '').startsWith('ST-WH-')
+}
+
+function isZoneFull(zone: any) {
+  const capacity = Number(zone?.capacity ?? 0)
+  if (capacity <= 0) return false
+  return Number(zone?.materialCount ?? 0) >= capacity
+}
+
+function normalizeLevel(value?: string) {
+  return String(value || 'L1').trim().toUpperCase()
+}
+
+function isCellOccupied(zone: any, cell: string, level: string, currentMaterialId?: string) {
+  if (!zone || !cell) return false
+  const normalizedCell = String(cell).trim().toUpperCase()
+  const normalizedLevel = normalizeLevel(level)
+  return (zone.cellOccupancy ?? []).some((entry: any) => {
+    const occupiedByCurrent =
+      currentMaterialId &&
+      Array.isArray(entry.materialIds) &&
+      entry.materialIds.map(String).includes(String(currentMaterialId))
+
+    return (
+      String(entry.slotId ?? '').toUpperCase() === normalizedCell &&
+      normalizeLevel(entry.level) === normalizedLevel &&
+      !occupiedByCurrent
+    )
+  })
+}
+
+function findEmptyCell(zone: any, currentMaterialId?: string) {
+  if (!zone) return null
+  for (const cell of INTERNAL_CELLS) {
+    for (const level of INTERNAL_LEVELS) {
+      if (!isCellOccupied(zone, cell, level, currentMaterialId)) return { cell, level }
+    }
+  }
+  return null
 }
 
 export function MaterialDrawer({ open, material, onClose }: Props) {
@@ -40,11 +88,18 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const [materialTypeId, setMaterialTypeId] = useState('')
   const [materialUsageType, setMaterialUsageType] = useState('PRIMARY')
   const [zoneId, setZoneId] = useState('')
+  const [slotId, setSlotId] = useState('')
+  const [level, setLevel] = useState('')
   const [error, setError] = useState('')
   const { data: materialTypes = [] } = useMaterialTypes()
   const { data: categories = [] } = useCategories()
   const { data: units = [] } = useUnits()
   const { data: zones = [] } = useZones()
+  const mainZones = zones.filter(isMainWarehouseZone)
+  const selectedZone = mainZones.find((zone: any) => zone.id === zoneId)
+  const selectedZoneFull = isZoneFull(selectedZone)
+  const selectedCellOccupied = isCellOccupied(selectedZone, slotId, level, material?.id)
+  const selectedZoneEmptyCell = findEmptyCell(selectedZone, material?.id)
   const createMaterialMutation = useCreateMaterial()
   const updateMaterialMutation = useUpdateMaterial()
   const isEditMode = Boolean(material)
@@ -61,6 +116,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setMaterialTypeId('')
       setMaterialUsageType('PRIMARY')
       setZoneId('')
+      setSlotId('')
+      setLevel('')
       return
     }
     setCode(material.code ?? '')
@@ -72,9 +129,27 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     setMaterialTypeId(material.materialTypeId ?? '')
     setMaterialUsageType(material.materialUsageType ?? 'PRIMARY')
     setZoneId(material.zoneId ?? '')
+    setSlotId(material.slotId ?? '')
+    setLevel(material.level ?? '')
   }, [material])
 
   if (!open) return null
+
+  function suggestEmptyLocation() {
+    const zonesToScan = selectedZone ? [selectedZone] : mainZones
+    const matchedZone = zonesToScan.find((zone: any) => findEmptyCell(zone, material?.id))
+    const matchedCell = findEmptyCell(matchedZone, material?.id)
+
+    if (!matchedZone || !matchedCell) {
+      setError('Không còn ô/tầng trống trong Kho chính. Vui lòng tạo thêm vị trí hoặc tăng cấu trúc kho.')
+      return
+    }
+
+    setZoneId(matchedZone.id)
+    setSlotId(matchedCell.cell)
+    setLevel(matchedCell.level)
+    setError('')
+  }
 
   async function handleSave() {
     if (!code.trim()) {
@@ -89,6 +164,14 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setError('Vui lòng chọn danh mục vật tư.')
       return
     }
+    if (zoneId && selectedZoneFull && material?.zoneId !== zoneId) {
+      setError('Vị trí/slot/tầng đã đầy. Vui lòng chọn vị trí hoặc tầng khác.')
+      return
+    }
+    if (zoneId && slotId && selectedCellOccupied) {
+      setError('Ô/tầng này đã có vật tư. Vui lòng chọn ô/tầng trống hoặc dùng gợi ý vị trí trống.')
+      return
+    }
 
     const payload = {
       code,
@@ -100,6 +183,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       materialTypeId,
       materialUsageType,
       zoneId,
+      slotId,
+      level,
     }
 
     try {
@@ -146,8 +231,22 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
               {materialTypes.filter((item: any) => !categoryId || item.categoryId === categoryId).map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
             <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className={drawerInput}>
-              <option value="">Vị trí kho mặc định</option>
-              {zones.map((zone: any) => <option key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
+              <option value="">Vị trí Kho chính mặc định</option>
+              {mainZones.map((zone: any) => <option disabled={isZoneFull(zone) && material?.zoneId !== zone.id} key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
+            </select>
+            <select value={slotId} onChange={(e) => setSlotId(e.target.value)} className={drawerInput}>
+              <option value="">Chọn ô trong vị trí</option>
+              {INTERNAL_CELLS.map((cell) => {
+                const occupiedOnAnyLevel = selectedZone && INTERNAL_LEVELS.every((item) => isCellOccupied(selectedZone, cell, item, material?.id))
+                return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
+              })}
+            </select>
+            <select value={level} onChange={(e) => setLevel(e.target.value)} className={drawerInput}>
+              <option value="">Chọn tầng</option>
+              {INTERNAL_LEVELS.map((item) => {
+                const occupied = selectedZone && slotId && isCellOccupied(selectedZone, slotId, item, material?.id)
+                return <option disabled={occupied} key={item} value={item}>Tầng {item}{occupied ? ' · đã có vật tư' : ''}</option>
+              })}
             </select>
             <select value={unit} onChange={(e) => setUnit(e.target.value)} className={drawerInput}>
               <option value="">Đơn vị tính</option>
@@ -159,12 +258,39 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
             <MetricBox title="Loại vật tư" value={usageLabel(materialUsageType)} />
             <MetricBox title="Tồn tối thiểu" value={Number(minimumStock || 0).toLocaleString('vi-VN')} />
-            <MetricBox title="Vị trí mặc định" value={zones.find((zone: any) => zone.id === zoneId)?.code ?? 'Chưa gán'} />
+            <MetricBox title="Vị trí mặc định" value={selectedZone?.code ?? 'Chưa gán'} />
             <MetricBox title="Trạng thái" value={isEditMode ? 'Đang chỉnh sửa' : 'Tạo mới'} />
           </div>
 
+          <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
+            <MetricBox title="Kho cha" value={selectedZone?.warehouse?.name ?? 'Kho chính'} />
+            <MetricBox title="Ô trong vị trí" value={slotId || 'Chưa chọn'} />
+            <MetricBox title="Tầng" value={level || 'Chưa chọn'} />
+            <MetricBox title="Sức chứa" value={selectedZone ? `${Number(selectedZone.materialCount ?? 0).toLocaleString('vi-VN')} / ${Number(selectedZone.capacity ?? 0).toLocaleString('vi-VN')}` : 'Chưa chọn'} />
+          </div>
+
+          {selectedZoneFull && material?.zoneId !== zoneId ? <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            Slot/tầng này đã đầy. Vui lòng chọn vị trí hoặc tầng khác trước khi lưu vật tư.
+          </div> : null}
+          {zoneId ? <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-sm md:flex-row md:items-center md:justify-between ${
+            selectedCellOccupied
+              ? 'border-red-400/40 bg-red-500/10 text-red-200'
+              : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+          }`}>
+            <span>
+              {selectedCellOccupied
+                ? `Ô ${slotId || '-'} / ${level || 'L1'} đã có vật tư.`
+                : selectedZoneEmptyCell
+                  ? `Có thể dùng ô trống gần nhất: ${selectedZoneEmptyCell.cell} / ${selectedZoneEmptyCell.level}.`
+                  : 'Vị trí này chưa có ô/tầng trống khả dụng.'}
+            </span>
+            <button type="button" onClick={suggestEmptyLocation} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+              Gợi ý vị trí trống
+            </button>
+          </div> : null}
+
           <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
-            Mã vật tư và loại vật tư sẽ được dùng xuyên suốt tồn kho, nhập xuất, BOM và sản xuất. Vị trí mặc định chỉ là nơi gợi ý khi nhập lần đầu, giao dịch thực tế vẫn có thể chọn zone khác.
+            Mã vật tư và loại vật tư sẽ được dùng xuyên suốt tồn kho, nhập xuất, BOM và sản xuất. Vị trí mặc định hiện chỉ lấy từ Kho chính; Kho sản xuất sẽ dành cho vật tư sản xuất/cấu kiện ở phase sau.
           </div>
 
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ghi chú quy cách, tiêu chuẩn, nguồn cung..." className={`${drawerTextarea} mt-3 w-full`} />

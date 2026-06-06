@@ -1,9 +1,38 @@
 # SteelTrack AI Changelog
 
+## 2026-06-06
+
+Completed:
+
+* Removed orphan warehouse-like zones `ST-WH-RAW` and `ST-WH-FAB` from the current database and added migration `20260606093000_remove_orphan_st_wh_zones` so they are not retained as usable or hidden locations.
+* Updated the operational sample-data seeder to stop recreating `ST-WH-RAW` and `ST-WH-FAB`.
+* Simplified Inventory navigation:
+  removed the horizontal in-page Inventory tab strip;
+  Inventory tab switching is now handled from the sidebar;
+  Inventory actions `Nhập kho`, `Xuất kho`, and `Khác` now render in the global topbar on Inventory routes.
+* Added persisted sidebar hide/show behavior to increase available workspace width.
+* Aligned the Stock tab free-text search field with the surrounding filters.
+* Frontend and backend builds pass.
+
 ## 2026-06-03
 
 Completed:
 
+* Completed Inventory Sprint B - Warehouse Locations:
+  added Inventory tab `/inventory/locations` labeled `Vị trí kho`;
+  extended `WarehouseZone` with `row`, `column`, `level`, and `capacity` fields while preserving `code`, `name`, and `active`;
+  added migration `20260605063000_inventory_warehouse_location_fields` and applied it to the local database;
+  expanded `GET /inventory/zones` with material count and total stock quantity statistics;
+  added `GET /inventory/zones/:id` detail data with stored materials and recent transaction lines;
+  added create, edit, activate, deactivate, and soft-delete APIs for warehouse locations;
+  added frontend location management workspace with KPI strip, filters, location table, current `warehouse_zones` audit panel, create/edit modal, and detail drawer;
+  added sidebar and Inventory tab navigation for `Vị trí kho`;
+  preserved the requested boundary: no Redis, caching, performance optimization, or 2D warehouse map UI in this sprint.
+* Audited current `warehouse_zones` after the clean workflow reset:
+  demo records are `DEMO-WH-FAB` and `DEMO-WH-RAW`;
+  warehouse-like records are `ST-WH-FAB` and `ST-WH-RAW`;
+  real storage locations are `A01`, `A02`, and `B01`.
+* Backend and frontend builds pass after Inventory Sprint B. Frontend still reports the existing Vite warnings for `.env NODE_ENV=production` and large bundle chunk size.
 * Added Material Master v1 usage classification:
   added Prisma enum `MaterialUsageType` with `PRIMARY`, `SECONDARY`, and `CONSUMABLE`;
   added `InventoryItem.materialUsageType` with default `PRIMARY` and applied migration `20260604214339_add_material_usage_type`;

@@ -19,6 +19,12 @@ type CountLine = {
   zoneId: string
 }
 
+const INTERNAL_CELLS = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((row) =>
+  ['01', '02', '03', '04', '05', '06'].map((column) => `${row}${column}`),
+)
+
+const INTERNAL_LEVELS = ['L1', 'L2', 'L3', 'L4']
+
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
@@ -26,6 +32,81 @@ function num(v: any) {
 
 function formatCurrency(v: any) {
   return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+}
+
+function isMainWarehouseZone(zone: any) {
+  return zone?.active !== false && zone?.warehouse?.code === 'MAIN' && !String(zone?.code ?? '').startsWith('ST-WH-')
+}
+
+function isProductionWarehouseZone(zone: any) {
+  return zone?.active !== false && zone?.warehouse?.code === 'PRODUCTION' && !String(zone?.code ?? '').startsWith('ST-WH-')
+}
+
+function isRealStorageZone(zone: any) {
+  return zone?.active !== false && !String(zone?.code ?? '').startsWith('ST-WH-') && Boolean(zone?.row || zone?.column || zone?.level || /^[A-Z]\d{2}$/i.test(String(zone?.code ?? '')))
+}
+
+function isZoneFull(zone: any) {
+  const capacity = Number(zone?.capacity ?? 0)
+  if (capacity <= 0) return false
+  return Number(zone?.materialCount ?? 0) >= capacity
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort()
+}
+
+function zoneSlot(zone: any) {
+  return String(zone?.column ?? '').trim()
+}
+
+function zoneLevel(zone: any) {
+  return String(zone?.level ?? '').trim()
+}
+
+function zoneCell(zone: any) {
+  return `${String(zone?.row ?? '').trim()}${String(zone?.column ?? '').trim()}` || String(zone?.code ?? '')
+}
+
+function internalSlot(cell: string, level: string) {
+  if (!cell && !level) return undefined
+  return `${cell || 'NA'}:${level || 'L1'}`
+}
+
+function normalizeLevel(value?: string) {
+  return String(value || 'L1').trim().toUpperCase()
+}
+
+function isCellOccupied(zone: any, cell: string, level: string, currentMaterialId?: string) {
+  if (!zone || !cell) return false
+  const normalizedCell = String(cell).trim().toUpperCase()
+  const normalizedLevel = normalizeLevel(level)
+  return (zone.cellOccupancy ?? []).some((entry: any) => {
+    const occupiedByCurrent =
+      currentMaterialId &&
+      Array.isArray(entry.materialIds) &&
+      entry.materialIds.map(String).includes(String(currentMaterialId))
+
+    return (
+      String(entry.slotId ?? '').toUpperCase() === normalizedCell &&
+      normalizeLevel(entry.level) === normalizedLevel &&
+      !occupiedByCurrent
+    )
+  })
+}
+
+function findEmptyCell(zone: any, currentMaterialId?: string) {
+  if (!zone) return null
+  for (const cell of INTERNAL_CELLS) {
+    for (const level of INTERNAL_LEVELS) {
+      if (!isCellOccupied(zone, cell, level, currentMaterialId)) return { cell, level }
+    }
+  }
+  return null
+}
+
+function zoneDisplay(zone: any) {
+  return `${zone?.code ?? 'ZONE'} · ${zone?.warehouse?.name ?? zone?.warehouseName ?? 'Kho'} · Ô ${zoneCell(zone) || '-'} · Tầng ${zone?.level ?? '-'}`
 }
 
 const primaryButtonClass =
@@ -83,6 +164,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const { data: materials = [] } = useInventoryItems()
   const { data: suppliers = [] } = useSuppliers()
   const { data: zones = [] } = useZones()
+  const mainZones = useMemo(() => zones.filter(isMainWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
 
   const [form, setForm] = useState({
@@ -90,6 +172,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     inventoryItemId: '',
     supplierId: '',
     zoneId: '',
+    slotId: '',
+    level: '',
     quantity: '',
     unitPrice: '',
     vat: '10',
@@ -106,21 +190,39 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const total = subTotal + vatAmount
   const defaultInboundZone = useMemo(() => {
     if (selectedMaterial?.zoneId) {
-      const materialZone = zones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
+      const materialZone = mainZones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
       if (materialZone) return materialZone
     }
-    return zones[0]
-  }, [selectedMaterial?.zoneId, zones])
-
+    return mainZones.find((zone: any) => !isZoneFull(zone)) ?? mainZones[0]
+  }, [selectedMaterial?.zoneId, mainZones])
+  const selectedInboundZone = mainZones.find((zone: any) => String(zone.id) === String(form.zoneId))
+  const selectedInboundZoneFull = isZoneFull(selectedInboundZone)
+  const selectedInboundCellOccupied = isCellOccupied(selectedInboundZone, form.slotId, form.level)
+  const inboundEmptyCell = findEmptyCell(selectedInboundZone)
   useEffect(() => {
     if (!form.inventoryItemId) return
-    const currentZoneIsValid = form.zoneId && zones.some((zone: any) => String(zone.id) === String(form.zoneId))
+    const currentZoneIsValid = form.zoneId && mainZones.some((zone: any) => String(zone.id) === String(form.zoneId))
     if (currentZoneIsValid || !defaultInboundZone?.id) return
     setForm((prev) => ({ ...prev, zoneId: defaultInboundZone.id }))
-  }, [form.inventoryItemId, form.zoneId, defaultInboundZone, zones])
+  }, [form.inventoryItemId, form.zoneId, defaultInboundZone, mainZones])
+
+  function suggestInboundLocation() {
+    const zonesToScan = selectedInboundZone ? [selectedInboundZone] : mainZones
+    const matchedZone = zonesToScan.find((zone: any) => findEmptyCell(zone))
+    const matchedCell = findEmptyCell(matchedZone)
+    if (!matchedZone || !matchedCell) return
+    setForm((prev) => ({
+      ...prev,
+      zoneId: matchedZone.id,
+      slotId: matchedCell.cell,
+      level: matchedCell.level,
+    }))
+  }
 
   async function submit() {
     if (!form.inventoryItemId || quantity <= 0 || unitPrice <= 0) return
+    if (selectedInboundZoneFull) return
+    if (selectedInboundCellOccupied) return
     const no = `NK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
     await createTransaction.mutateAsync({
       type: 'INBOUND',
@@ -128,13 +230,16 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
       supplierId: form.supplierId || undefined,
       supplierName: suppliers.find((x: any) => x.id === form.supplierId)?.name,
+      warehouseId: selectedInboundZone?.warehouseId || undefined,
       remarks: form.remark || undefined,
       items: [
         {
           inventoryItemId: form.inventoryItemId,
           quantity,
           unitPrice,
+          warehouseId: selectedInboundZone?.warehouseId || undefined,
           zoneId: form.zoneId || undefined,
+          slotId: internalSlot(form.slotId, form.level),
         },
       ],
     })
@@ -143,6 +248,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       inventoryItemId: '',
       supplierId: '',
       zoneId: '',
+      slotId: '',
+      level: '',
       quantity: '',
       unitPrice: '',
       vat: '10',
@@ -174,24 +281,57 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className={fieldClass} />
         <input value={form.unitPrice} onChange={(e) => setForm((f) => ({ ...f, unitPrice: e.target.value }))} placeholder="Đơn giá nhập" className={fieldClass} />
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
-          Vị trí mặc định lần nhập đầu: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
+          Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
         </div>
         <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={fieldClass}>
-          <option value="">Khu vực nhận (sau nhập)</option>
-          {zones.map((z: any) => (
-            <option key={z.id} value={z.id}>
-              {z.code}
+          <option value="">Vị trí nhận thuộc Kho chính</option>
+          {mainZones.map((z: any) => (
+            <option disabled={isZoneFull(z)} key={z.id} value={z.id}>
+              {zoneDisplay(z)}{isZoneFull(z) ? ' · FULL' : ''}
             </option>
           ))}
+        </select>
+        <select value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={fieldClass}>
+          <option value="">Chọn ô trong vị trí</option>
+          {INTERNAL_CELLS.map((cell) => {
+            const occupiedOnAnyLevel = selectedInboundZone && INTERNAL_LEVELS.every((item) => isCellOccupied(selectedInboundZone, cell, item))
+            return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
+          })}
+        </select>
+        <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={fieldClass}>
+          <option value="">Chọn tầng nhận</option>
+          {INTERNAL_LEVELS.map((level) => {
+            const occupied = selectedInboundZone && form.slotId && isCellOccupied(selectedInboundZone, form.slotId, level)
+            return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
+          })}
         </select>
         <input value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
         <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
         <MetricBox title="Sau nhập" value={(currentStock + quantity).toLocaleString('vi-VN')} />
-        <MetricBox title="Đơn giá TB mới" value={formatCurrency(unitPrice)} />
-        <MetricBox title="Giá nhập gần nhất" value={formatCurrency(unitPrice)} />
+        <MetricBox title="Ô/Tầng" value={form.slotId ? `${form.slotId} / ${form.level || 'L1'}` : 'Chưa chọn'} />
+        <MetricBox title="Sức chứa" value={selectedInboundZone ? `${num(selectedInboundZone.materialCount).toLocaleString('vi-VN')} / ${num(selectedInboundZone.capacity).toLocaleString('vi-VN')}` : 'Chưa chọn'} />
       </div>
+      {selectedInboundZoneFull ? <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+        Slot/tầng này đã đầy. Vui lòng chọn vị trí hoặc tầng khác trước khi xác nhận nhập kho.
+      </div> : null}
+      {form.zoneId ? <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-sm md:flex-row md:items-center md:justify-between ${
+        selectedInboundCellOccupied
+          ? 'border-red-400/40 bg-red-500/10 text-red-200'
+          : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+      }`}>
+        <span>
+          {selectedInboundCellOccupied
+            ? `Ô ${form.slotId || '-'} / ${form.level || 'L1'} đã có vật tư, không thể nhập thêm vào ô/tầng này.`
+            : inboundEmptyCell
+              ? `Ô trống gợi ý: ${inboundEmptyCell.cell} / ${inboundEmptyCell.level}.`
+              : 'Vị trí này chưa còn ô/tầng trống khả dụng.'}
+        </span>
+        <button type="button" onClick={suggestInboundLocation} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+          Gợi ý ô trống
+        </button>
+      </div> : null}
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
         <div className="text-slate-300">Thành tiền trước VAT: <span className="font-semibold text-cyan-300">{formatCurrency(subTotal)}</span></div>
         <div className="mt-1 text-slate-300">Tiền VAT: <span className="font-semibold text-cyan-300">{formatCurrency(vatAmount)}</span></div>
@@ -203,7 +343,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className={`${textareaClass} mt-3 w-full`} />
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className={secondaryButtonClass}>Hủy</button>
-        <button onClick={submit} className={primaryButtonClass}>
+        <button disabled={selectedInboundZoneFull || selectedInboundCellOccupied} onClick={submit} className={primaryButtonClass}>
           Xác nhận nhập kho
         </button>
       </div>
@@ -215,6 +355,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   const { data: materials = [] } = useInventoryItems()
   const { data: projects = [] } = useProjects()
   const { data: zones = [] } = useZones()
+  const productionZones = useMemo(() => zones.filter(isProductionWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
 
   const [form, setForm] = useState({
@@ -223,6 +364,9 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     projectId: '',
     inventoryItemId: '',
     zoneId: '',
+    productionZoneId: '',
+    productionSlotId: '',
+    productionLevel: '',
     quantity: '',
     remark: '',
   })
@@ -286,27 +430,61 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   }, [form.inventoryItemId, form.zoneId, availableZones])
   const selectedZoneStock = form.zoneId ? qtyByZoneId.get(String(form.zoneId)) ?? 0 : 0
   const selectedZoneAfterStock = selectedZoneStock - quantity
+  const selectedProductionZone = productionZones.find((zone: any) => String(zone.id) === String(form.productionZoneId))
+  const productionCellOccupied = form.target === 'COMPONENT_PRODUCTION'
+    ? isCellOccupied(selectedProductionZone, form.productionSlotId, form.productionLevel)
+    : false
+  const productionEmptyCell = findEmptyCell(selectedProductionZone)
+  const needsProductionLocation = form.target === 'COMPONENT_PRODUCTION'
   const canSubmit =
     Boolean(form.inventoryItemId) &&
     Boolean(form.zoneId) &&
     quantity > 0 &&
-    selectedZoneAfterStock >= 0
+    selectedZoneAfterStock >= 0 &&
+    (!needsProductionLocation || (Boolean(form.productionZoneId) && Boolean(form.productionSlotId) && !productionCellOccupied))
+
+  function suggestProductionDestination() {
+    const zonesToScan = selectedProductionZone ? [selectedProductionZone] : productionZones
+    const matchedZone = zonesToScan.find((zone: any) => findEmptyCell(zone))
+    const matchedCell = findEmptyCell(matchedZone)
+    if (!matchedZone || !matchedCell) return
+    setForm((prev) => ({
+      ...prev,
+      productionZoneId: matchedZone.id,
+      productionSlotId: matchedCell.cell,
+      productionLevel: matchedCell.level,
+    }))
+  }
 
   async function submit() {
     if (!canSubmit) return
     const no = `XK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
-    const targetTag = form.target === 'COMPONENT_PRODUCTION'
-      ? '[COMPONENT_PRODUCTION]'
-      : '[PROJECT]'
+    const isProductionTarget = form.target === 'COMPONENT_PRODUCTION'
+    const targetTag = isProductionTarget ? '[COMPONENT_PRODUCTION]' : '[PROJECT]'
     await createTransaction.mutateAsync({
-      type: 'OUTBOUND',
+      type: isProductionTarget ? 'TRANSFER' : 'OUTBOUND',
       transactionNo: no,
       transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
       projectId: form.projectId || undefined,
       projectName: projects.find((x: any) => x.id === form.projectId)?.name,
       zoneId: form.zoneId,
+      warehouseId: isProductionTarget ? selectedProductionZone?.warehouseId : undefined,
       remarks: `${targetTag} ${form.remark}`.trim(),
-      items: [
+      items: isProductionTarget ? [
+        {
+          inventoryItemId: form.inventoryItemId,
+          quantity: -Math.abs(quantity),
+          zoneId: form.zoneId || undefined,
+        },
+        {
+          inventoryItemId: form.inventoryItemId,
+          quantity: Math.abs(quantity),
+          warehouseId: selectedProductionZone?.warehouseId || undefined,
+          zoneId: form.productionZoneId || undefined,
+          slotId: internalSlot(form.productionSlotId, form.productionLevel),
+          unitPrice: estimatedUnitPrice || undefined,
+        },
+      ] : [
         {
           inventoryItemId: form.inventoryItemId,
           quantity: -Math.abs(quantity),
@@ -320,6 +498,9 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       projectId: '',
       inventoryItemId: '',
       zoneId: '',
+      productionZoneId: '',
+      productionSlotId: '',
+      productionLevel: '',
       quantity: '',
       remark: '',
     })
@@ -363,6 +544,44 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           Tồn vị trí đã chọn: <span className="ml-1 text-cyan-300">{selectedZoneStock.toLocaleString('vi-VN')}</span>
         </div>
       </div>
+      {form.target === 'COMPONENT_PRODUCTION' ? <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">Vị trí nhận Kho vật tư SX</div>
+            <div className="mt-1 text-xs text-slate-400">Chọn nơi đặt vật tư sau khi xuất khỏi kho chính.</div>
+          </div>
+          <button type="button" onClick={suggestProductionDestination} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+            Gợi ý ô trống
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <select value={form.productionZoneId} onChange={(e) => setForm((f) => ({ ...f, productionZoneId: e.target.value, productionSlotId: '', productionLevel: '' }))} className={fieldClass}>
+            <option value="">Vị trí kho SX nhận</option>
+            {productionZones.map((zone: any) => <option key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
+          </select>
+          <select value={form.productionSlotId} onChange={(e) => setForm((f) => ({ ...f, productionSlotId: e.target.value }))} className={fieldClass}>
+            <option value="">Ô nhận</option>
+            {INTERNAL_CELLS.map((cell) => {
+              const occupiedOnAnyLevel = selectedProductionZone && INTERNAL_LEVELS.every((level) => isCellOccupied(selectedProductionZone, cell, level))
+              return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
+            })}
+          </select>
+          <select value={form.productionLevel} onChange={(e) => setForm((f) => ({ ...f, productionLevel: e.target.value }))} className={fieldClass}>
+            <option value="">Tầng nhận</option>
+            {INTERNAL_LEVELS.map((level) => {
+              const occupied = selectedProductionZone && form.productionSlotId && isCellOccupied(selectedProductionZone, form.productionSlotId, level)
+              return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
+            })}
+          </select>
+        </div>
+        <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${productionCellOccupied ? 'border-red-400/40 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'}`}>
+          {productionCellOccupied
+            ? `Ô ${form.productionSlotId || '-'} / ${form.productionLevel || 'L1'} ở Kho vật tư SX đã có vật tư.`
+            : productionEmptyCell
+              ? `Ô trống gợi ý: ${productionEmptyCell.cell} / ${productionEmptyCell.level}.`
+              : form.productionZoneId ? 'Vị trí này chưa còn ô/tầng trống khả dụng.' : 'Chọn vị trí kho SX hoặc dùng gợi ý ô trống.'}
+        </div>
+      </div> : null}
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
         <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
         <MetricBox title="Tồn sau xuất" value={Math.max(0, currentStock - quantity).toLocaleString('vi-VN')} />
@@ -372,6 +591,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
         <div className="text-slate-300">Giá trị xuất dự kiến: <span className="font-semibold text-cyan-300">{formatCurrency(quantity * estimatedUnitPrice)}</span></div>
         <div className="mt-1 text-slate-300">Đối tượng xuất: <span className="font-semibold text-white">{form.target === 'COMPONENT_PRODUCTION' ? 'Sản xuất cấu kiện' : 'Công trình'}</span></div>
+        {form.target === 'COMPONENT_PRODUCTION' ? <div className="mt-1 text-slate-300">Vị trí nhận: <span className="font-semibold text-white">{selectedProductionZone ? `${selectedProductionZone.code} / ${form.productionSlotId || '-'} / ${form.productionLevel || 'L1'}` : 'Chưa chọn'}</span></div> : null}
       </div>
       {form.inventoryItemId && availableZones.length === 0 && (
         <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
@@ -400,12 +620,17 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const { data: materials = [] } = useInventoryItems()
   const { data: zones = [] } = useZones()
+  const realZones = useMemo(() => zones.filter(isRealStorageZone), [zones])
   const createTx = useCreateTransaction()
   const [form, setForm] = useState({
     transactionDate: new Date().toISOString().slice(0, 16),
     materialId: '',
     fromZoneId: '',
     toZoneId: '',
+    fromSlotId: '',
+    fromLevel: '',
+    toSlotId: '',
+    toLevel: '',
     quantity: '',
     reason: '',
   })
@@ -418,11 +643,11 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     const balances = Array.isArray((selectedMaterialDetail as any)?.locationBalances)
       ? ((selectedMaterialDetail as any).locationBalances as any[]).filter((b: any) => num(b.quantity) > 0)
       : []
-    const byId = new Map<string, any>(zones.map((z: any) => [String(z.id), z]))
+    const byId = new Map<string, any>(realZones.map((z: any) => [String(z.id), z]))
     if (balances.length === 0) {
       const fallbackZone = selectedMaterial?.zoneId
-        ? zones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
-        : zones[0]
+        ? realZones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
+        : realZones[0]
       const fallbackZoneId = selectedMaterial?.zoneId ?? fallbackZone?.id
       if (!fallbackZoneId || currentStock <= 0) return []
       return [
@@ -431,6 +656,10 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           label: `${selectedMaterial?.zoneCode ?? fallbackZone?.code ?? 'ZONE'} - ${selectedMaterial?.zone ?? fallbackZone?.name ?? ''}`,
           qty: currentStock,
           zoneCode: selectedMaterial?.zoneCode ?? fallbackZone?.code ?? 'ZONE',
+          warehouseName: fallbackZone?.warehouse?.name ?? '',
+          row: fallbackZone?.row ?? '',
+          column: fallbackZone?.column ?? '',
+          level: fallbackZone?.level ?? '',
         },
       ]
     }
@@ -440,12 +669,21 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         const zone = byId.get(String(b.zoneId))
         const zoneCode = zone?.code ?? b.zoneCode ?? 'NA'
         const zoneName = zone?.name ?? ''
-        return { id: String(b.zoneId), label: `${zoneCode} - ${zoneName}`, qty: num(b.quantity), zoneCode }
+        return {
+          id: String(b.zoneId),
+          label: `${zoneCode} - ${zoneName}`,
+          qty: num(b.quantity),
+          zoneCode,
+          warehouseName: zone?.warehouse?.name ?? b.warehouseName ?? '',
+          row: zone?.row ?? b.row ?? '',
+          column: zone?.column ?? b.column ?? '',
+          level: zone?.level ?? b.level ?? '',
+        }
       })
-  }, [selectedMaterialDetail, zones, selectedMaterial, currentStock])
+  }, [selectedMaterialDetail, realZones, selectedMaterial, currentStock])
 
   const destinationZoneOptions = useMemo(() => {
-    return zones
+    return realZones
       .filter((z: any) => String(z.id) !== form.fromZoneId)
       .map((z: any) => {
         const matched = sourceZoneOptions.find((s) => s.id === String(z.id))
@@ -454,14 +692,23 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           label: `${z.code} - ${z.name}`,
           qty: matched?.qty ?? 0,
           zoneCode: z.code,
+          warehouseName: z.warehouse?.name ?? '',
+          row: z.row ?? '',
+          column: z.column ?? '',
+          level: z.level ?? '',
         }
       })
-  }, [zones, form.fromZoneId, sourceZoneOptions])
+  }, [realZones, form.fromZoneId, sourceZoneOptions])
 
   const sourceQty = useMemo(() => {
     const selected = sourceZoneOptions.find((s) => s.id === form.fromZoneId)
     return num(selected?.qty)
   }, [sourceZoneOptions, form.fromZoneId])
+  const selectedSourceZone = sourceZoneOptions.find((zone) => zone.id === form.fromZoneId)
+  const selectedDestinationZone = destinationZoneOptions.find((zone) => zone.id === form.toZoneId)
+  const selectedDestinationFullZone = realZones.find((zone: any) => String(zone.id) === String(form.toZoneId))
+  const destinationCellOccupied = isCellOccupied(selectedDestinationFullZone, form.toSlotId, form.toLevel)
+  const destinationEmptyCell = findEmptyCell(selectedDestinationFullZone)
   const transferQty = num(form.quantity)
   const canTransfer =
     Boolean(form.materialId) &&
@@ -469,7 +716,8 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     Boolean(form.toZoneId) &&
     form.fromZoneId !== form.toZoneId &&
     transferQty > 0 &&
-    transferQty <= sourceQty
+    transferQty <= sourceQty &&
+    !destinationCellOccupied
 
   useEffect(() => {
     if (!form.materialId) return
@@ -502,11 +750,13 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         {
           inventoryItemId: form.materialId,
           zoneId: form.fromZoneId,
+          slotId: internalSlot(form.fromSlotId, form.fromLevel),
           quantity: -Math.abs(qty),
         },
         {
           inventoryItemId: form.materialId,
           zoneId: form.toZoneId,
+          slotId: internalSlot(form.toSlotId, form.toLevel),
           quantity: Math.abs(qty),
         },
       ],
@@ -517,10 +767,30 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
       materialId: '',
       fromZoneId: '',
       toZoneId: '',
+      fromSlotId: '',
+      fromLevel: '',
+      toSlotId: '',
+      toLevel: '',
       quantity: '',
       reason: '',
     })
     onClose()
+  }
+
+  function suggestTransferDestination() {
+    const zonesToScan = selectedDestinationFullZone
+      ? [selectedDestinationFullZone]
+      : realZones.filter((zone: any) => String(zone.id) !== String(form.fromZoneId))
+    const matchedZone = zonesToScan.find((zone: any) => findEmptyCell(zone))
+    const matchedCell = findEmptyCell(matchedZone)
+    if (!matchedZone || !matchedCell) return
+
+    setForm((prev) => ({
+      ...prev,
+      toZoneId: matchedZone.id,
+      toSlotId: matchedCell.cell,
+      toLevel: matchedCell.level,
+    }))
   }
 
   return (
@@ -538,20 +808,42 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
               ))}
             </select>
             <select value={form.fromZoneId} onChange={(e) => setForm((f) => ({ ...f, fromZoneId: e.target.value }))} className={fieldClass}>
-              <option value="">Từ khu vực</option>
+              <option value="">Từ vị trí kho</option>
               {sourceZoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.zoneCode} ({z.qty.toLocaleString('vi-VN')})
+                  {z.zoneCode} · {z.warehouseName || 'Kho'} · Ô {zoneCell(z) || '-'} · Tầng {z.level || '-'} · tồn {z.qty.toLocaleString('vi-VN')}
                 </option>
               ))}
             </select>
             <select value={form.toZoneId} onChange={(e) => setForm((f) => ({ ...f, toZoneId: e.target.value }))} className={fieldClass}>
-              <option value="">Đến khu vực</option>
+              <option value="">Đến vị trí kho</option>
               {destinationZoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.zoneCode} ({z.qty.toLocaleString('vi-VN')})
+                  {z.zoneCode} · {z.warehouseName || 'Kho'} · Ô {zoneCell(z) || '-'} · Tầng {z.level || '-'}
                 </option>
               ))}
+            </select>
+            <select value={form.fromSlotId} onChange={(e) => setForm((f) => ({ ...f, fromSlotId: e.target.value }))} className={fieldClass}>
+              <option value="">Ô nguồn</option>
+              {INTERNAL_CELLS.map((cell) => <option key={cell} value={cell}>Ô {cell}</option>)}
+            </select>
+            <select value={form.fromLevel} onChange={(e) => setForm((f) => ({ ...f, fromLevel: e.target.value }))} className={fieldClass}>
+              <option value="">Tầng nguồn</option>
+              {INTERNAL_LEVELS.map((level) => <option key={level} value={level}>Tầng {level}</option>)}
+            </select>
+            <select value={form.toSlotId} onChange={(e) => setForm((f) => ({ ...f, toSlotId: e.target.value }))} className={fieldClass}>
+              <option value="">Ô đích</option>
+              {INTERNAL_CELLS.map((cell) => {
+                const occupiedOnAnyLevel = selectedDestinationFullZone && INTERNAL_LEVELS.every((level) => isCellOccupied(selectedDestinationFullZone, cell, level))
+                return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
+              })}
+            </select>
+            <select value={form.toLevel} onChange={(e) => setForm((f) => ({ ...f, toLevel: e.target.value }))} className={fieldClass}>
+              <option value="">Tầng đích</option>
+              {INTERNAL_LEVELS.map((level) => {
+                const occupied = selectedDestinationFullZone && form.toSlotId && isCellOccupied(selectedDestinationFullZone, form.toSlotId, level)
+                return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
+              })}
             </select>
             <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className={fieldClass} />
             <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Lý do điều chuyển" className={fieldClass} />
@@ -559,7 +851,25 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm xl:grid-cols-2">
             <MetricBox title="Tồn tại nguồn" value={sourceQty.toLocaleString('vi-VN')} />
             <MetricBox title="Sau điều chuyển" value={Math.max(0, sourceQty - num(form.quantity)).toLocaleString('vi-VN')} />
+            <MetricBox title="Nguồn" value={selectedSourceZone ? `${selectedSourceZone.warehouseName || 'Kho'} / ${form.fromSlotId || '-'} / ${form.fromLevel || 'L1'}` : 'Chưa chọn'} />
+            <MetricBox title="Đích" value={selectedDestinationZone ? `${selectedDestinationZone.warehouseName || 'Kho'} / ${form.toSlotId || '-'} / ${form.toLevel || 'L1'}` : 'Chưa chọn'} />
           </div>
+          {form.toZoneId ? <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-sm md:flex-row md:items-center md:justify-between ${
+            destinationCellOccupied
+              ? 'border-red-400/40 bg-red-500/10 text-red-200'
+              : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+          }`}>
+            <span>
+              {destinationCellOccupied
+                ? `Ô đích ${form.toSlotId || '-'} / ${form.toLevel || 'L1'} đã có vật tư.`
+                : destinationEmptyCell
+                  ? `Ô đích trống gợi ý: ${destinationEmptyCell.cell} / ${destinationEmptyCell.level}.`
+                  : 'Vị trí đích chưa còn ô/tầng trống khả dụng.'}
+            </span>
+            <button type="button" onClick={suggestTransferDestination} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+              Gợi ý ô đích trống
+            </button>
+          </div> : null}
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">

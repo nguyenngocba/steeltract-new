@@ -215,18 +215,7 @@ export class OperationalSampleDataSeeder {
   }
 
   private seedWarehouseZones() {
-    return Promise.all(
-      [
-        ['ST-WH-RAW', 'Raw Material Warehouse'],
-        ['ST-WH-FAB', 'Fabrication Buffer'],
-      ].map(([code, name]) =>
-        this.prisma.warehouseZone.upsert({
-          where: { code },
-          create: { code, name, color: '#06b6d4' },
-          update: {},
-        }),
-      ),
-    );
+    return Promise.resolve([]);
   }
 
   private seedInventoryCategory() {

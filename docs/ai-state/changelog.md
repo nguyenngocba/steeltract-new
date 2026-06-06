@@ -1,5 +1,369 @@
 # SteelTrack Changelog
 
+## 2026-06-06
+
+### Inventory Overview Quick Action And Stock Status Polish
+
+Implemented:
+
+- Added the three requested Overview blocks directly below the search/filter bar:
+  - `Thao tác nhanh`;
+  - `Nhập kho hôm nay`;
+  - `Xuất kho hôm nay`.
+- Quick action buttons now open the same transaction modals as the Inventory topbar:
+  - inbound;
+  - outbound;
+  - transfer;
+  - stock take.
+- Reworked Overview search/filter controls to be more compact.
+- Reworked `Nhập kho gần đây` and `Xuất kho gần đây` into column-style rows matching the reference layout:
+  transaction code, material/target, date, quantity, and status.
+- Changed the old warehouse filter card grid into a warehouse status bar with a warehouse dropdown and quick status metrics.
+- Added `Trạng thái` column to the Stock tab inventory list and the expanded stock modal.
+
+Build:
+
+- Frontend build passed.
+
+### Inventory Overview Chart Synchronization
+
+Implemented:
+
+- Reworked Inventory Overview to use the same stock/audit data source and location display logic as the Stock tab.
+- Added compact Stock-tab-style filters to Overview:
+  - warehouse;
+  - material group;
+  - material usage type;
+  - stock status;
+  - manual text search;
+  - search and reset buttons.
+- Replaced Overview stock summary with donut charts:
+  - `Tổng quan tồn kho`;
+  - `Cơ cấu nhóm vật tư`.
+- Added compact `Giá trị tồn kho` trend chart.
+- Reworked `Cảnh báo tồn kho` to match the Stock tab style and added a full alert modal from `Xem tất cả`.
+- Reworked recent inbound/outbound panels to show the latest 5 transactions with:
+  - transaction code;
+  - material;
+  - date;
+  - quantity;
+  - total amount in expanded view.
+- Added warehouse status filter cards showing total materials, low-stock count, and out-of-stock count per warehouse.
+- Promoted shared Inventory chart components and simplified shared Inventory panel headings so Overview, Locations, Outbound, Transfer, Stock Take, Transactions, and Alerts use the same chart/panel visual language.
+
+Build:
+
+- Frontend build passed.
+
+### Inventory Shell Cleanup And Orphan Warehouse Removal
+
+Implemented:
+
+- Removed orphan warehouse-like records from the current database:
+  - `ST-WH-RAW`;
+  - `ST-WH-FAB`.
+- Added migration `20260606093000_remove_orphan_st_wh_zones` to null old references and delete those two warehouse zones.
+- Updated the operational simulation seeder so it no longer recreates `ST-WH-RAW` or `ST-WH-FAB`.
+- Removed the horizontal Inventory tab/action strip from the page body.
+- Moved Inventory actions to the global topbar on Inventory routes:
+  - `Nhập kho`;
+  - `Xuất kho`;
+  - `Khác`.
+- Kept Inventory tab switching in the sidebar only.
+- Added sidebar hide/show behavior with persisted collapsed state to increase workspace width.
+- Aligned the Stock tab text search field with the other filters.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+## 2026-06-05
+
+### Inventory Sprint B - Warehouse Locations
+
+Implemented:
+
+- Added Inventory tab `Vị trí kho` at `/inventory/locations`.
+- Extended `warehouse_zones` for location management:
+  - `row`;
+  - `column`;
+  - `level`;
+  - `capacity`;
+  - existing `code`, `name`, and `active` remain the core identity/status fields.
+- Added Prisma migration `20260605063000_inventory_warehouse_location_fields`.
+- Added Warehouse Location CRUD API:
+  - `GET /inventory/zones`;
+  - `GET /inventory/zones/:id`;
+  - `POST /inventory/zones`;
+  - `PUT /inventory/zones/:id`;
+  - `PATCH /inventory/zones/:id/activate`;
+  - `PATCH /inventory/zones/:id/deactivate`;
+  - `DELETE /inventory/zones/:id` as soft delete by setting `active = false`.
+- Added location statistics:
+  - number of active material records stored in each location;
+  - total stock quantity by location.
+- Added location detail drawer showing materials currently stored in the selected location.
+- Prepared future 2D warehouse map data by storing row/column/level without building map UI in this sprint.
+- Added sidebar/tab navigation entry for `Vị trí kho`.
+
+Warehouse zone audit:
+
+- Demo records:
+  - `DEMO-WH-FAB`;
+  - `DEMO-WH-RAW`.
+- Warehouse-like records:
+  - `ST-WH-FAB`;
+  - `ST-WH-RAW`.
+- Real storage locations:
+  - `A01`;
+  - `A02`;
+  - `B01`.
+
+Build:
+
+- Prisma migration deploy passed.
+- Prisma generate passed.
+- Backend build passed.
+- Frontend build passed.
+
+### Warehouse Zone Demo Cleanup
+
+Verified current warehouse zone references:
+
+- `InventoryItem.zoneId` references:
+  - `A01`: 1 active material;
+  - `A02`: 1 active material;
+  - `B01`: 1 active material.
+- `InventoryTransaction.zoneId` references:
+  - `A01`: 5 transactions;
+  - `A02`: 1 transaction;
+  - `B01`: 1 transaction.
+- `InventoryTransactionItem.zoneId` references:
+  - `A01`: 12 transaction lines;
+  - `A02`: 4 transaction lines;
+  - `B01`: 2 transaction lines.
+
+Cleaned:
+
+- Hard-deleted unreferenced demo warehouse zones:
+  - `DEMO-WH-FAB`;
+  - `DEMO-WH-RAW`.
+
+Remaining unreferenced warehouse zones:
+
+- `C01`
+- `ST-WH-FAB`
+- `ST-WH-RAW`
+
+### Warehouse Location Detail Modal
+
+Implemented:
+
+- Clicking a warehouse location row now opens a large read-only detail drawer.
+- Added drawer sections:
+  - location information;
+  - capacity information;
+  - material list;
+  - 2D visual preview.
+- Material list shows:
+  - material code;
+  - material name;
+  - quantity;
+  - unit.
+- 2D preview renders a simple row/column grid from existing `row` and `column` values.
+- Preview groups the selected location materials by the existing location `level`.
+- Preview shows selected/occupied/empty cells without drag-drop.
+
+Boundaries:
+
+- Did not change inventory transactions.
+- Did not change stock calculations.
+- Did not add drag-drop.
+
+Build:
+
+- Frontend build passed.
+
+### Warehouse Structure Cleanup UI
+
+Implemented:
+
+- Audited `InventoryLocationsPage` loading flow:
+  - `useZones()` calls `GET /inventory/zones`;
+  - API still returns all `warehouse_zones`;
+  - frontend now filters the Locations table to real storage locations only.
+- Excluded warehouse-like records from the main Locations table:
+  - `ST-WH-RAW`;
+  - `ST-WH-FAB`.
+- Kept warehouse-like records in the database.
+- Kept audit panel counts for warehouse-like records so they remain visible as structure cleanup context.
+- Current table is intended to show real storage locations such as:
+  - `A01`;
+  - `A02`;
+  - `B01`;
+  - `C01`.
+
+Boundaries:
+
+- Did not delete data.
+- Did not change Inventory transaction logic.
+- Did not change stock calculations.
+
+Build:
+
+- Frontend build passed.
+
+### Warehouse Parent Structure And Slot/Level UX
+
+Implemented:
+
+- Added data migration `20260605072000_seed_inventory_warehouses`.
+- Seeded master warehouse parents:
+  - `MAIN` / `Kho chính`;
+  - `PRODUCTION` / `Kho sản xuất`.
+- Assigned real storage locations `A01`, `A02`, `B01`, and `C01` to `MAIN`.
+- Kept `ST-WH-RAW` and `ST-WH-FAB` in the database but no longer treats them as usable storage locations.
+- Extended `GET /inventory/zones` response with the parent warehouse relation.
+- Added frontend warehouse API/hook for `GET /master-data/warehouses`.
+- Inventory Locations create/edit form now has `Thuộc kho nào?`.
+- Inventory Locations table and detail drawer now show parent warehouse.
+- Location labels now treat:
+  - `row` as row;
+  - `column` as slot;
+  - `level` as floor/tầng.
+- Reduced the 2D location preview size and added click-to-view cell details inside the preview.
+- Material create/edit drawer now:
+  - only offers locations from `Kho chính`;
+  - has separate `Chọn slot` and `Chọn tầng` selectors;
+  - automatically resolves the selected slot/tầng back to the matching warehouse location;
+  - shows selected slot/tầng;
+  - shows capacity usage;
+  - warns and blocks save if the selected slot/tầng is full.
+- Inbound transaction modal now:
+  - only offers receiving locations from `Kho chính`;
+  - shows selected slot/tầng;
+  - shows capacity usage;
+  - warns and blocks submit if the selected slot/tầng is full;
+  - sends parent `warehouseId` together with selected location.
+- Material detail `Vị trí` tab now shows:
+  - warehouse;
+  - location;
+  - row;
+  - slot;
+  - floor/tầng;
+  - quantity;
+  - updated time.
+- Material detail `Vị trí` tab now has `Xem 2D`, opening a focused 2D preview where the selected slot is highlighted and surrounding cells are dimmed.
+
+Boundaries:
+
+- Did not delete warehouse-like records.
+- Did not change Inventory stock calculation logic.
+- Did not implement drag-drop.
+- Did not fully implement production warehouse/component material balance yet; `PRODUCTION` is now available as a parent warehouse for the next production-material phase.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
+### Material Drawer Slot/Floor Visibility Fix
+
+Fixed:
+
+- Added migration `20260605073500_backfill_main_warehouse_location_slots`.
+- Backfilled main storage locations:
+  - `A01` = row `A`, slot `01`, floor `L1`, capacity `100`;
+  - `A02` = row `A`, slot `02`, floor `L1`, capacity `100`;
+  - `B01` = row `B`, slot `01`, floor `L1`, capacity `100`.
+- The create/edit material form now shows explicit dropdowns:
+  - `Chọn slot`;
+  - `Chọn tầng`.
+- Note: material master uses `Kho chính` locations only, so slots/floors from `Kho sản xuất` such as `C01` are intentionally not shown in the material form.
+
+### Inventory Transaction Slot/Floor Selectors
+
+Fixed:
+
+- Inbound transaction modal now has explicit selectors:
+  - receiving warehouse location;
+  - receiving slot;
+  - receiving floor/tầng.
+- Transfer transaction modal now understands warehouse locations with separate selectors:
+  - source location;
+  - source slot;
+  - source floor/tầng;
+  - destination location;
+  - destination slot;
+  - destination floor/tầng.
+- Transfer options now display parent warehouse, slot, floor, and available source quantity.
+- Destination transfer options exclude warehouse-like `ST-WH-*` records and use real active storage locations only.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
+### Warehouse 2D Grid Alignment
+
+Fixed:
+
+- Added migration `20260605075000_seed_main_warehouse_grid_levels`.
+- Seeded the actual `Kho chính` storage grid so the database now understands the same cells shown in the 2D preview:
+  - rows `A` through `F`;
+  - columns `01` through `06`;
+  - default floor `L1`;
+  - capacity `100` for each cell/floor.
+- Added extra floors for cell `A01`:
+  - `A01-L2`;
+  - `A01-L3`.
+- Current `Kho chính` has 38 warehouse zone records:
+  - 36 base cells from `A01` to `F06`;
+  - 2 extra A01 floors.
+- Material create/edit, inbound, and transfer now use the same location model:
+  - choose location cell such as `A01`;
+  - choose floor/tầng such as `L1`, `L2`, `L3`;
+  - resolve the selected cell/floor to the correct `warehouse_zones.id`.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
+### Warehouse Internal Cell Model Correction
+
+Corrected:
+
+- Reverted the mistaken model where internal cells `A01-F06` were created as separate `warehouse_zones`.
+- Added migration `20260605080500_cleanup_seeded_grid_zones_add_item_slot_level`.
+- Cleaned unreferenced seeded grid zones, leaving warehouse zones as parent storage locations only:
+  - `A01`;
+  - `A02`;
+  - `B01`;
+  - `C01`;
+  - inactive `ST-WH-*` records.
+- Added `InventoryItem.slotId` and `InventoryItem.level` so Material Master can store the default internal cell/floor inside a warehouse location.
+- Backfilled existing active materials from their current zone row/column/level into `slotId` and `level`.
+- Material create/edit now uses the correct structure:
+  - select parent warehouse location;
+  - select internal cell `A01-F06`;
+  - select floor `L1-L4`.
+- Inbound now records:
+  - parent warehouse location as `zoneId`;
+  - internal cell/floor as transaction item `slotId` in `CELL:LEVEL` format.
+- Transfer now records source/destination:
+  - parent warehouse location as `zoneId`;
+  - internal source/destination cell/floor as transaction item `slotId`.
+- Warehouse location detail 2D preview now treats `A01-F06` as internal cells inside the selected parent location, and uses material `slotId/level` to show occupied cells and material detail.
+
+Build:
+
+- Prisma migration deploy passed.
+- Prisma generate passed.
+- Backend build passed.
+- Frontend build passed.
+
 ## 2026-06-04
 
 ### Material Master v1 Usage Type
@@ -548,3 +912,144 @@ Verification after reset:
   - `qc_checklist_items = 4`;
   - `yard_zones = 8`;
   - `yard_slots = 93`.
+
+### Inventory Internal Slot Occupancy Guard
+
+Implemented:
+
+- Added `cellOccupancy` to `GET /inventory/zones` and `GET /inventory/zones/:id`.
+- Occupancy is calculated by `warehouseZone + InventoryItem.slotId + InventoryItem.level`.
+- Material creation/edit drawer now:
+  - warns when the selected internal cell/floor already has another material;
+  - disables fully occupied internal cells/floors;
+  - blocks save when the selected cell/floor is occupied;
+  - provides `Gợi ý vị trí trống`.
+- Inbound modal now:
+  - warns when the selected receiving cell/floor is occupied;
+  - blocks inbound confirmation for occupied cell/floor;
+  - provides `Gợi ý ô trống`.
+- Transfer modal now:
+  - checks destination cell/floor occupancy;
+  - blocks transfer to occupied destination cell/floor;
+  - provides `Gợi ý ô đích trống`.
+
+Notes:
+
+- Current guard uses active `InventoryItem` default location data as the occupancy source.
+- Transaction stock calculation and Prisma schema were not changed.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+### Inventory Stock Location Display Fix
+
+Implemented:
+
+- `GET /inventory/audit` now returns per-material `locationBalances` calculated from actual inventory transaction item locations.
+- Inventory stock list now displays the real stock location from `locationBalances` instead of the old default `position/zone` fallback.
+- If a material is stored in multiple locations, the stock table shows the primary location plus `... +N`.
+- Stock location distribution chart now uses the same real location balances.
+- Removed duplicate `SectionHeader` blocks from Inventory tabs so all tabs align with the Overview layout and only use the shared module topbar plus tab workspace.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+### Warehouse Location Detail Layer View
+
+Implemented:
+
+- Removed the remaining subtitle/header block from the Inventory Locations tab so it aligns with the Inventory Overview layout.
+- Location detail drawer now has tabs:
+  - `Tổng quan`;
+  - `Vật tư`;
+  - `Phân tầng ô`;
+  - `Sơ đồ 2D`.
+- Added a CSS isometric/pseudo-3D layer preview for slot levels `L1-L4`.
+- Level buttons can be clicked to highlight a floor and show the materials stored on that level.
+- Corrected UI semantics for `capacity`:
+  - `capacity` is shown as operational capacity, for example tons;
+  - 2D cell count is fixed at `A01-F06 = 36 cells`;
+  - floor structure is fixed at `L1-L4`;
+  - total addressable cell-level positions are displayed as `144`.
+- 2D preview now normalizes combined transaction slot values like `A01:L1` back to cell `A01`.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+### Component Production Warehouse Receiving UX
+
+Implemented:
+
+- Inventory outbound modal now supports a production receiving location when target is `Xuất cho sản xuất cấu kiện`.
+- Added destination selectors for `Kho vật tư SX`:
+  - production warehouse location;
+  - internal cell;
+  - level.
+- Added `Gợi ý ô trống` for the production receiving location.
+- Production receiving cell/level is blocked when occupied.
+- Production outbound now posts as a tagged `TRANSFER` with:
+  - negative line from the source inventory location;
+  - positive line into the selected production warehouse location.
+- Component production material stock now reads only the positive receiving line for `[COMPONENT_PRODUCTION]` transactions.
+- Component production material stock table now shows:
+  - `Loại vật tư`;
+  - `Vị trí kho SX` instead of generic `Khu vực`.
+- Removed duplicate subtitle/header blocks from Component module tabs so the module aligns with the Inventory layout.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+### Inventory Stock Tab Compact UX
+
+Implemented:
+
+- Reworked the Inventory Stock filter bar:
+  - removed the `Bộ lọc tồn kho` title divider;
+  - added compact filters for material group, material usage type, warehouse, and status;
+  - added manual text search with a dedicated `Tìm kiếm` button;
+  - added `Làm mới` to reset filters and refetch inventory audit data.
+- Reworked the stock list panel:
+  - moved `Xem tất cả` inline with `Danh sách tồn kho`;
+  - reduced table typography and spacing;
+  - added a compact specification column;
+  - kept the list at 10 rows per page for Full HD density.
+- Reworked right-side analytics cards:
+  - removed chart title divider bars;
+  - locked chart card height to prevent layout jumps;
+  - added pagination controls for stock distribution and alerts when data exceeds one card page;
+  - restyled stock distribution, trend, and alert cards for a denser dashboard layout.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+### Inventory Stock Full HD Density Pass
+
+Implemented:
+
+- `Cảnh báo tồn kho > Xem tất cả` now opens a modal with:
+  - full alert table;
+  - alert severity summary chart;
+  - top low-stock mini chart.
+- Reduced Stock tab vertical footprint:
+  - compact KPI cards;
+  - smaller filter controls;
+  - shorter stock table rows;
+  - shorter fixed-height chart cards;
+  - compact quick statistics panel.
+- Moved `Thống kê nhanh` higher in the viewport by reducing chart and table heights.
+- Kept chart cards fixed-height to avoid layout jumping.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   InventoryInsightPanel,
@@ -88,7 +87,6 @@ export function InventoryStockTakePage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Kiểm kê kho vật tư" description="Đối soát số lượng thực tế với hệ thống và ghi nhận chênh lệch." />
       <InventoryTabWorkspace />
 
       <div className={inventoryPageStack}>

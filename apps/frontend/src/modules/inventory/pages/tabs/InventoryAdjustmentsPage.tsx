@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { KpiCard, RuntimePanel, SectionHeader } from '../../../../shared/ui/enterprise'
+import { KpiCard, RuntimePanel } from '../../../../shared/ui/enterprise'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { useCreateTransaction } from '../../hooks/useCreateTransaction'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
@@ -255,11 +255,6 @@ export function InventoryAdjustmentsPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader
-        title="Điều Chỉnh Tồn Kho"
-        description="Manual stock difference adjustment using transaction-driven update."
-      />
-
       <InventoryTabWorkspace />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

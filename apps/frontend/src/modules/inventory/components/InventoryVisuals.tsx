@@ -65,7 +65,7 @@ export function InventoryPanel({
 }) {
   return (
     <section className={`${inventoryPanel} overflow-hidden ${className}`}>
-      {title && <h3 className="border-b border-white/10 bg-white/[0.025] px-4 py-2.5 text-sm font-semibold text-white">{title}</h3>}
+      {title && <h3 className="px-4 pt-3 text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</h3>}
       <div className="p-3">{children}</div>
     </section>
   )
@@ -232,6 +232,118 @@ export function DonutSummary({
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+export function InventoryChartCard({
+  title,
+  note,
+  action,
+  children,
+  className = '',
+}: {
+  title: string
+  note?: string
+  action?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={`${inventoryPanel} overflow-hidden p-3 ${className}`}>
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</h3>
+          {note ? <p className="mt-0.5 text-[11px] text-slate-500">{note}</p> : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+export function CompactDonutSummary({
+  segments,
+  centerValue,
+  centerLabel,
+}: {
+  segments: Array<{ label: string; value: number; color: string }>
+  centerValue: string
+  centerLabel: string
+}) {
+  const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
+  let cursor = 0
+  const gradient = segments
+    .map((item) => {
+      const start = cursor
+      const end = cursor + (item.value / total) * 100
+      cursor = end
+      return `${item.color} ${start}% ${end}%`
+    })
+    .join(', ')
+
+  return (
+    <div className="grid min-h-[150px] grid-cols-[126px_1fr] items-center gap-3">
+      <div className="relative h-28 w-28 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.2)]" style={{ background: `conic-gradient(${gradient})` }}>
+        <div className="absolute inset-3 rounded-full bg-[#08111f]" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div className="text-xl font-semibold text-white">{centerValue}</div>
+          <div className="text-[10px] text-slate-500">{centerLabel}</div>
+        </div>
+      </div>
+      <div className="space-y-1.5 overflow-hidden">
+        {segments.slice(0, 6).map((item) => {
+          const percent = (item.value / total) * 100
+          return (
+            <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-2 text-[11px]">
+              <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="truncate">{item.label}</span>
+              </span>
+              <span className="whitespace-nowrap text-slate-300">{item.value.toLocaleString('vi-VN')}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export function CompactTrendChart({
+  rows,
+}: {
+  rows: Array<{ label: string; value: number }>
+}) {
+  const max = Math.max(1, ...rows.map((row) => row.value))
+  const points = rows
+    .map((row, index) => {
+      const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+      const y = 94 - (row.value / max) * 78
+      return `${x},${y}`
+    })
+    .join(' ')
+
+  return (
+    <div className="h-[150px]">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[118px] w-full overflow-visible">
+        <defs>
+          <linearGradient id="inventoryCompactTrendFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#1d7cff" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#1d7cff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polyline points={`0,100 ${points} 100,100`} fill="url(#inventoryCompactTrendFill)" stroke="none" />
+        <polyline points={points} fill="none" stroke="#1d7cff" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
+        {rows.map((row, index) => {
+          const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+          const y = 94 - (row.value / max) * 78
+          return <circle key={row.label} cx={x} cy={y} r="1.5" fill="#38bdf8" />
+        })}
+      </svg>
+      <div className="grid grid-cols-6 gap-2 text-[10px] text-slate-500">
+        {rows.slice(0, 6).map((row) => <span key={row.label}>{row.label}</span>)}
       </div>
     </div>
   )

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
 import { useProductionBoms, useProductionOrders } from '../../../production/hooks/useProductionCockpit'
 import { useYardSlotsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
@@ -88,7 +87,6 @@ export function ComponentsStockPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Cấu kiện > Tồn kho cấu kiện" description="Tồn kho cấu kiện đồng bộ với vị trí thực tế trong bãi tập kết." />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">

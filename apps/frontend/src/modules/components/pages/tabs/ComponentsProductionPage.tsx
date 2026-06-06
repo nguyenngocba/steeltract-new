@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { SectionHeader } from '../../../../shared/ui/enterprise'
 import { componentsTabs } from '../../config/components-tabs'
 import { useProductionOrders } from '../../hooks/queries/useComponents'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
@@ -41,7 +40,6 @@ export function ComponentsProductionPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader title="Cấu kiện > Sản xuất (Lệnh SX)" description="Theo dõi lệnh sản xuất cấu kiện từ kho vật tư SX sang xưởng và vị trí bãi tập kết sau hoàn thành." />
       <EnterpriseTabBar tabs={componentsTabs} />
 
       <div className="space-y-4">
