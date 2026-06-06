@@ -6,6 +6,9 @@ import { Edit3, Eye, Layers3, MapPinned, Package, Power, PowerOff, Trash2, Wareh
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
+  CompactDonutSummary,
+  HorizontalBars,
+  InventoryChartCard,
   InventoryKpi,
   InventoryPagination,
   InventoryPanel,
@@ -136,6 +139,18 @@ export function InventoryLocationsPage() {
     stock: (zones as WarehouseLocation[]).filter(isRealStorageLocation).reduce((sum, zone) => sum + n(zone.totalStockQuantity), 0),
   }), [zones])
 
+  const locationSegments = useMemo(() => [
+    { label: 'Đang hoạt động', value: stats.active, color: '#14c987' },
+    { label: 'Ngưng dùng', value: Math.max(0, stats.total - stats.active), color: '#64748b' },
+    { label: 'Vị trí thật', value: stats.real, color: '#1d7cff' },
+  ], [stats.active, stats.real, stats.total])
+
+  const stockByLocation = useMemo(() => rows
+    .slice()
+    .sort((a, b) => n(b.totalStockQuantity) - n(a.totalStockQuantity))
+    .slice(0, 6)
+    .map((zone) => [zone.code, n(zone.totalStockQuantity)] as [string, number]), [rows])
+
   const edit = (zone: WarehouseLocation) => setForm({
     id: zone.id,
     code: zone.code,
@@ -213,14 +228,21 @@ export function InventoryLocationsPage() {
           {isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải vị trí kho...</p> : null}
         </InventoryPanel>
 
-        <InventoryPanel title="Audit warehouse_zones">
-          <div className="space-y-3 text-sm">
-            <AuditRow icon={<MapPinned size={16} />} label="Demo records" value={stats.demo} note="code bắt đầu DEMO-" />
-            <AuditRow icon={<Warehouse size={16} />} label="Warehouse-like" value={stats.warehouseLike} note="ST-WH-* là record dạng kho/buffer" />
-            <AuditRow icon={<Package size={16} />} label="Real storage" value={stats.real} note="A01/A02/B01 hoặc có row/column/level" />
-            <p className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">Bảng vị trí chỉ hiển thị real storage locations. Các record dạng kho/buffer như ST-WH-* vẫn được giữ trong database để không phá dữ liệu lịch sử hoặc tích hợp sau này.</p>
-          </div>
-        </InventoryPanel>
+        <div className="space-y-3">
+          <InventoryChartCard title="Tình trạng vị trí">
+            <CompactDonutSummary segments={locationSegments} centerValue={stats.real.toLocaleString('vi-VN')} centerLabel="vị trí thật" />
+          </InventoryChartCard>
+          <InventoryChartCard title="Tồn theo vị trí">
+            <HorizontalBars rows={stockByLocation} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+          </InventoryChartCard>
+          <InventoryChartCard title="Audit warehouse_zones">
+            <div className="space-y-2 text-sm">
+              <AuditRow icon={<MapPinned size={16} />} label="Demo records" value={stats.demo} note="code bắt đầu DEMO-" />
+              <AuditRow icon={<Warehouse size={16} />} label="Warehouse-like" value={stats.warehouseLike} note="ST-WH-* đã bị xóa nếu mồ côi dữ liệu" />
+              <AuditRow icon={<Package size={16} />} label="Real storage" value={stats.real} note="A01/A02/B01 hoặc có row/column/level" />
+            </div>
+          </InventoryChartCard>
+        </div>
       </div>
     </div>
 

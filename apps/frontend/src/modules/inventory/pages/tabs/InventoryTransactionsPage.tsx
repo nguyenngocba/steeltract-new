@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
-  InventoryInsightPanel,
+  CompactDonutSummary,
+  HorizontalBars,
+  InventoryChartCard,
   InventoryKpi,
   InventoryPagination,
   InventoryPanel,
@@ -87,6 +89,12 @@ export function InventoryTransactionsPage() {
   }, [rows])
 
   const recent = useMemo(() => rows.slice(0, 6), [rows])
+
+  const typeSegments = useMemo(() => byType.map(([label, value], index) => ({
+    label,
+    value,
+    color: ['#14c987', '#f97316', '#7c3aed', '#1d7cff', '#ef4444'][index % 5],
+  })), [byType])
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -216,33 +224,21 @@ export function InventoryTransactionsPage() {
             <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
           </InventoryPanel>
 
-          <div className="space-y-5 xl:col-span-3">
-            <InventoryInsightPanel title="Thống kê giao dịch">
-              {byType.map(([t, c]) => (
-                <div key={t} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{t}</span>
-                  <span>{c}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Giao dịch theo ngày">
-              <div className="space-y-2">
-                {dailyLoad.map(([d, c]) => (
-                  <div key={d} className="grid grid-cols-[1fr_auto] items-center gap-2 text-xs text-slate-300">
-                    <span>{d.slice(5)}</span>
-                    <span>{c}</span>
-                  </div>
-                ))}
-              </div>
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Giao dịch gần đây">
+          <div className="space-y-3 xl:col-span-3">
+            <InventoryChartCard title="Thống kê giao dịch">
+              <CompactDonutSummary segments={typeSegments} centerValue={kpis.total.toLocaleString('vi-VN')} centerLabel="giao dịch" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Giao dịch theo ngày">
+              <HorizontalBars rows={dailyLoad.map(([day, count]) => [day.slice(5), count])} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Giao dịch gần đây">
               {recent.map((x: any) => (
                 <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-cyan-300">{x.transactionNo}</div>
                   <div>{x.type}</div>
                 </div>
               ))}
-            </InventoryInsightPanel>
+            </InventoryChartCard>
           </div>
         </div>
       </div>

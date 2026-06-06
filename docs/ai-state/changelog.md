@@ -2,6 +2,46 @@
 
 ## 2026-06-06
 
+### Inventory Overview Two-Column Density And Tab Chart Sync
+
+Implemented:
+
+- Reworked Inventory Overview layout so:
+  - `Thao tác nhanh`;
+  - `Nhập kho hôm nay`;
+  - `Xuất kho hôm nay`;
+  sit inside the left stock-table column, directly above `Tồn kho vật tư`.
+- The Overview right-side charts now start at the same vertical level as the three quick cards, so `Tổng quan tồn kho` is pushed higher.
+- Reduced Overview filter height and tightened filter spacing.
+- Reduced shared Inventory input height to make filters across Inventory tabs more compact.
+- Synced chart treatment across remaining Inventory tabs:
+  - `Vị trí kho`: donut location status and stock-by-location bar chart.
+  - `Nhập kho`: donut inbound-by-location and top inbound material bar chart.
+  - `Xuất kho`: donut outbound-by-warehouse and top outbound material bar chart.
+  - `Điều chuyển`: donut transfer status and transfer-value bar chart.
+  - `Kiểm kê`: donut stock-take accuracy and variance/method bar charts.
+  - `Lịch sử giao dịch`: donut transaction type and daily transaction bar chart.
+  - `Cảnh báo tồn kho`: donut alert severity and alert-type bar chart.
+
+Build:
+
+- Frontend build passed.
+
+### Inventory Overview Density Adjustment
+
+Implemented:
+
+- Reduced the height and padding of Overview quick-action, inbound-today, and outbound-today cards.
+- Reduced quick-action button height and summary typography so the main stock/charts area starts higher.
+- Rebalanced the Overview filter grid:
+  - warehouse/category/type/status fields are narrower;
+  - manual search field is longer and cleaner;
+  - placeholder text is shorter.
+
+Build:
+
+- Frontend build passed.
+
 ### Inventory Overview Quick Action And Stock Status Polish
 
 Implemented:

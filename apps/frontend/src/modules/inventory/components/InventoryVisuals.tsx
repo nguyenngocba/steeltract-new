@@ -4,7 +4,7 @@ export const inventoryPanel =
   'rounded-2xl border border-white/10 bg-slate-950/45 shadow-[0_22px_70px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-2xl'
 
 export const inventoryInput =
-  'h-10 rounded-xl border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+  'h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
 
 export const inventoryPageStack = 'space-y-3'
 

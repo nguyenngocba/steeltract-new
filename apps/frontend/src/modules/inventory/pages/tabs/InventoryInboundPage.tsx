@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
-  InventoryInsightPanel,
+  CompactDonutSummary,
+  HorizontalBars,
+  InventoryChartCard,
   InventoryKpi,
   InventoryPagination,
   InventoryPanel,
@@ -103,6 +105,12 @@ export function InventoryInboundPage() {
     return Array.from(m.values()).sort((a, b) => b.qty - a.qty).slice(0, 5)
   }, [rows])
 
+  const zoneSegments = useMemo(() => byZone.map(([label, value], index) => ({
+    label,
+    value,
+    color: ['#1d7cff', '#14c987', '#f59e0b', '#7c3aed', '#ef4444', '#06b6d4'][index % 6],
+  })), [byZone])
+
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize
     return rows.slice(start, start + pageSize)
@@ -184,23 +192,13 @@ export function InventoryInboundPage() {
             <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
           </InventoryPanel>
 
-          <div className="space-y-5 xl:col-span-3">
-            <InventoryInsightPanel title="Phân bổ nhập theo vị trí">
-              {byZone.map(([z, q]) => (
-                <div key={z} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{z}</span>
-                  <span>{q.toLocaleString('vi-VN')}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Top 5 vật tư nhập nhiều nhất">
-              {topMaterials.map((m) => (
-                <div key={m.code} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{m.code}</span>
-                  <span>{m.qty.toLocaleString('vi-VN')}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
+          <div className="space-y-3 xl:col-span-3">
+            <InventoryChartCard title="Phân bổ nhập theo vị trí">
+              <CompactDonutSummary segments={zoneSegments} centerValue={kpis.monthlyQty.toLocaleString('vi-VN')} centerLabel="tổng nhập" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Top vật tư nhập">
+              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.qty])} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+            </InventoryChartCard>
           </div>
         </div>
 

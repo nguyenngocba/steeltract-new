@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
-  InventoryInsightPanel,
+  CompactDonutSummary,
+  HorizontalBars,
+  InventoryChartCard,
   InventoryKpi,
   InventoryPagination,
   InventoryPanel,
@@ -78,6 +80,11 @@ export function InventoryStockTakePage() {
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [rows])
+
+  const accuracySegments = useMemo(() => [
+    { label: 'Khớp', value: metrics.matched, color: '#14c987' },
+    { label: 'Chênh lệch', value: metrics.mismatch, color: '#f59e0b' },
+  ], [metrics.matched, metrics.mismatch])
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -155,23 +162,16 @@ export function InventoryStockTakePage() {
             <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
           </InventoryPanel>
 
-          <div className="space-y-5 xl:col-span-3">
-            <InventoryInsightPanel title="Giá trị chênh lệch theo kho">
-              {discrepancyByZone.map(([z, q]) => (
-                <div key={z} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{z}</span>
-                  <span>{q.toLocaleString('vi-VN')}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Phương pháp kiểm kê">
-              {methodDist.map(([m, c]) => (
-                <div key={m} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{m}</span>
-                  <span>{c}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
+          <div className="space-y-3 xl:col-span-3">
+            <InventoryChartCard title="Độ chính xác kiểm kê">
+              <CompactDonutSummary segments={accuracySegments} centerValue={`${metrics.accuracy.toFixed(1)}%`} centerLabel="chính xác" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Chênh lệch theo kho">
+              <HorizontalBars rows={discrepancyByZone} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Phương pháp kiểm kê">
+              <HorizontalBars rows={methodDist} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+            </InventoryChartCard>
           </div>
         </div>
 

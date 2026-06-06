@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
-  InventoryInsightPanel,
+  CompactDonutSummary,
+  HorizontalBars,
+  InventoryChartCard,
   InventoryKpi,
   InventoryPagination,
   InventoryPanel,
@@ -81,6 +83,12 @@ export function InventoryAlertsPage() {
   }, [alerts])
   const criticalList = useMemo(() => alerts.filter((x: any) => x.level === 'Nghiêm trọng').slice(0, 8), [alerts])
 
+  const levelSegments = useMemo(() => byLevel.map(([label, value], index) => ({
+    label,
+    value,
+    color: ['#ef4444', '#f59e0b', '#1d7cff', '#14c987'][index % 4],
+  })), [byLevel])
+
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize
     return alerts.slice(start, start + pageSize)
@@ -156,24 +164,14 @@ export function InventoryAlertsPage() {
             <InventoryPagination page={page} pageCount={pageCount} total={alerts.length} pageSize={pageSize} onPageChange={setPage} />
           </InventoryPanel>
 
-          <div className="space-y-5 xl:col-span-3">
-            <InventoryInsightPanel title="Phân bổ cảnh báo theo mức độ">
-              {byLevel.map(([level, count]) => (
-                <div key={level} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{level}</span>
-                  <span>{count}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Cảnh báo theo loại">
-              {byType.map(([typeName, count]) => (
-                <div key={typeName} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{typeName}</span>
-                  <span>{count}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Cảnh báo nghiêm trọng">
+          <div className="space-y-3 xl:col-span-3">
+            <InventoryChartCard title="Phân bổ cảnh báo theo mức độ">
+              <CompactDonutSummary segments={levelSegments} centerValue={kpi.total.toLocaleString('vi-VN')} centerLabel="cảnh báo" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Cảnh báo theo loại">
+              <HorizontalBars rows={byType} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Cảnh báo nghiêm trọng">
               {criticalList.map((x: any) => (
                 <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-red-300">
@@ -182,7 +180,7 @@ export function InventoryAlertsPage() {
                   <div>{x.zoneCode}</div>
                 </div>
               ))}
-            </InventoryInsightPanel>
+            </InventoryChartCard>
           </div>
         </div>
       </div>

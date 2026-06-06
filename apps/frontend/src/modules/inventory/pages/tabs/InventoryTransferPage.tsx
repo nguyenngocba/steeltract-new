@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
-  InventoryInsightPanel,
+  CompactDonutSummary,
+  HorizontalBars,
+  InventoryChartCard,
   InventoryKpi,
   InventoryPagination,
   InventoryPanel,
@@ -82,6 +84,12 @@ export function InventoryTransferPage() {
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [rows])
+
+  const transferSegments = useMemo(() => [
+    { label: 'Hoàn thành', value: kpis.done, color: '#14c987' },
+    { label: 'Đang thực hiện', value: kpis.pending, color: '#f59e0b' },
+    { label: 'Đã hủy', value: kpis.cancelled, color: '#ef4444' },
+  ], [kpis.done, kpis.pending, kpis.cancelled])
 
   const recentActivities = useMemo(() => rows.slice(0, 5), [rows])
 
@@ -184,31 +192,21 @@ export function InventoryTransferPage() {
             <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
           </InventoryPanel>
 
-          <div className="space-y-5 xl:col-span-3">
-            <InventoryInsightPanel title="Giá trị điều chuyển theo kho">
-              {zoneValue.map(([z, v]) => (
-                <div key={z} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{z}</span>
-                  <span>{formatCurrency(v)}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Loại điều chuyển">
-              {transferTypes.map(([t, c]) => (
-                <div key={t} className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                  <span>{t}</span>
-                  <span>{c}</span>
-                </div>
-              ))}
-            </InventoryInsightPanel>
-            <InventoryInsightPanel title="Hoạt động gần đây">
+          <div className="space-y-3 xl:col-span-3">
+            <InventoryChartCard title="Tổng quan điều chuyển">
+              <CompactDonutSummary segments={transferSegments} centerValue={kpis.total.toLocaleString('vi-VN')} centerLabel="phiếu" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Giá trị điều chuyển theo kho">
+              <HorizontalBars rows={zoneValue} valueFormatter={formatCurrency} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Hoạt động gần đây">
               {recentActivities.map((x: any) => (
                 <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-cyan-300">{x.transactionNo}</div>
                   <div>{new Date(x.transactionDate ?? x.createdAt).toLocaleString('vi-VN')}</div>
                 </div>
               ))}
-            </InventoryInsightPanel>
+            </InventoryChartCard>
           </div>
         </div>
 

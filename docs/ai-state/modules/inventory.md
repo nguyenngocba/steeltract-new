@@ -437,6 +437,10 @@ Latest polish:
 - Recent inbound/outbound cards use column-style rows with code, material/target, date, quantity, and status.
 - Warehouse filtering is presented as a compact status bar with a warehouse dropdown.
 - Stock tab inventory list includes a `Trạng thái` column.
+- Overview now uses a two-column cockpit layout: quick cards and stock table on the left, analytics charts starting at the same height on the right.
+- Shared Inventory inputs are compacted for lower filter height across tabs.
+- Remaining Inventory tabs now use shared donut/bar chart treatment for their side analytics:
+  locations, inbound, outbound, transfer, stock take, transactions, and alerts.
 
 ## Boundaries Preserved
 

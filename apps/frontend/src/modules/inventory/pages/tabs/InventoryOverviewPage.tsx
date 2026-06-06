@@ -151,7 +151,7 @@ function rowMatchesWarehouse(item: any, warehouse: string) {
 function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-slate-400">{label}</span>
+      <span className="mb-0.5 block text-[10px] font-medium text-slate-400">{label}</span>
       {children}
     </label>
   )
@@ -388,21 +388,21 @@ export function InventoryOverviewPage() {
         </div>
 
         <InventoryPanel>
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[0.95fr_0.95fr_0.95fr_0.95fr_1.55fr_auto_auto]">
+          <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-[0.72fr_0.76fr_0.8fr_0.72fr_1.7fr_auto_auto]">
             <LabeledFilter label="Kho">
-              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-8 rounded-lg text-xs`}>
+              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
                 <option value="">Tất cả kho</option>
                 {warehouseOptions.map((warehouse) => <option key={warehouse.value} value={warehouse.value}>{warehouse.label}</option>)}
               </select>
             </LabeledFilter>
             <LabeledFilter label="Nhóm vật tư">
-              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-8 rounded-lg text-xs`}>
+              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
                 <option value="">Tất cả</option>
                 {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </LabeledFilter>
             <LabeledFilter label="Loại vật tư">
-              <select value={usageFilter} onChange={(e) => { setUsageFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-8 rounded-lg text-xs`}>
+              <select value={usageFilter} onChange={(e) => { setUsageFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
                 <option value="">Tất cả</option>
                 <option value="PRIMARY">Vật tư chính</option>
                 <option value="SECONDARY">Vật tư phụ</option>
@@ -410,7 +410,7 @@ export function InventoryOverviewPage() {
               </select>
             </LabeledFilter>
             <LabeledFilter label="Trạng thái">
-              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-8 rounded-lg text-xs`}>
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
                 <option value="">Tất cả</option>
                 <option value="NORMAL">Bình thường</option>
                 <option value="LOW">Sắp hết</option>
@@ -422,34 +422,33 @@ export function InventoryOverviewPage() {
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') applySearch() }}
-                placeholder="Tìm kiếm mã, tên, quy cách, nhóm vật tư..."
-                className={`${inventoryInput} h-8 rounded-lg text-xs`}
+                placeholder="Tìm mã, tên, quy cách..."
+                className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}
               />
             </LabeledFilter>
-            <button onClick={applySearch} className="h-8 self-end rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">Tìm kiếm</button>
-            <button onClick={resetFilters} className="h-8 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10">Làm mới</button>
+            <button onClick={applySearch} className="h-7 self-end rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">Tìm kiếm</button>
+            <button onClick={resetFilters} className="h-7 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10">Làm mới</button>
           </div>
         </InventoryPanel>
 
-        <div className={`grid grid-cols-1 xl:grid-cols-[1fr_0.8fr_0.8fr] ${inventoryGridGap}`}>
-          <InventoryChartCard title="Thao tác nhanh">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <QuickActionButton label="Nhập kho" tone="blue" onClick={() => setTransactionModal('inbound')} />
-              <QuickActionButton label="Xuất kho" tone="emerald" onClick={() => setTransactionModal('outbound')} />
-              <QuickActionButton label="Điều chuyển" tone="amber" onClick={() => setTransactionModal('transfer')} />
-              <QuickActionButton label="Kiểm kê" tone="purple" onClick={() => setTransactionModal('stock-take')} />
-            </div>
-          </InventoryChartCard>
-          <InventoryChartCard title="Nhập kho hôm nay">
-            <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={recentInboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="cyan" />
-          </InventoryChartCard>
-          <InventoryChartCard title="Xuất kho hôm nay">
-            <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={recentOutboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="amber" />
-          </InventoryChartCard>
-        </div>
-
         <div className={`grid grid-cols-1 xl:grid-cols-12 ${inventoryGridGap}`}>
           <div className="space-y-3 xl:col-span-8">
+            <div className={`grid grid-cols-1 md:grid-cols-[1fr_0.78fr_0.78fr] ${inventoryGridGap}`}>
+              <InventoryChartCard title="Thao tác nhanh" className="p-2.5">
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <QuickActionButton label="Nhập kho" tone="blue" onClick={() => setTransactionModal('inbound')} />
+                  <QuickActionButton label="Xuất kho" tone="emerald" onClick={() => setTransactionModal('outbound')} />
+                  <QuickActionButton label="Điều chuyển" tone="amber" onClick={() => setTransactionModal('transfer')} />
+                  <QuickActionButton label="Kiểm kê" tone="purple" onClick={() => setTransactionModal('stock-take')} />
+                </div>
+              </InventoryChartCard>
+              <InventoryChartCard title="Nhập kho hôm nay" className="p-2.5">
+                <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={recentInboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="cyan" />
+              </InventoryChartCard>
+              <InventoryChartCard title="Xuất kho hôm nay" className="p-2.5">
+                <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={recentOutboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="amber" />
+              </InventoryChartCard>
+            </div>
             <InventoryPanel>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Tồn kho vật tư</h3>
@@ -583,7 +582,7 @@ function QuickActionButton({ label, tone, onClick }: { label: string; tone: 'blu
     <button
       type="button"
       onClick={onClick}
-      className={`h-14 rounded-xl border px-3 text-xs font-semibold transition ${toneClass}`}
+      className={`h-10 rounded-lg border px-2 text-[11px] font-semibold transition ${toneClass}`}
     >
       {label}
     </button>
@@ -606,13 +605,13 @@ function StatusMetric({ label, value, tone }: { label: string; value: number; to
 
 function TransactionSummary({ title, count, quantity, amount, tone }: { title: string; count: number; quantity: number; amount: number; tone: 'cyan' | 'amber' }) {
   return (
-    <div className="grid grid-cols-[auto_1fr] items-end gap-4">
+    <div className="grid grid-cols-[auto_1fr] items-end gap-3">
       <div>
-        <div className="text-3xl font-semibold text-white">{count}</div>
-        <div className="text-xs text-slate-500">{title}</div>
+        <div className="text-2xl font-semibold text-white">{count}</div>
+        <div className="text-[11px] text-slate-500">{title}</div>
       </div>
       <div className="text-right">
-        <div className={`text-lg font-semibold ${tone === 'cyan' ? 'text-cyan-300' : 'text-amber-300'}`}>{formatQty(quantity)} tấn</div>
+        <div className={`text-base font-semibold ${tone === 'cyan' ? 'text-cyan-300' : 'text-amber-300'}`}>{formatQty(quantity)} tấn</div>
         <div className="text-xs text-slate-400">{money(amount)}</div>
       </div>
     </div>
