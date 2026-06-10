@@ -306,7 +306,9 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
 
 function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDetail | null; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'materials' | 'levels' | 'map'>('overview')
-  const materials = detail?.inventoryItems ?? []
+  const materials = detail
+  ? buildMaterialsFromOccupancy(detail)
+  : []
   const capacity = n(detail?.capacity)
   const usedQuantity = n(detail?.totalStockQuantity)
   const occupiedSlots = getOccupiedCellLevels(materials, detail).length
@@ -375,20 +377,43 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
                   <tr>
                     <th className="px-4 py-3">Mã vật tư</th>
                     <th className="px-4 py-3">Tên vật tư</th>
+                    <th className="px-4 py-3">Slot</th>
+                    <th className="px-4 py-3">Level</th>
                     <th className="px-4 py-3 text-right">Số lượng</th>
                     <th className="px-4 py-3">Đơn vị</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {materials.map((item) => <tr key={item.id} className="border-t border-slate-800/80 hover:bg-slate-900/45">
-                    <td className="px-4 py-3 font-semibold text-cyan-300">{item.code}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-100">{item.name}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{item.category?.name ?? '-'} · {item.materialType?.name ?? '-'}</div>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold">{n(item.quantity).toLocaleString('vi-VN')}</td>
-                    <td className="px-4 py-3">{item.unitMaster?.symbol ?? item.unit ?? '-'}</td>
-                  </tr>)}
+                  {materials.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-slate-800/80 hover:bg-slate-900/45"
+                    >
+                      <td className="px-4 py-3 font-semibold text-cyan-300">
+                        {item.code}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {item.name}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {item.slotId}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {item.level}
+                      </td>
+
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {n(item.quantity).toLocaleString('vi-VN')}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {item.unit ?? '-'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
               {!materials.length ? <p className="border-t border-slate-800 px-4 py-6 text-center text-sm text-slate-500">Chưa có vật tư gán vào vị trí này.</p> : null}
@@ -522,22 +547,34 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
 function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
   const rowLabels = buildRowLabels(detail.row)
   const columnLabels = buildColumnLabels(detail.column)
+
+  const occupancyItems = buildMaterialsFromOccupancy(detail)
+
   const materialsByCell = useMemo(() => {
-    const map = new Map<string, WarehouseLocationDetail['inventoryItems']>()
-    const occupancyItems = buildMaterialsFromOccupancy(detail)
+    const map = new Map<string, any[]>()
 
     for (const item of occupancyItems) {
-      const key = normalizeSlotCell(item.slotId) || `${detail.row ?? ''}${detail.column ?? ''}` || 'A01'
+      const key =
+        normalizeSlotCell(item.slotId) ||
+        `${detail.row ?? ''}${detail.column ?? ''}` ||
+        'A01'
+
       const list = map.get(key) ?? []
+
       list.push(item)
+
       map.set(key, list)
     }
+
     return map
-  }, [detail])
+  }, [detail, occupancyItems])
+
   const defaultCell =
-  normalizeSlotCell(
-    detail.inventoryItems?.find((item) => item.slotId)?.slotId
-  ) ?? `${detail.row ?? 'A'}${detail.column ?? '01'}`
+    normalizeSlotCell(
+      occupancyItems.find((item) => item.slotId)?.slotId,
+    ) ||
+    `${detail.row ?? 'A'}${detail.column ?? '01'}`
+
   const [selectedCell, setSelectedCell] = useState(defaultCell)
   const [selectedLevel, setSelectedLevel] = useState('L2')
   const selectedItems = materialsByCell.get(selectedCell) ?? []
