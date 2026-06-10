@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart3, Building2, CalendarClock, CheckCircle2, Clock, FileBarChart, Layers, MapPin, PackageOpen, Search, TrendingUp, X, type LucideIcon } from 'lucide-react'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
-import { getProjectsRuntime, type ProjectMaterialRuntime, type ProjectRuntimeRow, type ProjectsRuntime } from '../api/projects.api'
+import { createProject, getProjectsRuntime, type ProjectMaterialRuntime, type ProjectRuntimeRow, type ProjectsRuntime, type ProjectStatus } from '../api/projects.api'
 
 type ProjectTab = 'overview' | 'list' | 'progress' | 'materials' | 'reports'
 
-const panel = 'rounded border border-slate-800 bg-[#071321]'
-const input = 'h-10 rounded border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 outline-none focus:border-cyan-500'
+const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
+const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
+const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
+const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
+const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
 const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value)
 const money = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value / 1_000_000_000)
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
@@ -22,15 +26,27 @@ const tabs: Array<[ProjectTab, string]> = [
 ]
 
 export function ProjectsPage() {
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState<ProjectTab>('overview')
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   const [selectedProject, setSelectedProject] = useState<ProjectRuntimeRow | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
   const { data, isLoading } = useQuery({
     queryKey: ['projects-runtime'],
     queryFn: getProjectsRuntime,
     refetchInterval: 5000,
+  })
+  const createMutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: async () => {
+      setCreateOpen(false)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['projects-runtime'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-projects'] }),
+      ])
+    },
   })
   const runtime = data ?? emptyRuntime()
   const rows = useMemo(() => runtime.projects.filter((project) => {
@@ -41,22 +57,22 @@ export function ProjectsPage() {
   const projectTypes = Array.from(new Set(runtime.projects.map((project) => project.type)))
 
   return <OperationalShell>
-    <main className="min-h-screen bg-[#020811] p-4 text-slate-100">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-3">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
+      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Công trình</p>
-          <h1 className="mt-1 text-2xl font-semibold">Công trình · {tabs.find(([id]) => id === tab)?.[1]}</h1>
+          <h1 className="mt-1 text-2xl font-semibold">Công trình</h1>
           <p className="mt-1 text-xs text-slate-500">Project cockpit liên kết Project, Component, Production và Inventory theo projectId.</p>
         </div>
         <div className="flex gap-2">
-          <button className="rounded bg-blue-600 px-4 py-2 text-xs font-semibold">+ Thêm công trình</button>
-          <button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs text-slate-200">Xuất Excel</button>
-          <button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs text-slate-200">Báo cáo</button>
+          <button onClick={() => setCreateOpen(true)} className={primaryButton}>+ Thêm công trình</button>
+          <button className={mutedButton}>Xuất Excel</button>
+          <button className={mutedButton}>Báo cáo</button>
         </div>
       </header>
 
-      <nav className="my-3 flex gap-1 overflow-x-auto rounded bg-[#06101b] p-1">
-        {tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded px-3 py-2 text-xs ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>{label}</button>)}
+      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>
+        {tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs transition ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}
       </nav>
 
       <FilterBar query={query} status={status} type={type} projectTypes={projectTypes} onQuery={setQuery} onStatus={setStatus} onType={setType} />
@@ -69,15 +85,77 @@ export function ProjectsPage() {
       {tab === 'reports' && <ReportsTab runtime={runtime} />}
 
       <ProjectDetailDialog project={selectedProject} materials={runtime.materials.filter((row) => row.projectId === selectedProject?.id)} onClose={() => setSelectedProject(null)} />
+      <CreateProjectDialog open={createOpen} saving={createMutation.isPending} error={createMutation.error} onClose={() => setCreateOpen(false)} onSubmit={(payload) => createMutation.mutate(payload)} />
     </main>
   </OperationalShell>
 }
 
+function CreateProjectDialog({ open, saving, error, onClose, onSubmit }: { open: boolean; saving: boolean; error: unknown; onClose: () => void; onSubmit: (payload: { code: string; name: string; description?: string; status?: ProjectStatus }) => void }) {
+  const [code, setCode] = useState(`CT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`)
+  const [name, setName] = useState('')
+  const [owner, setOwner] = useState('')
+  const [location, setLocation] = useState('')
+  const [type, setType] = useState('Nhà xưởng')
+  const [status, setStatus] = useState<ProjectStatus>('PLANNING')
+  const [note, setNote] = useState('')
+
+  if (!open) return null
+
+  const submit = () => {
+    if (!code.trim() || !name.trim()) return
+    onSubmit({
+      code: code.trim(),
+      name: name.trim(),
+      status,
+      description: [
+        owner.trim() ? `Chủ đầu tư: ${owner.trim()}` : '',
+        location.trim() ? `Địa điểm: ${location.trim()}` : '',
+        type.trim() ? `Loại: ${type.trim()}` : '',
+        note.trim(),
+      ].filter(Boolean).join('; '),
+    })
+  }
+
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <section className="w-full max-w-3xl overflow-hidden rounded-xl border border-cyan-900 bg-[#061321] text-slate-100 shadow-2xl">
+      <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Công trình</p>
+          <h2 className="mt-1 text-xl font-semibold">Thêm công trình</h2>
+          <p className="mt-1 text-xs text-slate-500">Công trình mới sẽ liên kết được với vật tư, cấu kiện, sản xuất và QC qua projectId.</p>
+        </div>
+        <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
+      </header>
+      <div className="grid gap-3 p-5 md:grid-cols-2">
+        <label className="text-xs text-slate-400">Mã công trình<input value={code} onChange={(event) => setCode(event.target.value)} className={`${input} mt-2 w-full`} /></label>
+        <label className="text-xs text-slate-400">Tên công trình<input value={name} onChange={(event) => setName(event.target.value)} className={`${input} mt-2 w-full`} placeholder="Nhà máy kết cấu thép..." /></label>
+        <label className="text-xs text-slate-400">Chủ đầu tư<input value={owner} onChange={(event) => setOwner(event.target.value)} className={`${input} mt-2 w-full`} placeholder="Công ty / khách hàng" /></label>
+        <label className="text-xs text-slate-400">Địa điểm<input value={location} onChange={(event) => setLocation(event.target.value)} className={`${input} mt-2 w-full`} placeholder="KCN, tỉnh/thành..." /></label>
+        <label className="text-xs text-slate-400">Loại công trình<select value={type} onChange={(event) => setType(event.target.value)} className={`${input} mt-2 w-full`}>
+          {['Nhà xưởng', 'Kho bãi', 'Tòa nhà', 'Hạ tầng', 'Văn phòng'].map((item) => <option key={item} value={item}>{item}</option>)}
+        </select></label>
+        <label className="text-xs text-slate-400">Trạng thái<select value={status} onChange={(event) => setStatus(event.target.value as ProjectStatus)} className={`${input} mt-2 w-full`}>
+          <option value="PLANNING">Chưa khởi công</option>
+          <option value="ACTIVE">Đang thi công</option>
+          <option value="ON_HOLD">Tạm dừng</option>
+          <option value="COMPLETED">Hoàn thành</option>
+        </select></label>
+        <label className="text-xs text-slate-400 md:col-span-2">Ghi chú<textarea value={note} onChange={(event) => setNote(event.target.value)} className={`${input} mt-2 min-h-24 w-full py-2`} placeholder="Thông tin hợp đồng, phạm vi, yêu cầu riêng..." /></label>
+        {error ? <p className="rounded border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-200 md:col-span-2">Không thể tạo công trình. Vui lòng kiểm tra mã trùng hoặc dữ liệu nhập.</p> : null}
+      </div>
+      <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
+        <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">Hủy</button>
+        <button disabled={saving || !code.trim() || !name.trim()} onClick={submit} className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? 'Đang tạo...' : 'Tạo công trình'}</button>
+      </footer>
+    </section>
+  </div>
+}
+
 function FilterBar({ query, status, type, projectTypes, onQuery, onStatus, onType }: { query: string; status: string; type: string; projectTypes: string[]; onQuery: (value: string) => void; onStatus: (value: string) => void; onType: (value: string) => void }) {
-  return <div className={`${panel} flex flex-wrap items-center gap-2 p-3`}>
-    <div className="flex min-w-72 flex-1 items-center gap-2 rounded border border-slate-700 bg-[#050d18] px-3">
+  return <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
+    <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3">
       <Search size={15} className="text-cyan-400" />
-      <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Tìm kiếm công trình, chủ đầu tư, địa điểm..." className="h-10 w-full bg-transparent text-sm text-slate-100 outline-none" />
+      <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Tìm kiếm công trình, chủ đầu tư, địa điểm..." className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none" />
     </div>
     <select value={status} onChange={(event) => onStatus(event.target.value)} className={input}>
       <option value="all">Trạng thái: Tất cả</option>
@@ -90,7 +168,7 @@ function FilterBar({ query, status, type, projectTypes, onQuery, onStatus, onTyp
       <option value="all">Loại công trình: Tất cả</option>
       {projectTypes.map((item) => <option key={item} value={item}>{item}</option>)}
     </select>
-    <button className="h-10 rounded border border-slate-700 bg-slate-900 px-4 text-sm text-slate-200">Làm mới</button>
+    <button className={mutedButton}>Làm mới</button>
   </div>
 }
 
@@ -136,11 +214,11 @@ function ProjectListTab({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (
 
 function ProjectTable({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
   return <div className={`${panel} overflow-hidden`}>
-    <div className="border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách công trình</h2></div>
+    <div className="flex items-center justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách công trình</h2><span className="text-xs text-slate-500">Hiển thị {rows.length} kết quả</span></div>
     <div className="overflow-auto">
       <table className="w-full min-w-[1120px] text-left text-sm">
-        <thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500"><tr>{['Mã công trình', 'Tên công trình', 'Chủ đầu tư', 'Địa điểm', 'Loại', 'Giá trị HĐ', 'Tiến độ', 'Trạng thái', 'Ngày khởi công', 'Ngày hoàn thành'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead>
-        <tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className="cursor-pointer border-t border-slate-800 text-slate-200 hover:bg-cyan-950/20">
+        <thead className={tableHead}><tr>{['Mã công trình', 'Tên công trình', 'Chủ đầu tư', 'Địa điểm', 'Loại', 'Giá trị HĐ', 'Tiến độ', 'Trạng thái', 'Ngày khởi công', 'Ngày hoàn thành'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead>
+        <tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}>
           <td className="px-4 py-3 font-semibold text-cyan-300">{row.code}</td><td className="px-4 py-3">{row.name}</td><td className="px-4 py-3">{row.owner}</td><td className="px-4 py-3">{row.location}</td><td className="px-4 py-3">{row.type}</td><td className="px-4 py-3">{money(row.contractValue)}</td><td className="px-4 py-3"><Progress value={row.progress} /></td><td className="px-4 py-3"><StatusBadge status={row.status} /></td><td className="px-4 py-3">{date(row.startedAt)}</td><td className="px-4 py-3">{date(row.plannedEndAt)}</td>
         </tr>)}</tbody>
       </table>
@@ -205,8 +283,16 @@ function ProjectDetailDialog({ project, materials, onClose }: { project: Project
 }
 
 function KpiCard({ icon: Icon, title, value, note, tone = 'cyan' }: { icon: LucideIcon; title: string; value: string; note: string; tone?: 'cyan' | 'emerald' | 'amber' | 'purple' }) {
-  const color = tone === 'emerald' ? 'text-emerald-300 bg-emerald-950' : tone === 'amber' ? 'text-amber-300 bg-amber-950' : tone === 'purple' ? 'text-purple-300 bg-purple-950' : 'text-cyan-300 bg-cyan-950'
-  return <div className={`${panel} p-4`}><div className="flex justify-between"><span className={`rounded-full p-3 ${color}`}><Icon size={20} /></span></div><div className="mt-4 text-[10px] uppercase tracking-[0.16em] text-slate-500">{title}</div><div className="mt-2 text-2xl font-semibold text-white">{value}</div><div className="mt-1 text-xs text-slate-500">{note}</div></div>
+  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-400 text-emerald-200' : tone === 'amber' ? 'from-amber-500 to-orange-400 text-amber-200' : tone === 'purple' ? 'from-purple-500 to-fuchsia-400 text-purple-200' : 'from-blue-500 to-cyan-400 text-cyan-200'
+  return <div className={`${panel} relative overflow-hidden p-4`}>
+    <div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`} />
+    <div className="flex items-center justify-between gap-3">
+      <span className={`grid h-11 w-11 place-items-center rounded-lg bg-gradient-to-br ${color} bg-opacity-15 text-white shadow-lg shadow-black/20`}><Icon size={20} /></span>
+      <span className="text-right text-[10px] uppercase tracking-[0.16em] text-slate-500">{note}</span>
+    </div>
+    <div className="mt-4 text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div>
+    <div className="mt-1 text-2xl font-semibold text-white">{value}</div>
+  </div>
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -224,12 +310,12 @@ function Ring({ value, label }: { value: number; label: string }) {
 }
 
 function DonutPanel({ title, center, note, rows }: { title: string; center: string; note: string; rows: Array<[string, number, string]> }) {
-  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">{title}</h3><div className="mt-4 grid grid-cols-[130px_1fr] items-center gap-4"><div className="flex aspect-square items-center justify-center rounded-full border-[18px] border-blue-600 bg-slate-950 text-center"><div><div className="text-xl font-semibold">{center}</div><div className="text-xs text-slate-500">{note}</div></div></div><div className="space-y-2">{rows.map(([label, value, color]) => <div key={label} className="flex items-center justify-between gap-2 text-xs"><span className="flex items-center gap-2"><i className={`h-2 w-2 rounded-full ${color}`} />{label}</span><b>{fmt(value)}</b></div>)}</div></div></div>
+  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">{title}</h3><div className="mt-4 grid grid-cols-[130px_1fr] items-center gap-4"><div className="grid aspect-square place-items-center rounded-full bg-[conic-gradient(#2563eb_0_35%,#10b981_35%_62%,#f59e0b_62%_82%,#8b5cf6_82%_100%)] p-4"><div className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-center"><div><div className="text-xl font-semibold">{center}</div><div className="text-xs text-slate-500">{note}</div></div></div></div><div className="space-y-2">{rows.map(([label, value, color]) => <div key={label} className="flex items-center justify-between gap-2 text-xs"><span className="flex items-center gap-2"><i className={`h-2 w-2 rounded-full ${color}`} />{label}</span><b>{fmt(value)}</b></div>)}</div></div></div>
 }
 
 function BarPanel({ title, rows, suffix }: { title: string; rows: Array<[string, number]>; suffix: string }) {
   const max = Math.max(1, ...rows.map(([, value]) => value))
-  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">{title}</h3><div className="mt-4 flex h-48 items-end gap-2 border-b border-l border-slate-800 px-3 pb-3">{rows.slice(0, 10).map(([label, value]) => <div key={label} className="flex flex-1 flex-col items-center justify-end gap-2"><span className="text-[10px] text-slate-300">{fmt(value)}{suffix}</span><div className="w-full rounded-t bg-blue-600" style={{ height: `${Math.max(4, value / max * 100)}%` }} /><span className="max-w-16 truncate text-[9px] text-slate-500">{label}</span></div>)}</div></div>
+  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">{title}</h3><div className="mt-4 flex h-44 items-end gap-2 rounded-lg border border-white/10 bg-slate-950/35 px-3 pb-3">{rows.slice(0, 10).map(([label, value]) => <div key={label} className="flex flex-1 flex-col items-center justify-end gap-2"><span className="text-[10px] text-slate-300">{fmt(value)}{suffix}</span><div className="w-full rounded-t bg-gradient-to-t from-blue-700 to-cyan-400" style={{ height: `${Math.max(4, value / max * 100)}%` }} /><span className="max-w-16 truncate text-[9px] text-slate-500">{label}</span></div>)}</div></div>
 }
 
 function GanttPanel({ rows }: { rows: ProjectRuntimeRow[] }) {

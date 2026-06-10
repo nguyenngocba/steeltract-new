@@ -68,7 +68,12 @@ Related gate:
 * Main inspection table linked to Project, Component, ProductionOrder, Checklist, Result, Status, and inspector.
 * Latest inspection panel with pass rate and related production/component data.
 * Completed production queue where each completed MO can open a popup and create a QC inspection.
+* Direct `Tạo phiếu kiểm tra cấu kiện` modal from the QC header:
+  * select a completed MO/component waiting for QC;
+  * create a ready inspection;
+  * or create and approve/pass immediately to unlock Yard staging.
 * Inspection detail popup with start, pass/approve, and rework actions.
+* Quick pass/approve workflow supports newly created `READY` inspections and no longer requires the UI to complete a separate start transition first.
 * Checklist standard cards from existing QC checklist data.
 * NCR table and status summary from existing NCR data.
 * Report panels and calibration placeholders prepared for Phase S2.

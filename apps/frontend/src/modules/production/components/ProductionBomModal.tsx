@@ -54,6 +54,12 @@ function bomCategoryLabel(category: MaterialDraft['category']) {
   return 'Vật tư chính'
 }
 
+function isProductionWarehouseLine(line: any, transaction: any) {
+  const warehouseCode = String(line.warehouse?.code ?? transaction.warehouse?.code ?? '').toUpperCase()
+  const warehouseName = String(line.warehouse?.name ?? transaction.warehouse?.name ?? '').toLowerCase()
+  return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất')
+}
+
 export function ProductionBomModal({
   components,
   initialComponentId = '',
@@ -111,9 +117,12 @@ export function ProductionBomModal({
 
       ;(transaction.items ?? []).forEach((line: any) => {
         const key = String(line.inventoryItemId ?? line.inventoryItem?.id ?? '')
-        const qty = Math.abs(Number(line.quantity ?? 0))
-        if (!key || qty <= 0) return
-        qtyByItem.set(key, (qtyByItem.get(key) ?? 0) + (isReturn ? -qty : qty))
+        const qty = Number(line.quantity ?? 0)
+        if (!key || !Number.isFinite(qty) || qty === 0) return
+        if (!isProductionWarehouseLine(line, transaction)) return
+        if (isReceipt && !isReturn && qty <= 0) return
+        if (isReturn && qty >= 0) return
+        qtyByItem.set(key, (qtyByItem.get(key) ?? 0) + qty)
         if (!itemById.has(key) && line.inventoryItem) itemById.set(key, line.inventoryItem)
       })
     })
@@ -134,6 +143,31 @@ export function ProductionBomModal({
       CONSUMABLE: [],
     })
   }, [productionMaterials])
+
+  const requiredByMaterial = useMemo(() => {
+    const required = new Map<string, number>()
+    materials.forEach((item) => {
+      if (!item.materialId) return
+      const quantity = Number(item.quantity)
+      const wastePercent = Number(item.wastePercent || 0)
+      if (!Number.isFinite(quantity) || quantity <= 0) return
+      required.set(
+        item.materialId,
+        (required.get(item.materialId) ?? 0) + quantity * (1 + wastePercent / 100),
+      )
+    })
+    return required
+  }, [materials])
+
+  const stockWarnings = useMemo(() => {
+    return Array.from(requiredByMaterial.entries())
+      .map(([materialId, required]) => {
+        const material = productionMaterials.find((item) => item.id === materialId)
+        const available = Number(material?.sxQty ?? 0)
+        return { materialId, material, required, available, shortage: Math.max(0, required - available) }
+      })
+      .filter((item) => item.shortage > 0)
+  }, [productionMaterials, requiredByMaterial])
 
   function updateMaterial(index: number, patch: Partial<MaterialDraft>) {
     setMaterials((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
@@ -158,6 +192,12 @@ export function ProductionBomModal({
     if (!component) return toast.error('Chọn cấu kiện áp dụng BOM')
     if (validMaterials.length === 0) return toast.error('BOM cần ít nhất một vật tư')
     if (validRouting.length === 0) return toast.error('BOM cần ít nhất một công đoạn')
+    if (stockWarnings.length > 0) {
+      const warning = stockWarnings[0]
+      return toast.error(
+        `${warning.material?.code ?? 'Vật tư'} vượt tồn kho SX: cần ${warning.required.toLocaleString('vi-VN')}, còn ${warning.available.toLocaleString('vi-VN')}`,
+      )
+    }
 
     try {
       const stamp = Date.now().toString().slice(-6)
@@ -227,11 +267,14 @@ export function ProductionBomModal({
               <div><h3 className="text-sm font-semibold">Materials Grid</h3><p className="mt-1 text-xs text-slate-500">Vật tư lấy từ kho vật tư sản xuất khi cấp phát cho MO.</p></div>
               <button onClick={() => setMaterials((rows) => [...rows, { materialId: '', quantity: '1', wastePercent: '0', category: 'MAIN_MATERIAL' }])} className="flex items-center gap-1 rounded border border-cyan-800 px-3 py-2 text-xs text-cyan-200"><Plus size={14} /> Thêm vật tư</button>
             </div>
-            <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs">
-              <thead className="text-[10px] uppercase text-slate-500"><tr>{['Vật tư', 'Danh mục', 'Định mức', 'Hao hụt %', 'ĐVT', ''].map((item) => <th key={item} className="pb-2 pr-2">{item}</th>)}</tr></thead>
+            <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs">
+              <thead className="text-[10px] uppercase text-slate-500"><tr>{['Vật tư', 'Danh mục', 'Định mức', 'Hao hụt %', 'Tồn SX', 'ĐVT', ''].map((item) => <th key={item} className="pb-2 pr-2">{item}</th>)}</tr></thead>
               <tbody>{materials.map((item, index) => {
                 const material = productionMaterials.find((row) => row.id === item.materialId)
                 const groupOptions = productionMaterialsByCategory[item.category]
+                const requiredTotal = item.materialId ? requiredByMaterial.get(item.materialId) ?? 0 : 0
+                const available = Number(material?.sxQty ?? 0)
+                const isOverStock = item.materialId && requiredTotal > available
                 return <tr key={index} className="border-t border-slate-800">
                   <td className="py-2 pr-2">
                     <select value={item.materialId} onChange={(event) => selectMaterial(index, event.target.value)} className={inputClass}>
@@ -253,6 +296,9 @@ export function ProductionBomModal({
                   </td>
                   <td className="pr-2"><input value={item.quantity} onChange={(event) => updateMaterial(index, { quantity: event.target.value })} type="number" min="0.01" step="0.01" className={inputClass} /></td>
                   <td className="pr-2"><input value={item.wastePercent} onChange={(event) => updateMaterial(index, { wastePercent: event.target.value })} type="number" min="0" max="100" step="0.01" className={inputClass} /></td>
+                  <td className={`pt-2 ${isOverStock ? 'text-red-300' : 'text-emerald-300'}`}>
+                    {item.materialId ? `${requiredTotal.toLocaleString('vi-VN')} / ${available.toLocaleString('vi-VN')}` : '-'}
+                  </td>
                   <td className="pt-2 text-slate-300">{material?.unitMaster?.symbol ?? material?.unit ?? '-'}</td>
                   <td className="pt-2"><button onClick={() => setMaterials((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa vật tư" className="text-red-300"><Trash2 size={15} /></button></td>
                 </tr>
@@ -283,6 +329,16 @@ export function ProductionBomModal({
             <div className="mt-4 text-slate-500">Công đoạn routing</div><div className="mt-2 text-xl font-semibold text-white">{routing.filter((item) => item.stepName).length}</div>
           </div>
           <div className="rounded border border-amber-900/70 bg-amber-950/20 p-4 text-xs text-amber-100">Production BOM chỉ chọn vật tư đã được xuất sang kho vật tư SX. Danh sách được tách theo Loại vật tư trong Material Master: chính, phụ, tiêu hao.</div>
+          {stockWarnings.length > 0 ? <div className="rounded border border-red-900/70 bg-red-950/25 p-4 text-xs text-red-100">
+            <div className="mb-2 font-semibold">Không đủ tồn kho SX</div>
+            <div className="space-y-1">
+              {stockWarnings.map((warning) => (
+                <div key={warning.materialId}>
+                  {warning.material?.code ?? warning.materialId}: cần {warning.required.toLocaleString('vi-VN')}, còn {warning.available.toLocaleString('vi-VN')}, thiếu {warning.shortage.toLocaleString('vi-VN')}
+                </div>
+              ))}
+            </div>
+          </div> : null}
           <div className="rounded border border-slate-800 bg-slate-950 p-4 text-xs">
             <div className="mb-3 font-semibold text-slate-100">Kho vật tư SX theo nhóm</div>
             {(['MAIN_MATERIAL', 'SECONDARY_MATERIAL', 'CONSUMABLE'] as MaterialDraft['category'][]).map((category) => (

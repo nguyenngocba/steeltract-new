@@ -103,8 +103,13 @@ export const navigation = [
     children: [
 
       {
-        title: 'Danh sách cấu kiện',
+        title: 'Tổng quan',
         path: '/components',
+      },
+
+      {
+        title: 'Danh sách cấu kiện',
+        path: '/components/list',
       },
 
       {

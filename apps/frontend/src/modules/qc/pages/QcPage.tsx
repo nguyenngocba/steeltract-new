@@ -16,8 +16,12 @@ const tabs: Array<[QcTab, string]> = [
   ['calibration', 'Hiệu chuẩn thiết bị'],
   ['reports', 'Báo cáo'],
 ]
-const panel = 'rounded border border-slate-800 bg-[#071321]'
-const input = 'h-10 rounded border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 outline-none focus:border-cyan-500'
+const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
+const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
+const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
+const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
+const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
 const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value)
 const date = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '-'
 
@@ -27,6 +31,7 @@ export function QcPage() {
   const [status, setStatus] = useState('all')
   const [selectedInspection, setSelectedInspection] = useState<QcInspectionRow | null>(null)
   const [selectedQueue, setSelectedQueue] = useState<QcProductionQueueRow | null>(null)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
@@ -53,6 +58,7 @@ export function QcPage() {
     onSuccess: async (_, row) => {
       setError('')
       setNotice(`Đã tạo phiếu QC cho ${row.orderNo}.`)
+      setCreateDialogOpen(false)
       setTab('inspections')
       await invalidate()
     },
@@ -115,6 +121,7 @@ export function QcPage() {
     },
     onSuccess: async (_, row) => {
       setError('')
+      setCreateDialogOpen(false)
       setNotice(`QC của ${row.orderNo} đã đạt/duyệt. Quay lại Sản xuất để chuyển thành phẩm ra bãi.`)
       await invalidate()
     },
@@ -125,12 +132,12 @@ export function QcPage() {
   })
 
   return <OperationalShell>
-    <main className="min-h-screen bg-[#020811] p-4 text-slate-100">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-3">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
+      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Chất lượng (QC)</p><h1 className="mt-1 text-2xl font-semibold">Chất lượng (QC)</h1><p className="mt-1 text-xs text-slate-500">QC móc nối sản xuất và cấu kiện. Thành phẩm chỉ được chuyển bãi khi QC đạt hoặc đã duyệt.</p></div>
-        <div className="flex gap-2"><button onClick={() => setTab('plan')} className="rounded bg-blue-600 px-4 py-2 text-xs font-semibold">+ Tạo phiếu kiểm tra</button><button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs">Xuất Excel</button><button className="rounded border border-slate-700 bg-slate-900 px-4 py-2 text-xs">Báo cáo</button></div>
+        <div className="flex gap-2"><button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button><button className={mutedButton}>Xuất Excel</button><button className={mutedButton}>Báo cáo</button></div>
       </header>
-      <nav className="my-3 flex gap-1 overflow-x-auto rounded bg-[#06101b] p-1">{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded px-3 py-2 text-xs ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>{label}</button>)}</nav>
+      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs transition ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}</nav>
       <FilterBar query={query} status={status} onQuery={setQuery} onStatus={setStatus} />
       {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
       {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
@@ -144,15 +151,91 @@ export function QcPage() {
       {tab === 'reports' && <Reports runtime={runtime} />}
       <InspectionDetail inspection={selectedInspection} onClose={() => setSelectedInspection(null)} onStart={(id) => startMutation.mutate(id)} onPass={(id) => passMutation.mutate(id)} onFail={(id) => failMutation.mutate(id)} />
       <QueueDetail row={selectedQueue} onClose={() => setSelectedQueue(null)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
+      <CreateInspectionDialog open={createDialogOpen} queue={runtime.productionQueue} checklists={runtime.checklists} saving={createMutation.isPending || quickApproveMutation.isPending} onClose={() => setCreateDialogOpen(false)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
     </main>
   </OperationalShell>
 }
 
+function CreateInspectionDialog({
+  open,
+  queue,
+  checklists,
+  saving,
+  onClose,
+  onCreate,
+  onQuickApprove,
+}: {
+  open: boolean
+  queue: QcProductionQueueRow[]
+  checklists: QcCockpit['checklists']
+  saving: boolean
+  onClose: () => void
+  onCreate: (row: QcProductionQueueRow) => void
+  onQuickApprove: (row: QcProductionQueueRow) => void
+}) {
+  const pendingRows = queue.filter((row) => row.qcStatus !== 'APPROVED')
+  const [orderId, setOrderId] = useState('')
+  const [checklistId, setChecklistId] = useState('')
+  const selected = pendingRows.find((row) => row.id === orderId) ?? pendingRows[0]
+
+  if (!open) return null
+
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <section className="w-full max-w-4xl overflow-hidden rounded-xl border border-cyan-900 bg-[#061321] text-slate-100 shadow-2xl">
+      <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">QC cấu kiện</p>
+          <h2 className="mt-1 text-xl font-semibold">Tạo phiếu kiểm tra cấu kiện</h2>
+          <p className="mt-1 text-xs text-slate-500">Chọn MO/cấu kiện đã hoàn thành. QC đạt/duyệt sẽ mở khóa chuyển thành phẩm ra bãi tập kết.</p>
+        </div>
+        <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><XCircle size={16} /></button>
+      </header>
+
+      <div className="grid gap-4 p-5 lg:grid-cols-[1fr_0.85fr]">
+        <div className="space-y-3">
+          <label className="block text-xs text-slate-400">Lệnh sản xuất / cấu kiện
+            <select value={selected?.id ?? ''} onChange={(event) => setOrderId(event.target.value)} className={`${input} mt-2 w-full`}>
+              {pendingRows.map((row) => <option key={row.id} value={row.id}>{row.orderNo} · {row.componentCode} · {row.componentName}</option>)}
+            </select>
+          </label>
+          <label className="block text-xs text-slate-400">Checklist / tiêu chuẩn
+            <select value={checklistId} onChange={(event) => setChecklistId(event.target.value)} className={`${input} mt-2 w-full`}>
+              <option value="">Tự động chọn checklist mặc định</option>
+              {checklists.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name} · {item.type}</option>)}
+            </select>
+          </label>
+          <div className="rounded border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
+            Phase này tạo phiếu kiểm tra theo MO/cấu kiện và dùng workflow nhanh `Tạo & duyệt đạt` để hoàn thiện cổng QC trước khi chuyển ra bãi. Checklist cụ thể sẽ được dùng để mở rộng nhập kết quả chi tiết ở phase sau.
+          </div>
+        </div>
+
+        <div className={`${panel} p-4`}>
+          <h3 className="text-sm font-semibold">Thông tin cấu kiện</h3>
+          {selected ? <div className="mt-3 space-y-2">
+            <Info k="MO" v={selected.orderNo} />
+            <Info k="Cấu kiện" v={`${selected.componentCode} · ${selected.componentName}`} />
+            <Info k="Lệnh sản xuất" v={selected.title} />
+            <Info k="Trạng thái sản xuất" v={selected.status} />
+            <Info k="Trạng thái QC" v={selected.qcStatus} />
+            <Info k="Số phiếu QC" v={fmt(selected.inspectionCount)} />
+          </div> : <Empty title="Không có MO hoàn thành đang chờ QC." />}
+        </div>
+      </div>
+
+      <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-800 px-5 py-4">
+        <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">Hủy</button>
+        <button disabled={saving || !selected} onClick={() => selected && onCreate(selected)} className="rounded border border-blue-700 px-4 py-2 text-xs text-blue-200 disabled:opacity-50">Tạo phiếu chờ kiểm</button>
+        <button disabled={saving || !selected} onClick={() => selected && onQuickApprove(selected)} className="rounded bg-emerald-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-50">Tạo & duyệt đạt</button>
+      </footer>
+    </section>
+  </div>
+}
+
 function FilterBar({ query, status, onQuery, onStatus }: { query: string; status: string; onQuery: (value: string) => void; onStatus: (value: string) => void }) {
-  return <div className={`${panel} flex flex-wrap items-center gap-2 p-3`}>
-    <div className="flex min-w-72 flex-1 items-center gap-2 rounded border border-slate-700 bg-[#050d18] px-3"><Search size={15} className="text-cyan-400" /><input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Tìm mã phiếu, MO, cấu kiện, dự án..." className="h-10 w-full bg-transparent text-sm outline-none" /></div>
+  return <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
+    <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3"><Search size={15} className="text-cyan-400" /><input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Tìm mã phiếu, MO, cấu kiện, dự án..." className="h-9 w-full bg-transparent text-xs outline-none" /></div>
     <select value={status} onChange={(e) => onStatus(e.target.value)} className={input}><option value="all">Trạng thái: Tất cả</option><option value="READY">Chờ xử lý</option><option value="IN_PROGRESS">Đang kiểm</option><option value="PASSED">Đạt</option><option value="APPROVED">Đã duyệt</option><option value="REWORK_REQUIRED">NCR/Rework</option><option value="FAILED">Không đạt</option></select>
-    <button className="h-10 rounded bg-blue-600 px-4 text-sm">Tìm kiếm</button><button className="h-10 rounded border border-slate-700 px-4 text-sm">Làm mới</button>
+    <button className={primaryButton}>Tìm kiếm</button><button className={mutedButton}>Làm mới</button>
   </div>
 }
 
@@ -176,7 +259,7 @@ function Inspections({ rows, queue, onOpen, onQueue, onCreate, onQuickApprove, o
 }
 
 function InspectionTable({ rows, onOpen, onPass, onFail }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void; onPass?: (row: QcInspectionRow) => void; onFail?: (row: QcInspectionRow) => void }) {
-  return <div className={`${panel} overflow-hidden`}><div className="flex justify-between border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách phiếu kiểm tra</h2><span className="text-xs text-slate-500">{rows.length} phiếu</span></div><div className="overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500"><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className="cursor-pointer border-t border-slate-800 text-slate-200 hover:bg-cyan-950/20"><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}</tbody></table></div>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</div>
+  return <div className={`${panel} overflow-hidden`}><div className="flex justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách phiếu kiểm tra</h2><span className="text-xs text-slate-500">{rows.length} phiếu</span></div><div className="overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className={tableHead}><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}</tbody></table></div>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</div>
 }
 
 function ProductionQueue({ rows, onOpen, onCreate, onQuickApprove, compact = false }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; compact?: boolean }) {
@@ -223,12 +306,12 @@ function ByProject({ rows }: { rows: QcCockpit['byProject'] }) {
 }
 
 function Kpi({ icon: Icon, title, value, note, tone = 'cyan' }: { icon: LucideIcon; title: string; value: string; note: string; tone?: 'cyan' | 'emerald' | 'red' | 'amber' | 'purple' }) {
-  const color = tone === 'emerald' ? 'text-emerald-300 bg-emerald-950' : tone === 'red' ? 'text-red-300 bg-red-950' : tone === 'amber' ? 'text-amber-300 bg-amber-950' : tone === 'purple' ? 'text-purple-300 bg-purple-950' : 'text-cyan-300 bg-cyan-950'
-  return <div className={`${panel} p-4`}><span className={`inline-flex rounded p-3 ${color}`}><Icon size={20} /></span><div className="mt-3 text-[10px] uppercase text-slate-500">{title}</div><div className="mt-2 text-2xl font-semibold text-white">{value}</div><div className="mt-1 text-xs text-slate-500">{note}</div></div>
+  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-400' : tone === 'red' ? 'from-red-500 to-rose-400' : tone === 'amber' ? 'from-amber-500 to-orange-400' : tone === 'purple' ? 'from-purple-500 to-fuchsia-400' : 'from-blue-500 to-cyan-400'
+  return <div className={`${panel} relative overflow-hidden p-4`}><div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`} /><span className={`inline-flex rounded-lg bg-gradient-to-br ${color} p-3 text-white shadow-lg shadow-black/20`}><Icon size={20} /></span><div className="mt-3 text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div><div className="mt-2 text-2xl font-semibold text-white">{value}</div><div className="mt-1 text-xs text-slate-500">{note}</div></div>
 }
 
 function Donut({ title, center, rows }: { title: string; center: string; rows: Array<[string, number, string]> }) {
-  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">{title}</h3><div className="mt-4 grid grid-cols-[120px_1fr] items-center gap-4"><div className="flex aspect-square items-center justify-center rounded-full border-[18px] border-blue-600 bg-slate-950 text-center"><div><div className="text-xl font-semibold">{center}</div><div className="text-xs text-slate-500">Tổng</div></div></div><div className="space-y-2">{rows.map(([label, value, color]) => <div key={label} className="flex justify-between gap-2 text-xs"><span className="flex items-center gap-2"><i className={`h-2 w-2 rounded-full ${color}`} />{label}</span><b>{fmt(value)}</b></div>)}</div></div></div>
+  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">{title}</h3><div className="mt-4 grid grid-cols-[120px_1fr] items-center gap-4"><div className="grid aspect-square place-items-center rounded-full bg-[conic-gradient(#2563eb_0_38%,#10b981_38%_66%,#f59e0b_66%_84%,#8b5cf6_84%_100%)] p-4"><div className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-center"><div><div className="text-xl font-semibold">{center}</div><div className="text-xs text-slate-500">Tổng</div></div></div></div><div className="space-y-2">{rows.map(([label, value, color]) => <div key={label} className="flex justify-between gap-2 text-xs"><span className="flex items-center gap-2"><i className={`h-2 w-2 rounded-full ${color}`} />{label}</span><b>{fmt(value)}</b></div>)}</div></div></div>
 }
 
 function InspectionDetail({ inspection, onClose, onStart, onPass, onFail }: { inspection: QcInspectionRow | null; onClose: () => void; onStart: (id: string) => void; onPass: (id: string) => void; onFail: (id: string) => void }) {

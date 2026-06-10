@@ -122,6 +122,26 @@ export class SystemController {
       },
     });
 
+    const userIds = users.map((user) => user.id);
+    const latestLogs = userIds.length
+      ? await this.prisma.activityLog.findMany({
+          where: { userId: { in: userIds } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            userId: true,
+            action: true,
+            module: true,
+            createdAt: true,
+          },
+        })
+      : [];
+    const latestByUser = new Map<string, (typeof latestLogs)[number]>();
+    for (const log of latestLogs) {
+      if (log.userId && !latestByUser.has(log.userId)) {
+        latestByUser.set(log.userId, log);
+      }
+    }
+
     return users.map((user) => ({
       id: user.id,
       username: user.username,
@@ -130,6 +150,9 @@ export class SystemController {
       status: user.status,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      lastActivityAt: latestByUser.get(user.id)?.createdAt ?? null,
+      lastActivityAction: latestByUser.get(user.id)?.action ?? null,
+      lastActivityModule: latestByUser.get(user.id)?.module ?? null,
       roles: user.userRoles.map((item) => item.role),
     }));
   }
@@ -157,6 +180,36 @@ export class SystemController {
       userCount: role.userRoles.length,
       permissions: role.rolePermissions.map((item) => item.permission),
     }));
+  }
+
+  @Get('role-matrix')
+  async roleMatrix() {
+    const permissions = await this.prisma.permission.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    const moduleAliases = [
+      ['dashboard', 'Tổng quan'],
+      ['projects', 'Dự án'],
+      ['components', 'Quản lý cấu kiện'],
+      ['production', 'Sản xuất'],
+      ['inventory', 'Kho vật tư'],
+      ['yard', 'Bãi tập kết'],
+      ['logistics', 'Vận chuyển'],
+      ['qc', 'Chất lượng (QC)'],
+      ['reports', 'Báo cáo'],
+      ['settings', 'Cài đặt hệ thống'],
+      ['users', 'Người dùng'],
+      ['roles', 'Vai trò'],
+      ['system-logs', 'Nhật ký hệ thống'],
+    ] as const;
+    const actions = ['view', 'create', 'update', 'delete', 'export'];
+
+    return {
+      modules: moduleAliases.map(([key, label]) => ({ key, label })),
+      actions,
+      permissionCount: permissions.length,
+    };
   }
 
   @Get('activity-logs')
@@ -190,5 +243,65 @@ export class SystemController {
       ...log,
       user: log.userId ? userMap.get(log.userId) ?? null : null,
     }));
+  }
+
+  @Get('activity-summary')
+  async activitySummary() {
+    const logs = await this.prisma.activityLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    });
+    const byAction: Record<string, number> = {};
+    const byModule: Record<string, number> = {};
+    const byDay: Record<string, number> = {};
+
+    for (const log of logs) {
+      byAction[log.action] = (byAction[log.action] ?? 0) + 1;
+      const module = log.module ?? 'system';
+      byModule[module] = (byModule[module] ?? 0) + 1;
+      const day = log.createdAt.toISOString().slice(5, 10);
+      byDay[day] = (byDay[day] ?? 0) + 1;
+    }
+
+    return {
+      total: logs.length,
+      byAction,
+      byModule,
+      byDay,
+    };
+  }
+
+  @Get('notifications')
+  async notifications() {
+    const notifications = await this.prisma.notification.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+
+    const unread = notifications.filter((item) => !item.isRead).length;
+    const highPriority = notifications.filter((item) =>
+      ['CRITICAL', 'WARNING', 'HIGH'].includes((item.severity ?? '').toUpperCase()),
+    ).length;
+    const bySeverity: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+
+    for (const item of notifications) {
+      const severity = item.severity ?? 'INFO';
+      const type = item.type ?? 'system';
+      bySeverity[severity] = (bySeverity[severity] ?? 0) + 1;
+      byType[type] = (byType[type] ?? 0) + 1;
+    }
+
+    return {
+      summary: {
+        total: notifications.length,
+        unread,
+        read: notifications.length - unread,
+        highPriority,
+      },
+      bySeverity,
+      byType,
+      items: notifications,
+    };
   }
 }

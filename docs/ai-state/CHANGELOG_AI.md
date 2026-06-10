@@ -1,5 +1,44 @@
 # SteelTrack AI Changelog
 
+## 2026-06-07
+
+Completed:
+
+* Fixed Production BOM and production material consumption:
+  BOM create now validates requested material quantity plus waste against real available `Kho vật tư SX` stock and blocks over-allocation;
+  the BOM modal now shows `Cần / Tồn SX` per selected material and displays shortage warnings before submit;
+  backend production stock calculation now counts only transaction lines that belong to the production warehouse and uses signed receipt/return quantities instead of counting main-warehouse transfer lines;
+  starting a Manufacturing Order now auto-creates `ISSUED` `ProductionMaterialIssue` rows for missing BOM requirements and creates outbound inventory movements from the production warehouse location so production material stock is reduced;
+  `/production/:id/requirements` now uses the corrected production-warehouse balance logic;
+  Production start now plans material issues before the MO state update and creates issue rows only after the start transition succeeds, avoiding orphaned production material issues if the start action fails.
+* Fixed QC quick pass workflow:
+  backend QC completion now accepts `READY` inspections in addition to `IN_PROGRESS` and `REWORK_REQUIRED`, so newly created ready inspections can be marked `PASSED` and approved without getting stuck.
+* Upgraded System module detail pages to use richer real runtime data:
+  Users now shows real user status, assigned roles, latest activity timestamp/action/module from `ActivityLog`, cockpit KPIs, filters, table, and detail panel;
+  Roles now shows real roles, user counts, permission counts, and a permission matrix derived from persisted `Permission` records;
+  System Logs now shows real `ActivityLog` rows, action/module summaries, activity trend, filters, and a cockpit table.
+* Added backend System support endpoints:
+  `GET /system/role-matrix`;
+  `GET /system/activity-summary`;
+  `GET /system/notifications`.
+* Rebuilt the main Dashboard/Tổng quan as an Inventory-style dark cockpit backed by `GET /dashboard/cockpit`, aggregating real Projects, Production Orders, Components, Inventory transactions/items, Yard activity, QC open work, Activity Logs, and Notifications.
+* Rebuilt the Notifications/Thông báo page to read persisted `notifications` records through `/system/notifications`, with unread/priority/read filters and a selected-notification detail workspace.
+* Registered the active `/notifications` route in the main app router.
+
+Modified:
+
+* Dashboard frontend API contract.
+* System frontend API contract.
+* Users, Roles, System Logs, Dashboard, and Notifications frontend pages.
+* Dashboard backend controller.
+* System backend controller.
+
+Build:
+
+* Backend build passed.
+* Frontend build passed.
+* Frontend still reports the existing Vite warnings for `.env NODE_ENV=production` and large bundle chunk size.
+
 ## 2026-06-06
 
 Completed:

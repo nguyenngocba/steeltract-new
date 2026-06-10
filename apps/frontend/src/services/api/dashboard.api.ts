@@ -51,6 +51,47 @@ export interface DashboardOverview {
   construction: ConstructionProgress | null
 }
 
+export interface DashboardCockpit {
+  generatedAt: string
+  kpis: {
+    projects: number
+    activeProjects: number
+    productionOrders: number
+    productionActive: number
+    components: number
+    completedComponents: number
+    componentCompletionRate: number
+    logisticsActive: number
+    inventoryTotal: number
+    inboundTransactions: number
+    outboundTransactions: number
+    qcOpen: number
+    yardActive: number
+  }
+  productionStatus: Array<{ status: string; count: number }>
+  inventoryDistribution: Array<{ label: string; value: number }>
+  movementTrend: Array<{ label: string; value: number }>
+  projects: Array<{ id: string; code: string; name: string; status: string; progress: number }>
+  productionSummary: { active: number; waiting: number; completed: number; delayed: number }
+  alerts: Array<{ code: string; title: string; count: number }>
+  recentActivities: DashboardActivity[]
+  recentNotifications: Array<{
+    id: string
+    title: string
+    message: string
+    type?: string | null
+    severity?: string | null
+    isRead: boolean
+    createdAt: string
+  }>
+}
+
+export async function getDashboardCockpit(): Promise<DashboardCockpit> {
+  const response = await api.get<DashboardCockpit>('/dashboard/cockpit')
+
+  return response.data
+}
+
 async function getOptional<T>(
   url: string,
   fallback: T,

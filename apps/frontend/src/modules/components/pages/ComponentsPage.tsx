@@ -1,5 +1,5 @@
-import { ComponentsListPage } from './tabs/ComponentsListPage'
+import { ComponentsOverviewPage } from './tabs/ComponentsOverviewPage'
 
 export function ComponentsPage() {
-  return <ComponentsListPage />
+  return <ComponentsOverviewPage />
 }

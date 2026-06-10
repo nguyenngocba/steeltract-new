@@ -234,7 +234,7 @@ export class ProjectsService {
       return {
         ...project,
         progress,
-        type: this.projectType(project.name),
+        type: this.projectType(project.name, project.description),
         location: this.projectLocation(project.description),
         owner: this.projectOwner(project.description),
         contractValue,
@@ -325,7 +325,10 @@ export class ProjectsService {
     };
   }
 
-  private projectType(name: string) {
+  private projectType(name: string, description?: string | null) {
+    const explicit = description?.match(/(?:loại|type)\s*:\s*([^;]+)/i)?.[1]?.trim();
+    if (explicit) return explicit;
+
     const value = name.toLowerCase();
     if (value.includes('kho') || value.includes('logistics')) return 'Kho bãi';
     if (value.includes('cầu') || value.includes('hạ tầng')) return 'Hạ tầng';

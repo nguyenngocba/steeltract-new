@@ -22,11 +22,11 @@ const tabs: Array<[Tab, string]> = [
   ['backup', 'Sao lưu & Phục hồi'],
   ['logs', 'Nhật ký cấu hình'],
 ]
-const panel = 'rounded border border-slate-800 bg-[#071321]'
-const input = 'h-10 rounded border border-slate-800 bg-slate-950/60 px-3 text-sm text-slate-100 outline-none focus:border-cyan-500'
-const textarea = 'min-h-20 rounded border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500'
-const actionButton = 'inline-flex items-center gap-2 rounded border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800'
-const primaryButton = 'inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50'
+const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
+const textarea = 'min-h-20 rounded-lg border border-white/10 bg-slate-950/65 px-3 py-2 text-xs text-slate-100 outline-none transition focus:border-blue-400'
+const actionButton = 'inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/[0.08]'
+const primaryButton = 'inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 disabled:opacity-50'
 const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
 const date = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '-'
 
@@ -73,12 +73,12 @@ export function SettingsPage() {
   ] as const, [])
 
   return <OperationalShell>
-    <main className="min-h-screen bg-[#020811] p-4 text-slate-100">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
       <header className="flex flex-wrap items-end justify-between gap-3 pb-4">
         <div><h1 className="text-2xl font-semibold">Cài đặt hệ thống</h1><p className="mt-1 text-sm text-slate-500">Quản lý toàn bộ cấu hình và thiết lập hệ thống</p></div>
-        <button className="inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-semibold"><Save size={16} />Lưu thay đổi</button>
+        <button className={primaryButton}><Save size={16} />Lưu thay đổi</button>
       </header>
-      <nav className="mb-3 flex gap-1 overflow-x-auto rounded border border-slate-800 bg-[#06101b] p-1">{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded px-4 py-2 text-sm ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>{label}</button>)}</nav>
+      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs transition ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}</nav>
       {tab === 'overview' && <Overview data={data} workflow={workflow} category={category} stats={stats} />}
       {tab === 'general' && <ConfigGrid title="Cấu hình chung" values={data?.system} />}
       {tab === 'permissions' && <ConfigGrid title="Tổng quan phân quyền" values={{ users: fmt(stats.totalUsers), activeUsers: fmt(stats.activeUsers), roles: fmt(stats.roles), permissions: fmt(stats.permissions) }} />}

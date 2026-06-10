@@ -36,7 +36,11 @@ Backend:
 * `GET /system/overview`
 * `GET /system/users`
 * `GET /system/roles`
+* `GET /system/role-matrix`
 * `GET /system/activity-logs`
+* `GET /system/activity-summary`
+* `GET /system/notifications`
+* `GET /dashboard/cockpit`
 * `GET /runtime/operational-workflow`
 
 ## Implemented Features
@@ -63,9 +67,11 @@ Backend:
   * Yard outbound.
   * Project return readiness.
   * QC failure readiness.
-* Users page shows real users, statuses, roles, KPI strip, table, and detail panel.
-* Roles page shows real roles, user counts, permission counts, and a derived permission matrix.
-* System Logs page shows real ActivityLog rows with filters and action summary.
+* Users page shows real users, statuses, roles, latest ActivityLog data, KPI strip, filters, table, and detail panel.
+* Roles page shows real roles, user counts, permission counts, and a permission matrix derived from persisted Permission names.
+* System Logs page shows real ActivityLog rows with filters, action summary, module distribution, and activity trend.
+* Notifications page uses persisted Notification records from `/system/notifications`, with unread/priority/read filters and a detail workspace.
+* Dashboard/Tổng quan uses `/dashboard/cockpit` to aggregate real Projects, Production Orders, Components, Inventory, Yard, QC, Activity Logs, and Notifications.
 * Inventory outbound now validates selected location balance server-side when `zoneId` is provided.
 
 ## Workflow Verification Result
@@ -96,6 +102,7 @@ Warnings still expected:
 * Persist settings in a dedicated settings table.
 * Add user create/edit/lock/delete/password-reset APIs.
 * Add role create/edit/delete and permission assignment APIs.
+* Add notification mark-read/archive APIs.
 * Add audit export.
 * Add backup execution and restore workflow.
 * Add configuration change approval.

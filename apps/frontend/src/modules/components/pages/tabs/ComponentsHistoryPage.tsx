@@ -1,13 +1,9 @@
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { componentsTabs } from '../../config/components-tabs'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
 
 export function ComponentsHistoryPage() {
   return (
     <EnterpriseModulePage>
-      <EnterpriseTabBar tabs={componentsTabs} />
-
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
           <ComponentsKpiCard title="Tổng cấu kiện gia công" value="5.281" sub="+12,6%" />

@@ -7,6 +7,12 @@ import { baseQuerySchema } from '../../../common/dto/query.dto';
 
 const itemIdSchema = z.string().trim().min(1);
 
+const optionalNullableText = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  const text = String(value ?? '').trim();
+  return text || null;
+}, z.string().nullable().optional());
+
 const positiveQuantity = z.coerce.number().positive();
 
 const signedQuantity = z.coerce
@@ -25,7 +31,9 @@ export const createInventoryItemSchema = z.object({
   category: optionalTextFilter,
   materialTypeId: optionalTextFilter,
   materialUsageType: z.nativeEnum(MaterialUsageType).optional().default(MaterialUsageType.PRIMARY),
-  zoneId: optionalTextFilter,
+  zoneId: optionalNullableText,
+  slotId: optionalNullableText,
+  level: optionalNullableText,
   minimumStock: z.coerce.number().nonnegative().optional().default(0),
 });
 
@@ -39,7 +47,9 @@ export const updateInventoryItemSchema = z.object({
   category: optionalTextFilter,
   materialTypeId: optionalTextFilter,
   materialUsageType: z.nativeEnum(MaterialUsageType).optional(),
-  zoneId: optionalTextFilter,
+  zoneId: optionalNullableText,
+  slotId: optionalNullableText,
+  level: optionalNullableText,
   minimumStock: z.coerce.number().nonnegative().optional(),
 });
 
@@ -50,6 +60,7 @@ export const stockItemSchema = z.object({
   warehouseId: optionalTextFilter,
   zoneId: optionalTextFilter,
   slotId: optionalTextFilter,
+  level: optionalTextFilter,
 });
 
 export const adjustmentItemSchema = z.object({

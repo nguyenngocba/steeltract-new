@@ -874,6 +874,7 @@ export class QcService {
 
   private canCompleteInspection(status: QcInspectionStatus) {
     return [
+      QcInspectionStatus.READY,
       QcInspectionStatus.IN_PROGRESS,
       QcInspectionStatus.REWORK_REQUIRED,
     ].some((item) => item === status);

@@ -52,6 +52,7 @@ import {
   InventoryAlertsPage,
 } from '@/modules/inventory/pages/tabs/InventoryAlertsPage'
 import { ComponentsPage } from '@/modules/components/pages/ComponentsPage'
+import { ComponentsListPage } from '@/modules/components/pages/tabs/ComponentsListPage'
 import { ComponentsProductionPage } from '@/modules/components/pages/tabs/ComponentsProductionPage'
 import { ComponentsStockPage } from '@/modules/components/pages/tabs/ComponentsStockPage'
 import { ComponentsMaterialStockPage } from '@/modules/components/pages/tabs/ComponentsMaterialStockPage'
@@ -62,6 +63,8 @@ import { SettingsPage } from '@/modules/settings/pages/SettingsPage'
 import { UsersPage } from '@/modules/users/pages/UsersPage'
 import { RolesPage } from '@/modules/roles/pages/RolesPage'
 import { SystemLogsWorkspace } from '@/modules/system-logs/workspaces/SystemLogsWorkspace'
+import { LogisticsPage } from '@/modules/logistics/pages/LogisticsPage'
+import { NotificationsPage } from '@/modules/notifications/pages/NotificationsPage'
 
 export function AppRouter() {
   return (
@@ -74,6 +77,11 @@ export function AppRouter() {
       <Route
         path="/inventory"
         element={<InventoryOverviewPage />}
+      />
+
+      <Route
+        path="/notifications"
+        element={<NotificationsPage />}
       />
 
       <Route
@@ -189,6 +197,14 @@ export function AppRouter() {
       />
 
       <Route
+        path="/logistics"
+        element={<LogisticsPage />}
+      />
+
+      <Route path="/logistics/routes" element={<LogisticsPage />} />
+      <Route path="/logistics/gps" element={<LogisticsPage />} />
+
+      <Route
         path="/suppliers"
         element={<SuppliersPage />}
       />
@@ -196,6 +212,11 @@ export function AppRouter() {
       <Route
         path="/components"
         element={<ComponentsPage />}
+      />
+
+      <Route
+        path="/components/list"
+        element={<ComponentsListPage />}
       />
 
       <Route

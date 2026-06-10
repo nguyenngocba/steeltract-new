@@ -1,6 +1,217 @@
 # SteelTrack Changelog
 
+## 2026-06-07
+
+### Production BOM Stock Guard And Auto Material Issue
+
+Fixed:
+
+- Production BOM creation now blocks material quantities that exceed real available `Kho vật tư SX` stock.
+- BOM modal now shows `Cần / Tồn SX` and shortage details per selected material.
+- Backend production stock calculation now only counts lines assigned to the production warehouse and uses signed receipt/return quantities.
+- Starting a Manufacturing Order now automatically creates `ISSUED` production material issue rows for missing BOM requirements.
+- Auto-issued production material creates inventory outbound movements from the production warehouse location, so `Kho vật tư SX` stock is reduced after production starts.
+- Production material requirements now use the corrected production warehouse balance.
+- Production start now creates material issue rows only after the MO start transition succeeds, avoiding orphaned issue rows if the start action fails.
+- QC quick pass now works for newly created `READY` inspections because backend completion accepts `READY` inspections.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
+### System Dashboard And Notifications Real Data Pass
+
+Implemented:
+
+- Added richer System backend endpoints for role matrix, activity summary, and persisted notifications.
+- Rebuilt Users with real user/role/status data plus latest activity from `ActivityLog`.
+- Rebuilt Roles & Permissions with real role/user/permission counts and a module/action permission matrix derived from persisted permission names.
+- Rebuilt System Logs with real activity rows, action/module summaries, and compact trend/donut analytics.
+- Added `GET /dashboard/cockpit` to aggregate real Projects, Production Orders, Components, Inventory, Yard, QC, Activity Logs, and Notifications.
+- Rebuilt the main Dashboard/Tổng quan using the Inventory dark cockpit theme and real dashboard cockpit data.
+- Rebuilt Notifications/Thông báo using persisted `notifications` rows from `/system/notifications`.
+- Registered `/notifications` in the active router.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
+Notes:
+
+- Create/edit/lock/delete user and role actions remain visual controls until mutation APIs are added in System Phase S2.
+- Notification mark-as-read remains visual until notification mutation APIs are added.
+
 ## 2026-06-06
+
+### Cross Module Cockpit UI Refresh
+
+Implemented:
+
+- Restyled Projects cockpit:
+  - Inventory-like dark glass background;
+  - compact header and tab strip;
+  - unified KPI cards;
+  - compact filter/search bar;
+  - cleaner project table shell;
+  - donut and bar chart panels refreshed.
+- Restyled Suppliers cockpit:
+  - supplier list and supplier rating tabs use the same panel/table/filter language;
+  - KPI cards now match the current Inventory baseline;
+  - rating list and detail panel were compacted.
+- Restyled QC cockpit:
+  - Inventory-like background, action buttons, tab strip, filter bar, KPI cards, and inspection table;
+  - donut chart styling aligned with the current cockpit baseline;
+  - QC workflow logic unchanged.
+- Added a new Logistics cockpit page:
+  - `/logistics`;
+  - `/logistics/routes`;
+  - `/logistics/gps`;
+  - KPI strip, filter/search bar, shipment table, donut summary, mini trend chart, 2D GPS preview, and warning list.
+- Restyled System pages:
+  - Settings;
+  - Users;
+  - Roles & Permissions;
+  - System Logs;
+  - all now use the same dark glass shell, compact filters, KPI cards, and table styling.
+
+Build:
+
+- Frontend build passed.
+
+Boundary:
+
+- Frontend UI/chart consolidation only.
+- No backend, Prisma, workflow, QC approval, inventory, supplier, project, or logistics calculation changed.
+- Logistics cockpit is UI/runtime placeholder until the real transport API phase.
+
+### Components And Production Visual Refresh
+
+Implemented:
+
+- Restyled Yard cockpit shell to match Inventory:
+  - Inventory-style dark glass background;
+  - compact page title;
+  - top action buttons;
+  - rounded tab strip;
+  - KPI cards;
+  - compact search/filter bar;
+  - chart row for yard capacity, operation flow, and yard movement trend.
+- Added Yard shell charts:
+  - slot occupancy donut;
+  - movement type donut;
+  - monthly yard movement mini trend.
+- Polished Yard lower panels:
+  - selected slot level cards;
+  - component-in-slot list;
+  - selected slot information;
+  - crane list;
+  - recent yard activity;
+  - create zone and create slot modals.
+- Further synchronized Production cockpit:
+  - BOM registry table now uses the shared production table shell/head/row style;
+  - material issue table now uses the shared production table shell/head/row style;
+  - production log table now uses the shared production table shell/head/row style;
+  - BOM tab now has a donut summary;
+  - material issue tab now has a compact issue-rate chart.
+- Added a dedicated Components Overview tab/page:
+  - `/components` now renders `ComponentsOverviewPage`;
+  - `/components/list` now renders the component list page.
+- Updated Components sidebar/navigation config:
+  - `Tổng quan`;
+  - `Danh sách cấu kiện`;
+  - existing production, stock, production-material, transfer, QC, and history pages remain.
+- Removed the duplicated in-page horizontal tab strip from Components child pages so navigation follows the Inventory/sidebar pattern.
+- Components Overview now includes:
+  - KPI strip;
+  - compact filter bar;
+  - main component list;
+  - status/type donut chart;
+  - production progress chart;
+  - top component profile chart;
+  - production status panel;
+  - quick steel component blueprint preview.
+- Restyled Components shared cockpit UI to match the current Inventory visual baseline:
+  - glass panels;
+  - compact KPI cards;
+  - compact filter inputs;
+  - shared table shell/head/row classes;
+  - shared muted/primary action buttons.
+- Added reusable Components chart helpers:
+  - donut summary;
+  - compact mini bar chart.
+- Updated Components list tab:
+  - tighter KPI strip;
+  - unified search/filter controls;
+  - cleaner action buttons;
+  - rounded table shell;
+  - status donut and creation-rhythm chart on the insight column;
+  - polished create/detail modals.
+- Updated Components stock tab:
+  - unified KPI and filter styling;
+  - stock table now uses the shared table shell;
+  - added inventory distribution donut and yard status panel.
+- Restyled Production cockpit shared UI to match Inventory:
+  - glass panels;
+  - compact KPI cards;
+  - shared buttons;
+  - shared table classes;
+  - donut and mini bar chart helpers.
+- Updated Production cockpit:
+  - Inventory-style background and tab bar;
+  - compact top actions and filter bar;
+  - quick action, MO today, and BOM-in-use panels;
+  - donut production status chart;
+  - shop-load mini bar chart;
+  - cleaner manufacturing order table shell.
+
+Build:
+
+- Frontend build passed.
+
+Boundary:
+
+- Frontend UI only.
+- No backend, Prisma, production logic, BOM logic, QC logic, or inventory calculation changed.
+
+### Inventory Warehouse Slot-Level Material Location Phase 1
+
+Implemented:
+
+- Audited current Prisma schema:
+  - `InventoryItem.slotId` already exists;
+  - `InventoryItem.level` already exists;
+  - `InventoryTransactionItem.slotId` already exists;
+  - `WarehouseZone.row`, `column`, `level`, and `capacity` already exist.
+- No migration was created because the required database fields already exist.
+- Fixed Inventory item DTO validation so Material Master create/update now accepts:
+  - `zoneId`;
+  - `slotId`;
+  - `level`.
+- Enhanced `WarehouseMiniMap` in Material Drawer:
+  - cell labels now show material occupancy such as `1 VT`, `3 VT`, or the single material code;
+  - hover tooltip shows material code, name, quantity, unit, and level;
+  - level cards show occupied material label instead of only `Đã dùng`.
+- Applied the same 2D mini map to transaction modals:
+  - inbound modal;
+  - outbound modal;
+  - transfer modal.
+- Outbound modal can now record selected source `slotId/level` metadata on the outbound transaction item without changing stock calculation.
+- Transfer modal now shows source and destination mini maps while preserving existing transfer quantity and zone validation.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
+Boundaries:
+
+- No drag-drop.
+- No 3D.
+- No canvas or Three.js.
+- No inventory stock calculation change.
+- No dashboard logic change.
 
 ### Inventory Overview Two-Column Density And Tab Chart Sync
 
@@ -1092,4 +1303,115 @@ Implemented:
 Build:
 
 - Frontend build passed.
+- Backend build passed.
+
+### Inventory Warehouse Capacity Semantics Fix
+
+Implemented:
+
+- Fixed Warehouse Location UI so `capacity` is shown as operational storage capacity/tải trọng, not as the number of 2D cells.
+- Inventory Location table now separates:
+  - `Sức chứa` in tons;
+  - `Ô/tầng` as occupied cell-level count.
+- Location detail drawer now uses the fixed 2D structure of `6 x 6 x 4 = 144` cell-level positions.
+- Material Drawer full-location validation now checks whether any empty cell-level exists instead of comparing `materialCount >= capacity`.
+- WarehouseMiniMap now displays occupied/total cell-level count separately from operational capacity.
+
+### Inventory Warehouse Location Move Cache Fix
+
+Implemented:
+
+- Material create/update/delete now invalidates:
+  - `inventory-zones`;
+  - `inventory-zone-detail`.
+- This prevents Warehouse Location detail drawers from showing stale material placement after a material is moved to another zone/slot/level.
+- Inventory item update now supports clearing `zoneId`, `slotId`, and `level` when the Material Drawer sends empty location values.
+- Backend DTO now normalizes empty location fields to `null` for Material Master create/update.
+
+### Projects Create + QC Component Inspection Workflow
+
+Implemented:
+
+- Projects backend now exposes `POST /projects` using the existing `ProjectsService.create()` flow.
+- Projects cockpit now has a working `+ Thêm công trình` button with a create modal.
+- New project form captures:
+  - code;
+  - name;
+  - owner;
+  - location;
+  - project type;
+  - status;
+  - note.
+- Project runtime now reads explicit `Loại:` from project description before falling back to name-based type inference.
+- QC cockpit header now opens a direct `Tạo phiếu kiểm tra cấu kiện` modal.
+- QC modal lets the user select completed MO/component from the QC waiting queue and either:
+  - create a ready inspection;
+  - create and approve/pass the inspection immediately.
+- This supports the current gate where finished components can only move to Yard after linked QC status is `PASSED` or `APPROVED`.
+
+Build:
+
+- Frontend build passed.
+- Backend build passed.
+
+### Production Material Warehouse Orphan Receipt Data Repair
+
+Data repair:
+
+- Found old `[COMPONENT_PRODUCTION]` issue documents that only had negative source lines from the main warehouse and no positive receiving lines into the production material warehouse.
+- Added 7 missing positive receiving lines into production warehouse location `P01`.
+- Assigned slot/level positions:
+  - `A02:L1`
+  - `A03:L1`
+  - `A04:L1`
+  - `A05:L1`
+  - `A06:L1`
+  - `B01:L1`
+  - `B02:L1`
+- Verified:
+  - `missing_positive_location = 0`;
+  - `orphan_negative_without_receipt = 0`.
+
+Impact:
+
+- Production Material Warehouse can now display the formerly orphaned materials.
+- No code or schema changes were made for this repair.
+
+### Component Production Material Warehouse Real Location Link
+
+Implemented:
+
+- `Kho vật tư SX` now calculates stock by real production warehouse location:
+  - `inventoryItemId`;
+  - `zoneId`;
+  - `slotId`.
+- The production material stock table now shows one row per material-location instead of merging all stock by material code.
+- This supports multiple production warehouse locations, such as `C01` and `P01`, without overwriting the displayed location.
+- Removed the old fallback behavior where the UI could show `Vị trí SX mặc định` when production transaction lines had real warehouse/zone data.
+- Return-to-main workflow now creates a real two-line return transaction:
+  - negative line from the selected production warehouse zone/slot;
+  - positive line back to the material's main warehouse location when available.
+
+Build:
+
+- Frontend build passed.
+
+### QC Gate Link Repair For Completed MO
+
+Fixed:
+
+- Root cause: `QcController` was protected by `JwtAuthGuard`, while the current frontend `http-client` does not attach an auth token.
+- Result: QC create/approve actions from the UI returned `401 Unauthorized`, so no `qc_inspections` row was created for the completed Manufacturing Order.
+- Removed the controller-level guard from QC so the current operational cockpit can create/start/complete/approve inspections consistently with the rest of the active modules.
+
+Data repair:
+
+- Created approved QC inspection `QC-AUTO-MO-20260606-90928`.
+- Linked it to:
+  - production order `MO-20260606-90928`;
+  - component `CPL-55982236`.
+- Verified the production Yard gate now finds QC status `APPROVED`.
+
+Build:
+
 - Backend build passed.

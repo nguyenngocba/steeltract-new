@@ -6,7 +6,18 @@ import { Link, useLocation } from 'react-router-dom'
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
 
 import type { ProductionBom, ProductionOrder } from '../api/production.api'
-import { Meter, ProductionKpi, ProductionPanel, StatusChip } from '../components/ProductionCockpitShared'
+import {
+  Meter,
+  ProductionDonut,
+  ProductionKpi,
+  ProductionMiniBars,
+  ProductionPanel,
+  StatusChip,
+  productionMutedButton,
+  productionPrimaryButton,
+  productionTableHead,
+  productionTableRow,
+} from '../components/ProductionCockpitShared'
 import { ManufacturingOrderModal } from '../components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../components/ProductionBomModal'
 import { productionTabs } from '../config/production-tabs'
@@ -54,7 +65,8 @@ export function ProductionCockpitPage() {
   const delayed = orders.filter((item) => item.status === 'DELAYED').length
 
   return <OperationalShell>
-    <main className="min-h-screen bg-[#020811] p-4 text-slate-100">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
+      <div className="mx-auto max-w-[1800px]">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Steel fabrication execution</p>
@@ -62,35 +74,37 @@ export function ProductionCockpitPage() {
           <p className="mt-1 text-xs text-slate-400">Inventory → BOM → Manufacturing Order → Execution → QC → Yard</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setCreateOrderOpen(true)} className="rounded border border-cyan-700 bg-cyan-950/50 px-3 py-2 text-xs text-cyan-200">+ Tạo lệnh sản xuất</button>
-          <button className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200">Xuất báo cáo</button>
+          <button onClick={() => setCreateOrderOpen(true)} className={productionPrimaryButton}>+ Tạo lệnh sản xuất</button>
+          <button className={productionMutedButton}>Xuất báo cáo</button>
         </div>
       </div>
 
-      <nav className="mb-4 flex flex-wrap gap-1 border-b border-slate-800">
+      <nav className="mb-3 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+        <div className="flex min-w-max gap-1">
         {productionTabs.map((tab) => <Link key={tab.path} to={tab.path}
-          className={`border-b-2 px-4 py-3 text-xs ${location.pathname === tab.path ? 'border-cyan-400 bg-cyan-950/30 text-cyan-200' : 'border-transparent text-slate-400 hover:text-white'}`}>
+          className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${location.pathname === tab.path ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/30' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
           {tab.label}
         </Link>)}
+        </div>
       </nav>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <ProductionKpi label="Tổng lệnh SX" value={number(orders.length)} note="Tất cả manufacturing order" />
+        <ProductionKpi label="Tổng lệnh SX" value={number(orders.length)} note="Tất cả manufacturing order" tone="blue" />
         <ProductionKpi label="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="green" />
         <ProductionKpi label="Hoàn thành" value={number(completed)} note="Đã sẵn sàng chuyển bãi" tone="green" />
         <ProductionKpi label="Quá hạn" value={number(delayed)} note="Cần điều phối lại" tone="red" />
         <ProductionKpi label="Production BOM" value={number(boms.length)} note="Định mức đang quản lý" tone="amber" />
-        <ProductionKpi label="Phiếu cấp vật tư" value={number(issues.length)} note="Từ kho vật tư SX" />
+        <ProductionKpi label="Phiếu cấp vật tư" value={number(issues.length)} note="Từ kho vật tư SX" tone="purple" />
       </div>
 
-      <div className="my-3 flex flex-wrap gap-2 rounded-lg border border-slate-800 bg-[#071321] p-3">
-        <div className="flex min-w-64 flex-1 items-center gap-2 rounded border border-slate-700 bg-[#020811] px-3">
+      <div className="my-3 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_18px_44px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] backdrop-blur-2xl">
+        <div className="flex min-w-64 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2">
           <Search size={15} className="text-cyan-400" />
           <input value={search} onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className="h-10 w-full bg-transparent text-xs outline-none" />
+            placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" />
         </div>
         {['Trạng thái: Tất cả', 'Xưởng: Tất cả', 'Dự án: Tất cả', 'Ưu tiên: Tất cả'].map((text) =>
-          <button key={text} className="rounded border border-slate-700 bg-[#020811] px-3 text-xs text-slate-300">{text}</button>)}
+          <button key={text} className={productionMutedButton}>{text}</button>)}
       </div>
 
       {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} onOpen={setSelectedOrder} />}
@@ -103,6 +117,7 @@ export function ProductionCockpitPage() {
       {selectedBom && <BomWorkspace bom={selectedBom} onClose={() => setSelectedBom(undefined)} />}
       {createOrderOpen && <ManufacturingOrderModal components={components} boms={boms} onClose={() => setCreateOrderOpen(false)} />}
       {createBomOpen && <ProductionBomModal components={components} onClose={() => setCreateBomOpen(false)} />}
+      </div>
     </main>
   </OperationalShell>
 }
@@ -110,6 +125,29 @@ export function ProductionCockpitPage() {
 function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: ReturnType<typeof useProductionLogs>['data']; onOpen: (row: ProductionOrder) => void }) {
   return <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
     <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <ProductionPanel title="Thao tác nhanh">
+          <ActionCards compact />
+        </ProductionPanel>
+        <ProductionPanel title="MO hôm nay">
+          <div className="grid grid-cols-[auto_1fr] items-end gap-4">
+            <div className="text-4xl font-semibold text-white">{orders.slice(0, 8).length}</div>
+            <div className="text-right text-sm text-slate-300">
+              <div>{orders.filter((row) => row.status === 'IN_PROGRESS').length.toLocaleString('vi-VN')} đang chạy</div>
+              <div className="mt-1 text-xs text-blue-300">Xem chi tiết</div>
+            </div>
+          </div>
+        </ProductionPanel>
+        <ProductionPanel title="BOM đang dùng">
+          <div className="grid grid-cols-[auto_1fr] items-end gap-4">
+            <div className="text-4xl font-semibold text-white">{orders.filter((row) => row.bom).length}</div>
+            <div className="text-right text-sm text-slate-300">
+              <div>{orders.length.toLocaleString('vi-VN')} MO</div>
+              <div className="mt-1 text-xs text-emerald-300">Đồng bộ BOM</div>
+            </div>
+          </div>
+        </ProductionPanel>
+      </div>
       <ProductionPanel title="Tiến độ sản xuất theo ngày">
         <div className="grid h-44 grid-cols-12 items-end gap-2 border-b border-l border-slate-800 px-3 pb-3">
           {[34, 48, 43, 58, 66, 72, 63, 81, 77, 86, 82, 94].map((value, index) =>
@@ -130,8 +168,19 @@ function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: R
     </div>
     <aside className="space-y-3">
       <ProductionPanel title="Phân bổ trạng thái">
-        {['Hoàn thành', 'Đang SX', 'Chờ vật tư', 'Quá hạn'].map((name, index) =>
-          <div key={name} className="mb-4"><div className="mb-1 flex justify-between text-xs"><span>{name}</span><span>{[68, 22, 7, 3][index]}%</span></div><Meter value={[68, 22, 7, 3][index]} tone={['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-red-500'][index]} /></div>)}
+        <ProductionDonut
+          centerValue={orders.length.toLocaleString('vi-VN')}
+          centerLabel="lệnh SX"
+          segments={[
+            { label: 'Hoàn thành', value: orders.filter((row) => row.status === 'COMPLETED').length, color: '#14c987' },
+            { label: 'Đang SX', value: orders.filter((row) => row.status === 'IN_PROGRESS').length, color: '#1d7cff' },
+            { label: 'Quá hạn', value: orders.filter((row) => row.status === 'DELAYED').length, color: '#ef4444' },
+            { label: 'Khác', value: orders.filter((row) => !['COMPLETED', 'IN_PROGRESS', 'DELAYED'].includes(row.status)).length, color: '#f59e0b' },
+          ]}
+        />
+      </ProductionPanel>
+      <ProductionPanel title="Tải xưởng">
+        <ProductionMiniBars values={[42, 48, 51, 63, 58, 72, 69, 81, 75, 88, 84, 92]} />
       </ProductionPanel>
       <ProductionPanel title="Hoạt động gần đây">
         <ActivityList logs={logs ?? []} />
@@ -142,13 +191,13 @@ function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: R
 
 function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; onOpen: (row: ProductionOrder) => void; embedded?: boolean }) {
   return <ProductionPanel title={embedded ? 'Lệnh sản xuất đang hoạt động' : 'Danh sách manufacturing order'} action={<span className="text-[11px] text-cyan-300">1-10 / {rows.length}</span>}>
-    <div className="overflow-x-auto"><table className="w-full min-w-[940px] text-left text-xs">
-      <thead className="text-[10px] uppercase text-slate-500"><tr>{['MO Number', 'Kết cấu', 'BOM', 'Số lượng', 'Ưu tiên', 'Công đoạn', 'Tiến độ', 'Bắt đầu', 'Đến hạn', 'Trạng thái'].map((x) => <th key={x} className="pb-3 pr-3">{x}</th>)}</tr></thead>
-      <tbody>{rows.slice(0, 10).map((row) => <tr key={row.id} onClick={() => onOpen(row)} className="cursor-pointer border-t border-slate-800 hover:bg-cyan-950/30">
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[940px] text-left text-xs">
+      <thead className={productionTableHead}><tr>{['MO Number', 'Kết cấu', 'BOM', 'Số lượng', 'Ưu tiên', 'Công đoạn', 'Tiến độ', 'Bắt đầu', 'Đến hạn', 'Trạng thái'].map((x) => <th key={x} className="px-3 py-2 text-left font-medium">{x}</th>)}</tr></thead>
+      <tbody>{rows.slice(0, 10).map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${productionTableRow}`}>
         <td className="py-3 pr-3 text-cyan-300">{row.orderNo}</td><td>{row.title}</td><td>{row.bom?.bomNo ?? '-'}</td><td>{number(row.quantity)}</td><td>{row.priority}</td><td>{row.currentStageCode ?? 'WAITING'}</td>
         <td className="w-28 pr-3"><Meter value={row.status === 'COMPLETED' ? 100 : row.status === 'IN_PROGRESS' ? 58 : 15} /></td><td>{date(row.plannedStartAt)}</td><td>{date(row.plannedEndAt)}</td><td><StatusChip status={row.status} /></td>
       </tr>)}</tbody>
-    </table></div>
+    </table></div></div>
   </ProductionPanel>
 }
 
@@ -174,18 +223,18 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
     }
   }
 
-  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Production BOM Registry" action={<button onClick={onCreate} className="text-xs text-cyan-300">+ Tạo BOM</button>}>
-    <div className="overflow-x-auto"><table className="w-full min-w-[950px] text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="pb-3 pr-3" key={x}>{x}</th>)}</tr></thead>
-    <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className="cursor-pointer border-t border-slate-800 hover:bg-cyan-950/30"><td className="py-3">{index+1}</td><td className="text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td>{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td><div className="flex gap-2 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td></tr>)}</tbody></table></div>
-  </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM">{['Dầm chính','Cột thép','Bản mã','Giằng'].map((x,i)=><div className="mb-4" key={x}><div className="mb-1 flex justify-between text-xs"><span>{x}</span><span>{[42,28,18,12][i]}%</span></div><Meter value={[42,28,18,12][i]}/></div>)}</ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
+  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Production BOM Registry" action={<button onClick={onCreate} className={productionMutedButton}>+ Tạo BOM</button>}>
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[950px] text-left text-xs"><thead className={productionTableHead}><tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+    <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className={`cursor-pointer ${productionTableRow}`}><td className="px-3 py-3">{index+1}</td><td className="px-3 py-3 text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td>{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td><div className="flex gap-2 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td></tr>)}</tbody></table></div></div>
+  </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM"><ProductionDonut centerValue={rows.length.toLocaleString('vi-VN')} centerLabel="BOM" segments={[{ label: 'Dầm chính', value: 42, color: '#1d7cff' }, { label: 'Cột thép', value: 28, color: '#14c987' }, { label: 'Bản mã', value: 18, color: '#f59e0b' }, { label: 'Giằng', value: 12, color: '#7c3aed' }]} /></ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
 }
 
 function Issues({ rows }: { rows: ReturnType<typeof useProductionIssues>['data'] }) {
-  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Phiếu cấp vật tư cho MO" action={<button className="text-xs text-cyan-300">+ Tạo phiếu cấp</button>}><div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Issue No','MO Number','Material','Issued Qty','Unit','Issued By','Issued Date','Status'].map(x=><th className="pb-3 pr-3" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,10).map(row=><tr className="border-t border-slate-800" key={row.id}><td className="py-3 text-cyan-300">{row.issueNo}</td><td>{row.productionOrder?.orderNo}</td><td>{row.inventoryItem?.code} · {row.inventoryItem?.name}</td><td>{number(row.issuedQty)}</td><td>{row.inventoryItem?.unit??'-'}</td><td>{row.issuedBy??'-'}</td><td>{date(row.issuedDate)}</td><td><StatusChip status={row.status}/></td></tr>)}</tbody></table></div></ProductionPanel><aside><ProductionPanel title="Luồng cấp phát"><div className="space-y-3 text-xs text-slate-300"><div>Kho vật tư chính</div><div className="text-cyan-300">↓ Điều chuyển</div><div>Kho vật tư sản xuất</div><div className="text-amber-300">↓ Cấp phát theo MO</div><div>Xưởng gia công</div></div></ProductionPanel></aside></div>
+  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Phiếu cấp vật tư cho MO" action={<button className={productionMutedButton}>+ Tạo phiếu cấp</button>}><div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs"><thead className={productionTableHead}><tr>{['Issue No','MO Number','Material','Issued Qty','Unit','Issued By','Issued Date','Status'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,10).map(row=><tr className={productionTableRow} key={row.id}><td className="px-3 py-3 text-cyan-300">{row.issueNo}</td><td>{row.productionOrder?.orderNo}</td><td>{row.inventoryItem?.code} · {row.inventoryItem?.name}</td><td>{number(row.issuedQty)}</td><td>{row.inventoryItem?.unit??'-'}</td><td>{row.issuedBy??'-'}</td><td>{date(row.issuedDate)}</td><td><StatusChip status={row.status}/></td></tr>)}</tbody></table></div></div></ProductionPanel><aside className="space-y-3"><ProductionPanel title="Luồng cấp phát"><div className="space-y-3 text-xs text-slate-300"><div>Kho vật tư chính</div><div className="text-cyan-300">↓ Điều chuyển</div><div>Kho vật tư sản xuất</div><div className="text-amber-300">↓ Cấp phát theo MO</div><div>Xưởng gia công</div></div></ProductionPanel><ProductionPanel title="Tỷ lệ cấp phát"><ProductionMiniBars values={[22, 34, 29, 44, 51, 47, 62, 58]} tone="emerald" /></ProductionPanel></aside></div>
 }
 
 function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) {
-  return <ProductionPanel title="Nhật ký thực thi sản xuất"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="pb-3 pr-3" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,20).map(row=><tr className="border-t border-slate-800" key={row.id}><td className="py-3">{new Date(row.createdAt).toLocaleString('vi-VN')}</td><td className="text-cyan-300">{row.productionOrder.orderNo}</td><td>{row.productionOrder.title}</td><td>{row.stage?.name??row.type}</td><td>{row.workerId??'-'}</td><td>{row.stage?.name??'-'}</td><td><StatusChip status={row.type}/></td><td>{row.message}</td></tr>)}</tbody></table></div></ProductionPanel>
+  return <ProductionPanel title="Nhật ký thực thi sản xuất"><div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className={productionTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,20).map(row=><tr className={productionTableRow} key={row.id}><td className="px-3 py-3">{new Date(row.createdAt).toLocaleString('vi-VN')}</td><td className="text-cyan-300">{row.productionOrder.orderNo}</td><td>{row.productionOrder.title}</td><td>{row.stage?.name??row.type}</td><td>{row.workerId??'-'}</td><td>{row.stage?.name??'-'}</td><td><StatusChip status={row.type}/></td><td>{row.message}</td></tr>)}</tbody></table></div></div></ProductionPanel>
 }
 
 function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: () => void }) {
@@ -325,5 +374,20 @@ function BomWorkspace({ bom, onClose }: { bom: ProductionBom; onClose: () => voi
 }
 
 function ActivityList({ logs }: { logs: NonNullable<ReturnType<typeof useProductionLogs>['data']> }) { return <div className="space-y-3">{logs.slice(0,7).map(row=><div key={row.id} className="border-l border-cyan-700 pl-3 text-xs"><div className="text-cyan-300">{row.productionOrder.orderNo}</div><div className="mt-1 text-slate-300">{row.message}</div></div>)}</div> }
-function ActionCards() { return <div className="grid grid-cols-2 gap-2">{[[FileStack,'Tạo BOM'],[Factory,'Tạo MO'],[Boxes,'Cấp vật tư'],[Archive,'Chuyển bãi'],[Wrench,'Cập nhật bước'],[ClipboardList,'Nhật ký']].map(([Icon,label])=><button key={String(label)} className="rounded border border-slate-800 bg-slate-950 p-3 text-left text-xs text-slate-300"><Icon size={16} className="mb-2 text-cyan-300"/>{label as string}</button>)}</div> }
+function ActionCards({ compact = false }: { compact?: boolean }) {
+  const actions = compact
+    ? [[FileStack, 'BOM'], [Factory, 'MO'], [Boxes, 'Cấp VT'], [Archive, 'Ra bãi']]
+    : [[FileStack, 'Tạo BOM'], [Factory, 'Tạo MO'], [Boxes, 'Cấp vật tư'], [Archive, 'Chuyển bãi'], [Wrench, 'Cập nhật bước'], [ClipboardList, 'Nhật ký']]
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {actions.map(([Icon, label]) => (
+        <button key={String(label)} className="rounded-xl border border-white/10 bg-white/[0.045] p-3 text-left text-xs text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-200">
+          <Icon size={16} className="mb-2 text-cyan-300" />
+          {label as string}
+        </button>
+      ))}
+    </div>
+  )
+}
 function Info({ k, v }: { k: string; v: string }) { return <div className="flex justify-between gap-3"><span className="text-slate-500">{k}</span><span className="text-right text-slate-200">{v}</span></div> }

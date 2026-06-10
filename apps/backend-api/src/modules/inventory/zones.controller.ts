@@ -118,6 +118,7 @@ export class ZonesController {
       ],
       include: {
         warehouse: true,
+
         inventoryItems: {
           where: {
             deletedAt: null,
@@ -138,6 +139,19 @@ export class ZonesController {
             },
           },
         },
+
+        locationStocks: {
+          include: {
+            inventoryItem: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                unit: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -151,12 +165,23 @@ export class ZonesController {
         ...zone,
         materialCount: zone.inventoryItems.length,
         totalStockQuantity,
-        cellOccupancy: buildCellOccupancy(zone.inventoryItems),
-        inventoryItems: undefined,
+
+        cellOccupancy: buildCellOccupancy(
+          zone.locationStocks.map((row) => ({
+            id: row.inventoryItem.id,
+            code: row.inventoryItem.code,
+            name: row.inventoryItem.name,
+            quantity: row.quantity,
+            unit: row.inventoryItem.unit,
+            slotId: row.slotId,
+            level: row.level,
+          })),
+          true,
+        ),
       }
     })
   }
-
+  
   @Get(':id')
   async getZone(@Param('id') id: string) {
     const zone = await this.prisma.warehouseZone.findUnique({
@@ -167,27 +192,30 @@ export class ZonesController {
           where: {
             deletedAt: null,
           },
-          include: {
-            category: true,
-            materialType: true,
-            unitMaster: true,
-          },
-          orderBy: {
-            code: 'asc',
-          },
-        },
-        transactionItems: {
-          take: 50,
-          orderBy: {
-            createdAt: 'desc',
-          },
-          include: {
-            inventoryItem: true,
-            transaction: true,
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            quantity: true,
             unit: true,
+            slotId: true,
+            level: true,
           },
         },
-      },
+
+        locationStocks: {
+          include: {
+            inventoryItem: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                unit: true,
+              },
+            },
+          },
+        },
+      }
     })
 
     if (!zone) return null
@@ -201,7 +229,19 @@ export class ZonesController {
       ...zone,
       materialCount: zone.inventoryItems.length,
       totalStockQuantity,
-      cellOccupancy: buildCellOccupancy(zone.inventoryItems, true),
+
+      cellOccupancy: buildCellOccupancy(
+        zone.locationStocks.map((row) => ({
+          id: row.inventoryItem.id,
+          code: row.inventoryItem.code,
+          name: row.inventoryItem.name,
+          quantity: row.quantity,
+          unit: row.inventoryItem.unit,
+          slotId: row.slotId,
+          level: row.level,
+        })),
+        true,
+      ),
     }
   }
 

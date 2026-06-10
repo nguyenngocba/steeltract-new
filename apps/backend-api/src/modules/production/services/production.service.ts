@@ -36,6 +36,7 @@ import {
   UpdateProductionOrderDto,
   UpdateProductionTaskDto,
 } from '../dto/production.dto';
+import { MaterialIssueService } from './material-issue.service';
 import {
   ProductionRepository,
   ProductionTx,
@@ -59,6 +60,14 @@ type ProductionOrderWithDetails = Prisma.ProductionOrderGetPayload<{
   include: ReturnType<ProductionRepository['orderInclude']>;
 }>;
 
+type BomMaterialIssuePlan = {
+  inventoryItemId: string;
+  warehouseId?: string;
+  zoneId?: string;
+  quantity: number;
+  materialCode: string;
+};
+
 @Injectable()
 export class ProductionService {
   constructor(
@@ -68,6 +77,7 @@ export class ProductionService {
     private readonly attachmentsService: AttachmentsService,
     private readonly prisma: PrismaService,
     private readonly yardService: YardService,
+    private readonly materialIssueService: MaterialIssueService,
   ) {}
 
   async findAll(query: ListProductionOrdersDto) {
@@ -281,6 +291,9 @@ export class ProductionService {
   }
 
   async start(id: string, dto: StartProductionDto, actorId?: string) {
+    const existingOrder = await this.getOrderOrThrow(id);
+    const issuePlans = await this.planMissingBomMaterialIssues(existingOrder);
+
     const order = await this.repository.transaction(async (tx) => {
       const existing = await this.getOrderOrThrow(id, tx);
       const firstStage = existing.stages[0];
@@ -333,6 +346,7 @@ export class ProductionService {
     });
 
     await this.emitProductionEvent('production.started', order);
+    await this.createPlannedMaterialIssues(order, issuePlans, actorId);
 
     return order;
   }
@@ -462,16 +476,16 @@ export class ProductionService {
 
     const approvedQc = await this.prisma.qcInspection.findFirst({
       where: {
-        OR: [
-          { productionOrderId: order.id },
-          { componentId: order.component.id },
-        ],
+        productionOrderId: order.id,
         status: {
           in: [
             QcInspectionStatus.PASSED,
             QcInspectionStatus.APPROVED,
           ],
         },
+      },
+      orderBy: {
+        updatedAt: 'desc',
       },
     });
 
@@ -822,63 +836,11 @@ export class ProductionService {
     const productionStockByMaterialId = new Map<string, number>();
 
     if (materialIds.length > 0) {
-      const transactions = await this.prisma.inventoryTransaction.findMany({
-        where: {
-          items: {
-            some: {
-              inventoryItemId: {
-                in: materialIds,
-              },
-            },
-          },
-          OR: [
-            {
-              remarks: {
-                contains: '[COMPONENT_PRODUCTION]',
-              },
-            },
-            {
-              note: {
-                contains: '[COMPONENT_PRODUCTION]',
-              },
-            },
-          ],
-        },
-        include: {
-          items: true,
-        },
-      });
-
-      for (const transaction of transactions) {
-        const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
-        const isReturn = text.includes('[COMPONENT_PRODUCTION_RETURN]');
-
-        for (const line of transaction.items) {
-          if (!materialIds.includes(line.inventoryItemId)) continue;
-
-          const quantity = Math.abs(Number(line.quantity ?? 0));
-          productionStockByMaterialId.set(
-            line.inventoryItemId,
-            (productionStockByMaterialId.get(line.inventoryItemId) ?? 0) +
-              (isReturn ? -quantity : quantity),
-          );
-        }
-      }
-
-      const issuedMaterials = await this.prisma.productionMaterialIssue.findMany({
-        where: {
-          inventoryItemId: {
-            in: materialIds,
-          },
-          status: 'ISSUED',
-        },
-      });
-
-      for (const issue of issuedMaterials) {
+      const buckets = await this.productionStockBuckets(materialIds);
+      for (const [materialId, rows] of buckets.entries()) {
         productionStockByMaterialId.set(
-          issue.inventoryItemId,
-          (productionStockByMaterialId.get(issue.inventoryItemId) ?? 0) -
-            Number(issue.issuedQty ?? 0),
+          materialId,
+          rows.reduce((total, row) => total + row.quantity, 0),
         );
       }
     }
@@ -902,6 +864,210 @@ export class ProductionService {
         shortageQty: Math.max(requiredQty - issuedQty - availableQty, 0),
       };
     });
+  }
+
+  private async planMissingBomMaterialIssues(
+    order: ProductionOrderWithDetails,
+  ): Promise<BomMaterialIssuePlan[]> {
+    if (!order.bom?.items.length) return [];
+
+    const requiredByMaterial = new Map<string, number>();
+    const materialById = new Map<string, { code: string; name: string }>();
+
+    for (const item of order.bom.items) {
+      const requiredQty =
+        Number(item.quantity ?? 0) *
+        (1 + Number(item.wastePercent ?? 0) / 100) *
+        Number(order.quantity ?? 1);
+      requiredByMaterial.set(
+        item.materialId,
+        (requiredByMaterial.get(item.materialId) ?? 0) + requiredQty,
+      );
+      materialById.set(item.materialId, {
+        code: item.material.code,
+        name: item.material.name,
+      });
+    }
+
+    const issuedByMaterial = new Map<string, number>();
+    for (const issue of order.materialIssues ?? []) {
+      if (issue.status !== 'ISSUED') continue;
+      issuedByMaterial.set(
+        issue.inventoryItemId,
+        (issuedByMaterial.get(issue.inventoryItemId) ?? 0) +
+          Number(issue.issuedQty ?? 0),
+      );
+    }
+
+    const materialIds = Array.from(requiredByMaterial.keys());
+    const buckets = await this.productionStockBuckets(materialIds);
+    const shortages: string[] = [];
+    const issuePlans: BomMaterialIssuePlan[] = [];
+
+    for (const materialId of materialIds) {
+      let remaining =
+        (requiredByMaterial.get(materialId) ?? 0) -
+        (issuedByMaterial.get(materialId) ?? 0);
+      if (remaining <= 0.000001) continue;
+
+      const materialBuckets = [...(buckets.get(materialId) ?? [])]
+        .filter((bucket) => bucket.quantity > 0.000001)
+        .sort((a, b) => `${a.zoneId ?? ''}`.localeCompare(`${b.zoneId ?? ''}`));
+      const available = materialBuckets.reduce(
+        (total, bucket) => total + bucket.quantity,
+        0,
+      );
+
+      if (available + 0.000001 < remaining) {
+        const material = materialById.get(materialId);
+        shortages.push(
+          `${material?.code ?? materialId}: cần ${remaining.toLocaleString('vi-VN')}, kho SX còn ${available.toLocaleString('vi-VN')}`,
+        );
+        continue;
+      }
+
+      for (const bucket of materialBuckets) {
+        if (remaining <= 0.000001) break;
+        const quantity = Math.min(bucket.quantity, remaining);
+        issuePlans.push({
+          inventoryItemId: materialId,
+          warehouseId: bucket.warehouseId,
+          zoneId: bucket.zoneId,
+          quantity,
+          materialCode: materialById.get(materialId)?.code ?? materialId,
+        });
+        remaining -= quantity;
+      }
+    }
+
+    if (shortages.length) {
+      throw new BadRequestException(
+        `Không đủ vật tư trong kho SX để bắt đầu sản xuất. ${shortages.join('; ')}`,
+      );
+    }
+
+    return issuePlans;
+  }
+
+  private async createPlannedMaterialIssues(
+    order: ProductionOrderWithDetails,
+    issuePlans: BomMaterialIssuePlan[],
+    actorId?: string,
+  ) {
+    if (!issuePlans.length) return;
+
+    const timestamp = Date.now();
+    for (const [index, plan] of issuePlans.entries()) {
+      await this.materialIssueService.create(
+        {
+          issueNo: `ISS-${order.orderNo}-${timestamp}-${index + 1}`,
+          productionOrderId: order.id,
+          inventoryItemId: plan.inventoryItemId,
+          warehouseId: plan.warehouseId,
+          zoneId: plan.zoneId,
+          issuedQty: plan.quantity,
+          issuedDate: new Date(),
+          status: 'ISSUED',
+          remarks: `[PRODUCTION_MATERIAL_CONSUME] Auto cấp phát ${plan.materialCode} cho ${order.orderNo}`,
+        },
+        actorId,
+      );
+    }
+  }
+
+  private async productionStockBuckets(materialIds: string[]) {
+    const buckets = new Map<
+      string,
+      Array<{ warehouseId?: string; zoneId?: string; quantity: number }>
+    >();
+
+    const transactions = await this.prisma.inventoryTransaction.findMany({
+      where: {
+        items: { some: { inventoryItemId: { in: materialIds } } },
+        OR: [
+          { remarks: { contains: '[COMPONENT_PRODUCTION]' } },
+          { remarks: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+          { note: { contains: '[COMPONENT_PRODUCTION]' } },
+          { note: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+        ],
+      },
+      include: {
+        warehouse: true,
+        items: {
+          include: {
+            warehouse: true,
+          },
+        },
+      },
+    });
+
+    for (const transaction of transactions) {
+      const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
+      const isReturn = text.includes('[COMPONENT_PRODUCTION_RETURN]');
+
+      for (const line of transaction.items) {
+        if (!materialIds.includes(line.inventoryItemId)) continue;
+        const rawQty = Number(line.quantity ?? 0);
+        if (!Number.isFinite(rawQty) || rawQty === 0) continue;
+        if (!this.isProductionWarehouseLine(line, transaction)) continue;
+        if (!isReturn && rawQty <= 0) continue;
+        if (isReturn && rawQty >= 0) continue;
+
+        const rows = buckets.get(line.inventoryItemId) ?? [];
+        const zoneId = line.zoneId ?? transaction.zoneId ?? undefined;
+        const warehouseId = line.warehouseId ?? transaction.warehouseId ?? undefined;
+        const existing = rows.find(
+          (row) =>
+            (row.zoneId ?? null) === (zoneId ?? null) &&
+            (row.warehouseId ?? null) === (warehouseId ?? null),
+        );
+        if (existing) {
+          existing.quantity += rawQty;
+        } else {
+          rows.push({ warehouseId, zoneId, quantity: rawQty });
+        }
+        buckets.set(line.inventoryItemId, rows);
+      }
+    }
+
+    const issues = await this.prisma.productionMaterialIssue.findMany({
+      where: {
+        inventoryItemId: { in: materialIds },
+        status: 'ISSUED',
+      },
+    });
+
+    for (const issue of issues) {
+      let remaining = Number(issue.issuedQty ?? 0);
+      const rows = buckets.get(issue.inventoryItemId) ?? [];
+      const preferred = issue.zoneId
+        ? rows.filter((row) => row.zoneId === issue.zoneId)
+        : rows;
+      const orderedRows = [...preferred, ...rows.filter((row) => !preferred.includes(row))];
+
+      for (const row of orderedRows) {
+        if (remaining <= 0.000001) break;
+        if (row.quantity <= 0) continue;
+        const deducted = Math.min(row.quantity, remaining);
+        row.quantity -= deducted;
+        remaining -= deducted;
+      }
+    }
+
+    return buckets;
+  }
+
+  private isProductionWarehouseLine(
+    line: { warehouse?: { code?: string | null; name?: string | null } | null },
+    transaction: { warehouse?: { code?: string | null; name?: string | null } | null },
+  ) {
+    const warehouseCode = String(
+      line.warehouse?.code ?? transaction.warehouse?.code ?? '',
+    ).toUpperCase();
+    const warehouseName = String(
+      line.warehouse?.name ?? transaction.warehouse?.name ?? '',
+    ).toLowerCase();
+    return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất');
   }
 
   async metrics() {

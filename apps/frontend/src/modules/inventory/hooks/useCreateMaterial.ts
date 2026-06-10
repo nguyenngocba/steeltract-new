@@ -29,6 +29,12 @@ export function useCreateMaterial() {
       queryClient.invalidateQueries({
         queryKey: ['inventory-audit'],
       })
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-zones'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-zone-detail'],
+      })
     },
   })
 }

@@ -442,6 +442,40 @@ Latest polish:
 - Remaining Inventory tabs now use shared donut/bar chart treatment for their side analytics:
   locations, inbound, outbound, transfer, stock take, transactions, and alerts.
 
+### Warehouse Slot-Level Material Location
+
+Current status:
+
+- `InventoryItem` persists:
+  - `zoneId`;
+  - `slotId`;
+  - `level`.
+- `InventoryTransactionItem` persists `slotId` metadata using the existing `CELL:LEVEL` convention.
+- Material Master create/update accepts and saves zone, slot, and level.
+- `WarehouseMiniMap` is a 2D-only view and now displays material occupancy in each cell:
+  - empty cell;
+  - single material code;
+  - multiple material count such as `3 VT`.
+- Hovering a cell/level shows material code, name, quantity, unit, and level.
+- The same 2D map is available in:
+  - Material Drawer;
+  - Inbound transaction modal;
+  - Outbound transaction modal;
+  - Transfer transaction modal.
+
+Boundary:
+
+- Stock calculation still uses the existing transaction/zone logic.
+- Slot/level is currently operational location metadata and is not yet a persisted balance ledger.
+- Drag-drop, 3D, Canvas, and Three.js are not implemented.
+
+Capacity semantics:
+
+- Warehouse `capacity` means operational storage capacity/tải trọng, not number of 2D cells.
+- The current 2D storage structure is fixed at 36 cells x 4 levels = 144 cell-level positions per real storage location.
+- UI must display capacity and occupied cell-level count as separate values.
+- Full-location validation should use empty cell-level availability, not `materialCount >= capacity`.
+
 ## Boundaries Preserved
 
 - Material creation does not create an initial inbound transaction.

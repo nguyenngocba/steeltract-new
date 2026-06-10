@@ -7,6 +7,7 @@ import { useMaterialDetail } from '../hooks/useMaterialDetail'
 import { useProjects } from '../hooks/useProjects'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useZones } from '../hooks/useZones'
+import { WarehouseMiniMap } from './material-table/MaterialDrawer'
 
 type ModalProps = {
   open: boolean
@@ -66,11 +67,6 @@ function zoneLevel(zone: any) {
 
 function zoneCell(zone: any) {
   return `${String(zone?.row ?? '').trim()}${String(zone?.column ?? '').trim()}` || String(zone?.code ?? '')
-}
-
-function internalSlot(cell: string, level: string) {
-  if (!cell && !level) return undefined
-  return `${cell || 'NA'}:${level || 'L1'}`
 }
 
 function normalizeLevel(value?: string) {
@@ -239,7 +235,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           unitPrice,
           warehouseId: selectedInboundZone?.warehouseId || undefined,
           zoneId: form.zoneId || undefined,
-          slotId: internalSlot(form.slotId, form.level),
+          slotId: form.slotId,
+          level: form.level,
         },
       ],
     })
@@ -259,7 +256,9 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Nhập kho vật tư">
+    <ModalShell open={open} onClose={onClose} title="Nhập kho vật tư" wide>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_420px]">
+      <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
         <select value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
@@ -347,6 +346,15 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           Xác nhận nhập kho
         </button>
       </div>
+      </div>
+      <WarehouseMiniMap
+        compact
+        zone={selectedInboundZone}
+        slotId={form.slotId}
+        level={form.level}
+        onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, slotId: cell, level: selectedLevel }))}
+      />
+      </div>
     </ModalShell>
   )
 }
@@ -364,6 +372,8 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     projectId: '',
     inventoryItemId: '',
     zoneId: '',
+    sourceSlotId: '',
+    sourceLevel: '',
     productionZoneId: '',
     productionSlotId: '',
     productionLevel: '',
@@ -385,6 +395,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       ? ((selectedMaterialDetail as any).locationBalances as any[]).filter((balance) => num(balance.quantity) > 0)
       : []
     if (balances.length > 0) return balances
+    return []
     const fallbackZone = selectedMaterial?.zoneId
       ? zones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
       : zones[0]
@@ -430,6 +441,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   }, [form.inventoryItemId, form.zoneId, availableZones])
   const selectedZoneStock = form.zoneId ? qtyByZoneId.get(String(form.zoneId)) ?? 0 : 0
   const selectedZoneAfterStock = selectedZoneStock - quantity
+  const selectedSourceFullZone = zones.find((zone: any) => String(zone.id) === String(form.zoneId))
   const selectedProductionZone = productionZones.find((zone: any) => String(zone.id) === String(form.productionZoneId))
   const productionCellOccupied = form.target === 'COMPONENT_PRODUCTION'
     ? isCellOccupied(selectedProductionZone, form.productionSlotId, form.productionLevel)
@@ -475,13 +487,16 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           inventoryItemId: form.inventoryItemId,
           quantity: -Math.abs(quantity),
           zoneId: form.zoneId || undefined,
+          slotId: form.sourceSlotId,
+          level: form.sourceLevel,
         },
         {
           inventoryItemId: form.inventoryItemId,
           quantity: Math.abs(quantity),
           warehouseId: selectedProductionZone?.warehouseId || undefined,
           zoneId: form.productionZoneId || undefined,
-          slotId: internalSlot(form.productionSlotId, form.productionLevel),
+          slotId: form.productionSlotId,
+          level: form.productionLevel,
           unitPrice: estimatedUnitPrice || undefined,
         },
       ] : [
@@ -489,6 +504,8 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           inventoryItemId: form.inventoryItemId,
           quantity: -Math.abs(quantity),
           zoneId: form.zoneId || undefined,
+          slotId: form.sourceSlotId,
+          level: form.sourceLevel,
         },
       ],
     })
@@ -498,6 +515,8 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       projectId: '',
       inventoryItemId: '',
       zoneId: '',
+      sourceSlotId: '',
+      sourceLevel: '',
       productionZoneId: '',
       productionSlotId: '',
       productionLevel: '',
@@ -508,7 +527,9 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Xuất kho vật tư">
+    <ModalShell open={open} onClose={onClose} title="Xuất kho vật tư" wide>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_420px]">
+      <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
         <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className={fieldClass}>
@@ -539,6 +560,14 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
               {z.code} - {z.name} · tồn {(qtyByZoneId.get(String(z.id)) ?? 0).toLocaleString('vi-VN')}
             </option>
           ))}
+        </select>
+        <select value={form.sourceSlotId} onChange={(e) => setForm((f) => ({ ...f, sourceSlotId: e.target.value }))} className={fieldClass}>
+          <option value="">Ô lấy vật tư</option>
+          {INTERNAL_CELLS.map((cell) => <option key={cell} value={cell}>Ô {cell}</option>)}
+        </select>
+        <select value={form.sourceLevel} onChange={(e) => setForm((f) => ({ ...f, sourceLevel: e.target.value }))} className={fieldClass}>
+          <option value="">Tầng lấy vật tư</option>
+          {INTERNAL_LEVELS.map((level) => <option key={level} value={level}>Tầng {level}</option>)}
         </select>
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
           Tồn vị trí đã chọn: <span className="ml-1 text-cyan-300">{selectedZoneStock.toLocaleString('vi-VN')}</span>
@@ -613,6 +642,26 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           Xác nhận xuất kho
         </button>
       </div>
+      </div>
+      <div className="space-y-3">
+        <WarehouseMiniMap
+          compact
+          zone={selectedSourceFullZone}
+          slotId={form.sourceSlotId}
+          level={form.sourceLevel}
+          onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, sourceSlotId: cell, sourceLevel: selectedLevel }))}
+        />
+        {form.target === 'COMPONENT_PRODUCTION' ? (
+          <WarehouseMiniMap
+            compact
+            zone={selectedProductionZone}
+            slotId={form.productionSlotId}
+            level={form.productionLevel}
+            onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, productionSlotId: cell, productionLevel: selectedLevel }))}
+          />
+        ) : null}
+      </div>
+      </div>
     </ModalShell>
   )
 }
@@ -670,7 +719,10 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         const zoneCode = zone?.code ?? b.zoneCode ?? 'NA'
         const zoneName = zone?.name ?? ''
         return {
-          id: String(b.zoneId),
+          id: [b.zoneId, b.slotId ?? '', b.level ?? ''].join('|'),
+          zoneId: String(b.zoneId),
+          slotId: b.slotId ?? '',
+          level: b.level ?? '',
           label: `${zoneCode} - ${zoneName}`,
           qty: num(b.quantity),
           zoneCode,
@@ -706,6 +758,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   }, [sourceZoneOptions, form.fromZoneId])
   const selectedSourceZone = sourceZoneOptions.find((zone) => zone.id === form.fromZoneId)
   const selectedDestinationZone = destinationZoneOptions.find((zone) => zone.id === form.toZoneId)
+  const selectedSourceFullZone = realZones.find((zone: any) => String(zone.id) === String(form.fromZoneId))
   const selectedDestinationFullZone = realZones.find((zone: any) => String(zone.id) === String(form.toZoneId))
   const destinationCellOccupied = isCellOccupied(selectedDestinationFullZone, form.toSlotId, form.toLevel)
   const destinationEmptyCell = findEmptyCell(selectedDestinationFullZone)
@@ -750,13 +803,15 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         {
           inventoryItemId: form.materialId,
           zoneId: form.fromZoneId,
-          slotId: internalSlot(form.fromSlotId, form.fromLevel),
+          slotId: form.fromSlotId,
+          level: form.fromLevel,
           quantity: -Math.abs(qty),
         },
         {
           inventoryItemId: form.materialId,
           zoneId: form.toZoneId,
-          slotId: internalSlot(form.toSlotId, form.toLevel),
+          slotId: form.toSlotId,
+          level: form.toLevel,
           quantity: Math.abs(qty),
         },
       ],
@@ -807,7 +862,18 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.fromZoneId} onChange={(e) => setForm((f) => ({ ...f, fromZoneId: e.target.value }))} className={fieldClass}>
+            <select value={form.fromZoneId} onChange={(e) => {
+  const selected = sourceZoneOptions.find(
+    (s) => s.id === e.target.value
+  )
+
+  setForm((f) => ({
+    ...f,
+    fromZoneId: selected?.zoneId ?? '',
+    fromSlotId: selected?.slotId ?? '',
+    fromLevel: selected?.level ?? '',
+  }))
+}} className={fieldClass}>
               <option value="">Từ vị trí kho</option>
               {sourceZoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
@@ -892,6 +958,22 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 {step}
               </div>
             ))}
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            <WarehouseMiniMap
+              compact
+              zone={selectedSourceFullZone}
+              slotId={form.fromSlotId}
+              level={form.fromLevel}
+              onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, fromSlotId: cell, fromLevel: selectedLevel }))}
+            />
+            <WarehouseMiniMap
+              compact
+              zone={selectedDestinationFullZone}
+              slotId={form.toSlotId}
+              level={form.toLevel}
+              onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, toSlotId: cell, toLevel: selectedLevel }))}
+            />
           </div>
         </div>
       </div>

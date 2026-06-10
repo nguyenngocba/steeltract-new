@@ -1,13 +1,11 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { useCreateTransaction } from '../../../inventory/hooks/useCreateTransaction'
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../../inventory/hooks/useInventoryTransactions'
 import { useProductionIssues } from '../../../production/hooks/useProductionCockpit'
-import { componentsTabs } from '../../config/components-tabs'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
 
 type MaterialStockRow = {
@@ -17,6 +15,11 @@ type MaterialStockRow = {
   name: string
   materialUsageType: string
   unit: string
+  warehouseId?: string
+  zoneId?: string
+  slotId?: string
+  returnWarehouseId?: string
+  returnZoneId?: string
   warehouse: string
   location: string
   currentStock: number
@@ -25,6 +28,16 @@ type MaterialStockRow = {
   averageCost: number
   inventoryValue: number
   status: 'Sẵn sàng' | 'Cảnh báo' | 'Thiếu'
+}
+
+type ProductionStockBucket = {
+  inventoryItemId: string
+  warehouseId?: string
+  zoneId?: string
+  slotId?: string
+  warehouse?: string
+  location?: string
+  quantity: number
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString('vi-VN')} đ`
@@ -47,6 +60,16 @@ function productionLocationLabel(line: any, transaction: any) {
   return slot ? `${zoneLabel} / ${slot}` : zoneLabel
 }
 
+function isProductionWarehouseLine(line: any, transaction: any) {
+  const warehouseCode = String(line.warehouse?.code ?? transaction.warehouse?.code ?? '').toUpperCase()
+  const warehouseName = String(line.warehouse?.name ?? transaction.warehouse?.name ?? '').toLowerCase()
+  return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất')
+}
+
+function productionBucketKey(inventoryItemId: string, zoneId?: string | null, slotId?: string | null) {
+  return `${inventoryItemId}:${zoneId ?? 'NO_ZONE'}:${String(slotId ?? '').trim() || 'NO_SLOT'}`
+}
+
 export function ComponentsMaterialStockPage() {
   const { data: inventoryItems = [], isLoading } = useInventoryItems()
   const { data: auditRows = [] } = useInventoryAudit()
@@ -63,8 +86,8 @@ export function ComponentsMaterialStockPage() {
       (auditRows as any[]).map((row) => [String(row.materialId ?? row.inventoryItemId), row]),
     )
     const itemById = new Map((inventoryItems as any[]).map((item) => [String(item.id), item]))
-    const issuedByItem = new Map<string, number>()
-    const sourceByItem = new Map<string, { warehouse?: string; location?: string }>()
+    const buckets = new Map<string, ProductionStockBucket>()
+    const issueByItem = new Map<string, number>()
     const transactionRows = Array.isArray(transactionsData)
       ? transactionsData
       : (transactionsData as any)?.data ?? []
@@ -72,11 +95,7 @@ export function ComponentsMaterialStockPage() {
     ;(materialIssues as any[]).forEach((issue) => {
       const key = String(issue.inventoryItemId)
       if (!key || issue.status !== 'ISSUED') return
-      issuedByItem.set(key, (issuedByItem.get(key) ?? 0) - Number(issue.issuedQty ?? 0))
-      sourceByItem.set(key, {
-        warehouse: issue.inventoryItem?.zone?.warehouse?.name,
-        location: issue.inventoryItem?.zone?.name,
-      })
+      issueByItem.set(key, (issueByItem.get(key) ?? 0) + Number(issue.issuedQty ?? 0))
     })
 
     ;(transactionRows as any[]).forEach((transaction) => {
@@ -88,24 +107,57 @@ export function ComponentsMaterialStockPage() {
       ;(transaction.items ?? []).forEach((line: any) => {
         const key = String(line.inventoryItemId ?? line.inventoryItem?.id ?? '')
         const rawQty = Number(line.quantity ?? 0)
-        if (isProductionReceipt && rawQty <= 0) return
-        const qty = Math.abs(rawQty)
-        if (!key || qty <= 0) return
+        if (!key || !Number.isFinite(rawQty) || rawQty === 0) return
+        if (!isProductionWarehouseLine(line, transaction)) return
+        if (isProductionReceipt && !isReturnToMain && rawQty <= 0) return
+        if (isReturnToMain && rawQty >= 0) return
 
-        issuedByItem.set(key, (issuedByItem.get(key) ?? 0) + (isReturnToMain ? -qty : qty))
-        sourceByItem.set(key, {
+        const zoneId = line.zoneId ?? transaction.zoneId
+        const slotId = String(line.slotId ?? '').trim()
+        const bucketKey = productionBucketKey(key, zoneId, slotId)
+        const current = buckets.get(bucketKey) ?? {
+          inventoryItemId: key,
+          warehouseId: line.warehouseId ?? transaction.warehouseId,
+          zoneId,
+          slotId,
           warehouse: line.warehouse?.name ?? transaction.warehouse?.name,
           location: productionLocationLabel(line, transaction),
-        })
+          quantity: 0,
+        }
+        current.quantity += rawQty
+        buckets.set(bucketKey, current)
       })
     })
 
-    return Array.from(issuedByItem.entries()).flatMap(([inventoryItemId, issuedQty]) => {
+    issueByItem.forEach((issuedQty, inventoryItemId) => {
+      let remaining = Math.max(0, issuedQty)
+      const itemBuckets = Array.from(buckets.values())
+        .filter((bucket) => bucket.inventoryItemId === inventoryItemId && bucket.quantity > 0)
+        .sort((a, b) => `${a.zoneId ?? ''}${a.slotId ?? ''}`.localeCompare(`${b.zoneId ?? ''}${b.slotId ?? ''}`))
+
+      for (const bucket of itemBuckets) {
+        if (remaining <= 0) break
+        const deducted = Math.min(bucket.quantity, remaining)
+        bucket.quantity -= deducted
+        remaining -= deducted
+      }
+
+      if (remaining > 0 && !itemBuckets.length) {
+        buckets.set(productionBucketKey(inventoryItemId), {
+          inventoryItemId,
+          quantity: -remaining,
+          warehouse: 'Kho vật tư SX',
+          location: 'Chưa xác định vị trí SX',
+        })
+      }
+    })
+
+    return Array.from(buckets.values()).flatMap((bucket) => {
+      const inventoryItemId = bucket.inventoryItemId
       const item = itemById.get(inventoryItemId) ?? (materialIssues as any[]).find((issue) => String(issue.inventoryItemId) === inventoryItemId)?.inventoryItem
       if (!item) return []
       const audit = auditById.get(String(item.id))
-      const source = sourceByItem.get(inventoryItemId)
-      const currentStock = Number(issuedQty)
+      const currentStock = Number(bucket.quantity)
       const minimumStock = Number(item.minimumStock ?? 0)
       const averageCost = Number(audit?.averageCost ?? item.unitPrice ?? 0)
       const reserved = 0
@@ -118,8 +170,13 @@ export function ComponentsMaterialStockPage() {
         name: item.name,
         materialUsageType: item.materialUsageType ?? 'PRIMARY',
         unit: item.unitMaster?.symbol ?? item.unit ?? '-',
-        warehouse: source?.warehouse ?? item.zone?.warehouse?.name ?? item.warehouse ?? 'Kho vật tư SX',
-        location: source?.location ?? item.zone?.name ?? item.zoneName ?? 'Vị trí SX mặc định',
+        warehouseId: bucket.warehouseId,
+        zoneId: bucket.zoneId,
+        slotId: bucket.slotId,
+        returnWarehouseId: item.zone?.warehouse?.code === 'MAIN' ? item.zone.warehouse.id : undefined,
+        returnZoneId: item.zone?.warehouse?.code === 'MAIN' ? item.zone.id : undefined,
+        warehouse: bucket.warehouse ?? 'Kho vật tư SX',
+        location: bucket.location ?? 'Chưa xác định vị trí SX',
         currentStock,
         reserved,
         available,
@@ -161,7 +218,7 @@ export function ComponentsMaterialStockPage() {
 
   async function returnToMainWarehouse(row: MaterialStockRow) {
     const quantity = Number(returnForm.quantity || 0)
-    if (quantity <= 0 || quantity > row.available) return
+    if (quantity <= 0 || quantity > row.available || !row.zoneId) return
 
     await createTransaction.mutateAsync({
       type: 'RETURN',
@@ -170,7 +227,20 @@ export function ComponentsMaterialStockPage() {
       items: [
         {
           inventoryItemId: row.inventoryItemId,
+          quantity: -Math.abs(quantity),
+          warehouseId: row.warehouseId,
+          zoneId: row.zoneId,
+          slotId: row.slotId,
+          unitPrice: row.averageCost,
+          totalAmount: -Math.abs(quantity) * row.averageCost,
+        },
+        {
+          inventoryItemId: row.inventoryItemId,
           quantity: Math.abs(quantity),
+          warehouseId: row.returnWarehouseId,
+          zoneId: row.returnZoneId,
+          unitPrice: row.averageCost,
+          totalAmount: Math.abs(quantity) * row.averageCost,
         },
       ],
     })
@@ -180,8 +250,6 @@ export function ComponentsMaterialStockPage() {
 
   return (
     <EnterpriseModulePage>
-      <EnterpriseTabBar tabs={componentsTabs} />
-
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
           <ComponentsKpiCard title="Tổng mã vật tư SX" value={rows.length.toLocaleString('vi-VN')} />
@@ -214,10 +282,10 @@ export function ComponentsMaterialStockPage() {
           <div className="xl:col-span-9">
             <ComponentsPanel title={`Danh sách vật tư cấp sản xuất (${filtered.length})`}>
               <div className="overflow-auto">
-                <table className="w-full min-w-[1100px] text-sm">
+                <table className="w-full min-w-[1180px] text-sm">
                   <thead className="text-xs uppercase text-slate-400">
                     <tr>
-                      {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho nhận', 'Vị trí kho SX', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
+                      {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho nhận', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
                         <th key={heading} className="px-2 py-2 text-left font-medium">{heading}</th>
                       ))}
                     </tr>
@@ -226,13 +294,14 @@ export function ComponentsMaterialStockPage() {
                     {isLoading || isTransactionsLoading ? (
                       <tr><td colSpan={12} className="px-2 py-6 text-center text-slate-400">Đang tải tồn kho vật tư...</td></tr>
                     ) : filtered.map((row) => (
-                      <tr key={row.id} onClick={() => setSelectedRow(row)} className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
+                      <tr key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`} onClick={() => setSelectedRow(row)} className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
                         <td className="px-2 py-2 text-cyan-300">{row.code}</td>
                         <td className="px-2 py-2">{row.name}</td>
                         <td className="px-2 py-2"><span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-200">{materialUsageLabel(row.materialUsageType)}</span></td>
                         <td className="px-2 py-2">{row.unit}</td>
                         <td className="px-2 py-2">{row.warehouse}</td>
                         <td className="px-2 py-2">{row.location}</td>
+                        <td className="px-2 py-2 text-cyan-200">{row.slotId ?? '-'}</td>
                         <td className="px-2 py-2">{row.currentStock.toLocaleString('vi-VN')}</td>
                         <td className="px-2 py-2">{row.reserved.toLocaleString('vi-VN')}</td>
                         <td className="px-2 py-2">{row.available.toLocaleString('vi-VN')}</td>
@@ -276,6 +345,7 @@ export function ComponentsMaterialStockPage() {
                 <div className="text-xs uppercase tracking-[0.16em] text-cyan-400">Kho vật tư SX</div>
                 <h3 className="mt-1 text-xl font-semibold text-white">{selectedRow.code} · {selectedRow.name}</h3>
                 <div className="mt-1 text-sm text-slate-400">{selectedRow.warehouse} / {selectedRow.location}</div>
+                <div className="mt-1 text-xs text-cyan-300">zoneId: {selectedRow.zoneId ?? '-'} · slot: {selectedRow.slotId ?? '-'}</div>
               </div>
               <button onClick={() => setSelectedRow(null)} className="text-slate-300">Đóng</button>
             </div>
@@ -305,7 +375,7 @@ export function ComponentsMaterialStockPage() {
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setSelectedRow(null)} className="rounded border border-slate-700 px-4 py-2 text-sm text-slate-200">Hủy</button>
-              <button disabled={Number(returnForm.quantity || 0) <= 0 || Number(returnForm.quantity || 0) > selectedRow.available} onClick={() => void returnToMainWarehouse(selectedRow)} className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-700">Trả về kho chính</button>
+              <button disabled={!selectedRow.zoneId || Number(returnForm.quantity || 0) <= 0 || Number(returnForm.quantity || 0) > selectedRow.available} onClick={() => void returnToMainWarehouse(selectedRow)} className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-700">Trả về kho chính</button>
             </div>
           </div>
         </div>

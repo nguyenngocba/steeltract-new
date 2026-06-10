@@ -727,6 +727,8 @@ model InventoryItem {
 
   level String?
 
+  locationStocks InventoryLocationStock[]
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -846,6 +848,8 @@ model InventoryTransactionItem {
 
   slotId String?
 
+  level String?
+
   createdAt DateTime @default(now())
 
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
@@ -859,6 +863,21 @@ model InventoryTransactionItem {
   zone WarehouseZone? @relation(fields: [zoneId], references: [id])
 
   @@map("inventory_transaction_items")
+}
+
+model InventoryLocationStock {
+  id String @id @default(cuid())
+  inventoryItemId String
+  warehouseId String?
+  zoneId String?
+  slotId String?
+  level String?
+  quantity Float @default(0)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId],references: [id],onDelete: Cascade)
+  zone WarehouseZone? @relation(fields: [zoneId], references: [id])
+  @@index([inventoryItemId])
+  @@index([zoneId, slotId, level])
+  @@map("inventory_location_stocks")
 }
 
 model ReturnRequest {
@@ -1313,6 +1332,9 @@ model WarehouseZone {
   warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
 
   inventoryItems InventoryItem[]
+
+  locationStocks InventoryLocationStock[]
+
   transactions InventoryTransaction[]
   transactionItems InventoryTransactionItem[]
   returnItems ReturnRequestItem[]

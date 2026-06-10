@@ -2,19 +2,30 @@ import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { useProjects } from '../../../inventory/hooks/useProjects'
 import { ManufacturingOrderModal } from '../../../production/components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../../../production/components/ProductionBomModal'
 import { useProductionBoms } from '../../../production/hooks/useProductionCockpit'
-import { componentsTabs } from '../../config/components-tabs'
 import {
   useComponents,
   useCreateComponent,
   useDeleteComponent,
   useProductionOrders,
 } from '../../hooks/queries/useComponents'
-import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel, ComponentsSelect } from './ComponentsCockpitShared'
+import {
+  ComponentsDonut,
+  ComponentsFilterBar,
+  ComponentsKpiCard,
+  ComponentsMiniBars,
+  ComponentsPanel,
+  ComponentsSelect,
+  componentsInput,
+  componentsMutedButton,
+  componentsPrimaryButton,
+  componentsTableHead,
+  componentsTableRow,
+  componentsTableShell,
+} from './ComponentsCockpitShared'
 
 type ComponentRow = {
   id: string
@@ -208,16 +219,14 @@ export function ComponentsListPage() {
 
   return (
     <EnterpriseModulePage>
-      <EnterpriseTabBar tabs={componentsTabs} />
-
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
-          <ComponentsKpiCard title="Tổng số cấu kiện" value={rows.length.toLocaleString('vi-VN')} sub="+8,6% so với tháng trước" />
-          <ComponentsKpiCard title="Đang sản xuất" value={rows.filter((x) => x.status === 'Đang SX').length.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Đã QC" value={rows.filter((x) => x.status === 'Đã QC').length.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Chờ QC" value={rows.filter((x) => x.status === 'Chờ QC').length.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Tồn kho cấu kiện" value={rows.filter((x) => x.status === 'Tồn kho').length.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Lệnh SX mới" value={productionOrders.length.toLocaleString('vi-VN')} />
+          <ComponentsKpiCard title="Tổng số cấu kiện" value={rows.length.toLocaleString('vi-VN')} sub="+8,6% so với tháng trước" tone="blue" />
+          <ComponentsKpiCard title="Đang sản xuất" value={rows.filter((x) => x.status === 'Đang SX').length.toLocaleString('vi-VN')} tone="amber" />
+          <ComponentsKpiCard title="Đã QC" value={rows.filter((x) => x.status === 'Đã QC').length.toLocaleString('vi-VN')} tone="emerald" />
+          <ComponentsKpiCard title="Chờ QC" value={rows.filter((x) => x.status === 'Chờ QC').length.toLocaleString('vi-VN')} tone="purple" />
+          <ComponentsKpiCard title="Tồn kho cấu kiện" value={rows.filter((x) => x.status === 'Tồn kho').length.toLocaleString('vi-VN')} tone="cyan" />
+          <ComponentsKpiCard title="Lệnh SX mới" value={productionOrders.length.toLocaleString('vi-VN')} tone="emerald" />
         </div>
 
         <ComponentsFilterBar>
@@ -225,7 +234,7 @@ export function ComponentsListPage() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Tìm theo mã, tên, profile, dự án, vị trí..."
-            className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 xl:col-span-4"
+            className={`${componentsInput} xl:col-span-4`}
           />
           <ComponentsSelect value={project} onChange={setProject} className="xl:col-span-2">
             <option value="">Dự án</option>
@@ -255,13 +264,13 @@ export function ComponentsListPage() {
         </ComponentsFilterBar>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setCreateOpen(true)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+          <button onClick={() => setCreateOpen(true)} className={componentsPrimaryButton}>
             + Tạo cấu kiện
           </button>
-          <button onClick={() => openProductionFor()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+          <button onClick={() => openProductionFor()} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500">
             + Tạo lệnh sản xuất
           </button>
-          <button onClick={() => openBomFor()} className="rounded-lg border border-cyan-700 px-4 py-2 text-sm font-medium text-cyan-200">
+          <button onClick={() => openBomFor()} className={componentsMutedButton}>
             + Tạo Production BOM
           </button>
         </div>
@@ -269,9 +278,10 @@ export function ComponentsListPage() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="xl:col-span-9">
             <ComponentsPanel title={`Danh sách cấu kiện (${filtered.length})`}>
-              <div className="overflow-auto">
+              <div className={componentsTableShell}>
+                <div className="overflow-auto">
                 <table className="w-full min-w-[1080px] text-sm">
-                  <thead className="text-xs uppercase text-slate-400">
+                  <thead className={componentsTableHead}>
                     <tr>
                       {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Vị trí hiện tại', 'Trạng thái', 'SL', 'Đã QC', 'Ngày tạo', 'Thao tác'].map((h) => (
                         <th key={h} className="px-2 py-2 text-left font-medium">
@@ -291,7 +301,7 @@ export function ComponentsListPage() {
                       <tr
                         key={row.code}
                         onClick={() => openDetail(row)}
-                        className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40"
+                        className={`cursor-pointer ${componentsTableRow}`}
                       >
                         <td className="px-2 py-2 text-cyan-300">{row.code}</td>
                         <td className="px-2 py-2">{row.name}</td>
@@ -309,7 +319,7 @@ export function ComponentsListPage() {
                               event.stopPropagation()
                               void handleDelete(row)
                             }}
-                            className="rounded border border-red-700/50 px-2 py-1 text-xs text-red-300 hover:bg-red-950/40"
+                            className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
                           >
                             Xóa
                           </button>
@@ -318,6 +328,7 @@ export function ComponentsListPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
               <div className="mt-3 text-xs text-slate-400">Hiển thị 1 - {filtered.length} của {filtered.length} kết quả</div>
             </ComponentsPanel>
@@ -329,7 +340,7 @@ export function ComponentsListPage() {
                 <div className="text-sm text-slate-400">Chưa có lệnh mới.</div>
               ) : (
                 recentOrders.map((order) => (
-                  <div key={order.orderNo} className="mb-3 rounded border border-slate-800 p-2 text-xs text-slate-300">
+                  <div key={order.orderNo} className="mb-3 rounded-xl border border-white/10 bg-white/[0.035] p-2 text-xs text-slate-300">
                     <div className="text-cyan-300">{order.orderNo}</div>
                     <div>{rows.find((row) => row.id === order.componentId)?.code ?? order.title} - SL: {order.quantity.toLocaleString('vi-VN')}</div>
                     <div>
@@ -342,10 +353,25 @@ export function ComponentsListPage() {
 
             <ComponentsPanel title="Hoạt động gần đây" action="Xem tất cả">
               {['CPL-PLT-000457 đã QC đạt', 'CPL-BEAM-001256 nhập kho cấu kiện', 'Tạo mới cấu kiện CPL-BASE-000241'].map((line) => (
-                <div key={line} className="mb-2 text-sm text-slate-300">
+                <div key={line} className="mb-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-slate-300">
                   {line}
                 </div>
               ))}
+            </ComponentsPanel>
+            <ComponentsPanel title="Cơ cấu trạng thái">
+              <ComponentsDonut
+                centerValue={rows.length.toLocaleString('vi-VN')}
+                centerLabel="cấu kiện"
+                segments={[
+                  { label: 'Tồn kho', value: rows.filter((x) => x.status === 'Tồn kho').length, color: '#1d7cff' },
+                  { label: 'Đang SX', value: rows.filter((x) => x.status === 'Đang SX').length, color: '#f59e0b' },
+                  { label: 'Đã QC', value: rows.filter((x) => x.status === 'Đã QC').length, color: '#14c987' },
+                  { label: 'Chờ QC', value: rows.filter((x) => x.status === 'Chờ QC').length, color: '#7c3aed' },
+                ]}
+              />
+            </ComponentsPanel>
+            <ComponentsPanel title="Nhịp tạo cấu kiện">
+              <ComponentsMiniBars values={[18, 24, 16, 31, 28, 35, 42, 38, 44, 49, 46, 52]} />
             </ComponentsPanel>
           </div>
         </div>
@@ -353,33 +379,33 @@ export function ComponentsListPage() {
 
       {createOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-[#071323] p-5">
+          <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-[#071323]/95 p-5 shadow-2xl ring-1 ring-white/[0.03] backdrop-blur-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Tạo cấu kiện mới</h3>
-              <button onClick={closeCreateModal} className="text-slate-300">✕</button>
+              <button onClick={closeCreateModal} className={componentsMutedButton}>Đóng</button>
             </div>
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <input value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Tên cấu kiện" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white xl:col-span-2" />
-              <select value={createForm.type} onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white">
+              <input value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Tên cấu kiện" className={`${componentsInput} xl:col-span-2`} />
+              <select value={createForm.type} onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))} className={componentsInput}>
                 <option>Dầm (Beam)</option>
                 <option>Cột (Column)</option>
                 <option>Bản mã (Plate)</option>
               </select>
-              <input value={createForm.profile} onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))} placeholder="Profile/Kích thước" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
-              <select value={createForm.projectId} onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value }))} className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white">
+              <input value={createForm.profile} onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))} placeholder="Profile/Kích thước" className={componentsInput} />
+              <select value={createForm.projectId} onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value }))} className={componentsInput}>
                 <option value="">Chọn dự án</option>
                 {projects.map((item: { id: string; code?: string; name: string }) => (
                   <option key={item.id} value={item.id}>{item.code ?? item.name} - {item.name}</option>
                 ))}
               </select>
-              <input value={createForm.qty} onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))} placeholder="Số lượng" className="h-10 rounded-lg border border-slate-700 bg-[#050d18] px-3 text-sm text-white" />
+              <input value={createForm.qty} onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))} placeholder="Số lượng" className={componentsInput} />
             </div>
             <div className="mt-4 rounded-xl border border-cyan-900/60 bg-cyan-950/10 p-3 text-xs text-cyan-100">
               Vật tư không khai báo tại đây. Sau khi tạo cấu kiện, tạo Production BOM riêng để quản lý định mức và routing sản xuất.
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={closeCreateModal} className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200">Hủy</button>
-              <button onClick={submitCreate} className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white">Lưu cấu kiện</button>
+              <button onClick={closeCreateModal} className={componentsMutedButton}>Hủy</button>
+              <button onClick={submitCreate} className={componentsPrimaryButton}>Lưu cấu kiện</button>
             </div>
           </div>
         </div>
@@ -390,42 +416,42 @@ export function ComponentsListPage() {
 
       {detailOpen && selected ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-5xl rounded-2xl border border-slate-700 bg-[#071323] p-5">
+          <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-[#071323]/95 p-5 shadow-2xl ring-1 ring-white/[0.03] backdrop-blur-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-white">{selected.name}</h3>
                 <div className="text-sm text-slate-400">{selected.code} · {selected.profile} · {selected.project}</div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => openBomFor(selected)} className="rounded-lg border border-cyan-700 px-3 py-2 text-sm text-cyan-100">Tạo BOM</button>
-                <button onClick={() => openProductionFor(selected)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white">Sản xuất</button>
+                <button onClick={() => openBomFor(selected)} className={componentsMutedButton}>Tạo BOM</button>
+                <button onClick={() => openProductionFor(selected)} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">Sản xuất</button>
                 <button onClick={() => void handleDelete(selected)} className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-300">Xóa</button>
-                <button onClick={() => setDetailOpen(false)} className="text-slate-300">✕</button>
+                <button onClick={() => setDetailOpen(false)} className={componentsMutedButton}>Đóng</button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <div className="rounded-xl border border-slate-800 bg-[#050d18] p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Trạng thái</div>
                 <div className="mt-1 text-lg font-semibold text-white">{selected.status}</div>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-[#050d18] p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Số lượng hiện tại</div>
                 <div className="mt-1 text-lg font-semibold text-white">{selected.qty.toLocaleString('vi-VN')} kiện</div>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-[#050d18] p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Vị trí hiện tại</div>
                 <div className="mt-1 text-lg font-semibold text-white">{selected.location}</div>
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl border border-slate-800 bg-[#050d18] p-4">
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-white">Production BOM liên kết</div>
                   <div className="mt-1 text-xs text-slate-500">Định mức vật tư và routing dùng khi phát hành lệnh sản xuất.</div>
                 </div>
-                <button onClick={() => openBomFor(selected)} className="rounded-lg border border-cyan-800 px-3 py-2 text-xs text-cyan-200">+ Tạo BOM</button>
+                <button onClick={() => openBomFor(selected)} className={componentsMutedButton}>+ Tạo BOM</button>
               </div>
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase text-slate-400">

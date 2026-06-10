@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { TransactionType } from '@prisma/client'
+import { Prisma, TransactionType } from '@prisma/client'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
 import { RuntimeGateway } from '../../core/ws/runtime.gateway'
@@ -268,6 +268,7 @@ export class InventoryService {
         row: string | null
         column: string | null
         level: string | null
+        slotId: string | null
         warehouseName: string | null
         warehouseCode: string | null
         quantity: number
@@ -300,14 +301,27 @@ export class InventoryService {
           tx.zone ??
           item.zone ??
           null
-        const key = zoneId ?? fallbackZoneName
+        const slotId =
+          line.slotId ??
+          null
+
+        const level =
+          line.level ??
+          null
+
+        const key = [
+          zoneId ?? fallbackZoneName,
+          slotId ?? '',
+          level ?? '',
+        ].join('|')
         const current = locationBalancesMap.get(key) ?? {
           zoneId,
           zoneCode,
           zoneName: fallbackZoneName,
+          slotId,
           row: sourceZone?.row ?? null,
           column: sourceZone?.column ?? null,
-          level: sourceZone?.level ?? null,
+          level,
           warehouseName: sourceZone?.warehouse?.name ?? null,
           warehouseCode: sourceZone?.warehouse?.code ?? null,
           quantity: 0,
@@ -384,6 +398,7 @@ export class InventoryService {
         zoneId: x.zoneId,
         zoneCode: x.zoneCode,
         zoneName: x.zoneName,
+        slotId: x.slotId,
         row: x.row,
         column: x.column,
         level: x.level,
@@ -472,11 +487,16 @@ export class InventoryService {
           zoneId: string | null
           zoneCode: string | null
           zoneName: string
+
           warehouseCode: string | null
           warehouseName: string | null
+
           row: string | null
           column: string | null
+
+          slotId: string | null
           level: string | null
+
           quantity: number
         }
       >
@@ -525,8 +545,11 @@ export class InventoryService {
         line.zoneId ??
         line.transaction?.zoneId ??
         null
-      const fallbackKey =
-        zoneId ?? 'UNASSIGNED'
+      const fallbackKey = [
+        zoneId ?? 'UNASSIGNED',
+        line.slotId ?? 'NOSLOT',
+        line.level ?? 'L1',
+      ].join('|')
       const byLocation =
         locationBalancesByItem.get(line.inventoryItemId) ??
         new Map()
@@ -537,11 +560,16 @@ export class InventoryService {
           zoneName: zone
             ? `${zone.code} - ${zone.name}`
             : 'KHU MẶC ĐỊNH',
+
           warehouseCode: zone?.warehouse?.code ?? null,
           warehouseName: zone?.warehouse?.name ?? null,
+
           row: zone?.row ?? null,
           column: zone?.column ?? null,
-          level: zone?.level ?? null,
+
+          slotId: line.slotId ?? null,
+          level: line.level ?? null,
+
           quantity: 0,
         }
       current.quantity += qty
@@ -675,26 +703,24 @@ export class InventoryService {
     id: string,
     payload: any,
   ) {
-    return this.inventoryRepository.updateItemInfo(
-      id,
-      {
-        code:
-          payload.code,
+    const data: Prisma.InventoryItemUpdateInput = {
+      code:
+        payload.code,
 
-        name:
-          payload.name,
+      name:
+        payload.name,
 
-        description:
-          payload.description,
+      description:
+        payload.description,
 
-        minimumStock:
-          payload.minimumStock,
+      minimumStock:
+        payload.minimumStock,
 
-        materialUsageType:
-          payload.materialUsageType,
+      materialUsageType:
+        payload.materialUsageType,
 
-        unit:
-          payload.unit,
+      unit:
+        payload.unit,
 
       ...(payload.categoryId && {
         category: {
@@ -705,19 +731,6 @@ export class InventoryService {
         },
       }),
 
-      ...(payload.zoneId && {
-        zone: {
-          connect: {
-            id:
-              payload.zoneId,
-          },
-        },
-      }),
-        slotId:
-          payload.slotId,
-
-        level:
-          payload.level,
       ...(payload.materialTypeId && {
         materialType: {
           connect: {
@@ -726,7 +739,32 @@ export class InventoryService {
           },
         },
       }),
-      },
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'zoneId')) {
+      data.zone = payload.zoneId
+        ? {
+            connect: {
+              id:
+                payload.zoneId,
+            },
+          }
+        : {
+            disconnect: true,
+          }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'slotId')) {
+      data.slotId = payload.slotId ?? null
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'level')) {
+      data.level = payload.level ?? null
+    }
+
+    return this.inventoryRepository.updateItemInfo(
+      id,
+      data,
     )
   }
 
@@ -1021,6 +1059,7 @@ export class InventoryService {
                     },
                   }),
                   slotId: line.slotId,
+                  level: line.level ?? null,
                 })),
               },
             },
@@ -1034,6 +1073,20 @@ export class InventoryService {
             line.quantity,
             tx,
           )
+
+          if (line.zoneId || line.slotId) {
+            await this.inventoryRepository.upsertLocationStock(
+              {
+                inventoryItemId: line.inventoryItemId,
+                warehouseId: line.warehouseId,
+                zoneId: line.zoneId,
+                slotId: line.slotId,
+                level: line.level,
+                quantity: line.quantity,
+              },
+              tx,
+            )
+          }
         }
 
         const realtimeEvent = {
@@ -1113,6 +1166,7 @@ export class InventoryService {
                   payload.warehouseId,
                 zoneId: payload.zoneId,
                 slotId: payload.slotId,
+                level: payload.level,
                 unitPrice:
                   payload.unitPrice,
                 totalAmount:
@@ -1178,6 +1232,8 @@ export class InventoryService {
           item.zoneId ?? payload.zoneId ?? undefined,
         slotId:
           item.slotId ?? payload.slotId ?? undefined,
+        level:
+          item.level ?? payload.level ?? undefined,  
         unitPrice: safeUnitPrice,
         totalAmount,
       }

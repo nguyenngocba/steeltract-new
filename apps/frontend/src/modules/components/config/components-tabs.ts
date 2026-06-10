@@ -1,9 +1,15 @@
 export const componentsTabs = [
   {
+    key: 'overview',
+    label: 'OVERVIEW',
+    vi: 'Tổng quan',
+    path: '/components',
+  },
+  {
     key: 'list',
     label: 'LIST',
     vi: 'Danh sách cấu kiện',
-    path: '/components',
+    path: '/components/list',
   },
   {
     key: 'production',

@@ -24,6 +24,10 @@ import { useZones } from '../../hooks/useZones'
 import { useWarehouses } from '../../hooks/useWarehouses'
 
 const PAGE_SIZE = 10
+const LOCATION_ROWS = ['A', 'B', 'C', 'D', 'E', 'F']
+const LOCATION_COLUMNS = ['01', '02', '03', '04', '05', '06']
+const LOCATION_LEVELS = ['L1', 'L2', 'L3', 'L4']
+const TOTAL_CELL_LEVELS = LOCATION_ROWS.length * LOCATION_COLUMNS.length * LOCATION_LEVELS.length
 
 type LocationForm = {
   id?: string
@@ -196,7 +200,7 @@ export function InventoryLocationsPage() {
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead className={inventoryTableHead}>
                 <tr>
-                  {['Mã vị trí', 'Tên vị trí', 'Kho cha', 'Row', 'Slot', 'Tầng', 'Capacity', 'Vật tư', 'Tồn', 'Audit', 'Trạng thái', 'Thao tác'].map((head) => <th key={head} className="px-4 py-3">{head}</th>)}
+                  {['Mã vị trí', 'Tên vị trí', 'Kho cha', 'Row', 'Slot', 'Tầng', 'Sức chứa', 'Ô/tầng', 'Vật tư', 'Tồn', 'Audit', 'Trạng thái', 'Thao tác'].map((head) => <th key={head} className="px-4 py-3">{head}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -207,7 +211,8 @@ export function InventoryLocationsPage() {
                   <td className="px-4 py-3">{zone.row ?? '-'}</td>
                   <td className="px-4 py-3">{zone.column ?? '-'}</td>
                   <td className="px-4 py-3">{zone.level ?? '-'}</td>
-                  <td className="px-4 py-3">{n(zone.capacity).toLocaleString('vi-VN')}</td>
+                  <td className="px-4 py-3">{n(zone.capacity).toLocaleString('vi-VN')} tấn</td>
+                  <td className="px-4 py-3">{countOccupiedFromOccupancy(zone.cellOccupancy).toLocaleString('vi-VN')} / {TOTAL_CELL_LEVELS}</td>
                   <td className="px-4 py-3">{n(zone.materialCount).toLocaleString('vi-VN')}</td>
                   <td className="px-4 py-3">{n(zone.totalStockQuantity).toLocaleString('vi-VN')}</td>
                   <td className="px-4 py-3"><AuditChip value={zone.auditType} /></td>
@@ -274,7 +279,7 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
     <div className="w-full max-w-3xl overflow-hidden rounded-xl border border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
       <header className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-        <div><h2 className="text-lg font-semibold">{form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'}</h2><p className="mt-1 text-xs text-slate-500">Capacity là sức chứa vận hành; sơ đồ ô/tầng dùng cấu trúc A01-F06 và L1-L4.</p></div>
+        <div><h2 className="text-lg font-semibold">{form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'}</h2><p className="mt-1 text-xs text-slate-500">Sức chứa là tải trọng/tồn chứa vận hành; sơ đồ ô/tầng dùng cấu trúc A01-F06 và L1-L4.</p></div>
         <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
       </header>
       <div className="grid gap-3 p-5 md:grid-cols-2">
@@ -350,14 +355,14 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
             <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
               <InfoBox label="Sức chứa vận hành" value={`${capacity.toLocaleString('vi-VN')} tấn`} />
               <InfoBox label="Đang sử dụng" value={`${usedQuantity.toLocaleString('vi-VN')} tấn`} />
-              <InfoBox label="Ô/tầng đã dùng" value={`${occupiedSlots.toLocaleString('vi-VN')} / 144`} />
+              <InfoBox label="Ô/tầng đã dùng" value={`${occupiedSlots.toLocaleString('vi-VN')} / ${TOTAL_CELL_LEVELS}`} />
               <InfoBox label="Tỷ lệ dùng" value={`${occupancy}%`} />
             </div>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-900">
               <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" style={{ width: `${occupancy}%` }} />
             </div>
             <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
-              Sơ đồ vị trí dùng cấu trúc cố định 6 hàng x 6 cột = 36 ô, mỗi ô có 4 tầng L1-L4 = 144 ô-tầng. Capacity không phải số ô, mà là sức chứa vận hành của vị trí.
+              Sơ đồ vị trí dùng cấu trúc cố định 6 hàng x 6 cột = 36 ô, mỗi ô có 4 tầng L1-L4 = {TOTAL_CELL_LEVELS} ô-tầng. Sức chứa không phải số ô, mà là tải trọng/tồn chứa vận hành của vị trí.
             </p>
           </SectionCard>
         </div> : null}
@@ -429,7 +434,12 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
 }
 
 function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
-  const defaultCell = normalizeSlotCell(detail.inventoryItems?.find((item) => item.slotId)?.slotId) ?? `${detail.row ?? 'A'}${detail.column ?? '01'}`
+  const occupancyItems = buildMaterialsFromOccupancy(detail)
+
+  const defaultCell =
+    normalizeSlotCell(
+      occupancyItems.find((item) => item.slotId)?.slotId,
+    ) ?? `${detail.row ?? 'A'}${detail.column ?? '01'}`
   const [selectedCell, setSelectedCell] = useState({
     row: defaultCell.slice(0, 1),
     column: defaultCell.slice(1) || '01',
@@ -439,15 +449,23 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
   const clickedKey = `${selectedCell.row}-${selectedCell.column}`
   const selectedCellCode = `${selectedCell.row}${selectedCell.column}`
   const materialsByCell = useMemo(() => {
-    const map = new Map<string, WarehouseLocationDetail['inventoryItems']>()
-    for (const item of detail.inventoryItems ?? []) {
-      const key = normalizeSlotCell(item.slotId) || `${detail.row ?? ''}${detail.column ?? ''}` || 'A01'
-      const list = map.get(key) ?? []
-      list.push(item)
-      map.set(key, list)
-    }
-    return map
-  }, [detail])
+  const map = new Map<string, any[]>()
+
+  for (const item of occupancyItems) {
+    const key =
+      normalizeSlotCell(item.slotId) ||
+      `${detail.row ?? ''}${detail.column ?? ''}` ||
+      'A01'
+
+    const list = map.get(key) ?? []
+
+    list.push(item)
+
+    map.set(key, list)
+  }
+
+  return map
+}, [detail, occupancyItems])
   const selectedCellMaterials = materialsByCell.get(selectedCellCode) ?? []
   const selectedLevels = Array.from(new Set(selectedCellMaterials.map((item) => item.level || 'L1'))).sort()
 
@@ -494,7 +512,7 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
       </div>
     </div>
     <div className="grid gap-3 md:grid-cols-3">
-      <InfoBox label="Số tầng mẫu" value="L1-L4" />
+      <InfoBox label="Số tầng mẫu" value={LOCATION_LEVELS.join('-')} />
       <InfoBox label="Ô đang xem" value={selectedCellCode} />
       <InfoBox label="Trạng thái ô" value={selectedCellMaterials.length ? 'Occupied' : 'Empty'} />
     </div>
@@ -506,7 +524,9 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
   const columnLabels = buildColumnLabels(detail.column)
   const materialsByCell = useMemo(() => {
     const map = new Map<string, WarehouseLocationDetail['inventoryItems']>()
-    for (const item of detail.inventoryItems ?? []) {
+    const occupancyItems = buildMaterialsFromOccupancy(detail)
+
+    for (const item of occupancyItems) {
       const key = normalizeSlotCell(item.slotId) || `${detail.row ?? ''}${detail.column ?? ''}` || 'A01'
       const list = map.get(key) ?? []
       list.push(item)
@@ -514,13 +534,16 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
     }
     return map
   }, [detail])
-  const defaultCell = normalizeSlotCell(detail.inventoryItems?.find((item) => item.slotId)?.slotId) ?? `${detail.row ?? 'A'}${detail.column ?? '01'}`
+  const defaultCell =
+  normalizeSlotCell(
+    detail.inventoryItems?.find((item) => item.slotId)?.slotId
+  ) ?? `${detail.row ?? 'A'}${detail.column ?? '01'}`
   const [selectedCell, setSelectedCell] = useState(defaultCell)
   const [selectedLevel, setSelectedLevel] = useState('L2')
   const selectedItems = materialsByCell.get(selectedCell) ?? []
   const selectedLevelItems = selectedItems.filter((item) => (item.level || 'L1') === selectedLevel)
   const usedQuantity = selectedLevelItems.reduce((sum, item) => sum + n(item.quantity), 0)
-  const levelStats = ['L4', 'L3', 'L2', 'L1'].map((level) => ({
+  const levelStats = LOCATION_LEVELS.slice().reverse().map((level) => ({
     level,
     items: selectedItems.filter((item) => (item.level || 'L1') === level),
   }))
@@ -616,16 +639,28 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
   </div>
 }
 
-function groupMaterialsByLevel(detail: WarehouseLocationDetail | null) {
-  if (!detail?.inventoryItems?.length) return []
-  const map = new Map<string, WarehouseLocationDetail['inventoryItems']>()
-  detail.inventoryItems.forEach((item) => {
+function groupMaterialsByLevel(
+  detail: WarehouseLocationDetail | null,
+) {
+  if (!detail) return []
+
+  const items = buildMaterialsFromOccupancy(detail)
+
+  const map = new Map<string, any[]>()
+
+  items.forEach((item) => {
     const level = item.level || 'L1'
     const list = map.get(level) ?? []
     list.push(item)
     map.set(level, list)
   })
-  return Array.from(map.entries()).map(([level, items]) => ({ level, items })).sort((a, b) => b.level.localeCompare(a.level))
+
+  return Array.from(map.entries())
+    .map(([level, items]) => ({
+      level,
+      items,
+    }))
+    .sort((a, b) => b.level.localeCompare(a.level))
 }
 
 function normalizeSlotCell(slotId?: string | null) {
@@ -633,8 +668,37 @@ function normalizeSlotCell(slotId?: string | null) {
   if (!value) return ''
   return value.includes(':') ? value.split(':')[0] : value
 }
+function buildMaterialsFromOccupancy(detail: WarehouseLocationDetail) {
+  const rows: Array<{
+    id: string
+    code: string
+    name: string
+    quantity: number
+    unit?: string | null
+    slotId: string
+    level: string
+  }> = []
 
-function getOccupiedCellLevels(items: WarehouseLocationDetail['inventoryItems'], detail?: WarehouseLocationDetail | null) {
+  ;(detail.cellOccupancy ?? []).forEach((cell) => {
+    ;(cell.materials ?? []).forEach((material) => {
+      rows.push({
+        id: `${material.id}-${cell.slotId}-${cell.level}`,
+        code: material.code,
+        name: material.name,
+        quantity: material.quantity,
+        unit: material.unit,
+        unitMaster: null,
+        slotId: cell.slotId,
+        level: cell.level,
+      })
+    })
+  })
+
+  return rows
+}
+
+function getOccupiedCellLevels(
+  items: any[], detail?: WarehouseLocationDetail | null) {
   const keys = new Set<string>()
   items.forEach((item) => {
     const cell = normalizeSlotCell(item.slotId) || `${detail?.row ?? ''}${detail?.column ?? ''}` || 'A01'
@@ -645,17 +709,27 @@ function getOccupiedCellLevels(items: WarehouseLocationDetail['inventoryItems'],
 }
 
 function buildRowLabels(current?: string | null) {
-  const base = ['A', 'B', 'C', 'D', 'E', 'F']
+  const base = LOCATION_ROWS
   const row = String(current ?? '').trim().toUpperCase()
   if (!row || base.includes(row)) return base
   return [row, ...base].slice(0, 6)
 }
 
 function buildColumnLabels(current?: string | null) {
-  const base = ['01', '02', '03', '04', '05', '06']
+  const base = LOCATION_COLUMNS
   const column = String(current ?? '').trim().padStart(2, '0')
   if (!column || base.includes(column)) return base
   return [column, ...base].slice(0, 6)
+}
+
+function countOccupiedFromOccupancy(cellOccupancy?: WarehouseLocation['cellOccupancy']) {
+  const keys = new Set<string>()
+  ;(cellOccupancy ?? []).forEach((entry) => {
+    const cell = String(entry.slotId ?? '').trim().toUpperCase()
+    const level = String(entry.level ?? 'L1').trim().toUpperCase()
+    if (cell) keys.add(`${cell}:${level}`)
+  })
+  return keys.size
 }
 
 function InfoBox({ label, value }: { label: string; value: string }) {

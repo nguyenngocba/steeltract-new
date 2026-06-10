@@ -1,9 +1,7 @@
 import { useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
 import { useYardMovementsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
-import { componentsTabs } from '../../config/components-tabs'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
 
 export function ComponentsTransfersPage() {
@@ -18,8 +16,6 @@ export function ComponentsTransfersPage() {
 
   return (
     <EnterpriseModulePage>
-      <EnterpriseTabBar tabs={componentsTabs} />
-
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
           <ComponentsKpiCard title="Tổng lệnh chuyển" value={rows.length.toLocaleString('vi-VN')} />

@@ -162,8 +162,7 @@ export class RuntimeController {
       }
       return !approvedQc.some(
         (inspection) =>
-          inspection.productionOrderId === order.id ||
-          inspection.componentId === order.componentId,
+          inspection.productionOrderId === order.id,
       )
     })
     const stagedWithoutQc = activePlacements.filter((placement) => {

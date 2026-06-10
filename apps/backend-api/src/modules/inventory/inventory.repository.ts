@@ -264,6 +264,51 @@ export class InventoryRepository {
       },
     });
   }
+  async upsertLocationStock(
+    data: {
+      inventoryItemId: string
+      warehouseId?: string | null
+      zoneId?: string | null
+      slotId?: string | null
+      level?: string | null
+      quantity: number
+    },
+    db: DbClient = this.prisma,
+  ) {
+    const existing =
+      await db.inventoryLocationStock.findFirst({
+        where: {
+          inventoryItemId: data.inventoryItemId,
+          zoneId: data.zoneId ?? null,
+          slotId: data.slotId ?? null,
+          level: data.level ?? null,
+        },
+      })
+
+    if (existing) {
+      return db.inventoryLocationStock.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          quantity: {
+            increment: data.quantity,
+          },
+        },
+      })
+    }
+
+    return db.inventoryLocationStock.create({
+      data: {
+        inventoryItemId: data.inventoryItemId,
+        warehouseId: data.warehouseId,
+        zoneId: data.zoneId,
+        slotId: data.slotId,
+        level: data.level,
+        quantity: data.quantity,
+      },
+    })
+  }
 
   createActivityLog(
     data: Prisma.ActivityLogCreateInput,

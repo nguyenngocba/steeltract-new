@@ -69,7 +69,11 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const minimumStock = num(item.minimumStock ?? fallback?.minimumStock)
   const materialUsageType = item.materialUsageType ?? fallback?.materialUsageType ?? 'PRIMARY'
   const status = currentStock <= 0 ? 'Hết hàng' : currentStock <= minimumStock || currentStock <= 5 ? 'Cảnh báo' : 'Bình thường'
-  const position = fallback?.position ?? fallback?.zone ?? detail?.locationBalances?.[0]?.zoneName ?? 'Chưa có vị trí'
+  const locationCount =
+    detail?.locationBalances?.length ?? 0
+
+  const locationLabel =
+    `${locationCount} vị trí lưu kho`
   const inbound = detail?.inboundHistory ?? []
   const outbound = detail?.outboundHistory ?? []
   const projectRows = detail?.projectConsumptionHistory ?? []
@@ -93,7 +97,9 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Chi tiết vật tư</div>
             <h3 className="mt-2 text-2xl font-semibold text-white">{code} · {name}</h3>
-            <p className="mt-1 text-sm text-slate-400">{position}</p>
+            <p className="mt-1 text-sm text-slate-400">
+              {locationLabel}
+            </p>
           </div>
           <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
             Đóng
@@ -186,13 +192,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
             {activeTab === 'locations' && (
               <LocationBalancePanel
-                rows={locationRows.length > 0 ? locationRows : [{
-                  zoneName: position,
-                  quantity: currentStock,
-                  row: fallback?.row,
-                  column: fallback?.column,
-                  level: fallback?.level,
-                }]}
+                rows={locationRows}
                 onFocus={setFocusedLocation}
               />
             )}
@@ -240,7 +240,7 @@ function LocationBalancePanel({ rows, onFocus }: { rows: any[]; onFocus: (row: a
         <table className="w-full min-w-[820px] text-sm">
           <thead className="bg-white/[0.05] text-xs uppercase text-slate-400">
             <tr>
-              {['Kho', 'Vị trí', 'Row', 'Slot', 'Tầng', 'Số lượng', 'Cập nhật', '2D'].map((header) => <th key={header} className="px-3 py-3 text-left">{header}</th>)}
+              {['Kho', 'Zone', 'Ô chứa', 'Tầng', 'Số lượng', 'Cập nhật', '2D'].map((header) => <th key={header} className="px-3 py-3 text-left">{header}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -248,8 +248,8 @@ function LocationBalancePanel({ rows, onFocus }: { rows: any[]; onFocus: (row: a
               <tr key={`${row.zoneId ?? row.zoneName}-${index}`} className="border-t border-white/10 text-slate-200">
                 <td className="px-3 py-2">{row.warehouseName ?? '-'}</td>
                 <td className="px-3 py-2 text-cyan-300">{row.zoneName ?? '-'}</td>
-                <td className="px-3 py-2">{row.row ?? '-'}</td>
-                <td className="px-3 py-2">{row.column ?? '-'}</td>
+                <td className="px-3 py-2">{row.zoneCode ?? '-'}</td>
+                <td className="px-3 py-2">{row.slotId ?? '-'}</td>
                 <td className="px-3 py-2">{row.level ?? '-'}</td>
                 <td className="px-3 py-2">{num(row.quantity).toLocaleString('vi-VN')}</td>
                 <td className="px-3 py-2">{row.updatedAt ? new Date(row.updatedAt).toLocaleString('vi-VN') : '-'}</td>
@@ -269,11 +269,21 @@ function LocationBalancePanel({ rows, onFocus }: { rows: any[]; onFocus: (row: a
     </div>
   )
 }
+function slotRow(slotId?: string | null) {
+  return String(slotId ?? '').substring(0, 1)
+}
 
+function slotColumn(slotId?: string | null) {
+  return String(slotId ?? '').substring(1)
+}
 function LocationFocusPreview({ location, onClose }: { location: any; onClose: () => void }) {
-  const rows = buildFocusRows(location.row)
-  const columns = buildFocusColumns(location.column)
-  const selectedKey = `${location.row ?? ''}-${location.column ?? ''}`
+  const row = slotRow(location.slotId)
+  const column = slotColumn(location.slotId)
+
+  const rows = buildFocusRows(row)
+  const columns = buildFocusColumns(column)
+
+  const selectedKey = `${row}-${column}`
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
@@ -282,7 +292,7 @@ function LocationFocusPreview({ location, onClose }: { location: any; onClose: (
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">Focus vị trí 2D</div>
             <h3 className="mt-1 text-xl font-semibold text-white">{location.zoneName ?? 'Vị trí kho'}</h3>
-            <p className="mt-1 text-sm text-slate-400">Slot {location.column ?? '-'} · Tầng {location.level ?? '-'} · {num(location.quantity).toLocaleString('vi-VN')}</p>
+            <p className="mt-1 text-sm text-slate-400">Slot {location.slotId ?? '-'} · Tầng {location.level ?? '-'} · {num(location.quantity).toLocaleString('vi-VN')}</p>
           </div>
           <button onClick={onClose} className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10">Đóng</button>
         </div>

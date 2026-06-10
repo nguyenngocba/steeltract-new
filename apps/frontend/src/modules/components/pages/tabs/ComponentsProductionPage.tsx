@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { EnterpriseTabBar } from '../../../../shared/runtime-tabs/EnterpriseTabBar'
-import { componentsTabs } from '../../config/components-tabs'
 import { useProductionOrders } from '../../hooks/queries/useComponents'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
 
@@ -40,8 +38,6 @@ export function ComponentsProductionPage() {
 
   return (
     <EnterpriseModulePage>
-      <EnterpriseTabBar tabs={componentsTabs} />
-
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
           <ComponentsKpiCard title="Tổng lệnh SX" value={productionOrders.length.toLocaleString('vi-VN')} />

@@ -7,13 +7,11 @@ import {
   Post,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 
 import { Request } from 'express';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthUser } from '../rbac/types/auth-user';
 import {
   approveQcInspectionSchema,
@@ -56,7 +54,6 @@ type AuthenticatedRequest = Request & {
   user?: AuthUser;
 };
 
-@UseGuards(JwtAuthGuard)
 @Controller('qc')
 export class QcController {
   constructor(private readonly qcService: QcService) {}

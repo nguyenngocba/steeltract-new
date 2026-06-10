@@ -9,6 +9,7 @@ import {
   Users,
   Settings,
   Factory,
+  Bell,
 } from 'lucide-react'
 
 export const navigation = [
@@ -31,6 +32,10 @@ export const navigation = [
       {
         title: 'Hoạt động gần đây',
         path: '/dashboard/activity',
+      },
+      {
+        title: 'Thông báo',
+        path: '/notifications',
       },
     ],
   },
@@ -92,10 +97,17 @@ export const navigation = [
     children: [
       {
         title:
-          'Danh sách cấu kiện',
+          'Tổng quan',
 
         path:
           '/components',
+      },
+      {
+        title:
+          'Danh sách cấu kiện',
+
+        path:
+          '/components/list',
       },
       {
         title:
@@ -174,11 +186,24 @@ export const navigation = [
 
     children: [
       {
-        title:
-          'Danh sách công trình',
-
-        path:
-          '/projects',
+        title: 'Tổng quan',
+        path: '/projects',
+      },
+      {
+        title: 'Danh sách công trình',
+        path: '/projects/list',
+      },
+      {
+        title: 'Tiến độ công trình',
+        path: '/projects/progress',
+      },
+      {
+        title: 'Vật tư theo công trình',
+        path: '/projects/materials',
+      },
+      {
+        title: 'Báo cáo công trình',
+        path: '/projects/reports',
       },
     ],
   },
@@ -190,11 +215,12 @@ export const navigation = [
 
     children: [
       {
-        title:
-          'Danh sách NCC',
-
-        path:
-          '/suppliers',
+        title: 'Danh sách NCC',
+        path: '/suppliers',
+      },
+      {
+        title: 'Đánh giá NCC',
+        path: '/suppliers/ratings',
       },
     ],
   },
@@ -206,11 +232,32 @@ export const navigation = [
 
     children: [
       {
-        title:
-          'Kế hoạch kiểm tra',
-
-        path:
-          '/qc',
+        title: 'Tổng quan QC',
+        path: '/qc',
+      },
+      {
+        title: 'Phiếu kiểm tra',
+        path: '/qc/inspections',
+      },
+      {
+        title: 'Kế hoạch QC',
+        path: '/qc/plan',
+      },
+      {
+        title: 'Tiêu chuẩn',
+        path: '/qc/standards',
+      },
+      {
+        title: 'NCR',
+        path: '/qc/ncr',
+      },
+      {
+        title: 'Hiệu chuẩn',
+        path: '/qc/calibration',
+      },
+      {
+        title: 'Báo cáo QC',
+        path: '/qc/reports',
       },
     ],
   },
@@ -222,11 +269,16 @@ export const navigation = [
 
     children: [
       {
-        title:
-          'Danh sách xe',
-
-        path:
-          '/logistics',
+        title: 'Tổng quan',
+        path: '/logistics',
+      },
+      {
+        title: 'Tuyến giao hàng',
+        path: '/logistics/routes',
+      },
+      {
+        title: 'GPS / Phương tiện',
+        path: '/logistics/gps',
       },
     ],
   },

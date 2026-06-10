@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Boxes, Construction, MapPinned, Radio, Search, Truck, Warehouse } from 'lucide-react'
+import { Activity, Boxes, Construction, MapPinned, Radio, Search, Truck, Warehouse, type LucideIcon } from 'lucide-react'
 
 import { useComponents } from '@/modules/components/hooks/queries/useComponents'
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
@@ -11,8 +11,103 @@ import { useCreateYardSlot, useCreateYardZone, useDeleteYardZone, useUpdateYardZ
 import type { YardZoneRuntime } from '../services/api/yard.api'
 
 const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
-const panel = 'rounded border border-slate-800 bg-[#071321]'
-const input = 'h-10 rounded border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 outline-none focus:border-cyan-500'
+const panel =
+  'rounded-2xl border border-white/10 bg-slate-950/45 shadow-[0_22px_70px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-2xl'
+const input =
+  'h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+const mutedButton =
+  'rounded-xl border border-white/10 bg-white/[0.055] px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40'
+const primaryButton =
+  'rounded-xl border border-blue-400/30 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500'
+
+function YardKpiCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+  tone = 'cyan',
+}: {
+  icon: LucideIcon
+  label: string
+  value: string | number
+  note: string
+  tone?: 'cyan' | 'emerald' | 'amber' | 'red' | 'purple' | 'blue'
+}) {
+  const toneClass = {
+    cyan: 'from-cyan-500 to-blue-400 text-cyan-300',
+    emerald: 'from-emerald-500 to-teal-400 text-emerald-300',
+    amber: 'from-amber-500 to-orange-400 text-amber-300',
+    red: 'from-red-500 to-rose-400 text-red-300',
+    purple: 'from-purple-500 to-indigo-400 text-purple-300',
+    blue: 'from-blue-500 to-sky-400 text-blue-300',
+  }[tone]
+
+  return (
+    <section className={`${panel} min-h-[104px] p-3`}>
+      <div className="flex items-start justify-between">
+        <Icon size={17} className={toneClass.split(' ').at(-1)} />
+        <span className="text-[9px] text-emerald-400">{note}</span>
+      </div>
+      <div className={`mt-3 h-1 w-14 rounded-full bg-gradient-to-r ${toneClass}`} />
+      <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400">{label}</div>
+      <div className="mt-1 text-xl font-semibold tracking-tight text-white">{value}</div>
+    </section>
+  )
+}
+
+function YardDonut({
+  segments,
+  centerValue,
+  centerLabel,
+}: {
+  segments: Array<{ label: string; value: number; color: string }>
+  centerValue: string
+  centerLabel: string
+}) {
+  const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
+  let cursor = 0
+  const gradient = segments.map((item) => {
+    const start = cursor
+    const end = cursor + item.value / total * 100
+    cursor = end
+    return `${item.color} ${start}% ${end}%`
+  }).join(', ')
+
+  return (
+    <div className="grid min-h-[150px] grid-cols-[126px_1fr] items-center gap-3">
+      <div className="relative h-28 w-28 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.2)]" style={{ background: `conic-gradient(${gradient})` }}>
+        <div className="absolute inset-3 rounded-full bg-[#08111f]" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div className="text-xl font-semibold text-white">{centerValue}</div>
+          <div className="text-[10px] text-slate-500">{centerLabel}</div>
+        </div>
+      </div>
+      <div className="space-y-1.5 overflow-hidden">
+        {segments.slice(0, 6).map((item) => (
+          <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-2 text-[11px]">
+            <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="truncate">{item.label}</span>
+            </span>
+            <span className="whitespace-nowrap text-slate-300">{item.value.toLocaleString('vi-VN')}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function YardMiniTrend({ values, tone = 'blue' }: { values: number[]; tone?: 'blue' | 'emerald' | 'amber' }) {
+  const max = Math.max(1, ...values)
+  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-300' : tone === 'amber' ? 'from-amber-500 to-orange-300' : 'from-blue-500 to-cyan-300'
+  return (
+    <div className="flex h-32 items-end gap-2">
+      {values.map((value, index) => (
+        <div key={index} className={`flex-1 rounded-t-lg bg-gradient-to-t ${color}`} style={{ height: `${Math.max(8, value / max * 100)}%` }} />
+      ))}
+    </div>
+  )
+}
 
 type ZoneForm = {
   code: string
@@ -163,44 +258,70 @@ export function YardPage() {
   }
 
   const stat = [
-    [Warehouse, 'Khu vực bãi', metrics?.zones ?? 0, 'zone vận hành'],
-    [MapPinned, 'Tổng vị trí', metrics?.totalSlots ?? 0, 'slot cấu hình'],
-    [Boxes, 'Cấu kiện lưu bãi', metrics?.placements ?? 0, 'thành phẩm'],
-    [Activity, 'Tổng trọng lượng', `${fmt(totalWeight)} tấn`, 'realtime'],
-    [Radio, 'Occupancy', `${metrics?.occupancyRate ?? 0}%`, 'LIVE 5s'],
+    [Warehouse, 'Khu vực bãi', metrics?.zones ?? 0, 'zone vận hành', 'blue'],
+    [MapPinned, 'Tổng vị trí', metrics?.totalSlots ?? 0, 'slot cấu hình', 'cyan'],
+    [Boxes, 'Cấu kiện lưu bãi', metrics?.placements ?? 0, 'thành phẩm', 'emerald'],
+    [Activity, 'Tổng trọng lượng', `${fmt(totalWeight)} tấn`, 'realtime', 'purple'],
+    [Radio, 'Occupancy', `${metrics?.occupancyRate ?? 0}%`, 'LIVE 5s', 'amber'],
   ] as const
+  const emptySlots = Math.max(0, (metrics?.totalSlots ?? 0) - (metrics?.occupiedSlots ?? 0))
+  const movementSegments = [
+    { label: 'Nhập bãi', value: movements.filter((item) => item.type === 'PLACE').length, color: '#14c987' },
+    { label: 'Di chuyển', value: movements.filter((item) => item.type === 'MOVE').length, color: '#1d7cff' },
+    { label: 'Xuất bãi', value: movements.filter((item) => item.type === 'REMOVE').length, color: '#f59e0b' },
+  ]
+  const slotSegments = [
+    { label: 'Đang dùng', value: metrics?.occupiedSlots ?? 0, color: '#1d7cff' },
+    { label: 'Trống', value: emptySlots, color: '#14c987' },
+    { label: 'Cảnh báo', value: (metrics?.zoneUtilization ?? []).filter((zone) => zone.occupancyRate >= 80).length, color: '#ef4444' },
+  ]
 
-  return <OperationalShell><main className="min-h-screen bg-[#020811] p-4 text-slate-100">
-    <header className="flex items-end justify-between border-b border-slate-800 pb-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Yard management</p><h1 className="mt-1 text-xl font-semibold">Bãi tập kết - quản lý vị trí cấu kiện</h1><p className="mt-1 text-xs text-slate-400">QC hoàn thành → nhập bãi → lưu vị trí → điều chuyển → xuất bãi</p></div>
-      <div className="flex flex-wrap justify-end gap-2"><button onClick={openCreateZone} className="rounded border border-cyan-700 bg-cyan-950/30 px-4 py-2 text-xs text-cyan-200">+ Zone</button><button onClick={() => openCreateSlot()} className="rounded border border-emerald-700 bg-emerald-950/30 px-4 py-2 text-xs text-emerald-200">+ Slot</button><button onClick={() => setOperation('inbound')} className="rounded bg-blue-600 px-4 py-2 text-xs">+ Nhập bãi</button><button onClick={() => setOperation('outbound')} className="rounded border border-amber-800 bg-amber-950/30 px-4 py-2 text-xs text-amber-300">Xuất bãi</button><button onClick={() => setOperation('transfer')} className="rounded border border-emerald-800 bg-emerald-950/30 px-4 py-2 text-xs text-emerald-300">+ Chuyển nội bộ</button></div>
+  return <OperationalShell><main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
+    <div className="mx-auto max-w-[1800px]">
+    <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Steeltrack yard</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">Bãi tập kết</h1><p className="mt-1 text-xs text-slate-400">QC hoàn thành → nhập bãi → lưu vị trí → điều chuyển → xuất bãi</p></div>
+      <div className="flex flex-wrap justify-end gap-2"><button onClick={openCreateZone} className={mutedButton}>+ Zone</button><button onClick={() => openCreateSlot()} className={mutedButton}>+ Slot</button><button onClick={() => setOperation('inbound')} className={primaryButton}>+ Nhập bãi</button><button onClick={() => setOperation('outbound')} className={mutedButton}>Xuất bãi</button><button onClick={() => setOperation('transfer')} className={mutedButton}>+ Chuyển nội bộ</button></div>
     </header>
-    <nav className="my-3 flex gap-1 overflow-x-auto rounded bg-[#06101b] p-1">{yardTabs.map(([id, label]) => <button key={id} onClick={() => selectTab(id)} className={`whitespace-nowrap rounded px-3 py-2 text-xs ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>{label}</button>)}</nav>
-    <section className="grid gap-2 md:grid-cols-5">{stat.map(([Icon, label, value, note]) => <div key={label} className={`${panel} p-3`}><div className="flex justify-between"><Icon size={16} className="text-cyan-400"/><span className="text-[9px] text-emerald-400">{note}</span></div><div className="mt-3 text-[10px] uppercase text-slate-500">{label}</div><div className="mt-1 text-xl font-semibold">{value}</div></div>)}</section>
-    <section className={`${panel} my-3 flex flex-wrap items-center gap-2 p-3`}><Search size={15} className="text-cyan-400"/><input className="min-w-52 flex-1 bg-transparent text-xs outline-none" placeholder="Tìm vị trí, cấu kiện, zone..."/><span className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300">Tất cả zone</span><span className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300">Tất cả trạng thái</span></section>
+    <nav className="mb-3 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl"><div className="flex min-w-max gap-1">{yardTabs.map(([id, label]) => <button key={id} onClick={() => selectTab(id)} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition ${tab === id ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/30' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>{label}</button>)}</div></nav>
+    <section className="grid gap-3 md:grid-cols-5">{stat.map(([Icon, label, value, note, tone]) => <YardKpiCard key={label} icon={Icon} label={label} value={value} note={note} tone={tone as 'cyan' | 'emerald' | 'amber' | 'red' | 'purple' | 'blue'} />)}</section>
+    <section className={`${panel} my-3 flex flex-wrap items-center gap-2 p-3`}><div className="flex min-w-72 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2"><Search size={15} className="text-cyan-400"/><input className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" placeholder="Tìm vị trí, cấu kiện, zone..."/></div><button className={mutedButton}>Tất cả zone</button><button className={mutedButton}>Tất cả trạng thái</button><button className={mutedButton}>Lớp hiển thị</button><button className={mutedButton}>Làm mới</button></section>
+    <section className="mb-3 grid gap-3 xl:grid-cols-[1fr_360px_360px]">
+      <div className={panel}>
+        <div className="px-4 pt-3 text-xs font-bold uppercase tracking-[0.12em] text-white">Sức chứa bãi</div>
+        <div className="p-3"><YardDonut centerValue={`${metrics?.occupancyRate ?? 0}%`} centerLabel="Occupancy" segments={slotSegments} /></div>
+      </div>
+      <div className={panel}>
+        <div className="px-4 pt-3 text-xs font-bold uppercase tracking-[0.12em] text-white">Luồng vận hành</div>
+        <div className="p-3"><YardDonut centerValue={movements.length.toLocaleString('vi-VN')} centerLabel="giao dịch" segments={movementSegments} /></div>
+      </div>
+      <div className={panel}>
+        <div className="flex items-center justify-between px-4 pt-3"><div className="text-xs font-bold uppercase tracking-[0.12em] text-white">Biến động bãi</div><span className="text-[11px] text-slate-500">Tháng này</span></div>
+        <div className="p-3"><YardMiniTrend values={[12, 18, 15, 26, 24, 31, 28, 35, 42, 38, 45, 52]} tone="emerald" /></div>
+      </div>
+    </section>
     <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
       <section className="space-y-3">
         <YardTabWorkspace tab={tab} zones={zones} slots={slots} metrics={metrics} movements={movements} cranes={cranes} selectedSlotId={selectedSlot?.id} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={setSelectedZoneId} onOpenZoneDetail={setZoneDetailId} onEditZone={editZone} onDeleteZone={removeZone} onCreateZone={openCreateZone} onCreateSlot={openCreateSlot} onOpenOperation={setOperation} />
         <div className="grid gap-3 lg:grid-cols-2">
-          <div className={`${panel} p-4`}><h2 className="text-sm font-semibold">Chi tiết tầng · {selectedSlot?.code ?? '--'}</h2><div className="mt-3 grid grid-cols-4 gap-2">{Array.from({ length: selectedSlot?.maxStackLevel ?? 4 }, (_, index) => <div key={index} className={`rounded border p-3 text-center text-xs ${index < (selectedSlot?.currentStackLevel ?? 0) ? 'border-cyan-600 bg-cyan-950/40 text-cyan-200' : 'border-slate-800 text-slate-600'}`}>L{index + 1}</div>)}</div><div className="mt-3 text-xs text-slate-500">Đang dùng {selectedSlot?.currentStackLevel ?? 0}/{selectedSlot?.maxStackLevel ?? 0} tầng</div></div>
-          <div className={`${panel} p-4`}><h2 className="text-sm font-semibold">Cấu kiện trong vị trí</h2><div className="mt-3 space-y-2">{selectedSlot?.placements.map((item) => <button key={item.id} onClick={() => setSelectedPlacementId(item.id)} className={`flex w-full justify-between rounded border p-2 text-left text-xs ${selectedPlacement?.id === item.id ? 'border-cyan-500 bg-cyan-950/30' : 'border-slate-800'}`}><span className="text-cyan-300">{item.itemCode}</span><span>L{item.stackLevel} · {fmt(item.quantity)}</span></button>)}{!selectedSlot?.placements.length && <p className="text-xs text-slate-500">Vị trí đang trống.</p>}</div></div>
+          <div className={`${panel} p-4`}><h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Chi tiết tầng · {selectedSlot?.code ?? '--'}</h2><div className="mt-3 grid grid-cols-4 gap-2">{Array.from({ length: selectedSlot?.maxStackLevel ?? 4 }, (_, index) => <div key={index} className={`rounded-xl border p-3 text-center text-xs ${index < (selectedSlot?.currentStackLevel ?? 0) ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.035] text-slate-500'}`}>L{index + 1}</div>)}</div><div className="mt-3 text-xs text-slate-500">Đang dùng {selectedSlot?.currentStackLevel ?? 0}/{selectedSlot?.maxStackLevel ?? 0} tầng</div></div>
+          <div className={`${panel} p-4`}><h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Cấu kiện trong vị trí</h2><div className="mt-3 space-y-2">{selectedSlot?.placements.map((item) => <button key={item.id} onClick={() => setSelectedPlacementId(item.id)} className={`flex w-full justify-between rounded-xl border px-3 py-2 text-left text-xs transition ${selectedPlacement?.id === item.id ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-100' : 'border-white/10 bg-white/[0.035] text-slate-300 hover:border-cyan-400/40'}`}><span className="text-cyan-300">{item.itemCode}</span><span>L{item.stackLevel} · {fmt(item.quantity)}</span></button>)}{!selectedSlot?.placements.length && <p className="text-xs text-slate-500">Vị trí đang trống.</p>}</div></div>
         </div>
       </section>
       <aside className="space-y-3">
-        <div className={`${panel} p-4`}><h2 className="text-sm font-semibold">Thông tin vị trí</h2><div className="mt-3 space-y-2 text-xs text-slate-400"><div className="flex justify-between"><span>Zone</span><b className="text-slate-200">{selectedSlot?.zone.name ?? '--'}</b></div><div className="flex justify-between"><span>Vị trí</span><b className="text-cyan-300">{selectedSlot?.code ?? '--'}</b></div><div className="flex justify-between"><span>Trạng thái</span><b className="text-emerald-300">{selectedSlot?.status ?? '--'}</b></div><div className="flex justify-between"><span>Cấu kiện</span><b className="text-slate-200">{selectedSlot?.placements.length ?? 0}</b></div></div></div>
-        <div className={`${panel} p-4`}><h2 className="text-sm font-semibold">Chi tiết cấu kiện</h2>{selectedPlacement ? <div className="mt-3 space-y-2 text-xs text-slate-400"><div className="text-sm font-semibold text-cyan-300">{selectedPlacement.itemCode}</div><div>{selectedPlacement.itemName ?? selectedPlacement.itemType}</div><div>Tầng L{selectedPlacement.stackLevel}</div><div>Khối lượng {fmt(selectedPlacement.weight)} tấn</div></div> : <p className="mt-3 text-xs text-slate-500">Chọn cấu kiện trên sơ đồ.</p>}</div>
-        <div className={`${panel} p-4`}><h2 className="text-sm font-semibold">Cầu trục</h2><div className="mt-3 space-y-2">{cranes.slice(0, 4).map((crane) => <div key={crane.id} className="flex justify-between text-xs text-slate-400"><span className="flex gap-2"><Construction size={14}/>{crane.code}</span><span className="text-emerald-300">{crane.status}</span></div>)}{!cranes.length && <p className="text-xs text-slate-500">Chưa cấu hình cầu trục.</p>}</div></div>
-        <div className={`${panel} p-4`}><h2 className="text-sm font-semibold">Hoạt động gần đây</h2><div className="mt-3 space-y-3">{movements.slice(0, 5).map((item) => <div key={item.id} className="border-l border-cyan-700 pl-2 text-[11px]"><div className="text-cyan-300">{item.itemCode} · {item.type}</div><div className="mt-1 text-slate-500">{item.fromSlot?.code ?? 'Xưởng'} → {item.toSlot?.code ?? 'Rời bãi'}</div></div>)}</div></div>
+        <div className={`${panel} p-4`}><h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Thông tin vị trí</h2><div className="mt-3 space-y-2 text-xs text-slate-400"><div className="flex justify-between"><span>Zone</span><b className="text-slate-200">{selectedSlot?.zone.name ?? '--'}</b></div><div className="flex justify-between"><span>Vị trí</span><b className="text-cyan-300">{selectedSlot?.code ?? '--'}</b></div><div className="flex justify-between"><span>Trạng thái</span><b className="text-emerald-300">{selectedSlot?.status ?? '--'}</b></div><div className="flex justify-between"><span>Cấu kiện</span><b className="text-slate-200">{selectedSlot?.placements.length ?? 0}</b></div></div></div>
+        <div className={`${panel} p-4`}><h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Chi tiết cấu kiện</h2>{selectedPlacement ? <div className="mt-3 space-y-2 text-xs text-slate-400"><div className="text-sm font-semibold text-cyan-300">{selectedPlacement.itemCode}</div><div>{selectedPlacement.itemName ?? selectedPlacement.itemType}</div><div>Tầng L{selectedPlacement.stackLevel}</div><div>Khối lượng {fmt(selectedPlacement.weight)} tấn</div></div> : <p className="mt-3 text-xs text-slate-500">Chọn cấu kiện trên sơ đồ.</p>}</div>
+        <div className={`${panel} p-4`}><h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Cầu trục</h2><div className="mt-3 space-y-2">{cranes.slice(0, 4).map((crane) => <div key={crane.id} className="flex justify-between rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-slate-400"><span className="flex gap-2"><Construction size={14}/>{crane.code}</span><span className="text-emerald-300">{crane.status}</span></div>)}{!cranes.length && <p className="text-xs text-slate-500">Chưa cấu hình cầu trục.</p>}</div></div>
+        <div className={`${panel} p-4`}><h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Hoạt động gần đây</h2><div className="mt-3 space-y-3">{movements.slice(0, 5).map((item) => <div key={item.id} className="border-l border-cyan-700 pl-2 text-[11px]"><div className="text-cyan-300">{item.itemCode} · {item.type}</div><div className="mt-1 text-slate-500">{item.fromSlot?.code ?? 'Xưởng'} → {item.toSlot?.code ?? 'Rời bãi'}</div></div>)}</div></div>
       </aside>
     </div>
     <footer className={`${panel} mt-3 flex flex-wrap gap-5 p-3 text-xs text-slate-400`}><span><Truck size={14} className="mr-1 inline text-cyan-400"/> Luồng bãi realtime</span><span>Occupied {metrics?.occupiedSlots ?? 0}/{metrics?.totalSlots ?? 0}</span><span className="text-emerald-400">Cập nhật 5 giây/lần</span></footer>
     <YardOperationDialog mode={operation ?? 'inbound'} open={Boolean(operation)} onClose={() => setOperation(undefined)} slots={slots} cranes={cranes} components={components}/>
     <YardZoneDetailDialog zoneId={zoneDetailId} slots={slots} selectedSlotId={selectedSlotId} onSelectSlot={(id) => setSelectedSlotId(id)} onClose={() => setZoneDetailId(undefined)} />
     {zoneForm ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-2xl overflow-hidden rounded border border-slate-700 bg-[#071321] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+      <div className={`w-full max-w-2xl overflow-hidden ${panel}`}>
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div><h2 className="text-base font-semibold">Tạo zone bãi</h2><p className="mt-1 text-xs text-slate-500">Zone sẽ hiển thị ngay trên sơ đồ 2D và nhận slot mới.</p></div>
-          <button type="button" onClick={() => setZoneForm(null)} className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300">Đóng</button>
+          <button type="button" onClick={() => setZoneForm(null)} className={mutedButton}>Đóng</button>
         </div>
         <div className="grid gap-3 p-5 md:grid-cols-2">
           <input value={zoneForm.code} onChange={(event) => setZoneForm({ ...zoneForm, code: event.target.value })} className={input} placeholder="Mã zone" />
@@ -210,17 +331,17 @@ export function YardPage() {
           <input value={zoneForm.color} onChange={(event) => setZoneForm({ ...zoneForm, color: event.target.value })} className={input} placeholder="Màu zone" type="color" />
           <textarea value={zoneForm.description} onChange={(event) => setZoneForm({ ...zoneForm, description: event.target.value })} className={`${input} h-24 py-2 md:col-span-2`} placeholder="Ghi chú zone" />
         </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
-          <button type="button" onClick={() => setZoneForm(null)} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">Hủy</button>
-          <button type="button" onClick={submitZoneForm} disabled={createZone.isPending} className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-50">{createZone.isPending ? 'Đang tạo...' : 'Tạo zone'}</button>
+        <footer className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+          <button type="button" onClick={() => setZoneForm(null)} className={mutedButton}>Hủy</button>
+          <button type="button" onClick={submitZoneForm} disabled={createZone.isPending} className={primaryButton}>{createZone.isPending ? 'Đang tạo...' : 'Tạo zone'}</button>
         </footer>
       </div>
     </div> : null}
     {slotForm ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-2xl overflow-hidden rounded border border-slate-700 bg-[#071321] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+      <div className={`w-full max-w-2xl overflow-hidden ${panel}`}>
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div><h2 className="text-base font-semibold">Tạo slot trong bãi</h2><p className="mt-1 text-xs text-slate-500">Slot mới sẽ được dùng để chuyển thành phẩm từ sản xuất/QC ra bãi.</p></div>
-          <button type="button" onClick={() => setSlotForm(null)} className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300">Đóng</button>
+          <button type="button" onClick={() => setSlotForm(null)} className={mutedButton}>Đóng</button>
         </div>
         <div className="grid gap-3 p-5 md:grid-cols-2">
           <select value={slotForm.zoneId} onChange={(event) => {
@@ -241,11 +362,12 @@ export function YardPage() {
             Slot trạng thái mặc định là <b className="text-emerald-300">AVAILABLE</b>; khi sản xuất chuyển thành phẩm ra bãi, dropdown sẽ thấy slot này nếu còn tầng trống.
           </div>
         </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
-          <button type="button" onClick={() => setSlotForm(null)} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">Hủy</button>
-          <button type="button" onClick={submitSlotForm} disabled={createSlot.isPending || !slotForm.zoneId} className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-50">{createSlot.isPending ? 'Đang tạo...' : 'Tạo slot'}</button>
+        <footer className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+          <button type="button" onClick={() => setSlotForm(null)} className={mutedButton}>Hủy</button>
+          <button type="button" onClick={submitSlotForm} disabled={createSlot.isPending || !slotForm.zoneId} className={primaryButton}>{createSlot.isPending ? 'Đang tạo...' : 'Tạo slot'}</button>
         </footer>
       </div>
     </div> : null}
+    </div>
   </main></OperationalShell>
 }

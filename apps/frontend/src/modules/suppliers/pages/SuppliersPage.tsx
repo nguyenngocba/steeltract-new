@@ -22,8 +22,12 @@ import type {
 const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
 const money = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(value)
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
-const panel = 'rounded border border-slate-800 bg-[#071321]'
-const input = 'h-10 rounded border border-slate-700 bg-[#050d18] px-3 text-sm text-slate-100 outline-none focus:border-cyan-500'
+const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
+const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
+const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
+const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
+const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
 
 type DetailTab = 'overview' | 'materials' | 'inbound' | 'ratings' | 'files'
 type SupplierModuleTab = 'list' | 'ratings'
@@ -88,7 +92,7 @@ export function SuppliersPage() {
           {[
             ['list', 'Danh sách nhà cung cấp'],
             ['ratings', 'Đánh giá nhà cung cấp'],
-          ].map(([id, label]) => <button key={id} onClick={() => setModuleTab(id as SupplierModuleTab)} className={`rounded px-4 py-2 text-sm ${moduleTab === id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-white'}`}>{label}</button>)}
+          ].map(([id, label]) => <button key={id} onClick={() => setModuleTab(id as SupplierModuleTab)} className={`rounded-lg px-4 py-2 text-xs transition ${moduleTab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}
         </nav>
 
         {moduleTab === 'list' ? <>
@@ -99,14 +103,14 @@ export function SuppliersPage() {
           <KpiCard title="Suppliers Used In Inventory" value={summary?.usedInInventory ?? 0} note="Inbound/transactions" tone="cyan" />
           </div>
 
-          <div className={`${panel} flex flex-wrap items-center gap-2 p-3`}>
-          <div className="flex min-w-72 flex-1 items-center gap-2 rounded border border-slate-700 bg-[#050d18] px-3">
+          <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
+          <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3">
             <Search size={15} className="text-cyan-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Tìm mã, tên, liên hệ, điện thoại, email..."
-              className="h-10 w-full bg-transparent text-sm text-slate-100 outline-none"
+              className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none"
             />
           </div>
           <select value={status} onChange={(event) => setStatus(event.target.value)} className={input}>
@@ -114,7 +118,7 @@ export function SuppliersPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button onClick={openCreateModal} className="h-10 rounded bg-cyan-600 px-4 text-sm font-semibold text-white">+ Tạo nhà cung cấp</button>
+          <button onClick={openCreateModal} className={primaryButton}>+ Tạo nhà cung cấp</button>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1fr_330px]">
@@ -125,7 +129,7 @@ export function SuppliersPage() {
             </div>
             <div className="overflow-auto">
               <table className="w-full min-w-[1040px] text-left text-sm">
-                <thead className="bg-slate-900/70 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                <thead className={tableHead}>
                   <tr>
                     {['STT', 'Supplier Code', 'Supplier Name', 'Contact', 'Phone', 'Email', 'Status', 'Created Date', 'Actions'].map((heading) => (
                       <th key={heading} className="px-4 py-3 font-medium">{heading}</th>
@@ -136,7 +140,7 @@ export function SuppliersPage() {
                   {isLoading ? (
                     <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Đang tải nhà cung cấp...</td></tr>
                   ) : rows.map((supplier, index) => (
-                    <tr key={supplier.id} onClick={() => setSelectedSupplier(supplier)} className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-cyan-950/20">
+                    <tr key={supplier.id} onClick={() => setSelectedSupplier(supplier)} className={`cursor-pointer ${tableRow}`}>
                       <td className="px-4 py-3 text-slate-500">{index + 1}</td>
                       <td className="px-4 py-3 font-semibold text-cyan-300">{supplier.code}</td>
                       <td className="px-4 py-3">{supplier.name}</td>
@@ -211,10 +215,11 @@ export function SuppliersPage() {
 }
 
 function KpiCard({ title, value, note, tone = 'cyan' }: { title: string; value: number; note: string; tone?: 'cyan' | 'emerald' | 'amber' }) {
-  const color = tone === 'emerald' ? 'text-emerald-300' : tone === 'amber' ? 'text-amber-300' : 'text-cyan-300'
-  return <div className={`${panel} p-4`}>
-    <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{title}</div>
-    <div className={`mt-3 text-3xl font-semibold ${color}`}>{fmt(value)}</div>
+  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-400 text-emerald-200' : tone === 'amber' ? 'from-amber-500 to-orange-400 text-amber-200' : 'from-blue-500 to-cyan-400 text-cyan-200'
+  return <div className={`${panel} relative overflow-hidden p-4`}>
+    <div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`} />
+    <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div>
+    <div className="mt-3 text-3xl font-semibold text-white">{fmt(value)}</div>
     <div className="mt-1 text-xs text-slate-500">{note}</div>
   </div>
 }
@@ -272,10 +277,10 @@ function SupplierEvaluationTab({
       <KpiCard title="Nhà cung cấp ngưng HĐ" value={metrics?.inactive ?? 0} note="Reserved S2" tone="amber" />
     </div>
 
-    <div className={`${panel} flex flex-wrap items-center gap-2 p-3`}>
-      <div className="flex min-w-72 flex-1 items-center gap-2 rounded border border-slate-700 bg-[#050d18] px-3">
+    <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
+      <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3">
         <Search size={15} className="text-cyan-400" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm kiếm theo tên, mã NCC, người liên hệ..." className="h-10 w-full bg-transparent text-sm text-slate-100 outline-none" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm kiếm theo tên, mã NCC, người liên hệ..." className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none" />
       </div>
       <select value={filter} onChange={(event) => onFilterChange(event.target.value)} className={input}>
         <option value="all">Kết quả đánh giá: Tất cả</option>
@@ -286,8 +291,8 @@ function SupplierEvaluationTab({
         <option value="WARNING">Cảnh báo</option>
         <option value="UNRATED">Chưa đánh giá</option>
       </select>
-      <button className="h-10 rounded border border-slate-700 bg-slate-900 px-4 text-sm text-slate-200">Bộ lọc</button>
-      <button className="h-10 rounded border border-cyan-700 bg-cyan-950/40 px-4 text-sm text-cyan-200">Làm mới</button>
+      <button className={mutedButton}>Bộ lọc</button>
+      <button className={mutedButton}>Làm mới</button>
     </div>
 
     <div className="grid gap-4 xl:grid-cols-[1fr_520px]">
@@ -298,8 +303,8 @@ function SupplierEvaluationTab({
         </div>
         <div className="overflow-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500"><tr>{['STT', 'Mã nhà cung cấp', 'Tên nhà cung cấp', 'Lần đánh giá mới nhất', 'Điểm tổng', 'Xếp loại', 'Trạng thái'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead>
-            <tbody>{visibleRows.map((row, index) => <tr key={row.id} onClick={() => setSelectedId(row.id)} className={`cursor-pointer border-t border-slate-800 text-slate-200 hover:bg-cyan-950/20 ${selected?.id === row.id ? 'bg-cyan-950/25' : ''}`}>
+            <thead className={tableHead}><tr>{['STT', 'Mã nhà cung cấp', 'Tên nhà cung cấp', 'Lần đánh giá mới nhất', 'Điểm tổng', 'Xếp loại', 'Trạng thái'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead>
+            <tbody>{visibleRows.map((row, index) => <tr key={row.id} onClick={() => setSelectedId(row.id)} className={`cursor-pointer ${tableRow} ${selected?.id === row.id ? 'bg-cyan-500/10' : ''}`}>
               <td className="px-4 py-3 text-slate-500">{index + 1}</td>
               <td className="px-4 py-3 text-cyan-300">{row.code}</td>
               <td className="px-4 py-3">{row.name}</td>

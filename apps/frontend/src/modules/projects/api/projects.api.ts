@@ -82,3 +82,15 @@ export async function getProjectsRuntime() {
   const response = await http.get('/projects/runtime')
   return response.data as ProjectsRuntime
 }
+
+export type CreateProjectPayload = {
+  code: string
+  name: string
+  description?: string
+  status?: ProjectStatus
+}
+
+export async function createProject(payload: CreateProjectPayload) {
+  const response = await http.post('/projects', payload)
+  return response.data
+}
