@@ -68,6 +68,7 @@ Behavior:
 - Material Master create/edit uses `Kho chính` locations only and warns when a selected slot/floor is full.
 - Inventory inbound uses `Kho chính` locations only and warns when a selected slot/floor is full.
 - Material detail `Vị trí` tab can open a focused 2D preview for the selected slot/floor.
+- Inventory transfer creation is limited to `Kho chính`, auto-fills source cell/floor from the selected material stock location, suggests a free destination cell/floor, and shows separate source/destination 2D location views instead of the legacy transfer diagram.
 
 Parent warehouses:
 

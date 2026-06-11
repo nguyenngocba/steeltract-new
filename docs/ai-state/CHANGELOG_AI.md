@@ -1,5 +1,79 @@
 # SteelTrack AI Changelog
 
+## 2026-06-11 Documentation Cleanup Phase
+
+Completed:
+
+* Merged legacy documentation classified as MERGE into ai-state:
+  `AI_CONTEXT.md`, `AI_RULES.md`, `KNOWN_ISSUES.md`, `ROADMAP.md`, `TREE_STRUCTURE.md`,
+  `architecture/ARCHITECTURE_FREEZE.md`, `architecture/INVENTORY_TRANSACTION_RULES.md`,
+  and `inventory/inventory-phase1-migration-plan.md`.
+* Preserved the KEEP event naming standard in ai-state by creating `design/event-naming.md` while leaving `docs/architecture/EVENT_NAMING.md` in place.
+* Created new ai-state documents:
+  `roadmap.md`;
+  `design/repo-structure.md`;
+  `design/event-naming.md`;
+  `audits/technical-debt-audit.md`;
+  `audits/post-cleanup-summary.md`.
+* Updated `CODEX_WORKFLOW.md` with merged engineering rules and removed dependency on legacy root AI docs as required reading.
+* Updated architecture and inventory decision docs with merged legacy decisions and migration rationale.
+* Updated `CURRENT_STATE.md` and `CURRENT_MODULES.md` with documentation cleanup state.
+* Created `docs/archive/` and moved ARCHIVE documents:
+  `docs/PROJECT_OVERVIEW.md` -> `docs/archive/PROJECT_OVERVIEW.md`;
+  `docs/architecture/REFACTOR_MASTER_PLAN.md` -> `docs/archive/REFACTOR_MASTER_PLAN.md`.
+* Deleted only documents classified as DELETE:
+  `docs/modules/COMPONENTS.md`;
+  `docs/modules/INVENTORY.md`;
+  `docs/modules/YARD.md`.
+
+Notes:
+
+* Documentation-only task; no application code, database, or schema changes were made.
+
+## 2026-06-11 Documentation Refactor
+
+Completed:
+
+* Normalized `docs/ai-state` structure with `audits/`, `design/`, `modules/`, and `decisions/` directories.
+* Moved module docs into the normalized module directory:
+  `MODULE_PRODUCTION.md` -> `modules/production.md`;
+  `MODULE_QC.md` -> `modules/qc.md`;
+  `MODULE_SUPPLIERS.md` -> `modules/suppliers.md`;
+  `MODULE_SYSTEM.md` -> `modules/system.md`.
+* Created `CURRENT_STATE.md` summarizing Inventory, Production, QC, Yard, Suppliers, Projects, Dashboard, and System by status, architecture, limitations, and current focus.
+* Created decision docs:
+  `decisions/architecture-decisions.md`;
+  `decisions/inventory-decisions.md`;
+  `decisions/production-decisions.md`.
+* Created missing module docs:
+  `modules/yard.md`;
+  `modules/projects.md`;
+  `modules/dashboard.md`.
+* Updated `CODEX_WORKFLOW.md` to require reading `PROJECT_STATUS.md`, `CURRENT_STATE.md`, `NEXT_TASKS.md`, related module docs, using Semble before grep, using Context7 before framework changes, building before completion, and updating ai-state docs after workflow changes.
+* Created `audits/documentation-audit.md` with missing, outdated, duplicate, and recommended cleanup notes.
+
+Notes:
+
+* Documentation-only task; no application code, database, or schema changes were made.
+
+## 2026-06-11
+
+Completed:
+
+* Updated Inventory transfer creation:
+  transfer source/destination locations are now limited to `Kho chính` and exclude production warehouse locations;
+  selecting a material source location now keeps the real `fromZoneId` for the transaction while using the selected `zone/slot/level` row to auto-fill source cell and level;
+  destination warehouse selection now suggests and fills the first available destination cell/level;
+  removed the old transfer flow diagram panel and replaced it with separate source and destination 2D warehouse location views matching the outbound workflow.
+* Fixed a frontend type mismatch in the warehouse location 2D material list by allowing `unitMaster` on generated occupancy rows.
+* Improved the Inventory location create/edit modal:
+  the parent warehouse selector now clearly shows `Kho chính (MAIN)` and `Kho sản xuất (PRODUCTION)` from real master warehouse data, falls back to warehouse data embedded in zones if the master-data request is empty, and requires a parent warehouse before saving a new location.
+
+Build:
+
+* Frontend build passed.
+* Frontend still reports the existing Vite warnings for `.env NODE_ENV=production` and large bundle chunk size.
+
 ## 2026-06-07
 
 Completed:

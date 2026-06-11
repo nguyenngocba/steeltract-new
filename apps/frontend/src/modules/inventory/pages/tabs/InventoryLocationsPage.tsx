@@ -155,6 +155,42 @@ export function InventoryLocationsPage() {
     .slice(0, 6)
     .map((zone) => [zone.code, n(zone.totalStockQuantity)] as [string, number]), [rows])
 
+  const warehouseOptions = useMemo(() => {
+    const byId = new Map<string, { id: string; code: string; name: string }>()
+
+    ;(warehouses as Array<{ id: string; code: string; name: string; active?: boolean }>).forEach((warehouse) => {
+      if (!warehouse?.id) return
+      byId.set(warehouse.id, {
+        id: warehouse.id,
+        code: warehouse.code,
+        name: warehouse.code === 'MAIN'
+          ? 'Kho chính'
+          : warehouse.code === 'PRODUCTION'
+            ? 'Kho sản xuất'
+            : warehouse.name,
+      })
+    })
+
+    ;(zones as WarehouseLocation[]).forEach((zone) => {
+      const warehouse = zone.warehouse
+      if (!warehouse?.id || byId.has(warehouse.id)) return
+      byId.set(warehouse.id, {
+        id: warehouse.id,
+        code: warehouse.code,
+        name: warehouse.code === 'MAIN'
+          ? 'Kho chính'
+          : warehouse.code === 'PRODUCTION'
+            ? 'Kho sản xuất'
+            : warehouse.name,
+      })
+    })
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const order = (code: string) => code === 'MAIN' ? 0 : code === 'PRODUCTION' ? 1 : 2
+      return order(a.code) - order(b.code) || a.name.localeCompare(b.name)
+    })
+  }, [warehouses, zones])
+
   const edit = (zone: WarehouseLocation) => setForm({
     id: zone.id,
     code: zone.code,
@@ -251,7 +287,7 @@ export function InventoryLocationsPage() {
       </div>
     </div>
 
-    {form ? <LocationFormModal form={form} warehouses={warehouses} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
+    {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
   </EnterpriseModulePage>
 }
@@ -286,9 +322,12 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
         <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className={inventoryInput} placeholder="Mã vị trí, ví dụ A01" />
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inventoryInput} placeholder="Tên vị trí" />
         <select value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })} className={inventoryInput}>
-          <option value="">Thuộc kho nào?</option>
+          <option value="">Chọn kho cha: Kho chính / Kho sản xuất</option>
           {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} ({warehouse.code})</option>)}
         </select>
+        {!warehouses.length ? <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
+          Chưa tải được danh sách kho cha. Cần có dữ liệu MAIN/PRODUCTION trong master warehouses.
+        </div> : null}
         <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inventoryInput} placeholder="Row, ví dụ A" />
         <input value={form.column} onChange={(e) => setForm({ ...form, column: e.target.value })} className={inventoryInput} placeholder="Slot, ví dụ 01" />
         <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} className={inventoryInput} placeholder="Tầng, ví dụ L1" />
@@ -298,7 +337,7 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
       </div>
       <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
         <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-sm text-slate-300">Hủy</button>
-        <button disabled={saving || !form.code.trim() || !form.name.trim()} onClick={onSubmit} className="rounded bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu vị trí'}</button>
+        <button disabled={saving || !form.code.trim() || !form.name.trim() || !form.warehouseId} onClick={onSubmit} className="rounded bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu vị trí'}</button>
       </footer>
     </div>
   </div>
@@ -712,6 +751,7 @@ function buildMaterialsFromOccupancy(detail: WarehouseLocationDetail) {
     name: string
     quantity: number
     unit?: string | null
+    unitMaster?: { symbol?: string | null } | null
     slotId: string
     level: string
   }> = []

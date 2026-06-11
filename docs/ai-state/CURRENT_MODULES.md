@@ -46,3 +46,11 @@
 - Production BOM creation now blocks over-allocation against real `Kho vật tư SX` balance and shows `Cần / Tồn SX` shortage warnings in the BOM modal.
 - Starting a Manufacturing Order now auto-issues missing BOM material quantities from production warehouse stock and creates `ISSUED` production material issue rows plus outbound inventory movements.
 - Formal BOM reservation documents and manual material issue approval/editing remain backlog work.
+
+## 2026-06-11 Documentation Notes
+
+- `docs/ai-state` is now the primary documentation source for current state, workflow, module status, decisions, design guidance, and audits.
+- Legacy MERGE documentation has been folded into ai-state documents:
+  architecture decisions, inventory decisions, workflow rules, roadmap, repo structure, event naming, and technical debt audit.
+- Legacy ARCHIVE documents are moved to `docs/archive/`.
+- Empty legacy module placeholder docs classified as DELETE have been removed.

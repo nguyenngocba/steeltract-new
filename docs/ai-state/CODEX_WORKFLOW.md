@@ -23,15 +23,24 @@ Do not create unrelated enterprise modules.
 
 ## REQUIRED READING
 
-Before starting ANY task, read:
+Before coding, read:
 
-docs/AI_CONTEXT.md
-docs/AI_RULES.md
+1. `docs/ai-state/PROJECT_STATUS.md`
+2. `docs/ai-state/CURRENT_STATE.md`
+3. `docs/ai-state/NEXT_TASKS.md`
+4. Related module docs in `docs/ai-state/modules/`
+5. Use Semble before grep for code discovery.
+6. Use Context7 before framework or library changes.
+7. Build before completion.
+8. Update ai-state docs after workflow changes.
 
-docs/ai-state/CURRENT_MODULES.md
-docs/ai-state/PROJECT_STATUS.md
-docs/ai-state/NEXT_TASKS.md
-docs/ai-state/CHANGELOG_AI.md
+For broader project context, also read:
+
+* `docs/ai-state/CURRENT_MODULES.md`
+* `docs/ai-state/CHANGELOG_AI.md`
+* `docs/ai-state/decisions/architecture-decisions.md`
+* `docs/ai-state/design/repo-structure.md`
+
 
 ---
 
@@ -75,6 +84,53 @@ Extend existing modules whenever possible.
 
 ---
 
+## ENGINEERING RULES
+
+Backend:
+
+1. Controllers validate requests and call services.
+2. Services contain business logic, coordinate workflows, and emit events.
+3. Repositories contain reusable database query logic.
+4. New backend work should follow Controller -> Service -> Repository -> Prisma.
+5. Existing direct Prisma usage is technical debt unless intentionally left untouched.
+
+Frontend:
+
+1. Use shared components, shared layouts, and shared table/panel patterns.
+2. Use TanStack Query for server state.
+3. Use Zustand for durable UI state such as auth, theme, sidebar, and global UI state when needed.
+4. Avoid duplicated UI and giant page files.
+
+Inventory:
+
+1. Inventory is transaction-based.
+2. Never directly edit stock quantity as the primary business operation.
+3. Create Inventory transactions and transaction items for stock-affecting workflows.
+4. `InventoryItem.quantity` is a cache/snapshot only.
+
+Realtime:
+
+1. Never emit full object payloads.
+2. Emit lightweight identifiers and changed fields.
+3. Frontend should refetch through TanStack Query or the relevant API after realtime signals.
+
+Type safety and validation:
+
+1. Avoid `any` in new code.
+2. Prefer DTOs, interfaces, Zod schemas, and validation pipes.
+3. Validate uploads, permissions, JWT, and request input.
+
+Logging:
+
+1. Critical actions should create logs: create, update, delete, approve, login, export.
+
+Performance:
+
+1. Use pagination, lazy loading, virtualization, and caching where appropriate.
+2. Avoid huge raw queries and unnecessary rerenders.
+
+---
+
 ## MODULE POLICY
 
 Preferred business modules:
@@ -104,6 +160,8 @@ A task is NOT complete until:
 3. Routes are registered.
 4. Navigation is updated if required.
 5. Documentation is updated.
+
+For documentation-only tasks, skip code/build requirements that do not apply, but still validate file structure and update `CHANGELOG_AI.md`.
 
 ---
 
@@ -138,13 +196,13 @@ For any module reaching 20%+ completion:
 
 Create or update:
 --------------------------------
-docs/ai-state/MODULE_<MODULE>.md
+docs/ai-state/modules/<module>.md
 
 Example:
 
-MODULE_SUPPLIERS.md
-MODULE_YARD.md
-MODULE_PRODUCTION.md
+modules/suppliers.md
+modules/yard.md
+modules/production.md
 
 This file must contain:
 
@@ -219,8 +277,10 @@ Keep status updated after every task.
 
 Every new chat session must start by reading:
 
-docs/AI_CONTEXT.md
-docs/AI_RULES.md
-docs/ai-state/*
+docs/ai-state/PROJECT_STATUS.md
+docs/ai-state/CURRENT_STATE.md
+docs/ai-state/NEXT_TASKS.md
+docs/ai-state/CURRENT_MODULES.md
+docs/ai-state/CODEX_WORKFLOW.md
 
 before performing any development work.

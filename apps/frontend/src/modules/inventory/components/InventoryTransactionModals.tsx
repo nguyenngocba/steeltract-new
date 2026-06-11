@@ -120,17 +120,20 @@ function ModalShell({
   title,
   children,
   wide = false,
+  maxWidthClass,
 }: ModalProps & {
   title: string
   children: ReactNode
   wide?: boolean
+  maxWidthClass?: string
 }) {
   if (!open) return null
+  const modalWidthClass = maxWidthClass ?? (wide ? 'max-w-7xl' : 'max-w-4xl')
 
   return createPortal(
     <div className="inventory-transaction-modal fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm">
       <style>{'.inventory-transaction-modal select option{background:#0f172a;color:#e2e8f0}.inventory-transaction-modal select:focus,.inventory-transaction-modal input:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
-      <div className={`w-full ${wide ? 'max-w-7xl' : 'max-w-4xl'} overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50`}>
+      <div className={`w-full ${modalWidthClass} overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50`}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div className="text-base font-semibold text-white">{title}</div>
           <button
@@ -654,8 +657,8 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Xuất kho vật tư" wide>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_700px]">
+    <ModalShell open={open} onClose={onClose} title="Xuất kho vật tư" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
       <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
@@ -847,7 +850,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const { data: materials = [] } = useInventoryItems()
   const { data: zones = [] } = useZones()
-  const realZones = useMemo(() => zones.filter(isRealStorageZone), [zones])
+  const realZones = useMemo(() => zones.filter((zone: any) => isRealStorageZone(zone) && isMainWarehouseZone(zone)), [zones])
   const createTx = useCreateTransaction()
   const [form, setForm] = useState({
     transactionDate: new Date().toISOString().slice(0, 16),
@@ -877,16 +880,20 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         : realZones[0]
       const fallbackZoneId = selectedMaterial?.zoneId ?? fallbackZone?.id
       if (!fallbackZoneId || currentStock <= 0) return []
+      const slotId = selectedMaterial?.slotId ?? ''
+      const level = selectedMaterial?.level ?? ''
       return [
         {
-          id: String(fallbackZoneId),
+          id: [fallbackZoneId, slotId, level].join('|'),
+          zoneId: String(fallbackZoneId),
+          slotId,
+          level,
           label: `${selectedMaterial?.zoneCode ?? fallbackZone?.code ?? 'ZONE'} - ${selectedMaterial?.zone ?? fallbackZone?.name ?? ''}`,
           qty: currentStock,
           zoneCode: selectedMaterial?.zoneCode ?? fallbackZone?.code ?? 'ZONE',
           warehouseName: fallbackZone?.warehouse?.name ?? '',
           row: fallbackZone?.row ?? '',
           column: fallbackZone?.column ?? '',
-          level: fallbackZone?.level ?? '',
         },
       ]
     }
@@ -907,7 +914,6 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           warehouseName: zone?.warehouse?.name ?? b.warehouseName ?? '',
           row: zone?.row ?? b.row ?? '',
           column: zone?.column ?? b.column ?? '',
-          level: zone?.level ?? b.level ?? '',
         }
       })
   }, [selectedMaterialDetail, realZones, selectedMaterial, currentStock])
@@ -930,11 +936,12 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
       })
   }, [realZones, form.fromZoneId, sourceZoneOptions])
 
+  const sourceLocationKey = form.fromZoneId ? [form.fromZoneId, form.fromSlotId, form.fromLevel].join('|') : ''
   const sourceQty = useMemo(() => {
-    const selected = sourceZoneOptions.find((s) => s.id === form.fromZoneId)
+    const selected = sourceZoneOptions.find((s) => s.id === sourceLocationKey)
     return num(selected?.qty)
-  }, [sourceZoneOptions, form.fromZoneId])
-  const selectedSourceZone = sourceZoneOptions.find((zone) => zone.id === form.fromZoneId)
+  }, [sourceZoneOptions, sourceLocationKey])
+  const selectedSourceZone = sourceZoneOptions.find((zone) => zone.id === sourceLocationKey)
   const selectedDestinationZone = destinationZoneOptions.find((zone) => zone.id === form.toZoneId)
   const selectedSourceFullZone = realZones.find((zone: any) => String(zone.id) === String(form.fromZoneId))
   const selectedDestinationFullZone = realZones.find((zone: any) => String(zone.id) === String(form.toZoneId))
@@ -946,26 +953,50 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     Boolean(form.fromZoneId) &&
     Boolean(form.toZoneId) &&
     form.fromZoneId !== form.toZoneId &&
+    Boolean(form.toSlotId) &&
+    Boolean(form.toLevel) &&
     transferQty > 0 &&
     transferQty <= sourceQty &&
     !destinationCellOccupied
   
   useEffect(() => {
     if (!form.materialId) return
-    const nextFromZoneId = sourceZoneOptions.some((zone) => zone.id === form.fromZoneId)
-      ? form.fromZoneId
-      : sourceZoneOptions[0]?.id ?? ''
+    const currentSource = sourceZoneOptions.find((zone) => zone.id === sourceLocationKey)
+    const nextSource = currentSource ?? sourceZoneOptions[0]
+    const nextFromZoneId = nextSource?.zoneId ?? ''
+    const nextFromSlotId = nextSource?.slotId ?? ''
+    const nextFromLevel = nextSource?.level ?? ''
     const nextToZoneId = destinationZoneOptions.some((zone) => zone.id === form.toZoneId)
       ? form.toZoneId
       : destinationZoneOptions.find((zone) => zone.id !== nextFromZoneId)?.id ?? ''
+    const shouldRefreshDestinationCell = nextToZoneId !== form.toZoneId || !form.toSlotId || !form.toLevel
+    const nextDestinationZone = shouldRefreshDestinationCell
+      ? realZones.find((zone: any) => String(zone.id) === String(nextToZoneId))
+      : null
+    const nextDestinationCell = shouldRefreshDestinationCell
+      ? findEmptyCell(nextDestinationZone, form.materialId)
+      : null
+    const nextToSlotId = shouldRefreshDestinationCell ? nextDestinationCell?.cell ?? '' : form.toSlotId
+    const nextToLevel = shouldRefreshDestinationCell ? nextDestinationCell?.level ?? '' : form.toLevel
 
-    if (nextFromZoneId === form.fromZoneId && nextToZoneId === form.toZoneId) return
+    if (
+      nextFromZoneId === form.fromZoneId &&
+      nextFromSlotId === form.fromSlotId &&
+      nextFromLevel === form.fromLevel &&
+      nextToZoneId === form.toZoneId &&
+      nextToSlotId === form.toSlotId &&
+      nextToLevel === form.toLevel
+    ) return
     setForm((prev) => ({
       ...prev,
       fromZoneId: nextFromZoneId,
+      fromSlotId: nextFromSlotId,
+      fromLevel: nextFromLevel,
       toZoneId: nextToZoneId,
+      toSlotId: nextToSlotId,
+      toLevel: nextToLevel,
     }))
-  }, [form.materialId, form.fromZoneId, form.toZoneId, sourceZoneOptions, destinationZoneOptions])
+  }, [form.materialId, form.fromZoneId, form.fromSlotId, form.fromLevel, form.toZoneId, form.toSlotId, form.toLevel, sourceZoneOptions, sourceLocationKey, destinationZoneOptions, realZones])
 
   async function submitTransfer() {
     const qty = num(form.quantity)
@@ -1027,12 +1058,12 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Tạo điều chuyển mới" wide>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <ModalShell open={open} onClose={onClose} title="Tạo điều chuyển mới" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
         <div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
-            <select value={form.materialId} onChange={(e) => setForm((f) => ({ ...f, materialId: e.target.value, fromZoneId: '', toZoneId: '' }))} className={fieldClass}>
+            <select value={form.materialId} onChange={(e) => setForm((f) => ({ ...f, materialId: e.target.value, fromZoneId: '', fromSlotId: '', fromLevel: '', toZoneId: '', toSlotId: '', toLevel: '' }))} className={fieldClass}>
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
                 <option key={m.id} value={m.id}>
@@ -1040,26 +1071,33 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.fromZoneId} onChange={(e) => {
-  const selected = sourceZoneOptions.find(
-    (s) => s.id === e.target.value
-  )
+            <select value={sourceLocationKey} onChange={(e) => {
+              const selected = sourceZoneOptions.find((s) => s.id === e.target.value)
 
-  setForm((f) => ({
-    ...f,
-    fromZoneId: selected?.zoneId ?? '',
-    fromSlotId: selected?.slotId ?? '',
-    fromLevel: selected?.level ?? '',
-  }))
-}} className={fieldClass}>
+              setForm((f) => ({
+                ...f,
+                fromZoneId: selected?.zoneId ?? '',
+                fromSlotId: selected?.slotId ?? '',
+                fromLevel: selected?.level ?? '',
+              }))
+            }} className={fieldClass}>
               <option value="">Từ vị trí kho</option>
               {sourceZoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.zoneCode} · {z.warehouseName || 'Kho'} · Ô {zoneCell(z) || '-'} · Tầng {z.level || '-'} · tồn {z.qty.toLocaleString('vi-VN')}
+                  {z.zoneCode} · {z.warehouseName || 'Kho'} · Ô {z.slotId || zoneCell(z) || '-'} · Tầng {z.level || '-'} · tồn {z.qty.toLocaleString('vi-VN')}
                 </option>
               ))}
             </select>
-            <select value={form.toZoneId} onChange={(e) => setForm((f) => ({ ...f, toZoneId: e.target.value }))} className={fieldClass}>
+            <select value={form.toZoneId} onChange={(e) => {
+              const zone = realZones.find((z: any) => String(z.id) === e.target.value)
+              const emptyCell = findEmptyCell(zone, form.materialId)
+              setForm((f) => ({
+                ...f,
+                toZoneId: e.target.value,
+                toSlotId: emptyCell?.cell ?? '',
+                toLevel: emptyCell?.level ?? '',
+              }))
+            }} className={fieldClass}>
               <option value="">Đến vị trí kho</option>
               {destinationZoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
@@ -1116,28 +1154,9 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           </div> : null}
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
-          <div className="mb-3 text-sm font-semibold text-white">Sơ đồ điều chuyển hàng hóa</div>
-          <div className="grid grid-cols-3 items-center gap-3">
-            <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3 text-center text-sm text-slate-200">
-              <div className="text-xs text-slate-400">KHO XUẤT</div>
-              <div className="mt-1 font-semibold">{sourceZoneOptions.find((x) => x.id === form.fromZoneId)?.zoneCode ?? '--'}</div>
-            </div>
-            <div className="text-center text-2xl text-cyan-400">→</div>
-            <div className="rounded-lg border border-white/10 bg-white/[0.06] p-3 text-center text-sm text-slate-200">
-              <div className="text-xs text-slate-400">KHO NHẬP</div>
-              <div className="mt-1 font-semibold">{destinationZoneOptions.find((x) => x.id === form.toZoneId)?.zoneCode ?? '--'}</div>
-            </div>
-          </div>
-          <div className="mt-6 grid grid-cols-5 gap-2 text-center text-xs">
-            {['Tạo phiếu', 'Duyệt phiếu', 'Đang vận chuyển', 'Nhận hàng', 'Hoàn thành'].map((step, idx) => (
-              <div key={step} className="text-slate-300">
-                <div className={`mx-auto mb-2 h-2 w-full rounded ${idx < 3 ? 'bg-cyan-500' : 'bg-slate-700'}`} />
-                {step}
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
+            <div className="mb-3 text-sm font-semibold text-white">Vị trí nguồn</div>
             <WarehouseMiniMap
               compact
               zone={selectedSourceFullZone}
@@ -1145,6 +1164,9 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
               level={form.fromLevel}
               onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, fromSlotId: cell, fromLevel: selectedLevel }))}
             />
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
+            <div className="mb-3 text-sm font-semibold text-white">Vị trí đích</div>
             <WarehouseMiniMap
               compact
               zone={selectedDestinationFullZone}

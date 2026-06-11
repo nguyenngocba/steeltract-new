@@ -1,5 +1,49 @@
 # SteelTrack Changelog
 
+## 2026-06-11 Documentation Cleanup Phase
+
+Documentation:
+
+- Merged legacy docs classified as MERGE into ai-state workflow, decisions, design, roadmap, and audit docs.
+- Added `docs/ai-state/roadmap.md`.
+- Added `docs/ai-state/design/repo-structure.md`.
+- Added `docs/ai-state/design/event-naming.md`.
+- Added `docs/ai-state/audits/technical-debt-audit.md`.
+- Added `docs/ai-state/audits/post-cleanup-summary.md`.
+- Archived `docs/PROJECT_OVERVIEW.md` and `docs/architecture/REFACTOR_MASTER_PLAN.md` into `docs/archive/`.
+- Deleted empty legacy module placeholders from `docs/modules/`.
+- Updated `CURRENT_STATE.md`, `CURRENT_MODULES.md`, and `CODEX_WORKFLOW.md`.
+
+## 2026-06-11 Documentation Refactor
+
+Documentation:
+
+- Normalized `docs/ai-state` into module, decision, audit, and design directories.
+- Moved root-level module docs into `docs/ai-state/modules/`.
+- Added `CURRENT_STATE.md`.
+- Added architecture, inventory, and production decision docs.
+- Added Yard, Projects, and Dashboard module docs.
+- Added documentation audit.
+- Updated Codex workflow reading and completion requirements.
+
+## 2026-06-11
+
+### Inventory Transfer 2D Location Flow
+
+Fixed:
+
+- Transfer creation now uses a separate selected source-location key so `fromZoneId` remains the real warehouse zone id sent to the API.
+- Transfer source and destination options are limited to `Kho chính`; `Kho sản xuất` is intentionally excluded from this workflow.
+- Selecting a source material location now auto-fills source cell and level from the selected real stock row.
+- Selecting a destination location now suggests the first available destination cell and level.
+- The old transfer diagram panel was removed and replaced with separate source and destination 2D warehouse views.
+- Warehouse location occupancy rows now include the optional `unitMaster` field expected by the view.
+- Inventory location create/edit now shows the real parent warehouse selector for `Kho chính (MAIN)` and `Kho sản xuất (PRODUCTION)`, with fallback from zone warehouse data and a required parent warehouse before save.
+
+Build:
+
+- Frontend build passed.
+
 ## 2026-06-07
 
 ### Production BOM Stock Guard And Auto Material Issue
