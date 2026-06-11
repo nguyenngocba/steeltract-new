@@ -141,6 +141,11 @@ export class ZonesController {
         },
 
         locationStocks: {
+          where: {
+            quantity: {
+              gt: 0,
+            },
+          },
           include: {
             inventoryItem: {
               select: {
@@ -156,10 +161,14 @@ export class ZonesController {
     })
 
     return zones.map((zone) => {
-      const totalStockQuantity = zone.inventoryItems.reduce(
-        (sum, item) => sum + Number(item.quantity ?? 0),
-        0,
-      )
+      const totalStockQuantity =
+        zone.locationStocks
+          .filter((row) => Number(row.quantity) > 0)
+          .reduce(
+            (sum, row) =>
+              sum + Number(row.quantity ?? 0),
+            0,
+          )
 
       return {
         ...zone,
@@ -167,7 +176,9 @@ export class ZonesController {
         totalStockQuantity,
 
         cellOccupancy: buildCellOccupancy(
-          zone.locationStocks.map((row) => ({
+          zone.locationStocks
+            .filter((row) => Number(row.quantity) > 0)
+            .map((row) => ({
             id: row.inventoryItem.id,
             code: row.inventoryItem.code,
             name: row.inventoryItem.name,
@@ -204,6 +215,11 @@ export class ZonesController {
         },
 
         locationStocks: {
+          where: {
+            quantity: {
+              gt: 0,
+            },
+          },
           include: {
             inventoryItem: {
               select: {
@@ -220,10 +236,14 @@ export class ZonesController {
 
     if (!zone) return null
 
-    const totalStockQuantity = zone.inventoryItems.reduce(
-      (sum, item) => sum + Number(item.quantity ?? 0),
-      0,
-    )
+    const totalStockQuantity =
+      zone.locationStocks
+        .filter((row) => Number(row.quantity) > 0)
+        .reduce(
+          (sum, row) =>
+            sum + Number(row.quantity ?? 0),
+          0,
+        )
 
     return {
       ...zone,
@@ -231,7 +251,9 @@ export class ZonesController {
       totalStockQuantity,
 
       cellOccupancy: buildCellOccupancy(
-        zone.locationStocks.map((row) => ({
+        zone.locationStocks
+          .filter((row) => Number(row.quantity) > 0)
+          .map((row) => ({
           id: row.inventoryItem.id,
           code: row.inventoryItem.code,
           name: row.inventoryItem.name,

@@ -286,16 +286,30 @@ export class InventoryRepository {
       })
 
     if (existing) {
+      const nextQuantity =
+        Number(existing.quantity) +
+        Number(data.quantity)
+
+      if (nextQuantity <= 0) {
+        return db.inventoryLocationStock.delete({
+          where: {
+            id: existing.id,
+          },
+        })
+      }
+
       return db.inventoryLocationStock.update({
         where: {
           id: existing.id,
         },
         data: {
-          quantity: {
-            increment: data.quantity,
-          },
+          quantity: nextQuantity,
         },
       })
+    }
+
+    if (data.quantity <= 0) {
+      return null
     }
 
     return db.inventoryLocationStock.create({

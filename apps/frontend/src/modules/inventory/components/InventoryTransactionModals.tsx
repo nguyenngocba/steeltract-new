@@ -130,7 +130,7 @@ function ModalShell({
   return createPortal(
     <div className="inventory-transaction-modal fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm">
       <style>{'.inventory-transaction-modal select option{background:#0f172a;color:#e2e8f0}.inventory-transaction-modal select:focus,.inventory-transaction-modal input:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
-      <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-4xl'} overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50`}>
+      <div className={`w-full ${wide ? 'max-w-7xl' : 'max-w-4xl'} overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50`}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div className="text-base font-semibold text-white">{title}</div>
           <button
@@ -412,11 +412,29 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       selectedMaterial?.unitPrice,
   )
   const locationBalances = useMemo(() => {
-    return Array.isArray((selectedMaterialDetail as any)?.locationBalances)
-      ? ((selectedMaterialDetail as any).locationBalances as any[])
-          .filter((balance) => num(balance.quantity) > 0)
+    return Array.isArray(
+      (selectedMaterialDetail as any)?.locationBalances,
+    )
+      ? (
+          (selectedMaterialDetail as any)
+            .locationBalances as any[]
+        )
+          .filter(
+            (balance) =>
+              num(balance.quantity) > 0 &&
+              balance.warehouseCode !==
+                'PRODUCTION',
+          )
       : []
   }, [selectedMaterialDetail])
+  console.log(
+  'LOCATION BALANCES',
+  JSON.stringify(
+    locationBalances,
+    null,
+    2,
+  ),
+)
 
   const selectedInboundZone = useMemo(() => {
     if (!form.zoneId) return null
@@ -445,12 +463,20 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     locationBalances.forEach((balance: any) => {
       if (!balance.zoneId) return
 
-      if (!zoneMap.has(String(balance.zoneId))) {
-        const zone = zones.find(
-          (z: any) =>
-            String(z.id) === String(balance.zoneId),
-        )
+      // Loại kho sản xuất
+      if (
+        String(balance.warehouseCode) ===
+        'PRODUCTION'
+      ) {
+        return
+      }
 
+      const zone = zones.find(
+        (z: any) =>
+          String(z.id) === String(balance.zoneId),
+      )
+
+      if (!zoneMap.has(String(balance.zoneId))) {
         zoneMap.set(String(balance.zoneId), {
           id: String(balance.zoneId),
           code:
@@ -467,6 +493,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
     return Array.from(zoneMap.values())
   }, [locationBalances, zones])
+  console.log('AVAILABLE ZONES', availableZones)
   useEffect(() => {
     if (!form.inventoryItemId) return
     if (form.zoneId && availableZones.some((zone) => zone.id === String(form.zoneId))) return
@@ -628,7 +655,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
   return (
     <ModalShell open={open} onClose={onClose} title="Xuất kho vật tư" wide>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_420px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_700px]">
       <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
@@ -775,21 +802,40 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         </button>
       </div>
       </div>
-      <div className="space-y-3">
+      <div
+        className={`grid gap-3 ${
+          form.target === 'COMPONENT_PRODUCTION'
+            ? 'grid-cols-2'
+            : 'grid-cols-1'
+        }`}
+      >
         <WarehouseMiniMap
           compact
           zone={selectedSourceFullZone}
           slotId={form.sourceSlotId}
           level={form.sourceLevel}
-          onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, sourceSlotId: cell, sourceLevel: selectedLevel }))}
+          onSelect={(cell: string, selectedLevel: string) =>
+            setForm((prev) => ({
+              ...prev,
+              sourceSlotId: cell,
+              sourceLevel: selectedLevel,
+            }))
+          }
         />
+
         {form.target === 'COMPONENT_PRODUCTION' ? (
           <WarehouseMiniMap
             compact
             zone={selectedProductionZone}
             slotId={form.productionSlotId}
             level={form.productionLevel}
-            onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, productionSlotId: cell, productionLevel: selectedLevel }))}
+            onSelect={(cell: string, selectedLevel: string) =>
+              setForm((prev) => ({
+                ...prev,
+                productionSlotId: cell,
+                productionLevel: selectedLevel,
+              }))
+            }
           />
         ) : null}
       </div>

@@ -79,6 +79,27 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const projectRows = detail?.projectConsumptionHistory ?? []
   const supplierRows = detail?.supplierHistory ?? []
   const locationRows = detail?.locationBalances ?? []
+  const mainLocations = locationRows.filter(
+    (x: any) =>
+      x.warehouseCode !== 'PRODUCTION',
+  )
+
+  const productionLocations = locationRows.filter(
+    (x: any) =>
+      x.warehouseCode === 'PRODUCTION',
+  )
+
+  const mainQty = mainLocations.reduce(
+    (sum: number, x: any) =>
+      sum + num(x.quantity),
+    0,
+  )
+
+  const productionQty = productionLocations.reduce(
+    (sum: number, x: any) =>
+      sum + num(x.quantity),
+    0,
+  )
   const supplier = detail?.supplierHistory?.[0]?.supplierName ?? '-'
   const tabs = [
     ['overview', 'Tổng quan'],
@@ -130,10 +151,41 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
             {activeTab === 'overview' && (
               <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                  <MetricCard title="Tồn hiện tại" value={`${currentStock.toLocaleString('vi-VN')} ${unit}`.trim()} tone="blue" />
-                  <MetricCard title="Giá trung bình" value={money(averageCost)} tone="cyan" />
-                  <MetricCard title="Giá trị tồn" value={money(inventoryValue)} tone="emerald" />
-                  <MetricCard title="Trạng thái" value={status} tone={status === 'Bình thường' ? 'emerald' : 'amber'} />
+                  <MetricCard
+                    title="Tổng tồn"
+                    value={`${currentStock.toLocaleString('vi-VN')} ${unit}`.trim()}
+                    tone="blue"
+                  />
+
+                  <MetricCard
+                    title="Kho chính"
+                    value={`${mainQty.toLocaleString('vi-VN')} ${unit}`.trim()}
+                    tone="emerald"
+                  />
+
+                  <MetricCard
+                    title="Kho Vật Tư Sản Xuất"
+                    value={`${productionQty.toLocaleString('vi-VN')} ${unit}`.trim()}
+                    tone="amber"
+                  />
+
+                  <MetricCard
+                    title="Giá trung bình"
+                    value={money(averageCost)}
+                    tone="cyan"
+                  />
+
+                  <MetricCard
+                    title="Giá trị tồn"
+                    value={money(inventoryValue)}
+                    tone="emerald"
+                  />
+
+                  <MetricCard
+                    title="Trạng thái"
+                    value={status}
+                    tone={status === 'Bình thường' ? 'emerald' : 'amber'}
+                  />
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
                   <div className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-cyan-300">Thông tin vật tư</div>

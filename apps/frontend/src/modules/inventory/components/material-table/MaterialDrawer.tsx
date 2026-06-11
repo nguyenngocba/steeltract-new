@@ -201,12 +201,12 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   return createPortal(
     <div className="inventory-material-drawer fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-950/75 p-4 py-8 backdrop-blur-md">
       <style>{'.inventory-material-drawer select option{background:#0f172a;color:#e2e8f0}.inventory-material-drawer select:focus,.inventory-material-drawer input:focus,.inventory-material-drawer textarea:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
-      <section className="w-[98vw] max-w-[2200px] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
+      <section className="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
         <header className="flex items-start justify-between border-b border-white/10 px-6 py-5">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300">Vật tư kho</p>
-            <h2 className="mt-1 text-xl font-semibold text-white">{isEditMode ? 'Sửa vật tư' : 'Thêm vật tư mới'}</h2>
-            <p className="mt-1 text-sm text-slate-400">Thông tin này đồng bộ với tồn kho, nhập xuất và BOM sản xuất.</p>
+            <h2 className="text-xl font-semibold text-white">
+              {isEditMode ? 'Sửa vật tư' : 'Thêm vật tư mới'}
+            </h2>
           </div>
           <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white">
             <X size={18} />
@@ -375,36 +375,99 @@ export function WarehouseMiniMap({
         VIEW 2D VỊ TRÍ VẬT TƯ
       </h3>
 
-      <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
-        <div className="text-xs text-slate-400">
-          Vị trí đang chọn
-        </div>
+      <div className="flex gap-4 items-start">
+        <div className="flex-1">
+          <div className="text-xs text-slate-400">
+            Vị trí đang chọn
+          </div>
 
-        <div className="mt-1 text-lg font-bold text-cyan-300">
-          {zone.code}
-        </div>
+          <div className="mt-1 text-lg font-bold text-cyan-300">
+            {zone.code}
+          </div>
 
-        <div className="text-xs text-slate-500">
-          {zone.name}
-        </div>
+          <div className="text-xs text-slate-500">
+            {zone.name}
+          </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
-          <span>
-            Ô/tầng:{' '}
-            <b className="text-slate-200">
+          <div className="mt-2 text-[11px] text-slate-400">
+            Ô/tầng:
+            <b className="ml-1 text-slate-200">
+              {slotId || selectedCell || '-'}/{level || '-'}
+            </b>
+          </div>
+
+          <div className="text-[11px] text-slate-400">
+            Đã sử dụng:
+            <b className="ml-1 text-slate-200">
               {countOccupiedCellLevels(zone)}/
               {TOTAL_STORAGE_CELL_LEVELS}
             </b>
-          </span>
+          </div>
 
-          <span>
-            Sức chứa:{' '}
-            <b className="text-slate-200">
-              {Number(
-                zone.capacity ?? 0,
-              ).toLocaleString('vi-VN')}
+          <div className="text-[11px] text-slate-400">
+            Sức chứa:
+            <b className="ml-1 text-slate-200">
+              {Number(zone.capacity ?? 0).toLocaleString('vi-VN')}
             </b>
-          </span>
+          </div>
+
+          </div> {/* đóng flex-1 */}
+
+          <div className="w-56 rounded-lg border border-slate-700 bg-slate-900/50 p-2">
+          <div className="mb-2 text-xs font-semibold text-slate-400">
+            Ô {activeCell || '-'}
+          </div>
+
+          {['L4', 'L3', 'L2', 'L1'].map((lv) => {
+            const levelEntry =
+              (cellMap.get(activeCell) ?? []).find(
+                (entry: any) => entry.level === lv,
+              )
+
+            const material =
+              levelEntry?.materials?.[0]
+
+            return (
+              <button
+                key={lv}
+                type="button"
+                onClick={() => {
+                  if (activeCell) {
+                    onSelect?.(activeCell, lv)
+                  }
+                }}
+                className={`mb-1 flex w-full items-center rounded border px-2 py-1 text-xs ${
+                  lv === level
+                    ? 'border-amber-400 bg-amber-500/10'
+                    : 'border-cyan-500/20'
+                }`}
+              >
+                <div className="w-8 font-bold text-cyan-300">
+                  {lv}
+                </div>
+
+                <div className="flex flex-1 items-center justify-between overflow-hidden">
+                  {material ? (
+                    <>
+                      <div className="truncate text-cyan-300">
+                        {material.code}
+                      </div>
+
+                      <div className="ml-2 min-w-[60px] text-right text-amber-300 font-semibold">
+                        {Number(
+                          material.quantity ?? 0,
+                        ).toLocaleString('vi-VN')}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-slate-500">
+                      Trống
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -495,175 +558,6 @@ export function WarehouseMiniMap({
           })}
         </div>
       </div>
-
-      {activeCell && (
-        <div className="mt-5">
-          <div className="mb-2 text-xs font-semibold text-slate-400">
-            Ô {activeCell}
-          </div>
-
-          <div className="grid grid-cols-5 gap-2">
-            {INTERNAL_LEVELS
-              .slice()
-              .reverse()
-              .map(
-                (
-                  currentLevel,
-                ) => {
-                  const occupied =
-                    isCellOccupied(
-                      zone,
-                      activeCell,
-                      currentLevel,
-                    )
-
-                  const levelItems =
-                    (
-                      cellMap.get(
-                        activeCell,
-                      ) ?? []
-                    ).filter(
-                      (
-                        entry: any,
-                      ) =>
-                        normalizeLevel(
-                          entry.level,
-                        ) ===
-                        normalizeLevel(
-                          currentLevel,
-                        ),
-                    )
-
-                  const levelTooltip =
-                    cellTooltip(
-                      activeCell,
-                      levelItems,
-                    )
-
-                  const selected =
-                    slotId ===
-                      activeCell &&
-                    level ===
-                      currentLevel
-
-                  return (
-                    <button
-                      key={
-                        currentLevel
-                      }
-                      type="button"
-                      title={
-                        levelTooltip
-                      }
-                      onClick={() =>
-                        onSelect(
-                          activeCell,
-                          currentLevel,
-                        )
-                      }
-                      className={`h-20 rounded-xl border ${
-                        selected
-                          ? 'border-cyan-400 bg-cyan-500/20'
-                          : occupied
-                          ? 'border-amber-500 bg-amber-500/10'
-                          : 'border-emerald-500 bg-emerald-500/10'
-                      }`}
-                    >
-                      <div className="font-semibold">
-                        {
-                          currentLevel
-                        }
-                      </div>
-
-                      <div className="mt-1 text-xs">
-                        {occupied
-                          ? occupancyLabel(
-                              levelItems,
-                            )
-                          : 'Trống'}
-                      </div>
-
-                      {occupied && (
-                        <div className="mt-1 text-[10px] text-cyan-300">
-                          {levelItems.reduce(
-                            (
-                              sum,
-                              x,
-                            ) =>
-                              sum +
-                              Number(
-                                x.totalQuantity ??
-                                  0,
-                              ),
-                            0,
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  )
-                },
-              )}
-          </div>
-        </div>
-      )}
-
-      {slotId && level && (
-        <div className="mt-5 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
-          <div className="text-xs text-slate-400">
-            Vị trí đã chọn
-          </div>
-
-          <div className="mt-1 text-lg font-bold text-cyan-300">
-            {zone.code}-{slotId}-{level}
-          </div>
-        </div>
-      )}
-
-      {selectedMaterials.length >
-        0 && (
-        <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
-          <div className="mb-2 text-xs font-semibold text-slate-400">
-            Vật tư trong ô {activeCell}
-          </div>
-
-          <div className="space-y-2">
-            {selectedMaterials.map(
-              (
-                material: any,
-              ) => (
-                <div
-                  key={
-                    material.id
-                  }
-                  className="rounded border border-slate-800 bg-slate-900 p-2"
-                >
-                  <div className="font-semibold text-cyan-300">
-                    {
-                      material.code
-                    }
-                  </div>
-
-                  <div className="text-xs text-slate-400">
-                    {
-                      material.name
-                    }
-                  </div>
-
-                  <div className="text-xs text-slate-500">
-                    {Number(material.quantity ?? 0).toLocaleString('vi-VN')}
-                    {' '}
-                    {material.unit ?? ''}
-                  </div>
-
-                  <div className="text-[10px] text-cyan-400">
-                    {activeCell}
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
