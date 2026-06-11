@@ -14,15 +14,23 @@ export function useCreateTransaction() {
 
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          'inventory-transactions',
-        ],
+        queryKey: ['inventory-transactions'],
       })
 
       queryClient.invalidateQueries({
-        queryKey: [
-          'inventory-items',
-        ],
+        queryKey: ['inventory-items'],
+      })
+
+      queryClient.invalidateQueries({
+        queryKey: ['material-detail'],
+      })
+
+      queryClient.invalidateQueries({
+        queryKey: ['zones'],
+      })
+
+      queryClient.invalidateQueries({
+        queryKey: ['inventory-audit'],
       })
     },
   })

@@ -195,12 +195,30 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const selectedInboundZoneFull = isZoneFull(selectedInboundZone)
   const selectedInboundCellOccupied = isCellOccupied(selectedInboundZone, form.slotId, form.level)
   const inboundEmptyCell = findEmptyCell(selectedInboundZone)
+  
   useEffect(() => {
     if (!form.inventoryItemId) return
-    const currentZoneIsValid = form.zoneId && mainZones.some((zone: any) => String(zone.id) === String(form.zoneId))
-    if (currentZoneIsValid || !defaultInboundZone?.id) return
-    setForm((prev) => ({ ...prev, zoneId: defaultInboundZone.id }))
-  }, [form.inventoryItemId, form.zoneId, defaultInboundZone, mainZones])
+
+    const currentZoneIsValid =
+      form.zoneId &&
+      mainZones.some(
+        (zone: any) =>
+          String(zone.id) === String(form.zoneId),
+      )
+
+    if (currentZoneIsValid || !defaultInboundZone?.id)
+      return
+
+    setForm((prev) => ({
+      ...prev,
+      zoneId: defaultInboundZone.id,
+    }))
+  }, [
+    form.inventoryItemId,
+    form.zoneId,
+    defaultInboundZone,
+    mainZones,
+  ])
 
   function suggestInboundLocation() {
     const zonesToScan = selectedInboundZone ? [selectedInboundZone] : mainZones
@@ -381,7 +399,10 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     remark: '',
   })
   const { data: selectedMaterialDetail } = useMaterialDetail(form.inventoryItemId || undefined)
-
+  console.log(
+    'DETAIL',
+    selectedMaterialDetail,
+  )
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const currentStock = num(selectedMaterial?.quantity)
   const quantity = num(form.quantity)
@@ -391,46 +412,60 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       selectedMaterial?.unitPrice,
   )
   const locationBalances = useMemo(() => {
-    const balances = Array.isArray((selectedMaterialDetail as any)?.locationBalances)
-      ? ((selectedMaterialDetail as any).locationBalances as any[]).filter((balance) => num(balance.quantity) > 0)
+    return Array.isArray((selectedMaterialDetail as any)?.locationBalances)
+      ? ((selectedMaterialDetail as any).locationBalances as any[])
+          .filter((balance) => num(balance.quantity) > 0)
       : []
-    if (balances.length > 0) return balances
-    return []
-    const fallbackZone = selectedMaterial?.zoneId
-      ? zones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
-      : zones[0]
-    const fallbackZoneId = selectedMaterial?.zoneId ?? fallbackZone?.id
-    if (fallbackZoneId && currentStock > 0) {
-      return [
-        {
-          zoneId: fallbackZoneId,
-          zoneCode: selectedMaterial?.zoneCode ?? fallbackZone?.code ?? 'ZONE',
-          zoneName: selectedMaterial?.zone ?? fallbackZone?.name ?? 'Vị trí vật tư',
-          quantity: currentStock,
-        },
-      ]
-    }
-    return []
-  }, [selectedMaterialDetail, selectedMaterial, currentStock, zones])
+  }, [selectedMaterialDetail])
+
+  const selectedInboundZone = useMemo(() => {
+    if (!form.zoneId) return null
+    return zones.find((zone: any) => String(zone.id) === String(form.zoneId) && isRealStorageZone(zone)) || null
+  }, [form.zoneId, zones])
   const qtyByZoneId = useMemo(() => {
     const map = new Map<string, number>()
+
     locationBalances.forEach((balance) => {
-      if (balance.zoneId) map.set(String(balance.zoneId), num(balance.quantity))
+      if (!balance.zoneId) return
+
+      const key = String(balance.zoneId)
+
+      map.set(
+        key,
+        (map.get(key) ?? 0) +
+          num(balance.quantity),
+      )
     })
+
     return map
   }, [locationBalances])
   const availableZones = useMemo(() => {
-    const zoneMap = new Map<string, any>(zones.map((zone: any) => [String(zone.id), zone]))
-    return locationBalances
-      .filter((balance) => balance.zoneId)
-      .map((balance) => {
-        const zone = zoneMap.get(String(balance.zoneId))
-        return {
+    const zoneMap = new Map<string, any>()
+
+    locationBalances.forEach((balance: any) => {
+      if (!balance.zoneId) return
+
+      if (!zoneMap.has(String(balance.zoneId))) {
+        const zone = zones.find(
+          (z: any) =>
+            String(z.id) === String(balance.zoneId),
+        )
+
+        zoneMap.set(String(balance.zoneId), {
           id: String(balance.zoneId),
-          code: zone?.code ?? balance.zoneCode ?? 'ZONE',
-          name: zone?.name ?? balance.zoneName ?? 'Vị trí vật tư',
-        }
-      })
+          code:
+            zone?.code ??
+            balance.zoneCode ??
+            'ZONE',
+          name:
+            zone?.name ??
+            balance.zoneName ??
+            'Vị trí vật tư',
+        })
+      }
+    })
+
+    return Array.from(zoneMap.values())
   }, [locationBalances, zones])
   useEffect(() => {
     if (!form.inventoryItemId) return
@@ -439,7 +474,72 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     if (!firstZone?.id) return
     setForm((prev) => ({ ...prev, zoneId: firstZone.id }))
   }, [form.inventoryItemId, form.zoneId, availableZones])
+  
   const selectedZoneStock = form.zoneId ? qtyByZoneId.get(String(form.zoneId)) ?? 0 : 0
+    const sourceLocations = useMemo(() => {
+    return locationBalances
+      .filter(
+        (x: any) =>
+          String(x.zoneId) === String(form.zoneId),
+      )
+      .sort((a: any, b: any) => {
+        const slotCompare =
+          String(a.slotId).localeCompare(
+            String(b.slotId),
+          )
+
+        if (slotCompare !== 0)
+          return slotCompare
+
+        return String(a.level).localeCompare(
+          String(b.level),
+        )
+      })
+  }, [locationBalances, form.zoneId])
+
+  useEffect(() => {
+    console.log(
+      JSON.stringify(
+        sourceLocations,
+        null,
+        2,
+      ),
+    )
+  }, [sourceLocations])
+
+  useEffect(() => {
+  if (!sourceLocations.length) return
+
+  const currentExists = sourceLocations.some(
+    (x: any) =>
+      x.slotId === form.sourceSlotId &&
+      x.level === form.sourceLevel,
+  )
+
+  if (currentExists) return
+
+  const first = sourceLocations[0]
+
+  setForm((prev) => ({
+    ...prev,
+    sourceSlotId: first.slotId ?? '',
+    sourceLevel: first.level ?? '',
+  }))
+}, [
+  sourceLocations,
+  form.sourceSlotId,
+  form.sourceLevel,
+])
+
+  const selectedSourceLocation =
+    sourceLocations.find(
+      (x: any) =>
+        x.slotId === form.sourceSlotId &&
+        x.level === form.sourceLevel,
+    )
+
+  const sourceLocationQty =
+    num(selectedSourceLocation?.quantity)
   const selectedZoneAfterStock = selectedZoneStock - quantity
   const selectedSourceFullZone = zones.find((zone: any) => String(zone.id) === String(form.zoneId))
   const selectedProductionZone = productionZones.find((zone: any) => String(zone.id) === String(form.productionZoneId))
@@ -452,7 +552,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     Boolean(form.inventoryItemId) &&
     Boolean(form.zoneId) &&
     quantity > 0 &&
-    selectedZoneAfterStock >= 0 &&
+    quantity <= sourceLocationQty &&
     (!needsProductionLocation || (Boolean(form.productionZoneId) && Boolean(form.productionSlotId) && !productionCellOccupied))
 
   function suggestProductionDestination() {
@@ -553,24 +653,46 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           ))}
         </select>
         <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className={fieldClass} />
-        <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={fieldClass}>
-          <option value="">Vị trí lấy vật tư</option>
-          {availableZones.map((z: any) => (
-            <option key={z.id} value={z.id}>
-              {z.code} - {z.name} · tồn {(qtyByZoneId.get(String(z.id)) ?? 0).toLocaleString('vi-VN')}
+        <select
+          value={`${form.zoneId}|${form.sourceSlotId}|${form.sourceLevel}`}
+          onChange={(e) => {
+            const [zoneId, slotId, level] =
+              e.target.value.split('|')
+
+            setForm((prev) => ({
+              ...prev,
+              zoneId,
+              sourceSlotId: slotId,
+              sourceLevel: level,
+            }))
+          }}
+          className={fieldClass}
+        >
+          <option value="">
+            Chọn vị trí vật tư
+          </option>
+
+          {locationBalances.map((loc: any) => (
+            <option
+              key={`${loc.zoneId}-${loc.slotId}-${loc.level}`}
+              value={`${loc.zoneId}|${loc.slotId}|${loc.level}`}
+            >
+              {loc.zoneCode}
+              {' / '}
+              {loc.slotId}
+              {' / '}
+              {loc.level}
+              {' - '}
+              {num(loc.quantity).toLocaleString('vi-VN')}
             </option>
           ))}
         </select>
-        <select value={form.sourceSlotId} onChange={(e) => setForm((f) => ({ ...f, sourceSlotId: e.target.value }))} className={fieldClass}>
-          <option value="">Ô lấy vật tư</option>
-          {INTERNAL_CELLS.map((cell) => <option key={cell} value={cell}>Ô {cell}</option>)}
-        </select>
-        <select value={form.sourceLevel} onChange={(e) => setForm((f) => ({ ...f, sourceLevel: e.target.value }))} className={fieldClass}>
-          <option value="">Tầng lấy vật tư</option>
-          {INTERNAL_LEVELS.map((level) => <option key={level} value={level}>Tầng {level}</option>)}
-        </select>
+        
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
-          Tồn vị trí đã chọn: <span className="ml-1 text-cyan-300">{selectedZoneStock.toLocaleString('vi-VN')}</span>
+          Tồn ô/tầng đã chọn:
+          <span className="ml-1 text-cyan-300">
+            {sourceLocationQty.toLocaleString('vi-VN')}
+          </span>
         </div>
       </div>
       {form.target === 'COMPONENT_PRODUCTION' ? <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
@@ -614,8 +736,18 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
         <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
         <MetricBox title="Tồn sau xuất" value={Math.max(0, currentStock - quantity).toLocaleString('vi-VN')} />
-        <MetricBox title="Tồn tại vị trí" value={selectedZoneStock.toLocaleString('vi-VN')} />
-        <MetricBox title="Vị trí sau xuất" value={Math.max(0, selectedZoneAfterStock).toLocaleString('vi-VN')} />
+        <MetricBox
+            title="Tồn ô/tầng"
+            value={sourceLocationQty.toLocaleString('vi-VN')}
+          />
+
+        <MetricBox
+            title="Sau xuất ô/tầng"
+            value={Math.max(
+              0,
+              sourceLocationQty - quantity,
+            ).toLocaleString('vi-VN')}
+          />
       </div>
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
         <div className="text-slate-300">Giá trị xuất dự kiến: <span className="font-semibold text-cyan-300">{formatCurrency(quantity * estimatedUnitPrice)}</span></div>
@@ -627,9 +759,9 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           Vật tư này chưa có vị trí tồn khả dụng. Hãy nhập kho hoặc gán vị trí tồn trước khi xuất.
         </div>
       )}
-      {form.zoneId && quantity > selectedZoneStock && (
+      {form.zoneId && quantity > sourceLocationQty && (
         <div className="mt-3 rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-100">
-          Số lượng xuất lớn hơn tồn tại vị trí đã chọn.
+          Số lượng xuất lớn hơn tồn của ô/tầng đã chọn.
         </div>
       )}
       <div className="mt-3">
@@ -771,7 +903,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     transferQty > 0 &&
     transferQty <= sourceQty &&
     !destinationCellOccupied
-
+  
   useEffect(() => {
     if (!form.materialId) return
     const nextFromZoneId = sourceZoneOptions.some((zone) => zone.id === form.fromZoneId)
