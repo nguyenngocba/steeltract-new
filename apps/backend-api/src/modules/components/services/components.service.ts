@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { ComponentStatus, Prisma } from '@prisma/client';
 
@@ -6,6 +6,7 @@ import { EventBusService } from '../../../core/events/event-bus.service';
 
 import {
   CreateComponentDto,
+  InstallComponentDto,
   ListComponentsDto,
   UpdateComponentDto,
 } from '../dto/components.dto';
@@ -225,6 +226,30 @@ export class ComponentsService {
     });
   }
 
+  deliver(id: string) {
+    return this.transitionProjectStatus(
+      id,
+      ComponentStatus.SHIPPED,
+      ComponentStatus.DELIVERED,
+      'Component delivered to project',
+    );
+  }
+
+  install(id: string, dto: InstallComponentDto) {
+    return this.transitionProjectStatus(
+      id,
+      ComponentStatus.DELIVERED,
+      ComponentStatus.INSTALLED,
+      `Component installed at project: ${dto.installZone} / ${dto.installAxis} / ${dto.installLevel} / ${dto.installPosition}`,
+      {
+        installZone: dto.installZone,
+        installAxis: dto.installAxis,
+        installLevel: dto.installLevel,
+        installPosition: dto.installPosition,
+      },
+    );
+  }
+
   getComponentUploadResponse(file: Express.Multer.File) {
     return {
       imageUrl: `/uploads/components/${file.filename}`,
@@ -245,6 +270,66 @@ export class ComponentsService {
     }
 
     return component;
+  }
+
+  private transitionProjectStatus(
+    id: string,
+    from: ComponentStatus,
+    to: ComponentStatus,
+    note: string,
+    installation?: Pick<
+      InstallComponentDto,
+      'installZone' | 'installAxis' | 'installLevel' | 'installPosition'
+    >,
+  ) {
+    return this.repository
+      .transaction(async (tx) => {
+        const current = await this.assertExists(id, tx);
+
+        if (current.status !== from) {
+          throw new BadRequestException(
+            `Component must be ${from} before it can be ${to}`,
+          );
+        }
+
+        const component = await this.repository.update(
+          id,
+          {
+            status: to,
+            installedDate: to === ComponentStatus.INSTALLED ? new Date() : undefined,
+            installZone: installation?.installZone,
+            installAxis: installation?.installAxis,
+            installLevel: installation?.installLevel,
+            installPosition: installation?.installPosition,
+          },
+          tx,
+        );
+
+        await this.repository.createTimeline(
+          {
+            component: {
+              connect: {
+                id,
+              },
+            },
+            action: to,
+            note,
+          },
+          tx,
+        );
+
+        await this.log(to, component.id, component, tx);
+
+        return component;
+      })
+      .then((component) => {
+        void this.eventBus.emit('component.updated', {
+          id: component.id,
+          changedFields: ['status', 'installedDate'],
+        });
+
+        return component;
+      });
   }
 
   private log(

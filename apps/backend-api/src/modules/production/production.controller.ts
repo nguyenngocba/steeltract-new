@@ -21,12 +21,21 @@ import {
   createMachineSchema,
   createBomSchema,
   createMaterialIssueSchema,
+  createProductionConsumptionSchema,
   createProductionLogSchema,
   createProductionOrderSchema,
+  createProductionReservationSchema,
   createProductionScheduleSchema,
   createProductionTaskSchema,
   createWorkCenterSchema,
+  issueFromReservationSchema,
+  listProductionConsumptionsSchema,
   listProductionOrdersSchema,
+  listProductionMaterialLedgerSchema,
+  listProductionReservationsSchema,
+  releaseProductionReservationSchema,
+  reserveProductionReservationSchema,
+  returnMaterialIssueSchema,
   stageProductionToYardSchema,
   startProductionSchema,
   updateProductionOrderSchema,
@@ -36,6 +45,9 @@ import {
 } from './dto/production.dto';
 import { BOMService } from './services/bom.service';
 import { MaterialIssueService } from './services/material-issue.service';
+import { ProductionConsumptionService } from './services/production-consumption.service';
+import { ProductionMaterialLedgerService } from './services/production-material-ledger.service';
+import { ProductionReservationService } from './services/production-reservation.service';
 import { ProductionService } from './services/production.service';
 
 import type {
@@ -44,12 +56,21 @@ import type {
   CreateMachineDto,
   CreateBomDto,
   CreateMaterialIssueDto,
+  CreateProductionConsumptionDto,
   CreateProductionLogDto,
   CreateProductionOrderDto,
+  CreateProductionReservationDto,
   CreateProductionScheduleDto,
   CreateProductionTaskDto,
   CreateWorkCenterDto,
+  IssueFromReservationDto,
+  ListProductionConsumptionsDto,
+  ListProductionMaterialLedgerDto,
   ListProductionOrdersDto,
+  ListProductionReservationsDto,
+  ReleaseProductionReservationDto,
+  ReturnMaterialIssueDto,
+  ReserveProductionReservationDto,
   StageProductionToYardDto,
   StartProductionDto,
   UpdateProductionOrderDto,
@@ -69,6 +90,9 @@ export class ProductionController {
     private readonly productionService: ProductionService,
     private readonly bomService: BOMService,
     private readonly materialIssueService: MaterialIssueService,
+    private readonly productionConsumptionService: ProductionConsumptionService,
+    private readonly productionMaterialLedgerService: ProductionMaterialLedgerService,
+    private readonly productionReservationService: ProductionReservationService,
   ) {}
 
   @Get()
@@ -183,9 +207,136 @@ export class ProductionController {
     return this.materialIssueService.update(id, body);
   }
 
+  @Post('material-issues/:id/return')
+  returnMaterialIssue(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(returnMaterialIssueSchema))
+    body: ReturnMaterialIssueDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.materialIssueService.returnIssue(id, body, request.user?.id);
+  }
+
+  @Get('reservations')
+  listReservations(
+    @Query(new ZodValidationPipe(listProductionReservationsSchema))
+    query: ListProductionReservationsDto,
+  ) {
+    return this.productionReservationService.findAll(query);
+  }
+
+  @Get('reservations/:id')
+  findReservation(@Param('id') id: string) {
+    return this.productionReservationService.findOne(id);
+  }
+
+  @Post('reservations/:id/reserve')
+  reserveReservation(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(reserveProductionReservationSchema))
+    body: ReserveProductionReservationDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionReservationService.reserve(
+      id,
+      body,
+      request.user?.id,
+    );
+  }
+
+  @Post('reservations/:id/release')
+  releaseReservation(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(releaseProductionReservationSchema))
+    body: ReleaseProductionReservationDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionReservationService.release(id, body, request.user?.id);
+  }
+
+  @Post('reservations/:id/expire')
+  expireReservation(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(releaseProductionReservationSchema))
+    body: ReleaseProductionReservationDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionReservationService.expire(id, body, request.user?.id);
+  }
+
+  @Post('reservations/:id/issue')
+  issueReservation(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(issueFromReservationSchema))
+    body: IssueFromReservationDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.materialIssueService.issueFromReservation(
+      id,
+      body,
+      request.user?.id,
+    );
+  }
+
   @Get('logs')
   listLogs() {
     return this.productionService.listLogs();
+  }
+
+  @Get('material-ledger')
+  listMaterialLedger(
+    @Query(new ZodValidationPipe(listProductionMaterialLedgerSchema))
+    query: ListProductionMaterialLedgerDto,
+  ) {
+    return this.productionMaterialLedgerService.findAll(query);
+  }
+
+  @Get('material-ledger/:id')
+  findMaterialLedger(@Param('id') id: string) {
+    return this.productionMaterialLedgerService.findOne(id);
+  }
+
+  @Get('consumptions')
+  listConsumptions(
+    @Query(new ZodValidationPipe(listProductionConsumptionsSchema))
+    query: ListProductionConsumptionsDto,
+  ) {
+    return this.productionConsumptionService.findAll(query);
+  }
+
+  @Get(':id/reservation-preview')
+  reservationPreview(@Param('id') id: string) {
+    return this.productionReservationService.preview(id);
+  }
+
+  @Get(':id/consumptions')
+  consumptionsByOrder(@Param('id') id: string) {
+    return this.productionConsumptionService.findByProductionOrder(id);
+  }
+
+  @Get(':id/material-ledger')
+  materialLedgerByOrder(@Param('id') id: string) {
+    return this.productionMaterialLedgerService.findByProductionOrder(id);
+  }
+
+  @Post(':id/reservations')
+  createReservation(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(createProductionReservationSchema))
+    body: CreateProductionReservationDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionReservationService.create(id, body, request.user?.id);
+  }
+
+  @Post(':id/consume')
+  consumeMaterial(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(createProductionConsumptionSchema))
+    body: CreateProductionConsumptionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionConsumptionService.consume(id, body, request.user?.id);
   }
 
   @Get(':id')
@@ -235,6 +386,17 @@ export class ProductionController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.productionService.stageToYard(id, body, request.user?.id);
+  }
+
+  @Post(':id/component')
+  createComponentFromProduction(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.createComponentFromProductionOrder(
+      id,
+      request.user?.id,
+    );
   }
 
   @Post(':id/tasks')

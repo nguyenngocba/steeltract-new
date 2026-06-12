@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   MachineStatus,
   ProductionLogType,
+  ProductionMaterialLedgerEventType,
+  ProductionMaterialReservationStatus,
   ProductionOrderStatus,
   ProductionStageCode,
   ProductionTaskStatus,
@@ -203,9 +205,13 @@ export const updateBomSchema = createBomSchema.partial();
 export const createMaterialIssueSchema = z.object({
   issueNo: z.string().min(1).optional(),
   productionOrderId: z.string().min(1),
+  reservationId: z.string().optional(),
+  reservationLineId: z.string().optional(),
   inventoryItemId: z.string().min(1),
   warehouseId: z.string().optional(),
   zoneId: z.string().optional(),
+  slotId: z.string().optional(),
+  level: z.string().optional(),
   issuedQty: z.coerce.number().positive(),
   issuedDate: z
     .union([z.string(), z.date()])
@@ -215,10 +221,77 @@ export const createMaterialIssueSchema = z.object({
   remarks: z.string().optional(),
 });
 
+export const issueReservationLineSchema = z.object({
+  reservationLineId: z.string().min(1),
+  quantity: z.coerce.number().positive().optional(),
+});
+
+export const issueFromReservationSchema = z.object({
+  lines: z.array(issueReservationLineSchema).optional(),
+  remarks: z.string().optional(),
+});
+
+export const returnMaterialIssueSchema = z.object({
+  quantity: z.coerce.number().positive().optional(),
+  remarks: z.string().optional(),
+});
+
 export const updateMaterialIssueSchema = z.object({
   status: z.enum(['DRAFT', 'ISSUED', 'RETURNED']),
   remarks: z.string().optional(),
 });
+
+export const listProductionReservationsSchema = z.object({
+  productionOrderId: z.string().optional(),
+  status: z.nativeEnum(ProductionMaterialReservationStatus).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+export const createProductionReservationSchema = z.object({
+  note: z.string().optional(),
+  expiresAt: dateSchema,
+  autoReserve: z.coerce.boolean().default(false),
+});
+
+export const reserveProductionReservationSchema = z.object({
+  note: z.string().optional(),
+});
+
+export const releaseProductionReservationSchema = z.object({
+  note: z.string().optional(),
+});
+
+export const listProductionMaterialLedgerSchema = z.object({
+  productionOrderId: z.string().optional(),
+  reservationId: z.string().optional(),
+  inventoryItemId: z.string().optional(),
+  warehouseId: z.string().optional(),
+  zoneId: z.string().optional(),
+  eventType: z.nativeEnum(ProductionMaterialLedgerEventType).optional(),
+  fromDate: dateSchema,
+  toDate: dateSchema,
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
+});
+
+export const listProductionConsumptionsSchema = z.object({
+  productionOrderId: z.string().optional(),
+  inventoryItemId: z.string().optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
+});
+
+export const createProductionConsumptionSchema = z
+  .object({
+    inventoryItemId: z.string().min(1),
+    consumedQty: z.coerce.number().nonnegative().default(0),
+    scrapQty: z.coerce.number().nonnegative().default(0),
+    remark: z.string().optional(),
+  })
+  .refine((value) => value.consumedQty > 0 || value.scrapQty > 0, {
+    message: 'Consumed or scrap quantity must be greater than zero',
+  });
 
 export type CreateProductionOrderDto = z.infer<
   typeof createProductionOrderSchema
@@ -252,4 +325,29 @@ export type CreateProductionScheduleDto = z.infer<
 export type CreateBomDto = z.infer<typeof createBomSchema>;
 export type UpdateBomDto = z.infer<typeof updateBomSchema>;
 export type CreateMaterialIssueDto = z.infer<typeof createMaterialIssueSchema>;
+export type IssueFromReservationDto = z.infer<
+  typeof issueFromReservationSchema
+>;
+export type ReturnMaterialIssueDto = z.infer<typeof returnMaterialIssueSchema>;
 export type UpdateMaterialIssueDto = z.infer<typeof updateMaterialIssueSchema>;
+export type ListProductionReservationsDto = z.infer<
+  typeof listProductionReservationsSchema
+>;
+export type CreateProductionReservationDto = z.infer<
+  typeof createProductionReservationSchema
+>;
+export type ReserveProductionReservationDto = z.infer<
+  typeof reserveProductionReservationSchema
+>;
+export type ReleaseProductionReservationDto = z.infer<
+  typeof releaseProductionReservationSchema
+>;
+export type ListProductionMaterialLedgerDto = z.infer<
+  typeof listProductionMaterialLedgerSchema
+>;
+export type ListProductionConsumptionsDto = z.infer<
+  typeof listProductionConsumptionsSchema
+>;
+export type CreateProductionConsumptionDto = z.infer<
+  typeof createProductionConsumptionSchema
+>;

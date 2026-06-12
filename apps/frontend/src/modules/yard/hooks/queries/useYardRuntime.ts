@@ -15,6 +15,9 @@ const useYardRuntimeMutation = <T,>(mutationFn: (payload: T) => Promise<unknown>
     mutationFn,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['yard'] })
+      queryClient.invalidateQueries({ queryKey: ['components'] })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

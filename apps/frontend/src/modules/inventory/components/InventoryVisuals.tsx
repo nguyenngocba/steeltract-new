@@ -45,7 +45,7 @@ export function InventoryKpi({
     cyan: 'from-cyan-500 to-blue-400',
   }[tone]
   return (
-    <section className={`${inventoryPanel} p-3`}>
+    <section className={`${inventoryPanel} p-3 h-[100px]`}>
       <div className={`mb-2 h-1 w-14 rounded-full bg-gradient-to-r ${toneClass}`} />
       <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400">{title}</p>
       <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">{value}</h2>
@@ -251,7 +251,7 @@ export function InventoryChartCard({
   className?: string
 }) {
   return (
-    <section className={`${inventoryPanel} overflow-hidden p-3 ${className}`}>
+    <section className={`${inventoryPanel} overflow-hidden p-2 ${className}`}>
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</h3>
@@ -285,7 +285,7 @@ export function CompactDonutSummary({
     .join(', ')
 
   return (
-    <div className="grid min-h-[150px] grid-cols-[126px_1fr] items-center gap-3">
+    <div className="grid min-h-[10px] grid-cols-[126px_1fr] items-center gap-3">
       <div className="relative h-28 w-28 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.2)]" style={{ background: `conic-gradient(${gradient})` }}>
         <div className="absolute inset-3 rounded-full bg-[#08111f]" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">

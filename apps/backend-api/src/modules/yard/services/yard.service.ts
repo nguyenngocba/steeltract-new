@@ -4,7 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { Prisma, YardMovementType, YardSlotStatus } from '@prisma/client';
+import {
+  ComponentStatus,
+  Prisma,
+  YardItemType,
+  YardMovementType,
+  YardSlotStatus,
+} from '@prisma/client';
 
 import { EventBusService } from '../../../core/events/event-bus.service';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
@@ -405,14 +411,71 @@ export class YardService {
         throw new BadRequestException('Placement is already removed');
       }
 
+      const existingMetadata = this.objectMetadata(existing.metadata);
+      const requestMetadata = this.objectMetadata(dto.metadata);
+      const mergedMetadata = {
+        ...existingMetadata,
+        ...requestMetadata,
+        outboundAt: new Date().toISOString(),
+      };
+
       const updated = await this.repository.updatePlacement(
         id,
         {
           removedAt: new Date(),
-          metadata: this.toJson(dto.metadata),
+          metadata: this.toJson(mergedMetadata),
         },
         tx,
       );
+
+      if (existing.itemType === YardItemType.COMPONENT) {
+        const component = await tx.component.findUnique({
+          where: { id: existing.itemId },
+          select: {
+            id: true,
+            projectId: true,
+          },
+        });
+
+        if (!component) {
+          throw new NotFoundException('Component not found for yard placement');
+        }
+
+        const productionOrderId =
+          typeof existingMetadata.productionOrderId === 'string'
+            ? existingMetadata.productionOrderId
+            : undefined;
+        const productionOrder = productionOrderId
+          ? await tx.productionOrder.findUnique({
+              where: { id: productionOrderId },
+              select: { projectId: true },
+            })
+          : null;
+        const projectId = component.projectId ?? productionOrder?.projectId;
+
+        await tx.component.update({
+          where: { id: component.id },
+          data: {
+            status: ComponentStatus.SHIPPED,
+            projectId,
+            floor: null,
+            zone: null,
+            position: null,
+            x: 0,
+            y: 0,
+          },
+        });
+
+        await tx.componentTimeline.create({
+          data: {
+            componentId: component.id,
+            action: ComponentStatus.SHIPPED,
+            note:
+              dto.reason ??
+              `Outbound from yard placement ${existing.itemCode}`,
+          },
+        });
+      }
 
       await this.repository.createMovement(
         {
@@ -425,7 +488,7 @@ export class YardService {
           crane: dto.craneId ? { connect: { id: dto.craneId } } : undefined,
           movedById: actorId,
           reason: dto.reason,
-          metadata: this.toJson(dto.metadata),
+          metadata: this.toJson(mergedMetadata),
         },
         tx,
       );
@@ -436,6 +499,10 @@ export class YardService {
         metadata: {
           itemCode: updated.itemCode,
           slotId: existing.slotId,
+          componentStatus:
+            existing.itemType === YardItemType.COMPONENT
+              ? ComponentStatus.SHIPPED
+              : undefined,
         },
       });
 
@@ -772,6 +839,14 @@ export class YardService {
 
   private toJson(value: unknown) {
     return value === undefined ? undefined : (value as Prisma.InputJsonValue);
+  }
+
+  private objectMetadata(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as Record<string, unknown>;
   }
 
   private paginated<T>(data: T[], page: number, limit: number, total: number) {

@@ -8,8 +8,10 @@ import {
   createComponent,
   createProductionOrder,
   deleteComponent,
+  getComponentCosting,
   getComponents,
   getProductionOrders,
+  recalculateComponentCosting,
 } from '../../services/api/components.api'
 
 export function useComponents() {
@@ -44,6 +46,33 @@ export function useDeleteComponent() {
       })
       queryClient.invalidateQueries({
         queryKey: ['production', 'components'],
+      })
+    },
+  })
+}
+
+export function useComponentCosting(componentId?: string) {
+  return useQuery({
+    queryKey: ['components', 'costing', componentId],
+    queryFn: () => getComponentCosting(componentId!),
+    enabled: Boolean(componentId),
+  })
+}
+
+export function useRecalculateComponentCosting() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: recalculateComponentCosting,
+    onSuccess: (_data, componentId) => {
+      queryClient.invalidateQueries({
+        queryKey: ['components'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['components', 'costing', componentId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['projects'],
       })
     },
   })

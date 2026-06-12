@@ -20,22 +20,28 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 import type {
   CreateComponentDto,
+  InstallComponentDto,
   ListComponentsDto,
   UpdateComponentDto,
 } from './dto/components.dto';
 
 import {
   createComponentSchema,
+  installComponentSchema,
   listComponentsSchema,
   updateComponentSchema,
 } from './dto/components.dto';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { ComponentCostingService } from './services/component-costing.service';
 import { ComponentsService } from './services/components.service';
 
 @Controller('components')
 export class ComponentsController {
-  constructor(private readonly componentsService: ComponentsService) {}
+  constructor(
+    private readonly componentsService: ComponentsService,
+    private readonly componentCostingService: ComponentCostingService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -44,6 +50,43 @@ export class ComponentsController {
     query: ListComponentsDto,
   ) {
     return this.componentsService.findAll(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/costing')
+  costing(@Param('id') id: string) {
+    return this.componentCostingService.findByComponent(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/costing/recalculate')
+  recalculateCosting(@Param('id') id: string) {
+    return this.componentCostingService.recalculate(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/deliver')
+  deliver(@Param('id') id: string) {
+    return this.componentsService.deliver(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/install')
+  install(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(installComponentSchema))
+    body: InstallComponentDto,
+  ) {
+    return this.componentsService.install(id, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  create(
+    @Body(new ZodValidationPipe(createComponentSchema))
+    body: CreateComponentDto,
+  ) {
+    return this.componentsService.create(body);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -56,15 +99,6 @@ export class ComponentsController {
   @Get(':id/timeline')
   timeline(@Param('id') id: string) {
     return this.componentsService.timeline(id);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post()
-  create(
-    @Body(new ZodValidationPipe(createComponentSchema))
-    body: CreateComponentDto,
-  ) {
-    return this.componentsService.create(body);
   }
 
   @UseGuards(JwtAuthGuard)

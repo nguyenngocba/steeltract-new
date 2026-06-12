@@ -8,9 +8,11 @@ import { ProductionBomModal } from '../../../production/components/ProductionBom
 import { useProductionBoms } from '../../../production/hooks/useProductionCockpit'
 import {
   useComponents,
+  useComponentCosting,
   useCreateComponent,
   useDeleteComponent,
   useProductionOrders,
+  useRecalculateComponentCosting,
 } from '../../hooks/queries/useComponents'
 import {
   ComponentsDonut,
@@ -35,6 +37,10 @@ type ComponentRow = {
   profile: string
   project: string
   location: string
+  installZone?: string | null
+  installAxis?: string | null
+  installLevel?: string | null
+  installPosition?: string | null
   status: 'Tồn kho' | 'Đang SX' | 'Đã QC' | 'Chờ QC' | 'Không đạt'
   qty: number
   qc: number
@@ -55,6 +61,7 @@ export function ComponentsListPage() {
   const { data: productionBoms = [] } = useProductionBoms()
   const createComponent = useCreateComponent()
   const deleteComponent = useDeleteComponent()
+  const recalculateCosting = useRecalculateComponentCosting()
   const [project, setProject] = useState('')
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')
@@ -68,6 +75,7 @@ export function ComponentsListPage() {
   const [bomOpen, setBomOpen] = useState(false)
   const [bomComponentId, setBomComponentId] = useState('')
   const [selected, setSelected] = useState<ComponentRow | null>(null)
+  const { data: selectedCosting, error: costingError } = useComponentCosting(selected?.id)
 
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -123,6 +131,10 @@ export function ComponentsListPage() {
         profile: metadata.profile ?? 'N/A',
         project: record.project?.code ?? record.project?.name ?? 'Chưa gán dự án',
         location: [record.floor, record.zone, record.position].filter(Boolean).join(' / ') || 'Kho cấu kiện',
+        installZone: record.installZone,
+        installAxis: record.installAxis,
+        installLevel: record.installLevel,
+        installPosition: record.installPosition,
         status: statusMap[record.status] ?? 'Tồn kho',
         qty: metadata.quantity ?? 1,
         qc: metadata.qcQuantity ?? (record.status === 'READY' ? metadata.quantity ?? 1 : 0),
@@ -202,6 +214,18 @@ export function ComponentsListPage() {
       }
     } catch {
       toast.error('Không thể xóa cấu kiện')
+    }
+  }
+
+  async function recalculateSelectedCosting() {
+    if (!selected) return
+
+    try {
+      await recalculateCosting.mutateAsync(selected.id)
+      toast.success('Đã tính lại chi phí cấu kiện')
+    } catch (error) {
+      const raw = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
+      toast.error(Array.isArray(raw) ? raw.join(', ') : raw || 'Không thể tính chi phí cấu kiện')
     }
   }
 
@@ -446,6 +470,19 @@ export function ComponentsListPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-3">
+                <div className="text-sm font-semibold text-white">Vị trí lắp đặt</div>
+                <div className="mt-1 text-xs text-slate-500">Thông tin được ghi khi xác nhận lắp đặt tại công trình.</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <CostMetric title="Khu vực" value={selected.installZone ?? '-'} />
+                <CostMetric title="Trục" value={selected.installAxis ?? '-'} />
+                <CostMetric title="Tầng" value={selected.installLevel ?? '-'} />
+                <CostMetric title="Vị trí" value={selected.installPosition ?? '-'} />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-white">Production BOM liên kết</div>
@@ -482,9 +519,50 @@ export function ComponentsListPage() {
                 </tbody>
               </table>
             </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-white">Costing cấu kiện</div>
+                  <div className="mt-1 text-xs text-slate-500">Chi phí thực tế tính từ production consumption và giá vốn bình quân vật tư.</div>
+                </div>
+                <button onClick={() => void recalculateSelectedCosting()} disabled={recalculateCosting.isPending} className={componentsMutedButton}>Tính lại costing</button>
+              </div>
+              {costingError ? (
+                <div className="rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-xs text-amber-200">
+                  Chưa đủ dữ liệu costing. Cấu kiện cần có lệnh sản xuất và consumption records.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                  <CostMetric title="Estimated Cost" value={money(selectedCosting?.estimatedCost)} />
+                  <CostMetric title="Actual Cost" value={money(selectedCosting?.actualCost)} tone="text-emerald-300" />
+                  <CostMetric title="Variance" value={money(selectedCosting?.varianceCost)} tone={(selectedCosting?.varianceCost ?? 0) > 0 ? 'text-red-300' : 'text-cyan-300'} />
+                  <CostMetric title="Material Cost" value={money(selectedCosting?.actualMaterialCost)} tone="text-cyan-300" />
+                  <CostMetric title="Labor Cost" value={money(selectedCosting?.laborCost)} />
+                  <CostMetric title="Machine Cost" value={money(selectedCosting?.machineCost)} />
+                  <CostMetric title="Overhead Cost" value={money(selectedCosting?.overheadCost)} />
+                  <CostMetric title="MO" value={selectedCosting?.productionOrder?.orderNo ?? '-'} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
     </EnterpriseModulePage>
+  )
+}
+
+function money(value?: number | null) {
+  return new Intl.NumberFormat('vi-VN', {
+    maximumFractionDigits: 0,
+  }).format(Number(value ?? 0))
+}
+
+function CostMetric({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-950/55 p-3">
+      <div className="text-[11px] text-slate-500">{title}</div>
+      <div className={`mt-1 text-base font-semibold ${tone}`}>{value}</div>
+    </div>
   )
 }

@@ -1,0 +1,697 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import {
+  Prisma,
+  ProductionMaterialLedgerEventType,
+  ProductionMaterialReservationStatus,
+  ProductionMaterialReservationLineStatus,
+} from '@prisma/client';
+
+import { PrismaService } from '../../../core/prisma/prisma.service';
+import {
+  CreateProductionReservationDto,
+  ListProductionReservationsDto,
+  ReserveProductionReservationDto,
+  ReleaseProductionReservationDto,
+} from '../dto/production.dto';
+import { ProductionMaterialLedgerService } from './production-material-ledger.service';
+
+const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
+  ProductionMaterialReservationStatus.RESERVED,
+  ProductionMaterialReservationStatus.PARTIALLY_ISSUED,
+];
+
+const epsilon = 0.000001;
+
+type StockBucket = {
+  warehouseId?: string;
+  warehouseCode?: string;
+  warehouseName?: string;
+  zoneId?: string;
+  zoneCode?: string;
+  zoneName?: string;
+  slotId?: string;
+  level?: string;
+  quantity: number;
+};
+
+type ReservationAllocation = {
+  warehouseId?: string;
+  zoneId?: string;
+  slotId?: string;
+  level?: string;
+  reservedQty: number;
+};
+
+type PreviewLine = {
+  bomItemId: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  unit?: string | null;
+  requiredQty: number;
+  availableQty: number;
+  alreadyReservedQty: number;
+  reservableQty: number;
+  shortageQty: number;
+  allocations: Array<
+    ReservationAllocation & {
+      warehouseCode?: string;
+      warehouseName?: string;
+      zoneCode?: string;
+      zoneName?: string;
+      availableQty: number;
+    }
+  >;
+};
+
+@Injectable()
+export class ProductionReservationService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly materialLedgerService: ProductionMaterialLedgerService,
+  ) {}
+
+  findAll(query: ListProductionReservationsDto = {}) {
+    return this.prisma.productionMaterialReservation.findMany({
+      where: {
+        productionOrderId: query.productionOrderId,
+        status: query.status,
+      },
+      include: this.reservationInclude(),
+      orderBy: { createdAt: 'desc' },
+      take: query.limit,
+      skip: query.page && query.limit ? (query.page - 1) * query.limit : undefined,
+    });
+  }
+
+  async findOne(id: string) {
+    const reservation =
+      await this.prisma.productionMaterialReservation.findUnique({
+        where: { id },
+        include: this.reservationInclude(),
+      });
+
+    if (!reservation) {
+      throw new NotFoundException('Production material reservation not found');
+    }
+
+    return reservation;
+  }
+
+  async preview(productionOrderId: string) {
+    const order = await this.getOrderWithBom(productionOrderId);
+    const lines = await this.buildPreviewLines(order);
+
+    return {
+      productionOrderId: order.id,
+      orderNo: order.orderNo,
+      bomId: order.bomId,
+      status: lines.some((line) => line.shortageQty > epsilon)
+        ? 'SHORTAGE'
+        : 'READY',
+      totalRequiredQty: this.sum(lines.map((line) => line.requiredQty)),
+      totalAvailableQty: this.sum(lines.map((line) => line.availableQty)),
+      totalAlreadyReservedQty: this.sum(
+        lines.map((line) => line.alreadyReservedQty),
+      ),
+      totalReservableQty: this.sum(lines.map((line) => line.reservableQty)),
+      totalShortageQty: this.sum(lines.map((line) => line.shortageQty)),
+      lines,
+    };
+  }
+
+  async create(
+    productionOrderId: string,
+    dto: CreateProductionReservationDto,
+    actorId?: string,
+  ) {
+    const order = await this.getOrderWithBom(productionOrderId);
+    const reservation = await this.prisma.productionMaterialReservation.create({
+      data: {
+        reservationNo: await this.nextReservationNo(order.orderNo),
+        productionOrderId: order.id,
+        bomId: order.bomId,
+        expiresAt: dto.expiresAt,
+        note: dto.note,
+        lines: {
+          create: (order.bom?.items ?? []).map((item) => ({
+            bomItemId: item.id,
+            inventoryItemId: item.materialId,
+            requiredQty:
+              item.quantity * (1 + item.wastePercent / 100) * order.quantity,
+            status: ProductionMaterialReservationLineStatus.OPEN,
+          })),
+        },
+      },
+      include: this.reservationInclude(),
+    });
+
+    if (dto.autoReserve) {
+      return this.reserve(reservation.id, { note: dto.note }, actorId);
+    }
+
+    await this.materialLedgerService.createReservationEntries({
+      productionOrderId: reservation.productionOrderId,
+      reservationId: reservation.id,
+      eventType: ProductionMaterialLedgerEventType.RESERVE,
+      lines: reservation.lines.map((line) => ({
+        inventoryItemId: line.inventoryItemId,
+        warehouseId: line.warehouseId,
+        zoneId: line.zoneId,
+        slotId: line.slotId,
+        level: line.level,
+        quantity: line.requiredQty,
+      })),
+      remark: dto.note ?? `Reservation ${reservation.reservationNo} created as draft`,
+      createdBy: actorId,
+    });
+
+    return reservation;
+  }
+
+  async reserve(
+    id: string,
+    dto: ReserveProductionReservationDto = {},
+    actorId?: string,
+  ) {
+    const existing = await this.findOne(id);
+    if (existing.status !== ProductionMaterialReservationStatus.DRAFT) {
+      throw new BadRequestException('Only draft reservations can be reserved');
+    }
+
+    const order = await this.getOrderWithBom(existing.productionOrderId);
+    const previewLines = await this.buildPreviewLines(order, existing.id);
+    const shortages = previewLines.filter((line) => line.shortageQty > epsilon);
+    if (shortages.length) {
+      throw new BadRequestException(
+        `Không đủ vật tư kho SX để giữ chỗ: ${shortages
+          .map(
+            (line) =>
+              `${line.materialCode} thiếu ${line.shortageQty.toLocaleString('vi-VN')}`,
+          )
+          .join('; ')}`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.productionMaterialReservationLine.deleteMany({
+        where: { reservationId: id },
+      });
+
+      const ledgerLines: Array<{
+        inventoryItemId: string;
+        warehouseId?: string;
+        zoneId?: string;
+        slotId?: string;
+        level?: string;
+        quantity: number;
+      }> = [];
+
+      for (const line of previewLines) {
+        for (const allocation of line.allocations) {
+          if (allocation.reservedQty <= epsilon) continue;
+          await tx.productionMaterialReservationLine.create({
+            data: {
+              reservationId: id,
+              bomItemId: line.bomItemId,
+              inventoryItemId: line.materialId,
+              warehouseId: allocation.warehouseId,
+              zoneId: allocation.zoneId,
+              slotId: allocation.slotId,
+              level: allocation.level,
+              requiredQty: allocation.reservedQty,
+              reservedQty: allocation.reservedQty,
+              status: ProductionMaterialReservationLineStatus.OPEN,
+            },
+          });
+          ledgerLines.push({
+            inventoryItemId: line.materialId,
+            warehouseId: allocation.warehouseId,
+            zoneId: allocation.zoneId,
+            slotId: allocation.slotId,
+            level: allocation.level,
+            quantity: allocation.reservedQty,
+          });
+        }
+      }
+
+      await tx.productionMaterialReservation.update({
+        where: { id },
+        data: {
+          status: ProductionMaterialReservationStatus.RESERVED,
+          reservedAt: new Date(),
+          reservedBy: actorId,
+          note: dto.note ?? existing.note,
+        },
+      });
+
+      await this.materialLedgerService.createReservationEntries(
+        {
+          productionOrderId: existing.productionOrderId,
+          reservationId: existing.id,
+          eventType: ProductionMaterialLedgerEventType.RESERVE,
+          lines: ledgerLines,
+          remark: dto.note ?? `Reservation ${existing.reservationNo} reserved`,
+          createdBy: actorId,
+        },
+        tx,
+      );
+    });
+
+    return this.findOne(id);
+  }
+
+  async release(
+    id: string,
+    dto: ReleaseProductionReservationDto = {},
+    actorId?: string,
+  ) {
+    const reservation = await this.findOne(id);
+    if (!activeReservationStatuses.includes(reservation.status)) {
+      throw new BadRequestException('Only active reservations can be released');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.materialLedgerService.createReservationEntries(
+        {
+          productionOrderId: reservation.productionOrderId,
+          reservationId: reservation.id,
+          eventType: ProductionMaterialLedgerEventType.RELEASE,
+          lines: reservation.lines.map((line) => ({
+            inventoryItemId: line.inventoryItemId,
+            warehouseId: line.warehouseId,
+            zoneId: line.zoneId,
+            slotId: line.slotId,
+            level: line.level,
+            quantity: -Math.max(
+              Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+              0,
+            ),
+          })),
+          remark: dto.note ?? `Reservation ${reservation.reservationNo} released`,
+          createdBy: actorId,
+        },
+        tx,
+      );
+
+      await tx.productionMaterialReservation.update({
+        where: { id },
+        data: {
+          status: ProductionMaterialReservationStatus.CANCELLED,
+          releasedAt: new Date(),
+          note: dto.note ?? reservation.note,
+          lines: {
+            updateMany: {
+              where: {},
+              data: {
+                status: ProductionMaterialReservationLineStatus.RELEASED,
+                reservedQty: 0,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    return this.findOne(id);
+  }
+
+  async expire(
+    id: string,
+    dto: ReleaseProductionReservationDto = {},
+    actorId?: string,
+  ) {
+    const reservation = await this.findOne(id);
+    if (
+      ![
+        ProductionMaterialReservationStatus.DRAFT,
+        ...activeReservationStatuses,
+      ].includes(reservation.status)
+    ) {
+      throw new BadRequestException('Reservation cannot be expired');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.materialLedgerService.createReservationEntries(
+        {
+          productionOrderId: reservation.productionOrderId,
+          reservationId: reservation.id,
+          eventType: ProductionMaterialLedgerEventType.RELEASE,
+          lines: reservation.lines.map((line) => ({
+            inventoryItemId: line.inventoryItemId,
+            warehouseId: line.warehouseId,
+            zoneId: line.zoneId,
+            slotId: line.slotId,
+            level: line.level,
+            quantity: -Math.max(
+              Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+              0,
+            ),
+          })),
+          remark: dto.note ?? `Reservation ${reservation.reservationNo} expired`,
+          createdBy: actorId,
+        },
+        tx,
+      );
+
+      await tx.productionMaterialReservation.update({
+        where: { id },
+        data: {
+          status: ProductionMaterialReservationStatus.EXPIRED,
+          releasedAt: new Date(),
+          note: dto.note ?? reservation.note,
+          lines: {
+            updateMany: {
+              where: {},
+              data: {
+                status: ProductionMaterialReservationLineStatus.RELEASED,
+                reservedQty: 0,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    return this.findOne(id);
+  }
+
+  private async buildPreviewLines(
+    order: Prisma.ProductionOrderGetPayload<{
+      include: {
+        bom: {
+          include: {
+            items: {
+              include: { material: { include: { unitMaster: true } } };
+            };
+          };
+        };
+      };
+    }>,
+    excludeReservationId?: string,
+  ): Promise<PreviewLine[]> {
+    const bomItems = order.bom?.items ?? [];
+    const materialIds = [...new Set(bomItems.map((item) => item.materialId))];
+    const [stockBuckets, reservedByMaterial] = await Promise.all([
+      this.productionStockBuckets(materialIds),
+      this.activeReservedQuantityByMaterial(materialIds, excludeReservationId),
+    ]);
+
+    return bomItems.map((item) => {
+      const requiredQty =
+        item.quantity * (1 + item.wastePercent / 100) * order.quantity;
+      const buckets = [...(stockBuckets.get(item.materialId) ?? [])]
+        .filter((bucket) => bucket.quantity > epsilon)
+        .sort((a, b) =>
+          `${a.zoneCode ?? ''}-${a.slotId ?? ''}-${a.level ?? ''}`.localeCompare(
+            `${b.zoneCode ?? ''}-${b.slotId ?? ''}-${b.level ?? ''}`,
+          ),
+        );
+      const alreadyReservedQty =
+        reservedByMaterial.get(item.materialId) ?? 0;
+      let reservedRemaining = alreadyReservedQty;
+      let requiredRemaining = requiredQty;
+
+      const allocations: PreviewLine['allocations'] = [];
+      for (const bucket of buckets) {
+        const freeQty = Math.max(bucket.quantity - reservedRemaining, 0);
+        reservedRemaining = Math.max(reservedRemaining - bucket.quantity, 0);
+        if (freeQty <= epsilon || requiredRemaining <= epsilon) continue;
+        const reserveQty = Math.min(freeQty, requiredRemaining);
+        allocations.push({
+          warehouseId: bucket.warehouseId,
+          warehouseCode: bucket.warehouseCode,
+          warehouseName: bucket.warehouseName,
+          zoneId: bucket.zoneId,
+          zoneCode: bucket.zoneCode,
+          zoneName: bucket.zoneName,
+          slotId: bucket.slotId,
+          level: bucket.level,
+          availableQty: freeQty,
+          reservedQty: reserveQty,
+        });
+        requiredRemaining -= reserveQty;
+      }
+
+      const availableQty = this.sum(buckets.map((bucket) => bucket.quantity));
+      const reservableQty = this.sum(
+        allocations.map((allocation) => allocation.reservedQty),
+      );
+
+      return {
+        bomItemId: item.id,
+        materialId: item.materialId,
+        materialCode: item.material.code,
+        materialName: item.material.name,
+        unit: item.material.unitMaster?.symbol ?? item.material.unit,
+        requiredQty,
+        availableQty,
+        alreadyReservedQty,
+        reservableQty,
+        shortageQty: Math.max(requiredQty - reservableQty, 0),
+        allocations,
+      };
+    });
+  }
+
+  private async getOrderWithBom(productionOrderId: string) {
+    const order = await this.prisma.productionOrder.findUnique({
+      where: { id: productionOrderId },
+      include: {
+        bom: {
+          include: {
+            items: {
+              include: {
+                material: {
+                  include: { unitMaster: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Production order not found');
+    }
+
+    if (!order.bom || !order.bom.items.length) {
+      throw new BadRequestException(
+        'Production order must have an active BOM before material reservation',
+      );
+    }
+
+    return order;
+  }
+
+  private async productionStockBuckets(materialIds: string[]) {
+    const buckets = new Map<string, StockBucket[]>();
+    if (!materialIds.length) return buckets;
+
+    const transactions = await this.prisma.inventoryTransaction.findMany({
+      where: {
+        items: { some: { inventoryItemId: { in: materialIds } } },
+        OR: [
+          { remarks: { contains: '[COMPONENT_PRODUCTION]' } },
+          { remarks: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+          { note: { contains: '[COMPONENT_PRODUCTION]' } },
+          { note: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+        ],
+      },
+      include: {
+        warehouse: true,
+        zone: true,
+        items: {
+          include: {
+            warehouse: true,
+            zone: true,
+          },
+        },
+      },
+    });
+
+    for (const transaction of transactions) {
+      const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
+      const isReturn = text.includes('[COMPONENT_PRODUCTION_RETURN]');
+
+      for (const line of transaction.items) {
+        if (!materialIds.includes(line.inventoryItemId)) continue;
+        const rawQty = Number(line.quantity ?? 0);
+        if (!Number.isFinite(rawQty) || rawQty === 0) continue;
+        if (!this.isProductionWarehouseLine(line, transaction)) continue;
+        if (!isReturn && rawQty <= 0) continue;
+        if (isReturn && rawQty >= 0) continue;
+
+        this.addBucketQuantity(buckets, line.inventoryItemId, {
+          warehouseId: line.warehouseId ?? transaction.warehouseId ?? undefined,
+          warehouseCode:
+            line.warehouse?.code ?? transaction.warehouse?.code ?? undefined,
+          warehouseName:
+            line.warehouse?.name ?? transaction.warehouse?.name ?? undefined,
+          zoneId: line.zoneId ?? transaction.zoneId ?? undefined,
+          zoneCode: line.zone?.code ?? transaction.zone?.code ?? undefined,
+          zoneName: line.zone?.name ?? transaction.zone?.name ?? undefined,
+          slotId: line.slotId ?? undefined,
+          level: line.level ?? undefined,
+          quantity: rawQty,
+        });
+      }
+    }
+
+    const issues = await this.prisma.productionMaterialIssue.findMany({
+      where: {
+        inventoryItemId: { in: materialIds },
+        status: 'ISSUED',
+      },
+    });
+
+    for (const issue of issues) {
+      this.deductFromBuckets(
+        buckets.get(issue.inventoryItemId) ?? [],
+        Number(issue.issuedQty ?? 0),
+        issue.warehouseId,
+        issue.zoneId,
+      );
+    }
+
+    return buckets;
+  }
+
+  private async activeReservedQuantityByMaterial(
+    materialIds: string[],
+    excludeReservationId?: string,
+  ) {
+    const reservedByMaterial = new Map<string, number>();
+    if (!materialIds.length) return reservedByMaterial;
+
+    const lines = await this.prisma.productionMaterialReservationLine.findMany({
+      where: {
+        inventoryItemId: { in: materialIds },
+        reservationId: excludeReservationId
+          ? { not: excludeReservationId }
+          : undefined,
+        reservation: {
+          status: { in: activeReservationStatuses },
+        },
+      },
+    });
+
+    for (const line of lines) {
+      const openQty = Math.max(
+        Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+        0,
+      );
+      reservedByMaterial.set(
+        line.inventoryItemId,
+        (reservedByMaterial.get(line.inventoryItemId) ?? 0) + openQty,
+      );
+    }
+
+    return reservedByMaterial;
+  }
+
+  private addBucketQuantity(
+    buckets: Map<string, StockBucket[]>,
+    materialId: string,
+    incoming: StockBucket,
+  ) {
+    const rows = buckets.get(materialId) ?? [];
+    const existing = rows.find(
+      (row) =>
+        (row.warehouseId ?? null) === (incoming.warehouseId ?? null) &&
+        (row.zoneId ?? null) === (incoming.zoneId ?? null) &&
+        (row.slotId ?? null) === (incoming.slotId ?? null) &&
+        (row.level ?? null) === (incoming.level ?? null),
+    );
+
+    if (existing) {
+      existing.quantity += incoming.quantity;
+    } else {
+      rows.push(incoming);
+    }
+    buckets.set(materialId, rows);
+  }
+
+  private deductFromBuckets(
+    rows: StockBucket[],
+    quantity: number,
+    warehouseId?: string | null,
+    zoneId?: string | null,
+  ) {
+    let remaining = quantity;
+    const preferred = rows.filter(
+      (row) =>
+        (!warehouseId || row.warehouseId === warehouseId) &&
+        (!zoneId || row.zoneId === zoneId),
+    );
+    const orderedRows = [
+      ...preferred,
+      ...rows.filter((row) => !preferred.includes(row)),
+    ];
+
+    for (const row of orderedRows) {
+      if (remaining <= epsilon) break;
+      if (row.quantity <= epsilon) continue;
+      const deducted = Math.min(row.quantity, remaining);
+      row.quantity -= deducted;
+      remaining -= deducted;
+    }
+  }
+
+  private isProductionWarehouseLine(
+    line: { warehouse?: { code?: string | null; name?: string | null } | null },
+    transaction: {
+      warehouse?: { code?: string | null; name?: string | null } | null;
+    },
+  ) {
+    const warehouseCode = String(
+      line.warehouse?.code ?? transaction.warehouse?.code ?? '',
+    ).toUpperCase();
+    const warehouseName = String(
+      line.warehouse?.name ?? transaction.warehouse?.name ?? '',
+    ).toLowerCase();
+    return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất');
+  }
+
+  private async nextReservationNo(orderNo: string) {
+    const suffix = (await this.prisma.productionMaterialReservation.count()) + 1;
+    return `RSV-${orderNo}-${String(suffix).padStart(4, '0')}`;
+  }
+
+  private reservationInclude() {
+    return {
+      productionOrder: {
+        select: { id: true, orderNo: true, title: true, status: true },
+      },
+      bom: {
+        select: { id: true, bomNo: true, productCode: true, productName: true },
+      },
+      lines: {
+        include: {
+          inventoryItem: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              unit: true,
+              unitMaster: { select: { symbol: true } },
+            },
+          },
+          warehouse: { select: { id: true, code: true, name: true } },
+          zone: { select: { id: true, code: true, name: true } },
+        },
+        orderBy: [{ inventoryItemId: 'asc' }, { zoneId: 'asc' }],
+      },
+    } satisfies Prisma.ProductionMaterialReservationInclude;
+  }
+
+  private sum(values: number[]) {
+    return values.reduce((total, value) => total + value, 0);
+  }
+}

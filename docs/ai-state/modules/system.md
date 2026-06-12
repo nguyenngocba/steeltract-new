@@ -11,6 +11,7 @@ Included:
 * API-backed Roles & Permissions page.
 * API-backed System Logs page.
 * Operational workflow health check from Supplier/Inventory/Production/QC/Yard/Projects.
+* Runtime integrity KPI summaries for Inventory, Production, and Projects.
 * Sidebar and route wiring for `/settings`, `/users`, `/roles`, and `/system-logs`.
 
 Excluded in S1:
@@ -42,6 +43,9 @@ Backend:
 * `GET /system/notifications`
 * `GET /dashboard/cockpit`
 * `GET /runtime/operational-workflow`
+* `GET /runtime/integrity/inventory-summary`
+* `GET /runtime/integrity/production-summary`
+* `GET /runtime/integrity/project-summary`
 
 ## Implemented Features
 
@@ -73,6 +77,7 @@ Backend:
 * Notifications page uses persisted Notification records from `/system/notifications`, with unread/priority/read filters and a detail workspace.
 * Dashboard/Tổng quan uses `/dashboard/cockpit` to aggregate real Projects, Production Orders, Components, Inventory, Yard, QC, Activity Logs, and Notifications.
 * Inventory outbound now validates selected location balance server-side when `zoneId` is provided.
+* Runtime Integrity APIs provide read-only KPI summaries for reconciliation/hardening and do not mutate business records.
 
 ## Workflow Verification Result
 
@@ -104,6 +109,7 @@ Warnings still expected:
 * Add role create/edit/delete and permission assignment APIs.
 * Add notification mark-read/archive APIs.
 * Add audit export.
+* Add a frontend System Integrity page or dashboard panel if operators need ongoing visibility into `/runtime/integrity/*`.
 * Add backup execution and restore workflow.
 * Add configuration change approval.
 * Add formal project-return and Yard shipment documents.

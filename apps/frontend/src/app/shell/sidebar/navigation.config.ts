@@ -158,6 +158,7 @@ export const navigation = [
       { title: 'Production BOM', path: '/production/boms' },
       { title: 'Lệnh sản xuất (MO)', path: '/production/orders' },
       { title: 'Cấp phát vật tư', path: '/production/material-issues' },
+      { title: 'Tiêu hao vật tư', path: '/production/consumptions' },
       { title: 'Nhật ký sản xuất', path: '/production/logs' },
     ],
   },

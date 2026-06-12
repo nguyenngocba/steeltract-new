@@ -2,8 +2,11 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
 } from 'react-router-dom'
 
+import { useAuthStore } from '@/store/auth.store'
+import { LoginPage } from '@/modules/auth/pages/LoginPage'
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage'
 import { InventoryOverviewPage } from '@/modules/inventory/pages/tabs/InventoryOverviewPage'
 import { InventoryMaterialsPage } from '@/modules/inventory/pages/tabs/InventoryMaterialsPage'
@@ -67,6 +70,38 @@ import { LogisticsPage } from '@/modules/logistics/pages/LogisticsPage'
 import { NotificationsPage } from '@/modules/notifications/pages/NotificationsPage'
 
 export function AppRouter() {
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const location = useLocation()
+
+  if (location.pathname === '/login') {
+    return (
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            accessToken ? (
+              <Navigate to="/" replace />
+            ) : (
+              <LoginPage />
+            )
+          }
+        />
+      </Routes>
+    )
+  }
+
+  if (!accessToken) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{
+          from: location.pathname,
+        }}
+      />
+    )
+  }
+
   return (
     <Routes>
       <Route
@@ -173,7 +208,10 @@ export function AppRouter() {
 
       <Route path="/production/boms" element={<ProductionPage />} />
       <Route path="/production/orders" element={<ProductionPage />} />
+      <Route path="/production/reservations" element={<ProductionPage />} />
+      <Route path="/production/material-ledger" element={<ProductionPage />} />
       <Route path="/production/material-issues" element={<ProductionPage />} />
+      <Route path="/production/consumptions" element={<ProductionPage />} />
       <Route path="/production/logs" element={<ProductionPage />} />
 
       <Route

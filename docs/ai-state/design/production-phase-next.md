@@ -2,6 +2,16 @@
 
 Planning date: 2026-06-11
 
+Implementation note:
+
+- Sprint 1 Production Reservation was implemented on 2026-06-11.
+- Implemented scope: reservation models, preview, create, reserve, release, expire, `/production/reservations`, and MO detail reservation preview/create action.
+- Sprint 2 Production Material Ledger was implemented on 2026-06-11.
+- Implemented Sprint 2 scope: `ProductionMaterialLedger`, ledger APIs, reservation lifecycle ledger writes, and `/production/material-ledger`.
+- Sprint 3 Production Execution was implemented on 2026-06-11.
+- Implemented Sprint 3 scope: issue-from-reservation, material return, exact production location stock updates, `ISSUE`/`RETURN` ledger writers, and production-context component creation.
+- Not implemented yet: approval-oriented issue/return documents, consume/adjust ledger writers, and component costing.
+
 Scope:
 
 - Production Reservation workflow.
@@ -30,6 +40,8 @@ Design principle:
 - Do not silently mutate material quantity. Use Inventory transactions for stock movement and Production ledgers/documents for production intent and traceability.
 
 ## 1. Production Reservation Workflow
+
+Sprint 1 status: implemented.
 
 Purpose:
 
@@ -140,6 +152,8 @@ UI elements:
 
 ## 2. Material Issue Workflow
 
+Sprint 3 status: basic issue-from-reservation implemented.
+
 Purpose:
 
 - Formalize production material issue as a document-driven workflow.
@@ -198,6 +212,7 @@ Add issue endpoints:
 - `GET /production/material-issues/:id`
 - `POST /production/:id/material-issues`
 - `POST /production/material-issues/from-reservation/:reservationId`
+- `POST /production/reservations/:id/issue`
 - `PATCH /production/material-issues/:id`
 - `POST /production/material-issues/:id/submit`
 - `POST /production/material-issues/:id/approve`
@@ -253,6 +268,8 @@ UI elements:
 
 ## 3. Material Return Workflow
 
+Sprint 3 status: basic return-from-issue implemented.
+
 Purpose:
 
 - Return unused production material from MO back to production warehouse stock or main warehouse according to business decision.
@@ -302,6 +319,7 @@ Add return endpoints:
 - `GET /production/material-returns/:id`
 - `POST /production/:id/material-returns`
 - `POST /production/material-returns/from-issue/:issueId`
+- `POST /production/material-issues/:id/return`
 - `PATCH /production/material-returns/:id`
 - `POST /production/material-returns/:id/inspect`
 - `POST /production/material-returns/:id/approve`
@@ -355,6 +373,8 @@ UI elements:
 
 ## 4. Production Material Ledger
 
+Sprint 2 status: partially implemented.
+
 Purpose:
 
 - Provide auditable production material balance independent of derived transaction scans.
@@ -362,35 +382,27 @@ Purpose:
 
 ### Database Changes
 
-Add `ProductionMaterialLedgerEntry`:
+Implemented in Sprint 2: `ProductionMaterialLedger`:
 
 - `id`
-- `entryNo` unique
 - `productionOrderId`
-- `bomId`
-- `bomItemId`
 - `reservationId`
-- `reservationLineId`
-- `issueDocumentId`
-- `issueLineId`
-- `returnDocumentId`
-- `returnLineId`
-- `inventoryTransactionId`
-- `inventoryTransactionItemId`
 - `inventoryItemId`
 - `warehouseId`
 - `zoneId`
 - `slotId`
 - `level`
-- `movementType`: `RESERVE`, `RELEASE_RESERVATION`, `ISSUE`, `RETURN`, `SCRAP`, `ADJUSTMENT`
 - `quantity`
-- `unitCost`
-- `totalCost`
-- `balanceAfter`
-- `occurredAt`
+- `eventType`: `RESERVE`, `RELEASE`, `ISSUE`, `RETURN`, `CONSUME`, `ADJUST`
+- `eventDate`
+- `remark`
 - `createdBy`
-- `note`
 - `createdAt`
+
+Later extensions:
+
+- Link issue, return, Inventory transaction, and Inventory transaction item IDs when those documents are implemented.
+- Add cost snapshots and balance snapshots if costing/reconciliation require them.
 
 Add optional `ProductionMaterialBalance`:
 
@@ -415,15 +427,19 @@ Add ledger endpoints:
 
 - `GET /production/material-ledger`
 - `GET /production/:id/material-ledger`
+- `GET /production/material-ledger/:id`
+
+Future endpoints:
+
 - `GET /production/material-balances`
 - `POST /production/material-ledger/reconcile`
 
 Ledger writes:
 
 - Reservation creates `RESERVE` entries.
-- Reservation release creates `RELEASE_RESERVATION` entries.
+- Reservation release and expiry create signed `RELEASE` entries.
 - Issue posting creates `ISSUE` entries.
-- Return posting creates `RETURN` or `SCRAP` entries.
+- Return posting creates `RETURN` entries.
 - Reconciliation compares production ledger to Inventory location stock and transaction history.
 
 ### Frontend Pages

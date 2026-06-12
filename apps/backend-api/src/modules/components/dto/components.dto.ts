@@ -42,8 +42,17 @@ export const updateComponentSchema = z.object({
   photoUrl: z.string().optional(),
 });
 
+export const installComponentSchema = z.object({
+  installZone: z.string().trim().min(1),
+  installAxis: z.string().trim().min(1),
+  installLevel: z.string().trim().min(1),
+  installPosition: z.string().trim().min(1),
+});
+
 export type ListComponentsDto = z.infer<typeof listComponentsSchema>;
 
 export type CreateComponentDto = z.infer<typeof createComponentSchema>;
 
 export type UpdateComponentDto = z.infer<typeof updateComponentSchema>;
+
+export type InstallComponentDto = z.infer<typeof installComponentSchema>;

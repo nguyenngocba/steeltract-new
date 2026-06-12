@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../core/prisma/prisma.module';
 import { ComponentsController } from './components.controller';
 import { ComponentsRepository } from './repositories/components.repository';
+import { ComponentCostingService } from './services/component-costing.service';
 import { ComponentsService } from './services/components.service';
 import { EventsModule } from '../../core/events/events.module'
 
@@ -11,7 +12,7 @@ import { EventsModule } from '../../core/events/events.module'
   EventsModule,
 ],
   controllers: [ComponentsController],
-  providers: [ComponentsRepository, ComponentsService],
+  providers: [ComponentsRepository, ComponentsService, ComponentCostingService],
   exports: [ComponentsService],
 })
 export class ComponentsModule {}

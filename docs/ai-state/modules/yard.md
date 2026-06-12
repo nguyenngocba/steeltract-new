@@ -13,6 +13,7 @@ In Progress.
 * Yard cockpit UI follows the Inventory visual baseline.
 * Yard staging is integrated with Production and gated by QC release.
 * Yard placements and movements are included in operational workflow checks.
+* Yard outbound removal marks linked component placements as `SHIPPED`, preserves/infers `projectId`, and writes component timeline history.
 * Dashboard aggregates Yard activity and open workflow state.
 
 ## Database Models
@@ -37,7 +38,7 @@ Currently documented through existing runtime/workflow integrations:
 
 ## Remaining Tasks
 
-* Add formal Yard outbound/shipment documents.
+* Add formal Yard outbound/shipment documents beyond the current Yard movement + Component timeline record.
 * Add shipment staging workflow.
 * Add richer crane telemetry.
 * Add realtime movement animation.

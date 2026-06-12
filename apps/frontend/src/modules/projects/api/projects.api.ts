@@ -1,6 +1,7 @@
 import { http } from '@/shared/http/http-client'
 
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED' | 'ON_HOLD'
+export type ProjectComponentStatus = 'STOCK' | 'CUTTING' | 'WELDING' | 'PAINTING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'INSTALLED'
 
 export type ProjectRuntimeRow = {
   id: string
@@ -17,6 +18,10 @@ export type ProjectRuntimeRow = {
   contractValue: number
   actualValue: number
   tonnage: number
+  readyComponents: number
+  shippedComponents: number
+  deliveredComponents: number
+  installedComponents: number
   delivered: number
   pending: number
   delayedOrders: number
@@ -42,6 +47,31 @@ export type ProjectMaterialRuntime = {
   date: string
 }
 
+export type ProjectComponentRuntime = {
+  id: string
+  projectId?: string | null
+  projectCode: string
+  projectName: string
+  code: string
+  name: string
+  status: ProjectComponentStatus
+  plannedDate?: string | null
+  installedDate?: string | null
+  installZone?: string | null
+  installAxis?: string | null
+  installLevel?: string | null
+  installPosition?: string | null
+  estimatedCost: number
+  actualCost: number
+}
+
+export type InstallProjectComponentPayload = {
+  installZone: string
+  installAxis: string
+  installLevel: string
+  installPosition: string
+}
+
 export type ProjectsRuntime = {
   metrics: {
     totalProjects: number
@@ -51,6 +81,10 @@ export type ProjectsRuntime = {
     contractValue: number
     actualValue: number
     averageProgress: number
+    readyComponents: number
+    shippedComponents: number
+    deliveredComponents: number
+    installedComponents: number
   }
   projects: ProjectRuntimeRow[]
   progress: Array<{
@@ -66,6 +100,7 @@ export type ProjectsRuntime = {
     plannedEndAt: string
   }>
   materials: ProjectMaterialRuntime[]
+  components: ProjectComponentRuntime[]
   reports: {
     byStatus: Array<{ status: ProjectStatus; count: number }>
     byType: Array<{ type: string; value: number }>
@@ -93,4 +128,14 @@ export type CreateProjectPayload = {
 export async function createProject(payload: CreateProjectPayload) {
   const response = await http.post('/projects', payload)
   return response.data
+}
+
+export async function deliverProjectComponent(id: string) {
+  const response = await http.post(`/components/${id}/deliver`)
+  return response.data as ProjectComponentRuntime
+}
+
+export async function installProjectComponent({ id, payload }: { id: string; payload: InstallProjectComponentPayload }) {
+  const response = await http.post(`/components/${id}/install`, payload)
+  return response.data as ProjectComponentRuntime
 }

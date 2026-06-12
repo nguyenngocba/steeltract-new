@@ -1,0 +1,82 @@
+# Components Module
+
+## Scope
+
+Components covers steel component master records, production linkage, component timeline, stock/yard visibility, and handoff from Production.
+
+## Implemented Features
+
+* Components list, overview, stock, material stock, production, yard, and history pages.
+* Generic component master creation through `POST /components`.
+* Component creation UI in `/components/list`.
+* Component records can be linked to Projects.
+* Production BOM and Manufacturing Order workflows can start from selected Components.
+* Production execution can create or mark a component as `READY` from a valid Manufacturing Order after material issue.
+* Component timeline records production-created and yard-staged state changes.
+* Component delivery workflow advances `SHIPPED -> DELIVERED -> INSTALLED` through dedicated APIs.
+* Delivery and installation write `ComponentTimeline` actions `DELIVERED` and `INSTALLED`.
+* Installation mapping stores `installZone`, `installAxis`, `installLevel`, and `installPosition` on the Component.
+* Component detail UI shows installation location for installed components.
+* Component costing is persisted in `ComponentCosting` and can be recalculated from production consumption data.
+* Component detail UI includes a Costing section for estimated cost, actual cost, variance, material, labor, machine, and overhead.
+
+## Component Creation Audit
+
+Current frontend path:
+
+* `/components/list`
+* `ComponentsListPage`
+* `useCreateComponent`
+* `POST /components`
+
+Backend path:
+
+* `ComponentsController.create`
+* `ComponentsService.create`
+* `ComponentsRepository.create`
+* Tables: `components`, `activity_logs`
+
+Production-context path:
+
+* `POST /production/:id/component`
+* Requires issued production material for the MO.
+* Updates existing linked Component to `READY`, or creates one if the MO does not already reference a Component.
+* Tables: `components`, `component_timelines`, `production_logs`
+
+## Root Cause Found
+
+Generic backend component creation was functional in API smoke testing.
+
+The isolated UI blocker found during Sprint 3 was the login page default password:
+
+* UI default: `admin123`
+* Current seed password: `123`
+
+This prevented a fresh user from logging in with the prefilled credentials before using the create component form.
+
+Fix:
+
+* Login page default password now matches the seed password `123`.
+
+## API Endpoints
+
+* `GET /components`
+* `GET /components/:id`
+* `GET /components/:id/timeline`
+* `GET /components/:id/costing`
+* `POST /components`
+* `POST /components/:id/deliver`
+* `POST /components/:id/install` with `installZone`, `installAxis`, `installLevel`, `installPosition`
+* `POST /components/:id/costing/recalculate`
+* `PATCH /components/:id`
+* `DELETE /components/:id`
+* `POST /components/upload`
+* `POST /components/timeline-upload`
+* `POST /production/:id/component`
+
+## Remaining Tasks
+
+* Decide whether component master creation should remain separate from production-output creation long term.
+* Add richer costing inputs for labor, machine, overhead, QC rework, and Yard handling.
+* Add stricter UI messaging that Production output creation requires issued material.
+* Add delivery and installation document numbers, signed handover evidence, and coordinate/drawing references if required by field operations.

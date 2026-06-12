@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { productionApi, type ProductionBomInput } from '../api/production.api'
+import { productionApi, type ProductionBomInput, type ProductionConsumptionParams, type ProductionMaterialLedgerParams } from '../api/production.api'
 
 export const useProductionOrders = () =>
   useQuery({ queryKey: ['production', 'orders'], queryFn: productionApi.orders, refetchInterval: 5000 })
@@ -13,6 +13,38 @@ export const useProductionBoms = () =>
 
 export const useProductionIssues = () =>
   useQuery({ queryKey: ['production', 'issues'], queryFn: productionApi.issues })
+
+export const useProductionConsumptions = (params?: ProductionConsumptionParams) =>
+  useQuery({
+    queryKey: ['production', 'consumptions', params],
+    queryFn: () => productionApi.consumptions(params),
+  })
+
+export const useProductionOrderConsumptions = (id?: string) =>
+  useQuery({
+    queryKey: ['production', 'order-consumptions', id],
+    queryFn: () => productionApi.consumptionsByOrder(id!),
+    enabled: Boolean(id),
+  })
+
+export const useProductionReservations = (productionOrderId?: string) =>
+  useQuery({
+    queryKey: ['production', 'reservations', productionOrderId],
+    queryFn: () => productionApi.reservations(productionOrderId),
+  })
+
+export const useProductionMaterialLedger = (params?: ProductionMaterialLedgerParams) =>
+  useQuery({
+    queryKey: ['production', 'material-ledger', params],
+    queryFn: () => productionApi.materialLedger(params),
+  })
+
+export const useReservationPreview = (id?: string) =>
+  useQuery({
+    queryKey: ['production', 'reservation-preview', id],
+    queryFn: () => productionApi.reservationPreview(id!),
+    enabled: Boolean(id),
+  })
 
 export const useProductionLogs = () =>
   useQuery({ queryKey: ['production', 'logs'], queryFn: productionApi.logs })
@@ -60,9 +92,40 @@ export const useArchiveProductionBom = () =>
 export const useStartProductionOrder = () =>
   useProductionMutation((id: string) => productionApi.startOrder(id))
 
+export const useCreateProductionReservation = () =>
+  useProductionMutation(({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+    productionApi.createReservation(id, payload))
+
+export const useReserveProductionReservation = () =>
+  useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
+    productionApi.reserveReservation(id, payload))
+
+export const useIssueProductionReservation = () =>
+  useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
+    productionApi.issueReservation(id, payload))
+
+export const useReleaseProductionReservation = () =>
+  useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
+    productionApi.releaseReservation(id, payload))
+
+export const useExpireProductionReservation = () =>
+  useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
+    productionApi.expireReservation(id, payload))
+
+export const useReturnProductionMaterialIssue = () =>
+  useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
+    productionApi.returnMaterialIssue(id, payload))
+
+export const useConsumeProductionMaterial = () =>
+  useProductionMutation(({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+    productionApi.consumeMaterial(id, payload))
+
 export const useCompleteProductionStage = () =>
   useProductionMutation((id: string) => productionApi.completeStage(id))
 
 export const useStageProductionToYard = () =>
   useProductionMutation(({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
     productionApi.stageToYard(id, payload))
+
+export const useCreateComponentFromProductionOrder = () =>
+  useProductionMutation((id: string) => productionApi.createComponentFromOrder(id))

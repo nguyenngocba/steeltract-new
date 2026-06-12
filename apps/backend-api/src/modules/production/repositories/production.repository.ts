@@ -307,6 +307,14 @@ export class ProductionRepository {
           issuedDate: 'desc' as const,
         },
       },
+      materialConsumptions: {
+        include: {
+          inventoryItem: true,
+        },
+        orderBy: {
+          createdAt: 'desc' as const,
+        },
+      },
     };
   }
 

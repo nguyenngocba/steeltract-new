@@ -1,5 +1,203 @@
 # SteelTrack Changelog
 
+## 2026-06-12 System Audit & Hardening Sprint 8
+
+Implemented:
+
+- Added read-only Runtime Integrity KPI APIs:
+  - `GET /runtime/integrity/inventory-summary`
+  - `GET /runtime/integrity/production-summary`
+  - `GET /runtime/integrity/project-summary`
+- Created `docs/ai-state/audits/system-integrity-audit.md`.
+- Documented Inventory, Production, Component lifecycle, Costing, and Project integrity findings.
+
+Verified:
+
+- Backend build passed.
+- Frontend build passed.
+- KPI endpoints were smoke tested in-memory.
+
+Known findings:
+
+- Inventory has transaction-vs-location reconciliation mismatches.
+- Production has issued material that is not yet consumed/returned/scrapped in current data.
+- One `READY` component lacks a matching timeline action.
+
+## 2026-06-12 Installation Mapping Sprint 7
+
+Implemented:
+
+- Added component installation location database fields.
+- Extended `POST /components/:id/install` to require `installZone`, `installAxis`, `installLevel`, and `installPosition`.
+- Added Projects install modal for `Khu vực`, `Trục`, `Tầng`, and `Vị trí`.
+- Added Zone, Axis, Level, and Position columns to Project Components.
+- Added installation location to Component Detail.
+- Project runtime now returns installation location fields.
+
+Verified:
+
+- Prisma migration applied successfully.
+- Prisma generate passed.
+- Backend build passed.
+- Frontend build passed.
+- Smoke test confirmed missing install payload returns 400 and valid install stores location in component, timeline note, and project runtime. Smoke data was cleaned up.
+
+## 2026-06-12 Delivery And Installation Sprint 6
+
+Implemented:
+
+- Added component delivery and installation APIs.
+- Enforced lifecycle validation: only `SHIPPED` can become `DELIVERED`, and only `DELIVERED` can become `INSTALLED`.
+- Added `ComponentTimeline` actions for `DELIVERED` and `INSTALLED`.
+- Updated Project runtime delivered/installed counts so `SHIPPED` is no longer counted as project received.
+- Added Projects tab actions `Xác nhận nhận hàng` and `Xác nhận lắp đặt`.
+
+Verified:
+
+- Backend build passed.
+- Frontend build passed.
+- Smoke API test confirmed invalid direct install returns 400, delivery/install transitions succeed, timeline rows are written, and Project runtime reflects the installed component. Smoke rows were cleaned up.
+
+## 2026-06-12 Component Costing Sprint 5
+
+Implemented:
+
+- Added `ComponentCosting` database model and migration.
+- Added component costing APIs for read and recalculation.
+- Added actual material costing from production consumption and inventory average cost.
+- Added Component detail Costing section.
+- Recalculation updates component `estimatedCost` and `actualCost`, so Project Components shows real Actual Cost.
+
+Verified:
+
+- Prisma migration applied successfully.
+- Smoke recalculation for `CPL-98509548` produced actual material cost and Project runtime Actual Cost, then smoke rows were cleaned up.
+- Backend build passed.
+- Frontend build passed.
+
+## 2026-06-12 Production Consumption Sprint 4
+
+Implemented:
+
+- Added `ProductionMaterialConsumption` database model and migration.
+- Added material consumption APIs for list, order detail, and posting consumption.
+- Added validation for net issued quantity, consumed quantity, scrap quantity, and returned/consume/scrap total.
+- Added automatic `CONSUME` rows in Production Material Ledger.
+- Added Production Cockpit tab `Tiêu hao vật tư` with Issued, Returned, Consumed, Scrap, and Remaining views.
+
+Verified:
+
+- Prisma migration applied successfully.
+- Authenticated `GET /production/consumptions` returned an array.
+- Smoke `POST /production/:id/consume` created consumption and `CONSUME` ledger rows, then smoke rows were cleaned up.
+- Backend build passed.
+- Frontend build passed.
+
+## 2026-06-12 Project Components Tab
+
+Implemented:
+
+- Extended Projects runtime data with project-linked component rows from `components.projectId`.
+- Added Projects tab `Cấu kiện công trình` next to `Vật tư theo công trình`.
+- Added component status filters for `ALL`, `STOCK`, `READY`, `SHIPPED`, `DELIVERED`, and `INSTALLED`.
+- Added summary cards for total components, `READY`, `SHIPPED`, `DELIVERED`, and `INSTALLED`.
+- Added component table columns for code, name, project, status, planned date, installed date, estimated cost, and actual cost.
+
+Verified:
+
+- Existing component `CPL-98509548` appears under project `CT-2026-4166` with status `SHIPPED`.
+- Backend build passed.
+- Frontend build passed.
+
+Known gap:
+
+- Component row click currently routes to `/components/list` with selected component state because no active component detail route by id exists yet.
+
+## 2026-06-12 Yard Outbound Component Status Fix
+
+Fixed:
+
+- Yard outbound now updates component placements to `Component.status = SHIPPED`.
+- Yard outbound preserves or infers the component `projectId` so shipped components remain visible in project-linked component data.
+- Yard outbound writes a `ComponentTimeline` `SHIPPED` entry.
+- Yard mutations now refetch Yard, Components, Projects, and Dashboard data.
+- Project runtime delivered/completed counts now include `SHIPPED` and `DELIVERED` component states.
+
+Verified:
+
+- `POST /yard/placements/:id/remove` returned 201.
+- Smoke component changed to `SHIPPED`.
+- Smoke placement had `removedAt`.
+- Project runtime delivered count increased while smoke component existed.
+- Smoke data was cleaned up.
+- Backend and frontend builds passed.
+
+## 2026-06-12 Auth Route Guard Fix
+
+Fixed:
+
+- Added active `/login` route and auth guard for application routes.
+- Wrapped the active frontend provider tree with `AuthProvider`.
+- Updated LoginPage to store both access and refresh tokens through the shared auth store.
+- Prevented unauthenticated business pages from firing `/components` and `/production` requests without Bearer tokens.
+
+Verified:
+
+- `/auth/login` returns access and refresh tokens.
+- `/auth/refresh` accepts `{ refreshToken }`.
+- `GET /components` returned 200.
+- `GET /production` returned 200.
+- `POST /components` returned 201.
+- Frontend build passed.
+
+## 2026-06-11 Production Execution Sprint 3
+
+Implemented:
+
+- Added issue-from-reservation workflow.
+- Added material return workflow.
+- Added exact production location stock decrement/increment for issue and return.
+- Added `ISSUE` and `RETURN` Production Material Ledger writes.
+- Added Production endpoint to create/mark component from MO after material issue.
+- Added UI actions for reservation issue, material return, and MO component creation.
+- Added Components module ai-state doc and fixed login default password to match seed credentials.
+
+Verified:
+
+- Production Order -> Reservation -> Issue -> Create Component -> Return Excess Material smoke workflow passed.
+
+## 2026-06-11 Production Material Ledger Sprint 2
+
+Implemented:
+
+- Added `ProductionMaterialLedgerEventType` enum.
+- Added `ProductionMaterialLedger` database model and migration.
+- Added Production Material Ledger read APIs.
+- Added automatic ledger writes for reservation create/reserve/release/expire.
+- Added `/production/material-ledger` UI tab with MO, material, event type, and date range filters.
+- Updated ai-state production docs and decisions.
+
+Build:
+
+- Prisma generate passed.
+- Backend build passed.
+- Frontend build passed.
+
+## 2026-06-11 Production Reservation Sprint 1
+
+Implemented:
+
+- Added production material reservation header/line database models and migration.
+- Added backend APIs for reservation list/detail/preview/create/reserve/release/expire.
+- Added production warehouse reservation validation against active reserved quantities.
+- Added `/production/reservations` and MO detail reservation preview/create action.
+- Updated ai-state production docs and decisions.
+
+Build:
+
+- Backend build passed.
+- Frontend build passed.
+
 ## 2026-06-11 Documentation Cleanup Phase
 
 Documentation:

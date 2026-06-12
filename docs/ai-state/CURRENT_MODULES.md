@@ -45,7 +45,15 @@
 
 - Production BOM creation now blocks over-allocation against real `Kho vật tư SX` balance and shows `Cần / Tồn SX` shortage warnings in the BOM modal.
 - Starting a Manufacturing Order now auto-issues missing BOM material quantities from production warehouse stock and creates `ISSUED` production material issue rows plus outbound inventory movements.
-- Formal BOM reservation documents and manual material issue approval/editing remain backlog work.
+- Production Reservation Sprint 1 now has formal reservation documents, reservation preview, reserve/release/expire APIs, `/production/reservations`, and MO detail reservation preview/create action.
+- Production Material Ledger Sprint 2 now has a `ProductionMaterialLedger` model, read APIs, reservation lifecycle ledger writes, `/production/material-ledger`, and filters for MO, material, event type, and date range.
+- Production Execution Sprint 3 now has issue-from-reservation, material return, exact production location stock updates, `ISSUE`/`RETURN` ledger events, and production-context component creation.
+- Production Consumption Sprint 4 now has `ProductionMaterialConsumption`, consume APIs, `CONSUME` ledger events, and `/production/consumptions`.
+- Component Costing Sprint 5 now has `ComponentCosting`, component costing APIs, material actual cost from production consumption and Inventory average cost, and a Component detail Costing section.
+- Delivery/Installation Sprint 6 now has component `SHIPPED -> DELIVERED -> INSTALLED` APIs, timeline rows, Project Components actions, and runtime delivered/installed counters.
+- Installation Mapping Sprint 7 now stores component install Zone/Axis/Level/Position, requires those fields in the install modal/API, returns them through Projects runtime, and shows them in Project Components and Component Detail.
+- System Audit & Hardening Sprint 8 added read-only Runtime Integrity KPI APIs and documented current Inventory, Production, Component, Costing, and Project integrity findings.
+- Approval-oriented issue/return documents, adjust ledger writers, richer consumption entry UX, labor/machine/overhead costing inputs, and costing approvals remain backlog work.
 
 ## 2026-06-11 Documentation Notes
 

@@ -173,8 +173,18 @@ export class ProjectsService {
         (component) => component.projectId === project.id,
       );
       const completedComponents = projectComponents.filter((component) =>
-        ['INSTALLED', 'READY', 'STOCK'].includes(component.status),
+        component.status === 'INSTALLED',
       );
+      const readyComponents = projectComponents.filter(
+        (component) => component.status === 'READY',
+      ).length;
+      const shippedComponents = projectComponents.filter(
+        (component) => component.status === 'SHIPPED',
+      ).length;
+      const deliveredComponents = projectComponents.filter((component) =>
+        ['DELIVERED', 'INSTALLED'].includes(component.status),
+      ).length;
+      const installedComponents = completedComponents.length;
       const projectTransactions = inventoryTransactions.filter(
         (transaction) => transaction.projectId === project.id,
       );
@@ -225,9 +235,6 @@ export class ProjectsService {
       const tonnage =
         projectOrders.reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) ||
         projectComponents.length;
-      const delivered = projectComponents.filter((component) =>
-        ['READY', 'STOCK', 'INSTALLED'].includes(component.status),
-      ).length;
       const delayedOrders = projectOrders.filter((order) => order.status === 'DELAYED')
         .length;
 
@@ -240,8 +247,12 @@ export class ProjectsService {
         contractValue,
         actualValue,
         tonnage,
-        delivered,
-        pending: Math.max(0, projectComponents.length - delivered),
+        readyComponents,
+        shippedComponents,
+        delivered: deliveredComponents,
+        deliveredComponents,
+        installedComponents,
+        pending: Math.max(0, projectComponents.length - deliveredComponents),
         delayedOrders,
         componentCount: projectComponents.length,
         orderCount: projectOrders.length,
@@ -281,6 +292,32 @@ export class ProjectsService {
         };
       }),
     );
+    const componentRows = components
+      .filter((component) => component.projectId)
+      .map((component) => ({
+        id: component.id,
+        projectId: component.projectId,
+        projectCode: component.project?.code ?? '-',
+        projectName: component.project?.name ?? '-',
+        code: component.code,
+        name: component.name,
+        status: component.status,
+        plannedDate: component.plannedDate,
+        installedDate: component.installedDate,
+        installZone: component.installZone,
+        installAxis: component.installAxis,
+        installLevel: component.installLevel,
+        installPosition: component.installPosition,
+        estimatedCost: Number(component.estimatedCost ?? 0),
+        actualCost: Number(component.actualCost ?? 0),
+      }));
+    const componentStatusCounts = componentRows.reduce(
+      (map, row) => {
+        map.set(row.status, (map.get(row.status) ?? 0) + 1);
+        return map;
+      },
+      new Map<string, number>(),
+    );
 
     return {
       metrics: {
@@ -291,6 +328,12 @@ export class ProjectsService {
         contractValue: totalContractValue,
         actualValue: totalActualValue,
         averageProgress: totalProgress,
+        readyComponents: componentStatusCounts.get('READY') ?? 0,
+        shippedComponents: componentStatusCounts.get('SHIPPED') ?? 0,
+        deliveredComponents:
+          (componentStatusCounts.get('DELIVERED') ?? 0) +
+          (componentStatusCounts.get('INSTALLED') ?? 0),
+        installedComponents: componentStatusCounts.get('INSTALLED') ?? 0,
       },
       projects: projectRows,
       progress: projectRows.map((row) => ({
@@ -306,6 +349,7 @@ export class ProjectsService {
         plannedEndAt: row.plannedEndAt,
       })),
       materials: materialRows,
+      components: componentRows,
       reports: {
         byStatus: [
           { status: 'ACTIVE', count: projectRows.filter((row) => row.status === 'ACTIVE').length },

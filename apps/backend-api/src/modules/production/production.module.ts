@@ -9,6 +9,9 @@ import { ProductionService } from './services/production.service';
 import { EventsModule } from '../../core/events/events.module'
 import { BOMService } from './services/bom.service';
 import { MaterialIssueService } from './services/material-issue.service';
+import { ProductionConsumptionService } from './services/production-consumption.service';
+import { ProductionMaterialLedgerService } from './services/production-material-ledger.service';
+import { ProductionReservationService } from './services/production-reservation.service';
 import { InventoryModule } from '../inventory/inventory.module';
 import { YardModule } from '../yard/yard.module';
 @Module({
@@ -26,6 +29,9 @@ import { YardModule } from '../yard/yard.module';
     ProductionService,
     BOMService,
     MaterialIssueService,
+    ProductionConsumptionService,
+    ProductionMaterialLedgerService,
+    ProductionReservationService,
   ],
   exports: [ProductionService],
 })

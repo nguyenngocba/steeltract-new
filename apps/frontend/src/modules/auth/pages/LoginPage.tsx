@@ -1,36 +1,66 @@
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { loginApi } from '../login.api'
-import { useAuthStore } from '../store/auth.store'
+import { useAuthStore } from '../../../store/auth.store'
 
 export function LoginPage() {
   const [username, setUsername] =
     useState('admin')
 
   const [password, setPassword] =
-    useState('admin123')
+    useState('123')
 
-  const setAuth =
-    useAuthStore((s) => s.setAuth)
+  const setSession =
+    useAuthStore((s) => s.setSession)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   async function login() {
-    const data =
-      await loginApi({
-        username,
-        password,
+    setError('')
+    setSubmitting(true)
+
+    try {
+      const data =
+        await loginApi({
+          username,
+          password,
+        })
+      const accessToken =
+        data.accessToken ||
+        data.access_token
+      const refreshToken =
+        data.refreshToken ||
+        data.refresh_token
+
+      if (!accessToken || !refreshToken) {
+        throw new Error('Login response did not include tokens')
+      }
+
+      setSession({
+        accessToken,
+        refreshToken,
+        user: data.user,
       })
 
-    setAuth(
-      data.token,
-      data.user
-    )
+      const from =
+        (location.state as { from?: string } | null)
+          ?.from || '/'
 
-    localStorage.setItem(
-      'token',
-      data.token
-    )
-
-    location.reload()
+      navigate(from, {
+        replace: true,
+      })
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Không thể đăng nhập',
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -69,10 +99,17 @@ export function LoginPage() {
 
           <button
             onClick={login}
-            className="h-12 w-full rounded-xl bg-blue-600 font-medium text-white"
+            disabled={submitting}
+            className="h-12 w-full rounded-xl bg-blue-600 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Login
+            {submitting ? 'Đang đăng nhập...' : 'Login'}
           </button>
+
+          {error ? (
+            <p className="rounded-xl border border-red-800 bg-red-950/50 px-3 py-2 text-sm text-red-200">
+              {error}
+            </p>
+          ) : null}
 
         </div>
 

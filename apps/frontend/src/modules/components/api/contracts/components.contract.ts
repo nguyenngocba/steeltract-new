@@ -22,11 +22,40 @@ export interface ComponentRecord {
   floor?: string | null
   zone?: string | null
   position?: string | null
+  installZone?: string | null
+  installAxis?: string | null
+  installLevel?: string | null
+  installPosition?: string | null
   status: ComponentStatus
   projectId?: string | null
   project?: ProjectReference | null
+  estimatedCost?: number
+  actualCost?: number
   createdAt?: string
   updatedAt?: string
+}
+
+export interface ComponentCostingRecord {
+  id?: string | null
+  componentId: string
+  productionOrderId: string
+  estimatedMaterialCost: number
+  actualMaterialCost: number
+  laborCost: number
+  machineCost: number
+  overheadCost: number
+  estimatedCost: number
+  actualCost: number
+  varianceCost: number
+  createdAt?: string | null
+  updatedAt?: string | null
+  component?: Pick<ComponentRecord, 'id' | 'code' | 'name' | 'status'>
+  productionOrder?: {
+    id: string
+    orderNo: string
+    title: string
+    status: string
+  }
 }
 
 export interface CreateComponentPayload {

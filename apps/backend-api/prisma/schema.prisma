@@ -199,6 +199,32 @@ enum ProductionOrderStatus {
   CANCELLED
 }
 
+enum ProductionMaterialReservationStatus {
+  DRAFT
+  RESERVED
+  PARTIALLY_ISSUED
+  ISSUED
+  CANCELLED
+  EXPIRED
+}
+
+enum ProductionMaterialReservationLineStatus {
+  OPEN
+  PARTIAL
+  FULFILLED
+  RELEASED
+  SHORTAGE
+}
+
+enum ProductionMaterialLedgerEventType {
+  RESERVE
+  RELEASE
+  ISSUE
+  RETURN
+  CONSUME
+  ADJUST
+}
+
 enum ProductionStageCode {
   CUTTING
   ASSEMBLY
@@ -382,12 +408,12 @@ enum AnalyticsPredictionStatus {
 //
 
 model User {
-  id        String     @id @default(cuid())
-  username  String     @unique
-  email     String?    @unique
-  password  String
-  fullName  String?
-  status    UserStatus @default(ACTIVE)
+  id       String     @id @default(cuid())
+  username String     @unique
+  email    String?    @unique
+  password String
+  fullName String?
+  status   UserStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -399,13 +425,13 @@ model User {
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   tokenHash String
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -476,11 +502,11 @@ model RolePermission {
 //
 
 model InventoryCategory {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
-  code        String   @unique
+  code        String  @unique
   description String?
-  active      Boolean  @default(true)
+  active      Boolean @default(true)
   color       String?
   createdBy   String?
   updatedBy   String?
@@ -488,45 +514,46 @@ model InventoryCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items InventoryItem[]
+  items         InventoryItem[]
   materialTypes MaterialType[]
 
   @@map("inventory_categories")
 }
 
 model MaterialType {
-  id String @id @default(cuid())
-  code String @unique
-  name String
-  description String?
-  active Boolean @default(true)
-  color String?
-  categoryId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
-  category InventoryCategory @relation(fields: [categoryId], references: [id])
+  id             String            @id @default(cuid())
+  code           String            @unique
+  name           String
+  description    String?
+  active         Boolean           @default(true)
+  color          String?
+  categoryId     String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  category       InventoryCategory @relation(fields: [categoryId], references: [id])
   inventoryItems InventoryItem[]
+
   @@index([categoryId])
   @@index([active])
   @@map("material_types")
 }
 
 model MasterTransactionType {
-  id String @id @default(cuid())
-  code String @unique
-  name String
-  description String?
-  direction String
-  affectsStock Boolean @default(true)
-  requiresApproval Boolean @default(false)
-  active Boolean @default(true)
-  color String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  description      String?
+  direction        String
+  affectsStock     Boolean  @default(true)
+  requiresApproval Boolean  @default(false)
+  active           Boolean  @default(true)
+  color            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdBy        String?
+  updatedBy        String?
 
   transactions InventoryTransaction[]
 
@@ -536,121 +563,123 @@ model MasterTransactionType {
 }
 
 model MasterWarehouse {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
-  zones WarehouseZone[]
-  transactions InventoryTransaction[]
-  transactionItems InventoryTransactionItem[]
-  returnRequests ReturnRequest[]
+  zones                              WarehouseZone[]
+  transactions                       InventoryTransaction[]
+  transactionItems                   InventoryTransactionItem[]
+  returnRequests                     ReturnRequest[]
+  productionMaterialReservationLines ProductionMaterialReservationLine[]
+  productionMaterialLedgers          ProductionMaterialLedger[]
 
   @@index([active])
   @@map("master_warehouses")
 }
 
 model MasterQcStatus {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  sortOrder Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
   @@index([active])
   @@map("master_qc_statuses")
 }
 
 model MasterPriority {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  sortOrder Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
   @@index([active])
   @@map("master_priorities")
 }
 
 model MasterMaterialStatus {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  sortOrder Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
   @@index([active])
   @@map("master_material_statuses")
 }
 
 model MasterSupplierCategory {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
   @@index([active])
   @@map("master_supplier_categories")
 }
 
 model MasterProjectCategory {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
   @@index([active])
   @@map("master_project_categories")
 }
 
 model MasterWorkflowStatus {
-  id String @id @default(cuid())
-  code String @unique
-  name String
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
   description String?
-  active Boolean @default(true)
-  color String?
-  sortOrder Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  updatedBy String?
+  active      Boolean  @default(true)
+  color       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
 
   @@index([active])
   @@map("master_workflow_statuses")
@@ -687,14 +716,13 @@ model MasterUnit {
 
   derivedUnits MasterUnit[] @relation("UnitConversionBase")
 
-  inventoryItems InventoryItem[]
+  inventoryItems   InventoryItem[]
   transactionItems InventoryTransactionItem[]
-  returnItems ReturnRequestItem[]
+  returnItems      ReturnRequestItem[]
 
   @@index([category])
   @@index([active])
   @@index([baseUnitId])
-
   @@map("master_units")
 }
 
@@ -743,10 +771,13 @@ model InventoryItem {
 
   zone WarehouseZone? @relation(fields: [zoneId], references: [id])
 
-  transactionItems InventoryTransactionItem[]
-  returnItems ReturnRequestItem[]
-  bomItems BOMItem[]
-  productionMaterialIssues ProductionMaterialIssue[]
+  transactionItems                   InventoryTransactionItem[]
+  returnItems                        ReturnRequestItem[]
+  bomItems                           BOMItem[]
+  productionMaterialIssues           ProductionMaterialIssue[]
+  productionMaterialReservationLines ProductionMaterialReservationLine[]
+  productionMaterialLedgers          ProductionMaterialLedger[]
+  productionMaterialConsumptions     ProductionMaterialConsumption[]
 
   @@index([code])
   @@index([name])
@@ -756,7 +787,6 @@ model InventoryItem {
   @@index([slotId])
   @@index([level])
   @@index([deletedAt])
-
   @@map("inventory_items")
 }
 
@@ -822,12 +852,10 @@ model InventoryTransaction {
   @@index([zoneId])
   @@index([projectId])
   @@index([transactionDate])
-
   @@map("inventory_transactions")
 }
 
 model InventoryTransactionItem {
-
   id String @id @default(cuid())
 
   transactionId String
@@ -866,44 +894,45 @@ model InventoryTransactionItem {
 }
 
 model InventoryLocationStock {
-  id String @id @default(cuid())
+  id              String         @id @default(cuid())
   inventoryItemId String
-  warehouseId String?
-  zoneId String?
-  slotId String?
-  level String?
-  quantity Float @default(0)
-  inventoryItem InventoryItem @relation(fields: [inventoryItemId],references: [id],onDelete: Cascade)
-  zone WarehouseZone? @relation(fields: [zoneId], references: [id])
+  warehouseId     String?
+  zoneId          String?
+  slotId          String?
+  level           String?
+  quantity        Float          @default(0)
+  inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  zone            WarehouseZone? @relation(fields: [zoneId], references: [id])
+
   @@index([inventoryItemId])
   @@index([zoneId, slotId, level])
   @@map("inventory_location_stocks")
 }
 
 model ReturnRequest {
-  id String @id @default(cuid())
-  returnNo String @unique
-  flowType ReturnFlowType
-  status ReturnRequestStatus @default(REQUESTED)
-  projectId String?
-  supplierId String?
+  id          String              @id @default(cuid())
+  returnNo    String              @unique
+  flowType    ReturnFlowType
+  status      ReturnRequestStatus @default(REQUESTED)
+  projectId   String?
+  supplierId  String?
   warehouseId String?
   requestedBy String?
-  approvedBy String?
-  receivedBy String?
+  approvedBy  String?
+  receivedBy  String?
   inspectedBy String?
-  remarks String?
-  requestedAt DateTime @default(now())
-  approvedAt DateTime?
-  receivedAt DateTime?
+  remarks     String?
+  requestedAt DateTime            @default(now())
+  approvedAt  DateTime?
+  receivedAt  DateTime?
   inspectedAt DateTime?
-  disposedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  disposedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  project Project? @relation(fields: [projectId], references: [id])
-  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
-  items ReturnRequestItem[]
+  project   Project?            @relation(fields: [projectId], references: [id])
+  warehouse MasterWarehouse?    @relation(fields: [warehouseId], references: [id])
+  items     ReturnRequestItem[]
 
   @@index([flowType])
   @@index([status])
@@ -913,23 +942,23 @@ model ReturnRequest {
 }
 
 model ReturnRequestItem {
-  id String @id @default(cuid())
-  returnRequestId String
-  inventoryItemId String
+  id                String             @id @default(cuid())
+  returnRequestId   String
+  inventoryItemId   String
   requestedQuantity Float
-  receivedQuantity Float?
+  receivedQuantity  Float?
   inspectedQuantity Float?
-  disposition ReturnDisposition?
-  unitId String?
-  zoneId String?
-  remarks String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  disposition       ReturnDisposition?
+  unitId            String?
+  zoneId            String?
+  remarks           String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  unit MasterUnit? @relation(fields: [unitId], references: [id])
-  zone WarehouseZone? @relation(fields: [zoneId], references: [id])
+  returnRequest ReturnRequest  @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+  unit          MasterUnit?    @relation(fields: [unitId], references: [id])
+  zone          WarehouseZone? @relation(fields: [zoneId], references: [id])
 
   @@index([returnRequestId])
   @@index([inventoryItemId])
@@ -956,12 +985,11 @@ model Project {
 
   updatedAt DateTime @updatedAt
 
-  components Component[]
+  components            Component[]
   inventoryTransactions InventoryTransaction[]
-  returnRequests ReturnRequest[]
+  returnRequests        ReturnRequest[]
 
   @@index([status])
-
   @@map("projects")
 }
 
@@ -992,6 +1020,14 @@ model Component {
 
   installedDate DateTime?
 
+  installZone String?
+
+  installAxis String?
+
+  installLevel String?
+
+  installPosition String?
+
   imageUrl String?
 
   estimatedCost Float @default(0)
@@ -1010,10 +1046,33 @@ model Component {
 
   productionOrders ProductionOrder[]
 
+  costing ComponentCosting?
+
   @@index([status])
   @@index([projectId])
-
   @@map("components")
+}
+
+model ComponentCosting {
+  id                    String   @id @default(uuid())
+  componentId           String   @unique
+  productionOrderId     String
+  estimatedMaterialCost Float    @default(0)
+  actualMaterialCost    Float    @default(0)
+  laborCost             Float    @default(0)
+  machineCost           Float    @default(0)
+  overheadCost          Float    @default(0)
+  estimatedCost         Float    @default(0)
+  actualCost            Float    @default(0)
+  varianceCost          Float    @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  component       Component       @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  @@index([componentId])
+  @@index([productionOrderId])
 }
 
 model ComponentTimeline {
@@ -1060,7 +1119,6 @@ model Task {
   updatedAt DateTime @updatedAt
 
   @@index([status])
-
   @@map("tasks")
 }
 
@@ -1090,7 +1148,6 @@ model Worker {
   updatedAt DateTime @updatedAt
 
   @@index([status])
-
   @@map("workers")
 }
 
@@ -1134,7 +1191,6 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   @@index([status])
-
   @@map("vehicles")
 }
 
@@ -1162,7 +1218,6 @@ model SafetyInspection {
   updatedAt DateTime @updatedAt
 
   @@index([status])
-
   @@map("safety_inspections")
 }
 
@@ -1194,7 +1249,6 @@ model PurchaseOrder {
   items PurchaseOrderItem[]
 
   @@index([status])
-
   @@map("purchase_orders")
 }
 
@@ -1242,7 +1296,6 @@ model MaterialRequest {
   items MaterialRequestItem[]
 
   @@index([status])
-
   @@map("material_requests")
 }
 
@@ -1290,7 +1343,6 @@ model Approval {
   approvedAt DateTime?
 
   @@index([status])
-
   @@map("approvals")
 }
 
@@ -1335,16 +1387,17 @@ model WarehouseZone {
 
   locationStocks InventoryLocationStock[]
 
-  transactions InventoryTransaction[]
-  transactionItems InventoryTransactionItem[]
-  returnItems ReturnRequestItem[]
+  transactions                       InventoryTransaction[]
+  transactionItems                   InventoryTransactionItem[]
+  returnItems                        ReturnRequestItem[]
+  productionMaterialReservationLines ProductionMaterialReservationLine[]
+  productionMaterialLedgers          ProductionMaterialLedger[]
 
   @@index([warehouseId])
   @@index([active])
   @@index([row])
   @@index([column])
   @@index([level])
-
   @@map("warehouse_zones")
 }
 
@@ -1425,15 +1478,15 @@ model EquipmentBooking {
 model AnalyticsSnapshot {
   id String @id @default(cuid())
 
-  domain       AnalyticsDomain @default(ERP)
-  snapshotType String          @default("operational")
-  periodStart  DateTime?
-  periodEnd    DateTime?
-  metrics      Json?
-  trends       Json?
-  bottlenecks  Json?
-  slaViolations Json?
-  anomalies    Json?
+  domain           AnalyticsDomain @default(ERP)
+  snapshotType     String          @default("operational")
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  metrics          Json?
+  trends           Json?
+  bottlenecks      Json?
+  slaViolations    Json?
+  anomalies        Json?
   generatedByJobId String?
 
   totalProjects Int @default(0)
@@ -1451,9 +1504,9 @@ model AnalyticsSnapshot {
   createdAt DateTime @default(now())
 
   metricRecords AnalyticsMetric[]
-  aggregations   AnalyticsAggregation[]
-  alerts         AnalyticsAlert[]
-  predictions    AnalyticsPrediction[]
+  aggregations  AnalyticsAggregation[]
+  alerts        AnalyticsAlert[]
+  predictions   AnalyticsPrediction[]
 
   @@index([domain])
   @@index([snapshotType])
@@ -1486,16 +1539,16 @@ model AnalyticsMetric {
 }
 
 model AnalyticsAggregation {
-  id         String          @id @default(cuid())
-  snapshotId String?
-  domain     AnalyticsDomain
-  key        String
-  interval   String          @default("realtime")
-  value      Json
+  id          String          @id @default(cuid())
+  snapshotId  String?
+  domain      AnalyticsDomain
+  key         String
+  interval    String          @default("realtime")
+  value       Json
   periodStart DateTime?
   periodEnd   DateTime?
-  metadata   Json?
-  createdAt  DateTime        @default(now())
+  metadata    Json?
+  createdAt   DateTime        @default(now())
 
   snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
 
@@ -1506,21 +1559,21 @@ model AnalyticsAggregation {
 }
 
 model AnalyticsAlert {
-  id          String                 @id @default(cuid())
-  snapshotId  String?
-  domain      AnalyticsDomain
-  key         String
-  title       String
-  message     String
-  severity    AnalyticsAlertSeverity @default(WARNING)
-  status      AnalyticsAlertStatus   @default(OPEN)
-  threshold   Float?
-  actualValue Float?
-  metadata    Json?
+  id             String                 @id @default(cuid())
+  snapshotId     String?
+  domain         AnalyticsDomain
+  key            String
+  title          String
+  message        String
+  severity       AnalyticsAlertSeverity @default(WARNING)
+  status         AnalyticsAlertStatus   @default(OPEN)
+  threshold      Float?
+  actualValue    Float?
+  metadata       Json?
   acknowledgedAt DateTime?
   resolvedAt     DateTime?
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
 
@@ -1533,19 +1586,19 @@ model AnalyticsAlert {
 }
 
 model AnalyticsPrediction {
-  id          String                    @id @default(cuid())
-  snapshotId  String?
-  domain      AnalyticsDomain
-  key         String
-  title       String
-  prediction  Json
-  confidence  Float?
-  horizon     String?
-  status      AnalyticsPredictionStatus @default(DRAFT)
-  modelName   String?
-  metadata    Json?
-  createdAt   DateTime                  @default(now())
-  expiresAt   DateTime?
+  id         String                    @id @default(cuid())
+  snapshotId String?
+  domain     AnalyticsDomain
+  key        String
+  title      String
+  prediction Json
+  confidence Float?
+  horizon    String?
+  status     AnalyticsPredictionStatus @default(DRAFT)
+  modelName  String?
+  metadata   Json?
+  createdAt  DateTime                  @default(now())
+  expiresAt  DateTime?
 
   snapshot AnalyticsSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
 
@@ -1609,22 +1662,22 @@ model WorkflowDefinition {
 }
 
 model WorkflowStep {
-  id           String           @id @default(cuid())
-  definitionId String
-  key          String
-  name         String
-  description  String?
-  type         WorkflowStepType @default(APPROVAL)
-  order        Int
-  approverRole String?
-  approverUserId String?
-  requiredPermission String?
-  slaHours     Int?
-  escalationRole String?
+  id                   String           @id @default(cuid())
+  definitionId         String
+  key                  String
+  name                 String
+  description          String?
+  type                 WorkflowStepType @default(APPROVAL)
+  order                Int
+  approverRole         String?
+  approverUserId       String?
+  requiredPermission   String?
+  slaHours             Int?
+  escalationRole       String?
   escalationAfterHours Int?
-  metadata     Json?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  metadata             Json?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   definition WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
   instances  WorkflowInstance[] @relation("CurrentWorkflowStep")
@@ -1637,19 +1690,19 @@ model WorkflowStep {
 }
 
 model WorkflowInstance {
-  id             String                 @id @default(cuid())
-  definitionId   String
-  currentStepId  String?
+  id              String                 @id @default(cuid())
+  definitionId    String
+  currentStepId   String?
   referenceModule String
   referenceId     String
-  status         WorkflowInstanceStatus @default(PENDING)
-  startedById    String?
-  completedAt    DateTime?
-  dueAt          DateTime?
-  escalatedAt    DateTime?
-  metadata       Json?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  status          WorkflowInstanceStatus @default(PENDING)
+  startedById     String?
+  completedAt     DateTime?
+  dueAt           DateTime?
+  escalatedAt     DateTime?
+  metadata        Json?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   definition  WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
   currentStep WorkflowStep?      @relation("CurrentWorkflowStep", fields: [currentStepId], references: [id], onDelete: SetNull)
@@ -1690,21 +1743,21 @@ model WorkflowAction {
 //
 
 model Attachment {
-  id          String             @id @default(cuid())
-  title       String
-  description String?
-  category    AttachmentCategory @default(OTHER)
-  mimeType    String
-  fileSize    Int
-  uploaderId  String?
-  tags        String[]           @default([])
+  id               String             @id @default(cuid())
+  title            String
+  description      String?
+  category         AttachmentCategory @default(OTHER)
+  mimeType         String
+  fileSize         Int
+  uploaderId       String?
+  tags             String[]           @default([])
   currentVersionId String?
-  thumbnailUrl String?
-  ocrStatus   String?
-  metadata    Json?
-  deletedAt   DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  thumbnailUrl     String?
+  ocrStatus        String?
+  metadata         Json?
+  deletedAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   versions AttachmentVersion[]
   links    AttachmentLink[]
@@ -1718,19 +1771,19 @@ model Attachment {
 }
 
 model AttachmentVersion {
-  id           String   @id @default(cuid())
-  attachmentId String
-  version      Int
-  originalName String
-  storageKey   String
-  publicUrl    String?
+  id                 String    @id @default(cuid())
+  attachmentId       String
+  version            Int
+  originalName       String
+  storageKey         String
+  publicUrl          String?
   signedUrlExpiresAt DateTime?
-  mimeType     String
-  fileSize     Int
-  checksum     String?
-  uploadedById String?
-  metadata     Json?
-  createdAt    DateTime @default(now())
+  mimeType           String
+  fileSize           Int
+  checksum           String?
+  uploadedById       String?
+  metadata           Json?
+  createdAt          DateTime  @default(now())
 
   attachment Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
 
@@ -1841,15 +1894,15 @@ model JobExecution {
 //
 
 model WorkCenter {
-  id          String           @id @default(cuid())
-  code        String           @unique
-  name        String
-  description String?
-  status      WorkCenterStatus @default(ACTIVE)
+  id             String           @id @default(cuid())
+  code           String           @unique
+  name           String
+  description    String?
+  status         WorkCenterStatus @default(ACTIVE)
   capacityPerDay Float?
-  metadata    Json?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   machines  Machine[]
   stages    ProductionStage[]
@@ -1872,7 +1925,7 @@ model Machine {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  workCenter WorkCenter? @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  workCenter WorkCenter?          @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
   stages     ProductionStage[]
   tasks      ProductionTask[]
   schedules  ProductionSchedule[]
@@ -1883,35 +1936,39 @@ model Machine {
 }
 
 model ProductionOrder {
-  id              String                @id @default(cuid())
-  orderNo         String                @unique
-  title           String
-  description     String?
-  projectId       String?
-  componentId     String?
-  bomId           String?
-  quantity        Float                 @default(1)
-  priority        TaskPriority          @default(MEDIUM)
-  status          ProductionOrderStatus @default(DRAFT)
-  currentStageCode ProductionStageCode?
-  plannedStartAt  DateTime?
-  plannedEndAt    DateTime?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  delayedAt       DateTime?
-  delayReason     String?
+  id                 String                @id @default(cuid())
+  orderNo            String                @unique
+  title              String
+  description        String?
+  projectId          String?
+  componentId        String?
+  bomId              String?
+  quantity           Float                 @default(1)
+  priority           TaskPriority          @default(MEDIUM)
+  status             ProductionOrderStatus @default(DRAFT)
+  currentStageCode   ProductionStageCode?
+  plannedStartAt     DateTime?
+  plannedEndAt       DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  delayedAt          DateTime?
+  delayReason        String?
   workflowInstanceId String?
-  metadata        Json?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  metadata           Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
-  stages    ProductionStage[]
-  tasks     ProductionTask[]
-  schedules ProductionSchedule[]
-  logs      ProductionLog[]
-  bom       BOM?                  @relation(fields: [bomId], references: [id], onDelete: SetNull)
-  component Component?            @relation(fields: [componentId], references: [id], onDelete: SetNull)
-  materialIssues ProductionMaterialIssue[]
+  stages               ProductionStage[]
+  tasks                ProductionTask[]
+  schedules            ProductionSchedule[]
+  logs                 ProductionLog[]
+  bom                  BOM?                            @relation(fields: [bomId], references: [id], onDelete: SetNull)
+  component            Component?                      @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  materialIssues       ProductionMaterialIssue[]
+  materialReservations ProductionMaterialReservation[]
+  materialLedgers      ProductionMaterialLedger[]
+  materialConsumptions ProductionMaterialConsumption[]
+  componentCostings    ComponentCosting[]
 
   @@index([status])
   @@index([projectId])
@@ -1940,9 +1997,9 @@ model ProductionStage {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  workCenter      WorkCenter?     @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
-  machine         Machine?        @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  productionOrder ProductionOrder  @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workCenter      WorkCenter?      @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  machine         Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
   tasks           ProductionTask[]
   logs            ProductionLog[]
 
@@ -1973,7 +2030,7 @@ model ProductionTask {
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
-  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  productionOrder ProductionOrder  @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
   stage           ProductionStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
   workCenter      WorkCenter?      @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
   machine         Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
@@ -1999,8 +2056,8 @@ model ProductionSchedule {
   updatedAt         DateTime @updatedAt
 
   productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  workCenter      WorkCenter?      @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
-  machine         Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  workCenter      WorkCenter?     @relation(fields: [workCenterId], references: [id], onDelete: SetNull)
+  machine         Machine?        @relation(fields: [machineId], references: [id], onDelete: SetNull)
 
   @@index([startAt, endAt])
   @@index([workCenterId])
@@ -2021,7 +2078,7 @@ model ProductionLog {
   metadata          Json?
   createdAt         DateTime          @default(now())
 
-  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  productionOrder ProductionOrder  @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
   stage           ProductionStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
 
   @@index([productionOrderId])
@@ -2099,7 +2156,7 @@ model QcInspection {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  checklist   QcChecklist?            @relation(fields: [checklistId], references: [id], onDelete: SetNull)
+  checklist   QcChecklist?           @relation(fields: [checklistId], references: [id], onDelete: SetNull)
   results     QcResult[]
   issues      QcIssue[]
   attachments QcAttachment[]
@@ -2115,19 +2172,19 @@ model QcInspection {
 }
 
 model QcResult {
-  id              String         @id @default(cuid())
+  id              String          @id @default(cuid())
   inspectionId    String
   checklistItemId String?
   category        QcChecklistType @default(FINAL)
-  status          QcResultStatus @default(PENDING)
+  status          QcResultStatus  @default(PENDING)
   measuredValue   String?
   expectedValue   String?
   tolerance       String?
   unit            String?
   notes           String?
   metadata        Json?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   inspection    QcInspection     @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   checklistItem QcChecklistItem? @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
@@ -2276,26 +2333,26 @@ model YardRow {
 }
 
 model YardSlot {
-  id             String         @id @default(cuid())
-  zoneId         String
-  rowId          String?
-  code           String
-  status         YardSlotStatus @default(AVAILABLE)
-  x              Float
-  y              Float
-  width          Float          @default(1)
-  height         Float          @default(1)
-  maxStackLevel  Int            @default(1)
-  currentStackLevel Int         @default(0)
-  metadata       Json?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                String         @id @default(cuid())
+  zoneId            String
+  rowId             String?
+  code              String
+  status            YardSlotStatus @default(AVAILABLE)
+  x                 Float
+  y                 Float
+  width             Float          @default(1)
+  height            Float          @default(1)
+  maxStackLevel     Int            @default(1)
+  currentStackLevel Int            @default(0)
+  metadata          Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  zone       YardZone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  row        YardRow?             @relation(fields: [rowId], references: [id], onDelete: SetNull)
+  zone       YardZone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  row        YardRow?            @relation(fields: [rowId], references: [id], onDelete: SetNull)
   placements YardItemPlacement[]
-  fromMoves  YardMovement[]       @relation("YardMovementFromSlot")
-  toMoves    YardMovement[]       @relation("YardMovementToSlot")
+  fromMoves  YardMovement[]      @relation("YardMovementFromSlot")
+  toMoves    YardMovement[]      @relation("YardMovementToSlot")
 
   @@unique([zoneId, code])
   @@index([zoneId])
@@ -2323,11 +2380,11 @@ model YardItemPlacement {
   metadata       Json?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  stagedQuantity Float @default(0)
+  stagedQuantity Float        @default(0)
 
-  remainingQuantity Float @default(0)
-  slot      YardSlot       @relation(fields: [slotId], references: [id], onDelete: Restrict)
-  movements YardMovement[]
+  remainingQuantity Float          @default(0)
+  slot              YardSlot       @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  movements         YardMovement[]
 
   @@index([slotId])
   @@index([itemType, itemId])
@@ -2337,19 +2394,19 @@ model YardItemPlacement {
 }
 
 model YardMovement {
-  id            String           @id @default(cuid())
-  placementId   String?
-  type          YardMovementType
-  itemType      YardItemType
-  itemId        String
-  itemCode      String
-  fromSlotId    String?
-  toSlotId      String?
-  craneId       String?
-  movedById     String?
-  reason        String?
-  metadata      Json?
-  createdAt     DateTime         @default(now())
+  id          String           @id @default(cuid())
+  placementId String?
+  type        YardMovementType
+  itemType    YardItemType
+  itemId      String
+  itemCode    String
+  fromSlotId  String?
+  toSlotId    String?
+  craneId     String?
+  movedById   String?
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
 
   placement YardItemPlacement? @relation(fields: [placementId], references: [id], onDelete: SetNull)
   fromSlot  YardSlot?          @relation("YardMovementFromSlot", fields: [fromSlotId], references: [id], onDelete: SetNull)
@@ -2383,17 +2440,17 @@ model Crane {
 }
 
 model YardSnapshot {
-  id           String   @id @default(cuid())
-  zoneId       String?
-  name         String
-  occupancyRate Float   @default(0)
-  totalSlots   Int      @default(0)
-  occupiedSlots Int     @default(0)
-  heatmap      Json?
-  congestion   Json?
-  payload      Json
+  id            String   @id @default(cuid())
+  zoneId        String?
+  name          String
+  occupancyRate Float    @default(0)
+  totalSlots    Int      @default(0)
+  occupiedSlots Int      @default(0)
+  heatmap       Json?
+  congestion    Json?
+  payload       Json
   generatedById String?
-  createdAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   zone YardZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
 
@@ -2424,7 +2481,6 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
-
   @@map("activity_logs")
 }
 
@@ -2433,24 +2489,23 @@ model ActivityLog {
 // =========================================================
 
 model Supplier {
+  id String @id @default(uuid())
 
-  id          String   @id @default(uuid())
+  code String @unique
 
-  code        String   @unique
+  name String
 
-  name        String
+  contact String?
 
-  contact     String?
+  phone String?
 
-  phone       String?
+  email String?
 
-  email       String?
+  address String?
 
-  address     String?
+  createdAt DateTime @default(now())
 
-  createdAt   DateTime @default(now())
-
-  updatedAt   DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 // =========================================================
@@ -2458,20 +2513,19 @@ model Supplier {
 // =========================================================
 
 model PurchaseReceiving {
+  id String @id @default(uuid())
 
-  id            String   @id @default(uuid())
+  receivingNo String @unique
 
-  receivingNo   String   @unique
+  supplierId String
 
-  supplierId    String
+  materialId String
 
-  materialId    String
+  quantity Float
 
-  quantity      Float
+  status String @default("RECEIVED")
 
-  status        String   @default("RECEIVED")
-
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 // =========================================================
@@ -2479,113 +2533,236 @@ model PurchaseReceiving {
 // =========================================================
 
 model BOM {
+  id String @id @default(uuid())
 
-  id            String   @id @default(uuid())
+  bomNo String @unique
 
-  bomNo         String   @unique
+  productCode String
 
-  productCode   String
-
-  productName   String
+  productName String
 
   structureType String?
 
-  projectId     String?
+  projectId String?
 
-  unit          String?
+  unit String?
 
   estimatedWeight Float @default(0)
 
-  version       String
+  version String
 
-  status        String   @default("ACTIVE")
+  status String @default("ACTIVE")
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  updatedAt     DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
-  items         BOMItem[]
+  items BOMItem[]
 
-  routingSteps  BOMRoutingStep[]
+  routingSteps BOMRoutingStep[]
 
   productionOrders ProductionOrder[]
+
+  materialReservations ProductionMaterialReservation[]
 }
 
 model BOMItem {
+  id String @id @default(uuid())
 
-  id            String   @id @default(uuid())
+  bomId String
 
-  bomId         String
+  materialId String
 
-  materialId    String
+  quantity Float
 
-  quantity      Float
+  wastePercent Float @default(0)
 
-  wastePercent  Float @default(0)
+  category String @default("MAIN_MATERIAL")
 
-  category      String @default("MAIN_MATERIAL")
+  bom BOM @relation(fields: [bomId], references: [id])
 
-  bom           BOM @relation(fields: [bomId], references: [id])
+  material InventoryItem @relation(fields: [materialId], references: [id])
 
-  material      InventoryItem @relation(fields: [materialId], references: [id])
+  reservationLines ProductionMaterialReservationLine[]
 
   @@index([bomId])
   @@index([materialId])
 }
 
 model BOMRoutingStep {
+  id String @id @default(uuid())
 
-  id            String   @id @default(uuid())
+  bomId String
 
-  bomId         String
+  stepNo Int
 
-  stepNo        Int
+  stepName String
 
-  stepName      String
-
-  workshop      String?
+  workshop String?
 
   expectedHours Float @default(0)
 
-  qcRequired    Boolean @default(false)
+  qcRequired Boolean @default(false)
 
-  bom           BOM @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  bom BOM @relation(fields: [bomId], references: [id], onDelete: Cascade)
 
   @@unique([bomId, stepNo])
   @@index([bomId])
 }
 
+model ProductionMaterialReservation {
+  id                String                              @id @default(uuid())
+  reservationNo     String                              @unique
+  productionOrderId String
+  bomId             String?
+  status            ProductionMaterialReservationStatus @default(DRAFT)
+  reservedBy        String?
+  reservedAt        DateTime?
+  expiresAt         DateTime?
+  releasedAt        DateTime?
+  note              String?
+  createdAt         DateTime                            @default(now())
+  updatedAt         DateTime                            @updatedAt
+
+  productionOrder ProductionOrder                     @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  bom             BOM?                                @relation(fields: [bomId], references: [id], onDelete: SetNull)
+  lines           ProductionMaterialReservationLine[]
+  materialLedgers ProductionMaterialLedger[]
+  materialIssues  ProductionMaterialIssue[]
+
+  @@index([productionOrderId])
+  @@index([bomId])
+  @@index([status])
+  @@index([reservedAt])
+}
+
+model ProductionMaterialReservationLine {
+  id              String                                  @id @default(uuid())
+  reservationId   String
+  inventoryItemId String
+  bomItemId       String?
+  warehouseId     String?
+  zoneId          String?
+  slotId          String?
+  level           String?
+  requiredQty     Float
+  reservedQty     Float                                   @default(0)
+  issuedQty       Float                                   @default(0)
+  returnedQty     Float                                   @default(0)
+  status          ProductionMaterialReservationLineStatus @default(OPEN)
+  createdAt       DateTime                                @default(now())
+  updatedAt       DateTime                                @updatedAt
+
+  reservation    ProductionMaterialReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  inventoryItem  InventoryItem                 @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  bomItem        BOMItem?                      @relation(fields: [bomItemId], references: [id], onDelete: SetNull)
+  warehouse      MasterWarehouse?              @relation(fields: [warehouseId], references: [id])
+  zone           WarehouseZone?                @relation(fields: [zoneId], references: [id])
+  materialIssues ProductionMaterialIssue[]
+
+  @@index([reservationId])
+  @@index([inventoryItemId])
+  @@index([bomItemId])
+  @@index([warehouseId, zoneId, slotId, level])
+  @@index([status])
+}
+
+model ProductionMaterialLedger {
+  id                String                            @id @default(uuid())
+  productionOrderId String
+  reservationId     String?
+  inventoryItemId   String
+  warehouseId       String?
+  zoneId            String?
+  slotId            String?
+  level             String?
+  quantity          Float
+  eventType         ProductionMaterialLedgerEventType
+  eventDate         DateTime                          @default(now())
+  remark            String?
+  createdBy         String?
+  createdAt         DateTime                          @default(now())
+
+  productionOrder ProductionOrder                @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  reservation     ProductionMaterialReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  inventoryItem   InventoryItem                  @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  warehouse       MasterWarehouse?               @relation(fields: [warehouseId], references: [id])
+  zone            WarehouseZone?                 @relation(fields: [zoneId], references: [id])
+
+  @@index([productionOrderId])
+  @@index([reservationId])
+  @@index([inventoryItemId])
+  @@index([eventType])
+  @@index([eventDate])
+  @@index([warehouseId, zoneId, slotId, level])
+}
+
 model ProductionMaterialIssue {
+  id String @id @default(uuid())
 
-  id                String   @id @default(uuid())
-
-  issueNo           String   @unique
+  issueNo String @unique
 
   productionOrderId String
 
-  inventoryItemId   String
+  reservationId String?
 
-  warehouseId       String?
+  reservationLineId String?
 
-  zoneId            String?
+  inventoryItemId String
 
-  issuedQty         Float
+  warehouseId String?
 
-  issuedBy          String?
+  zoneId String?
 
-  issuedDate        DateTime @default(now())
+  slotId String?
 
-  status            String   @default("DRAFT")
+  level String?
 
-  remarks           String?
+  issuedQty Float
+
+  returnedQty Float @default(0)
+
+  issuedBy String?
+
+  issuedDate DateTime @default(now())
+
+  status String @default("DRAFT")
+
+  remarks String?
 
   productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  reservation ProductionMaterialReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  reservationLine ProductionMaterialReservationLine? @relation(fields: [reservationLineId], references: [id], onDelete: SetNull)
 
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
 
   @@index([productionOrderId])
+  @@index([reservationId])
+  @@index([reservationLineId])
   @@index([inventoryItemId])
   @@index([issuedDate])
+}
+
+model ProductionMaterialConsumption {
+  id                String   @id @default(uuid())
+  productionOrderId String
+  inventoryItemId   String
+  issuedQty         Float    @default(0)
+  consumedQty       Float    @default(0)
+  scrapQty          Float    @default(0)
+  returnedQty       Float    @default(0)
+  remark            String?
+  createdBy         String?
+  createdAt         DateTime @default(now())
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId])
+  @@index([inventoryItemId])
+  @@index([createdAt])
 }
 
 // =========================================================
@@ -2593,20 +2770,19 @@ model ProductionMaterialIssue {
 // =========================================================
 
 model WorkOrder {
+  id String @id @default(uuid())
 
-  id              String   @id @default(uuid())
+  workOrderNo String @unique
 
-  workOrderNo     String   @unique
+  productCode String
 
-  productCode     String
+  quantity Float
 
-  quantity         Float
+  plannedStart DateTime?
 
-  plannedStart    DateTime?
+  plannedEnd DateTime?
 
-  plannedEnd      DateTime?
+  status String @default("PLANNED")
 
-  status          String   @default("PLANNED")
-
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 }

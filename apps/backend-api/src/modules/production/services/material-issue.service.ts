@@ -1,9 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+
+import {
+  Prisma,
+  ProductionMaterialLedgerEventType,
+  ProductionMaterialReservationStatus,
+  ProductionMaterialReservationLineStatus,
+  TransactionType,
+} from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { InventoryService } from '../../inventory/inventory.service';
+import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 import {
   CreateMaterialIssueDto,
+  IssueFromReservationDto,
+  ReturnMaterialIssueDto,
   UpdateMaterialIssueDto,
 } from '../dto/production.dto';
 
@@ -12,6 +23,7 @@ export class MaterialIssueService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
+    private readonly materialLedgerService: ProductionMaterialLedgerService,
   ) {}
 
   findAll(productionOrderId?: string, status?: string) {
@@ -22,6 +34,8 @@ export class MaterialIssueService {
       },
       include: {
         productionOrder: true,
+        reservation: true,
+        reservationLine: true,
         inventoryItem: {
           include: {
             category: true,
@@ -39,9 +53,13 @@ export class MaterialIssueService {
       data: {
         issueNo: body.issueNo ?? `ISS-${Date.now()}`,
         productionOrderId: body.productionOrderId,
+        reservationId: body.reservationId,
+        reservationLineId: body.reservationLineId,
         inventoryItemId: body.inventoryItemId,
         warehouseId: body.warehouseId,
         zoneId: body.zoneId,
+        slotId: body.slotId,
+        level: body.level,
         issuedQty: body.issuedQty,
         issuedBy: actorId,
         issuedDate: body.issuedDate,
@@ -92,6 +110,241 @@ export class MaterialIssueService {
     });
   }
 
+  async issueFromReservation(
+    reservationId: string,
+    body: IssueFromReservationDto = {},
+    actorId?: string,
+  ) {
+    const reservation = await this.prisma.productionMaterialReservation.findUnique({
+      where: { id: reservationId },
+      include: {
+        lines: {
+          include: {
+            inventoryItem: true,
+          },
+        },
+        productionOrder: true,
+      },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException('Production material reservation not found');
+    }
+
+    const issueableStatuses: ProductionMaterialReservationStatus[] = [
+      ProductionMaterialReservationStatus.RESERVED,
+      ProductionMaterialReservationStatus.PARTIALLY_ISSUED,
+    ];
+    if (!issueableStatuses.includes(reservation.status)) {
+      throw new BadRequestException('Only active reservations can be issued');
+    }
+
+    const requested = new Map(
+      (body.lines ?? []).map((line) => [line.reservationLineId, line.quantity]),
+    );
+    const targetLines = reservation.lines
+      .map((line) => {
+        const remaining =
+          Number(line.reservedQty ?? 0) -
+          Number(line.issuedQty ?? 0) +
+          Number(line.returnedQty ?? 0);
+        const requestedQty = requested.has(line.id)
+          ? Number(requested.get(line.id) ?? remaining)
+          : body.lines?.length
+            ? 0
+            : remaining;
+        return { line, quantity: requestedQty };
+      })
+      .filter((item) => item.quantity > 0);
+
+    if (!targetLines.length) {
+      throw new BadRequestException('No reserved material quantity available to issue');
+    }
+
+    for (const item of targetLines) {
+      const openQty =
+        Number(item.line.reservedQty ?? 0) -
+        Number(item.line.issuedQty ?? 0) +
+        Number(item.line.returnedQty ?? 0);
+      if (item.quantity > openQty + 0.000001) {
+        throw new BadRequestException(
+          `Cannot issue more than reserved quantity for ${item.line.inventoryItem.code}`,
+        );
+      }
+      await this.assertLocationStock(item.line, item.quantity);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const timestamp = Date.now();
+      const issues = [];
+
+      for (const [index, item] of targetLines.entries()) {
+        const issue = await tx.productionMaterialIssue.create({
+          data: {
+            issueNo: `ISS-${reservation.reservationNo}-${timestamp}-${index + 1}`,
+            productionOrderId: reservation.productionOrderId,
+            reservationId: reservation.id,
+            reservationLineId: item.line.id,
+            inventoryItemId: item.line.inventoryItemId,
+            warehouseId: item.line.warehouseId,
+            zoneId: item.line.zoneId,
+            slotId: item.line.slotId,
+            level: item.line.level,
+            issuedQty: item.quantity,
+            issuedBy: actorId,
+            issuedDate: new Date(),
+            status: 'ISSUED',
+            remarks: body.remarks ?? `Issue from reservation ${reservation.reservationNo}`,
+          },
+          include: {
+            productionOrder: true,
+            reservation: true,
+            reservationLine: true,
+            inventoryItem: true,
+          },
+        });
+
+        await this.createInventoryTransaction(
+          tx,
+          issue,
+          TransactionType.EXPORT,
+          -Math.abs(item.quantity),
+          actorId,
+        );
+        await this.applyLocationStock(tx, item.line, -Math.abs(item.quantity));
+        await tx.productionMaterialReservationLine.update({
+          where: { id: item.line.id },
+          data: {
+            issuedQty: { increment: item.quantity },
+            status:
+              item.quantity + Number(item.line.issuedQty ?? 0) >=
+              Number(item.line.reservedQty ?? 0) + Number(item.line.returnedQty ?? 0) - 0.000001
+                ? ProductionMaterialReservationLineStatus.FULFILLED
+                : ProductionMaterialReservationLineStatus.PARTIAL,
+          },
+        });
+        await this.materialLedgerService.createReservationEntries(
+          {
+            productionOrderId: reservation.productionOrderId,
+            reservationId: reservation.id,
+            eventType: ProductionMaterialLedgerEventType.ISSUE,
+            lines: [
+              {
+                inventoryItemId: item.line.inventoryItemId,
+                warehouseId: item.line.warehouseId,
+                zoneId: item.line.zoneId,
+                slotId: item.line.slotId,
+                level: item.line.level,
+                quantity: item.quantity,
+              },
+            ],
+            remark: issue.remarks ?? undefined,
+            createdBy: actorId,
+          },
+          tx,
+        );
+
+        issues.push(issue);
+      }
+
+      await this.refreshReservationStatus(tx, reservation.id);
+      return issues;
+    });
+  }
+
+  async returnIssue(id: string, body: ReturnMaterialIssueDto = {}, actorId?: string) {
+    const issue = await this.prisma.productionMaterialIssue.findUnique({
+      where: { id },
+      include: {
+        reservationLine: {
+          include: {
+            inventoryItem: true,
+          },
+        },
+        reservation: true,
+        productionOrder: true,
+        inventoryItem: true,
+      },
+    });
+
+    if (!issue) {
+      throw new NotFoundException('Material issue not found');
+    }
+    if (issue.status !== 'ISSUED' && issue.status !== 'RETURNED') {
+      throw new BadRequestException('Only issued material can be returned');
+    }
+    if (!issue.reservationLine) {
+      throw new BadRequestException('Issue is not linked to a reservation line');
+    }
+
+    const returnableQty = Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0);
+    const quantity = Number(body.quantity ?? returnableQty);
+    if (quantity <= 0 || quantity > returnableQty + 0.000001) {
+      throw new BadRequestException('Cannot return more than issued quantity');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.createInventoryTransaction(
+        tx,
+        issue,
+        TransactionType.RETURN,
+        Math.abs(quantity),
+        actorId,
+      );
+      await this.applyLocationStock(tx, issue.reservationLine!, Math.abs(quantity));
+      const updatedIssue = await tx.productionMaterialIssue.update({
+        where: { id },
+        data: {
+          returnedQty: { increment: quantity },
+          status:
+            quantity >= returnableQty - 0.000001
+              ? 'RETURNED'
+              : issue.status,
+          remarks: body.remarks ?? issue.remarks,
+        },
+        include: {
+          productionOrder: true,
+          reservation: true,
+          reservationLine: true,
+          inventoryItem: true,
+        },
+      });
+
+      await tx.productionMaterialReservationLine.update({
+        where: { id: issue.reservationLineId! },
+        data: {
+          returnedQty: { increment: quantity },
+          status: ProductionMaterialReservationLineStatus.PARTIAL,
+        },
+      });
+      await this.materialLedgerService.createReservationEntries(
+        {
+          productionOrderId: issue.productionOrderId,
+          reservationId: issue.reservationId ?? undefined,
+          eventType: ProductionMaterialLedgerEventType.RETURN,
+          lines: [
+            {
+              inventoryItemId: issue.inventoryItemId,
+              warehouseId: issue.warehouseId,
+              zoneId: issue.zoneId,
+              slotId: issue.slotId,
+              level: issue.level,
+              quantity,
+            },
+          ],
+          remark: body.remarks ?? `Return material from ${issue.issueNo}`,
+          createdBy: actorId,
+        },
+        tx,
+      );
+      if (issue.reservationId) {
+        await this.refreshReservationStatus(tx, issue.reservationId);
+      }
+
+      return updatedIssue;
+    });
+  }
+
   private createInventoryMovement(
     issue: {
       id: string;
@@ -119,6 +372,152 @@ export class MaterialIssueService {
           quantity: type === 'OUTBOUND' ? issue.issuedQty : Math.abs(issue.issuedQty),
         },
       ],
+    });
+  }
+
+  private async assertLocationStock(
+    line: {
+      inventoryItemId: string;
+      warehouseId: string | null;
+      zoneId: string | null;
+      slotId: string | null;
+      level: string | null;
+    },
+    quantity: number,
+  ) {
+    const stock = await this.prisma.inventoryLocationStock.findFirst({
+      where: {
+        inventoryItemId: line.inventoryItemId,
+        warehouseId: line.warehouseId ?? null,
+        zoneId: line.zoneId ?? null,
+        slotId: line.slotId ?? null,
+        level: line.level ?? null,
+      },
+    });
+    if (Number(stock?.quantity ?? 0) + 0.000001 < quantity) {
+      throw new BadRequestException('Inventory quantity cannot become negative');
+    }
+  }
+
+  private async applyLocationStock(
+    tx: Prisma.TransactionClient,
+    line: {
+      inventoryItemId: string;
+      warehouseId: string | null;
+      zoneId: string | null;
+      slotId: string | null;
+      level: string | null;
+    },
+    delta: number,
+  ) {
+    const existing = await tx.inventoryLocationStock.findFirst({
+      where: {
+        inventoryItemId: line.inventoryItemId,
+        warehouseId: line.warehouseId ?? null,
+        zoneId: line.zoneId ?? null,
+        slotId: line.slotId ?? null,
+        level: line.level ?? null,
+      },
+    });
+    const nextQuantity = Number(existing?.quantity ?? 0) + delta;
+    if (nextQuantity < -0.000001) {
+      throw new BadRequestException('Inventory quantity cannot become negative');
+    }
+    if (existing) {
+      if (nextQuantity <= 0.000001) {
+        await tx.inventoryLocationStock.delete({ where: { id: existing.id } });
+      } else {
+        await tx.inventoryLocationStock.update({
+          where: { id: existing.id },
+          data: { quantity: nextQuantity },
+        });
+      }
+    } else if (nextQuantity > 0.000001) {
+      await tx.inventoryLocationStock.create({
+        data: {
+          inventoryItemId: line.inventoryItemId,
+          warehouseId: line.warehouseId,
+          zoneId: line.zoneId,
+          slotId: line.slotId,
+          level: line.level,
+          quantity: nextQuantity,
+        },
+      });
+    }
+    await tx.inventoryItem.update({
+      where: { id: line.inventoryItemId },
+      data: { quantity: { increment: delta } },
+    });
+  }
+
+  private createInventoryTransaction(
+    tx: Prisma.TransactionClient,
+    issue: {
+      id: string;
+      issueNo: string;
+      productionOrderId: string;
+      inventoryItemId: string;
+      warehouseId: string | null;
+      zoneId: string | null;
+      slotId: string | null;
+      level: string | null;
+      remarks: string | null;
+    },
+    type: TransactionType,
+    quantity: number,
+    actorId?: string,
+  ) {
+    const timestamp = Date.now();
+    return tx.inventoryTransaction.create({
+      data: {
+        code: `PM-${type}-${timestamp}`,
+        transactionNo: `${issue.issueNo}-${type}-${timestamp}`,
+        type,
+        direction: type === TransactionType.EXPORT ? 'OUT' : 'IN',
+        performedBy: actorId,
+        referenceModule: 'production_material_issue',
+        referenceId: issue.id,
+        warehouseId: issue.warehouseId,
+        zoneId: issue.zoneId,
+        remarks: issue.remarks,
+        items: {
+          create: [
+            {
+              inventoryItemId: issue.inventoryItemId,
+              quantity,
+              warehouseId: issue.warehouseId,
+              zoneId: issue.zoneId,
+              slotId: issue.slotId,
+              level: issue.level,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  private async refreshReservationStatus(
+    tx: Prisma.TransactionClient,
+    reservationId: string,
+  ) {
+    const lines = await tx.productionMaterialReservationLine.findMany({
+      where: { reservationId },
+    });
+    const allIssued = lines.every(
+      (line) =>
+        Number(line.issuedQty ?? 0) >=
+        Number(line.reservedQty ?? 0) + Number(line.returnedQty ?? 0) - 0.000001,
+    );
+    const anyIssued = lines.some((line) => Number(line.issuedQty ?? 0) > 0);
+    await tx.productionMaterialReservation.update({
+      where: { id: reservationId },
+      data: {
+        status: allIssued
+          ? ProductionMaterialReservationStatus.ISSUED
+          : anyIssued
+            ? ProductionMaterialReservationStatus.PARTIALLY_ISSUED
+            : ProductionMaterialReservationStatus.RESERVED,
+      },
     });
   }
 }

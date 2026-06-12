@@ -72,17 +72,154 @@ Current implementation:
 
 - `POST /production/:id/stage-to-yard` enforces the linked QC status gate.
 
-## PROD-006: Formal Reservation And Costing Are Future Work
+## PROD-006: Production Reservation Does Not Move Stock
 
 Decision:
 
-- Formal BOM reservation documents and finished-component costing ledgers are not part of the current foundation.
+- Production reservation is a planning lock only. It does not create Inventory outbound movements and does not decrement stock.
 
 Rationale:
 
-- Current priority is operational material movement and QC-gated flow.
+- Inventory must remain the audited stock movement system. Reservation explains intent and protects production warehouse availability before issue.
+
+Current implementation:
+
+- `ProductionMaterialReservation` and `ProductionMaterialReservationLine` persist reservation state.
+- Reservation preview validates BOM required quantity plus waste and MO quantity against production warehouse stock minus active reservations.
+- Reservation allocation is stored by `warehouseId + zoneId + slotId + level`.
+- Active reservation statuses are `RESERVED` and `PARTIALLY_ISSUED`.
 
 Implications:
 
-- Reservation remains derived.
-- Future costing must persist material actuals, labor, machine, overhead, QC rework, and Yard handling cost.
+- Inventory outbound must occur only when the future material issue posting workflow runs.
+- Reservation lines should be linked to future issue lines so `issuedQty` and remaining reservation can be tracked.
+
+## PROD-007: Costing Builds From Production Actuals
+
+Decision:
+
+- Finished-component costing must build from production actuals rather than static BOM estimates alone.
+
+Rationale:
+
+- BOM estimates explain planned material demand. Actual cost must use material actually consumed or scrapped during Production.
+
+Current implementation:
+
+- Sprint 5 adds `ComponentCosting` as the persisted component costing breakdown.
+- Material actual cost is calculated from `ProductionMaterialConsumption`.
+- Labor, machine, overhead, QC rework, and Yard handling are currently zero/future inputs.
+
+## PROD-008: Production Material Ledger Explains Production Intent
+
+Decision:
+
+- Production material ledger records production-side material intent and lifecycle events, but does not replace Inventory transactions.
+
+Rationale:
+
+- Inventory remains the audited stock movement system. Production needs its own ledger to explain reservation, release, future issue, return, consume, and adjustment events by MO, reservation, material, and location.
+
+Current implementation:
+
+- `ProductionMaterialLedger` stores `productionOrderId`, optional `reservationId`, `inventoryItemId`, `warehouseId`, `zoneId`, `slotId`, `level`, signed `quantity`, `eventType`, `eventDate`, `remark`, and `createdBy`.
+- Supported event enum values are `RESERVE`, `RELEASE`, `ISSUE`, `RETURN`, `CONSUME`, and `ADJUST`.
+- Sprint 2 writes ledger rows for reservation create/reserve/release/expire.
+- Release and expire write `RELEASE` events with negative quantities.
+- Sprint 3 writes `ISSUE` and `RETURN` events when material is issued from or returned to a reservation.
+- Sprint 4 writes `CONSUME` events when actual production material consumption or scrap is posted.
+
+Implications:
+
+- Future material adjustment flows must write ledger rows in the same model.
+- Inventory stock movement still requires Inventory transactions, especially for posted issue and return documents.
+
+## PROD-009: Production Issue And Return Use Reservation Lines
+
+Decision:
+
+- Production material issue must be created from active reservation lines.
+- Returns must be created from issued material issue rows.
+
+Rationale:
+
+- Reservation lines carry the approved material, warehouse, zone, slot, and level allocation. Issue and return must preserve that location traceability and prevent over-issue/over-return.
+
+Current implementation:
+
+- `POST /production/reservations/:id/issue` issues remaining reserved quantities or requested reservation line quantities.
+- Issue validates `issuedQty <= reservedQty - issuedQty + returnedQty`.
+- Issue validates exact `inventory_location_stocks` bucket before reducing stock.
+- `POST /production/material-issues/:id/return` validates `returnQty <= issuedQty - returnedQty`.
+- Return adds stock back to the same `warehouseId + zoneId + slotId + level`.
+- Both flows update reservation line balances and write Production Material Ledger rows.
+
+Implications:
+
+- Future manual issue UI should still select reservation lines or explicitly create a reservation first.
+- Generic stock mutation remains disallowed; Inventory location stock must not become negative.
+
+## PROD-010: Component Output Requires Production Context
+
+Decision:
+
+- Production output component creation must require a valid Manufacturing Order with issued material.
+
+Rationale:
+
+- A finished/ready component should not appear from Production without material execution evidence.
+
+Current implementation:
+
+- `POST /production/:id/component` updates the linked component to `READY` or creates/links a component if missing.
+- The endpoint rejects MOs whose net issued material quantity is zero.
+
+## PROD-011: Production Consumption Tracks Actual Usage After Issue
+
+Decision:
+
+- Production material consumption is recorded after issue/return and does not mutate Inventory stock again.
+
+Rationale:
+
+- Inventory stock was already reduced at issue time and restored at return time. Consumption explains actual usage and scrap inside Production, while preserving Inventory movement auditability.
+
+Current implementation:
+
+- `ProductionMaterialConsumption` stores `productionOrderId`, `inventoryItemId`, issued snapshot, consumed quantity, scrap quantity, returned snapshot, remark, actor, and creation time.
+- `POST /production/:id/consume` validates against issued material for the same MO/material.
+- Validation enforces:
+  consumed quantity cannot exceed net issued quantity;
+  scrap quantity cannot exceed remaining quantity;
+  returned plus consumed plus scrap cannot exceed issued quantity.
+- Posting consumption writes `ProductionMaterialLedger` rows with event type `CONSUME`, allocated across issued material location buckets.
+
+Implications:
+
+- Consumption is the basis for future component costing.
+- Production adjustments remain a separate future workflow and should use `ADJUST` ledger events.
+
+## PROD-012: Component Costing Uses Consumption Times Inventory Average Cost
+
+Decision:
+
+- Component actual material cost is calculated as:
+  `(consumedQty + scrapQty) * inventory average cost`.
+
+Rationale:
+
+- Consumed quantity and scrap quantity are both material used by the Manufacturing Order.
+- Inventory average cost is already the operational cost basis for material valuation.
+
+Current implementation:
+
+- `POST /components/:id/costing/recalculate` selects the latest Production Order for the Component.
+- The endpoint requires that the Component has a Production Order and that the selected Production Order has `ProductionMaterialConsumption` rows.
+- Inventory average cost is calculated from positive inbound `InventoryTransactionItem` quantity/value:
+  inbound value divided by inbound quantity.
+- Recalculation upserts `ComponentCosting`, updates `Component.estimatedCost` and `Component.actualCost`, and writes an ActivityLog row.
+
+Implications:
+
+- Project component Actual Cost reads the synchronized `Component.actualCost`.
+- Future labor, machine, overhead, QC rework, and Yard handling cost should extend `ComponentCosting` rather than replacing the material-cost formula.

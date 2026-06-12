@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart3, Building2, CalendarClock, CheckCircle2, Clock, FileBarChart, Layers, MapPin, PackageOpen, Search, TrendingUp, X, type LucideIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
-import { createProject, getProjectsRuntime, type ProjectMaterialRuntime, type ProjectRuntimeRow, type ProjectsRuntime, type ProjectStatus } from '../api/projects.api'
+import { createProject, deliverProjectComponent, getProjectsRuntime, installProjectComponent, type InstallProjectComponentPayload, type ProjectComponentRuntime, type ProjectComponentStatus, type ProjectMaterialRuntime, type ProjectRuntimeRow, type ProjectsRuntime, type ProjectStatus } from '../api/projects.api'
 
-type ProjectTab = 'overview' | 'list' | 'progress' | 'materials' | 'reports'
+type ProjectTab = 'overview' | 'list' | 'progress' | 'materials' | 'components' | 'reports'
 
 const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
 const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
@@ -22,17 +23,20 @@ const tabs: Array<[ProjectTab, string]> = [
   ['list', 'Danh sách công trình'],
   ['progress', 'Tiến độ công trình'],
   ['materials', 'Vật tư theo công trình'],
+  ['components', 'Cấu kiện công trình'],
   ['reports', 'Báo cáo công trình'],
 ]
 
 export function ProjectsPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<ProjectTab>('overview')
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   const [selectedProject, setSelectedProject] = useState<ProjectRuntimeRow | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [installTarget, setInstallTarget] = useState<ProjectComponentRuntime | null>(null)
   const { data, isLoading } = useQuery({
     queryKey: ['projects-runtime'],
     queryFn: getProjectsRuntime,
@@ -48,6 +52,22 @@ export function ProjectsPage() {
       ])
     },
   })
+  const deliverMutation = useMutation({
+    mutationFn: deliverProjectComponent,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects-runtime'] }),
+  })
+  const installMutation = useMutation({
+    mutationFn: installProjectComponent,
+    onSuccess: async () => {
+      setInstallTarget(null)
+      await queryClient.invalidateQueries({ queryKey: ['projects-runtime'] })
+    },
+  })
+  const pendingComponentId = deliverMutation.isPending
+    ? deliverMutation.variables ?? null
+    : installMutation.isPending
+      ? installMutation.variables?.id ?? null
+      : null
   const runtime = data ?? emptyRuntime()
   const rows = useMemo(() => runtime.projects.filter((project) => {
     if (status !== 'all' && project.status !== status) return false
@@ -82,10 +102,12 @@ export function ProjectsPage() {
       {tab === 'list' && <ProjectListTab rows={rows} onOpen={setSelectedProject} />}
       {tab === 'progress' && <ProgressTab runtime={runtime} rows={rows} onOpen={setSelectedProject} />}
       {tab === 'materials' && <MaterialsTab rows={filterMaterials(runtime.materials, rows)} projects={runtime.projects} />}
+      {tab === 'components' && <ProjectComponentsTab rows={filterComponents(runtime.components, rows)} projects={runtime.projects} pendingId={pendingComponentId} onDeliver={(component) => deliverMutation.mutate(component.id)} onInstall={setInstallTarget} onOpen={(component) => navigate('/components/list', { state: { componentId: component.id } })} />}
       {tab === 'reports' && <ReportsTab runtime={runtime} />}
 
       <ProjectDetailDialog project={selectedProject} materials={runtime.materials.filter((row) => row.projectId === selectedProject?.id)} onClose={() => setSelectedProject(null)} />
       <CreateProjectDialog open={createOpen} saving={createMutation.isPending} error={createMutation.error} onClose={() => setCreateOpen(false)} onSubmit={(payload) => createMutation.mutate(payload)} />
+      <InstallComponentDialog key={installTarget?.id ?? 'install-empty'} component={installTarget} saving={installMutation.isPending} onClose={() => setInstallTarget(null)} onSubmit={(payload) => installTarget ? installMutation.mutate({ id: installTarget.id, payload }) : undefined} />
     </main>
   </OperationalShell>
 }
@@ -146,6 +168,43 @@ function CreateProjectDialog({ open, saving, error, onClose, onSubmit }: { open:
       <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
         <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">Hủy</button>
         <button disabled={saving || !code.trim() || !name.trim()} onClick={submit} className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? 'Đang tạo...' : 'Tạo công trình'}</button>
+      </footer>
+    </section>
+  </div>
+}
+
+function InstallComponentDialog({ component, saving, onClose, onSubmit }: { component: ProjectComponentRuntime | null; saving: boolean; onClose: () => void; onSubmit: (payload: InstallProjectComponentPayload) => void }) {
+  const [form, setForm] = useState<InstallProjectComponentPayload>({
+    installZone: '',
+    installAxis: '',
+    installLevel: '',
+    installPosition: '',
+  })
+
+  if (!component) return null
+
+  const canSubmit = Object.values(form).every((value) => value.trim())
+  const update = (key: keyof InstallProjectComponentPayload, value: string) => setForm((current) => ({ ...current, [key]: value }))
+
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <section className="w-full max-w-2xl overflow-hidden rounded-xl border border-cyan-900 bg-[#061321] text-slate-100 shadow-2xl">
+      <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Lắp đặt cấu kiện</p>
+          <h2 className="mt-1 text-xl font-semibold">{component.code}</h2>
+          <p className="mt-1 text-xs text-slate-500">{component.name} · {component.projectCode} · {component.projectName}</p>
+        </div>
+        <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
+      </header>
+      <div className="grid gap-3 p-5 md:grid-cols-2">
+        <label className="text-xs text-slate-400">Khu vực<input value={form.installZone} onChange={(event) => update('installZone', event.target.value)} className={`${input} mt-2 w-full`} placeholder="Zone A" /></label>
+        <label className="text-xs text-slate-400">Trục<input value={form.installAxis} onChange={(event) => update('installAxis', event.target.value)} className={`${input} mt-2 w-full`} placeholder="A-01" /></label>
+        <label className="text-xs text-slate-400">Tầng<input value={form.installLevel} onChange={(event) => update('installLevel', event.target.value)} className={`${input} mt-2 w-full`} placeholder="L2" /></label>
+        <label className="text-xs text-slate-400">Vị trí<input value={form.installPosition} onChange={(event) => update('installPosition', event.target.value)} className={`${input} mt-2 w-full`} placeholder="Grid A1-B1" /></label>
+      </div>
+      <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
+        <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">Hủy</button>
+        <button disabled={!canSubmit || saving} onClick={() => onSubmit(form)} className="rounded bg-emerald-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? 'Đang xác nhận...' : 'Xác nhận lắp đặt'}</button>
       </footer>
     </section>
   </div>
@@ -262,6 +321,77 @@ function MaterialsTab({ rows, projects }: { rows: ProjectMaterialRuntime[]; proj
   </div>
 }
 
+const componentStatusOptions: Array<'ALL' | ProjectComponentStatus> = ['ALL', 'STOCK', 'READY', 'SHIPPED', 'DELIVERED', 'INSTALLED']
+
+function ProjectComponentsTab({ rows, projects, pendingId, onDeliver, onInstall, onOpen }: { rows: ProjectComponentRuntime[]; projects: ProjectRuntimeRow[]; pendingId: string | null; onDeliver: (row: ProjectComponentRuntime) => void; onInstall: (row: ProjectComponentRuntime) => void; onOpen: (row: ProjectComponentRuntime) => void }) {
+  const [projectId, setProjectId] = useState('all')
+  const [status, setStatus] = useState<'ALL' | ProjectComponentStatus>('ALL')
+  const filtered = rows.filter((row) => (projectId === 'all' || row.projectId === projectId) && (status === 'ALL' || row.status === status))
+  const count = (value: ProjectComponentStatus) => filtered.filter((row) => row.status === value).length
+
+  return <div className="mt-3 space-y-4">
+    <div className={`${panel} flex flex-wrap gap-2 p-3`}>
+      <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={input}>
+        <option value="all">Tất cả công trình</option>
+        {projects.map((project) => <option key={project.id} value={project.id}>{project.code} · {project.name}</option>)}
+      </select>
+      <select value={status} onChange={(event) => setStatus(event.target.value as 'ALL' | ProjectComponentStatus)} className={input}>
+        {componentStatusOptions.map((option) => <option key={option} value={option}>Trạng thái: {option}</option>)}
+      </select>
+      <button className="rounded bg-blue-600 px-4 text-xs">Xuất Excel</button>
+      <button className="rounded border border-slate-700 px-4 text-xs">Bộ lọc</button>
+    </div>
+    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <KpiCard icon={PackageOpen} title="Tổng cấu kiện" value={fmt(filtered.length)} note="Cấu kiện" />
+      <KpiCard icon={CheckCircle2} title="READY" value={fmt(count('READY'))} note="Sẵn sàng" tone="emerald" />
+      <KpiCard icon={Layers} title="SHIPPED" value={fmt(count('SHIPPED'))} note="Đã xuất bãi" tone="cyan" />
+      <KpiCard icon={TrendingUp} title="DELIVERED" value={fmt(count('DELIVERED'))} note="Đã giao" tone="purple" />
+      <KpiCard icon={CalendarClock} title="INSTALLED" value={fmt(count('INSTALLED'))} note="Đã lắp" tone="amber" />
+    </div>
+    <div className={`${panel} overflow-hidden`}>
+      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+        <h3 className="text-sm font-semibold">Cấu kiện công trình</h3>
+        <span className="text-xs text-slate-500">{filtered.length.toLocaleString('vi-VN')} cấu kiện</span>
+      </div>
+      <div className="overflow-auto">
+        <table className="w-full min-w-[1640px] text-left text-sm">
+          <thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500"><tr>{['Mã cấu kiện', 'Tên cấu kiện', 'Công trình', 'Trạng thái', 'Ngày kế hoạch', 'Ngày lắp đặt', 'Zone', 'Axis', 'Level', 'Position', 'Estimated Cost', 'Actual Cost', 'Thao tác'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead>
+          <tbody>{filtered.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}>
+            <td className="px-4 py-3 font-semibold text-cyan-300">{row.code}</td>
+            <td className="px-4 py-3">{row.name}</td>
+            <td className="px-4 py-3">{row.projectCode} · {row.projectName}</td>
+            <td className="px-4 py-3"><ComponentStatusBadge status={row.status} /></td>
+            <td className="px-4 py-3">{date(row.plannedDate)}</td>
+            <td className="px-4 py-3">{date(row.installedDate)}</td>
+            <td className="px-4 py-3">{row.installZone ?? '-'}</td>
+            <td className="px-4 py-3">{row.installAxis ?? '-'}</td>
+            <td className="px-4 py-3">{row.installLevel ?? '-'}</td>
+            <td className="px-4 py-3">{row.installPosition ?? '-'}</td>
+            <td className="px-4 py-3">{fmt(row.estimatedCost)}</td>
+            <td className="px-4 py-3">{fmt(row.actualCost)}</td>
+            <td className="px-4 py-3">
+              <ComponentProjectAction row={row} pending={pendingId === row.id} onDeliver={onDeliver} onInstall={onInstall} />
+            </td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      {!filtered.length ? <Empty title="Chưa có cấu kiện theo bộ lọc công trình." /> : null}
+    </div>
+  </div>
+}
+
+function ComponentProjectAction({ row, pending, onDeliver, onInstall }: { row: ProjectComponentRuntime; pending: boolean; onDeliver: (row: ProjectComponentRuntime) => void; onInstall: (row: ProjectComponentRuntime) => void }) {
+  if (row.status === 'SHIPPED') {
+    return <button disabled={pending} onClick={(event) => { event.stopPropagation(); onDeliver(row) }} className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-50">{pending ? 'Đang xác nhận...' : 'Xác nhận nhận hàng'}</button>
+  }
+
+  if (row.status === 'DELIVERED') {
+    return <button disabled={pending} onClick={(event) => { event.stopPropagation(); onInstall(row) }} className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">{pending ? 'Đang xác nhận...' : 'Xác nhận lắp đặt'}</button>
+  }
+
+  return <span className="text-xs text-slate-500">-</span>
+}
+
 function ReportsTab({ runtime }: { runtime: ProjectsRuntime }) {
   const m = runtime.metrics
   return <div className="mt-3 space-y-4">
@@ -299,6 +429,11 @@ function StatusBadge({ status }: { status: string }) {
   const tone = status === 'ACTIVE' ? 'bg-blue-950 text-blue-300' : status === 'COMPLETED' ? 'bg-emerald-950 text-emerald-300' : status === 'PLANNING' ? 'bg-amber-950 text-amber-300' : 'bg-slate-900 text-slate-300'
   const label = status === 'ACTIVE' ? 'Đang thi công' : status === 'COMPLETED' ? 'Hoàn thành' : status === 'PLANNING' ? 'Chưa khởi công' : status
   return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{label}</span>
+}
+
+function ComponentStatusBadge({ status }: { status: ProjectComponentStatus }) {
+  const tone = status === 'SHIPPED' ? 'bg-cyan-950 text-cyan-300' : status === 'DELIVERED' ? 'bg-purple-950 text-purple-300' : status === 'INSTALLED' ? 'bg-emerald-950 text-emerald-300' : status === 'READY' ? 'bg-blue-950 text-blue-300' : status === 'STOCK' ? 'bg-amber-950 text-amber-300' : 'bg-slate-900 text-slate-300'
+  return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{status}</span>
 }
 
 function Progress({ value }: { value: number }) {
@@ -344,12 +479,18 @@ function filterMaterials(materials: ProjectMaterialRuntime[], projects: ProjectR
   return materials.filter((row) => row.projectId && ids.has(row.projectId))
 }
 
+function filterComponents(components: ProjectComponentRuntime[], projects: ProjectRuntimeRow[]) {
+  const ids = new Set(projects.map((project) => project.id))
+  return components.filter((row) => row.projectId && ids.has(row.projectId))
+}
+
 function emptyRuntime(): ProjectsRuntime {
   return {
-    metrics: { totalProjects: 0, activeProjects: 0, planningProjects: 0, completedProjects: 0, contractValue: 0, actualValue: 0, averageProgress: 0 },
+    metrics: { totalProjects: 0, activeProjects: 0, planningProjects: 0, completedProjects: 0, contractValue: 0, actualValue: 0, averageProgress: 0, readyComponents: 0, shippedComponents: 0, deliveredComponents: 0, installedComponents: 0 },
     projects: [],
     progress: [],
     materials: [],
+    components: [],
     reports: { byStatus: [], byType: [], topByContract: [] },
   }
 }

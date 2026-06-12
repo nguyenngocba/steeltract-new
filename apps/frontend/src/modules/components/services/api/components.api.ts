@@ -1,6 +1,7 @@
 import { api } from '../../../../lib/api'
 
 import type {
+  ComponentCostingRecord,
   ComponentRecord,
   CreateComponentPayload,
   CreateProductionOrderPayload,
@@ -25,6 +26,21 @@ export async function createComponent(payload: CreateComponentPayload) {
 
 export async function deleteComponent(id: string) {
   await api.delete(`/components/${id}`)
+}
+
+export async function getComponentCosting(id: string) {
+  const response = await api.get<ComponentCostingRecord>(`/components/${id}/costing`)
+
+  return response.data
+}
+
+export async function recalculateComponentCosting(id: string) {
+  const response = await api.post<ComponentCostingRecord>(
+    `/components/${id}/costing/recalculate`,
+    {},
+  )
+
+  return response.data
 }
 
 export async function getProductionOrders() {

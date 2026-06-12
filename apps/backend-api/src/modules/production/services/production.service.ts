@@ -621,6 +621,81 @@ export class ProductionService {
     return placement;
   }
 
+  async createComponentFromProductionOrder(id: string, actorId?: string) {
+    const order = await this.prisma.productionOrder.findUnique({
+      where: { id },
+      include: {
+        component: true,
+        materialIssues: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Production order not found');
+    }
+
+    const netIssuedQty = order.materialIssues.reduce(
+      (total, issue) =>
+        total + Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0),
+      0,
+    );
+
+    if (netIssuedQty <= 0) {
+      throw new BadRequestException(
+        'Cannot create component without issued production material',
+      );
+    }
+
+    const component = order.component
+      ? await this.prisma.component.update({
+          where: { id: order.component.id },
+          data: {
+            status: ComponentStatus.READY,
+            projectId: order.projectId ?? order.component.projectId,
+          },
+          include: { project: true },
+        })
+      : await this.prisma.component.create({
+          data: {
+            code: `CPL-${order.orderNo}`,
+            name: order.title,
+            projectId: order.projectId,
+            status: ComponentStatus.READY,
+            description: JSON.stringify({
+              productionOrderId: order.id,
+              source: 'production',
+            }),
+          },
+          include: { project: true },
+        });
+
+    if (!order.componentId) {
+      await this.prisma.productionOrder.update({
+        where: { id: order.id },
+        data: { componentId: component.id },
+      });
+    }
+
+    await this.prisma.componentTimeline.create({
+      data: {
+        componentId: component.id,
+        action: ComponentStatus.READY,
+        note: `${order.orderNo} material issued and component created by production execution`,
+      },
+    });
+
+    await this.prisma.productionLog.create({
+      data: {
+        productionOrderId: order.id,
+        type: ProductionLogType.NOTE,
+        message: `Component ${component.code} created from production execution`,
+        workerId: actorId,
+      },
+    });
+
+    return component;
+  }
+
   private componentStatusForStage(stage: ProductionStageCode) {
     if (stage === ProductionStageCode.WELDING) {
       return ComponentStatus.WELDING;

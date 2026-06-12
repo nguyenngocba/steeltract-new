@@ -8,7 +8,7 @@ import {
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { useAuthStore } from '../../../modules/auth/store/auth.store'
+import { useAuthStore } from '../../../store/auth.store'
 import { InventoryGlobalActionBar } from '../../../modules/inventory/components/InventoryGlobalActionBar'
 
 export function AppTopbar() {
@@ -74,7 +74,7 @@ export function AppTopbar() {
                 {user?.fullName || 'Admin'}
               </p>
               <p className="text-xs text-zinc-500">
-                {user?.role?.name || 'ADMIN'}
+                {user?.roles?.[0] || 'ADMIN'}
               </p>
             </div>
             <ChevronDown size={14} className="text-zinc-500" />
@@ -91,7 +91,7 @@ export function AppTopbar() {
                 </div>
               </div>
               <div className="py-2 text-xs text-zinc-400">
-                Quyền: {user?.role?.name || 'ADMIN'}
+                Quyền: {user?.roles?.[0] || 'ADMIN'}
               </div>
               <button
                 type="button"
