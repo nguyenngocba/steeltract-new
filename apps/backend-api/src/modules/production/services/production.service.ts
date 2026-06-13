@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -19,6 +20,7 @@ import {
 import { EventBusService } from '../../../core/events/event-bus.service';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
+import { ComponentCostingService } from '../../components/services/component-costing.service';
 import { YardService } from '../../yard/services/yard.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import {
@@ -64,12 +66,16 @@ type BomMaterialIssuePlan = {
   inventoryItemId: string;
   warehouseId?: string;
   zoneId?: string;
+  slotId?: string;
+  level?: string;
   quantity: number;
   materialCode: string;
 };
 
 @Injectable()
 export class ProductionService {
+  private readonly logger = new Logger(ProductionService.name);
+
   constructor(
     private readonly repository: ProductionRepository,
     private readonly eventBus: EventBusService,
@@ -78,6 +84,7 @@ export class ProductionService {
     private readonly prisma: PrismaService,
     private readonly yardService: YardService,
     private readonly materialIssueService: MaterialIssueService,
+    private readonly componentCostingService: ComponentCostingService,
   ) {}
 
   async findAll(query: ListProductionOrdersDto) {
@@ -450,6 +457,7 @@ export class ProductionService {
 
     if (order.status === ProductionOrderStatus.COMPLETED) {
       await this.emitProductionEvent('production.completed', order);
+      await this.autoRecalculateComponentCosting(order);
     }
 
     return order;
@@ -691,6 +699,12 @@ export class ProductionService {
         message: `Component ${component.code} created from production execution`,
         workerId: actorId,
       },
+    });
+
+    await this.autoRecalculateComponentCosting({
+      id: order.id,
+      orderNo: order.orderNo,
+      componentId: component.id,
     });
 
     return component;
@@ -1008,6 +1022,8 @@ export class ProductionService {
           inventoryItemId: materialId,
           warehouseId: bucket.warehouseId,
           zoneId: bucket.zoneId,
+          slotId: bucket.slotId,
+          level: bucket.level,
           quantity,
           materialCode: materialById.get(materialId)?.code ?? materialId,
         });
@@ -1040,6 +1056,8 @@ export class ProductionService {
           inventoryItemId: plan.inventoryItemId,
           warehouseId: plan.warehouseId,
           zoneId: plan.zoneId,
+          slotId: plan.slotId,
+          level: plan.level,
           issuedQty: plan.quantity,
           issuedDate: new Date(),
           status: 'ISSUED',
@@ -1053,7 +1071,13 @@ export class ProductionService {
   private async productionStockBuckets(materialIds: string[]) {
     const buckets = new Map<
       string,
-      Array<{ warehouseId?: string; zoneId?: string; quantity: number }>
+      Array<{
+        warehouseId?: string;
+        zoneId?: string;
+        slotId?: string;
+        level?: string;
+        quantity: number;
+      }>
     >();
 
     const transactions = await this.prisma.inventoryTransaction.findMany({
@@ -1091,15 +1115,19 @@ export class ProductionService {
         const rows = buckets.get(line.inventoryItemId) ?? [];
         const zoneId = line.zoneId ?? transaction.zoneId ?? undefined;
         const warehouseId = line.warehouseId ?? transaction.warehouseId ?? undefined;
+        const slotId = line.slotId ?? undefined;
+        const level = line.level ?? undefined;
         const existing = rows.find(
           (row) =>
             (row.zoneId ?? null) === (zoneId ?? null) &&
-            (row.warehouseId ?? null) === (warehouseId ?? null),
+            (row.warehouseId ?? null) === (warehouseId ?? null) &&
+            (row.slotId ?? null) === (slotId ?? null) &&
+            (row.level ?? null) === (level ?? null),
         );
         if (existing) {
           existing.quantity += rawQty;
         } else {
-          rows.push({ warehouseId, zoneId, quantity: rawQty });
+          rows.push({ warehouseId, zoneId, slotId, level, quantity: rawQty });
         }
         buckets.set(line.inventoryItemId, rows);
       }
@@ -1115,9 +1143,13 @@ export class ProductionService {
     for (const issue of issues) {
       let remaining = Number(issue.issuedQty ?? 0);
       const rows = buckets.get(issue.inventoryItemId) ?? [];
-      const preferred = issue.zoneId
-        ? rows.filter((row) => row.zoneId === issue.zoneId)
-        : rows;
+      const preferred = rows.filter(
+        (row) =>
+          (!issue.warehouseId || row.warehouseId === issue.warehouseId) &&
+          (!issue.zoneId || row.zoneId === issue.zoneId) &&
+          (!issue.slotId || row.slotId === issue.slotId) &&
+          (!issue.level || row.level === issue.level),
+      );
       const orderedRows = [...preferred, ...rows.filter((row) => !preferred.includes(row))];
 
       for (const row of orderedRows) {
@@ -1201,6 +1233,33 @@ export class ProductionService {
         }),
       ),
     );
+  }
+
+  private async autoRecalculateComponentCosting(order: {
+    id: string;
+    orderNo?: string | null;
+    componentId?: string | null;
+  }) {
+    if (!order.componentId) {
+      return;
+    }
+
+    try {
+      await this.componentCostingService.recalculate(order.componentId, {
+        activityAction: 'AUTO_RECALCULATE_COSTING',
+        metadata: {
+          componentId: order.componentId,
+          productionOrderId: order.id,
+          source: 'production_completion',
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.warn(
+        `Automatic component costing failed for component ${order.componentId} from production order ${order.orderNo ?? order.id}: ${message}`,
+      );
+    }
   }
 
   private logActivity(

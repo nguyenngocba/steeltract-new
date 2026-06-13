@@ -20,7 +20,7 @@ import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 15
 const CHART_PAGE_SIZE = 6
 const compactInput =
   'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
@@ -481,8 +481,8 @@ export function InventoryMaterialsPage() {
 
       <InventoryTabWorkspace />
 
-      <div className={inventoryPageStack}>
-        <div className={`grid grid-cols-1 md:grid-cols-5 ${inventoryGridGap}`}>
+      <div className="space-y-1 -mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-1">
           <CompactKpi title="Tổng giá trị tồn kho" value={money(kpis.totalValue)} note="Theo giá bình quân" tone="blue" />
           <CompactKpi title="Tổng khối lượng" value={kpis.totalQty.toLocaleString('vi-VN')} note="Tồn hiện hành" tone="emerald" />
           <CompactKpi title="Mã vật tư" value={kpis.totalCodes.toLocaleString('vi-VN')} note="Đang theo dõi" tone="cyan" />
@@ -572,94 +572,83 @@ export function InventoryMaterialsPage() {
           </div>
         </InventoryPanel>
 
-        <div className={`grid grid-cols-1 xl:grid-cols-12 ${inventoryGridGap}`}>
-          <InventoryPanel className="xl:col-span-8">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách tồn kho</h3>
-            <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
-          </div>
-          {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
-          <div className={`${inventoryTableShell} min-h-[354px]`}>
-            <table className="w-full text-xs">
-              <thead className={inventoryTableHead}>
-                <tr>
-                  <th className="w-8 px-2 py-2 text-left font-medium"><input type="checkbox" className="h-3.5 w-3.5 rounded border-white/10 bg-slate-950" /></th>
-                  <th className="px-2 py-2 text-left font-medium">Mã vật tư</th>
-                  <th className="px-2 py-2 text-left font-medium">Tên vật tư</th>
-                  <th className="px-2 py-2 text-left font-medium">Quy cách</th>
-                  <th className="px-2 py-2 text-left font-medium">Loại</th>
-                  <th className="px-2 py-2 text-right font-medium">Tồn</th>
-                  <th className="px-2 py-2 text-right font-medium">Giá trị</th>
-                  <th className="px-2 py-2 text-left font-medium">Vị trí</th>
-                  <th className="px-2 py-2 text-left font-medium">Trạng thái</th>
-                  <th className="px-2 py-2 text-left font-medium">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedRows.map((item: any) => (
-                  <tr key={item.id} onClick={() => openMaterial(item)} className={`cursor-pointer ${inventoryTableRow}`}>
-                    <td className="px-2 py-1.5"><input type="checkbox" onClick={(event) => event.stopPropagation()} className="h-3.5 w-3.5 rounded border-white/10 bg-slate-950" /></td>
-                    <td className="px-2 py-1.5 font-medium text-cyan-300">{item.materialCode}</td>
-                    <td className="px-2 py-1.5 text-white">{item.materialName}</td>
-                    <td className="px-2 py-1.5 text-slate-300">{item.materialType ?? '-'}</td>
-                    <td className="px-2 py-1.5">
-                      <span className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-200">
-                        {materialUsageLabel(item.materialUsageType)}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5 text-right">{Number(item.currentStock ?? 0).toLocaleString('vi-VN')}</td>
-                    <td className="px-2 py-1.5 text-right font-medium text-cyan-300">{money(Number(item.inventoryValue ?? 0))}</td>
-                    <td className="px-2 py-1.5">
-                      <span title={rowLocations(item).map(locationLabel).join('\n')} className="inline-flex max-w-44 items-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100">
-                        {displayLocation(item)}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${stockStatusClass(stockStatus(item))}`}>
-                        {stockStatusLabel(stockStatus(item))}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <div className="flex gap-2">
-                        <button onClick={(event) => { event.stopPropagation(); editMaterial(item) }} className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">Sửa</button>
-                        <button onClick={(event) => { event.stopPropagation(); handleDelete(item.materialId ?? item.inventoryItemId ?? item.id) }} className="rounded border border-red-400/40 bg-red-500/10 px-2 py-1 text-xs text-red-300">Xóa</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <InventoryPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
-          </InventoryPanel>
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
+            <InventoryPanel className="xl:col-span-8 p-0">
+              <div className="mb-1 flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách tồn kho</h3>
+                <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
+              </div>
+              {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
+              <div className={`${inventoryTableShell} h-[525px] overflow-auto`}>
+                <table className="w-full min-w-[980px] text-xs">
+                  <thead className={inventoryTableHead}>
+                    <tr>
+                      <th className="px-1.5 py-1.5 text-left font-medium">Mã vật tư</th>
+                      <th className="px-1.5 py-1.5 text-left font-medium">Tên vật tư</th>
+                      <th className="px-1.5 py-1.5 text-left font-medium">Quy cách</th>
+                      <th className="px-1.5 py-1.5 text-left font-medium">ĐVT</th>
+                      <th className="px-1.5 py-1.5 text-right font-medium">Tồn</th>
+                      <th className="px-1.5 py-1.5 text-right font-medium">Đơn giá</th>
+                      <th className="px-1.5 py-1.5 text-right font-medium">Giá trị</th>
+                      <th className="px-1.5 py-1.5 text-left font-medium">Vị trí</th>
+                      <th className="px-1.5 py-1.5 text-left font-medium">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedRows.map((item: any) => (
+                      <tr key={item.id} onClick={() => openMaterial(item)} className={`cursor-pointer ${inventoryTableRow}`}>
+                        <td className="px-1.5 py-1 font-medium text-cyan-300">{item.materialCode}</td>
+                        <td className="max-w-[180px] truncate px-1.5 py-1 text-white">{item.materialName}</td>
+                        <td className="max-w-[150px] truncate px-1.5 py-1 text-slate-300">{item.materialType ?? '-'}</td>
+                        <td className="px-1.5 py-1 text-slate-300">{item.unit ?? '-'}</td>
+                        <td className="px-1.5 py-1 text-right text-slate-200">{Number(item.currentStock ?? 0).toLocaleString('vi-VN')}</td>
+                        <td className="px-1.5 py-1 text-right text-slate-300">{money(Number(item.averageCost ?? 0))}</td>
+                        <td className="px-1.5 py-1 text-right font-medium text-cyan-300">{money(Number(item.inventoryValue ?? 0))}</td>
+                        <td className="px-1.5 py-1">
+                          <span title={rowLocations(item).map(locationLabel).join('\n')} className="inline-flex max-w-44 items-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100">
+                            {displayLocation(item)}
+                          </span>
+                        </td>
+                        <td className="px-1.5 py-1">
+                          <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${stockStatusClass(stockStatus(item))}`}>
+                            {stockStatusLabel(stockStatus(item))}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <InventoryPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            </InventoryPanel>
 
-          <div className="space-y-3 xl:col-span-4">
-          <ChartCard title="Phân bố tồn kho theo kho" note="Đơn vị: tấn" page={pagedZoneDistribution.page} pageCount={pagedZoneDistribution.pageCount} onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))} onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}>
-            <CompactDonut
-              segments={pagedZoneSegments}
-              centerValue={kpis.totalQty.toLocaleString('vi-VN')}
-              centerLabel="tấn"
-            />
-          </ChartCard>
+            <div className="space-y-1 xl:col-span-4">
+              <ChartCard title="Phân bố tồn kho theo kho" note="Đơn vị: tấn" page={pagedZoneDistribution.page} pageCount={pagedZoneDistribution.pageCount} onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))} onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}>
+                <CompactDonut
+                  segments={pagedZoneSegments}
+                  centerValue={kpis.totalQty.toLocaleString('vi-VN')}
+                  centerLabel="tấn"
+                />
+              </ChartCard>
 
-          <ChartCard title="Biến động tồn kho" note="Giá trị: tỷ đồng">
-            <StockTrendChart rows={monthlyTrend} />
-          </ChartCard>
+              <ChartCard title="Biến động tồn kho" note="Giá trị: tỷ đồng">
+                <StockTrendChart rows={monthlyTrend} />
+              </ChartCard>
 
-          <ChartCard title="Cảnh báo tồn kho" action={<button onClick={() => setShowAllAlerts(true)} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>} page={pagedAlerts.page} pageCount={pagedAlerts.pageCount} onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))} onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}>
-            <div className="h-[154px] space-y-1.5 overflow-hidden text-xs">
-              {pagedAlerts.rows.map((row: any) => (
-                  <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
-                    <span className={row.level === 'Hết hàng' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
-                    <span className="text-slate-400">Tồn còn: {row.stock.toLocaleString('vi-VN')}</span>
-                    <span className={`rounded px-2 py-0.5 ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
-                  </div>
-              ))}
-              {alerts.length === 0 && <div className="rounded border border-white/10 bg-white/[0.04] px-3 py-4 text-center text-slate-500">Không có cảnh báo tồn kho.</div>}
+              <ChartCard title="Cảnh báo tồn kho" action={<button onClick={() => setShowAllAlerts(true)} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>} page={pagedAlerts.page} pageCount={pagedAlerts.pageCount} onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))} onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}>
+                <div className="h-[154px] space-y-1.5 overflow-hidden text-xs">
+                  {pagedAlerts.rows.map((row: any) => (
+                    <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
+                      <span className={row.level === 'Hết hàng' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
+                      <span className="text-slate-400">Tồn còn: {row.stock.toLocaleString('vi-VN')}</span>
+                      <span className={`rounded px-2 py-0.5 ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
+                    </div>
+                  ))}
+                  {alerts.length === 0 && <div className="rounded border border-white/10 bg-white/[0.04] px-3 py-4 text-center text-slate-500">Không có cảnh báo tồn kho.</div>}
+                </div>
+              </ChartCard>
             </div>
-          </ChartCard>
-        </div>
-      </div>
+          </div>
 
         <section className="rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_16px_52px_rgba(0,0,0,0.2)]">
           <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-white">Thống kê nhanh</h3>

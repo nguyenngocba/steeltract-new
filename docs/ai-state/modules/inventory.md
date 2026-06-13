@@ -69,6 +69,9 @@ Behavior:
 - Inventory inbound uses `Kho chính` locations only and warns when a selected slot/floor is full.
 - Material detail `Vị trí` tab can open a focused 2D preview for the selected slot/floor.
 - Inventory transfer creation is limited to `Kho chính`, auto-fills source cell/floor from the selected material stock location, suggests a free destination cell/floor, and shows separate source/destination 2D location views instead of the legacy transfer diagram.
+- Sprint 9 stock mutation hardening validates and updates the exact full bucket `inventoryItemId + warehouseId + zoneId + slotId + level`, so new transaction paths keep `inventory_items.quantity` and `inventory_location_stocks` synchronized.
+- Sprint 11A decimal quantity pass lets Inventory inbound, outbound, transfer, stock-take, stock adjustment, Material Master minimum stock, and warehouse location capacity accept decimal values with `vi-VN` formatted typing.
+- Currency display uses whole-number VND formatting, for example `25.000.000 đ`.
 
 Parent warehouses:
 
@@ -92,7 +95,7 @@ Warehouse zone audit:
 Boundary:
 
 - `PRODUCTION` exists as the parent warehouse for future production-material/component integration.
-- Production warehouse balances are not yet persisted independently in this sprint.
+- Production warehouse balances are persisted in `inventory_location_stocks`; historical rows created before full bucket enforcement may still require reconciliation.
 - Drag-drop warehouse map is not implemented yet.
 
 Build:
@@ -101,6 +104,7 @@ Build:
 - Prisma generate passed.
 - Backend build passed.
 - Frontend build passed.
+- Sprint 11A audit found no Inventory quantity/cost migration requirement because audited operational fields already use `Float`.
 
 ## Implemented In Phase A
 

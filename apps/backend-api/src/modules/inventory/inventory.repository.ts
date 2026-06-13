@@ -279,6 +279,7 @@ export class InventoryRepository {
       await db.inventoryLocationStock.findFirst({
         where: {
           inventoryItemId: data.inventoryItemId,
+          warehouseId: data.warehouseId ?? null,
           zoneId: data.zoneId ?? null,
           slotId: data.slotId ?? null,
           level: data.level ?? null,

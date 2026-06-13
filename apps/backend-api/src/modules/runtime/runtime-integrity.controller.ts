@@ -1,10 +1,18 @@
 import { Controller, Get } from '@nestjs/common';
 
-import { ComponentStatus, TransactionType } from '@prisma/client';
+import {
+  ComponentStatus,
+  ProductionMaterialReservationStatus,
+  TransactionType,
+} from '@prisma/client';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
 
 const EPSILON = 0.000001;
+const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
+  ProductionMaterialReservationStatus.RESERVED,
+  ProductionMaterialReservationStatus.PARTIALLY_ISSUED,
+];
 
 type LocationKey = {
   inventoryItemId: string;
@@ -110,19 +118,47 @@ export class RuntimeIntegrityController {
 
   @Get('production-summary')
   async productionSummary() {
-    const [reservations, reservationLines, issues, consumptions, ledgers] =
+    const [
+      reservations,
+      reservationLines,
+      issues,
+      consumptions,
+      ledgers,
+      locationStocks,
+    ] =
       await Promise.all([
         this.prisma.productionMaterialReservation.findMany({
           select: {
             status: true,
           },
         }),
-        this.prisma.productionMaterialReservationLine.findMany(),
+        this.prisma.productionMaterialReservationLine.findMany({
+          include: {
+            reservation: {
+              select: {
+                status: true,
+              },
+            },
+          },
+        }),
         this.prisma.productionMaterialIssue.findMany(),
         this.prisma.productionMaterialConsumption.findMany(),
         this.prisma.productionMaterialLedger.findMany({
           select: {
             eventType: true,
+          },
+        }),
+        this.prisma.inventoryLocationStock.findMany({
+          where: {
+            quantity: { gt: EPSILON },
+          },
+          select: {
+            inventoryItemId: true,
+            warehouseId: true,
+            zoneId: true,
+            slotId: true,
+            level: true,
+            quantity: true,
           },
         }),
       ]);
@@ -138,6 +174,24 @@ export class RuntimeIntegrityController {
       (row) =>
         Math.abs(row.issuedQty - row.returnedQty - row.consumedQty - row.scrapQty) >
         EPSILON,
+    );
+
+    const activeReservationLines = reservationLines.filter((line) =>
+      activeReservationStatuses.includes(line.reservation.status),
+    );
+    const activeStockBuckets = new Map(
+      locationStocks.map((stock) => [this.locationKey(stock), Number(stock.quantity ?? 0)]),
+    );
+    const invalidReservationBuckets = activeReservationLines.filter(
+      (line) => {
+        const openQty = Math.max(
+          Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+          0,
+        );
+        if (openQty <= EPSILON) return false;
+        const stockQty = activeStockBuckets.get(this.locationKey(line)) ?? 0;
+        return stockQty <= EPSILON;
+      },
     );
 
     return {
@@ -172,6 +226,7 @@ export class RuntimeIntegrityController {
       ledgerEventCounts: this.countBy(ledgers, 'eventType'),
       consumptionBalanceViolations: consumptionBalanceViolations.length,
       exactCostingBalanceViolations: exactCostingBalanceViolations.length,
+      invalidReservationBuckets: invalidReservationBuckets.length,
     };
   }
 

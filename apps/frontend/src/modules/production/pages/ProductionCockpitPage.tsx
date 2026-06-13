@@ -21,6 +21,7 @@ import {
 import { ManufacturingOrderModal } from '../components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../components/ProductionBomModal'
 import { productionTabs } from '../config/production-tabs'
+import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import {
   useMaterialRequirements,
   useArchiveProductionBom,
@@ -49,7 +50,7 @@ import {
   useYardSlots,
 } from '../hooks/useProductionCockpit'
 
-const number = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
+const number = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value)
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
 
 export function ProductionCockpitPage() {
@@ -135,7 +136,7 @@ export function ProductionCockpitPage() {
       {mode === 'orders' && <Orders rows={filteredOrders} onOpen={setSelectedOrder} />}
       {mode === 'reservations' && <Reservations rows={reservations} orders={orders} onOpen={setSelectedOrder} />}
       {mode === 'material-ledger' && <MaterialLedger rows={ledger} orders={orders} filters={ledgerFilters} onFiltersChange={setLedgerFilters} />}
-      {mode === 'material-issues' && <Issues rows={issues} />}
+      {mode === 'material-issues' && <Issues rows={issues} consumptions={consumptions} />}
       {mode === 'consumptions' && <Consumptions issues={issues} consumptions={consumptions} />}
       {mode === 'logs' && <Logs rows={logs} />}
 
@@ -255,21 +256,59 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
   </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM"><ProductionDonut centerValue={rows.length.toLocaleString('vi-VN')} centerLabel="BOM" segments={[{ label: 'Dầm chính', value: 42, color: '#1d7cff' }, { label: 'Cột thép', value: 28, color: '#14c987' }, { label: 'Bản mã', value: 18, color: '#f59e0b' }, { label: 'Giằng', value: 12, color: '#7c3aed' }]} /></ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
 }
 
-function Issues({ rows }: { rows: ReturnType<typeof useProductionIssues>['data'] }) {
+function Issues({
+  rows,
+  consumptions,
+}: {
+  rows: ReturnType<typeof useProductionIssues>['data']
+  consumptions: ProductionMaterialConsumption[]
+}) {
   const returnIssue = useReturnProductionMaterialIssue()
+  const consumptionRows = useMemo(
+    () => buildConsumptionRows(rows ?? [], consumptions),
+    [rows, consumptions],
+  )
+  const remainingByMaterial = useMemo(() => {
+    const map = new Map<string, number>()
+    consumptionRows.forEach((row) => {
+      map.set(`${row.productionOrderId}:${row.inventoryItemId}`, row.remainingQty)
+    })
+    return map
+  }, [consumptionRows])
 
   async function runReturn(row: NonNullable<ReturnType<typeof useProductionIssues>['data']>[number]) {
-    const returnable = Number(row.issuedQty ?? 0) - Number(row.returnedQty ?? 0)
+    const returnable = getIssueReturnableQty(row, remainingByMaterial)
     if (returnable <= 0) {
-      toast.error('Phiếu này không còn vật tư có thể hoàn trả')
+      toast.error('Phiếu này không còn vật tư dư sau tiêu hao/scrap để hoàn trả')
+      return
+    }
+    const input = window.prompt(
+      `Nhập số lượng hoàn trả về Kho chính cho ${row.inventoryItem?.code ?? row.inventoryItemId}`,
+      String(returnable),
+    )
+    if (input === null) return
+    const quantity = parseLocaleNumber(input)
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > returnable) {
+      toast.error(`Số lượng hoàn trả phải lớn hơn 0 và không vượt quá ${number(returnable)}`)
       return
     }
     try {
-      await returnIssue.mutateAsync({ id: row.id, payload: { quantity: returnable } })
-      toast.success('Đã hoàn trả vật tư dư')
+      await returnIssue.mutateAsync({
+        id: row.id,
+        payload: {
+          quantity,
+          remarks: `Return unused production material to Main Warehouse from ${row.issueNo}`,
+        },
+      })
+      toast.success('Đã hoàn trả vật tư dư về Kho chính')
     } catch (error) {
       const raw = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
-      toast.error(Array.isArray(raw) ? raw.join(', ') : raw || 'Không thể hoàn trả vật tư')
+      const message = Array.isArray(raw) ? raw.join(', ') : raw || ''
+      toast.error(
+        message.includes('Insufficient stock')
+          ? 'Không còn vật tư dư hợp lệ để hoàn trả. Vui lòng tải lại dữ liệu phiếu cấp.'
+          : message || 'Không thể hoàn trả vật tư',
+      )
     }
   }
 
@@ -279,7 +318,7 @@ function Issues({ rows }: { rows: ReturnType<typeof useProductionIssues>['data']
         <thead className={productionTableHead}><tr>{['Issue No','MO Number','Material','Issued','Returned','Returnable','Location','Issued Date','Status','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
         <tbody>{(rows??[]).slice(0,12).map(row=>{
           const returned = Number(row.returnedQty ?? 0)
-          const returnable = Math.max(0, Number(row.issuedQty ?? 0) - returned)
+          const returnable = getIssueReturnableQty(row, remainingByMaterial)
           const location = [row.warehouseId, row.zoneId, row.slotId, row.level ? `L${row.level}` : undefined].filter(Boolean).join(' / ') || '-'
           return <tr className={productionTableRow} key={row.id}>
             <td className="px-3 py-3 text-cyan-300">{row.issueNo}</td>
@@ -288,17 +327,17 @@ function Issues({ rows }: { rows: ReturnType<typeof useProductionIssues>['data']
             <td>{number(row.issuedQty)}</td>
             <td>{number(returned)}</td>
             <td className={returnable > 0 ? 'text-emerald-300' : 'text-slate-500'}>{number(returnable)}</td>
-            <td>{location}</td>
+            <td>{location}<div className="mt-1 text-[10px] text-slate-500">Hoàn dư về Kho chính</div></td>
             <td>{date(row.issuedDate)}</td>
             <td><StatusChip status={row.status}/></td>
-            <td>{returnable > 0 && <button onClick={() => void runReturn(row)} className="text-amber-300">Return</button>}</td>
+            <td>{returnable > 0 ? <button disabled={returnIssue.isPending} onClick={() => void runReturn(row)} className="text-amber-300 disabled:opacity-50">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
           </tr>
         })}</tbody>
       </table></div></div>
     </ProductionPanel>
     <aside className="space-y-3">
       <ProductionPanel title="Luồng cấp phát">
-        <div className="space-y-3 text-xs text-slate-300"><div>Reservation</div><div className="text-cyan-300">↓ Issue</div><div>Kho vật tư sản xuất giảm tồn</div><div className="text-amber-300">↓ Return dư</div><div>Kho vật tư sản xuất tăng lại</div></div>
+        <div className="space-y-3 text-xs text-slate-300"><div>Reservation</div><div className="text-cyan-300">↓ Issue</div><div>Kho vật tư sản xuất giảm tồn</div><div className="text-amber-300">↓ Return dư</div><div>Kho chính tăng lại, ledger ghi RETURN</div></div>
       </ProductionPanel>
       <ProductionPanel title="Tỷ lệ cấp phát"><ProductionMiniBars values={[22, 34, 29, 44, 51, 47, 62, 58]} tone="emerald" /></ProductionPanel>
     </aside>
@@ -333,8 +372,8 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
     if (consumedInput === null) return
     const scrapInput = window.prompt('Nhập số lượng phế phẩm/scrap', '0')
     if (scrapInput === null) return
-    const consumedQty = Number(consumedInput)
-    const scrapQty = Number(scrapInput)
+    const consumedQty = parseLocaleNumber(consumedInput)
+    const scrapQty = parseLocaleNumber(scrapInput)
     if (!Number.isFinite(consumedQty) || !Number.isFinite(scrapQty) || consumedQty < 0 || scrapQty < 0 || consumedQty + scrapQty <= 0) {
       toast.error('Số lượng tiêu hao hoặc scrap không hợp lệ')
       return
@@ -573,7 +612,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
     .filter((placement) => placement.itemId === latest.component?.id && placement.metadata?.productionOrderId === latest.id)
     .reduce((sum, placement) => sum + Number(placement.quantity ?? 0), 0)
   const remainingQuantity = Math.max(0, Number(latest.quantity ?? 0) - stagedQuantity)
-  const stageQuantity = Number(quantity) || 0
+  const stageQuantity = parseLocaleNumber(quantity) || 0
   const stageInvalid = !slotId || stageQuantity <= 0 || stageQuantity > remainingQuantity
   const netIssuedMaterialQty = (latest.materialIssues ?? []).reduce(
     (sum, issue) => sum + Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0),
@@ -589,8 +628,8 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
         : ''
 
   useEffect(() => {
-    if (remainingQuantity > 0 && Number(quantity) > remainingQuantity) {
-      setQuantity(String(remainingQuantity))
+    if (remainingQuantity > 0 && parseLocaleNumber(quantity) > remainingQuantity) {
+      setQuantity(number(remainingQuantity))
     }
   }, [quantity, remainingQuantity])
 
@@ -712,8 +751,8 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
                 {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
               </select>
               {!availableSlots.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">Bãi không còn slot có tầng trống.</p> : null}
-              <input value={quantity} onChange={(e)=>{ setQuantity(e.target.value); setActionError(''); setActionMessage('') }} type="number" min="0.01" max={remainingQuantity || undefined} step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
-              <input value={weight} onChange={(e)=>setWeight(e.target.value)} type="number" min="0" step="0.01" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
+              <input value={quantity} onChange={(e)=>{ setQuantity(formatQuantityInput(e.target.value)); setActionError(''); setActionMessage('') }} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
+              <input value={weight} onChange={(e)=>setWeight(formatQuantityInput(e.target.value))} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
               <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
                 <div>Slot đích: <b className="text-cyan-300">{targetSlot ? `${targetSlot.zone.code}/${targetSlot.code}` : '--'}</b></div>
                 <div className="mt-1">Tầng xếp tự động: <b className="text-cyan-300">L{targetSlot ? targetSlot.currentStackLevel + 1 : '--'}</b></div>
@@ -722,7 +761,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
               {stageDisabledReason ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">{stageDisabledReason}</p> : null}
               {actionError ? <p className="rounded border border-red-900 bg-red-950/40 p-2 text-red-200">{actionError}</p> : null}
               {actionMessage ? <p className="rounded border border-emerald-900 bg-emerald-950/40 p-2 text-emerald-200">{actionMessage}</p> : null}
-              <button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: Number(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button>
+              <button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: parseLocaleNumber(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button>
             </div>
           </ProductionPanel>}
         </aside>
@@ -790,6 +829,22 @@ function buildConsumptionRows(issues: ProductionMaterialIssue[], consumptions: P
     }))
     .sort((a, b) => `${a.orderNo}-${a.material}`.localeCompare(`${b.orderNo}-${b.material}`))
 }
+
+function getIssueReturnableQty(
+  issue: ProductionMaterialIssue,
+  remainingByMaterial: Map<string, number>,
+) {
+  if (issue.status === 'RETURNED') return 0
+  const issuedQty = Number(issue.issuedQty ?? 0)
+  const returnedQty = Number(issue.returnedQty ?? 0)
+  const issueRemaining = Math.max(0, issuedQty - returnedQty)
+  const materialRemaining =
+    remainingByMaterial.get(`${issue.productionOrderId}:${issue.inventoryItemId}`) ??
+    issueRemaining
+
+  return Math.max(0, Math.min(issueRemaining, materialRemaining))
+}
+
 function ActionCards({ compact = false }: { compact?: boolean }) {
   const actions = compact
     ? [[FileStack, 'BOM'], [Factory, 'MO'], [Boxes, 'Cấp VT'], [Archive, 'Ra bãi']]

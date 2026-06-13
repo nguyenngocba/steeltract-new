@@ -53,6 +53,10 @@
 - Delivery/Installation Sprint 6 now has component `SHIPPED -> DELIVERED -> INSTALLED` APIs, timeline rows, Project Components actions, and runtime delivered/installed counters.
 - Installation Mapping Sprint 7 now stores component install Zone/Axis/Level/Position, requires those fields in the install modal/API, returns them through Projects runtime, and shows them in Project Components and Component Detail.
 - System Audit & Hardening Sprint 8 added read-only Runtime Integrity KPI APIs and documented current Inventory, Production, Component, Costing, and Project integrity findings.
+- Material Return Reconciliation Sprint 10A now validates returnable quantity after consumed/scrap quantities, returns unused issued material to Main Warehouse, writes Inventory `RETURN` plus Production Material Ledger `RETURN`, and prompts for partial returns in the Production Cockpit.
+- Automatic Component Costing Sprint 10B now recalculates ComponentCosting during production completion/component READY workflows without requiring a manual Recalculate button.
+- Reservation Allocation Integrity Sprint 10C now allocates reservations from active exact `inventory_location_stocks` production buckets only and exposes invalid reservation buckets in Runtime Integrity.
+- Component Costing Breakdown Sprint 11 now exposes material-level planned vs actual costing rows and warnings in Component Detail.
 - Approval-oriented issue/return documents, adjust ledger writers, richer consumption entry UX, labor/machine/overhead costing inputs, and costing approvals remain backlog work.
 
 ## 2026-06-11 Documentation Notes

@@ -13,11 +13,26 @@ const optionalNullableText = z.preprocess((value) => {
   return text || null;
 }, z.string().nullable().optional());
 
-const positiveQuantity = z.coerce.number().positive();
+const localeNumber = (schema: z.ZodType<number>) =>
+  z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const raw = value.trim();
+    if (!raw) return value;
+    const cleaned = raw.replace(/\s/g, '').replace(/[^\d,.-]/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      return Number(cleaned.replace(/\./g, '').replace(',', '.'));
+    }
+    if (cleaned.includes(',')) {
+      return Number(cleaned.replace(',', '.'));
+    }
+    return Number(cleaned);
+  }, schema);
 
-const signedQuantity = z.coerce
-  .number()
-  .refine((value) => value !== 0, 'Quantity cannot be zero');
+const positiveQuantity = localeNumber(z.number().positive());
+
+const signedQuantity = localeNumber(
+  z.number().refine((value) => value !== 0, 'Quantity cannot be zero'),
+);
 
 export const listInventorySchema = baseQuerySchema;
 
@@ -34,7 +49,7 @@ export const createInventoryItemSchema = z.object({
   zoneId: optionalNullableText,
   slotId: optionalNullableText,
   level: optionalNullableText,
-  minimumStock: z.coerce.number().nonnegative().optional().default(0),
+  minimumStock: localeNumber(z.number().nonnegative()).optional().default(0),
 });
 
 export const updateInventoryItemSchema = z.object({
@@ -50,7 +65,7 @@ export const updateInventoryItemSchema = z.object({
   zoneId: optionalNullableText,
   slotId: optionalNullableText,
   level: optionalNullableText,
-  minimumStock: z.coerce.number().nonnegative().optional(),
+  minimumStock: localeNumber(z.number().nonnegative()).optional(),
 });
 
 export const stockItemSchema = z.object({

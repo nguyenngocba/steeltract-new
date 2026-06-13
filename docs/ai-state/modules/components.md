@@ -18,7 +18,12 @@ Components covers steel component master records, production linkage, component 
 * Installation mapping stores `installZone`, `installAxis`, `installLevel`, and `installPosition` on the Component.
 * Component detail UI shows installation location for installed components.
 * Component costing is persisted in `ComponentCosting` and can be recalculated from production consumption data.
+* Component costing is now automatically recalculated when production completion marks the component `READY`.
+* Automatic costing writes ActivityLog action `AUTO_RECALCULATE_COSTING`; manual recalculation still writes `RECALCULATE_COSTING`.
 * Component detail UI includes a Costing section for estimated cost, actual cost, variance, material, labor, machine, and overhead.
+* Sprint 11 adds Component Cost Breakdown with planned BOM material rows, actual consumed/scrap material rows, KPI cards, and costing warnings.
+* Costing warnings detect `BOM_MATERIAL_NOT_CONSUMED`, `UNPLANNED_MATERIAL`, and `QUANTITY_VARIANCE`.
+* Sprint 11A formats component material stock costs as whole VND and supports decimal return quantities when returning production material back to Main Warehouse.
 
 ## Component Creation Audit
 
@@ -64,10 +69,11 @@ Fix:
 * `GET /components/:id`
 * `GET /components/:id/timeline`
 * `GET /components/:id/costing`
+* `GET /components/:id/costing/breakdown`
 * `POST /components`
 * `POST /components/:id/deliver`
 * `POST /components/:id/install` with `installZone`, `installAxis`, `installLevel`, `installPosition`
-* `POST /components/:id/costing/recalculate`
+* `POST /components/:id/costing/recalculate` for manual recalculation; production completion now also calls the same upsert logic automatically.
 * `PATCH /components/:id`
 * `DELETE /components/:id`
 * `POST /components/upload`
@@ -80,3 +86,4 @@ Fix:
 * Add richer costing inputs for labor, machine, overhead, QC rework, and Yard handling.
 * Add stricter UI messaging that Production output creation requires issued material.
 * Add delivery and installation document numbers, signed handover evidence, and coordinate/drawing references if required by field operations.
+* Evaluate whether long-term component costing should move from `Float` to database decimal types if accounting-grade precision is required.

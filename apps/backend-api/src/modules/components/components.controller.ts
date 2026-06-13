@@ -53,6 +53,12 @@ export class ComponentsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':id/costing/breakdown')
+  costingBreakdown(@Param('id') id: string) {
+    return this.componentCostingService.breakdown(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':id/costing')
   costing(@Param('id') id: string) {
     return this.componentCostingService.findByComponent(id);

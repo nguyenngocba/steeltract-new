@@ -8,6 +8,13 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
+type RecalculateCostingOptions = {
+  activityAction?: string;
+  metadata?: Prisma.InputJsonObject;
+};
+
+const defaultQuantityVarianceThresholdPercent = 10;
+
 @Injectable()
 export class ComponentCostingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,7 +32,112 @@ export class ComponentCostingService {
     return this.preview(componentId);
   }
 
-  async recalculate(componentId: string) {
+  async breakdown(componentId: string) {
+    const component = await this.getComponentWithProduction(componentId);
+    const order = this.pickProductionOrder(component);
+    const bomItems = order.bom?.items ?? [];
+    const consumptions = await this.prisma.productionMaterialConsumption.findMany({
+      where: { productionOrderId: order.id },
+      include: {
+        inventoryItem: true,
+      },
+    });
+
+    const materialIds = [
+      ...new Set([
+        ...bomItems.map((item) => item.materialId),
+        ...consumptions.map((row) => row.inventoryItemId),
+      ]),
+    ];
+    const averageCosts = await this.averageCostsByMaterial(materialIds);
+
+    const estimatedMaterials = bomItems.map((item) => {
+      const bomQty = Number(item.quantity ?? 0);
+      const wastePercent = Number(item.wastePercent ?? 0);
+      const requiredQty =
+        bomQty * (1 + wastePercent / 100) * Number(order.quantity ?? 1);
+      const averageCost = averageCosts.get(item.materialId) ?? 0;
+      return {
+        materialId: item.materialId,
+        materialCode: item.material?.code ?? item.materialId,
+        materialName: item.material?.name ?? item.materialId,
+        bomQty,
+        wastePercent,
+        requiredQty,
+        averageCost,
+        estimatedAmount: requiredQty * averageCost,
+      };
+    });
+
+    const consumptionByMaterial = new Map<
+      string,
+      {
+        materialId: string;
+        materialCode: string;
+        materialName: string;
+        consumedQty: number;
+        scrapQty: number;
+      }
+    >();
+
+    for (const row of consumptions) {
+      const current = consumptionByMaterial.get(row.inventoryItemId) ?? {
+        materialId: row.inventoryItemId,
+        materialCode: row.inventoryItem?.code ?? row.inventoryItemId,
+        materialName: row.inventoryItem?.name ?? row.inventoryItemId,
+        consumedQty: 0,
+        scrapQty: 0,
+      };
+      current.consumedQty += Number(row.consumedQty ?? 0);
+      current.scrapQty += Number(row.scrapQty ?? 0);
+      consumptionByMaterial.set(row.inventoryItemId, current);
+    }
+
+    const actualMaterials = Array.from(consumptionByMaterial.values()).map(
+      (row) => {
+        const averageCost = averageCosts.get(row.materialId) ?? 0;
+        const actualQty = row.consumedQty + row.scrapQty;
+        return {
+          ...row,
+          actualQty,
+          averageCost,
+          actualAmount: actualQty * averageCost,
+        };
+      },
+    );
+
+    const warnings = this.costingWarnings(
+      estimatedMaterials,
+      actualMaterials,
+    );
+    const estimatedMaterialCost = estimatedMaterials.reduce(
+      (sum, row) => sum + row.estimatedAmount,
+      0,
+    );
+    const actualMaterialCost = actualMaterials.reduce(
+      (sum, row) => sum + row.actualAmount,
+      0,
+    );
+
+    return {
+      componentId: component.id,
+      componentCode: component.code,
+      productionOrderId: order.id,
+      estimatedMaterials,
+      actualMaterials,
+      summary: {
+        estimatedMaterialCost,
+        actualMaterialCost,
+        varianceCost: actualMaterialCost - estimatedMaterialCost,
+      },
+      warnings,
+    };
+  }
+
+  async recalculate(
+    componentId: string,
+    options: RecalculateCostingOptions = {},
+  ) {
     const component = await this.getComponentWithProduction(componentId);
     const order = this.pickProductionOrder(component);
     const consumptions = await this.prisma.productionMaterialConsumption.findMany({
@@ -98,11 +210,13 @@ export class ComponentCostingService {
 
       await tx.activityLog.create({
         data: {
-          action: 'RECALCULATE_COSTING',
+          action: options.activityAction ?? 'RECALCULATE_COSTING',
           entity: 'Component',
           entityId: componentId,
           module: 'components',
           metadata: {
+            ...(options.metadata ?? {}),
+            componentId,
             productionOrderId: order.id,
             estimatedCost,
             actualCost,
@@ -159,7 +273,11 @@ export class ComponentCostingService {
           include: {
             bom: {
               include: {
-                items: true,
+                items: {
+                  include: {
+                    material: true,
+                  },
+                },
               },
             },
           },
@@ -187,7 +305,11 @@ export class ComponentCostingService {
           include: {
             bom: {
               include: {
-                items: true;
+                items: {
+                  include: {
+                    material: true;
+                  };
+                };
               };
             };
           };
@@ -243,6 +365,92 @@ export class ComponentCostingService {
     }
 
     return costs;
+  }
+
+  private costingWarnings(
+    estimatedMaterials: Array<{
+      materialId: string;
+      materialCode: string;
+      materialName: string;
+      requiredQty: number;
+    }>,
+    actualMaterials: Array<{
+      materialId: string;
+      materialCode: string;
+      materialName: string;
+      actualQty: number;
+    }>,
+  ) {
+    const warnings: Array<{
+      type:
+        | 'BOM_MATERIAL_NOT_CONSUMED'
+        | 'UNPLANNED_MATERIAL'
+        | 'QUANTITY_VARIANCE';
+      materialId: string;
+      materialCode: string;
+      materialName: string;
+      message: string;
+      plannedQty?: number;
+      actualQty?: number;
+      varianceQty?: number;
+      thresholdPercent?: number;
+    }> = [];
+    const estimatedByMaterial = new Map(
+      estimatedMaterials.map((row) => [row.materialId, row]),
+    );
+    const actualByMaterial = new Map(
+      actualMaterials.map((row) => [row.materialId, row]),
+    );
+    const thresholdPercent =
+      Number(process.env.COMPONENT_COSTING_QTY_VARIANCE_THRESHOLD_PERCENT) ||
+      defaultQuantityVarianceThresholdPercent;
+
+    for (const estimated of estimatedMaterials) {
+      const actual = actualByMaterial.get(estimated.materialId);
+      if (!actual || actual.actualQty <= 0) {
+        warnings.push({
+          type: 'BOM_MATERIAL_NOT_CONSUMED',
+          materialId: estimated.materialId,
+          materialCode: estimated.materialCode,
+          materialName: estimated.materialName,
+          plannedQty: estimated.requiredQty,
+          actualQty: actual?.actualQty ?? 0,
+          message: `${estimated.materialCode} is in BOM but has no production consumption.`,
+        });
+        continue;
+      }
+
+      const varianceQty = actual.actualQty - estimated.requiredQty;
+      const thresholdQty =
+        Math.abs(estimated.requiredQty) * (thresholdPercent / 100);
+      if (Math.abs(varianceQty) > thresholdQty) {
+        warnings.push({
+          type: 'QUANTITY_VARIANCE',
+          materialId: estimated.materialId,
+          materialCode: estimated.materialCode,
+          materialName: estimated.materialName,
+          plannedQty: estimated.requiredQty,
+          actualQty: actual.actualQty,
+          varianceQty,
+          thresholdPercent,
+          message: `${estimated.materialCode} consumption variance exceeds ${thresholdPercent}%.`,
+        });
+      }
+    }
+
+    for (const actual of actualMaterials) {
+      if (estimatedByMaterial.has(actual.materialId)) continue;
+      warnings.push({
+        type: 'UNPLANNED_MATERIAL',
+        materialId: actual.materialId,
+        materialCode: actual.materialCode,
+        materialName: actual.materialName,
+        actualQty: actual.actualQty,
+        message: `${actual.materialCode} was consumed but is not in the BOM.`,
+      });
+    }
+
+    return warnings;
   }
 
   private async estimatedMaterialCost(

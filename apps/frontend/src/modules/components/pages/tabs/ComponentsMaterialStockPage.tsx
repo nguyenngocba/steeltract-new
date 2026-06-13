@@ -7,6 +7,7 @@ import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../../inventory/hooks/useInventoryTransactions'
 import { useProductionIssues } from '../../../production/hooks/useProductionCockpit'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
+import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type MaterialStockRow = {
   id: string
@@ -40,7 +41,7 @@ type ProductionStockBucket = {
   quantity: number
 }
 
-const money = (value: number) => `${Math.round(value).toLocaleString('vi-VN')} đ`
+const money = (value: number) => formatCurrencyVnd(value)
 
 function materialUsageLabel(value: string | undefined) {
   const map: Record<string, string> = {
@@ -217,7 +218,7 @@ export function ComponentsMaterialStockPage() {
   }, [selectedRow, transactionsData])
 
   async function returnToMainWarehouse(row: MaterialStockRow) {
-    const quantity = Number(returnForm.quantity || 0)
+    const quantity = parseLocaleNumber(returnForm.quantity || 0)
     if (quantity <= 0 || quantity > row.available || !row.zoneId) return
 
     await createTransaction.mutateAsync({
@@ -254,8 +255,8 @@ export function ComponentsMaterialStockPage() {
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
           <ComponentsKpiCard title="Tổng mã vật tư SX" value={rows.length.toLocaleString('vi-VN')} />
           <ComponentsKpiCard title="Giá trị tồn kho SX" value={money(totalValue)} sub="đồng bộ từ giao dịch kho" />
-          <ComponentsKpiCard title="Đã reserve BOM" value={totalReserved.toLocaleString('vi-VN')} sub="chờ allocation backend" />
-          <ComponentsKpiCard title="Khả dụng sản xuất" value={totalAvailable.toLocaleString('vi-VN')} />
+          <ComponentsKpiCard title="Đã reserve BOM" value={formatQuantity(totalReserved)} sub="chờ allocation backend" />
+          <ComponentsKpiCard title="Khả dụng sản xuất" value={formatQuantity(totalAvailable)} />
           <ComponentsKpiCard title="Cảnh báo thiếu BOM" value={warningCount.toLocaleString('vi-VN')} sub="cần cấp phát" />
           <ComponentsKpiCard title="Trạng thái dữ liệu" value="LIVE" sub="làm mới mỗi 5 giây" />
         </div>
@@ -302,9 +303,9 @@ export function ComponentsMaterialStockPage() {
                         <td className="px-2 py-2">{row.warehouse}</td>
                         <td className="px-2 py-2">{row.location}</td>
                         <td className="px-2 py-2 text-cyan-200">{row.slotId ?? '-'}</td>
-                        <td className="px-2 py-2">{row.currentStock.toLocaleString('vi-VN')}</td>
-                        <td className="px-2 py-2">{row.reserved.toLocaleString('vi-VN')}</td>
-                        <td className="px-2 py-2">{row.available.toLocaleString('vi-VN')}</td>
+                        <td className="px-2 py-2">{formatQuantity(row.currentStock)}</td>
+                        <td className="px-2 py-2">{formatQuantity(row.reserved)}</td>
+                        <td className="px-2 py-2">{formatQuantity(row.available)}</td>
                         <td className="px-2 py-2">{money(row.averageCost)}</td>
                         <td className="px-2 py-2 text-cyan-300">{money(row.inventoryValue)}</td>
                         <td className="px-2 py-2">{row.status}</td>
@@ -329,7 +330,7 @@ export function ComponentsMaterialStockPage() {
               {topMaterials.map((row) => (
                 <div key={row.id} className="mb-2 flex justify-between gap-2 text-sm text-slate-300">
                   <span>{row.code}</span>
-                  <span className="text-cyan-300">{row.available.toLocaleString('vi-VN')} {row.unit}</span>
+                  <span className="text-cyan-300">{formatQuantity(row.available)} {row.unit}</span>
                 </div>
               ))}
             </ComponentsPanel>
@@ -350,8 +351,8 @@ export function ComponentsMaterialStockPage() {
               <button onClick={() => setSelectedRow(null)} className="text-slate-300">Đóng</button>
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <ComponentsKpiCard title="Tồn SX" value={selectedRow.currentStock.toLocaleString('vi-VN')} />
-              <ComponentsKpiCard title="Khả dụng" value={selectedRow.available.toLocaleString('vi-VN')} />
+              <ComponentsKpiCard title="Tồn SX" value={formatQuantity(selectedRow.currentStock)} />
+              <ComponentsKpiCard title="Khả dụng" value={formatQuantity(selectedRow.available)} />
               <ComponentsKpiCard title="Giá TB" value={money(selectedRow.averageCost)} />
               <ComponentsKpiCard title="Giá trị" value={money(selectedRow.inventoryValue)} />
             </div>
@@ -362,7 +363,7 @@ export function ComponentsMaterialStockPage() {
                   <div key={`${transaction.id}-${line.id}`} className="mb-2 flex justify-between rounded border border-slate-800 px-2 py-1.5">
                     <span className={String(transaction.remarks ?? '').includes('RETURN') ? 'text-amber-300' : 'text-emerald-300'}>{transaction.transactionNo ?? transaction.code}</span>
                     <span>{new Date(transaction.transactionDate ?? transaction.createdAt).toLocaleString('vi-VN')}</span>
-                    <span>{Math.abs(Number(line.quantity ?? 0)).toLocaleString('vi-VN')} {selectedRow.unit}</span>
+                    <span>{formatQuantity(Math.abs(Number(line.quantity ?? 0)))} {selectedRow.unit}</span>
                   </div>
                 ))}
                 {!selectedHistory.length ? <p className="text-slate-500">Chưa có lịch sử nhập/trả.</p> : null}
@@ -370,12 +371,12 @@ export function ComponentsMaterialStockPage() {
             </div>
             <div className="mt-4 grid gap-3 rounded border border-amber-900/60 bg-amber-950/10 p-4 md:grid-cols-3">
               <input type="datetime-local" value={returnForm.returnedAt} onChange={(event) => setReturnForm((prev) => ({ ...prev, returnedAt: event.target.value }))} className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
-              <input value={returnForm.quantity} onChange={(event) => setReturnForm((prev) => ({ ...prev, quantity: event.target.value }))} inputMode="decimal" placeholder="Số lượng trả" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
+              <input value={returnForm.quantity} onChange={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} inputMode="decimal" placeholder="Số lượng trả" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
               <input value={returnForm.note} onChange={(event) => setReturnForm((prev) => ({ ...prev, note: event.target.value }))} placeholder="Ghi chú trả kho" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setSelectedRow(null)} className="rounded border border-slate-700 px-4 py-2 text-sm text-slate-200">Hủy</button>
-              <button disabled={!selectedRow.zoneId || Number(returnForm.quantity || 0) <= 0 || Number(returnForm.quantity || 0) > selectedRow.available} onClick={() => void returnToMainWarehouse(selectedRow)} className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-700">Trả về kho chính</button>
+              <button disabled={!selectedRow.zoneId || parseLocaleNumber(returnForm.quantity || 0) <= 0 || parseLocaleNumber(returnForm.quantity || 0) > selectedRow.available} onClick={() => void returnToMainWarehouse(selectedRow)} className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-700">Trả về kho chính</button>
             </div>
           </div>
         </div>

@@ -1,5 +1,157 @@
 # SteelTrack Changelog
 
+## 2026-06-13 Sprint 11A Decimal Quantity & Currency Formatting
+
+Fixed:
+
+- Quantity inputs in Inventory, Production, Yard staging, and production material return now support decimal values and `vi-VN` formatted typing.
+- Currency values use whole-number VND display such as `25.000.000 đ`.
+- Backend Inventory and Production DTOs accept locale-formatted numeric strings for quantity-related fields.
+
+Verified:
+
+- Frontend build passed.
+- Backend build passed.
+
+Database:
+
+- No migration required; audited operational quantity/cost columns already use `Float`.
+
+## 2026-06-13 Sprint 11 Component Costing Breakdown
+
+Implemented:
+
+- Added `GET /components/:id/costing/breakdown`.
+- Component Detail now includes a `Cost Breakdown` tab.
+- Breakdown shows Estimated Materials, Actual Materials, KPI cards, and Warnings.
+- Warning engine detects BOM material not consumed, unplanned consumed material, and quantity variance.
+
+Verified:
+
+- BOM `VAL-MAT-100 qty=100` with actual consumption `VAL-MAT-002 qty=9`.
+- Warnings returned:
+  `BOM_MATERIAL_NOT_CONSUMED`,
+  `UNPLANNED_MATERIAL`.
+- Estimated material cost:
+  `128,571,428.57142857`.
+- Actual material cost:
+  `2,442,627.7427184465`.
+
+## 2026-06-13 Sprint 10C Reservation Allocation Integrity
+
+Fixed:
+
+- Production reservation allocation now uses active `inventory_location_stocks` only.
+- Allocation ignores historical transaction/issue buckets and zero-quantity buckets.
+- Reservation bucket matching is exact by material, warehouse, zone, slot, and level.
+- Runtime production integrity summary now reports active reservation lines pointing to buckets without positive current stock.
+
+Verified:
+
+- Production warehouse smoke stock:
+  `A02/L1 = 10`, `A02/L2 = 5`.
+- Reservation `8` allocated from active `A02/L1`.
+- Issue from reservation succeeded.
+- Final stock:
+  `A02/L1 = 2`, `A02/L2 = 5`.
+
+Known data state:
+
+- Runtime summary still reports one historical invalid reservation bucket from before the fix; no data backfill was performed.
+
+## 2026-06-13 Sprint 10B Automatic Component Costing
+
+Fixed:
+
+- Production completion now automatically recalculates costing for the linked Component.
+- Production output creation/READY marking also triggers automatic costing.
+- Automatic costing uses the existing upsert behavior: create if missing, update if present.
+- Costing failure is logged as a warning and does not roll back production completion.
+- ActivityLog now records `AUTO_RECALCULATE_COSTING` with component and production order metadata.
+
+Verified:
+
+- Smoke component `S10B-20260613103402-COMP` was completed from production after material issue and consumption.
+- `ComponentCosting` was created automatically without pressing Recalculate.
+- Component costs were updated:
+  `estimatedCost = 2,714,030.825242719`,
+  `actualCost = 2,442,627.742718447`.
+
+Known follow-up:
+
+- Reservation-based smoke exposed a separate reservation allocation issue where a historical production slot was selected despite no current location stock.
+
+## 2026-06-13 Sprint 10A.1 Return Material UI Reconciliation
+
+Fixed:
+
+- Production Cockpit Return action now uses the same returnable source of truth as backend reconciliation.
+- `ProductionMaterialIssue.returnedQty` is the active returned quantity; `ProductionMaterialConsumption.returnedQty` remains a snapshot and is not used as the live return source.
+- Successful return updates the Production Issues query cache immediately, so the row becomes reconciled before background refetch completes.
+- Reconciled rows show `Đã cân bằng` instead of another Return button.
+- Stale insufficient-stock errors are shown as a friendly reload/reconciliation message.
+
+Verified:
+
+- Existing smoke row `Issue 10 / Consume 8 / Scrap 1 / Return 1` calculates `ui_returnable = 0`.
+- Backend build passed.
+- Frontend build passed.
+
+## 2026-06-13 Sprint 10A Material Return Reconciliation
+
+Fixed:
+
+- Production Material Return now caps return quantity by issued minus consumed, scrap, and already returned quantity.
+- Unused issued material returns to `MAIN` / `Kho chính`; issue remains the stock-reducing step for `PRODUCTION` / `Kho vật tư SX`.
+- Return now writes Inventory `RETURN`, updates main warehouse `inventory_location_stocks`, increments `ProductionMaterialIssue.returnedQty`, and writes a `RETURN` material ledger row.
+- Legacy direct issue status update to `RETURNED` now uses the same return validation.
+- Production Cockpit now prompts for partial return quantity and shows returnable quantity after consumption/scrap.
+
+Verified:
+
+- Smoke test passed:
+  issue `10`, consume `8`, scrap `1`, return `1`.
+- Verified production balance:
+  `10 = 8 + 1 + 1`.
+- Verified Inventory transactions and Production Material Ledger rows for the smoke workflow.
+
+## 2026-06-12 Sprint 9 Bug Fixes
+
+Fixed:
+
+- Fixed Inventory production-transfer stock check so the source line no longer inherits the destination production warehouse from top-level payload data.
+- Inventory line normalization now resolves warehouse from each line zone when zone is present.
+- Inventory outbound modal now sends source line warehouse explicitly.
+- Inventory location stock upsert now uses the full location key including warehouse.
+- Inventory outbound validation now checks the exact selected warehouse/zone/slot/level bucket.
+- Production material issue transaction items now preserve warehouse, zone, slot, and level.
+- Production MO auto-issue planning now carries slot/level from production stock buckets.
+- Project Components delivery/install calls now use the authenticated API client.
+- Project Components actions now show success/error feedback.
+- Project Components row click now opens the existing Component detail modal from the Components list.
+
+Verified:
+
+- Backend build passed.
+- Frontend build passed.
+- `POST /components/:id/deliver` changed `CPL-48937939` from `SHIPPED` to `DELIVERED`.
+- Production issue/return smoke test kept item snapshot and location stock synchronized.
+
+Known data state:
+
+- Existing validation data for `VAL-MAT-001` still has historical mismatch `80` vs `90`; this was not silently backfilled.
+- Runtime integrity APIs still report historical reconciliation findings until a dedicated cleanup/backfill pass is approved.
+
+## 2026-06-12 Clean Dataset Plan
+
+Documented:
+
+- Added `docs/ai-state/audits/clean-dataset-plan.md`.
+- Listed operational tables to clear and master/reference tables to keep.
+- Defined Scenario A clean validation workflow and expected balances at every step.
+
+No code or database data was changed.
+
 ## 2026-06-12 System Audit & Hardening Sprint 8
 
 Implemented:

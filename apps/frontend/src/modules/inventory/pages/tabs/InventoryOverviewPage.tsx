@@ -125,6 +125,7 @@ function rowLocations(item: any) {
   return fallback ? [{ zoneName: fallback, quantity: item.currentStock }] : []
 }
 
+
 function displayLocation(item: any) {
   const locations = rowLocations(item)
   if (!locations.length) return '-'
@@ -151,7 +152,7 @@ function rowMatchesWarehouse(item: any, warehouse: string) {
 function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-0.5 block text-[10px] font-medium text-slate-400">{label}</span>
+      <span className="mb-0 block text-[12px] font-medium text-slate-400">{label}</span>
       {children}
     </label>
   )
@@ -377,8 +378,8 @@ export function InventoryOverviewPage() {
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
 
-      <div className={inventoryPageStack}>
-        <div className={`grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-6 ${inventoryGridGap}`}>
+      <div className="space-y-1 -mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-6 gap-1">
           <InventoryKpi title="Tổng chủng loại" value={summary.totalItems.toLocaleString('vi-VN')} note="Theo bộ lọc hiện tại" tone="blue" />
           <InventoryKpi title="Giá trị tồn kho" value={money(summary.totalValue)} note="+8,6% so với tháng trước" tone="emerald" />
           <InventoryKpi title="Đang dự trữ" value={formatQty(summary.reserved)} note="Khối lượng đã giữ chỗ" tone="purple" />
@@ -387,22 +388,22 @@ export function InventoryOverviewPage() {
           <InventoryKpi title="Vật tư tiêu hao" value={money(summary.consumableValue)} note="Tháng này" tone="cyan" />
         </div>
 
-        <InventoryPanel>
-          <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-[0.72fr_0.76fr_0.8fr_0.72fr_1.7fr_auto_auto]">
+        <InventoryPanel className="rounded-xl p-0.5">
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
             <LabeledFilter label="Kho">
-              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
+              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
                 <option value="">Tất cả kho</option>
                 {warehouseOptions.map((warehouse) => <option key={warehouse.value} value={warehouse.value}>{warehouse.label}</option>)}
               </select>
             </LabeledFilter>
             <LabeledFilter label="Nhóm vật tư">
-              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
+              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
                 <option value="">Tất cả</option>
                 {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </LabeledFilter>
             <LabeledFilter label="Loại vật tư">
-              <select value={usageFilter} onChange={(e) => { setUsageFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
+              <select value={usageFilter} onChange={(e) => { setUsageFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
                 <option value="">Tất cả</option>
                 <option value="PRIMARY">Vật tư chính</option>
                 <option value="SECONDARY">Vật tư phụ</option>
@@ -410,7 +411,7 @@ export function InventoryOverviewPage() {
               </select>
             </LabeledFilter>
             <LabeledFilter label="Trạng thái">
-              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}>
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
                 <option value="">Tất cả</option>
                 <option value="NORMAL">Bình thường</option>
                 <option value="LOW">Sắp hết</option>
@@ -422,39 +423,43 @@ export function InventoryOverviewPage() {
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') applySearch() }}
-                placeholder="Tìm mã, tên, quy cách..."
-                className={`${inventoryInput} h-7 rounded-lg px-2 text-xs`}
+                placeholder="Mã, tên, quy cách, nhà cung cấp..."
+                className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}
               />
             </LabeledFilter>
-            <button onClick={applySearch} className="h-7 self-end rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">Tìm kiếm</button>
-            <button onClick={resetFilters} className="h-7 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10">Làm mới</button>
+            <button onClick={applySearch} className="h-5 self-end rounded-md bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
+              Tìm kiếm
+            </button>
+            <button onClick={resetFilters} className="h-5 self-end rounded-md border border-white/10 bg-white/[0.055] px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10">
+              Làm mới
+            </button>
           </div>
         </InventoryPanel>
 
-        <div className={`grid grid-cols-1 xl:grid-cols-12 ${inventoryGridGap}`}>
-          <div className="space-y-3 xl:col-span-8">
-            <div className={`grid grid-cols-1 md:grid-cols-[1fr_0.78fr_0.78fr] ${inventoryGridGap}`}>
-              <InventoryChartCard title="Thao tác nhanh" className="p-2.5">
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
+          <div className="space-y-1.5 xl:col-span-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
+              <InventoryChartCard title="Thao tác nhanh" className="p-1.5">
+                <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
                   <QuickActionButton label="Nhập kho" tone="blue" onClick={() => setTransactionModal('inbound')} />
                   <QuickActionButton label="Xuất kho" tone="emerald" onClick={() => setTransactionModal('outbound')} />
                   <QuickActionButton label="Điều chuyển" tone="amber" onClick={() => setTransactionModal('transfer')} />
                   <QuickActionButton label="Kiểm kê" tone="purple" onClick={() => setTransactionModal('stock-take')} />
                 </div>
               </InventoryChartCard>
-              <InventoryChartCard title="Nhập kho hôm nay" className="p-2.5">
+              <InventoryChartCard title="Nhập kho hôm nay" className="p-1.5">
                 <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={recentInboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="cyan" />
               </InventoryChartCard>
-              <InventoryChartCard title="Xuất kho hôm nay" className="p-2.5">
+              <InventoryChartCard title="Xuất kho hôm nay" className="p-1.5">
                 <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={recentOutboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="amber" />
               </InventoryChartCard>
             </div>
             <InventoryPanel>
-              <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="mb-1 flex items-center justify-between gap-3">
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Tồn kho vật tư</h3>
                 <button onClick={() => setOverviewPopup('stock-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
               </div>
-              <div className={`${inventoryTableShell} min-h-[354px] overflow-auto`}>
+              <div className={`${inventoryTableShell} h-[425px] overflow-auto`}>
                 <table className="w-full min-w-[980px] text-xs">
                   <thead className={inventoryTableHead}>
                     <tr>
@@ -497,16 +502,16 @@ export function InventoryOverviewPage() {
                   </tbody>
                 </table>
               </div>
-              <InventoryPagination page={activePage} pageCount={pageCount} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+              <OverviewPagination page={activePage} pageCount={pageCount} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </InventoryPanel>
 
-            <div className={`grid grid-cols-1 md:grid-cols-2 ${inventoryGridGap}`}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <RecentTransactionCard title="Nhập kho gần đây" rows={recentInboundRows.slice(0, 5)} tone="cyan" onViewAll={() => setOverviewPopup('recent-inbound')} />
               <RecentTransactionCard title="Xuất kho gần đây" rows={recentOutboundRows.slice(0, 5)} tone="amber" onViewAll={() => setOverviewPopup('recent-outbound')} />
             </div>
           </div>
 
-          <div className="space-y-3 xl:col-span-4">
+          <div className="space-y-1.5 xl:col-span-4">
             <InventoryChartCard title="Tổng quan tồn kho" note="Theo vị trí thực tế">
               <CompactDonutSummary segments={zoneSegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
             </InventoryChartCard>
@@ -658,7 +663,60 @@ function AlertRows({ rows }: { rows: any[] }) {
     </div>
   )
 }
+function OverviewPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const safePageCount = Math.max(1, pageCount)
+  const safePage = Math.min(Math.max(1, page), safePageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  const windowSize = 5
+  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
+  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
 
+  return (
+    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
+      <div>
+        Hiển thị {start}-{end}/{total.toLocaleString('vi-VN')} kết quả
+      </div>
+      <div className="flex justify-center gap-2">
+        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
+        {pages.map((pageNo) => (
+          <button
+            key={pageNo}
+            onClick={() => onPageChange(pageNo)}
+            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
+              safePage === pageNo
+                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
+            }`}
+          >
+            {pageNo}
+          </button>
+        ))}
+        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
+      </div>
+      <div className="flex justify-start gap-2 md:justify-end">
+        <button disabled={safePage <= 1} onClick={() => onPageChange(Math.max(1, safePage - 1))} className={inventoryMutedButton}>
+          Trước
+        </button>
+        <button disabled={safePage >= safePageCount} onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))} className={inventoryMutedButton}>
+          Sau
+        </button>
+      </div>
+    </div>
+  )
+}
 function OverviewModal({
   type,
   onClose,

@@ -7,6 +7,18 @@ import { EventStoreService } from '../../core/events/event-store.service'
 import { TelemetryService } from '../../core/telemetry/telemetry.service'
 import { InventoryRepository } from './inventory.repository'
 
+type NormalizedInventoryLine = {
+  inventoryItemId: string
+  quantity: number
+  unitId?: string
+  warehouseId?: string
+  zoneId?: string
+  slotId?: string
+  level?: string
+  unitPrice: number | null
+  totalAmount: number | null
+}
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -866,10 +878,13 @@ export class InventoryService {
     const direction =
       this.toBusinessDirection(businessType)
 
-    const baseItems = this.normalizeItems(
-      payload,
-      type,
-    )
+    const baseItems =
+      await this.resolveLineWarehouses(
+        this.normalizeItems(
+          payload,
+          type,
+        ),
+      )
     if (!baseItems.length) {
       throw new Error(
         'Transaction requires at least one item',
@@ -891,17 +906,31 @@ export class InventoryService {
           }
 
           if (line.quantity < 0) {
-            const currentStock =
-              line.zoneId
-                ? await this.getCurrentStockAtLocation(
-                    line.inventoryItemId,
-                    line.zoneId,
-                    tx,
-                  )
-                : await this.getCurrentStock(line.inventoryItemId, tx)
+            const hasLocation =
+              Boolean(line.warehouseId) ||
+              Boolean(line.zoneId) ||
+              Boolean(line.slotId) ||
+              Boolean(line.level)
+            const locationLookup = hasLocation
+              ? await this.getLocationStockLookup(line, tx)
+              : null
+            const currentStock = locationLookup
+              ? locationLookup.quantity
+              : await this.getCurrentStock(line.inventoryItemId, tx)
             if (currentStock + line.quantity < 0) {
+              console.warn(
+                '[inventory.stock-check] insufficient stock',
+                {
+                  requestPayload: payload,
+                  normalizedLine: line,
+                  bucketQuery: locationLookup?.where ?? null,
+                  bucketFound: locationLookup?.stock ?? null,
+                  currentStock,
+                  requestedDelta: line.quantity,
+                },
+              )
               throw new Error(
-                line.zoneId
+                hasLocation
                   ? `Insufficient stock for ${item.code} at selected location`
                   : `Insufficient stock for ${item.code}`,
               )
@@ -1019,7 +1048,12 @@ export class InventoryService {
             tx,
           )
 
-          if (line.zoneId || line.slotId) {
+          if (
+            line.warehouseId ||
+            line.zoneId ||
+            line.slotId ||
+            line.level
+          ) {
             await this.inventoryRepository.upsertLocationStock(
               {
                 inventoryItemId: line.inventoryItemId,
@@ -1095,7 +1129,7 @@ export class InventoryService {
   private normalizeItems(
     payload: any,
     type: TransactionType,
-  ) {
+  ): NormalizedInventoryLine[] {
     const rawItems: Array<any> =
       Array.isArray(payload.items) &&
       payload.items.length > 0
@@ -1171,7 +1205,7 @@ export class InventoryService {
           item.unitId ?? payload.unitId ?? undefined,
         warehouseId:
           item.warehouseId ??
-          payload.warehouseId ??
+          (item.zoneId ? undefined : payload.warehouseId) ??
           undefined,
         zoneId:
           item.zoneId ?? payload.zoneId ?? undefined,
@@ -1183,6 +1217,46 @@ export class InventoryService {
         totalAmount,
       }
     })
+  }
+
+  private async resolveLineWarehouses(
+    lines: NormalizedInventoryLine[],
+  ): Promise<NormalizedInventoryLine[]> {
+    const zoneIds = Array.from(
+      new Set(
+        lines
+          .filter((line) => !line.warehouseId && line.zoneId)
+          .map((line) => line.zoneId as string),
+      ),
+    )
+
+    if (!zoneIds.length) {
+      return lines
+    }
+
+    const zones = await this.prisma.warehouseZone.findMany({
+      where: {
+        id: {
+          in: zoneIds,
+        },
+      },
+      select: {
+        id: true,
+        warehouseId: true,
+      },
+    })
+    const warehouseByZoneId = new Map(
+      zones.map((zone) => [zone.id, zone.warehouseId]),
+    )
+
+    return lines.map((line) => ({
+      ...line,
+      warehouseId:
+        line.warehouseId ??
+        (line.zoneId
+          ? warehouseByZoneId.get(line.zoneId) ?? undefined
+          : undefined),
+    }))
   }
 
   private async getCurrentStock(
@@ -1207,44 +1281,32 @@ export class InventoryService {
     return Number(item?.quantity ?? 0)
   }
 
-  private async getCurrentStockAtLocation(
-    inventoryItemId: string,
-    zoneId: string,
+  private async getLocationStockLookup(
+    line: {
+      inventoryItemId: string
+      warehouseId?: string | null
+      zoneId?: string | null
+      slotId?: string | null
+      level?: string | null
+    },
     tx: any = this.prisma,
   ) {
-    const item = await tx.inventoryItem.findUnique({
-      where: { id: inventoryItemId },
-      select: { zoneId: true },
-    })
-    const locationFilters: any[] = [
-      { zoneId },
-      {
-        zoneId: null,
-        transaction: {
-          zoneId,
-        },
-      },
-    ]
-
-    if (item?.zoneId === zoneId) {
-      locationFilters.push({
-        zoneId: null,
-        transaction: {
-          zoneId: null,
-        },
-      })
+    const where = {
+      inventoryItemId: line.inventoryItemId,
+      warehouseId: line.warehouseId ?? null,
+      zoneId: line.zoneId ?? null,
+      slotId: line.slotId ?? null,
+      level: line.level ?? null,
     }
+    const stock = await tx.inventoryLocationStock.findFirst({
+      where,
+    })
 
-    const aggregate =
-      await tx.inventoryTransactionItem.aggregate({
-        where: {
-          inventoryItemId,
-          OR: locationFilters,
-        },
-        _sum: { quantity: true },
-      })
-
-    return Number(aggregate._sum.quantity ?? 0)
+    return {
+      where,
+      stock,
+      quantity: Number(stock?.quantity ?? 0),
+    }
   }
 
   private async getStockMap(itemIds: string[]) {

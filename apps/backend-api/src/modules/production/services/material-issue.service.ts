@@ -97,7 +97,7 @@ export class MaterialIssueService {
       await this.createInventoryMovement(existing, 'OUTBOUND');
     }
     if (existing.status === 'ISSUED' && body.status === 'RETURNED') {
-      await this.createInventoryMovement(existing, 'RETURN');
+      return this.returnIssue(id, { remarks: body.remarks });
     }
 
     return this.prisma.productionMaterialIssue.update({
@@ -263,7 +263,15 @@ export class MaterialIssueService {
         },
         reservation: true,
         productionOrder: true,
-        inventoryItem: true,
+        inventoryItem: {
+          include: {
+            zone: {
+              include: {
+                warehouse: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -273,25 +281,71 @@ export class MaterialIssueService {
     if (issue.status !== 'ISSUED' && issue.status !== 'RETURNED') {
       throw new BadRequestException('Only issued material can be returned');
     }
-    if (!issue.reservationLine) {
-      throw new BadRequestException('Issue is not linked to a reservation line');
+
+    const [issuesForMaterial, consumptionsForMaterial] = await Promise.all([
+      this.prisma.productionMaterialIssue.findMany({
+        where: {
+          productionOrderId: issue.productionOrderId,
+          inventoryItemId: issue.inventoryItemId,
+          status: { in: ['ISSUED', 'RETURNED'] },
+        },
+      }),
+      this.prisma.productionMaterialConsumption.findMany({
+        where: {
+          productionOrderId: issue.productionOrderId,
+          inventoryItemId: issue.inventoryItemId,
+        },
+      }),
+    ]);
+    const issuedForMaterial = this.sum(
+      issuesForMaterial.map((row) => Number(row.issuedQty ?? 0)),
+    );
+    const returnedForMaterial = this.sum(
+      issuesForMaterial.map((row) => Number(row.returnedQty ?? 0)),
+    );
+    const consumedForMaterial = this.sum(
+      consumptionsForMaterial.map((row) => Number(row.consumedQty ?? 0)),
+    );
+    const scrapForMaterial = this.sum(
+      consumptionsForMaterial.map((row) => Number(row.scrapQty ?? 0)),
+    );
+    const issueRemainingQty =
+      Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0);
+    const materialRemainingQty =
+      issuedForMaterial -
+      returnedForMaterial -
+      consumedForMaterial -
+      scrapForMaterial;
+    const returnableQty = Math.min(issueRemainingQty, materialRemainingQty);
+    const quantity = Number(body.quantity ?? returnableQty);
+
+    if (quantity <= 0 || quantity > returnableQty + 0.000001) {
+      throw new BadRequestException(
+        `Cannot return more than remaining material quantity (${Math.max(returnableQty, 0).toLocaleString('vi-VN')})`,
+      );
     }
 
-    const returnableQty = Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0);
-    const quantity = Number(body.quantity ?? returnableQty);
-    if (quantity <= 0 || quantity > returnableQty + 0.000001) {
-      throw new BadRequestException('Cannot return more than issued quantity');
-    }
+    const destination = await this.resolveMainWarehouseReturnDestination(issue);
 
     return this.prisma.$transaction(async (tx) => {
-      await this.createInventoryTransaction(
+      await this.createReturnToMainInventoryTransaction(
         tx,
         issue,
-        TransactionType.RETURN,
-        Math.abs(quantity),
+        destination,
+        quantity,
         actorId,
       );
-      await this.applyLocationStock(tx, issue.reservationLine!, Math.abs(quantity));
+      await this.applyLocationStock(
+        tx,
+        {
+          inventoryItemId: issue.inventoryItemId,
+          warehouseId: destination.warehouseId,
+          zoneId: destination.zoneId,
+          slotId: destination.slotId,
+          level: destination.level,
+        },
+        Math.abs(quantity),
+      );
       const updatedIssue = await tx.productionMaterialIssue.update({
         where: { id },
         data: {
@@ -310,13 +364,15 @@ export class MaterialIssueService {
         },
       });
 
-      await tx.productionMaterialReservationLine.update({
-        where: { id: issue.reservationLineId! },
-        data: {
-          returnedQty: { increment: quantity },
-          status: ProductionMaterialReservationLineStatus.PARTIAL,
-        },
-      });
+      if (issue.reservationLineId) {
+        await tx.productionMaterialReservationLine.update({
+          where: { id: issue.reservationLineId },
+          data: {
+            returnedQty: { increment: quantity },
+            status: ProductionMaterialReservationLineStatus.PARTIAL,
+          },
+        });
+      }
       await this.materialLedgerService.createReservationEntries(
         {
           productionOrderId: issue.productionOrderId,
@@ -325,14 +381,16 @@ export class MaterialIssueService {
           lines: [
             {
               inventoryItemId: issue.inventoryItemId,
-              warehouseId: issue.warehouseId,
-              zoneId: issue.zoneId,
-              slotId: issue.slotId,
-              level: issue.level,
+              warehouseId: destination.warehouseId,
+              zoneId: destination.zoneId,
+              slotId: destination.slotId,
+              level: destination.level,
               quantity,
             },
           ],
-          remark: body.remarks ?? `Return material from ${issue.issueNo}`,
+          remark:
+            body.remarks ??
+            `Return material from ${issue.issueNo} to main warehouse`,
           createdBy: actorId,
         },
         tx,
@@ -353,6 +411,8 @@ export class MaterialIssueService {
       productionOrderId: string;
       warehouseId: string | null;
       zoneId: string | null;
+      slotId?: string | null;
+      level?: string | null;
       issuedQty: number;
       remarks: string | null;
     },
@@ -369,6 +429,10 @@ export class MaterialIssueService {
       items: [
         {
           inventoryItemId: issue.inventoryItemId,
+          warehouseId: issue.warehouseId ?? undefined,
+          zoneId: issue.zoneId ?? undefined,
+          slotId: issue.slotId ?? undefined,
+          level: issue.level ?? undefined,
           quantity: type === 'OUTBOUND' ? issue.issuedQty : Math.abs(issue.issuedQty),
         },
       ],
@@ -450,6 +514,150 @@ export class MaterialIssueService {
     });
   }
 
+  private async resolveMainWarehouseReturnDestination(issue: {
+    inventoryItemId: string;
+    inventoryItem: {
+      zoneId: string | null;
+      slotId: string | null;
+      level: string | null;
+      zone?: {
+        id: string;
+        warehouseId: string | null;
+        row: string | null;
+        column: string | null;
+        level: string | null;
+        warehouse?: {
+          code: string | null;
+        } | null;
+      } | null;
+    };
+  }) {
+    const mainWarehouse = await this.prisma.masterWarehouse.findUnique({
+      where: {
+        code: 'MAIN',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!mainWarehouse) {
+      throw new BadRequestException('Main warehouse is not configured');
+    }
+
+    const currentMainStock = await this.prisma.inventoryLocationStock.findFirst({
+      where: {
+        inventoryItemId: issue.inventoryItemId,
+        warehouseId: mainWarehouse.id,
+        quantity: {
+          gt: 0,
+        },
+      },
+    });
+
+    if (currentMainStock?.warehouseId && currentMainStock.zoneId) {
+      return {
+        warehouseId: currentMainStock.warehouseId,
+        zoneId: currentMainStock.zoneId,
+        slotId: currentMainStock.slotId,
+        level: currentMainStock.level,
+      };
+    }
+
+    const itemZone = issue.inventoryItem.zone;
+    if (
+      itemZone?.warehouse?.code === 'MAIN' &&
+      itemZone.warehouseId &&
+      itemZone.id
+    ) {
+      return {
+        warehouseId: itemZone.warehouseId,
+        zoneId: itemZone.id,
+        slotId:
+          issue.inventoryItem.slotId ??
+          (itemZone.row && itemZone.column ? `${itemZone.row}${itemZone.column}` : null),
+        level: issue.inventoryItem.level ?? itemZone.level,
+      };
+    }
+
+    const fallbackZone = await this.prisma.warehouseZone.findFirst({
+      where: {
+        active: true,
+        warehouse: {
+          code: 'MAIN',
+        },
+      },
+      include: {
+        warehouse: true,
+      },
+      orderBy: {
+        code: 'asc',
+      },
+    });
+
+    if (!fallbackZone?.warehouseId) {
+      throw new BadRequestException('No active main warehouse return location is available');
+    }
+
+    return {
+      warehouseId: fallbackZone.warehouseId,
+      zoneId: fallbackZone.id,
+      slotId:
+        fallbackZone.row && fallbackZone.column
+          ? `${fallbackZone.row}${fallbackZone.column}`
+          : null,
+      level: fallbackZone.level,
+    };
+  }
+
+  private createReturnToMainInventoryTransaction(
+    tx: Prisma.TransactionClient,
+    issue: {
+      id: string;
+      issueNo: string;
+      inventoryItemId: string;
+      remarks: string | null;
+    },
+    destination: {
+      warehouseId: string | null;
+      zoneId: string | null;
+      slotId: string | null;
+      level: string | null;
+    },
+    quantity: number,
+    actorId?: string,
+  ) {
+    const timestamp = Date.now();
+    return tx.inventoryTransaction.create({
+      data: {
+        code: `PM-RETURN-${timestamp}`,
+        transactionNo: `${issue.issueNo}-RETURN-${timestamp}`,
+        type: TransactionType.RETURN,
+        direction: 'IN',
+        performedBy: actorId,
+        referenceModule: 'production_material_issue',
+        referenceId: issue.id,
+        warehouseId: destination.warehouseId,
+        zoneId: destination.zoneId,
+        remarks:
+          issue.remarks ??
+          `[PRODUCTION_MATERIAL_RETURN] Return unused material to main warehouse`,
+        items: {
+          create: [
+            {
+              inventoryItemId: issue.inventoryItemId,
+              quantity: Math.abs(quantity),
+              warehouseId: destination.warehouseId,
+              zoneId: destination.zoneId,
+              slotId: destination.slotId,
+              level: destination.level,
+            },
+          ],
+        },
+      },
+    });
+  }
+
   private createInventoryTransaction(
     tx: Prisma.TransactionClient,
     issue: {
@@ -494,6 +702,13 @@ export class MaterialIssueService {
         },
       },
     });
+  }
+
+  private sum(values: number[]) {
+    return values.reduce(
+      (total, value) => total + (Number.isFinite(value) ? value : 0),
+      0,
+    );
   }
 
   private async refreshReservationStatus(

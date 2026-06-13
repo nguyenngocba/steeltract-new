@@ -7,6 +7,7 @@ import { useInventoryTransactions } from '../../inventory/hooks/useInventoryTran
 import { useProjects } from '../../inventory/hooks/useProjects'
 import type { ProductionComponent } from '../api/production.api'
 import { useCreateProductionBom, useProductionIssues } from '../hooks/useProductionCockpit'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const inputClass = 'mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-xs text-slate-100 outline-none focus:border-cyan-600'
 const defaultRouting = [
@@ -148,8 +149,8 @@ export function ProductionBomModal({
     const required = new Map<string, number>()
     materials.forEach((item) => {
       if (!item.materialId) return
-      const quantity = Number(item.quantity)
-      const wastePercent = Number(item.wastePercent || 0)
+      const quantity = parseLocaleNumber(item.quantity)
+      const wastePercent = parseLocaleNumber(item.wastePercent || 0)
       if (!Number.isFinite(quantity) || quantity <= 0) return
       required.set(
         item.materialId,
@@ -186,7 +187,7 @@ export function ProductionBomModal({
   }
 
   async function submit() {
-    const validMaterials = materials.filter((item) => item.materialId && Number(item.quantity) > 0)
+    const validMaterials = materials.filter((item) => item.materialId && parseLocaleNumber(item.quantity) > 0)
     const validRouting = routing.filter((item) => item.stepName.trim())
 
     if (!component) return toast.error('Chọn cấu kiện áp dụng BOM')
@@ -195,7 +196,7 @@ export function ProductionBomModal({
     if (stockWarnings.length > 0) {
       const warning = stockWarnings[0]
       return toast.error(
-        `${warning.material?.code ?? 'Vật tư'} vượt tồn kho SX: cần ${warning.required.toLocaleString('vi-VN')}, còn ${warning.available.toLocaleString('vi-VN')}`,
+        `${warning.material?.code ?? 'Vật tư'} vượt tồn kho SX: cần ${formatQuantity(warning.required)}, còn ${formatQuantity(warning.available)}`,
       )
     }
 
@@ -208,20 +209,20 @@ export function ProductionBomModal({
         structureType: structureType || undefined,
         projectId: component.projectId,
         unit,
-        estimatedWeight: Number(estimatedWeight || 0),
+        estimatedWeight: parseLocaleNumber(estimatedWeight || 0),
         version,
         status: 'ACTIVE',
         items: validMaterials.map((item) => ({
           materialId: item.materialId,
-          quantity: Number(item.quantity),
-          wastePercent: Number(item.wastePercent || 0),
+          quantity: parseLocaleNumber(item.quantity),
+          wastePercent: parseLocaleNumber(item.wastePercent || 0),
           category: item.category,
         })),
         routingSteps: validRouting.map((item, index) => ({
           stepNo: index + 1,
           stepName: item.stepName,
           workshop: item.workshop || undefined,
-          expectedHours: Number(item.expectedHours || 0),
+          expectedHours: parseLocaleNumber(item.expectedHours || 0),
           qcRequired: item.qcRequired,
         })),
       })
@@ -253,7 +254,7 @@ export function ProductionBomModal({
               </select>
             </label>
             <label className="text-xs text-slate-400">Loại cấu kiện<input value={structureType} onChange={(event) => setStructureType(event.target.value)} className={inputClass} placeholder="Dầm, cột, bản mã..." /></label>
-            <label className="text-xs text-slate-400">Khối lượng ước tính (kg)<input value={estimatedWeight} onChange={(event) => setEstimatedWeight(event.target.value)} type="number" min="0" step="0.01" className={inputClass} /></label>
+            <label className="text-xs text-slate-400">Khối lượng ước tính (kg)<input value={estimatedWeight} onChange={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} inputMode="decimal" className={inputClass} /></label>
             <label className="text-xs text-slate-400">Đơn vị<input value={unit} onChange={(event) => setUnit(event.target.value)} className={inputClass} /></label>
             <label className="text-xs text-slate-400">Phiên bản<input value={version} onChange={(event) => setVersion(event.target.value)} className={inputClass} /></label>
             <div className="rounded border border-slate-800 bg-slate-950 p-3 text-xs">
@@ -280,7 +281,7 @@ export function ProductionBomModal({
                     <select value={item.materialId} onChange={(event) => selectMaterial(index, event.target.value)} className={inputClass}>
                       <option value="">Chọn {bomCategoryLabel(item.category).toLowerCase()} từ kho SX</option>
                       {groupOptions.length === 0 ? <option value="" disabled>Không có {bomCategoryLabel(item.category).toLowerCase()} trong kho SX</option> : null}
-                      {groupOptions.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · tồn SX {Number(row.sxQty ?? 0).toLocaleString('vi-VN')}</option>)}
+                      {groupOptions.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · tồn SX {formatQuantity(row.sxQty ?? 0)}</option>)}
                     </select>
                   </td>
                   <td className="pr-2">
@@ -294,10 +295,10 @@ export function ProductionBomModal({
                       <option value="CONSUMABLE">Tiêu hao ({productionMaterialsByCategory.CONSUMABLE.length})</option>
                     </select>
                   </td>
-                  <td className="pr-2"><input value={item.quantity} onChange={(event) => updateMaterial(index, { quantity: event.target.value })} type="number" min="0.01" step="0.01" className={inputClass} /></td>
-                  <td className="pr-2"><input value={item.wastePercent} onChange={(event) => updateMaterial(index, { wastePercent: event.target.value })} type="number" min="0" max="100" step="0.01" className={inputClass} /></td>
+                  <td className="pr-2"><input value={item.quantity} onChange={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
+                  <td className="pr-2"><input value={item.wastePercent} onChange={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
                   <td className={`pt-2 ${isOverStock ? 'text-red-300' : 'text-emerald-300'}`}>
-                    {item.materialId ? `${requiredTotal.toLocaleString('vi-VN')} / ${available.toLocaleString('vi-VN')}` : '-'}
+                    {item.materialId ? `${formatQuantity(requiredTotal)} / ${formatQuantity(available)}` : '-'}
                   </td>
                   <td className="pt-2 text-slate-300">{material?.unitMaster?.symbol ?? material?.unit ?? '-'}</td>
                   <td className="pt-2"><button onClick={() => setMaterials((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa vật tư" className="text-red-300"><Trash2 size={15} /></button></td>
@@ -315,7 +316,7 @@ export function ProductionBomModal({
               <div className="flex items-center justify-center text-xs text-cyan-300">{index + 1}</div>
               <input value={item.stepName} onChange={(event) => updateRouting(index, { stepName: event.target.value })} className={inputClass} placeholder="Tên công đoạn" />
               <input value={item.workshop} onChange={(event) => updateRouting(index, { workshop: event.target.value })} className={inputClass} placeholder="Xưởng" />
-              <input value={item.expectedHours} onChange={(event) => updateRouting(index, { expectedHours: event.target.value })} type="number" min="0" step="0.25" className={inputClass} />
+              <input value={item.expectedHours} onChange={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} />
               <label className="flex items-center gap-2 pt-2 text-xs text-slate-300"><input checked={item.qcRequired} onChange={(event) => updateRouting(index, { qcRequired: event.target.checked })} type="checkbox" /> QC</label>
               <button onClick={() => setRouting((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa công đoạn" className="pt-2 text-red-300"><Trash2 size={15} /></button>
             </div>)}</div>
@@ -334,7 +335,7 @@ export function ProductionBomModal({
             <div className="space-y-1">
               {stockWarnings.map((warning) => (
                 <div key={warning.materialId}>
-                  {warning.material?.code ?? warning.materialId}: cần {warning.required.toLocaleString('vi-VN')}, còn {warning.available.toLocaleString('vi-VN')}, thiếu {warning.shortage.toLocaleString('vi-VN')}
+                  {warning.material?.code ?? warning.materialId}: cần {formatQuantity(warning.required)}, còn {formatQuantity(warning.available)}, thiếu {formatQuantity(warning.shortage)}
                 </div>
               ))}
             </div>

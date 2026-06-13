@@ -1,5 +1,222 @@
 # SteelTrack AI Changelog
 
+## 2026-06-13 Sprint 11A Decimal Quantity & Currency Formatting
+
+Fixed:
+
+* Added shared frontend number helpers for `vi-VN` decimal quantity input and VND currency display.
+* Inventory transaction modals now accept and display decimal quantities/unit prices using locale formatting while preserving up to 3 decimal digits.
+* Inventory inbound/outbound legacy wizards, stock adjustment, stock-take, Material Master minimum stock, and warehouse location capacity now parse decimal values consistently.
+* Production BOM, Manufacturing Order, production return/consume prompts, and Yard staging now support decimal quantities such as `0,001`, `1,5`, and `1.234.567,125`.
+* Components production material return uses the same decimal parser and VND currency formatter.
+* Backend Inventory and Production DTOs now tolerate locale-formatted numeric strings in quantity-related fields.
+
+Database audit:
+
+* No migration required for the audited operational quantity/cost fields; current Prisma models use `Float` for Inventory, BOM, Production, Yard quantity, and Component costing values.
+
+Verification:
+
+* Frontend build passed.
+* Backend build passed.
+
+## 2026-06-13 Sprint 11 Component Costing Breakdown
+
+Implemented:
+
+* Added `GET /components/:id/costing/breakdown`.
+* Breakdown response includes component id/code, production order id, estimated material rows, actual material rows, summary material costs, and warnings.
+* Estimated material rows use BOM quantities, waste percent, production order quantity, and Inventory average material cost.
+* Actual material rows use `ProductionMaterialConsumption.consumedQty + scrapQty` and Inventory average material cost.
+* Added warning engine:
+  `BOM_MATERIAL_NOT_CONSUMED`;
+  `UNPLANNED_MATERIAL`;
+  `QUANTITY_VARIANCE`.
+* Quantity variance threshold is configurable with `COMPONENT_COSTING_QTY_VARIANCE_THRESHOLD_PERCENT` and defaults to 10%.
+* Component Detail UI now has a `Cost Breakdown` tab with KPI cards, Estimated Materials table, Actual Materials table, and Warnings section.
+
+Root cause:
+
+* `ComponentCosting` stored summary totals but did not expose the material rows used to create those totals.
+* Users could see estimated, actual, and variance cost but could not tell which BOM materials or actual consumed materials drove the numbers.
+
+Verification:
+
+* Test case created BOM material `VAL-MAT-100` quantity `100` and consumed unplanned `VAL-MAT-002` quantity `9`.
+* `GET /components/:id/costing/breakdown` returned:
+  estimated material cost `128,571,428.57142857`;
+  actual material cost `2,442,627.7427184465`;
+  warnings `BOM_MATERIAL_NOT_CONSUMED` and `UNPLANNED_MATERIAL`.
+* Backend build passed.
+* Frontend build passed.
+
+## 2026-06-13 Sprint 10C Reservation Allocation Integrity
+
+Fixed:
+
+* Production reservation preview/allocation now reads active `inventory_location_stocks` buckets directly instead of reconstructing availability from historical Inventory transactions and issue rows.
+* Reservation allocation only considers production warehouse buckets where `inventory_location_stocks.quantity > 0`.
+* Bucket selection is exact by:
+  `inventoryItemId + warehouseId + zoneId + slotId + level`.
+* Active reservations are deducted by exact bucket, so one occupied slot/level no longer reduces a different slot/level.
+* Runtime production integrity summary now reports `invalidReservationBuckets` for active reservation lines whose exact bucket has no positive current stock.
+
+Root cause:
+
+* Reservation allocation used transaction history tagged `[COMPONENT_PRODUCTION]` and manual issue deduction.
+* Historical production buckets could remain in the derived availability map after their active `inventory_location_stocks` row was consumed or removed.
+* Reservation could succeed against that historical bucket, then issue-from-reservation failed during exact stock mutation with negative/insufficient stock validation.
+
+Verification:
+
+* Smoke setup created active production stock for a new material:
+  `A02/L1 = 10`, `A02/L2 = 5`.
+* Reservation requirement `8` previewed and allocated only from active bucket `A02/L1`.
+* Issue from reservation succeeded immediately.
+* Verified final stock:
+  `A02/L1 = 2`, `A02/L2 = 5`.
+* Backend build passed.
+* Frontend build passed.
+
+Remaining data state:
+
+* Runtime integrity summary still reports `invalidReservationBuckets = 1` from a historical reservation created before this fix. No silent data backfill was performed.
+
+## 2026-06-13 Sprint 10B Automatic Component Costing
+
+Fixed:
+
+* Production completion now automatically recalculates Component costing for the linked component.
+* `POST /production/:id/component` also triggers automatic costing after creating or marking a component `READY`.
+* Automatic costing calls the existing ComponentCosting upsert path, so an existing `ComponentCosting` row is updated and a missing row is created.
+* Costing failures are caught and logged with `Logger.warn`; production completion remains successful.
+* Automatic costing writes ActivityLog action `AUTO_RECALCULATE_COSTING` with `componentId` and `productionOrderId` metadata.
+* Manual `POST /components/:id/costing/recalculate` remains unchanged and continues to write `RECALCULATE_COSTING`.
+
+Root cause:
+
+* Component costing existed only behind the manual Components API action.
+* Production completion and production-output component creation updated Component status to `READY` but never called the costing service, leaving `components.estimatedCost` and `components.actualCost` at zero until a user pressed Recalculate.
+
+Verification:
+
+* Smoke flow created component `S10B-20260613103402-COMP`, transferred material to production, issued `10`, consumed `8`, scrapped `1`, and completed the production stage.
+* Without calling manual recalculate, verified:
+  `ComponentCosting` row exists;
+  `components.estimatedCost = 2,714,030.825242719`;
+  `components.actualCost = 2,442,627.742718447`.
+* Verified ActivityLog:
+  `AUTO_RECALCULATE_COSTING` with component and production order metadata.
+* Reservation-based smoke found a separate existing defect: reservation issue allocated a historical production slot without current stock and returned `Inventory quantity cannot become negative`. This is documented as future reservation reconciliation work, not part of Sprint 10B.
+
+## 2026-06-13 Sprint 10A.1 Return Material UI Reconciliation
+
+Fixed:
+
+* Production Cockpit now uses one shared returnable calculation for rendering and click handling.
+* Returnable quantity is computed from `ProductionMaterialIssue.returnedQty` plus consumed/scrap aggregate:
+  `issued - consumed - scrap - returned`.
+* Rows with status `RETURNED` are treated as fully reconciled in the UI, so the Return action is disabled/hidden.
+* Successful return mutation now updates the `['production', 'issues']` query cache immediately with the backend response before async refetch completes.
+* Inventory insufficient-stock errors from stale return attempts are translated into a user-friendly reload/reconciliation message.
+
+Root cause:
+
+* The backend correctly wrote `ProductionMaterialLedger` `RETURN` and updated `ProductionMaterialIssue.returnedQty`, while `ProductionMaterialConsumption.returnedQty` remained a historical snapshot.
+* The Cockpit depended on query invalidation/refetch timing after return. A stale issue row could keep the Return action visible long enough for a second return attempt.
+* The UI needed to use `ProductionMaterialIssue.returnedQty` as the active returned source of truth and refresh it synchronously from the return mutation response.
+
+Verification:
+
+* Existing Sprint 10A smoke row `S10A-20260613094829-ISSUE` verifies:
+  issue `10`, consume `8`, scrap `1`, return `1`.
+* SQL returnable check now reports:
+  `backend_formula_returnable = 0`, `ui_returnable = 0`.
+* Backend build passed.
+* Frontend build passed.
+
+## 2026-06-13 Sprint 10A Material Return Reconciliation
+
+Fixed:
+
+* Production Material Return now validates against the real MO/material balance:
+  `issued - consumed - scrap - previously returned`.
+* Returning unused issued material now creates an Inventory `RETURN` transaction into `MAIN` / `Kho chính` instead of restoring the old production issue bucket.
+* `inventory_location_stocks` and `inventory_items.quantity` are updated through the Inventory return transaction and exact main warehouse bucket upsert.
+* `ProductionMaterialIssue.returnedQty` is incremented by the returned quantity.
+* `ProductionMaterialLedger` writes a `RETURN` event at the main warehouse destination bucket.
+* Legacy `PATCH /production/material-issues/:id` status changes to `RETURNED` now route through the same return validation instead of the old stock movement path.
+* Production Cockpit Material Issues UI now calculates returnable quantity after consumed/scrap quantities and prompts for partial return quantity.
+* Production mutations now invalidate Inventory query caches after issue/return changes.
+
+Root cause:
+
+* The previous return path treated returnable quantity as `issuedQty - returnedQty`, so it ignored consumed and scrap quantities.
+* The previous return path restored stock to the original production issue location. That conflicted with the active workflow where issue already deducts `Kho vật tư SX`, consumption/scrap are production-side actuals, and only unused remainder should return to `Kho chính`.
+* A legacy status-update path could still create the old return movement without the new reconciliation checks.
+
+Verification:
+
+* Smoke test completed through API using `VAL-MAT-002`:
+  issue `10`, consume `8`, scrap `1`, return `1`.
+* Verified balance:
+  `issued = 10`, `consumed = 8`, `scrap = 1`, `returned = 1`.
+* Verified Inventory transactions:
+  transfer Main -> Production `-10/+10`, production issue export `-10`, return to Main `+1`.
+* Verified ledger rows:
+  `CONSUME = 9` at production bucket and `RETURN = 1` at main warehouse bucket.
+
+## 2026-06-12 Sprint 9 Bug Fixes
+
+Fixed:
+
+* Fixed critical Inventory production-transfer stock check where top-level `warehouseId` for the receiving production warehouse was inherited by the main-warehouse source line.
+* Inventory line normalization now resolves `warehouseId` from each line `zoneId` when the line has a zone, preventing source and destination warehouse IDs from being mixed in multi-line transfers.
+* Inventory outbound modal now sends source line `warehouseId` explicitly from the selected source location/zone.
+* Inventory transaction location synchronization now keys `inventory_location_stocks` by the full location bucket:
+  `inventoryItemId + warehouseId + zoneId + slotId + level`.
+* Inventory outbound validation now checks the exact selected location bucket instead of a zone-only aggregate.
+* Inventory transactions now update location stock whenever any location field is present, including warehouse-only buckets.
+* Production material issue transactions now pass `warehouseId`, `zoneId`, `slotId`, and `level` on transaction item lines.
+* MO auto-issue planning now preserves production warehouse slot and level from production stock buckets, so issue rows and Inventory transaction items target the same 2D location.
+* Project Components delivery/install API calls now use the authenticated shared API client instead of the unauthenticated `shared/http/http-client`.
+* Project Components actions now show success/error feedback and invalidate both Projects runtime and Components queries.
+* Project Components row navigation now opens the existing Component detail modal on the Components list when a `componentId` route state is provided.
+
+Root causes:
+
+* Production issue paths could create Inventory transaction items without slot/level, so `inventory_items.quantity` changed while the exact `inventory_location_stocks` bucket did not.
+* Production stock planning grouped buckets by warehouse/zone only, dropping slot/level selected in the production warehouse 2D location.
+* Project delivery used an Axios client without auth interceptors, causing protected `POST /components/:id/deliver` requests to return `401 Unauthorized` from the real UI path.
+* Production transfer payloads used top-level `warehouseId = wh-production-steeltrack`; before the fix, the source line for `Kho chính` inherited that value and queried the wrong stock bucket.
+
+Verification:
+
+* Before fix data check for `VAL-MAT-001` remained `inventory_items.quantity = 80` and location stock total `90`, proving existing validation data was already inconsistent.
+* Authenticated delivery verification changed `CPL-48937939` from `SHIPPED` to `DELIVERED` via `POST /components/:id/deliver` (`201`).
+* Production issue/return smoke test on `VAL-MAT-001` quantity `1` changed item/location `80/50 -> 79/49 -> 80/50`, and created `EXPORT`/`RETURN` transaction item rows with the same warehouse, zone, slot, and level.
+* Production transfer smoke test on `VAL-MAT-002` with legacy payload shape changed source line normalization to `wh-main-steeltrack` and completed without insufficient-stock error; reverse transfer restored the checked bucket.
+* Runtime integrity APIs still report historical mismatches after the fix because existing bad rows were not backfilled in this bug-fix sprint.
+* Backend build passed.
+* Frontend build passed.
+
+## 2026-06-12 Clean Dataset Plan
+
+Completed:
+
+* Created `docs/ai-state/audits/clean-dataset-plan.md`.
+* Classified operational tables that can be cleared to isolate legacy/test data from active workflow defects.
+* Classified master/reference tables that should be kept.
+* Defined Scenario A clean validation workflow:
+  1 material, 1 BOM, 1 MO, 1 reservation, 1 issue, 1 return, 1 consume, 1 component, 1 QC, 1 Yard placement, shipped, delivered, installed.
+* Documented expected Inventory and Production balances for every validation step.
+
+Notes:
+
+* No production code changed.
+* No database cleanup was executed.
+* Existing `scripts/reset-clean-workflow.sql` is not suitable for this exact plan because it clears `projects`, while this plan keeps Projects as master/context data.
+
 ## 2026-06-12 System Audit & Hardening Sprint 8
 
 Completed:

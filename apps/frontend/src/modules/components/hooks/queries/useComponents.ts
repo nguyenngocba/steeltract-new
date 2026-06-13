@@ -8,6 +8,7 @@ import {
   createComponent,
   createProductionOrder,
   deleteComponent,
+  getComponentCostingBreakdown,
   getComponentCosting,
   getComponents,
   getProductionOrders,
@@ -59,6 +60,14 @@ export function useComponentCosting(componentId?: string) {
   })
 }
 
+export function useComponentCostingBreakdown(componentId?: string) {
+  return useQuery({
+    queryKey: ['components', 'costing-breakdown', componentId],
+    queryFn: () => getComponentCostingBreakdown(componentId!),
+    enabled: Boolean(componentId),
+  })
+}
+
 export function useRecalculateComponentCosting() {
   const queryClient = useQueryClient()
 
@@ -70,6 +79,9 @@ export function useRecalculateComponentCosting() {
       })
       queryClient.invalidateQueries({
         queryKey: ['components', 'costing', componentId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['components', 'costing-breakdown', componentId],
       })
       queryClient.invalidateQueries({
         queryKey: ['projects'],

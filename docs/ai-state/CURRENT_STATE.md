@@ -1,6 +1,6 @@
 # Current State
 
-This document summarizes the current operational state of SteelTrack as of 2026-06-12. Percentages and detailed task ordering remain tracked in `PROJECT_STATUS.md` and `NEXT_TASKS.md`.
+This document summarizes the current operational state of SteelTrack as of 2026-06-13. Percentages and detailed task ordering remain tracked in `PROJECT_STATUS.md` and `NEXT_TASKS.md`.
 
 ## Inventory
 
@@ -15,12 +15,15 @@ Current architecture:
 - `inventory_location_stocks` stores current balance by `inventoryItemId + zoneId + slotId + level`.
 - `inventory_items.quantity` remains a compatibility snapshot for modules still reading material quantity directly.
 - Warehouse locations are stored in `warehouse_zones` and linked to `master_warehouses` (`MAIN` / `PRODUCTION`).
+- Sprint 9 stock mutation paths use the full location bucket `inventoryItemId + warehouseId + zoneId + slotId + level` for exact location validation and location stock upsert.
+- Sprint 11A decimal pass supports locale-formatted quantity input in operational Inventory forms and keeps VND currency display rounded to whole dong.
 
 Known limitations:
 
 - Some document numbers are still generated on the frontend.
 - Slot-level reconciliation is not yet a formal ledger rebuilt from immutable transaction history.
 - Sprint 8 audit found transaction-vs-location reconciliation mismatches and snapshot mismatches that need operator/admin review before any automated backfill.
+- Sprint 9 fixed active mutation paths that created new snapshot/location mismatches, but existing mismatched validation rows still require a dedicated reconciliation/backfill decision.
 - Some Inventory modal helpers remain locally embedded instead of shared visual components.
 
 Current focus:
@@ -39,12 +42,18 @@ Current architecture:
 - Production covers BOMs, Manufacturing Orders, routing stages, production logs, material issues, QC gate handoff, and Yard staging.
 - BOM material availability uses production warehouse stock.
 - Production Material Reservation Sprint 1 persists reservation headers/lines and previews allocation by production warehouse location.
+- Sprint 10C reservation allocation uses active `inventory_location_stocks.quantity > 0` buckets only and matches exact `inventoryItemId + warehouseId + zoneId + slotId + level`.
 - Production Material Ledger Sprint 2 records reservation lifecycle events with MO, reservation, material, location, quantity, event type, date, remark, and actor.
 - Sprint 3 issues material from reservation lines, returns unused issued material, updates exact `inventory_location_stocks`, and writes `ISSUE`/`RETURN` ledger rows.
+- Sprint 10A reconciles production material return after consumption: returnable quantity is capped by issued minus consumed, scrap, and previous returned quantity; valid returns are posted back to `MAIN` / `Kho chính`.
 - Sprint 4 records actual production material consumption and scrap per MO/material and writes `CONSUME` ledger rows.
 - Sprint 5 persists component costing from production consumption and Inventory average cost, then syncs Component estimated/actual cost fields.
+- Sprint 10B automatically recalculates Component costing after production completion/component `READY`; costing failure is logged as a warning and does not roll back production completion.
+- Sprint 11 exposes Component costing material breakdown by BOM planned materials and actual production consumption, including variance warnings.
+- Sprint 11A decimal pass supports decimal BOM, MO, issue/return/consume, and Yard staging quantities in frontend workflows and backend DTO parsing.
 - Production can create/mark a component from an MO only after material has been issued.
 - MO start auto-issues missing BOM material quantities from `Kho vật tư SX` and creates outbound Inventory movements.
+- Sprint 9 auto-issue planning preserves production warehouse slot/level and production issue transaction items carry the same warehouse/zone/slot/level into Inventory.
 - Production-to-Yard staging requires linked QC inspection status `PASSED` or `APPROVED`.
 
 Known limitations:
@@ -52,10 +61,13 @@ Known limitations:
 - Material issue from reservation is implemented, but approval-oriented multi-line issue/return documents are still future work.
 - Ledger records `RESERVE`, `RELEASE`, `ISSUE`, `RETURN`, and `CONSUME`; adjust writers remain future work.
 - Production material warehouse balance is still tied to Inventory transactions and issue rows, not a fully independent receipt/ledger model.
-- Component costing persists material actuals; labor, machine, overhead, QC rework, and Yard handling cost are currently zero/manual future inputs.
+- Component costing persists material actuals and exposes material-level breakdown; labor, machine, overhead, QC rework, and Yard handling cost are currently zero/manual future inputs.
 - Delivery and installation now complete the component lifecycle after Yard outbound with `SHIPPED -> DELIVERED -> INSTALLED`.
 - Installation mapping stores exact project placement fields on Component: `installZone`, `installAxis`, `installLevel`, and `installPosition`.
 - Sprint 8 audit found issued material remains unallocated where consumption has not been posted, and some issue rows are not yet represented by `ISSUE` ledger rows.
+- Historical production issue rows that were created before Sprint 9 may still be missing exact slot/level transaction location and require reconciliation rather than silent mutation.
+- Historical issue/consume rows may remain partially unreconciled until a clean validation dataset or approved backfill is run; Sprint 10A fixed the active return path only.
+- Runtime integrity currently still reports one historical invalid reservation bucket created before Sprint 10C; no silent data backfill was performed.
 
 Current focus:
 
@@ -145,6 +157,8 @@ Current architecture:
 - Project runtime separates `readyComponents`, `shippedComponents`, `deliveredComponents`, and `installedComponents`; delivered project counts include `DELIVERED` and `INSTALLED`, not in-transit `SHIPPED`.
 - Project Components installation confirmation requires Khu vực, Trục, Tầng, and Vị trí, and runtime returns these installation fields.
 - Project component Actual Cost is populated from Component costing recalculation when consumption data exists.
+- Project Components delivery and installation actions use the authenticated frontend API client and show success/error feedback.
+- Project Components row navigation opens the existing Component detail modal on the Components list when routed with a component id.
 - Sprint 8 audit found no installed-component `projectId` violations in current data.
 - Current project workflows support visible management context and integration points rather than full contract/schedule control.
 
@@ -154,7 +168,7 @@ Known limitations:
 - Project return flows are not yet formalized with full Yard and Inventory documents.
 - Delivery/installation confirmation does not yet create formal signed handover or installation certificate documents.
 - Installation mapping is text-field based; coordinate/drawing overlay validation is still future work.
-- Project component row click routes to the Components list because an active component detail route by id is not implemented yet.
+- Component detail still lives as a modal on the Components list rather than a dedicated `/components/:id` route.
 
 Current focus:
 

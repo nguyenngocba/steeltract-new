@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart3, Building2, CalendarClock, CheckCircle2, Clock, FileBarChart, Layers, MapPin, PackageOpen, Search, TrendingUp, X, type LucideIcon } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
@@ -54,13 +55,29 @@ export function ProjectsPage() {
   })
   const deliverMutation = useMutation({
     mutationFn: deliverProjectComponent,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects-runtime'] }),
+    onSuccess: async () => {
+      toast.success('Đã xác nhận nhận hàng')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['projects-runtime'] }),
+        queryClient.invalidateQueries({ queryKey: ['components'] }),
+      ])
+    },
+    onError: () => {
+      toast.error('Không thể xác nhận nhận hàng')
+    },
   })
   const installMutation = useMutation({
     mutationFn: installProjectComponent,
     onSuccess: async () => {
       setInstallTarget(null)
-      await queryClient.invalidateQueries({ queryKey: ['projects-runtime'] })
+      toast.success('Đã xác nhận lắp đặt')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['projects-runtime'] }),
+        queryClient.invalidateQueries({ queryKey: ['components'] }),
+      ])
+    },
+    onError: () => {
+      toast.error('Không thể xác nhận lắp đặt')
     },
   })
   const pendingComponentId = deliverMutation.isPending
@@ -382,11 +399,11 @@ function ProjectComponentsTab({ rows, projects, pendingId, onDeliver, onInstall,
 
 function ComponentProjectAction({ row, pending, onDeliver, onInstall }: { row: ProjectComponentRuntime; pending: boolean; onDeliver: (row: ProjectComponentRuntime) => void; onInstall: (row: ProjectComponentRuntime) => void }) {
   if (row.status === 'SHIPPED') {
-    return <button disabled={pending} onClick={(event) => { event.stopPropagation(); onDeliver(row) }} className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-50">{pending ? 'Đang xác nhận...' : 'Xác nhận nhận hàng'}</button>
+    return <button type="button" disabled={pending} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDeliver(row) }} className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-50">{pending ? 'Đang xác nhận...' : 'Xác nhận nhận hàng'}</button>
   }
 
   if (row.status === 'DELIVERED') {
-    return <button disabled={pending} onClick={(event) => { event.stopPropagation(); onInstall(row) }} className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">{pending ? 'Đang xác nhận...' : 'Xác nhận lắp đặt'}</button>
+    return <button type="button" disabled={pending} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onInstall(row) }} className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">{pending ? 'Đang xác nhận...' : 'Xác nhận lắp đặt'}</button>
   }
 
   return <span className="text-xs text-slate-500">-</span>

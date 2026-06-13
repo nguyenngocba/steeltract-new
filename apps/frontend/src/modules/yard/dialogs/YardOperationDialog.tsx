@@ -3,6 +3,7 @@ import { ArrowRight, Boxes, Construction, MapPinned, X } from 'lucide-react'
 
 import type { ComponentRecord } from '@/modules/components/api/contracts/components.contract'
 import { useProductionOrders, useStageProductionToYard } from '@/modules/production/hooks/useProductionCockpit'
+import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import { useMoveYardItem, useRemoveYardItem } from '../hooks/queries/useYardRuntime'
 import type { YardCrane, YardPlacement, YardSlotRuntime } from '../services/api/yard.api'
 
@@ -15,7 +16,7 @@ const labels = {
 } as const
 
 const input = 'w-full rounded border border-slate-700 bg-[#06111e] px-3 py-2 text-xs text-slate-100 outline-none focus:border-cyan-500'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
+const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value)
 
 type ActivePlacement = YardPlacement & { slot: YardSlotRuntime }
 
@@ -82,7 +83,7 @@ export function YardOperationDialog({
   const target = slots.find((slot) => slot.id === slotId)
   const selectedOrder = completedOrders.find((item) => item.id === productionOrderId)
   const component = selectedOrder?.component ?? components.find((item) => item.id === componentId)
-  const inboundQuantity = Number(quantity) || 0
+  const inboundQuantity = parseLocaleNumber(quantity) || 0
   const inboundRemaining = selectedOrder?.remainingQuantity ?? 0
   const inboundQuantityInvalid = mode === 'inbound' && (!selectedOrder || inboundQuantity <= 0 || inboundQuantity > inboundRemaining)
   const pending = move.isPending || remove.isPending || stageToYard.isPending
@@ -104,7 +105,7 @@ export function YardOperationDialog({
   useEffect(() => {
     if (!selectedOrder) return
     setComponentId(selectedOrder.component?.id ?? '')
-    setQuantity(String(Math.min(1, selectedOrder.remainingQuantity)))
+    setQuantity(fmt(Math.min(1, selectedOrder.remainingQuantity)))
   }, [selectedOrder])
 
   if (!open) return null
@@ -116,7 +117,7 @@ export function YardOperationDialog({
         payload: {
         slotId,
           quantity: inboundQuantity,
-        weight: Number(weight) || 0,
+        weight: parseLocaleNumber(weight) || 0,
         craneId: craneId || undefined,
         reason: reason || 'Nhập bãi sau hoàn thành sản xuất',
         },
@@ -162,8 +163,8 @@ export function YardOperationDialog({
               </label>
             </>}
             {mode === 'inbound' && <>
-              <label className="text-xs text-slate-400">Số lượng cấu kiện<input value={quantity} onChange={(event) => setQuantity(event.target.value)} className={`${input} mt-2`} inputMode="decimal" type="number" min="0.01" max={inboundRemaining || undefined}/>{selectedOrder ? <span className={`mt-2 block text-[11px] ${inboundQuantityInvalid ? 'text-red-300' : 'text-emerald-300'}`}>Còn được nhập bãi: {fmt(inboundRemaining)} cấu kiện. Đã nhập: {fmt(selectedOrder.stagedQuantity)} / MO: {fmt(selectedOrder.quantity)}</span> : null}</label>
-              <label className="text-xs text-slate-400">Khối lượng (tấn)<input value={weight} onChange={(event) => setWeight(event.target.value)} className={`${input} mt-2`} inputMode="decimal"/></label>
+              <label className="text-xs text-slate-400">Số lượng cấu kiện<input value={quantity} onChange={(event) => setQuantity(formatQuantityInput(event.target.value))} className={`${input} mt-2`} inputMode="decimal"/>{selectedOrder ? <span className={`mt-2 block text-[11px] ${inboundQuantityInvalid ? 'text-red-300' : 'text-emerald-300'}`}>Còn được nhập bãi: {fmt(inboundRemaining)} cấu kiện. Đã nhập: {fmt(selectedOrder.stagedQuantity)} / MO: {fmt(selectedOrder.quantity)}</span> : null}</label>
+              <label className="text-xs text-slate-400">Khối lượng (tấn)<input value={weight} onChange={(event) => setWeight(formatQuantityInput(event.target.value))} className={`${input} mt-2`} inputMode="decimal"/></label>
             </>}
             <label className="text-xs text-slate-400 md:col-span-2">Lý do / ghi chú vận hành<textarea value={reason} onChange={(event) => setReason(event.target.value)} className={`${input} mt-2 min-h-24 resize-none`} placeholder={mode === 'outbound' ? 'Công trình, xe nhận, mã shipment...' : 'Ghi chú điều phối...'}/></label>
           </div>
@@ -174,7 +175,7 @@ export function YardOperationDialog({
           <div className="mt-4 space-y-3">
             <div className="rounded border border-slate-800 p-3"><Boxes size={16} className="text-cyan-400"/><p className="mt-2 text-[10px] uppercase text-slate-500">Cấu kiện</p><p className="mt-1 text-sm text-slate-200">{component?.code ?? placement?.itemCode ?? '--'}</p></div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-slate-800 p-3 text-xs"><div><MapPinned size={15} className="text-emerald-400"/><p className="mt-2 text-slate-300">{placement?.slot.code ?? 'Xưởng'}</p></div><ArrowRight size={16} className="text-amber-400"/><div><MapPinned size={15} className="text-cyan-400"/><p className="mt-2 text-slate-300">{mode === 'outbound' ? 'Cổng xuất' : target?.code ?? '--'}</p></div></div>
-            <div className="rounded border border-slate-800 p-3 text-xs text-slate-400"><Construction size={15} className="text-amber-400"/><p className="mt-2">Tầng đích: <b className="text-slate-200">L{target ? target.currentStackLevel + 1 : '--'}</b></p><p className="mt-2">Occupancy: <b className="text-slate-200">{target ? `${target.currentStackLevel}/${target.maxStackLevel}` : '--'}</b></p><p className="mt-2">Số lượng nhập: <b className="text-slate-200">{mode === 'inbound' ? fmt(inboundQuantity) : fmt(Number(quantity))}</b></p><p className="mt-2">Khối lượng: <b className="text-slate-200">{fmt(Number(weight))} tấn</b></p></div>
+            <div className="rounded border border-slate-800 p-3 text-xs text-slate-400"><Construction size={15} className="text-amber-400"/><p className="mt-2">Tầng đích: <b className="text-slate-200">L{target ? target.currentStackLevel + 1 : '--'}</b></p><p className="mt-2">Occupancy: <b className="text-slate-200">{target ? `${target.currentStackLevel}/${target.maxStackLevel}` : '--'}</b></p><p className="mt-2">Số lượng nhập: <b className="text-slate-200">{mode === 'inbound' ? fmt(inboundQuantity) : fmt(parseLocaleNumber(quantity))}</b></p><p className="mt-2">Khối lượng: <b className="text-slate-200">{fmt(parseLocaleNumber(weight))} tấn</b></p></div>
           </div>
         </aside>
       </div>

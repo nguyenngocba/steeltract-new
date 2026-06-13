@@ -13,6 +13,6 @@ import { EventsModule } from '../../core/events/events.module'
 ],
   controllers: [ComponentsController],
   providers: [ComponentsRepository, ComponentsService, ComponentCostingService],
-  exports: [ComponentsService],
+  exports: [ComponentsService, ComponentCostingService],
 })
 export class ComponentsModule {}

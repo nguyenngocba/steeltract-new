@@ -30,6 +30,7 @@ export class BOMService {
 
   async create(body: CreateBomDto) {
     await this.ensureProductionStockForBom(body.items);
+    const bomItems = this.toBomItemCreates(body.items);
 
     return this.prisma.bOM.create({
       data: {
@@ -42,7 +43,7 @@ export class BOMService {
         estimatedWeight: body.estimatedWeight,
         version: body.version,
         status: body.status,
-        items: { create: body.items },
+        items: { create: bomItems },
         routingSteps: { create: body.routingSteps },
       },
       include: this.include(),
@@ -72,7 +73,9 @@ export class BOMService {
           estimatedWeight: body.estimatedWeight,
           version: body.version,
           status: body.status,
-          items: body.items ? { create: body.items } : undefined,
+          items: body.items
+            ? { create: this.toBomItemCreates(body.items) }
+            : undefined,
           routingSteps: body.routingSteps
             ? { create: body.routingSteps }
             : undefined,
@@ -149,6 +152,15 @@ export class BOMService {
         },
       },
     } satisfies Prisma.BOMInclude;
+  }
+
+  private toBomItemCreates(items: CreateBomDto['items']) {
+    return items.map((item) => ({
+      materialId: item.materialId,
+      quantity: Number(item.quantity ?? 0),
+      wastePercent: Number(item.wastePercent ?? 0),
+      category: item.category,
+    }));
   }
 
   private async ensureProductionStockForBom(items: CreateBomDto['items']) {

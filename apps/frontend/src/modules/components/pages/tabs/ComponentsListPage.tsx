@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { useLocation } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { useProjects } from '../../../inventory/hooks/useProjects'
 import { ManufacturingOrderModal } from '../../../production/components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../../../production/components/ProductionBomModal'
 import { useProductionBoms } from '../../../production/hooks/useProductionCockpit'
+import type { ComponentCostingWarning } from '../../api/contracts/components.contract'
 import {
   useComponents,
+  useComponentCostingBreakdown,
   useComponentCosting,
   useCreateComponent,
   useDeleteComponent,
@@ -54,7 +57,15 @@ type ComponentMetadata = {
   qcQuantity?: number
 }
 
+type ComponentsListRouteState = {
+  componentId?: string
+} | null
+
 export function ComponentsListPage() {
+  const routeLocation = useLocation()
+  const routeComponentId =
+    (routeLocation.state as ComponentsListRouteState)?.componentId
+  const openedRouteComponentIdRef = useRef<string | null>(null)
   const { data: componentRecords = [], isLoading } = useComponents()
   const { data: productionOrders = [] } = useProductionOrders()
   const { data: projects = [] } = useProjects()
@@ -75,7 +86,10 @@ export function ComponentsListPage() {
   const [bomOpen, setBomOpen] = useState(false)
   const [bomComponentId, setBomComponentId] = useState('')
   const [selected, setSelected] = useState<ComponentRow | null>(null)
+  const [costingView, setCostingView] = useState<'summary' | 'breakdown'>('summary')
   const { data: selectedCosting, error: costingError } = useComponentCosting(selected?.id)
+  const { data: selectedCostingBreakdown, error: costingBreakdownError } =
+    useComponentCostingBreakdown(selected?.id)
 
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -144,6 +158,24 @@ export function ComponentsListPage() {
       }
     })
   }, [componentRecords])
+
+  useEffect(() => {
+    if (
+      !routeComponentId ||
+      openedRouteComponentIdRef.current === routeComponentId
+    ) {
+      return
+    }
+
+    const row = rows.find((item) => item.id === routeComponentId)
+    if (!row) {
+      return
+    }
+
+    openedRouteComponentIdRef.current = routeComponentId
+    setSelected(row)
+    setDetailOpen(true)
+  }, [routeComponentId, rows])
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -526,13 +558,19 @@ export function ComponentsListPage() {
                   <div className="text-sm font-semibold text-white">Costing cấu kiện</div>
                   <div className="mt-1 text-xs text-slate-500">Chi phí thực tế tính từ production consumption và giá vốn bình quân vật tư.</div>
                 </div>
-                <button onClick={() => void recalculateSelectedCosting()} disabled={recalculateCosting.isPending} className={componentsMutedButton}>Tính lại costing</button>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-xl border border-white/10 bg-slate-950/70 p-1 text-xs">
+                    <button onClick={() => setCostingView('summary')} className={`rounded-lg px-3 py-1.5 ${costingView === 'summary' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}>Costing</button>
+                    <button onClick={() => setCostingView('breakdown')} className={`rounded-lg px-3 py-1.5 ${costingView === 'breakdown' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}>Cost Breakdown</button>
+                  </div>
+                  <button onClick={() => void recalculateSelectedCosting()} disabled={recalculateCosting.isPending} className={componentsMutedButton}>Tính lại costing</button>
+                </div>
               </div>
-              {costingError ? (
+              {costingView === 'summary' && costingError ? (
                 <div className="rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-xs text-amber-200">
                   Chưa đủ dữ liệu costing. Cấu kiện cần có lệnh sản xuất và consumption records.
                 </div>
-              ) : (
+              ) : costingView === 'summary' ? (
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                   <CostMetric title="Estimated Cost" value={money(selectedCosting?.estimatedCost)} />
                   <CostMetric title="Actual Cost" value={money(selectedCosting?.actualCost)} tone="text-emerald-300" />
@@ -542,6 +580,39 @@ export function ComponentsListPage() {
                   <CostMetric title="Machine Cost" value={money(selectedCosting?.machineCost)} />
                   <CostMetric title="Overhead Cost" value={money(selectedCosting?.overheadCost)} />
                   <CostMetric title="MO" value={selectedCosting?.productionOrder?.orderNo ?? '-'} />
+                </div>
+              ) : costingBreakdownError ? (
+                <div className="rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-xs text-amber-200">
+                  Chưa đủ dữ liệu breakdown. Cấu kiện cần có BOM, lệnh sản xuất và dữ liệu consumption.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <CostMetric title="Estimated Material Cost" value={money(selectedCostingBreakdown?.summary.estimatedMaterialCost)} />
+                    <CostMetric title="Actual Material Cost" value={money(selectedCostingBreakdown?.summary.actualMaterialCost)} tone="text-emerald-300" />
+                    <CostMetric title="Variance" value={money(selectedCostingBreakdown?.summary.varianceCost)} tone={(selectedCostingBreakdown?.summary.varianceCost ?? 0) > 0 ? 'text-red-300' : 'text-cyan-300'} />
+                  </div>
+                  <CostBreakdownTable
+                    title="Estimated Materials"
+                    rows={(selectedCostingBreakdown?.estimatedMaterials ?? []).map((row) => ({
+                      id: row.materialId,
+                      material: `${row.materialCode} · ${row.materialName}`,
+                      qty: row.requiredQty,
+                      unitCost: row.averageCost,
+                      amount: row.estimatedAmount,
+                    }))}
+                  />
+                  <CostBreakdownTable
+                    title="Actual Materials"
+                    rows={(selectedCostingBreakdown?.actualMaterials ?? []).map((row) => ({
+                      id: row.materialId,
+                      material: `${row.materialCode} · ${row.materialName}`,
+                      qty: row.actualQty,
+                      unitCost: row.averageCost,
+                      amount: row.actualAmount,
+                    }))}
+                  />
+                  <CostWarnings warnings={selectedCostingBreakdown?.warnings ?? []} />
                 </div>
               )}
             </div>
@@ -565,4 +636,75 @@ function CostMetric({ title, value, tone = 'text-white' }: { title: string; valu
       <div className={`mt-1 text-base font-semibold ${tone}`}>{value}</div>
     </div>
   )
+}
+
+function CostBreakdownTable({
+  title,
+  rows,
+}: {
+  title: string
+  rows: Array<{
+    id: string
+    material: string
+    qty: number
+    unitCost: number
+    amount: number
+  }>
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/45">
+      <div className="border-b border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-300">{title}</div>
+      <table className="w-full text-xs">
+        <thead className="bg-white/[0.03] text-slate-500">
+          <tr>
+            <th className="px-3 py-2 text-left">Material</th>
+            <th className="px-3 py-2 text-right">Qty</th>
+            <th className="px-3 py-2 text-right">Unit Cost</th>
+            <th className="px-3 py-2 text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="px-3 py-4 text-center text-slate-500">Không có dữ liệu vật tư.</td>
+            </tr>
+          ) : rows.map((row) => (
+            <tr key={row.id} className="border-t border-white/10 text-slate-200">
+              <td className="px-3 py-2 text-cyan-200">{row.material}</td>
+              <td className="px-3 py-2 text-right">{quantity(row.qty)}</td>
+              <td className="px-3 py-2 text-right">{money(row.unitCost)}</td>
+              <td className="px-3 py-2 text-right font-semibold text-white">{money(row.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function CostWarnings({ warnings }: { warnings: ComponentCostingWarning[] }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-950/45 p-3">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-amber-300">Warnings</div>
+      {warnings.length === 0 ? (
+        <div className="text-xs text-slate-500">Không có cảnh báo costing.</div>
+      ) : (
+        <div className="space-y-2">
+          {warnings.map((warning) => (
+            <div key={`${warning.type}-${warning.materialId}`} className="rounded-lg border border-amber-800/70 bg-amber-950/25 p-2 text-xs text-amber-100">
+              <div className="font-semibold">{warning.type}</div>
+              <div className="mt-1 text-amber-100/80">{warning.materialCode} · {warning.materialName}</div>
+              <div className="mt-1 text-slate-300">{warning.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function quantity(value?: number | null) {
+  return new Intl.NumberFormat('vi-VN', {
+    maximumFractionDigits: 3,
+  }).format(Number(value ?? 0))
 }

@@ -12,6 +12,7 @@ import { MaterialIssueService } from './services/material-issue.service';
 import { ProductionConsumptionService } from './services/production-consumption.service';
 import { ProductionMaterialLedgerService } from './services/production-material-ledger.service';
 import { ProductionReservationService } from './services/production-reservation.service';
+import { ComponentsModule } from '../components/components.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { YardModule } from '../yard/yard.module';
 @Module({
@@ -20,6 +21,7 @@ import { YardModule } from '../yard/yard.module';
     WorkflowModule,
     AttachmentsModule,
     EventsModule,
+    ComponentsModule,
     InventoryModule,
     YardModule,
   ],

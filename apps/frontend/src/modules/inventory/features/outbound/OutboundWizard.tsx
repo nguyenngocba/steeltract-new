@@ -8,6 +8,7 @@ import {
   useCreateOutbound,
 } from '../../hooks/mutations/useCreateOutbound'
 import { useProjects } from '../../hooks/useProjects'
+import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function OutboundWizard() {
 
@@ -15,7 +16,7 @@ export function OutboundWizard() {
     useState('')
 
   const [quantity, setQuantity] =
-    useState(1)
+    useState('1')
 
   const [projectId, setProjectId] =
     useState('')
@@ -42,7 +43,9 @@ export function OutboundWizard() {
       return
     }
 
-    if (quantity <= 0) {
+    const parsedQuantity = parseLocaleNumber(quantity)
+
+    if (parsedQuantity <= 0) {
       alert('Quantity must be greater than 0')
       return
     }
@@ -51,7 +54,7 @@ export function OutboundWizard() {
 
       await outboundMutation.mutateAsync({
         inventoryItemId,
-        quantity,
+        quantity: parsedQuantity,
         projectId:
           projectId || undefined,
       })
@@ -62,7 +65,7 @@ export function OutboundWizard() {
 
       setInventoryItemId('')
       setProjectId('')
-      setQuantity(1)
+      setQuantity('1')
 
     } catch (error) {
 
@@ -163,16 +166,13 @@ export function OutboundWizard() {
         </select>
 
         <input
-          type="number"
-          min="1"
           value={quantity}
           onChange={(e) =>
             setQuantity(
-              Number(
-                e.target.value,
-              ),
+              formatQuantityInput(e.target.value),
             )
           }
+          inputMode="decimal"
           className="
             w-full
             rounded-xl

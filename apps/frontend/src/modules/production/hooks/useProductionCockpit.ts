@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { productionApi, type ProductionBomInput, type ProductionConsumptionParams, type ProductionMaterialLedgerParams } from '../api/production.api'
+import { productionApi, type ProductionBomInput, type ProductionConsumptionParams, type ProductionMaterialIssue, type ProductionMaterialLedgerParams } from '../api/production.api'
 
 export const useProductionOrders = () =>
   useQuery({ queryKey: ['production', 'orders'], queryFn: productionApi.orders, refetchInterval: 5000 })
@@ -73,6 +73,8 @@ function useProductionMutation<TArgs>(mutationFn: (args: TArgs) => Promise<unkno
       queryClient.invalidateQueries({ queryKey: ['production'] })
       queryClient.invalidateQueries({ queryKey: ['components'] })
       queryClient.invalidateQueries({ queryKey: ['yard'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['materials'] })
     },
   })
 }
@@ -112,9 +114,23 @@ export const useExpireProductionReservation = () =>
   useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
     productionApi.expireReservation(id, payload))
 
-export const useReturnProductionMaterialIssue = () =>
-  useProductionMutation(({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
-    productionApi.returnMaterialIssue(id, payload))
+export const useReturnProductionMaterialIssue = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload = {} }: { id: string; payload?: Record<string, unknown> }) =>
+      productionApi.returnMaterialIssue(id, payload),
+    onSuccess: (updatedIssue) => {
+      queryClient.setQueryData<ProductionMaterialIssue[]>(['production', 'issues'], (current) =>
+        current?.map((issue) => (issue.id === updatedIssue.id ? updatedIssue : issue)) ?? current,
+      )
+      queryClient.invalidateQueries({ queryKey: ['production'] })
+      queryClient.invalidateQueries({ queryKey: ['components'] })
+      queryClient.invalidateQueries({ queryKey: ['yard'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['materials'] })
+    },
+  })
+}
 
 export const useConsumeProductionMaterial = () =>
   useProductionMutation(({ id, payload }: { id: string; payload: Record<string, unknown> }) =>

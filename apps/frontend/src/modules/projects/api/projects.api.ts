@@ -1,4 +1,4 @@
-import { http } from '@/shared/http/http-client'
+import { api } from '@/lib/api'
 
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED' | 'ON_HOLD'
 export type ProjectComponentStatus = 'STOCK' | 'CUTTING' | 'WELDING' | 'PAINTING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'INSTALLED'
@@ -109,12 +109,12 @@ export type ProjectsRuntime = {
 }
 
 export async function getProjects() {
-  const response = await http.get('/projects')
+  const response = await api.get('/projects')
   return Array.isArray(response.data) ? response.data : response.data?.data ?? []
 }
 
 export async function getProjectsRuntime() {
-  const response = await http.get('/projects/runtime')
+  const response = await api.get('/projects/runtime')
   return response.data as ProjectsRuntime
 }
 
@@ -126,16 +126,16 @@ export type CreateProjectPayload = {
 }
 
 export async function createProject(payload: CreateProjectPayload) {
-  const response = await http.post('/projects', payload)
+  const response = await api.post('/projects', payload)
   return response.data
 }
 
 export async function deliverProjectComponent(id: string) {
-  const response = await http.post(`/components/${id}/deliver`)
+  const response = await api.post(`/components/${id}/deliver`)
   return response.data as ProjectComponentRuntime
 }
 
 export async function installProjectComponent({ id, payload }: { id: string; payload: InstallProjectComponentPayload }) {
-  const response = await http.post(`/components/${id}/install`, payload)
+  const response = await api.post(`/components/${id}/install`, payload)
   return response.data as ProjectComponentRuntime
 }

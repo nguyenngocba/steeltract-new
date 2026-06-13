@@ -58,6 +58,60 @@ export interface ComponentCostingRecord {
   }
 }
 
+export interface ComponentCostingBreakdownMaterial {
+  materialId: string
+  materialCode: string
+  materialName: string
+  averageCost: number
+  estimatedAmount?: number
+  actualAmount?: number
+}
+
+export interface ComponentCostingEstimatedMaterial
+  extends ComponentCostingBreakdownMaterial {
+  bomQty: number
+  wastePercent: number
+  requiredQty: number
+  estimatedAmount: number
+}
+
+export interface ComponentCostingActualMaterial
+  extends ComponentCostingBreakdownMaterial {
+  consumedQty: number
+  scrapQty: number
+  actualQty: number
+  actualAmount: number
+}
+
+export interface ComponentCostingWarning {
+  type:
+    | 'BOM_MATERIAL_NOT_CONSUMED'
+    | 'UNPLANNED_MATERIAL'
+    | 'QUANTITY_VARIANCE'
+  materialId: string
+  materialCode: string
+  materialName: string
+  message: string
+  plannedQty?: number
+  actualQty?: number
+  varianceQty?: number
+  thresholdPercent?: number
+}
+
+export interface ComponentCostingBreakdown {
+  componentId: string
+  componentCode: string
+  productionOrderId: string
+  estimatedMaterials: ComponentCostingEstimatedMaterial[]
+  actualMaterials: ComponentCostingActualMaterial[]
+  summary: {
+    estimatedMaterialCost: number
+    actualMaterialCost: number
+    varianceCost: number
+  }
+  warnings: ComponentCostingWarning[]
+}
+
 export interface CreateComponentPayload {
   code: string
   name: string

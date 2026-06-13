@@ -8,6 +8,7 @@ import { useCategories } from '../../hooks/useCategories'
 import { useUnits } from '../../hooks/useUnits'
 import { useMaterialTypes } from '../../hooks/useMaterialTypes'
 import { useZones } from '../../hooks/useZones'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type Props = {
   open: boolean
@@ -81,7 +82,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('PCS')
-  const [minimumStock, setMinimumStock] = useState(0)
+  const [minimumStock, setMinimumStock] = useState('0')
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [materialTypeId, setMaterialTypeId] = useState('')
@@ -108,7 +109,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setCode('')
       setName('')
       setUnit('PCS')
-      setMinimumStock(0)
+      setMinimumStock('0')
       setDescription('')
       setCategoryId('')
       setMaterialTypeId('')
@@ -121,7 +122,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     setCode(material.code ?? '')
     setName(material.name ?? '')
     setUnit(material.unit ?? 'PCS')
-    setMinimumStock(material.minimumStock ?? 0)
+    setMinimumStock(formatQuantity(material.minimumStock ?? 0))
     setDescription(material.description ?? '')
     setCategoryId(material.categoryId ?? '')
     setMaterialTypeId(material.materialTypeId ?? '')
@@ -176,7 +177,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       name,
       categoryId,
       unit,
-      minimumStock,
+      minimumStock: parseLocaleNumber(minimumStock),
       description,
       materialTypeId,
       materialUsageType,
@@ -250,12 +251,12 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
               <option value="">Đơn vị tính</option>
               {units.map((item: any) => <option key={item.id} value={item.code}>{item.name} ({item.code})</option>)}
             </select>
-            <input type="number" value={minimumStock} onChange={(e) => setMinimumStock(Number(e.target.value))} placeholder="Tồn tối thiểu" className={drawerInput} />
+            <input value={minimumStock} onChange={(e) => setMinimumStock(formatQuantityInput(e.target.value))} inputMode="decimal" placeholder="Tồn tối thiểu" className={drawerInput} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
             <MetricBox title="Loại vật tư" value={usageLabel(materialUsageType)} />
-            <MetricBox title="Tồn tối thiểu" value={Number(minimumStock || 0).toLocaleString('vi-VN')} />
+            <MetricBox title="Tồn tối thiểu" value={formatQuantity(minimumStock || 0)} />
             <MetricBox title="Vị trí mặc định" value={selectedZone?.code ?? 'Chưa gán'} />
             <MetricBox title="Trạng thái" value={isEditMode ? 'Đang chỉnh sửa' : 'Tạo mới'} />
           </div>

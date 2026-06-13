@@ -8,6 +8,7 @@ import { useProjects } from '../hooks/useProjects'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useZones } from '../hooks/useZones'
 import { WarehouseMiniMap } from './material-table/MaterialDrawer'
+import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type ModalProps = {
   open: boolean
@@ -27,12 +28,12 @@ const INTERNAL_CELLS = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((row) =>
 const INTERNAL_LEVELS = ['L1', 'L2', 'L3', 'L4']
 
 function num(v: any) {
-  const n = Number(v ?? 0)
+  const n = parseLocaleNumber(v)
   return Number.isFinite(n) ? n : 0
 }
 
 function formatCurrency(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(v)
 }
 
 function isMainWarehouseZone(zone: any) {
@@ -298,8 +299,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
             </option>
           ))}
         </select>
-        <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className={fieldClass} />
-        <input value={form.unitPrice} onChange={(e) => setForm((f) => ({ ...f, unitPrice: e.target.value }))} placeholder="Đơn giá nhập" className={fieldClass} />
+        <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+        <input value={form.unitPrice} onChange={(e) => setForm((f) => ({ ...f, unitPrice: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Đơn giá nhập" className={fieldClass} />
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
           Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
         </div>
@@ -328,10 +329,10 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         <input value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
-        <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
-        <MetricBox title="Sau nhập" value={(currentStock + quantity).toLocaleString('vi-VN')} />
+        <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
+        <MetricBox title="Sau nhập" value={formatQuantity(currentStock + quantity)} />
         <MetricBox title="Ô/Tầng" value={form.slotId ? `${form.slotId} / ${form.level || 'L1'}` : 'Chưa chọn'} />
-        <MetricBox title="Sức chứa" value={selectedInboundZone ? `${num(selectedInboundZone.materialCount).toLocaleString('vi-VN')} / ${num(selectedInboundZone.capacity).toLocaleString('vi-VN')}` : 'Chưa chọn'} />
+        <MetricBox title="Sức chứa" value={selectedInboundZone ? `${formatQuantity(selectedInboundZone.materialCount)} / ${formatQuantity(selectedInboundZone.capacity)}` : 'Chưa chọn'} />
       </div>
       {selectedInboundZoneFull ? <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
         Slot/tầng này đã đầy. Vui lòng chọn vị trí hoặc tầng khác trước khi xác nhận nhập kho.
@@ -402,10 +403,6 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     remark: '',
   })
   const { data: selectedMaterialDetail } = useMaterialDetail(form.inventoryItemId || undefined)
-  console.log(
-    'DETAIL',
-    selectedMaterialDetail,
-  )
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const currentStock = num(selectedMaterial?.quantity)
   const quantity = num(form.quantity)
@@ -430,15 +427,6 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           )
       : []
   }, [selectedMaterialDetail])
-  console.log(
-  'LOCATION BALANCES',
-  JSON.stringify(
-    locationBalances,
-    null,
-    2,
-  ),
-)
-
   const selectedInboundZone = useMemo(() => {
     if (!form.zoneId) return null
     return zones.find((zone: any) => String(zone.id) === String(form.zoneId) && isRealStorageZone(zone)) || null
@@ -496,7 +484,6 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
     return Array.from(zoneMap.values())
   }, [locationBalances, zones])
-  console.log('AVAILABLE ZONES', availableZones)
   useEffect(() => {
     if (!form.inventoryItemId) return
     if (form.zoneId && availableZones.some((zone) => zone.id === String(form.zoneId))) return
@@ -526,16 +513,6 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         )
       })
   }, [locationBalances, form.zoneId])
-
-  useEffect(() => {
-    console.log(
-      JSON.stringify(
-        sourceLocations,
-        null,
-        2,
-      ),
-    )
-  }, [sourceLocations])
 
   useEffect(() => {
   if (!sourceLocations.length) return
@@ -616,6 +593,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         {
           inventoryItemId: form.inventoryItemId,
           quantity: -Math.abs(quantity),
+          warehouseId: selectedSourceLocation?.warehouseId || selectedSourceFullZone?.warehouseId || undefined,
           zoneId: form.zoneId || undefined,
           slotId: form.sourceSlotId,
           level: form.sourceLevel,
@@ -633,6 +611,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         {
           inventoryItemId: form.inventoryItemId,
           quantity: -Math.abs(quantity),
+          warehouseId: selectedSourceLocation?.warehouseId || selectedSourceFullZone?.warehouseId || undefined,
           zoneId: form.zoneId || undefined,
           slotId: form.sourceSlotId,
           level: form.sourceLevel,
@@ -682,7 +661,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
             </option>
           ))}
         </select>
-        <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className={fieldClass} />
+        <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
         <select
           value={`${form.zoneId}|${form.sourceSlotId}|${form.sourceLevel}`}
           onChange={(e) => {
@@ -713,7 +692,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
               {' / '}
               {loc.level}
               {' - '}
-              {num(loc.quantity).toLocaleString('vi-VN')}
+              {formatQuantity(loc.quantity)}
             </option>
           ))}
         </select>
@@ -721,7 +700,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
           Tồn ô/tầng đã chọn:
           <span className="ml-1 text-cyan-300">
-            {sourceLocationQty.toLocaleString('vi-VN')}
+            {formatQuantity(sourceLocationQty)}
           </span>
         </div>
       </div>
@@ -764,19 +743,19 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         </div>
       </div> : null}
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
-        <MetricBox title="Tồn hiện tại" value={currentStock.toLocaleString('vi-VN')} />
-        <MetricBox title="Tồn sau xuất" value={Math.max(0, currentStock - quantity).toLocaleString('vi-VN')} />
+        <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
+        <MetricBox title="Tồn sau xuất" value={formatQuantity(Math.max(0, currentStock - quantity))} />
         <MetricBox
             title="Tồn ô/tầng"
-            value={sourceLocationQty.toLocaleString('vi-VN')}
+            value={formatQuantity(sourceLocationQty)}
           />
 
         <MetricBox
             title="Sau xuất ô/tầng"
-            value={Math.max(
+            value={formatQuantity(Math.max(
               0,
               sourceLocationQty - quantity,
-            ).toLocaleString('vi-VN')}
+            ))}
           />
       </div>
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
@@ -1084,7 +1063,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
               <option value="">Từ vị trí kho</option>
               {sourceZoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.zoneCode} · {z.warehouseName || 'Kho'} · Ô {z.slotId || zoneCell(z) || '-'} · Tầng {z.level || '-'} · tồn {z.qty.toLocaleString('vi-VN')}
+                  {z.zoneCode} · {z.warehouseName || 'Kho'} · Ô {z.slotId || zoneCell(z) || '-'} · Tầng {z.level || '-'} · tồn {formatQuantity(z.qty)}
                 </option>
               ))}
             </select>
@@ -1127,12 +1106,12 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
               })}
             </select>
-            <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="Số lượng" className={fieldClass} />
+            <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
             <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Lý do điều chuyển" className={fieldClass} />
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm xl:grid-cols-2">
-            <MetricBox title="Tồn tại nguồn" value={sourceQty.toLocaleString('vi-VN')} />
-            <MetricBox title="Sau điều chuyển" value={Math.max(0, sourceQty - num(form.quantity)).toLocaleString('vi-VN')} />
+            <MetricBox title="Tồn tại nguồn" value={formatQuantity(sourceQty)} />
+            <MetricBox title="Sau điều chuyển" value={formatQuantity(Math.max(0, sourceQty - num(form.quantity)))} />
             <MetricBox title="Nguồn" value={selectedSourceZone ? `${selectedSourceZone.warehouseName || 'Kho'} / ${form.fromSlotId || '-'} / ${form.fromLevel || 'L1'}` : 'Chưa chọn'} />
             <MetricBox title="Đích" value={selectedDestinationZone ? `${selectedDestinationZone.warehouseName || 'Kho'} / ${form.toSlotId || '-'} / ${form.toLevel || 'L1'}` : 'Chưa chọn'} />
           </div>
@@ -1279,11 +1258,11 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
                     ))}
                   </select>
                 </td>
-                <td className="px-3 py-2 text-slate-200">{line.systemQty.toLocaleString('vi-VN')}</td>
+                <td className="px-3 py-2 text-slate-200">{formatQuantity(line.systemQty)}</td>
                 <td className="px-3 py-2">
-                  <input value={line.physicalQty} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: e.target.value } : r)))} className="h-9 w-32 rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
+                  <input value={line.physicalQty} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} inputMode="decimal" className="h-9 w-32 rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
                 </td>
-                <td className={`px-3 py-2 ${line.difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{line.difference.toLocaleString('vi-VN')}</td>
+                <td className={`px-3 py-2 ${line.difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatQuantity(line.difference)}</td>
                 <td className="px-3 py-2">
                   <button onClick={() => setCountRows((prev) => prev.filter((_r, i) => i !== idx))} className="rounded border border-red-700/60 px-2 py-1 text-xs text-red-300">
                     Xóa

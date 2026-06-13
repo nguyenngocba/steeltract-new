@@ -22,6 +22,7 @@ import {
 import { activateZone, createZone, deactivateZone, deleteZone, getZoneDetail, updateZone, type WarehouseLocation, type WarehouseLocationDetail } from '../../api/zones.api'
 import { useZones } from '../../hooks/useZones'
 import { useWarehouses } from '../../hooks/useWarehouses'
+import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 10
 const LOCATION_ROWS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -55,7 +56,7 @@ const emptyForm: LocationForm = {
 }
 
 function n(value: unknown) {
-  const parsed = Number(value ?? 0)
+  const parsed = parseLocaleNumber(value)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
@@ -331,7 +332,7 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
         <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inventoryInput} placeholder="Row, ví dụ A" />
         <input value={form.column} onChange={(e) => setForm({ ...form, column: e.target.value })} className={inventoryInput} placeholder="Slot, ví dụ 01" />
         <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} className={inventoryInput} placeholder="Tầng, ví dụ L1" />
-        <input value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} className={inventoryInput} type="number" placeholder="Sức chứa vận hành, ví dụ 100 tấn" />
+        <input value={form.capacity} onChange={(e) => setForm({ ...form, capacity: formatQuantityInput(e.target.value) })} className={inventoryInput} inputMode="decimal" placeholder="Sức chứa vận hành, ví dụ 100 tấn" />
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inventoryInput} h-24 py-2 md:col-span-2`} placeholder="Ghi chú vị trí" />
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Đang hoạt động</label>
       </div>

@@ -17,6 +17,8 @@ In Progress.
 * Project runtime exposes component rows linked by `components.projectId`.
 * Project UI includes the `Cấu kiện công trình` tab with project/status filters, summary cards, and component date/cost columns.
 * Project Components tab can confirm delivery (`Xác nhận nhận hàng`) for `SHIPPED` components and confirm installation (`Xác nhận lắp đặt`) for `DELIVERED` components.
+* Project Components delivery/install actions use the authenticated frontend API client and surface success/error feedback.
+* Clicking a Project Component row opens the existing Component detail modal on the Components list through route state.
 * Installation confirmation opens a required mapping modal for Khu vực, Trục, Tầng, and Vị trí.
 * Project Components table displays installation Zone, Axis, Level, and Position.
 * Project component Actual Cost reflects `Component.actualCost`, which is updated by Component Costing recalculation.
@@ -53,4 +55,4 @@ Currently documented through active integrations:
 * Add planned/actual schedule baselines.
 * Add project document and photo attachments.
 * Add formal project return workflow across Yard and Inventory.
-* Add a dedicated active component detail route if Project component row drill-down should open a detail page by id.
+* Add a dedicated active component detail route if Project component row drill-down should use `/components/:id` instead of the existing list modal.

@@ -8,6 +8,7 @@ import {
   useMaterials,
 } from '../../hooks/useMaterials'
 import { useSuppliers } from '../../hooks/useSuppliers'
+import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function InboundWizard() {
 
@@ -15,10 +16,10 @@ export function InboundWizard() {
     useState('')
 
   const [quantity, setQuantity] =
-    useState(1)
+    useState('1')
 
   const [unitPrice, setUnitPrice] =
-    useState(0)
+    useState('0')
 
   const [supplierId, setSupplierId] =
     useState('')
@@ -48,7 +49,10 @@ export function InboundWizard() {
       return
     }
 
-    if (quantity <= 0) {
+    const parsedQuantity = parseLocaleNumber(quantity)
+    const parsedUnitPrice = parseLocaleNumber(unitPrice)
+
+    if (parsedQuantity <= 0) {
       alert('Quantity must be greater than 0')
       return
     }
@@ -57,10 +61,10 @@ export function InboundWizard() {
 
       const payload = {
         inventoryItemId,
-        quantity,
+        quantity: parsedQuantity,
         unitPrice:
-          unitPrice > 0
-            ? unitPrice
+          parsedUnitPrice > 0
+            ? parsedUnitPrice
             : undefined,
         supplierId:
           supplierId || undefined,
@@ -77,8 +81,8 @@ export function InboundWizard() {
       )
 
       setInventoryItemId('')
-      setQuantity(1)
-      setUnitPrice(0)
+      setQuantity('1')
+      setUnitPrice('0')
       setSupplierId('')
       setInvoiceNo('')
 
@@ -219,16 +223,13 @@ export function InboundWizard() {
         />
 
         <input
-          type="number"
-          min="1"
           value={quantity}
           onChange={(e) =>
             setQuantity(
-              Number(
-                e.target.value,
-              ),
+              formatQuantityInput(e.target.value),
             )
           }
+          inputMode="decimal"
           placeholder="Quantity"
           className="
             w-full
@@ -243,17 +244,13 @@ export function InboundWizard() {
         />
 
         <input
-          type="number"
-          min="0"
-          step="0.01"
           value={unitPrice}
           onChange={(e) =>
             setUnitPrice(
-              Number(
-                e.target.value,
-              ),
+              formatQuantityInput(e.target.value),
             )
           }
+          inputMode="decimal"
           placeholder="Unit Price"
           className="
             w-full

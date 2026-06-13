@@ -19,6 +19,21 @@ const dateSchema = z
   .optional()
   .transform((value) => (value ? new Date(value) : undefined));
 
+const localeNumber = (schema: z.ZodType<number>) =>
+  z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const raw = value.trim();
+    if (!raw) return value;
+    const cleaned = raw.replace(/\s/g, '').replace(/[^\d,.-]/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      return Number(cleaned.replace(/\./g, '').replace(',', '.'));
+    }
+    if (cleaned.includes(',')) {
+      return Number(cleaned.replace(',', '.'));
+    }
+    return Number(cleaned);
+  }, schema);
+
 const productionStageInputSchema = z.object({
   code: z.nativeEnum(ProductionStageCode),
   name: z.string().optional(),
@@ -38,7 +53,7 @@ export const createProductionOrderSchema = z.object({
   projectId: z.string().optional(),
   componentId: z.string().optional(),
   bomId: z.string().optional(),
-  quantity: z.coerce.number().positive().default(1),
+  quantity: localeNumber(z.number().positive()).default(1),
   priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),
   status: z
     .nativeEnum(ProductionOrderStatus)
@@ -55,7 +70,7 @@ export const updateProductionOrderSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   bomId: z.string().optional(),
-  quantity: z.coerce.number().positive().optional(),
+  quantity: localeNumber(z.number().positive()).optional(),
   priority: z.nativeEnum(TaskPriority).optional(),
   status: z.nativeEnum(ProductionOrderStatus).optional(),
   plannedStartAt: dateSchema,
@@ -82,19 +97,19 @@ export const startProductionSchema = z.object({
 export const completeStageSchema = z.object({
   message: z.string().optional(),
   qualityStatus: z.string().optional(),
-  quantity: z.coerce.number().nonnegative().optional(),
+  quantity: localeNumber(z.number().nonnegative()).optional(),
   attachmentIds: z.array(z.string()).optional().default([]),
   metadata: metadataSchema,
 });
 
 export const stageProductionToYardSchema = z.object({
   slotId: z.string().min(1),
-  quantity: z.coerce.number().positive().optional(),
+  quantity: localeNumber(z.number().positive()).optional(),
   stackLevel: z.coerce.number().int().positive().optional(),
-  weight: z.coerce.number().nonnegative().optional(),
-  length: z.coerce.number().nonnegative().optional(),
-  width: z.coerce.number().nonnegative().optional(),
-  height: z.coerce.number().nonnegative().optional(),
+  weight: localeNumber(z.number().nonnegative()).optional(),
+  length: localeNumber(z.number().nonnegative()).optional(),
+  width: localeNumber(z.number().nonnegative()).optional(),
+  height: localeNumber(z.number().nonnegative()).optional(),
   craneId: z.string().optional(),
   reason: z.string().optional(),
   metadata: metadataSchema,
@@ -130,7 +145,7 @@ export const createProductionLogSchema = z.object({
   stageId: z.string().optional(),
   type: z.nativeEnum(ProductionLogType).default(ProductionLogType.NOTE),
   message: z.string().min(1),
-  quantity: z.coerce.number().optional(),
+  quantity: localeNumber(z.number()).optional(),
   workerId: z.string().optional(),
   machineId: z.string().optional(),
   attachmentIds: z.array(z.string()).optional().default([]),
@@ -142,7 +157,7 @@ export const createWorkCenterSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   status: z.nativeEnum(WorkCenterStatus).default(WorkCenterStatus.ACTIVE),
-  capacityPerDay: z.coerce.number().positive().optional(),
+  capacityPerDay: localeNumber(z.number().positive()).optional(),
   metadata: metadataSchema,
 });
 
@@ -152,7 +167,7 @@ export const createMachineSchema = z.object({
   description: z.string().optional(),
   status: z.nativeEnum(MachineStatus).default(MachineStatus.AVAILABLE),
   workCenterId: z.string().optional(),
-  utilization: z.coerce.number().min(0).max(100).optional(),
+  utilization: localeNumber(z.number().min(0).max(100)).optional(),
   metadata: metadataSchema,
 });
 
@@ -164,15 +179,15 @@ export const createProductionScheduleSchema = z.object({
     .union([z.string(), z.date()])
     .transform((value) => new Date(value)),
   endAt: z.union([z.string(), z.date()]).transform((value) => new Date(value)),
-  capacityPlanned: z.coerce.number().optional(),
-  capacityUsed: z.coerce.number().optional(),
+  capacityPlanned: localeNumber(z.number()).optional(),
+  capacityUsed: localeNumber(z.number()).optional(),
   metadata: metadataSchema,
 });
 
 const bomItemSchema = z.object({
   materialId: z.string().min(1),
-  quantity: z.coerce.number().positive(),
-  wastePercent: z.coerce.number().min(0).max(100).default(0),
+  quantity: localeNumber(z.number().positive()),
+  wastePercent: localeNumber(z.number().min(0).max(100)).default(0),
   category: z
     .enum(['MAIN_MATERIAL', 'SECONDARY_MATERIAL', 'CONSUMABLE'])
     .default('MAIN_MATERIAL'),
@@ -182,7 +197,7 @@ const bomRoutingStepSchema = z.object({
   stepNo: z.coerce.number().int().positive(),
   stepName: z.string().min(1),
   workshop: z.string().optional(),
-  expectedHours: z.coerce.number().nonnegative().default(0),
+  expectedHours: localeNumber(z.number().nonnegative()).default(0),
   qcRequired: z.coerce.boolean().default(false),
 });
 
@@ -193,7 +208,7 @@ export const createBomSchema = z.object({
   structureType: z.string().optional(),
   projectId: z.string().optional(),
   unit: z.string().optional(),
-  estimatedWeight: z.coerce.number().nonnegative().default(0),
+  estimatedWeight: localeNumber(z.number().nonnegative()).default(0),
   version: z.string().min(1).default('V1'),
   status: z.string().min(1).default('ACTIVE'),
   items: z.array(bomItemSchema).default([]),
@@ -212,7 +227,7 @@ export const createMaterialIssueSchema = z.object({
   zoneId: z.string().optional(),
   slotId: z.string().optional(),
   level: z.string().optional(),
-  issuedQty: z.coerce.number().positive(),
+  issuedQty: localeNumber(z.number().positive()),
   issuedDate: z
     .union([z.string(), z.date()])
     .optional()
@@ -223,7 +238,7 @@ export const createMaterialIssueSchema = z.object({
 
 export const issueReservationLineSchema = z.object({
   reservationLineId: z.string().min(1),
-  quantity: z.coerce.number().positive().optional(),
+  quantity: localeNumber(z.number().positive()).optional(),
 });
 
 export const issueFromReservationSchema = z.object({
@@ -232,7 +247,7 @@ export const issueFromReservationSchema = z.object({
 });
 
 export const returnMaterialIssueSchema = z.object({
-  quantity: z.coerce.number().positive().optional(),
+  quantity: localeNumber(z.number().positive()).optional(),
   remarks: z.string().optional(),
 });
 
@@ -285,8 +300,8 @@ export const listProductionConsumptionsSchema = z.object({
 export const createProductionConsumptionSchema = z
   .object({
     inventoryItemId: z.string().min(1),
-    consumedQty: z.coerce.number().nonnegative().default(0),
-    scrapQty: z.coerce.number().nonnegative().default(0),
+    consumedQty: localeNumber(z.number().nonnegative()).default(0),
+    scrapQty: localeNumber(z.number().nonnegative()).default(0),
     remark: z.string().optional(),
   })
   .refine((value) => value.consumedQty > 0 || value.scrapQty > 0, {

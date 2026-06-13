@@ -28,6 +28,7 @@ const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
 const epsilon = 0.000001;
 
 type StockBucket = {
+  inventoryItemId: string;
   warehouseId?: string;
   warehouseCode?: string;
   warehouseName?: string;
@@ -397,9 +398,9 @@ export class ProductionReservationService {
   ): Promise<PreviewLine[]> {
     const bomItems = order.bom?.items ?? [];
     const materialIds = [...new Set(bomItems.map((item) => item.materialId))];
-    const [stockBuckets, reservedByMaterial] = await Promise.all([
+    const [stockBuckets, reservedByBucket] = await Promise.all([
       this.productionStockBuckets(materialIds),
-      this.activeReservedQuantityByMaterial(materialIds, excludeReservationId),
+      this.activeReservedQuantityByBucket(materialIds, excludeReservationId),
     ]);
 
     return bomItems.map((item) => {
@@ -412,15 +413,13 @@ export class ProductionReservationService {
             `${b.zoneCode ?? ''}-${b.slotId ?? ''}-${b.level ?? ''}`,
           ),
         );
-      const alreadyReservedQty =
-        reservedByMaterial.get(item.materialId) ?? 0;
-      let reservedRemaining = alreadyReservedQty;
       let requiredRemaining = requiredQty;
 
       const allocations: PreviewLine['allocations'] = [];
       for (const bucket of buckets) {
-        const freeQty = Math.max(bucket.quantity - reservedRemaining, 0);
-        reservedRemaining = Math.max(reservedRemaining - bucket.quantity, 0);
+        const bucketReservedQty =
+          reservedByBucket.get(this.bucketKey(bucket)) ?? 0;
+        const freeQty = Math.max(bucket.quantity - bucketReservedQty, 0);
         if (freeQty <= epsilon || requiredRemaining <= epsilon) continue;
         const reserveQty = Math.min(freeQty, requiredRemaining);
         allocations.push({
@@ -439,6 +438,11 @@ export class ProductionReservationService {
       }
 
       const availableQty = this.sum(buckets.map((bucket) => bucket.quantity));
+      const alreadyReservedQty = this.sum(
+        buckets.map(
+          (bucket) => reservedByBucket.get(this.bucketKey(bucket)) ?? 0,
+        ),
+      );
       const reservableQty = this.sum(
         allocations.map((allocation) => allocation.reservedQty),
       );
@@ -494,81 +498,61 @@ export class ProductionReservationService {
     const buckets = new Map<string, StockBucket[]>();
     if (!materialIds.length) return buckets;
 
-    const transactions = await this.prisma.inventoryTransaction.findMany({
+    const productionWarehouse = await this.prisma.masterWarehouse.findUnique({
+      where: { code: 'PRODUCTION' },
+      select: { id: true, code: true, name: true },
+    });
+
+    if (!productionWarehouse) return buckets;
+
+    const locationStocks = await this.prisma.inventoryLocationStock.findMany({
       where: {
-        items: { some: { inventoryItemId: { in: materialIds } } },
+        inventoryItemId: { in: materialIds },
+        quantity: { gt: epsilon },
         OR: [
-          { remarks: { contains: '[COMPONENT_PRODUCTION]' } },
-          { remarks: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
-          { note: { contains: '[COMPONENT_PRODUCTION]' } },
-          { note: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+          { warehouseId: productionWarehouse.id },
+          { zone: { warehouse: { code: 'PRODUCTION' } } },
         ],
       },
       include: {
-        warehouse: true,
-        zone: true,
-        items: {
+        zone: {
           include: {
             warehouse: true,
-            zone: true,
           },
         },
       },
+      orderBy: [
+        { inventoryItemId: 'asc' },
+        { zoneId: 'asc' },
+        { slotId: 'asc' },
+        { level: 'asc' },
+      ],
     });
 
-    for (const transaction of transactions) {
-      const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
-      const isReturn = text.includes('[COMPONENT_PRODUCTION_RETURN]');
-
-      for (const line of transaction.items) {
-        if (!materialIds.includes(line.inventoryItemId)) continue;
-        const rawQty = Number(line.quantity ?? 0);
-        if (!Number.isFinite(rawQty) || rawQty === 0) continue;
-        if (!this.isProductionWarehouseLine(line, transaction)) continue;
-        if (!isReturn && rawQty <= 0) continue;
-        if (isReturn && rawQty >= 0) continue;
-
-        this.addBucketQuantity(buckets, line.inventoryItemId, {
-          warehouseId: line.warehouseId ?? transaction.warehouseId ?? undefined,
-          warehouseCode:
-            line.warehouse?.code ?? transaction.warehouse?.code ?? undefined,
-          warehouseName:
-            line.warehouse?.name ?? transaction.warehouse?.name ?? undefined,
-          zoneId: line.zoneId ?? transaction.zoneId ?? undefined,
-          zoneCode: line.zone?.code ?? transaction.zone?.code ?? undefined,
-          zoneName: line.zone?.name ?? transaction.zone?.name ?? undefined,
-          slotId: line.slotId ?? undefined,
-          level: line.level ?? undefined,
-          quantity: rawQty,
-        });
-      }
-    }
-
-    const issues = await this.prisma.productionMaterialIssue.findMany({
-      where: {
-        inventoryItemId: { in: materialIds },
-        status: 'ISSUED',
-      },
-    });
-
-    for (const issue of issues) {
-      this.deductFromBuckets(
-        buckets.get(issue.inventoryItemId) ?? [],
-        Number(issue.issuedQty ?? 0),
-        issue.warehouseId,
-        issue.zoneId,
-      );
+    for (const row of locationStocks) {
+      this.addBucketQuantity(buckets, row.inventoryItemId, {
+        inventoryItemId: row.inventoryItemId,
+        warehouseId: row.warehouseId ?? row.zone?.warehouseId ?? undefined,
+        warehouseCode: row.zone?.warehouse?.code ?? productionWarehouse.code,
+        warehouseName: row.zone?.warehouse?.name ?? productionWarehouse.name,
+        zoneId: row.zoneId ?? undefined,
+        zoneCode: row.zone?.code ?? undefined,
+        zoneName: row.zone?.name ?? undefined,
+        slotId: row.slotId ?? undefined,
+        level: row.level ?? undefined,
+        quantity: Number(row.quantity ?? 0),
+      });
     }
 
     return buckets;
   }
 
-  private async activeReservedQuantityByMaterial(
+  private async activeReservedQuantityByBucket(
     materialIds: string[],
     excludeReservationId?: string,
   ) {
-    const reservedByMaterial = new Map<string, number>();
-    if (!materialIds.length) return reservedByMaterial;
+    const reservedByBucket = new Map<string, number>();
+    if (!materialIds.length) return reservedByBucket;
 
     const lines = await this.prisma.productionMaterialReservationLine.findMany({
       where: {
@@ -587,13 +571,17 @@ export class ProductionReservationService {
         Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
         0,
       );
-      reservedByMaterial.set(
-        line.inventoryItemId,
-        (reservedByMaterial.get(line.inventoryItemId) ?? 0) + openQty,
-      );
+      const key = this.bucketKey({
+        inventoryItemId: line.inventoryItemId,
+        warehouseId: line.warehouseId ?? undefined,
+        zoneId: line.zoneId ?? undefined,
+        slotId: line.slotId ?? undefined,
+        level: line.level ?? undefined,
+      });
+      reservedByBucket.set(key, (reservedByBucket.get(key) ?? 0) + openQty);
     }
 
-    return reservedByMaterial;
+    return reservedByBucket;
   }
 
   private addBucketQuantity(
@@ -618,45 +606,20 @@ export class ProductionReservationService {
     buckets.set(materialId, rows);
   }
 
-  private deductFromBuckets(
-    rows: StockBucket[],
-    quantity: number,
-    warehouseId?: string | null,
-    zoneId?: string | null,
-  ) {
-    let remaining = quantity;
-    const preferred = rows.filter(
-      (row) =>
-        (!warehouseId || row.warehouseId === warehouseId) &&
-        (!zoneId || row.zoneId === zoneId),
-    );
-    const orderedRows = [
-      ...preferred,
-      ...rows.filter((row) => !preferred.includes(row)),
-    ];
-
-    for (const row of orderedRows) {
-      if (remaining <= epsilon) break;
-      if (row.quantity <= epsilon) continue;
-      const deducted = Math.min(row.quantity, remaining);
-      row.quantity -= deducted;
-      remaining -= deducted;
-    }
-  }
-
-  private isProductionWarehouseLine(
-    line: { warehouse?: { code?: string | null; name?: string | null } | null },
-    transaction: {
-      warehouse?: { code?: string | null; name?: string | null } | null;
-    },
-  ) {
-    const warehouseCode = String(
-      line.warehouse?.code ?? transaction.warehouse?.code ?? '',
-    ).toUpperCase();
-    const warehouseName = String(
-      line.warehouse?.name ?? transaction.warehouse?.name ?? '',
-    ).toLowerCase();
-    return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất');
+  private bucketKey(row: {
+    inventoryItemId: string;
+    warehouseId?: string | null;
+    zoneId?: string | null;
+    slotId?: string | null;
+    level?: string | null;
+  }) {
+    return [
+      row.inventoryItemId,
+      row.warehouseId ?? '',
+      row.zoneId ?? '',
+      row.slotId ?? '',
+      row.level ?? '',
+    ].join('|');
   }
 
   private async nextReservationNo(orderNo: string) {

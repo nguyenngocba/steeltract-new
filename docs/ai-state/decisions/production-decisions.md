@@ -140,24 +140,30 @@ Decision:
 
 - Production material issue must be created from active reservation lines.
 - Returns must be created from issued material issue rows.
+- Returned unused material is received back into `MAIN` / `Kho chính`; the original issue already reduced `PRODUCTION` / `Kho vật tư SX` stock.
 
 Rationale:
 
 - Reservation lines carry the approved material, warehouse, zone, slot, and level allocation. Issue and return must preserve that location traceability and prevent over-issue/over-return.
+- After issue, consumed and scrap quantities are production-side usage records, not additional Inventory decrements. Only the unconsumed remainder is returnable to Main Warehouse.
 
 Current implementation:
 
 - `POST /production/reservations/:id/issue` issues remaining reserved quantities or requested reservation line quantities.
 - Issue validates `issuedQty <= reservedQty - issuedQty + returnedQty`.
 - Issue validates exact `inventory_location_stocks` bucket before reducing stock.
-- `POST /production/material-issues/:id/return` validates `returnQty <= issuedQty - returnedQty`.
-- Return adds stock back to the same `warehouseId + zoneId + slotId + level`.
+- `POST /production/material-issues/:id/return` validates against the aggregate MO/material balance:
+  `returnQty <= issuedQty - consumedQty - scrapQty - returnedQty`.
+- Return creates an Inventory `RETURN` transaction into Main Warehouse and adds stock to the selected/default main warehouse bucket.
+- Direct `PATCH /production/material-issues/:id` status changes to `RETURNED` are routed through the same return validation instead of the legacy stock movement path.
 - Both flows update reservation line balances and write Production Material Ledger rows.
 
 Implications:
 
 - Future manual issue UI should still select reservation lines or explicitly create a reservation first.
 - Generic stock mutation remains disallowed; Inventory location stock must not become negative.
+- Production return smoke tests should verify:
+  `Issued = Consumed + Scrap + Returned` for closed issue material.
 
 ## PROD-010: Component Output Requires Production Context
 
@@ -178,11 +184,11 @@ Current implementation:
 
 Decision:
 
-- Production material consumption is recorded after issue/return and does not mutate Inventory stock again.
+- Production material consumption is recorded after issue and does not mutate Inventory stock again.
 
 Rationale:
 
-- Inventory stock was already reduced at issue time and restored at return time. Consumption explains actual usage and scrap inside Production, while preserving Inventory movement auditability.
+- Inventory stock was already reduced at issue time. Consumption explains actual usage and scrap inside Production, while return restores only unused issued material to Main Warehouse.
 
 Current implementation:
 

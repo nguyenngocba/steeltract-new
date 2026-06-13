@@ -22,11 +22,12 @@ Decision:
 
 Rationale:
 
-- Warehouse 2D views and location-specific validation require real balance by zone, slot, and level.
+- Warehouse 2D views and location-specific validation require real balance by warehouse, zone, slot, and level.
 
 Current implementation:
 
 - `InventoryLocationStock` stores `inventoryItemId`, optional `warehouseId`, `zoneId`, `slotId`, `level`, and `quantity`.
+- Active stock mutation and validation use the full bucket `inventoryItemId + warehouseId + zoneId + slotId + level`.
 - Material detail and location selectors read positive quantity balances.
 
 ## INV-003: Delete Non-Positive Location Rows
