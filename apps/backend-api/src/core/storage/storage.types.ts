@@ -11,6 +11,7 @@ export interface StoreFileInput {
   originalName: string;
   mimeType: string;
   folder?: string;
+  storedName?: string;
 }
 
 export interface SignedUrlOptions {

@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { ValidationPipe } from '@nestjs/common'
 import { NestExpressApplication } from '@nestjs/platform-express'
-import { join } from 'path'
 import { CommandBus } from './core/cqrs/command.bus'
 import { registerInventoryRuntime } from './modules/inventory/inventory.runtime'
 import { CreateTransactionHandler } from './modules/inventory/commands/create-transaction.handler'
@@ -21,11 +20,7 @@ async function bootstrap() {
   )
 
   app.useStaticAssets(
-    join(
-      __dirname,
-      '..',
-      'uploads',
-    ),
+    process.env.STORAGE_ROOT || '/data/steeltrack-storage',
     {
       prefix: '/uploads/',
     },

@@ -13,6 +13,7 @@ import {
 
 import { EventBusService } from '../../../core/events/event-bus.service';
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import {
@@ -209,7 +210,7 @@ export class QcService {
 
       const created = await this.repository.createInspection(
         {
-          inspectionNo: dto.inspectionNo ?? this.nextInspectionNo(),
+          inspectionNo: dto.inspectionNo ?? await this.nextInspectionNo(),
           checklist: dto.checklistId
             ? { connect: { id: dto.checklistId } }
             : undefined,
@@ -605,7 +606,7 @@ export class QcService {
 
       const created = await this.repository.createNcr(
         {
-          ncrNo: dto.ncrNo ?? this.nextNcrNo(),
+          ncrNo: dto.ncrNo ?? await this.nextNcrNo(),
           inspection: { connect: { id: inspectionId } },
           issue: dto.issueId ? { connect: { id: dto.issueId } } : undefined,
           productionOrderId:
@@ -1004,11 +1005,11 @@ export class QcService {
   }
 
   private nextInspectionNo() {
-    return `QC-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${Date.now()}`;
+    return nextOperationalCode(this.prisma, 'qcInspection', 'inspectionNo', 'QC');
   }
 
   private nextNcrNo() {
-    return `NCR-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${Date.now()}`;
+    return nextOperationalCode(this.prisma, 'ncr', 'ncrNo', 'NCR');
   }
 
   private asRecord(value: unknown) {

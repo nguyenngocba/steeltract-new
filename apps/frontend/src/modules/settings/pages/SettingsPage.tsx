@@ -9,6 +9,7 @@ import { useCategories } from '@/modules/inventory/hooks/useCategories'
 import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
 import { useMaterialTypes } from '@/modules/inventory/hooks/useMaterialTypes'
 import { useUnits } from '@/modules/inventory/hooks/useUnits'
+import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 type Tab = 'overview' | 'general' | 'permissions' | 'master' | 'integrations' | 'notifications' | 'backup' | 'logs'
 
@@ -27,8 +28,8 @@ const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-x
 const textarea = 'min-h-20 rounded-lg border border-white/10 bg-slate-950/65 px-3 py-2 text-xs text-slate-100 outline-none transition focus:border-blue-400'
 const actionButton = 'inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/[0.08]'
 const primaryButton = 'inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 disabled:opacity-50'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
-const date = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '-'
+const fmt = (value = 0) => formatQuantity(value, 0)
+const date = (value?: string) => value ? formatDateTime(value) : '-'
 
 type CategoryForm = {
   id?: string

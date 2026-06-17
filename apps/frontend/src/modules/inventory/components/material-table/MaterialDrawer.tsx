@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { ImageIcon, Upload, X } from 'lucide-react'
 
 import { useCreateMaterial } from '../../hooks/useCreateMaterial'
 import { useUpdateMaterial } from '../../hooks/useUpdateMaterial'
@@ -90,6 +90,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const [zoneId, setZoneId] = useState('')
   const [slotId, setSlotId] = useState('')
   const [level, setLevel] = useState('')
+  const [imagePreview, setImagePreview] = useState('')
+  const [imageName, setImageName] = useState('')
   const [error, setError] = useState('')
   const { data: materialTypes = [] } = useMaterialTypes()
   const { data: categories = [] } = useCategories()
@@ -117,6 +119,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setZoneId('')
       setSlotId('')
       setLevel('')
+      setImagePreview('')
+      setImageName('')
       return
     }
     setCode(material.code ?? '')
@@ -130,7 +134,15 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     setZoneId(material.zoneId ?? '')
     setSlotId(material.slotId ?? '')
     setLevel(material.level ?? '')
+    setImagePreview(material.imageUrl ?? material.photoUrl ?? material.thumbnailUrl ?? '')
+    setImageName(material.imageUrl || material.photoUrl ? 'Ảnh hiện có' : '')
   }, [material])
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview.startsWith('blob:')) URL.revokeObjectURL(imagePreview)
+    }
+  }, [imagePreview])
 
   if (!open) return null
 
@@ -251,7 +263,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
               <option value="">Đơn vị tính</option>
               {units.map((item: any) => <option key={item.id} value={item.code}>{item.name} ({item.code})</option>)}
             </select>
-            <input value={minimumStock} onChange={(e) => setMinimumStock(formatQuantityInput(e.target.value))} inputMode="decimal" placeholder="Tồn tối thiểu" className={drawerInput} />
+            <input value={minimumStock} onFocus={(e) => setMinimumStock(formatQuantityInput(e.target.value))} onBlur={(e) => setMinimumStock(formatQuantity(e.target.value))} onChange={(e) => setMinimumStock(formatQuantityInput(e.target.value))} inputMode="decimal" placeholder="Tồn tối thiểu" className={drawerInput} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
@@ -265,7 +277,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
             <MetricBox title="Kho cha" value={selectedZone?.warehouse?.name ?? 'Kho chính'} />
             <MetricBox title="Ô trong vị trí" value={slotId || 'Chưa chọn'} />
             <MetricBox title="Tầng" value={level || 'Chưa chọn'} />
-            <MetricBox title="Ô/tầng khả dụng" value={selectedZone ? `${countOccupiedCellLevels(selectedZone).toLocaleString('vi-VN')} / ${TOTAL_STORAGE_CELL_LEVELS.toLocaleString('vi-VN')}` : 'Chưa chọn'} />
+            <MetricBox title="Ô/tầng khả dụng" value={selectedZone ? `${countOccupiedCellLevels(selectedZone)} / ${formatQuantity(TOTAL_STORAGE_CELL_LEVELS, 0)}` : 'Chưa chọn'} />
           </div>
 
           {selectedZoneFull && material?.zoneId !== zoneId ? <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
@@ -295,6 +307,46 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ghi chú quy cách, tiêu chuẩn, nguồn cung..." className={`${drawerTextarea} mt-3 w-full`} />
       </div>
       <div className="col-span-5">
+        <div className="mb-3 rounded-xl border border-cyan-300/15 bg-slate-950/55 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-cyan-200">Ảnh vật tư</h3>
+              <p className="text-xs text-slate-500">Preview trước khi lưu. Chưa gửi lên API nếu Material Master chưa có imageUrl.</p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-cyan-300/20 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-cyan-400/10">
+              <Upload size={14} />
+              Chọn ảnh
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (!file) return
+                  if (imagePreview.startsWith('blob:')) URL.revokeObjectURL(imagePreview)
+                  setImagePreview(URL.createObjectURL(file))
+                  setImageName(file.name)
+                }}
+              />
+            </label>
+          </div>
+          {imagePreview ? (
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/60">
+              <img src={imagePreview} alt="Preview vật tư" className="h-48 w-full object-cover" />
+              <div className="truncate px-3 py-2 text-xs text-slate-400">{imageName || 'Ảnh vật tư'}</div>
+            </div>
+          ) : (
+            <div className="grid h-48 place-items-center rounded-xl border border-dashed border-white/12 bg-white/[0.035] text-center">
+              <div>
+                <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-slate-950/60 text-slate-400">
+                  <ImageIcon size={18} />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-slate-300">Chưa có ảnh</p>
+                <p className="mt-1 text-xs text-slate-500">Hỗ trợ preview PNG/JPG/WebP tại form.</p>
+              </div>
+            </div>
+          )}
+        </div>
         <WarehouseMiniMap
             zone={selectedZone}
             slotId={slotId}
@@ -408,7 +460,7 @@ export function WarehouseMiniMap({
           <div className="text-[11px] text-slate-400">
             Sức chứa:
             <b className="ml-1 text-slate-200">
-              {Number(zone.capacity ?? 0).toLocaleString('vi-VN')}
+              {formatQuantity(Number(zone.capacity ?? 0), 0)}
             </b>
           </div>
 
@@ -455,9 +507,7 @@ export function WarehouseMiniMap({
                       </div>
 
                       <div className="ml-2 min-w-[60px] text-right text-amber-300 font-semibold">
-                        {Number(
-                          material.quantity ?? 0,
-                        ).toLocaleString('vi-VN')}
+                        {formatQuantity(Number(material.quantity ?? 0), 0)}
                       </div>
                     </>
                   ) : (
@@ -599,10 +649,10 @@ function cellTooltip(cell: string, entries: any[]) {
     .flatMap((entry) => {
       const level = normalizeLevel(entry.level)
       const materials = entry.materials ?? []
-      if (!materials.length) return [`${cell}\n${Number(entry.totalQuantity ?? 0).toLocaleString('vi-VN')}\n${level}`]
+      if (!materials.length) return [`${cell}\n${formatQuantity(Number(entry.totalQuantity ?? 0), 0)}\n${level}`]
       return materials.map((material: any) => {
         const unit = material.unit ?? ''
-        return `${material.code} - ${material.name}\n${Number(material.quantity ?? 0).toLocaleString('vi-VN')} ${unit}\n${level}`
+        return `${material.code} - ${material.name}\n${formatQuantity(Number(material.quantity ?? 0), 0)} ${unit}\n${level}`
       })
     })
     .join('\n\n')

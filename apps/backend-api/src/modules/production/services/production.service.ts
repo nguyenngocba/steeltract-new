@@ -19,6 +19,7 @@ import {
 
 import { EventBusService } from '../../../core/events/event-bus.service';
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
 import { ComponentCostingService } from '../../components/services/component-costing.service';
 import { YardService } from '../../yard/services/yard.service';
@@ -665,7 +666,7 @@ export class ProductionService {
         })
       : await this.prisma.component.create({
           data: {
-            code: `CPL-${order.orderNo}`,
+            code: await nextOperationalCode(this.prisma, 'component', 'code', 'CPL'),
             name: order.title,
             projectId: order.projectId,
             status: ComponentStatus.READY,
@@ -1047,11 +1048,10 @@ export class ProductionService {
   ) {
     if (!issuePlans.length) return;
 
-    const timestamp = Date.now();
-    for (const [index, plan] of issuePlans.entries()) {
+    for (const plan of issuePlans) {
       await this.materialIssueService.create(
         {
-          issueNo: `ISS-${order.orderNo}-${timestamp}-${index + 1}`,
+          issueNo: await nextOperationalCode(this.prisma, 'productionMaterialIssue', 'issueNo', 'ISS'),
           productionOrderId: order.id,
           inventoryItemId: plan.inventoryItemId,
           warehouseId: plan.warehouseId,

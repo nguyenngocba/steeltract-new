@@ -8,7 +8,8 @@ import { useProjects } from '../hooks/useProjects'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useZones } from '../hooks/useZones'
 import { WarehouseMiniMap } from './material-table/MaterialDrawer'
-import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { nextLocalCode } from '@/shared/utils/code-format'
+import { formatCurrencyInput, formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type ModalProps = {
   open: boolean
@@ -72,6 +73,10 @@ function zoneCell(zone: any) {
 
 function normalizeLevel(value?: string) {
   return String(value || 'L1').trim().toUpperCase()
+}
+
+function generateTransactionNo(prefix: string) {
+  return nextLocalCode(prefix)
 }
 
 function isCellOccupied(zone: any, cell: string, level: string, currentMaterialId?: string) {
@@ -241,7 +246,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     if (!form.inventoryItemId || quantity <= 0 || unitPrice <= 0) return
     if (selectedInboundZoneFull) return
     if (selectedInboundCellOccupied) return
-    const no = `NK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+    const no = generateTransactionNo('NK')
     await createTransaction.mutateAsync({
       type: 'INBOUND',
       transactionNo: no,
@@ -299,8 +304,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
             </option>
           ))}
         </select>
-        <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
-        <input value={form.unitPrice} onChange={(e) => setForm((f) => ({ ...f, unitPrice: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Đơn giá nhập" className={fieldClass} />
+        <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+        <input value={form.unitPrice} onChange={(e) => setForm((f) => ({ ...f, unitPrice: formatCurrencyInput(e.target.value) }))} inputMode="numeric" placeholder="Đơn giá nhập" className={fieldClass} />
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
           Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
         </div>
@@ -577,7 +582,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
   async function submit() {
     if (!canSubmit) return
-    const no = `XK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+    const no = generateTransactionNo('XK')
     const isProductionTarget = form.target === 'COMPONENT_PRODUCTION'
     const targetTag = isProductionTarget ? '[COMPONENT_PRODUCTION]' : '[PROJECT]'
     await createTransaction.mutateAsync({
@@ -661,7 +666,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
             </option>
           ))}
         </select>
-        <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+        <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
         <select
           value={`${form.zoneId}|${form.sourceSlotId}|${form.sourceLevel}`}
           onChange={(e) => {
@@ -981,7 +986,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     const qty = num(form.quantity)
     if (!canTransfer) return
 
-    const no = `DC-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+    const no = generateTransactionNo('DC')
     await createTx.mutateAsync({
       type: 'TRANSFER',
       transactionNo: no,
@@ -1106,7 +1111,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
               })}
             </select>
-            <input value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+            <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
             <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Lý do điều chuyển" className={fieldClass} />
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm xl:grid-cols-2">
@@ -1170,7 +1175,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
   const { data: zones = [] } = useZones()
   const createTx = useCreateTransaction()
   const [methodFilter, setMethodFilter] = useState('')
-  const [sessionNo, setSessionNo] = useState(`KK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`)
+  const [sessionNo, setSessionNo] = useState(generateTransactionNo('KK'))
   const [countRows, setCountRows] = useState<CountLine[]>([])
 
   const countSheet = useMemo(() => {
@@ -1203,7 +1208,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
       items,
     })
     setCountRows([])
-    setSessionNo(`KK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`)
+    setSessionNo(generateTransactionNo('KK'))
     onClose()
   }
 
@@ -1260,7 +1265,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
                 </td>
                 <td className="px-3 py-2 text-slate-200">{formatQuantity(line.systemQty)}</td>
                 <td className="px-3 py-2">
-                  <input value={line.physicalQty} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} inputMode="decimal" className="h-9 w-32 rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
+                  <input value={line.physicalQty} onFocus={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} onBlur={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantity(e.target.value) } : r)))} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} inputMode="decimal" className="h-9 w-32 rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
                 </td>
                 <td className={`px-3 py-2 ${line.difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatQuantity(line.difference)}</td>
                 <td className="px-3 py-2">

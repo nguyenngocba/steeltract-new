@@ -10,9 +10,10 @@ import {
   inventoryPanel,
 } from '@/modules/inventory/components/InventoryVisuals'
 import { systemApi, type SystemNotification, type SystemNotificationsResponse } from '@/modules/system/api/system.api'
+import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
-const date = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '-'
+const fmt = (value = 0) => formatQuantity(value, 0)
+const date = (value?: string) => value ? formatDateTime(value) : '-'
 
 type FilterValue = 'all' | 'unread' | 'priority' | 'read'
 

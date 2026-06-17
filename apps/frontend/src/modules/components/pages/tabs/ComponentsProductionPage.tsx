@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { useProductionOrders } from '../../hooks/queries/useComponents'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
+import { formatQuantity } from '@/shared/utils/number-format'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nháp',
@@ -40,12 +41,12 @@ export function ComponentsProductionPage() {
     <EnterpriseModulePage>
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
-          <ComponentsKpiCard title="Tổng lệnh SX" value={productionOrders.length.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Đang sản xuất" value={running.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Chờ sản xuất" value={waiting.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Hoàn thành" value={completed.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Quá hạn" value={delayed.toLocaleString('vi-VN')} />
-          <ComponentsKpiCard title="Tỷ lệ hoàn thành" value={`${completionRate.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`} sub="đồng bộ realtime" />
+          <ComponentsKpiCard title="Tổng lệnh SX" value={formatQuantity(productionOrders.length, 0)} />
+          <ComponentsKpiCard title="Đang sản xuất" value={formatQuantity(running, 0)} />
+          <ComponentsKpiCard title="Chờ sản xuất" value={formatQuantity(waiting, 0)} />
+          <ComponentsKpiCard title="Hoàn thành" value={formatQuantity(completed, 0)} />
+          <ComponentsKpiCard title="Quá hạn" value={formatQuantity(delayed, 0)} />
+          <ComponentsKpiCard title="Tỷ lệ hoàn thành" value={`${formatQuantity(completionRate, 1)}%`} sub="đồng bộ realtime" />
         </div>
 
         <ComponentsFilterBar>
@@ -77,7 +78,7 @@ export function ComponentsProductionPage() {
                         <td className="px-2 py-2 text-cyan-300">{row.orderNo}</td>
                         <td className="px-2 py-2">{row.title}</td>
                         <td className="px-2 py-2">{row.metadata?.workshop ?? '-'}</td>
-                        <td className="px-2 py-2">{row.quantity.toLocaleString('vi-VN')}</td>
+                        <td className="px-2 py-2">{formatQuantity(row.quantity, 0)}</td>
                         <td className="px-2 py-2">{row.currentStageCode ?? 'Chờ phân công'}</td>
                         <td className="px-2 py-2">{statusLabel[row.status] ?? row.status}</td>
                         <td className="px-2 py-2">{date(row.plannedStartAt)}</td>
@@ -94,7 +95,7 @@ export function ComponentsProductionPage() {
           </div>
           <div className="space-y-4 xl:col-span-3">
             <ComponentsPanel title="Tiến độ sản xuất tổng thể">
-              <div className="text-4xl font-semibold text-white">{completionRate.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%</div>
+              <div className="text-4xl font-semibold text-white">{formatQuantity(completionRate, 1)}%</div>
               <div className="mt-1 text-sm text-slate-400">Hoàn thành</div>
             </ComponentsPanel>
             <ComponentsPanel title="Luồng sau sản xuất">
@@ -128,7 +129,7 @@ export function ComponentsProductionPage() {
               <button onClick={() => setSelectedOrder(null)} className="rounded border border-slate-700 px-3 py-1 text-sm text-slate-300">Đóng</button>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-              <ComponentsKpiCard title="Số lượng" value={selectedOrder.quantity?.toLocaleString('vi-VN') ?? '0'} />
+              <ComponentsKpiCard title="Số lượng" value={formatQuantity(selectedOrder.quantity ?? 0, 0)} />
               <ComponentsKpiCard title="Công đoạn hiện tại" value={selectedOrder.currentStageCode ?? 'Hoàn tất'} />
               <ComponentsKpiCard title="Bắt đầu" value={date(selectedOrder.plannedStartAt)} />
               <ComponentsKpiCard title="Dự kiến HT" value={date(selectedOrder.plannedEndAt)} />

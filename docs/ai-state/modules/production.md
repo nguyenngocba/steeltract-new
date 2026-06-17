@@ -41,6 +41,8 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * Production UI includes `/production/reservations` and MO detail reservation preview/create action.
 * Production UI includes `/production/material-ledger` with filters for Production Order, Material, Event Type, and Date Range.
 * Production UI includes `/production/consumptions` with Issued, Returned, Consumed, Scrap, and Remaining summaries.
+* Sprint 12B standardizes Production Cockpit presentation with shared module UI primitives for KPI strip, analytics panels, filter bar, and the primary Manufacturing Order data grid.
+* Sprint 12C adds sticky Production filters and frontend status KPI click-to-filter without changing Production APIs or workflow logic.
 * Production-to-Yard staging is gated by linked QC inspection status `PASSED` or `APPROVED`.
 
 ## Database Models

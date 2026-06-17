@@ -1,4 +1,8 @@
 import {
+  lazy,
+  Suspense,
+} from 'react'
+import {
   Navigate,
   Route,
   Routes,
@@ -6,68 +10,61 @@ import {
 } from 'react-router-dom'
 
 import { useAuthStore } from '@/store/auth.store'
-import { LoginPage } from '@/modules/auth/pages/LoginPage'
-import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage'
-import { InventoryOverviewPage } from '@/modules/inventory/pages/tabs/InventoryOverviewPage'
-import { InventoryMaterialsPage } from '@/modules/inventory/pages/tabs/InventoryMaterialsPage'
-import { InventoryLocationsPage } from '@/modules/inventory/pages/tabs/InventoryLocationsPage'
-import { InventoryTransactionsPage } from '@/modules/inventory/pages/tabs/InventoryTransactionsPage'
-import { MaterialDetailPage } from '@/modules/inventory/pages/MaterialDetailPage'
-import { ProductionPage } from '@/modules/production/pages/ProductionPage'
-import { QcPage } from '@/modules/qc/pages/QcPage'
-import { ProjectsPage } from '@/modules/projects/pages/ProjectsPage'
-import { ProcurementPage } from '@/modules/procurement/pages/ProcurementPage'
-import { AnalyticsPage } from '@/modules/analytics/pages/AnalyticsPage'
-import { CommandCenterPage } from '@/modules/command-center/pages/CommandCenterPage'
-import { DigitalTwinPage } from '@/modules/digital-twin/pages/DigitalTwinPage'
-import { CopilotPage } from '@/modules/copilot/pages/CopilotPage'
-import { WorkflowPage } from '@/modules/workflow/pages/WorkflowPage'
-import { FederationPage } from '@/modules/federation/pages/FederationPage'
-import { KernelPage } from '@/modules/kernel/pages/KernelPage'
-import { MarketplacePage } from '@/modules/marketplace/pages/MarketplacePage'
-import { IntelligencePage } from '@/modules/intelligence/pages/IntelligencePage'
-import { AutonomousPage } from '@/modules/autonomous/pages/AutonomousPage'
-import { SimulationUniversePage } from '@/modules/simulation-universe/pages/SimulationUniversePage'
-import { NexusPage } from '@/modules/nexus/pages/NexusPage'
-import { MaterialMovementsPage } from '@/modules/material-movements/pages/MaterialMovementsPage'
-import { YardPage } from '@/modules/yard/pages/YardPage'
-import { SuppliersPage } from '@/modules/suppliers/pages/SuppliersPage'
-import { InventoryInboundPage } from '@/modules/inventory/pages/tabs/InventoryInboundPage'
-import {
-  InventoryOutboundPage,
-} from '@/modules/inventory/pages/tabs/InventoryOutboundPage'
-import {
-  InventoryMasterDataPage,
-} from '@/modules/inventory/pages/tabs/InventoryMasterDataPage'
-import {
-  InventoryAuditPage,
-} from '@/modules/inventory/pages/tabs/InventoryAuditPage'
-import {
-  InventoryTransferPage,
-} from '@/modules/inventory/pages/tabs/InventoryTransferPage'
-import {
-  InventoryStockTakePage,
-} from '@/modules/inventory/pages/tabs/InventoryStockTakePage'
-import {
-  InventoryAdjustmentsPage,
-} from '@/modules/inventory/pages/tabs/InventoryAdjustmentsPage'
-import {
-  InventoryAlertsPage,
-} from '@/modules/inventory/pages/tabs/InventoryAlertsPage'
-import { ComponentsPage } from '@/modules/components/pages/ComponentsPage'
-import { ComponentsListPage } from '@/modules/components/pages/tabs/ComponentsListPage'
-import { ComponentsProductionPage } from '@/modules/components/pages/tabs/ComponentsProductionPage'
-import { ComponentsStockPage } from '@/modules/components/pages/tabs/ComponentsStockPage'
-import { ComponentsMaterialStockPage } from '@/modules/components/pages/tabs/ComponentsMaterialStockPage'
-import { ComponentsTransfersPage } from '@/modules/components/pages/tabs/ComponentsTransfersPage'
-import { ComponentsInternalQcPage } from '@/modules/components/pages/tabs/ComponentsInternalQcPage'
-import { ComponentsHistoryPage } from '@/modules/components/pages/tabs/ComponentsHistoryPage'
-import { SettingsPage } from '@/modules/settings/pages/SettingsPage'
-import { UsersPage } from '@/modules/users/pages/UsersPage'
-import { RolesPage } from '@/modules/roles/pages/RolesPage'
-import { SystemLogsWorkspace } from '@/modules/system-logs/workspaces/SystemLogsWorkspace'
-import { LogisticsPage } from '@/modules/logistics/pages/LogisticsPage'
-import { NotificationsPage } from '@/modules/notifications/pages/NotificationsPage'
+import { ModuleLoadingState } from '@/shared/ui/modules'
+
+const lazyNamed = <T extends Record<string, any>, K extends keyof T>(
+  loader: () => Promise<T>,
+  exportName: K,
+) => lazy(() => loader().then((module) => ({ default: module[exportName] })))
+
+const LoginPage = lazyNamed(() => import('@/modules/auth/pages/LoginPage'), 'LoginPage')
+const DashboardPage = lazyNamed(() => import('@/modules/dashboard/pages/DashboardPage'), 'DashboardPage')
+const InventoryOverviewPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryOverviewPage'), 'InventoryOverviewPage')
+const InventoryMaterialsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryMaterialsPage'), 'InventoryMaterialsPage')
+const InventoryLocationsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryLocationsPage'), 'InventoryLocationsPage')
+const InventoryTransactionsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryTransactionsPage'), 'InventoryTransactionsPage')
+const MaterialDetailPage = lazyNamed(() => import('@/modules/inventory/pages/MaterialDetailPage'), 'MaterialDetailPage')
+const ProductionPage = lazyNamed(() => import('@/modules/production/pages/ProductionPage'), 'ProductionPage')
+const QcPage = lazyNamed(() => import('@/modules/qc/pages/QcPage'), 'QcPage')
+const ProjectsPage = lazyNamed(() => import('@/modules/projects/pages/ProjectsPage'), 'ProjectsPage')
+const ProcurementPage = lazyNamed(() => import('@/modules/procurement/pages/ProcurementPage'), 'ProcurementPage')
+const AnalyticsPage = lazyNamed(() => import('@/modules/analytics/pages/AnalyticsPage'), 'AnalyticsPage')
+const CommandCenterPage = lazyNamed(() => import('@/modules/command-center/pages/CommandCenterPage'), 'CommandCenterPage')
+const DigitalTwinPage = lazyNamed(() => import('@/modules/digital-twin/pages/DigitalTwinPage'), 'DigitalTwinPage')
+const CopilotPage = lazyNamed(() => import('@/modules/copilot/pages/CopilotPage'), 'CopilotPage')
+const WorkflowPage = lazyNamed(() => import('@/modules/workflow/pages/WorkflowPage'), 'WorkflowPage')
+const FederationPage = lazyNamed(() => import('@/modules/federation/pages/FederationPage'), 'FederationPage')
+const KernelPage = lazyNamed(() => import('@/modules/kernel/pages/KernelPage'), 'KernelPage')
+const MarketplacePage = lazyNamed(() => import('@/modules/marketplace/pages/MarketplacePage'), 'MarketplacePage')
+const IntelligencePage = lazyNamed(() => import('@/modules/intelligence/pages/IntelligencePage'), 'IntelligencePage')
+const AutonomousPage = lazyNamed(() => import('@/modules/autonomous/pages/AutonomousPage'), 'AutonomousPage')
+const SimulationUniversePage = lazyNamed(() => import('@/modules/simulation-universe/pages/SimulationUniversePage'), 'SimulationUniversePage')
+const NexusPage = lazyNamed(() => import('@/modules/nexus/pages/NexusPage'), 'NexusPage')
+const MaterialMovementsPage = lazyNamed(() => import('@/modules/material-movements/pages/MaterialMovementsPage'), 'MaterialMovementsPage')
+const YardPage = lazyNamed(() => import('@/modules/yard/pages/YardPage'), 'YardPage')
+const SuppliersPage = lazyNamed(() => import('@/modules/suppliers/pages/SuppliersPage'), 'SuppliersPage')
+const InventoryInboundPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryInboundPage'), 'InventoryInboundPage')
+const InventoryOutboundPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryOutboundPage'), 'InventoryOutboundPage')
+const InventoryMasterDataPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryMasterDataPage'), 'InventoryMasterDataPage')
+const InventoryAuditPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryAuditPage'), 'InventoryAuditPage')
+const InventoryTransferPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryTransferPage'), 'InventoryTransferPage')
+const InventoryStockTakePage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryStockTakePage'), 'InventoryStockTakePage')
+const InventoryAdjustmentsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryAdjustmentsPage'), 'InventoryAdjustmentsPage')
+const InventoryAlertsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryAlertsPage'), 'InventoryAlertsPage')
+const ComponentsPage = lazyNamed(() => import('@/modules/components/pages/ComponentsPage'), 'ComponentsPage')
+const ComponentsListPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsListPage'), 'ComponentsListPage')
+const ComponentsProductionPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsProductionPage'), 'ComponentsProductionPage')
+const ComponentsStockPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsStockPage'), 'ComponentsStockPage')
+const ComponentsMaterialStockPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsMaterialStockPage'), 'ComponentsMaterialStockPage')
+const ComponentsTransfersPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsTransfersPage'), 'ComponentsTransfersPage')
+const ComponentsInternalQcPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsInternalQcPage'), 'ComponentsInternalQcPage')
+const ComponentsHistoryPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsHistoryPage'), 'ComponentsHistoryPage')
+const SettingsPage = lazyNamed(() => import('@/modules/settings/pages/SettingsPage'), 'SettingsPage')
+const UsersPage = lazyNamed(() => import('@/modules/users/pages/UsersPage'), 'UsersPage')
+const RolesPage = lazyNamed(() => import('@/modules/roles/pages/RolesPage'), 'RolesPage')
+const SystemLogsWorkspace = lazyNamed(() => import('@/modules/system-logs/workspaces/SystemLogsWorkspace'), 'SystemLogsWorkspace')
+const LogisticsPage = lazyNamed(() => import('@/modules/logistics/pages/LogisticsPage'), 'LogisticsPage')
+const NotificationsPage = lazyNamed(() => import('@/modules/notifications/pages/NotificationsPage'), 'NotificationsPage')
 
 export function AppRouter() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -75,18 +72,20 @@ export function AppRouter() {
 
   if (location.pathname === '/login') {
     return (
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            accessToken ? (
-              <Navigate to="/" replace />
-            ) : (
-              <LoginPage />
-            )
-          }
-        />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              accessToken ? (
+                <Navigate to="/" replace />
+              ) : (
+                <LoginPage />
+              )
+            }
+          />
+        </Routes>
+      </Suspense>
     )
   }
 
@@ -103,6 +102,7 @@ export function AppRouter() {
   }
 
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route
         path="/"
@@ -379,5 +379,14 @@ export function AppRouter() {
         element={<Navigate to="/" replace />}
       />
     </Routes>
+    </Suspense>
+  )
+}
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen bg-[#07111f] p-6 text-slate-100">
+      <ModuleLoadingState label="Đang tải module..." variant="analytics" />
+    </div>
   )
 }

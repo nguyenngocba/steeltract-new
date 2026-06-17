@@ -4,6 +4,7 @@ import { Activity, Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wr
 import { Link, useLocation } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { ModuleDataGrid, ModuleFilterBar, ModuleKpiStrip, ModulePageHeader } from '@/shared/ui/modules'
 
 import type { ProductionBom, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
 import {
@@ -21,7 +22,7 @@ import {
 import { ManufacturingOrderModal } from '../components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../components/ProductionBomModal'
 import { productionTabs } from '../config/production-tabs'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import {
   useMaterialRequirements,
   useArchiveProductionBom,
@@ -50,12 +51,13 @@ import {
   useYardSlots,
 } from '../hooks/useProductionCockpit'
 
-const number = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value)
+const number = (value = 0) => formatQuantity(value, 3)
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
 
 export function ProductionCockpitPage() {
   const location = useLocation()
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder>()
   const [selectedBom, setSelectedBom] = useState<ProductionBom>()
   const [createOrderOpen, setCreateOrderOpen] = useState(false)
@@ -79,8 +81,10 @@ export function ProductionCockpitPage() {
 
   const view = location.pathname.split('/').at(-1) ?? 'production'
   const mode = view === 'production' ? 'overview' : view
-  const filteredOrders = useMemo(() => orders.filter((row) =>
-    `${row.orderNo} ${row.title} ${row.status}`.toLowerCase().includes(search.toLowerCase())), [orders, search])
+  const filteredOrders = useMemo(() => orders.filter((row) => {
+    if (statusFilter && row.status !== statusFilter) return false
+    return `${row.orderNo} ${row.title} ${row.status}`.toLowerCase().includes(search.toLowerCase())
+  }), [orders, search, statusFilter])
   const filteredBoms = useMemo(() => boms.filter((row) =>
     `${row.bomNo} ${row.productCode} ${row.productName}`.toLowerCase().includes(search.toLowerCase())), [boms, search])
 
@@ -91,17 +95,15 @@ export function ProductionCockpitPage() {
   return <OperationalShell>
     <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
       <div className="mx-auto max-w-[1800px]">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Steel fabrication execution</p>
-          <h1 className="mt-1 text-2xl font-semibold text-white">Trung tâm điều hành sản xuất</h1>
-          <p className="mt-1 text-xs text-slate-400">Inventory → BOM → Manufacturing Order → Execution → QC → Yard</p>
-        </div>
-        <div className="flex gap-2">
+      <ModulePageHeader
+        eyebrow="Steel fabrication execution"
+        title="Trung tâm điều hành sản xuất"
+        description="Inventory → BOM → Manufacturing Order → Execution → QC → Yard"
+        action={<>
           <button onClick={() => setCreateOrderOpen(true)} className={productionPrimaryButton}>+ Tạo lệnh sản xuất</button>
           <button className={productionMutedButton}>Xuất báo cáo</button>
-        </div>
-      </div>
+        </>}
+      />
 
       <nav className="mb-3 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <div className="flex min-w-max gap-1">
@@ -112,24 +114,25 @@ export function ProductionCockpitPage() {
         </div>
       </nav>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <ProductionKpi label="Tổng lệnh SX" value={number(orders.length)} note="Tất cả manufacturing order" tone="blue" />
-        <ProductionKpi label="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="green" />
-        <ProductionKpi label="Hoàn thành" value={number(completed)} note="Đã sẵn sàng chuyển bãi" tone="green" />
-        <ProductionKpi label="Quá hạn" value={number(delayed)} note="Cần điều phối lại" tone="red" />
+      <ModuleKpiStrip className="grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
+        <ProductionKpi label="Tổng lệnh SX" value={number(orders.length)} note="Tất cả manufacturing order" tone="blue" active={!statusFilter} onClick={() => setStatusFilter('')} />
+        <ProductionKpi label="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="green" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} />
+        <ProductionKpi label="Hoàn thành" value={number(completed)} note="Đã sẵn sàng chuyển bãi" tone="green" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} />
+        <ProductionKpi label="Quá hạn" value={number(delayed)} note="Cần điều phối lại" tone="red" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} />
         <ProductionKpi label="Production BOM" value={number(boms.length)} note="Định mức đang quản lý" tone="amber" />
         <ProductionKpi label="Giữ chỗ vật tư" value={number(reservations.filter((item) => item.status === 'RESERVED').length)} note="Không trừ kho SX" tone="purple" />
-      </div>
+      </ModuleKpiStrip>
 
-      <div className="my-3 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_18px_44px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] backdrop-blur-2xl">
-        <div className="flex min-w-64 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2">
+      <ModuleFilterBar className="my-3">
+        <div className="flex min-w-64 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-5">
           <Search size={15} className="text-cyan-400" />
           <input value={search} onChange={(event) => setSearch(event.target.value)}
             placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" />
         </div>
-        {['Trạng thái: Tất cả', 'Xưởng: Tất cả', 'Dự án: Tất cả', 'Ưu tiên: Tất cả'].map((text) =>
-          <button key={text} className={productionMutedButton}>{text}</button>)}
-      </div>
+        <button onClick={() => setStatusFilter('')} className={`${productionMutedButton} xl:col-span-1 ${!statusFilter ? 'border-cyan-400/50 text-cyan-200' : ''}`}>Trạng thái: Tất cả</button>
+        {['Xưởng: Tất cả', 'Dự án: Tất cả', 'Ưu tiên: Tất cả'].map((text) =>
+          <button key={text} className={`${productionMutedButton} xl:col-span-1`}>{text}</button>)}
+      </ModuleFilterBar>
 
       {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} onOpen={setSelectedOrder} />}
       {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
@@ -160,7 +163,7 @@ function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: R
           <div className="grid grid-cols-[auto_1fr] items-end gap-4">
             <div className="text-4xl font-semibold text-white">{orders.slice(0, 8).length}</div>
             <div className="text-right text-sm text-slate-300">
-              <div>{orders.filter((row) => row.status === 'IN_PROGRESS').length.toLocaleString('vi-VN')} đang chạy</div>
+              <div>{formatQuantity(orders.filter((row) => row.status === 'IN_PROGRESS').length, 0)} đang chạy</div>
               <div className="mt-1 text-xs text-blue-300">Xem chi tiết</div>
             </div>
           </div>
@@ -169,7 +172,7 @@ function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: R
           <div className="grid grid-cols-[auto_1fr] items-end gap-4">
             <div className="text-4xl font-semibold text-white">{orders.filter((row) => row.bom).length}</div>
             <div className="text-right text-sm text-slate-300">
-              <div>{orders.length.toLocaleString('vi-VN')} MO</div>
+              <div>{formatQuantity(orders.length, 0)} MO</div>
               <div className="mt-1 text-xs text-emerald-300">Đồng bộ BOM</div>
             </div>
           </div>
@@ -196,7 +199,7 @@ function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: R
     <aside className="space-y-3">
       <ProductionPanel title="Phân bổ trạng thái">
         <ProductionDonut
-          centerValue={orders.length.toLocaleString('vi-VN')}
+          centerValue={formatQuantity(orders.length, 0)}
           centerLabel="lệnh SX"
           segments={[
             { label: 'Hoàn thành', value: orders.filter((row) => row.status === 'COMPLETED').length, color: '#14c987' },
@@ -218,13 +221,13 @@ function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: R
 
 function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; onOpen: (row: ProductionOrder) => void; embedded?: boolean }) {
   return <ProductionPanel title={embedded ? 'Lệnh sản xuất đang hoạt động' : 'Danh sách manufacturing order'} action={<span className="text-[11px] text-cyan-300">1-10 / {rows.length}</span>}>
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[940px] text-left text-xs">
+    <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[940px] text-left text-xs">
       <thead className={productionTableHead}><tr>{['MO Number', 'Kết cấu', 'BOM', 'Số lượng', 'Ưu tiên', 'Công đoạn', 'Tiến độ', 'Bắt đầu', 'Đến hạn', 'Trạng thái'].map((x) => <th key={x} className="px-3 py-2 text-left font-medium">{x}</th>)}</tr></thead>
       <tbody>{rows.slice(0, 10).map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${productionTableRow}`}>
         <td className="py-3 pr-3 text-cyan-300">{row.orderNo}</td><td>{row.title}</td><td>{row.bom?.bomNo ?? '-'}</td><td>{number(row.quantity)}</td><td>{row.priority}</td><td>{row.currentStageCode ?? 'WAITING'}</td>
         <td className="w-28 pr-3"><Meter value={row.status === 'COMPLETED' ? 100 : row.status === 'IN_PROGRESS' ? 58 : 15} /></td><td>{date(row.plannedStartAt)}</td><td>{date(row.plannedEndAt)}</td><td><StatusChip status={row.status} /></td>
       </tr>)}</tbody>
-    </table></div></div>
+    </table></div></ModuleDataGrid>
   </ProductionPanel>
 }
 
@@ -253,7 +256,7 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
   return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Production BOM Registry" action={<button onClick={onCreate} className={productionMutedButton}>+ Tạo BOM</button>}>
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[950px] text-left text-xs"><thead className={productionTableHead}><tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
     <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className={`cursor-pointer ${productionTableRow}`}><td className="px-3 py-3">{index+1}</td><td className="px-3 py-3 text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td>{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td><div className="flex gap-2 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td></tr>)}</tbody></table></div></div>
-  </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM"><ProductionDonut centerValue={rows.length.toLocaleString('vi-VN')} centerLabel="BOM" segments={[{ label: 'Dầm chính', value: 42, color: '#1d7cff' }, { label: 'Cột thép', value: 28, color: '#14c987' }, { label: 'Bản mã', value: 18, color: '#f59e0b' }, { label: 'Giằng', value: 12, color: '#7c3aed' }]} /></ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
+  </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM"><ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={[{ label: 'Dầm chính', value: 42, color: '#1d7cff' }, { label: 'Cột thép', value: 28, color: '#14c987' }, { label: 'Bản mã', value: 18, color: '#f59e0b' }, { label: 'Giằng', value: 12, color: '#7c3aed' }]} /></ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
 }
 
 function Issues({
@@ -404,7 +407,7 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
         <ProductionKpi label="Scrap" value={number(scrap)} note="Phế phẩm" tone="red" />
         <ProductionKpi label="Remaining" value={number(remaining)} note="Còn treo tại sản xuất" tone="purple" />
       </div>
-      <ProductionPanel title="Production Consumption" action={<span className="text-[11px] text-cyan-300">{rows.length.toLocaleString('vi-VN')} dòng vật tư</span>}>
+      <ProductionPanel title="Production Consumption" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng vật tư</span>}>
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left text-xs">
           <thead className={productionTableHead}><tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
           <tbody>{rows.slice(0,50).map(row=><tr className={productionTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
@@ -458,7 +461,7 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
   }
 
   return <div className="grid gap-3 xl:grid-cols-[1fr_320px]">
-    <ProductionPanel title="Giữ chỗ vật tư sản xuất" action={<span className="text-[11px] text-cyan-300">{rows.length.toLocaleString('vi-VN')} reservation</span>}>
+    <ProductionPanel title="Giữ chỗ vật tư sản xuất" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} reservation</span>}>
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[1020px] text-left text-xs">
         <thead className={productionTableHead}><tr>{['Reservation','MO Number','BOM','Dòng VT','Required','Reserved','Issued','Vị trí','Ngày giữ','Trạng thái','Thao tác'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
         <tbody>{rows.slice(0,12).map((row)=>{
@@ -476,7 +479,7 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
             <td className="text-emerald-300">{number(reservedQty)}</td>
             <td>{number(issuedQty)}</td>
             <td>{locations.size ? Array.from(locations).slice(0,2).join(', ') : '-'}</td>
-            <td>{row.reservedAt ? new Date(row.reservedAt).toLocaleString('vi-VN') : '-'}</td>
+            <td>{row.reservedAt ? formatDateTime(row.reservedAt) : '-'}</td>
             <td><StatusChip status={row.status}/></td>
             <td><div className="flex flex-wrap gap-2">
               {row.status === 'DRAFT' && <button className="text-cyan-300" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
@@ -497,7 +500,7 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
         </div>
       </ProductionPanel>
       <ProductionPanel title="Trạng thái">
-        <ProductionDonut centerValue={rows.length.toLocaleString('vi-VN')} centerLabel="RSV" segments={[
+        <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="RSV" segments={[
           { label: 'Reserved', value: rows.filter((row) => row.status === 'RESERVED').length, color: '#14c987' },
           { label: 'Draft', value: rows.filter((row) => row.status === 'DRAFT').length, color: '#1d7cff' },
           { label: 'Cancelled', value: rows.filter((row) => row.status === 'CANCELLED').length, color: '#f59e0b' },
@@ -545,11 +548,11 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
           <input type="date" value={filters.toDate ?? ''} onChange={(event) => update('toDate', event.target.value)} className="h-10 rounded border border-slate-700 bg-slate-950 px-2 text-xs" />
         </div>
       </ProductionPanel>
-      <ProductionPanel title="Production Material Ledger" action={<span className="text-[11px] text-cyan-300">{rows.length.toLocaleString('vi-VN')} dòng</span>}>
+      <ProductionPanel title="Production Material Ledger" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng</span>}>
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left text-xs">
           <thead className={productionTableHead}><tr>{['Thời gian','Event','MO','Reservation','Material','Vị trí','Quantity','Created By','Remark'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
           <tbody>{rows.slice(0,50).map((row)=><tr key={row.id} className={productionTableRow}>
-            <td className="px-3 py-3">{new Date(row.eventDate).toLocaleString('vi-VN')}</td>
+            <td className="px-3 py-3">{formatDateTime(row.eventDate)}</td>
             <td><StatusChip status={row.eventType}/></td>
             <td className="text-cyan-300">{row.productionOrder?.orderNo ?? row.productionOrderId}</td>
             <td>{row.reservation?.reservationNo ?? '-'}</td>
@@ -568,11 +571,11 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
           <Info k="Reserve" v={number(reserveQty)} />
           <Info k="Release" v={number(releaseQty)} />
           <Info k="Net" v={number(netQty)} />
-          <Info k="Số dòng" v={rows.length.toLocaleString('vi-VN')} />
+          <Info k="Số dòng" v={formatQuantity(rows.length, 0)} />
         </div>
       </ProductionPanel>
       <ProductionPanel title="Phân bổ event">
-        <ProductionDonut centerValue={rows.length.toLocaleString('vi-VN')} centerLabel="events" segments={eventTypes.map((eventType, index) => ({
+        <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="events" segments={eventTypes.map((eventType, index) => ({
           label: eventType,
           value: rows.filter((row) => row.eventType === eventType).length,
           color: ['#1d7cff', '#f59e0b', '#14c987', '#06b6d4', '#7c3aed', '#ef4444'][index],
@@ -583,7 +586,7 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
 }
 
 function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) {
-  return <ProductionPanel title="Nhật ký thực thi sản xuất"><div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className={productionTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,20).map(row=><tr className={productionTableRow} key={row.id}><td className="px-3 py-3">{new Date(row.createdAt).toLocaleString('vi-VN')}</td><td className="text-cyan-300">{row.productionOrder.orderNo}</td><td>{row.productionOrder.title}</td><td>{row.stage?.name??row.type}</td><td>{row.workerId??'-'}</td><td>{row.stage?.name??'-'}</td><td><StatusChip status={row.type}/></td><td>{row.message}</td></tr>)}</tbody></table></div></div></ProductionPanel>
+  return <ProductionPanel title="Nhật ký thực thi sản xuất"><div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className={productionTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,20).map(row=><tr className={productionTableRow} key={row.id}><td className="px-3 py-3">{formatDateTime(row.createdAt)}</td><td className="text-cyan-300">{row.productionOrder.orderNo}</td><td>{row.productionOrder.title}</td><td>{row.stage?.name??row.type}</td><td>{row.workerId??'-'}</td><td>{row.stage?.name??'-'}</td><td><StatusChip status={row.type}/></td><td>{row.message}</td></tr>)}</tbody></table></div></div></ProductionPanel>
 }
 
 function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: () => void }) {
@@ -710,7 +713,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
               </table>
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="text-slate-400">{orderReservations.filter((item) => item.status === 'RESERVED').length.toLocaleString('vi-VN')} reservation đang active cho MO này</span>
+              <span className="text-slate-400">{formatQuantity(orderReservations.filter((item) => item.status === 'RESERVED').length, 0)} reservation đang active cho MO này</span>
               <button onClick={reserveMaterials} disabled={!reservationPreview || reservationPreview.status === 'SHORTAGE' || createReservation.isPending} className="rounded bg-cyan-600 px-3 py-2 font-semibold text-white disabled:opacity-40">Tạo và giữ chỗ vật tư</button>
             </div>
           </ProductionPanel>
@@ -751,8 +754,8 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
                 {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
               </select>
               {!availableSlots.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">Bãi không còn slot có tầng trống.</p> : null}
-              <input value={quantity} onChange={(e)=>{ setQuantity(formatQuantityInput(e.target.value)); setActionError(''); setActionMessage('') }} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
-              <input value={weight} onChange={(e)=>setWeight(formatQuantityInput(e.target.value))} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
+              <input value={quantity} onFocus={(e)=>setQuantity(formatQuantityInput(e.target.value))} onBlur={(e)=>setQuantity(formatQuantity(e.target.value))} onChange={(e)=>{ setQuantity(formatQuantityInput(e.target.value)); setActionError(''); setActionMessage('') }} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
+              <input value={weight} onFocus={(e)=>setWeight(formatQuantityInput(e.target.value))} onBlur={(e)=>setWeight(formatQuantity(e.target.value))} onChange={(e)=>setWeight(formatQuantityInput(e.target.value))} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
               <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
                 <div>Slot đích: <b className="text-cyan-300">{targetSlot ? `${targetSlot.zone.code}/${targetSlot.code}` : '--'}</b></div>
                 <div className="mt-1">Tầng xếp tự động: <b className="text-cyan-300">L{targetSlot ? targetSlot.currentStackLevel + 1 : '--'}</b></div>

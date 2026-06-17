@@ -15,6 +15,7 @@ import {
   MiniBars,
 } from '../../components/InventoryVisuals'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
+import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 function num(value: unknown) {
   const n = Number(value ?? 0)
@@ -22,7 +23,7 @@ function num(value: unknown) {
 }
 
 function money(value: unknown) {
-  return `${Math.round(num(value)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(value))
 }
 
 export function InventoryAuditPage() {
@@ -48,10 +49,10 @@ export function InventoryAuditPage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid md:grid-cols-4 ${inventoryGridGap}`}>
-          <InventoryKpi title="Tổng tồn" value={summary.stock.toLocaleString('vi-VN')} note="Theo audit transaction" tone="blue" />
+          <InventoryKpi title="Tổng tồn" value={formatQuantity(summary.stock, 0)} note="Theo audit transaction" tone="blue" />
           <InventoryKpi title="Giá trị tồn" value={money(summary.value)} note="Theo giá bình quân" tone="emerald" />
           <InventoryKpi title="Giá trị TB / mã" value={money(summary.avg)} note="Bình quân danh mục" tone="cyan" />
-          <InventoryKpi title="Chưa có phát sinh" value={summary.stale.toLocaleString('vi-VN')} note="Cần rà soát" tone="amber" />
+          <InventoryKpi title="Chưa có phát sinh" value={formatQuantity(summary.stale, 0)} note="Cần rà soát" tone="amber" />
         </div>
 
         <div className={`grid xl:grid-cols-[1fr_380px] ${inventoryGridGap}`}>
@@ -77,10 +78,10 @@ export function InventoryAuditPage() {
                   <tr key={row.materialId} className={inventoryTableRow}>
                     <td className="px-4 py-3 font-medium text-cyan-300">{row.materialCode}</td>
                     <td className="px-4 py-3 text-white">{row.materialName}</td>
-                    <td className="px-4 py-3">{num(row.currentStock).toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-3">{formatQuantity(num(row.currentStock), 0)}</td>
                     <td className="px-4 py-3">{money(row.averageCost)}</td>
                     <td className="px-4 py-3 font-medium text-cyan-300">{money(row.inventoryValue)}</td>
-                    <td className="px-4 py-3 text-slate-500">{row.lastMovementDate ? new Date(row.lastMovementDate).toLocaleString('vi-VN') : '-'}</td>
+                    <td className="px-4 py-3 text-slate-500">{row.lastMovementDate ? formatDateTime(row.lastMovementDate) : '-'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,5 +1,238 @@
 # SteelTrack Changelog
 
+## 2026-06-17 Attachment & Image Foundation
+
+Implemented:
+
+- Added shared attachment metadata support with filesystem-backed storage outside the repo.
+- Runtime file storage now uses `STORAGE_ROOT` or `/data/steeltrack-storage`.
+- Added checksum dedupe so duplicate uploads reuse the same physical file while creating a separate metadata reference.
+- Added allowed file validation for images, PDF, DOCX, and XLSX.
+- Added Material Detail image upload in the `Hình ảnh vật tư` tab.
+- Added Material Detail document listing under `Tài liệu vật tư`.
+
+Verified:
+
+- Prisma generate passed.
+- Backend build passed.
+- Frontend build passed.
+
+Scope:
+
+- Attachment foundation and Material Detail upload UI. No OCR, AI tagging, S3, MinIO, versioning workflow, or image recognition.
+
+## 2026-06-17 Quantity Input Thousand Separator Bug Fix
+
+Fixed:
+
+- Quantity inputs no longer insert thousands separators while typing.
+- Focused quantity fields preserve editable raw values such as `1000`, `10000`, `100000`, `1,5`, and `1000,5`.
+- Quantity fields format on blur using shared `formatQuantity()`.
+- VND currency inputs are unchanged.
+
+Verified:
+
+- Helper verification passed for required quantity examples and smart paste formats.
+- Frontend build passed.
+
+## 2026-06-17 Numeric Formatting + Material Visual Analytics
+
+Implemented:
+
+- Consolidated frontend number formatting through shared quantity/currency parsing helpers.
+- Removed remaining direct `toLocaleString('vi-VN')` / `Intl.NumberFormat` usage from frontend source.
+- Added smart locale parsing for Vietnamese and English-style pasted decimal values.
+- Updated VND display to whole dong with `đ` suffix.
+- Added Material Detail image gallery/empty state and Material Master image preview UI.
+- Reworked Material Detail analytics into inbound, outbound, inventory trend, 7-day forecast, and turnover panels.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- Frontend UI/formatting only; no API, backend, Prisma, database, schema, or workflow changes.
+
+## 2026-06-15 Inventory Numeric Input Formatting Fix
+
+Fixed:
+
+- Currency inputs now use a dedicated VND formatter: digits only, grouped by `.` and no decimal part.
+- Quantity inputs keep decimal support through `,`.
+- Inventory inbound unit price inputs now use the currency formatter.
+- Locale parsing now treats `.` as thousands separator and `,` as decimal separator.
+
+Verified:
+
+- Frontend build passed.
+
+## 2026-06-15 Inventory Stock KPI Sparkline Cards
+
+Implemented:
+
+- Updated the five top KPI cards on Inventory Material Stock to a compact fixed-height format.
+- Added icon badges and bottom monthly sparkline charts for inventory value, quantity, material codes, low-stock items, and out-of-stock items.
+- Preserved existing frontend filters and data sources.
+- Extended `/inventory/audit` with existing material timestamps.
+- Replaced decorative KPI trend data with monthly snapshots from real material `createdAt` values and inventory transaction item movement history.
+- KPI helper text now reports real month-over-month deltas where applicable.
+
+Verified:
+
+- Backend build passed.
+- Frontend build passed.
+
+Scope:
+
+- KPI presentation and audit response timestamp extension only; no database, schema, or workflow changes.
+
+## 2026-06-15 Operational Code Numbering Standardization
+
+Implemented:
+
+- Standardized new operational codes to `PREFIX-YYMMDD-###`.
+- Updated frontend-generated suggestions for Inventory, Production BOM, Manufacturing Order, Components, and Projects.
+- Updated backend fallback generation for Inventory transactions, return requests, Production BOM, Work Orders, reservations, material issues, component creation from Production, QC/NCR, material movements, and receiving.
+- Added a code numbering decision document.
+
+Verified:
+
+- Backend build passed.
+- Frontend build passed.
+
+Scope:
+
+- Code generation standardization only; no schema or migration changes and no historical data rewrite.
+
+## 2026-06-15 Sprint 13B.2 Theme Consistency Audit
+
+Implemented:
+
+- Audited Material Detail Drawer against Dashboard, Inventory Stock, and Production Cockpit theme patterns.
+- Added shared `ModuleTabs` to the Module UI Foundation.
+- Replaced Material Detail custom tabs with shared `ModuleTabs`.
+- Updated Material Detail tables to use shared module table tokens.
+- Replaced the focused 2D location preview custom modal with the standard module drawer/panel surface.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- UI/theme consistency only; no API, backend, database, schema, workflow, or business logic changes.
+
+## 2026-06-15 Sprint 13B.1 Material Detail Redesign
+
+Implemented:
+
+- Redesigned the Material Detail drawer with shared Module UI Foundation components.
+- Added header KPI cards for Current Stock, Average Cost, Inventory Value, and Storage Locations.
+- Replaced the left detail menu with horizontal tabs.
+- Added colored transaction badges for Inbound, Outbound, Transfer, and Adjustment.
+- Added location distribution donut/table, movement trend, forecast panel, project usage summary, and supplier purchase summary.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- Material Detail Drawer UI only; no API, backend, database, schema, or workflow changes.
+
+## 2026-06-13 Sprint 13 Dashboard Forecast Enhancement
+
+Implemented:
+
+- Added material replenishment forecast to the Executive Dashboard.
+- Material forecast shows which material codes need buying/importing, projected 7-day balance, and recommended quantity.
+- Added 7-day component forecast from lifecycle status and open Production Orders.
+- Executive Alerts now surface top material replenishment needs and component delivery/installation backlog signals.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- Dashboard analytics/presentation only; no API, database, Prisma, schema, workflow, AI, or machine-learning changes.
+
+## 2026-06-13 Sprint 13 Executive Dashboard
+
+Implemented:
+
+- Reworked the main Dashboard into an Executive Dashboard.
+- Added Inventory Forecast, Component Pipeline, Yard Occupancy, QC Quality Trend, Production Signal, and Executive Alerts panels.
+- Forecasts and alerts use rules-based calculations from existing transactions, movements, component statuses, production records, Yard metrics, and QC cockpit aggregates.
+- Panels display assumptions when detailed historical data is incomplete.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- Dashboard analytics/presentation only; no API, database, Prisma, schema, or workflow changes.
+
+## 2026-06-13 Sprint 12C UI Polish, UX Consistency & Frontend Performance
+
+Implemented:
+
+- Shared module UI now supports sticky filters, clickable/active KPI cards, richer empty states, loading skeleton variants, and a standard detail drawer.
+- Inventory, Components, Production, and Projects KPI cards now support frontend click-to-filter where matching status filters exist.
+- Components and Projects detail views now use the standard drawer pattern.
+- App routes now use `React.lazy` and `Suspense` route splitting.
+- Yard 2D/3D maps are lazy-loaded from the Yard workspace.
+
+Bundle audit:
+
+- Main chunk reduced to about `380 kB`.
+- Yard route chunk reduced to about `56 kB`.
+- Remaining large warning is the lazy 3D Yard map chunk at about `969 kB`.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- UI/UX/frontend performance only; no API, database, Prisma, or workflow changes.
+
+## 2026-06-13 Sprint 12B Production + Projects + Yard UI Rollout
+
+Implemented:
+
+- Production Cockpit now uses the shared module UI foundation for header, KPI strip, filter bar, analytics panels, and primary data grid.
+- Projects cockpit now uses the shared module UI foundation for KPI strip, runtime cards, Project Components cards, table shell, and empty state.
+- Yard cockpit now uses the shared module UI foundation for KPI strip, occupancy analytics, shipment/operation analytics, and trend panels.
+- `ModuleKpiCard` now accepts an optional icon for module runtime cards.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- UI architecture and presentation only; no API, database, Prisma, or workflow changes.
+
+## 2026-06-13 Sprint 12A UI Standardization Foundation
+
+Implemented:
+
+- Added shared module UI primitives under `apps/frontend/src/shared/ui/modules`.
+- Inventory visual wrappers now use the shared module UI foundation without changing Inventory behavior or API calls.
+- Components List and Components Stock now follow the Inventory cockpit layout with page headers and lifecycle KPI strips.
+- Documented the Inventory UI pattern audit in `docs/ai-state/design/ui-standardization-foundation.md`.
+
+Verified:
+
+- Frontend build passed.
+
+Scope:
+
+- UI architecture and presentation only; no API, database, Prisma, or workflow changes.
+
 ## 2026-06-13 Sprint 11A Decimal Quantity & Currency Formatting
 
 Fixed:

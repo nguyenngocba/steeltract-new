@@ -12,6 +12,7 @@ import { useUnits } from '../../hooks/useUnits'
 import { useZones } from '../../hooks/useZones'
 import { useMaterialTypes } from '../../hooks/useMaterialTypes'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
+import { formatQuantity } from '@/shared/utils/number-format'
 
 type CategoryForm = {
   id?: string
@@ -153,10 +154,10 @@ export function InventoryMasterDataPage() {
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
       <div className="grid gap-3 md:grid-cols-4">
-        <InventoryKpi title="Danh mục vật tư" value={stats.categories.toLocaleString('vi-VN')} tone="cyan" note="nhóm quản trị" />
-        <InventoryKpi title="Loại / quy cách" value={stats.materialTypes.toLocaleString('vi-VN')} tone="blue" note="gắn theo danh mục" />
-        <InventoryKpi title="Đơn vị tính" value={stats.units.toLocaleString('vi-VN')} tone="emerald" note="Material Master dùng chung" />
-        <InventoryKpi title="Zone kho" value={stats.zones.toLocaleString('vi-VN')} tone="amber" note="vị trí mặc định vật tư" />
+        <InventoryKpi title="Danh mục vật tư" value={formatQuantity(stats.categories, 0)} tone="cyan" note="nhóm quản trị" />
+        <InventoryKpi title="Loại / quy cách" value={formatQuantity(stats.materialTypes, 0)} tone="blue" note="gắn theo danh mục" />
+        <InventoryKpi title="Đơn vị tính" value={formatQuantity(stats.units, 0)} tone="emerald" note="Material Master dùng chung" />
+        <InventoryKpi title="Zone kho" value={formatQuantity(stats.zones, 0)} tone="amber" note="vị trí mặc định vật tư" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">

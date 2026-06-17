@@ -19,6 +19,7 @@ import {
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useSuppliers } from '../../hooks/useSuppliers'
 import { useZones } from '../../hooks/useZones'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
 function num(v: any) {
   const n = Number(v ?? 0)
@@ -26,7 +27,7 @@ function num(v: any) {
 }
 
 function formatCurrency(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(v))
 }
 
 export function InventoryInboundPage() {
@@ -124,10 +125,10 @@ export function InventoryInboundPage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid grid-cols-1 xl:grid-cols-4 ${inventoryGridGap}`}>
-          <InventoryKpi title="Tổng nhập trong tháng" value={`${kpis.monthlyQty.toLocaleString('vi-VN')} tấn`} note="Theo phiếu nhập" tone="blue" />
+          <InventoryKpi title="Tổng nhập trong tháng" value={`${formatQuantity(kpis.monthlyQty, 0)} tấn`} note="Theo phiếu nhập" tone="blue" />
           <InventoryKpi title="Giá trị nhập trong tháng" value={formatCurrency(kpis.monthlyAmount)} note="Theo đơn giá nhập" tone="emerald" />
-          <InventoryKpi title="Số phiếu nhập" value={kpis.docs.toLocaleString('vi-VN')} note="Trong tháng hiện tại" tone="cyan" />
-          <InventoryKpi title="Hoàn thành" value={kpis.done.toLocaleString('vi-VN')} note="Phiếu đã ghi nhận" tone="emerald" />
+          <InventoryKpi title="Số phiếu nhập" value={formatQuantity(kpis.docs, 0)} note="Trong tháng hiện tại" tone="cyan" />
+          <InventoryKpi title="Hoàn thành" value={formatQuantity(kpis.done, 0)} note="Phiếu đã ghi nhận" tone="emerald" />
         </div>
 
         <InventoryPanel title="Bộ lọc phiếu nhập">
@@ -194,10 +195,10 @@ export function InventoryInboundPage() {
 
           <div className="space-y-3 xl:col-span-3">
             <InventoryChartCard title="Phân bổ nhập theo vị trí">
-              <CompactDonutSummary segments={zoneSegments} centerValue={kpis.monthlyQty.toLocaleString('vi-VN')} centerLabel="tổng nhập" />
+              <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.monthlyQty, 0)} centerLabel="tổng nhập" />
             </InventoryChartCard>
             <InventoryChartCard title="Top vật tư nhập">
-              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.qty])} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.qty])} valueFormatter={(value) => formatQuantity(value, 0)} />
             </InventoryChartCard>
           </div>
         </div>

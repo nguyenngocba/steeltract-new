@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Edit3, Eye, Layers3, MapPinned, Package, Power, PowerOff, Trash2, Warehouse, X } from 'lucide-react'
-
+import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import {
   CompactDonutSummary,
   HorizontalBars,
@@ -18,11 +19,13 @@ import {
   inventoryTableHead,
   inventoryTableRow,
   inventoryTableShell,
+  inventoryMutedButton,
+   inventoryPanel,
 } from '../../components/InventoryVisuals'
 import { activateZone, createZone, deactivateZone, deleteZone, getZoneDetail, updateZone, type WarehouseLocation, type WarehouseLocationDetail } from '../../api/zones.api'
 import { useZones } from '../../hooks/useZones'
 import { useWarehouses } from '../../hooks/useWarehouses'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 10
 const LOCATION_ROWS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -70,11 +73,206 @@ function auditZone(zone: WarehouseLocation) {
 function isRealStorageLocation(zone: WarehouseLocation) {
   return auditZone(zone) === 'Real storage location'
 }
+// ================= COMPONENT SPARKLINE =================
+function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
+  const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
+  const min = Math.min(...rows)
+  const max = Math.max(...rows)
+  const range = Math.max(1, max - min)
+  const points = rows.map((value, index) => {
+    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+    const y = 34 - ((value - min) / range) * 24 - 5
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
+      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
+      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
 
+// ================= COMPONENT METRIC CARD =================
+function OverviewMetricCard({
+  title,
+  value,
+  note,
+  tone = 'blue',
+  icon,
+  trend,
+  active,
+  onClick,
+}: {
+  title: string
+  value: string
+  note?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple'
+  icon: React.ReactNode
+  trend: number[]
+  active?: boolean
+  onClick?: () => void
+}) {
+  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
+    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
+    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
+    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
+    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
+    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
+    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
+  }
+  const item = color[tone]
+  const content = (
+    <>
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
+          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
+          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
+        </div>
+        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
+          {icon}
+        </div>
+      </div>
+      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
+    </>
+  )
+  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
+    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
+  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
+  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
+  return <section className={className}>{content}</section>
+}
+function LocationsPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const safePageCount = Math.max(1, pageCount)
+  const safePage = Math.min(Math.max(1, page), safePageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  const windowSize = 5
+  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
+  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
+
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-0 mb-0 text-[10px] text-slate-400">
+      <div className="whitespace-nowrap">
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
+      </div>
+      <div className="flex items-center gap-1">
+        {pages[0] > 1 && <span className="px-1">...</span>}
+        {pages.map((pageNo) => (
+          <button
+            key={pageNo}
+            onClick={() => onPageChange(pageNo)}
+            className={`h-5 min-w-5 rounded border px-1 text-[10px] transition ${
+              safePage === pageNo
+                ? 'border-blue-400 bg-blue-600 text-white shadow-sm'
+                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40'
+            }`}
+          >
+            {pageNo}
+          </button>
+        ))}
+        {pages[pages.length - 1] < safePageCount && <span className="px-1">...</span>}
+      </div>
+      <div className="flex gap-1">
+        <button
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(Math.max(1, safePage - 1))}
+          className="rounded border border-white/10 bg-white/[0.055] px-1.5 text-[10px] font-medium text-slate-300 transition hover:border-cyan-400/40 disabled:opacity-40"
+        >
+          Trước
+        </button>
+        <button
+          disabled={safePage >= safePageCount}
+          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
+          className="rounded border border-white/10 bg-white/[0.055] px-1.5 text-[10px] font-medium text-slate-300 transition hover:border-cyan-400/40 disabled:opacity-40"
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MaterialsPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const safePageCount = Math.max(1, pageCount)
+  const safePage = Math.min(Math.max(1, page), safePageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  const windowSize = 5
+  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
+  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
+
+  return (
+    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
+      <div>
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
+      </div>
+      <div className="flex justify-center gap-2">
+        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
+        {pages.map((pageNo) => (
+          <button
+            key={pageNo}
+            onClick={() => onPageChange(pageNo)}
+            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
+              safePage === pageNo
+                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
+            }`}
+          >
+            {pageNo}
+          </button>
+        ))}
+        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
+      </div>
+      <div className="flex justify-start gap-2 md:justify-end">
+        <button
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(Math.max(1, safePage - 1))}
+          className={inventoryMutedButton}
+        >
+          Trước
+        </button>
+        <button
+          disabled={safePage >= safePageCount}
+          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
+          className={inventoryMutedButton}
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  )
+}
 export function InventoryLocationsPage() {
   const queryClient = useQueryClient()
   const { data: zones = [], isLoading } = useZones()
   const { data: warehouses = [] } = useWarehouses()
+  const { data: transactionsData = [] } = useInventoryTransactions({})
+  const { data: auditRows = [] } = useInventoryAudit()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [audit, setAudit] = useState<'all' | 'Demo record' | 'Warehouse-like record' | 'Real storage location' | 'Needs review'>('all')
@@ -204,19 +402,113 @@ export function InventoryLocationsPage() {
     active: zone.active,
     warehouseId: zone.warehouseId ?? '',
   })
+  // Thống kê theo tầng
+const levelStats = useMemo(() => {
+  const map = new Map<string, { count: number; stock: number }>();
+  rows.forEach((zone) => {
+    const level = zone.level || 'Khác';
+    if (!map.has(level)) map.set(level, { count: 0, stock: 0 });
+    const entry = map.get(level)!;
+    entry.count += zone.materialCount || 0;
+    entry.stock += zone.totalStockQuantity || 0;
+  });
+  return Array.from(map.entries())
+    .map(([level, data]) => ({ level, ...data }))
+    .sort((a, b) => b.stock - a.stock);
+}, [rows]);
+
+// Vật tư nhập nhiều nhất (dùng materialCount làm đại diện)
+const inboundZones = useMemo(() => {
+  return rows
+    .map((zone) => ({ code: zone.code, count: zone.materialCount || 0 }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}, [rows]);
+
+// Vật tư xuất nhiều nhất (dùng tồn thấp -> giả định xuất nhiều)
+const outboundZones = useMemo(() => {
+  return rows
+    .map((zone) => ({ code: zone.code, stock: zone.totalStockQuantity || 0 }))
+    .sort((a, b) => a.stock - b.stock)
+    .slice(0, 5);
+}, [rows]);
+// Lấy 10 giao dịch nhập gần nhất
+const recentInbound = useMemo(() => {
+  const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+  return txRows
+    .filter((tx: any) => String(tx.type ?? '').toUpperCase() === 'INBOUND')
+    .sort((a: any, b: any) => {
+      const dateA = a.transactionDate ?? a.createdAt ?? 0
+      const dateB = b.transactionDate ?? b.createdAt ?? 0
+      return new Date(dateB).getTime() - new Date(dateA).getTime()
+    })
+    .slice(0, 10)
+}, [transactionsData])
+
+// Lấy 10 giao dịch xuất gần nhất
+const recentOutbound = useMemo(() => {
+  const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+  return txRows
+    .filter((tx: any) => String(tx.type ?? '').toUpperCase() === 'OUTBOUND')
+    .sort((a: any, b: any) => {
+      const dateA = a.transactionDate ?? a.createdAt ?? 0
+      const dateB = b.transactionDate ?? b.createdAt ?? 0
+      return new Date(dateB).getTime() - new Date(dateA).getTime()
+    })
+    .slice(0, 10)
+}, [transactionsData])
+
+const topMaterials = useMemo(() => {
+  return auditRows
+    .filter((item: any) => n(item.currentStock) > 0)
+    .sort((a: any, b: any) => n(b.currentStock) - n(a.currentStock))
+    .slice(0, 5)
+    .map((item: any) => ({
+      code: item.materialCode ?? item.code,
+      stock: n(item.currentStock),
+    }))
+}, [auditRows])
 
   return <EnterpriseModulePage>
-    <div className={inventoryPageStack}>
+    <div className="space-y-1 -mt-2">
       <InventoryTabWorkspace />
-      <div className={`grid ${inventoryGridGap} md:grid-cols-4`}>
-        <InventoryKpi title="Tổng vị trí" value={stats.total.toLocaleString('vi-VN')} note={`${stats.active} đang hoạt động`} />
-        <InventoryKpi title="Vị trí lưu kho thật" value={stats.real.toLocaleString('vi-VN')} tone="emerald" note="A01/A02/row/column/level" />
-        <InventoryKpi title="Vật tư đang gán" value={stats.materialCount.toLocaleString('vi-VN')} tone="cyan" note="theo Material Master" />
-        <InventoryKpi title="Tổng tồn theo vị trí" value={stats.stock.toLocaleString('vi-VN')} tone="amber" note="quantity snapshot" />
+      <div className="grid gap-1.5 md:grid-cols-4">
+        <OverviewMetricCard
+          title="Tổng vị trí"
+          value={formatQuantity(stats.total, 0)}
+          note={`${stats.active} đang hoạt động`}
+          tone="blue"
+          icon={<MapPinned size={15} />}
+          trend={[0,0,0,0,0,0]}
+        />
+        <OverviewMetricCard
+          title="Vị trí lưu kho thật"
+          value={formatQuantity(stats.real, 0)}
+          note="A01/A02/row/column/level"
+          tone="emerald"
+          icon={<Layers3 size={15} />}
+          trend={[0,0,0,0,0,0]}
+        />
+        <OverviewMetricCard
+          title="Vật tư đang gán"
+          value={formatQuantity(stats.materialCount, 0)}
+          note="theo Material Master"
+          tone="cyan"
+          icon={<Package size={15} />}
+          trend={[0,0,0,0,0,0]}
+        />
+        <OverviewMetricCard
+          title="Tổng tồn theo vị trí"
+          value={formatQuantity(stats.stock, 0)}
+          note="quantity snapshot"
+          tone="amber"
+          icon={<Warehouse size={15} />}
+          trend={[0,0,0,0,0,0]}
+        />
       </div>
 
       <InventoryPanel>
-        <div className="grid gap-3 lg:grid-cols-[1fr_180px_220px_auto]">
+        <div className="grid gap-1.5 lg:grid-cols-[1fr_180px_220px_auto]">
           <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className={inventoryInput} placeholder="Tìm mã, tên, row, column, level..." />
           <select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); setPage(1) }} className={inventoryInput}>
             <option value="all">Tất cả trạng thái</option>
@@ -231,63 +523,198 @@ export function InventoryLocationsPage() {
         </div>
       </InventoryPanel>
 
-      <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_320px]`}>
-        <InventoryPanel title="Danh sách vị trí kho">
-          <div className={inventoryTableShell}>
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className={inventoryTableHead}>
-                <tr>
-                  {['Mã vị trí', 'Tên vị trí', 'Kho cha', 'Row', 'Slot', 'Tầng', 'Sức chứa', 'Ô/tầng', 'Vật tư', 'Tồn', 'Audit', 'Trạng thái', 'Thao tác'].map((head) => <th key={head} className="px-4 py-3">{head}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {pagedRows.map((zone) => <tr key={zone.id} className={`${inventoryTableRow} cursor-pointer`} onClick={() => setDetailId(zone.id)}>
-                  <td className="px-4 py-3 font-semibold text-cyan-300">{zone.code}</td>
-                  <td className="px-4 py-3">{zone.name}</td>
-                  <td className="px-4 py-3">{zone.warehouse?.name ?? '-'}</td>
-                  <td className="px-4 py-3">{zone.row ?? '-'}</td>
-                  <td className="px-4 py-3">{zone.column ?? '-'}</td>
-                  <td className="px-4 py-3">{zone.level ?? '-'}</td>
-                  <td className="px-4 py-3">{n(zone.capacity).toLocaleString('vi-VN')} tấn</td>
-                  <td className="px-4 py-3">{countOccupiedFromOccupancy(zone.cellOccupancy).toLocaleString('vi-VN')} / {TOTAL_CELL_LEVELS}</td>
-                  <td className="px-4 py-3">{n(zone.materialCount).toLocaleString('vi-VN')}</td>
-                  <td className="px-4 py-3">{n(zone.totalStockQuantity).toLocaleString('vi-VN')}</td>
-                  <td className="px-4 py-3"><AuditChip value={zone.auditType} /></td>
-                  <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-[10px] ${zone.active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>{zone.active ? 'Hoạt động' : 'Ngưng dùng'}</span></td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <IconButton title="Chi tiết" onClick={(event) => { event.stopPropagation(); setDetailId(zone.id) }}><Eye size={14} /></IconButton>
-                      <IconButton title="Sửa" onClick={(event) => { event.stopPropagation(); edit(zone) }}><Edit3 size={14} /></IconButton>
-                      <IconButton title={zone.active ? 'Ngưng dùng' : 'Kích hoạt'} onClick={(event) => { event.stopPropagation(); zone.active ? deactivateMutation.mutate(zone.id) : activateMutation.mutate(zone.id) }}>{zone.active ? <PowerOff size={14} /> : <Power size={14} />}</IconButton>
-                      <IconButton title="Soft delete" onClick={(event) => { event.stopPropagation(); deleteMutation.mutate(zone.id) }}><Trash2 size={14} /></IconButton>
-                    </div>
-                  </td>
-                </tr>)}
-              </tbody>
-            </table>
-          </div>
-          <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
-          {isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải vị trí kho...</p> : null}
-        </InventoryPanel>
+      <div className="grid items-start gap-1.5 xl:grid-cols-[1fr_320px]">
+        {/* Cột trái: bảng + các chart mới */}
+        <div className="flex flex-col gap-1.5">
+          <InventoryPanel title="Danh sách vị trí kho" className="!p-0 pb-0">
+            <div className={`${inventoryTableShell} h-[240px] overflow-auto`}>
+              <table className="w-full min-w-[980px] text-xs">
+                <thead className={inventoryTableHead}>
+                  <tr>
+                    <th className="px-2 py-2 text-left font-medium">Mã vị trí</th>
+                    <th className="px-2 py-2 text-left font-medium">Tên vị trí</th>
+                    <th className="px-2 py-2 text-left font-medium">Kho cha</th>
+                    <th className="px-2 py-2 text-left font-medium">Row</th>
+                    <th className="px-2 py-2 text-left font-medium">Slot</th>
+                    <th className="px-2 py-2 text-left font-medium">Tầng</th>
+                    <th className="px-2 py-2 text-right font-medium">Sức chứa</th>
+                    <th className="px-2 py-2 text-right font-medium">Ô/tầng</th>
+                    <th className="px-2 py-2 text-right font-medium">Vật tư</th>
+                    <th className="px-2 py-2 text-right font-medium">Tồn</th>
+                    <th className="px-2 py-2 text-left font-medium">Trạng thái</th>
+                    <th className="px-2 py-2 text-center font-medium">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((zone) => (
+                    <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
+                      <td className="px-2 py-1.5 font-medium text-cyan-300">{zone.code}</td>
+                      <td className="px-2 py-1.5 text-white">{zone.name}</td>
+                      <td className="px-2 py-1.5 text-slate-300">{zone.warehouse?.name ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-300">{zone.row ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-300">{zone.column ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-300">{zone.level ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.capacity), 0)} t</td>
+                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(countOccupiedFromOccupancy(zone.cellOccupancy), 0)} / {formatQuantity(TOTAL_CELL_LEVELS, 0)}</td>
+                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.materialCount), 0)}</td>
+                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.totalStockQuantity), 0)}</td>
+                      <td className="px-2 py-1.5">
+                        <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${zone.active ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-600 bg-slate-800/50 text-slate-400'}`}>
+                          {zone.active ? 'Hoạt động' : 'Ngưng dùng'}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <div className="flex justify-center gap-1.5">
+                          <IconButton title="Chi tiết" onClick={(event) => { event.stopPropagation(); setDetailId(zone.id) }}><Eye size={14} /></IconButton>
+                          <IconButton title="Sửa" onClick={(event) => { event.stopPropagation(); edit(zone) }}><Edit3 size={14} /></IconButton>
+                          <IconButton title={zone.active ? 'Ngưng dùng' : 'Kích hoạt'} onClick={(event) => { event.stopPropagation(); zone.active ? deactivateMutation.mutate(zone.id) : activateMutation.mutate(zone.id) }}>
+                            {zone.active ? <PowerOff size={14} /> : <Power size={14} />}
+                          </IconButton>
+                          <IconButton title="Xóa (soft delete)" onClick={(event) => { event.stopPropagation(); deleteMutation.mutate(zone.id) }}><Trash2 size={14} /></IconButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <MaterialsPagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            {isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải vị trí kho...</p> : null}
+          </InventoryPanel>
 
-        <div className="space-y-3">
-          <InventoryChartCard title="Tình trạng vị trí">
-            <CompactDonutSummary segments={locationSegments} centerValue={stats.real.toLocaleString('vi-VN')} centerLabel="vị trí thật" />
-          </InventoryChartCard>
-          <InventoryChartCard title="Tồn theo vị trí">
-            <HorizontalBars rows={stockByLocation} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
-          </InventoryChartCard>
-          <InventoryChartCard title="Audit warehouse_zones">
-            <div className="space-y-2 text-sm">
-              <AuditRow icon={<MapPinned size={16} />} label="Demo records" value={stats.demo} note="code bắt đầu DEMO-" />
-              <AuditRow icon={<Warehouse size={16} />} label="Warehouse-like" value={stats.warehouseLike} note="ST-WH-* đã bị xóa nếu mồ côi dữ liệu" />
-              <AuditRow icon={<Package size={16} />} label="Real storage" value={stats.real} note="A01/A02/B01 hoặc có row/column/level" />
+          
+
+          {/* Hàng chart 2: Top 10 nhập + Top 10 xuất (nằm song song nhau) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
+            <InventoryChartCard title="Top 10 vật tư nhập gần nhất" className="p-2">
+              <div className="space-y-1">
+                {recentInbound.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-4">Chưa có giao dịch nhập</div>
+                ) : (
+                  recentInbound.map((tx: any, index: number) => {
+                    const firstItem = tx.items?.[0]?.inventoryItem
+                    return (
+                      <div key={tx.id} className="flex justify-between text-xs border-b border-white/5 py-1">
+                        <span className="text-slate-300">{index+1}. {firstItem?.code ?? tx.itemCode ?? 'N/A'}</span>
+                        <span className="text-cyan-300">
+                          {firstItem?.name ?? tx.itemName ?? ''}
+                          <span className="ml-2 text-slate-500">
+                            {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('vi-VN') : ''}
+                          </span>
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </InventoryChartCard>
+
+            <InventoryChartCard title="Top 10 vật tư xuất gần nhất" className="p-2">
+              <div className="space-y-1">
+                {recentOutbound.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-4">Chưa có giao dịch xuất</div>
+                ) : (
+                  recentOutbound.map((tx: any, index: number) => {
+                    const firstItem = tx.items?.[0]?.inventoryItem
+                    return (
+                      <div key={tx.id} className="flex justify-between text-xs border-b border-white/5 py-1">
+                        <span className="text-slate-300">{index+1}. {firstItem?.code ?? tx.itemCode ?? 'N/A'}</span>
+                        <span className="text-red-300">
+                          {firstItem?.name ?? tx.itemName ?? ''}
+                          <span className="ml-2 text-slate-500">
+                            {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('vi-VN') : ''}
+                          </span>
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </InventoryChartCard>
+          </div>
+        </div>
+
+        {/* Cột phải: 3 chart cũ */}
+        <div className="space-y-1.5 self-start">
+          <InventoryChartCard title="Top 5 vị trí có tồn cao nhất" className="p-2">
+            <div className="space-y-2">
+              {stockByLocation.slice(0, 5).map(([code, value], index) => {
+                const percent = value / (stockByLocation[0]?.[1] || 1) * 100;
+                return (
+                  <div key={code}>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-300">#{index+1} {code}</span>
+                      <span className="text-cyan-300">{formatQuantity(value, 0)} tấn</span>
+                    </div>
+                    <div className="mt-1 h-2 rounded-full bg-slate-700">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400"
+                        style={{ width: `${Math.max(2, percent)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </InventoryChartCard>
+          <InventoryChartCard title="Top 5 vật tư tồn cao nhất" className="p-2">
+            <div className="space-y-2">
+              {topMaterials.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-4">Chưa có dữ liệu</div>
+              ) : (
+                topMaterials.map((item, index) => {
+                  const maxStock = topMaterials[0]?.stock || 1;
+                  const percent = (item.stock / maxStock) * 100;
+                  return (
+                    <div key={item.code}>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-300">#{index+1} {item.code}</span>
+                        <span className="text-cyan-300">{formatQuantity(item.stock, 0)} tấn</span>
+                      </div>
+                      <div className="mt-1 h-2 rounded-full bg-slate-700">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-400"
+                          style={{ width: `${Math.max(2, percent)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </InventoryChartCard>
+          {/* Cột phải: 1 chart mới - Hiệu suất sức chứa */}
+          <div className="space-y-1.5 self-start">
+            <InventoryChartCard title="Hiệu suất sức chứa" className="p-2">
+              <div className="space-y-2">
+                {rows.slice(0, 6).map((zone) => {
+                  const used = n(zone.totalStockQuantity);
+                  const capacity = n(zone.capacity);
+                  const percent = capacity > 0 ? (used / capacity) * 100 : 0;
+                  return (
+                    <div key={zone.id}>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-300">{zone.code}</span>
+                        <span className="text-cyan-300">
+                          {used.toLocaleString('vi-VN')} / {capacity.toLocaleString('vi-VN')} tấn
+                          <span className="ml-2 text-slate-500">({percent.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                      <div className="mt-1 h-2 rounded-full bg-slate-700">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                          style={{ width: `${Math.min(100, percent)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </InventoryChartCard>
+          </div>
         </div>
       </div>
     </div>
-
     {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
   </EnterpriseModulePage>
@@ -306,7 +733,7 @@ function AuditRow({ icon, label, value, note }: { icon: ReactNode; label: string
   return <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2 text-slate-300">{icon}{label}</span>
-      <b className="text-cyan-300">{value.toLocaleString('vi-VN')}</b>
+      <b className="text-cyan-300">{formatQuantity(value, 0)}</b>
     </div>
     <p className="mt-1 text-xs text-slate-500">{note}</p>
   </div>
@@ -332,7 +759,7 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
         <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inventoryInput} placeholder="Row, ví dụ A" />
         <input value={form.column} onChange={(e) => setForm({ ...form, column: e.target.value })} className={inventoryInput} placeholder="Slot, ví dụ 01" />
         <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} className={inventoryInput} placeholder="Tầng, ví dụ L1" />
-        <input value={form.capacity} onChange={(e) => setForm({ ...form, capacity: formatQuantityInput(e.target.value) })} className={inventoryInput} inputMode="decimal" placeholder="Sức chứa vận hành, ví dụ 100 tấn" />
+        <input value={form.capacity} onFocus={(e) => setForm({ ...form, capacity: formatQuantityInput(e.target.value) })} onBlur={(e) => setForm({ ...form, capacity: formatQuantity(e.target.value) })} onChange={(e) => setForm({ ...form, capacity: formatQuantityInput(e.target.value) })} className={inventoryInput} inputMode="decimal" placeholder="Sức chứa vận hành, ví dụ 100 tấn" />
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inventoryInput} h-24 py-2 md:col-span-2`} placeholder="Ghi chú vị trí" />
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Đang hoạt động</label>
       </div>
@@ -395,9 +822,9 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
 
           <SectionCard title="Thông tin sức chứa">
             <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
-              <InfoBox label="Sức chứa vận hành" value={`${capacity.toLocaleString('vi-VN')} tấn`} />
-              <InfoBox label="Đang sử dụng" value={`${usedQuantity.toLocaleString('vi-VN')} tấn`} />
-              <InfoBox label="Ô/tầng đã dùng" value={`${occupiedSlots.toLocaleString('vi-VN')} / ${TOTAL_CELL_LEVELS}`} />
+              <InfoBox label="Sức chứa vận hành" value={`${formatQuantity(capacity, 0)} tấn`} />
+              <InfoBox label="Đang sử dụng" value={`${formatQuantity(usedQuantity, 0)} tấn`} />
+              <InfoBox label="Ô/tầng đã dùng" value={`${formatQuantity(occupiedSlots, 0)} / ${TOTAL_CELL_LEVELS}`} />
               <InfoBox label="Tỷ lệ dùng" value={`${occupancy}%`} />
             </div>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-900">
@@ -446,7 +873,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
                       </td>
 
                       <td className="px-4 py-3 text-right font-semibold">
-                        {n(item.quantity).toLocaleString('vi-VN')}
+                        {formatQuantity(n(item.quantity), 0)}
                       </td>
 
                       <td className="px-4 py-3">
@@ -461,7 +888,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
           </SectionCard>
 
           <SectionCard title="Nhóm vật tư theo level">
-            <div className="space-y-3">
+            <div className="space-y-1.5 self-start">
               {levelGroups.map((group) => <div key={group.level} className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-sm font-semibold text-slate-100"><Layers3 size={15} className="text-cyan-300" />{group.level}</span>
@@ -470,7 +897,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
                 <div className="mt-3 space-y-2">
                   {group.items.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate text-slate-300">{item.code} · {item.name}</span>
-                    <span className="shrink-0 text-cyan-300">{n(item.quantity).toLocaleString('vi-VN')}</span>
+                    <span className="shrink-0 text-cyan-300">{formatQuantity(n(item.quantity), 0)}</span>
                   </div>)}
                 </div>
               </div>)}
@@ -571,7 +998,7 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
           {selectedCellMaterials.length ? selectedCellMaterials.map((item) => <div key={item.id} className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-xs">
             <div className="font-semibold text-cyan-300">{item.code}</div>
             <div className="mt-1 text-slate-200">{item.name}</div>
-            <div className="mt-1 text-slate-500">Tầng {item.level ?? 'L1'} · {n(item.quantity).toLocaleString('vi-VN')} {item.unitMaster?.symbol ?? item.unit ?? ''}</div>
+            <div className="mt-1 text-slate-500">Tầng {item.level ?? 'L1'} · {formatQuantity(n(item.quantity), 0)} {item.unitMaster?.symbol ?? item.unit ?? ''}</div>
           </div>) : <p className="text-sm text-slate-500">Ô này đang trống hoặc chưa có vật tư gán.</p>}
         </div>
       </div>
@@ -653,8 +1080,8 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
         <InfoBox label="Zone" value={detail.code} />
         <InfoBox label="Ô (Slot)" value={selectedCell} />
         <InfoBox label="Tầng đang nổi bật" value={selectedLevel} />
-        <InfoBox label="Sức chứa tối đa" value={`${n(detail.capacity).toLocaleString('vi-VN')} tấn`} />
-        <InfoBox label="Đang sử dụng" value={`${usedQuantity.toLocaleString('vi-VN')} tấn`} />
+        <InfoBox label="Sức chứa tối đa" value={`${formatQuantity(n(detail.capacity), 0)} tấn`} />
+        <InfoBox label="Đang sử dụng" value={`${formatQuantity(usedQuantity, 0)} tấn`} />
       </div>
     </div>
 
@@ -708,7 +1135,7 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
         <div className="mt-2 space-y-2">
           {selectedLevelItems.length ? selectedLevelItems.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-900/55 px-3 py-2 text-sm">
             <span className="truncate text-slate-200">{item.code} · {item.name}</span>
-            <span className="shrink-0 text-cyan-300">{n(item.quantity).toLocaleString('vi-VN')} {item.unitMaster?.symbol ?? item.unit ?? ''}</span>
+            <span className="shrink-0 text-cyan-300">{formatQuantity(n(item.quantity), 0)} {item.unitMaster?.symbol ?? item.unit ?? ''}</span>
           </div>) : <p className="text-sm text-slate-500">Tầng này chưa có vật tư.</p>}
         </div>
       </div>

@@ -6,7 +6,8 @@ import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { useCreateTransaction } from '../../hooks/useCreateTransaction'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { nextLocalCode } from '@/shared/utils/code-format'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function InventoryAdjustmentsPage() {
   const { data: materials = [] } =
@@ -29,12 +30,7 @@ export function InventoryAdjustmentsPage() {
   const [createdBy, setCreatedBy] =
     useState('Warehouse Operator')
   const [adjustmentNo, setAdjustmentNo] =
-    useState(
-      `ADJ-${new Date()
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`,
-    )
+    useState(nextLocalCode('DC'))
   const [dateFilter, setDateFilter] =
     useState(
       new Date()
@@ -78,12 +74,7 @@ export function InventoryAdjustmentsPage() {
 
     setQuantityDifference('')
     setReason('')
-    setAdjustmentNo(
-      `ADJ-${new Date()
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`,
-    )
+    setAdjustmentNo(nextLocalCode('DC'))
   }
 
   const filteredAdjustments =
@@ -398,6 +389,16 @@ export function InventoryAdjustmentsPage() {
             <input
               value={
                 quantityDifference
+              }
+              onFocus={(event) =>
+                setQuantityDifference(
+                  formatQuantityInput(event.target.value),
+                )
+              }
+              onBlur={(event) =>
+                setQuantityDifference(
+                  formatQuantity(event.target.value),
+                )
               }
               onChange={(event) =>
                 setQuantityDifference(

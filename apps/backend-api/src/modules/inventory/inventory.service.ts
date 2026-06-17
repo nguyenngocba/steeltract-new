@@ -5,6 +5,7 @@ import { PrismaService } from '../../core/prisma/prisma.service'
 import { RuntimeGateway } from '../../core/ws/runtime.gateway'
 import { EventStoreService } from '../../core/events/event-store.service'
 import { TelemetryService } from '../../core/telemetry/telemetry.service'
+import { nextOperationalCode } from '../../common/utils/code-generator'
 import { InventoryRepository } from './inventory.repository'
 
 type NormalizedInventoryLine = {
@@ -586,6 +587,8 @@ export class InventoryService {
         minimumStock: item.minimumStock ?? 0,
         unit:
           item.unit ?? item.unitMaster?.code ?? 'PCS',
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
         zoneId: item.zoneId,
         slotId: item.slotId,
         level: item.level,
@@ -626,6 +629,7 @@ export class InventoryService {
       code: payload.code,
       name: payload.name,
       description: payload.description,
+      createdAt: new Date(),
       minimumStock:
         payload.minimumStock ?? 0,
       materialUsageType:
@@ -938,16 +942,21 @@ export class InventoryService {
           }
         }
 
-        const timestamp = Date.now()
+        const generatedNo = await nextOperationalCode(
+          this.prisma,
+          'inventoryTransaction',
+          'transactionNo',
+          inventoryCodePrefix(type),
+        )
         const transaction =
           await this.inventoryRepository.createTransaction(
             {
               code:
                 payload.code ??
-                `TX-${timestamp}`,
+                generatedNo,
               transactionNo:
                 payload.transactionNo ??
-                `INV-${timestamp}`,
+                generatedNo,
               type,
               direction,
               note: payload.note,
@@ -1085,7 +1094,7 @@ export class InventoryService {
         }
 
         this.eventStore.append({
-          id: `${timestamp}`,
+          id: transaction.id,
           type:
             'inventory.transaction.created',
           payload: realtimeEvent,
@@ -1443,4 +1452,12 @@ export class InventoryService {
       | 'ADJUSTMENT'
     >
   }
+}
+
+function inventoryCodePrefix(type: TransactionType) {
+  if (type === TransactionType.IMPORT) return 'NK'
+  if (type === TransactionType.EXPORT) return 'XK'
+  if (type === TransactionType.TRANSFER) return 'DC'
+  if (type === TransactionType.ADJUSTMENT) return 'KK'
+  return 'INV'
 }

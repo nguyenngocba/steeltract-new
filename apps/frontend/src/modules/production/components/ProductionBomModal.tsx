@@ -7,6 +7,7 @@ import { useInventoryTransactions } from '../../inventory/hooks/useInventoryTran
 import { useProjects } from '../../inventory/hooks/useProjects'
 import type { ProductionComponent } from '../api/production.api'
 import { useCreateProductionBom, useProductionIssues } from '../hooks/useProductionCockpit'
+import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const inputClass = 'mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-xs text-slate-100 outline-none focus:border-cyan-600'
@@ -201,9 +202,8 @@ export function ProductionBomModal({
     }
 
     try {
-      const stamp = Date.now().toString().slice(-6)
       await create.mutateAsync({
-        bomNo: `BOM-${component.code}-${stamp}`,
+        bomNo: nextLocalCode('BOM'),
         productCode: component.code,
         productName: component.name,
         structureType: structureType || undefined,
@@ -254,7 +254,7 @@ export function ProductionBomModal({
               </select>
             </label>
             <label className="text-xs text-slate-400">Loại cấu kiện<input value={structureType} onChange={(event) => setStructureType(event.target.value)} className={inputClass} placeholder="Dầm, cột, bản mã..." /></label>
-            <label className="text-xs text-slate-400">Khối lượng ước tính (kg)<input value={estimatedWeight} onChange={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} inputMode="decimal" className={inputClass} /></label>
+            <label className="text-xs text-slate-400">Khối lượng ước tính (kg)<input value={estimatedWeight} onFocus={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} onBlur={(event) => setEstimatedWeight(formatQuantity(event.target.value))} onChange={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} inputMode="decimal" className={inputClass} /></label>
             <label className="text-xs text-slate-400">Đơn vị<input value={unit} onChange={(event) => setUnit(event.target.value)} className={inputClass} /></label>
             <label className="text-xs text-slate-400">Phiên bản<input value={version} onChange={(event) => setVersion(event.target.value)} className={inputClass} /></label>
             <div className="rounded border border-slate-800 bg-slate-950 p-3 text-xs">
@@ -295,8 +295,8 @@ export function ProductionBomModal({
                       <option value="CONSUMABLE">Tiêu hao ({productionMaterialsByCategory.CONSUMABLE.length})</option>
                     </select>
                   </td>
-                  <td className="pr-2"><input value={item.quantity} onChange={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
-                  <td className="pr-2"><input value={item.wastePercent} onChange={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
+                  <td className="pr-2"><input value={item.quantity} onFocus={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { quantity: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
+                  <td className="pr-2"><input value={item.wastePercent} onFocus={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { wastePercent: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
                   <td className={`pt-2 ${isOverStock ? 'text-red-300' : 'text-emerald-300'}`}>
                     {item.materialId ? `${formatQuantity(requiredTotal)} / ${formatQuantity(available)}` : '-'}
                   </td>
@@ -316,7 +316,7 @@ export function ProductionBomModal({
               <div className="flex items-center justify-center text-xs text-cyan-300">{index + 1}</div>
               <input value={item.stepName} onChange={(event) => updateRouting(index, { stepName: event.target.value })} className={inputClass} placeholder="Tên công đoạn" />
               <input value={item.workshop} onChange={(event) => updateRouting(index, { workshop: event.target.value })} className={inputClass} placeholder="Xưởng" />
-              <input value={item.expectedHours} onChange={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} />
+              <input value={item.expectedHours} onFocus={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} onBlur={(event) => updateRouting(index, { expectedHours: formatQuantity(event.target.value) })} onChange={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} />
               <label className="flex items-center gap-2 pt-2 text-xs text-slate-300"><input checked={item.qcRequired} onChange={(event) => updateRouting(index, { qcRequired: event.target.checked })} type="checkbox" /> QC</label>
               <button onClick={() => setRouting((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa công đoạn" className="pt-2 text-red-300"><Trash2 size={15} /></button>
             </div>)}</div>

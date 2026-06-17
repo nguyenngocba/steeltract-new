@@ -3,22 +3,20 @@ import { Activity, Boxes, Construction, MapPinned, Radio, Search, Truck, Warehou
 
 import { useComponents } from '@/modules/components/hooks/queries/useComponents'
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { ModuleAnalyticsPanel, ModuleFilterBar, ModuleKpiCard, ModuleKpiStrip, ModulePageHeader, moduleInput, moduleMutedButton, modulePanel, modulePrimaryButton, type ModuleTone } from '@/shared/ui/modules'
 import { YardTabWorkspace } from '../components/YardTabWorkspace'
 import { YardZoneDetailDialog } from '../components/YardZoneDetailDialog'
 import { yardTabs, type YardTab } from '../config/yard-tabs'
 import { YardOperationDialog, type YardOperationMode } from '../dialogs/YardOperationDialog'
 import { useCreateYardSlot, useCreateYardZone, useDeleteYardZone, useUpdateYardZone, useYardCranesRuntime, useYardMetricsRuntime, useYardMovementsRuntime, useYardSlotsRuntime, useYardZonesRuntime } from '../hooks/queries/useYardRuntime'
 import type { YardZoneRuntime } from '../services/api/yard.api'
+import { formatQuantity } from '@/shared/utils/number-format'
 
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
-const panel =
-  'rounded-2xl border border-white/10 bg-slate-950/45 shadow-[0_22px_70px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-2xl'
-const input =
-  'h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
-const mutedButton =
-  'rounded-xl border border-white/10 bg-white/[0.055] px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40'
-const primaryButton =
-  'rounded-xl border border-blue-400/30 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500'
+const fmt = (value = 0) => formatQuantity(value, 2)
+const panel = modulePanel
+const input = moduleInput
+const mutedButton = moduleMutedButton
+const primaryButton = modulePrimaryButton
 
 function YardKpiCard({
   icon: Icon,
@@ -33,26 +31,7 @@ function YardKpiCard({
   note: string
   tone?: 'cyan' | 'emerald' | 'amber' | 'red' | 'purple' | 'blue'
 }) {
-  const toneClass = {
-    cyan: 'from-cyan-500 to-blue-400 text-cyan-300',
-    emerald: 'from-emerald-500 to-teal-400 text-emerald-300',
-    amber: 'from-amber-500 to-orange-400 text-amber-300',
-    red: 'from-red-500 to-rose-400 text-red-300',
-    purple: 'from-purple-500 to-indigo-400 text-purple-300',
-    blue: 'from-blue-500 to-sky-400 text-blue-300',
-  }[tone]
-
-  return (
-    <section className={`${panel} min-h-[104px] p-3`}>
-      <div className="flex items-start justify-between">
-        <Icon size={17} className={toneClass.split(' ').at(-1)} />
-        <span className="text-[9px] text-emerald-400">{note}</span>
-      </div>
-      <div className={`mt-3 h-1 w-14 rounded-full bg-gradient-to-r ${toneClass}`} />
-      <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400">{label}</div>
-      <div className="mt-1 text-xl font-semibold tracking-tight text-white">{value}</div>
-    </section>
-  )
+  return <ModuleKpiCard icon={<Icon size={17} />} title={label} value={String(value)} note={note} tone={tone as ModuleTone} className="min-h-[104px]" />
 }
 
 function YardDonut({
@@ -89,7 +68,7 @@ function YardDonut({
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
               <span className="truncate">{item.label}</span>
             </span>
-            <span className="whitespace-nowrap text-slate-300">{item.value.toLocaleString('vi-VN')}</span>
+            <span className="whitespace-nowrap text-slate-300">{formatQuantity(item.value, 0)}</span>
           </div>
         ))}
       </div>
@@ -278,26 +257,31 @@ export function YardPage() {
 
   return <OperationalShell><main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
     <div className="mx-auto max-w-[1800px]">
-    <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Steeltrack yard</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">Bãi tập kết</h1><p className="mt-1 text-xs text-slate-400">QC hoàn thành → nhập bãi → lưu vị trí → điều chuyển → xuất bãi</p></div>
-      <div className="flex flex-wrap justify-end gap-2"><button onClick={openCreateZone} className={mutedButton}>+ Zone</button><button onClick={() => openCreateSlot()} className={mutedButton}>+ Slot</button><button onClick={() => setOperation('inbound')} className={primaryButton}>+ Nhập bãi</button><button onClick={() => setOperation('outbound')} className={mutedButton}>Xuất bãi</button><button onClick={() => setOperation('transfer')} className={mutedButton}>+ Chuyển nội bộ</button></div>
-    </header>
+    <ModulePageHeader
+      eyebrow="Steeltrack yard"
+      title="Bãi tập kết"
+      description="QC hoàn thành → nhập bãi → lưu vị trí → điều chuyển → xuất bãi"
+      action={<>
+        <button onClick={openCreateZone} className={mutedButton}>+ Zone</button>
+        <button onClick={() => openCreateSlot()} className={mutedButton}>+ Slot</button>
+        <button onClick={() => setOperation('inbound')} className={primaryButton}>+ Nhập bãi</button>
+        <button onClick={() => setOperation('outbound')} className={mutedButton}>Xuất bãi</button>
+        <button onClick={() => setOperation('transfer')} className={mutedButton}>+ Chuyển nội bộ</button>
+      </>}
+    />
     <nav className="mb-3 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl"><div className="flex min-w-max gap-1">{yardTabs.map(([id, label]) => <button key={id} onClick={() => selectTab(id)} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition ${tab === id ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/30' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>{label}</button>)}</div></nav>
-    <section className="grid gap-3 md:grid-cols-5">{stat.map(([Icon, label, value, note, tone]) => <YardKpiCard key={label} icon={Icon} label={label} value={value} note={note} tone={tone as 'cyan' | 'emerald' | 'amber' | 'red' | 'purple' | 'blue'} />)}</section>
-    <section className={`${panel} my-3 flex flex-wrap items-center gap-2 p-3`}><div className="flex min-w-72 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2"><Search size={15} className="text-cyan-400"/><input className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" placeholder="Tìm vị trí, cấu kiện, zone..."/></div><button className={mutedButton}>Tất cả zone</button><button className={mutedButton}>Tất cả trạng thái</button><button className={mutedButton}>Lớp hiển thị</button><button className={mutedButton}>Làm mới</button></section>
+    <ModuleKpiStrip className="md:grid-cols-5">{stat.map(([Icon, label, value, note, tone]) => <YardKpiCard key={label} icon={Icon} label={label} value={value} note={note} tone={tone as 'cyan' | 'emerald' | 'amber' | 'red' | 'purple' | 'blue'} />)}</ModuleKpiStrip>
+    <ModuleFilterBar className="my-3"><div className="flex min-w-72 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-5"><Search size={15} className="text-cyan-400"/><input className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" placeholder="Tìm vị trí, cấu kiện, zone..."/></div><button className={`${mutedButton} xl:col-span-1`}>Tất cả zone</button><button className={`${mutedButton} xl:col-span-1`}>Tất cả trạng thái</button><button className={`${mutedButton} xl:col-span-1`}>Lớp hiển thị</button><button className={`${mutedButton} xl:col-span-1`}>Làm mới</button></ModuleFilterBar>
     <section className="mb-3 grid gap-3 xl:grid-cols-[1fr_360px_360px]">
-      <div className={panel}>
-        <div className="px-4 pt-3 text-xs font-bold uppercase tracking-[0.12em] text-white">Sức chứa bãi</div>
-        <div className="p-3"><YardDonut centerValue={`${metrics?.occupancyRate ?? 0}%`} centerLabel="Occupancy" segments={slotSegments} /></div>
-      </div>
-      <div className={panel}>
-        <div className="px-4 pt-3 text-xs font-bold uppercase tracking-[0.12em] text-white">Luồng vận hành</div>
-        <div className="p-3"><YardDonut centerValue={movements.length.toLocaleString('vi-VN')} centerLabel="giao dịch" segments={movementSegments} /></div>
-      </div>
-      <div className={panel}>
-        <div className="flex items-center justify-between px-4 pt-3"><div className="text-xs font-bold uppercase tracking-[0.12em] text-white">Biến động bãi</div><span className="text-[11px] text-slate-500">Tháng này</span></div>
-        <div className="p-3"><YardMiniTrend values={[12, 18, 15, 26, 24, 31, 28, 35, 42, 38, 45, 52]} tone="emerald" /></div>
-      </div>
+      <ModuleAnalyticsPanel title="Sức chứa bãi">
+        <YardDonut centerValue={`${metrics?.occupancyRate ?? 0}%`} centerLabel="Occupancy" segments={slotSegments} />
+      </ModuleAnalyticsPanel>
+      <ModuleAnalyticsPanel title="Luồng vận hành">
+        <YardDonut centerValue={formatQuantity(movements.length, 0)} centerLabel="giao dịch" segments={movementSegments} />
+      </ModuleAnalyticsPanel>
+      <ModuleAnalyticsPanel title="Biến động bãi" action={<span className="text-[11px] text-slate-500">Tháng này</span>}>
+        <YardMiniTrend values={[12, 18, 15, 26, 24, 31, 28, 35, 42, 38, 45, 52]} tone="emerald" />
+      </ModuleAnalyticsPanel>
     </section>
     <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
       <section className="space-y-3">

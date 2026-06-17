@@ -8,7 +8,7 @@ import {
   useCreateOutbound,
 } from '../../hooks/mutations/useCreateOutbound'
 import { useProjects } from '../../hooks/useProjects'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function OutboundWizard() {
 
@@ -167,6 +167,16 @@ export function OutboundWizard() {
 
         <input
           value={quantity}
+          onFocus={(e) =>
+            setQuantity(
+              formatQuantityInput(e.target.value),
+            )
+          }
+          onBlur={(e) =>
+            setQuantity(
+              formatQuantity(e.target.value),
+            )
+          }
           onChange={(e) =>
             setQuantity(
               formatQuantityInput(e.target.value),

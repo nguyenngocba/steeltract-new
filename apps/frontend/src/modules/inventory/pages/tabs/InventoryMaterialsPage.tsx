@@ -1,17 +1,16 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
 import { MaterialDrawer } from '../../components/material-table/MaterialDrawer'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
-  InventoryPagination,
   InventoryPanel,
-  inventoryGridGap,
-  inventoryPageStack,
   inventoryTableHead,
   inventoryTableRow,
   inventoryTableShell,
+  inventoryMutedButton,
 } from '../../components/InventoryVisuals'
 import { useDeleteMaterial } from '../../hooks/useDeleteMaterial'
 import { useCategories } from '../../hooks/useCategories'
@@ -19,6 +18,7 @@ import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 15
 const CHART_PAGE_SIZE = 6
@@ -31,7 +31,7 @@ function num(value: any) {
 }
 
 function money(value: number) {
-  return value.toLocaleString('vi-VN') + ' đ'
+  return formatCurrencyVnd(value)
 }
 
 function materialUsageLabel(value: string | undefined) {
@@ -84,6 +84,33 @@ function transactionAmount(tx: any) {
     return items.reduce((sum: number, line: any) => sum + Math.abs(num(line.totalAmount ?? num(line.quantity) * num(line.unitPrice))), 0)
   }
   return Math.abs(num(tx.totalAmount))
+}
+
+function transactionItemRows(tx: any) {
+  const items = Array.isArray(tx.items) ? tx.items : []
+  return items.map((line: any) => ({
+    inventoryItemId: String(line.inventoryItemId ?? line.inventoryItem?.id ?? ''),
+    quantity: num(line.quantity),
+    transactionDate: tx.transactionDate ?? tx.createdAt,
+  })).filter((line: any) => line.inventoryItemId)
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthEnd(date: Date, now = new Date()) {
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
+  return end > now ? now : end
+}
+
+function formatPercentDelta(current: number, previous: number) {
+  if (!previous) {
+    if (!current) return '+ 0% so với tháng trước'
+    return '+ mới so với tháng trước'
+  }
+  const value = ((current - previous) / Math.abs(previous)) * 100
+  return `${value >= 0 ? '+' : ''} ${value.toFixed(1)}% so với tháng trước`
 }
 
 function locationLabel(location: any) {
@@ -164,21 +191,76 @@ function ChartCard({
   )
 }
 
-function CompactKpi({ title, value, note, tone = 'cyan' }: { title: string; value: string; note?: string; tone?: string }) {
-  const toneClass: Record<string, string> = {
-    blue: 'from-blue-500 to-cyan-400',
-    emerald: 'from-emerald-500 to-teal-400',
-    cyan: 'from-cyan-500 to-sky-400',
-    amber: 'from-amber-500 to-orange-400',
-    red: 'from-red-500 to-rose-400',
+function InventoryMetricCard({
+  title,
+  value,
+  note,
+  tone = 'blue',
+  icon,
+  trend,
+  active,
+  onClick,
+}: {
+  title: string
+  value: string
+  note?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red'
+  icon: ReactNode
+  trend: number[]
+  active?: boolean
+  onClick?: () => void
+}) {
+  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
+    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
+    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
+    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
+    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
+    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
   }
+  const item = color[tone]
+  const content = (
+    <>
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
+          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
+          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
+        </div>
+        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
+          {icon}
+        </div>
+      </div>
+      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
+    </>
+  )
+
+  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
+    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
+  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
+
+  if (onClick) {
+    return <button type="button" onClick={onClick} className={className}>{content}</button>
+  }
+
+  return <section className={className}>{content}</section>
+}
+
+function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
+  const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
+  const min = Math.min(...rows)
+  const max = Math.max(...rows)
+  const range = Math.max(1, max - min)
+  const points = rows.map((value, index) => {
+    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+    const y = 34 - ((value - min) / range) * 24 - 5
+    return `${x},${y}`
+  }).join(' ')
+
   return (
-    <section className="rounded-xl border border-white/10 bg-slate-950/45 p-2.5 shadow-[0_14px_44px_rgba(0,0,0,0.18)]">
-      <div className={`mb-1 h-0.5 w-10 rounded-full bg-gradient-to-r ${toneClass[tone] ?? toneClass.cyan}`} />
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-      <div className="mt-0.5 truncate text-base font-semibold text-white">{value}</div>
-      {note ? <div className="mt-0.5 truncate text-[11px] text-slate-500">{note}</div> : null}
-    </section>
+    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
+      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
+      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+    </svg>
   )
 }
 
@@ -210,7 +292,7 @@ function CompactDonut({ segments, centerValue, centerLabel }: { segments: Array<
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="truncate">{item.label}</span>
               </span>
-              <span className="text-slate-300">{item.value.toLocaleString('vi-VN')} ({percent.toFixed(1)}%)</span>
+              <span className="text-slate-300">{formatQuantity(item.value, 0)} ({percent.toFixed(1)}%)</span>
             </div>
           )
         })}
@@ -424,6 +506,94 @@ export function InventoryMaterialsPage() {
     })
   }, [transactions, kpis.totalValue])
 
+  const kpiTrend = useMemo(() => {
+    const txRows = transactionRows(transactions)
+    const now = new Date()
+    const months = Array.from({ length: 6 }).map((_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
+      return {
+        key: monthKey(date),
+        end: monthEnd(date, now),
+      }
+    })
+    const selectedIds = new Set(filteredRows.map((row: any) => String(row.materialId ?? row.inventoryItemId ?? row.id)))
+    const movements = txRows.flatMap((tx: any) => {
+      const txDate = new Date(tx.transactionDate ?? tx.createdAt ?? 0)
+      return transactionItemRows(tx)
+        .filter((line: any) => selectedIds.has(line.inventoryItemId))
+        .map((line: any) => ({
+          ...line,
+          transactionDate: txDate,
+        }))
+    })
+    const stockAt = (row: any, endDate: Date) => {
+      const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
+      const afterEnd = movements
+        .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > endDate)
+        .reduce((sum: number, line: any) => sum + num(line.quantity), 0)
+      return num(row.currentStock) - afterEnd
+    }
+    const snapshots = months.map(({ end }) => {
+      let quantity = 0
+      let value = 0
+      let codes = 0
+      let low = 0
+      let out = 0
+
+      filteredRows.forEach((row: any) => {
+        const createdAt = row.createdAt ? new Date(row.createdAt) : null
+        const existed = !createdAt || createdAt <= end
+        if (!existed) return
+
+        codes += 1
+        const stock = stockAt(row, end)
+        const averageCost = num(row.averageCost)
+        const minimumStock = num(row.minimumStock || 5)
+        quantity += stock
+        value += stock * averageCost
+        if (stock <= 0) out += 1
+        else if (stock <= minimumStock || stock <= 5) low += 1
+      })
+
+      return {
+        value: Math.max(0, value),
+        quantity: Math.max(0, quantity),
+        codes,
+        low,
+        out,
+      }
+    })
+
+    return {
+      value: snapshots.map((row) => row.value),
+      quantity: snapshots.map((row) => row.quantity),
+      codes: snapshots.map((row) => row.codes),
+      low: snapshots.map((row) => row.low),
+      out: snapshots.map((row) => row.out),
+      newCodesThisMonth: filteredRows.filter((row: any) => {
+        if (!row.createdAt) return false
+        return monthKey(new Date(row.createdAt)) === monthKey(now)
+      }).length,
+      newCodesPreviousMonth: filteredRows.filter((row: any) => {
+        if (!row.createdAt) return false
+        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        return monthKey(new Date(row.createdAt)) === monthKey(previousMonth)
+      }).length,
+    }
+  }, [transactions, filteredRows])
+
+  const kpiDeltas = useMemo(() => {
+    const delta = (values: number[]) => formatPercentDelta(values.at(-1) ?? 0, values.at(-2) ?? 0)
+    const newCodeDelta = formatPercentDelta(kpiTrend.newCodesThisMonth, kpiTrend.newCodesPreviousMonth)
+    return {
+      value: delta(kpiTrend.value),
+      quantity: delta(kpiTrend.quantity),
+      codes: `+ ${formatQuantity(kpiTrend.newCodesThisMonth, 0)} mã mới · ${newCodeDelta}`,
+      low: delta(kpiTrend.low),
+      out: delta(kpiTrend.out),
+    }
+  }, [kpiTrend])
+
   const quickStats = useMemo(() => {
     const txRows = transactionRows(transactions)
     const today = new Date().toISOString().slice(0, 10)
@@ -432,10 +602,10 @@ export function InventoryMaterialsPage() {
     const byTypeMonth = (type: string) => txRows.filter((tx: any) => String(tx.type ?? '').toUpperCase() === type && transactionDateKey(tx, 7) === month)
     const sumQty = (list: any[]) => list.reduce((sum, tx) => sum + transactionQuantity(tx), 0)
     return [
-      { title: 'Nhập kho hôm nay', value: `${sumQty(byTypeToday('INBOUND')).toLocaleString('vi-VN')} tấn`, note: `${byTypeToday('INBOUND').length} phiếu`, tone: 'text-cyan-300' },
-      { title: 'Xuất kho hôm nay', value: `${sumQty(byTypeToday('OUTBOUND')).toLocaleString('vi-VN')} tấn`, note: `${byTypeToday('OUTBOUND').length} phiếu`, tone: 'text-red-300' },
-      { title: 'Điều chuyển hôm nay', value: `${sumQty(byTypeToday('TRANSFER')).toLocaleString('vi-VN')} tấn`, note: `${byTypeToday('TRANSFER').length} phiếu`, tone: 'text-blue-300' },
-      { title: 'Kiểm kê tháng này', value: `${sumQty(byTypeMonth('ADJUSTMENT')).toLocaleString('vi-VN')} tấn`, note: 'Hoàn thành', tone: 'text-emerald-300' },
+      { title: 'Nhập kho hôm nay', value: `${formatQuantity(sumQty(byTypeToday('INBOUND')), 0)} tấn`, note: `${byTypeToday('INBOUND').length} phiếu`, tone: 'text-cyan-300' },
+      { title: 'Xuất kho hôm nay', value: `${formatQuantity(sumQty(byTypeToday('OUTBOUND')), 0)} tấn`, note: `${byTypeToday('OUTBOUND').length} phiếu`, tone: 'text-red-300' },
+      { title: 'Điều chuyển hôm nay', value: `${formatQuantity(sumQty(byTypeToday('TRANSFER')), 0)} tấn`, note: `${byTypeToday('TRANSFER').length} phiếu`, tone: 'text-blue-300' },
+      { title: 'Kiểm kê tháng này', value: `${formatQuantity(sumQty(byTypeMonth('ADJUSTMENT')), 0)} tấn`, note: 'Hoàn thành', tone: 'text-emerald-300' },
       { title: 'Chênh lệch tồn kho', value: `${kpis.totalCodes ? (((kpis.low + kpis.out) / kpis.totalCodes) * -100).toFixed(2) : '0.00'}%`, note: 'Theo cảnh báo tồn', tone: 'text-amber-300' },
     ]
   }, [transactions, kpis.low, kpis.out, kpis.totalCodes])
@@ -482,12 +652,53 @@ export function InventoryMaterialsPage() {
       <InventoryTabWorkspace />
 
       <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-1">
-          <CompactKpi title="Tổng giá trị tồn kho" value={money(kpis.totalValue)} note="Theo giá bình quân" tone="blue" />
-          <CompactKpi title="Tổng khối lượng" value={kpis.totalQty.toLocaleString('vi-VN')} note="Tồn hiện hành" tone="emerald" />
-          <CompactKpi title="Mã vật tư" value={kpis.totalCodes.toLocaleString('vi-VN')} note="Đang theo dõi" tone="cyan" />
-          <CompactKpi title="Vật tư sắp hết" value={kpis.low.toLocaleString('vi-VN')} note="Cần bổ sung" tone="amber" />
-          <CompactKpi title="Vật tư hết hàng" value={kpis.out.toLocaleString('vi-VN')} note="Rủi ro cao" tone="red" />
+        <div className="grid grid-cols-1 gap-1.5 md:grid-cols-5">
+          <InventoryMetricCard
+            title="Tổng giá trị tồn kho"
+            value={money(kpis.totalValue)}
+            note={kpiDeltas.value}
+            tone="blue"
+            icon={<CircleDollarSign size={15} />}
+            trend={kpiTrend.value}
+          />
+          <InventoryMetricCard
+            title="Tổng khối lượng"
+            value={`${formatQuantity(kpis.totalQty, 0)} tấn`}
+            note={kpiDeltas.quantity}
+            tone="cyan"
+            icon={<RefreshCw size={15} />}
+            trend={kpiTrend.quantity}
+          />
+          <InventoryMetricCard
+            title="Mã vật tư"
+            value={formatQuantity(kpis.totalCodes, 0)}
+            note={kpiDeltas.codes}
+            tone="emerald"
+            icon={<PackageCheck size={15} />}
+            trend={kpiTrend.codes}
+            active={!statusFilter}
+            onClick={() => { setStatusFilter(''); setPage(1) }}
+          />
+          <InventoryMetricCard
+            title="Vật tư sắp hết hàng"
+            value={formatQuantity(kpis.low, 0)}
+            note={kpiDeltas.low}
+            tone="amber"
+            icon={<TriangleAlert size={15} />}
+            trend={kpiTrend.low}
+            active={statusFilter === 'LOW'}
+            onClick={() => { setStatusFilter('LOW'); setPage(1) }}
+          />
+          <InventoryMetricCard
+            title="Vật tư hết hàng"
+            value={formatQuantity(kpis.out, 0)}
+            note={kpiDeltas.out}
+            tone="red"
+            icon={<ShieldX size={15} />}
+            trend={kpiTrend.out}
+            active={statusFilter === 'OUT'}
+            onClick={() => { setStatusFilter('OUT'); setPage(1) }}
+          />
         </div>
 
         <InventoryPanel className="rounded-xl">
@@ -572,14 +783,14 @@ export function InventoryMaterialsPage() {
           </div>
         </InventoryPanel>
 
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-            <InventoryPanel className="xl:col-span-8 p-0">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
+            <InventoryPanel className="xl:col-span-8 p-0 pb-0">
               <div className="mb-1 flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách tồn kho</h3>
                 <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
               </div>
               {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
-              <div className={`${inventoryTableShell} h-[525px] overflow-auto`}>
+              <div className={`${inventoryTableShell} h-[520px] overflow-auto`}>
                 <table className="w-full min-w-[980px] text-xs">
                   <thead className={inventoryTableHead}>
                     <tr>
@@ -601,7 +812,7 @@ export function InventoryMaterialsPage() {
                         <td className="max-w-[180px] truncate px-1.5 py-1 text-white">{item.materialName}</td>
                         <td className="max-w-[150px] truncate px-1.5 py-1 text-slate-300">{item.materialType ?? '-'}</td>
                         <td className="px-1.5 py-1 text-slate-300">{item.unit ?? '-'}</td>
-                        <td className="px-1.5 py-1 text-right text-slate-200">{Number(item.currentStock ?? 0).toLocaleString('vi-VN')}</td>
+                        <td className="px-1.5 py-1 text-right text-slate-200">{formatQuantity(Number(item.currentStock ?? 0), 0)}</td>
                         <td className="px-1.5 py-1 text-right text-slate-300">{money(Number(item.averageCost ?? 0))}</td>
                         <td className="px-1.5 py-1 text-right font-medium text-cyan-300">{money(Number(item.inventoryValue ?? 0))}</td>
                         <td className="px-1.5 py-1">
@@ -619,14 +830,14 @@ export function InventoryMaterialsPage() {
                   </tbody>
                 </table>
               </div>
-              <InventoryPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+              <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </InventoryPanel>
 
             <div className="space-y-1 xl:col-span-4">
               <ChartCard title="Phân bố tồn kho theo kho" note="Đơn vị: tấn" page={pagedZoneDistribution.page} pageCount={pagedZoneDistribution.pageCount} onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))} onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}>
                 <CompactDonut
                   segments={pagedZoneSegments}
-                  centerValue={kpis.totalQty.toLocaleString('vi-VN')}
+                  centerValue={formatQuantity(kpis.totalQty, 0)}
                   centerLabel="tấn"
                 />
               </ChartCard>
@@ -640,7 +851,7 @@ export function InventoryMaterialsPage() {
                   {pagedAlerts.rows.map((row: any) => (
                     <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
                       <span className={row.level === 'Hết hàng' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
-                      <span className="text-slate-400">Tồn còn: {row.stock.toLocaleString('vi-VN')}</span>
+                      <span className="text-slate-400">Tồn còn: {formatQuantity(row.stock, 0)}</span>
                       <span className={`rounded px-2 py-0.5 ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
                     </div>
                   ))}
@@ -690,7 +901,7 @@ export function InventoryMaterialsPage() {
                       <td className="px-3 py-2 text-cyan-300">{item.materialCode}</td>
                       <td className="px-3 py-2 text-white">{item.materialName}</td>
                       <td className="px-3 py-2 text-slate-300">{materialUsageLabel(item.materialUsageType)}</td>
-                      <td className="px-3 py-2 text-slate-200">{Number(item.currentStock ?? 0).toLocaleString('vi-VN')}</td>
+                      <td className="px-3 py-2 text-slate-200">{formatQuantity(Number(item.currentStock ?? 0), 0)}</td>
                       <td className="px-3 py-2 text-cyan-300">{money(Number(item.inventoryValue ?? 0))}</td>
                       <td className="px-3 py-2 text-slate-300">{displayLocation(item)}</td>
                       <td className="px-3 py-2">
@@ -713,7 +924,7 @@ export function InventoryMaterialsPage() {
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <div>
                 <h3 className="text-lg font-semibold text-white">Tất cả cảnh báo tồn kho</h3>
-                <p className="mt-1 text-xs text-slate-500">{alerts.length.toLocaleString('vi-VN')} cảnh báo theo bộ lọc hiện tại</p>
+                <p className="mt-1 text-xs text-slate-500">{formatQuantity(alerts.length, 0)} cảnh báo theo bộ lọc hiện tại</p>
               </div>
               <button onClick={() => setShowAllAlerts(false)} className="rounded border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-300 hover:text-white">Đóng</button>
             </div>
@@ -737,8 +948,8 @@ export function InventoryMaterialsPage() {
                         <td className="px-3 py-2 text-cyan-300">{row.materialCode}</td>
                         <td className="px-3 py-2">{row.materialName}</td>
                         <td className="px-3 py-2 text-slate-400">{row.category ?? '-'}</td>
-                        <td className="px-3 py-2 text-right">{row.stock.toLocaleString('vi-VN')}</td>
-                        <td className="px-3 py-2 text-right">{num(row.minimumStock || 5).toLocaleString('vi-VN')}</td>
+                        <td className="px-3 py-2 text-right">{formatQuantity(row.stock, 0)}</td>
+                        <td className="px-3 py-2 text-right">{formatQuantity(num(row.minimumStock || 5), 0)}</td>
                         <td className="px-3 py-2">
                           <span className={`rounded px-2 py-1 text-xs ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
                         </td>
@@ -816,13 +1027,76 @@ function AlertMiniChart({ title, rows }: { title: string; rows: Array<[string, n
           <div key={label}>
             <div className="mb-1 flex items-center justify-between gap-2 text-xs">
               <span className="truncate text-slate-300">{label}</span>
-              <span className="text-cyan-300">{value.toLocaleString('vi-VN')}</span>
+              <span className="text-cyan-300">{formatQuantity(value, 0)}</span>
             </div>
             <div className="h-2 rounded-full bg-slate-900">
               <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-red-400" style={{ width: `${Math.max(5, (value / max) * 100)}%` }} />
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function MaterialsPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const safePageCount = Math.max(1, pageCount)
+  const safePage = Math.min(Math.max(1, page), safePageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  const windowSize = 5
+  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
+  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
+
+  return (
+    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
+      <div>
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
+      </div>
+      <div className="flex justify-center gap-2">
+        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
+        {pages.map((pageNo) => (
+          <button
+            key={pageNo}
+            onClick={() => onPageChange(pageNo)}
+            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
+              safePage === pageNo
+                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
+            }`}
+          >
+            {pageNo}
+          </button>
+        ))}
+        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
+      </div>
+      <div className="flex justify-start gap-2 md:justify-end">
+        <button
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(Math.max(1, safePage - 1))}
+          className={inventoryMutedButton}
+        >
+          Trước
+        </button>
+        <button
+          disabled={safePage >= safePageCount}
+          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
+          className={inventoryMutedButton}
+        >
+          Sau
+        </button>
       </div>
     </div>
   )

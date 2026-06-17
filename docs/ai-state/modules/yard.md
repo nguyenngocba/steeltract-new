@@ -11,6 +11,8 @@ In Progress.
 ## Implemented Features
 
 * Yard cockpit UI follows the Inventory visual baseline.
+* Sprint 12B standardizes Yard cockpit page header, KPI strip, filter bar, occupancy analytics, shipment/operation analytics, and trend panels with shared module UI primitives.
+* Sprint 12C makes Yard filters sticky and lazy-loads 2D/3D operational maps so the Yard route chunk stays light until map tabs are opened.
 * Yard staging is integrated with Production and gated by QC release.
 * Yard placements and movements are included in operational workflow checks.
 * Yard outbound removal marks linked component placements as `SHIPPED`, preserves/infers `projectId`, and writes component timeline history.

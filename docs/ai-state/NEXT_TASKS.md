@@ -19,6 +19,7 @@ Backlog after the locked order:
 6. Replace the derived production-material warehouse view with a persisted balance/receipt ledger so returns, BOM reservations, and material issues are all auditable independently from main Inventory.
 7. Add a persisted slot-level balance ledger so `zoneId + slotId + level` can be reconciled from transaction history instead of relying only on Material Master default location metadata.
 8. Continue Inventory technical cleanup by extracting the remaining local modal/table helpers into shared Inventory visual components and replacing frontend-generated inventory document numbers with backend deterministic sequences.
+8a. Roll shared Attachments UI beyond Material photos: add non-photo document upload controls for datasheets, CO, CQ, catalogs, then extend attachment surfaces to Components, Projects, Suppliers, Production, QC, and Assets.
 9. Extend Production Material Issue and Consumption workflows with manual approval controls, issue/return document headers, adjust postings, and richer consumption entry UX. Sprint 10A fixed the active return reconciliation path; this backlog item is for approval/document UX, not the basic return balance equation.
 10. Extend Component Costing with labor, machine, overhead, QC rework, Yard handling cost, approvals, and costing history snapshots.
 11. Backfill or reconcile legacy Production Material Ledger gaps for issue rows that predate ledger automation or came from non-ledger issue paths.
@@ -30,5 +31,5 @@ Backlog after the locked order:
 17. Dashboard Phase S2: add persisted dashboard preferences, deeper drill-through links, and formal notification/action mutation flows after System mutation APIs exist.
 18. Build Organizations operational foundation.
 19. Build Logistics operational foundation.
-20. Replace frontend-generated random document numbers with backend-generated deterministic sequences.
+20. Move remaining frontend-suggested document numbers fully backend-side. Sprint 2026-06-15 standardized active generated codes to `PREFIX-YYMMDD-###`; the follow-up is a formal backend sequence/locking API.
 21. Clean up legacy frontend auth/router files after confirming no imports remain, so future auth work only uses the active shared auth store and guarded router.

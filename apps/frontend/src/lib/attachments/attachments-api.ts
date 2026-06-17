@@ -68,6 +68,7 @@ export async function uploadAttachment(
   appendJson(formData, 'category', payload.category)
   appendJson(formData, 'tags', payload.tags)
   appendJson(formData, 'module', payload.module)
+  appendJson(formData, 'entityType', payload.entityType)
   appendJson(formData, 'entityId', payload.entityId)
   appendJson(formData, 'purpose', payload.purpose)
   appendJson(formData, 'metadata', payload.metadata)

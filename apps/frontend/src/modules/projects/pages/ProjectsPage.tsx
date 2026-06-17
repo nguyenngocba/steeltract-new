@@ -5,18 +5,21 @@ import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleKpiCard, ModuleKpiStrip, ModulePageHeader, moduleInput, moduleMutedButton, modulePanel, modulePrimaryButton, moduleTableHead, moduleTableRow, type ModuleTone } from '@/shared/ui/modules'
+import { nextLocalCode } from '@/shared/utils/code-format'
 import { createProject, deliverProjectComponent, getProjectsRuntime, installProjectComponent, type InstallProjectComponentPayload, type ProjectComponentRuntime, type ProjectComponentStatus, type ProjectMaterialRuntime, type ProjectRuntimeRow, type ProjectsRuntime, type ProjectStatus } from '../api/projects.api'
+import { formatQuantity } from '@/shared/utils/number-format'
 
 type ProjectTab = 'overview' | 'list' | 'progress' | 'materials' | 'components' | 'reports'
 
-const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
-const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
-const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
-const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
-const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
-const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value)
-const money = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value / 1_000_000_000)
+const panel = modulePanel
+const input = `${moduleInput} h-9 px-3`
+const primaryButton = modulePrimaryButton
+const mutedButton = moduleMutedButton
+const tableHead = moduleTableHead
+const tableRow = moduleTableRow
+const fmt = (value = 0) => formatQuantity(value, 1)
+const money = (value = 0) => formatQuantity(value / 1_000_000_000, 1)
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
 
 const tabs: Array<[ProjectTab, string]> = [
@@ -95,18 +98,16 @@ export function ProjectsPage() {
 
   return <OperationalShell>
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
-      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Công trình</p>
-          <h1 className="mt-1 text-2xl font-semibold">Công trình</h1>
-          <p className="mt-1 text-xs text-slate-500">Project cockpit liên kết Project, Component, Production và Inventory theo projectId.</p>
-        </div>
-        <div className="flex gap-2">
+      <ModulePageHeader
+        eyebrow="Công trình"
+        title="Công trình"
+        description="Project cockpit liên kết Project, Component, Production và Inventory theo projectId."
+        action={<>
           <button onClick={() => setCreateOpen(true)} className={primaryButton}>+ Thêm công trình</button>
           <button className={mutedButton}>Xuất Excel</button>
           <button className={mutedButton}>Báo cáo</button>
-        </div>
-      </header>
+        </>}
+      />
 
       <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>
         {tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs transition ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}
@@ -115,7 +116,7 @@ export function ProjectsPage() {
       <FilterBar query={query} status={status} type={type} projectTypes={projectTypes} onQuery={setQuery} onStatus={setStatus} onType={setType} />
       {isLoading ? <div className={`${panel} mt-3 p-6 text-center text-sm text-slate-500`}>Đang tải dữ liệu công trình...</div> : null}
 
-      {tab === 'overview' && <OverviewTab runtime={runtime} rows={rows} onOpen={setSelectedProject} />}
+      {tab === 'overview' && <OverviewTab runtime={runtime} rows={rows} status={status} onStatus={setStatus} onOpen={setSelectedProject} />}
       {tab === 'list' && <ProjectListTab rows={rows} onOpen={setSelectedProject} />}
       {tab === 'progress' && <ProgressTab runtime={runtime} rows={rows} onOpen={setSelectedProject} />}
       {tab === 'materials' && <MaterialsTab rows={filterMaterials(runtime.materials, rows)} projects={runtime.projects} />}
@@ -130,7 +131,7 @@ export function ProjectsPage() {
 }
 
 function CreateProjectDialog({ open, saving, error, onClose, onSubmit }: { open: boolean; saving: boolean; error: unknown; onClose: () => void; onSubmit: (payload: { code: string; name: string; description?: string; status?: ProjectStatus }) => void }) {
-  const [code, setCode] = useState(`CT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`)
+  const [code, setCode] = useState(nextLocalCode('CT'))
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('')
   const [location, setLocation] = useState('')
@@ -228,30 +229,30 @@ function InstallComponentDialog({ component, saving, onClose, onSubmit }: { comp
 }
 
 function FilterBar({ query, status, type, projectTypes, onQuery, onStatus, onType }: { query: string; status: string; type: string; projectTypes: string[]; onQuery: (value: string) => void; onStatus: (value: string) => void; onType: (value: string) => void }) {
-  return <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
-    <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3">
+  return <ModuleFilterBar>
+    <div className="flex min-w-[320px] items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3 xl:col-span-5">
       <Search size={15} className="text-cyan-400" />
       <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Tìm kiếm công trình, chủ đầu tư, địa điểm..." className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none" />
     </div>
-    <select value={status} onChange={(event) => onStatus(event.target.value)} className={input}>
+    <select value={status} onChange={(event) => onStatus(event.target.value)} className={`${input} xl:col-span-2`}>
       <option value="all">Trạng thái: Tất cả</option>
       <option value="ACTIVE">Đang thi công</option>
       <option value="PLANNING">Chưa khởi công</option>
       <option value="COMPLETED">Hoàn thành</option>
       <option value="ON_HOLD">Tạm dừng</option>
     </select>
-    <select value={type} onChange={(event) => onType(event.target.value)} className={input}>
+    <select value={type} onChange={(event) => onType(event.target.value)} className={`${input} xl:col-span-2`}>
       <option value="all">Loại công trình: Tất cả</option>
       {projectTypes.map((item) => <option key={item} value={item}>{item}</option>)}
     </select>
-    <button className={mutedButton}>Làm mới</button>
-  </div>
+    <button className={`${mutedButton} xl:col-span-1`}>Làm mới</button>
+  </ModuleFilterBar>
 }
 
-function OverviewTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
+function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; status: string; onStatus: (value: string) => void; onOpen: (row: ProjectRuntimeRow) => void }) {
   const metrics = runtime.metrics
   return <div className="mt-3 space-y-4">
-    <KpiStrip runtime={runtime} />
+    <KpiStrip runtime={runtime} status={status} onStatus={onStatus} />
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
       <ProjectTable rows={rows.slice(0, 10)} onOpen={onOpen} />
       <aside className="space-y-4">
@@ -272,16 +273,16 @@ function OverviewTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows
   </div>
 }
 
-function KpiStrip({ runtime }: { runtime: ProjectsRuntime }) {
+function KpiStrip({ runtime, status, onStatus }: { runtime: ProjectsRuntime; status?: string; onStatus?: (value: string) => void }) {
   const m = runtime.metrics
-  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-    <KpiCard icon={Building2} title="Tổng số công trình" value={fmt(m.totalProjects)} note="Công trình" tone="cyan" />
-    <KpiCard icon={CheckCircle2} title="Công trình đang thi công" value={fmt(m.activeProjects)} note="Công trình" tone="emerald" />
-    <KpiCard icon={Clock} title="Công trình chưa khởi công" value={fmt(m.planningProjects)} note="Công trình" tone="amber" />
-    <KpiCard icon={Layers} title="Công trình hoàn thành" value={fmt(m.completedProjects)} note="Công trình" tone="purple" />
+  return <ModuleKpiStrip className="md:grid-cols-2 xl:grid-cols-6">
+    <KpiCard icon={Building2} title="Tổng số công trình" value={fmt(m.totalProjects)} note="Công trình" tone="cyan" active={!status || status === 'all'} onClick={onStatus ? () => onStatus('all') : undefined} />
+    <KpiCard icon={CheckCircle2} title="Công trình đang thi công" value={fmt(m.activeProjects)} note="Công trình" tone="emerald" active={status === 'ACTIVE'} onClick={onStatus ? () => onStatus('ACTIVE') : undefined} />
+    <KpiCard icon={Clock} title="Công trình chưa khởi công" value={fmt(m.planningProjects)} note="Công trình" tone="amber" active={status === 'PLANNING'} onClick={onStatus ? () => onStatus('PLANNING') : undefined} />
+    <KpiCard icon={Layers} title="Công trình hoàn thành" value={fmt(m.completedProjects)} note="Công trình" tone="purple" active={status === 'COMPLETED'} onClick={onStatus ? () => onStatus('COMPLETED') : undefined} />
     <KpiCard icon={TrendingUp} title="Giá trị hợp đồng" value={money(m.contractValue)} note="Tỷ VNĐ" tone="cyan" />
     <KpiCard icon={BarChart3} title="Giá trị đã thực hiện" value={money(m.actualValue)} note="Tỷ VNĐ" tone="cyan" />
-  </div>
+  </ModuleKpiStrip>
 }
 
 function ProjectListTab({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
@@ -289,7 +290,7 @@ function ProjectListTab({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (
 }
 
 function ProjectTable({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
-  return <div className={`${panel} overflow-hidden`}>
+  return <ModuleDataGrid>
     <div className="flex items-center justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách công trình</h2><span className="text-xs text-slate-500">Hiển thị {rows.length} kết quả</span></div>
     <div className="overflow-auto">
       <table className="w-full min-w-[1120px] text-left text-sm">
@@ -300,7 +301,7 @@ function ProjectTable({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (ro
       </table>
     </div>
     {!rows.length ? <Empty title="Không có công trình phù hợp bộ lọc." /> : null}
-  </div>
+  </ModuleDataGrid>
 }
 
 function ProgressTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
@@ -359,16 +360,16 @@ function ProjectComponentsTab({ rows, projects, pendingId, onDeliver, onInstall,
       <button className="rounded border border-slate-700 px-4 text-xs">Bộ lọc</button>
     </div>
     <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
-      <KpiCard icon={PackageOpen} title="Tổng cấu kiện" value={fmt(filtered.length)} note="Cấu kiện" />
-      <KpiCard icon={CheckCircle2} title="READY" value={fmt(count('READY'))} note="Sẵn sàng" tone="emerald" />
-      <KpiCard icon={Layers} title="SHIPPED" value={fmt(count('SHIPPED'))} note="Đã xuất bãi" tone="cyan" />
-      <KpiCard icon={TrendingUp} title="DELIVERED" value={fmt(count('DELIVERED'))} note="Đã giao" tone="purple" />
-      <KpiCard icon={CalendarClock} title="INSTALLED" value={fmt(count('INSTALLED'))} note="Đã lắp" tone="amber" />
+      <KpiCard icon={PackageOpen} title="Tổng cấu kiện" value={fmt(filtered.length)} note="Cấu kiện" active={status === 'ALL'} onClick={() => setStatus('ALL')} />
+      <KpiCard icon={CheckCircle2} title="READY" value={fmt(count('READY'))} note="Sẵn sàng" tone="emerald" active={status === 'READY'} onClick={() => setStatus('READY')} />
+      <KpiCard icon={Layers} title="SHIPPED" value={fmt(count('SHIPPED'))} note="Đã xuất bãi" tone="cyan" active={status === 'SHIPPED'} onClick={() => setStatus('SHIPPED')} />
+      <KpiCard icon={TrendingUp} title="DELIVERED" value={fmt(count('DELIVERED'))} note="Đã giao" tone="purple" active={status === 'DELIVERED'} onClick={() => setStatus('DELIVERED')} />
+      <KpiCard icon={CalendarClock} title="INSTALLED" value={fmt(count('INSTALLED'))} note="Đã lắp" tone="amber" active={status === 'INSTALLED'} onClick={() => setStatus('INSTALLED')} />
     </div>
     <div className={`${panel} overflow-hidden`}>
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <h3 className="text-sm font-semibold">Cấu kiện công trình</h3>
-        <span className="text-xs text-slate-500">{filtered.length.toLocaleString('vi-VN')} cấu kiện</span>
+        <span className="text-xs text-slate-500">{formatQuantity(filtered.length, 0)} cấu kiện</span>
       </div>
       <div className="overflow-auto">
         <table className="w-full min-w-[1640px] text-left text-sm">
@@ -419,27 +420,22 @@ function ReportsTab({ runtime }: { runtime: ProjectsRuntime }) {
 }
 
 function ProjectDetailDialog({ project, materials, onClose }: { project: ProjectRuntimeRow | null; materials: ProjectMaterialRuntime[]; onClose: () => void }) {
-  if (!project) return null
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-    <section className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded border border-cyan-900 bg-[#061321] shadow-2xl">
-      <header className="flex items-start justify-between border-b border-slate-800 p-5"><div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Chi tiết công trình</p><h2 className="mt-1 text-2xl font-semibold text-white">{project.name}</h2><p className="mt-1 text-xs text-slate-500">Mã dự án: {project.code} · Chủ đầu tư: {project.owner} · {project.location}</p></div><button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button></header>
+  return <ModuleDetailDrawer
+    open={Boolean(project)}
+    title={project?.name ?? ''}
+    subtitle={project ? `Mã dự án: ${project.code} · Chủ đầu tư: ${project.owner} · ${project.location}` : undefined}
+    onClose={onClose}
+    widthClass="max-w-6xl"
+  >
+    {project ? <>
       <div className="grid gap-4 p-5 xl:grid-cols-3"><div className={`${panel} p-4`}><h3 className="text-sm font-semibold">Thông tin công trình</h3><Info k="Tên công trình" v={project.name} /><Info k="Địa điểm" v={project.location} /><Info k="Chủ đầu tư" v={project.owner} /><Info k="Loại" v={project.type} /><Info k="Giá trị hợp đồng" v={`${money(project.contractValue)} tỷ VNĐ`} /><Info k="Trạng thái" v={project.status} /></div><div className={`${panel} p-4`}><h3 className="text-sm font-semibold">Tiến độ tổng quan</h3><div className="mt-5 flex items-center justify-center"><Ring value={project.progress} label="Hoàn thành" /></div><Info k="Ngày bắt đầu" v={date(project.startedAt)} /><Info k="Ngày hoàn thành kế hoạch" v={date(project.plannedEndAt)} /></div><div className={`${panel} p-4`}><h3 className="text-sm font-semibold">Giá trị & chi phí</h3><div className="mt-5 flex items-center justify-center"><Ring value={project.contractValue ? project.actualValue / project.contractValue * 100 : 0} label="Đã thực hiện" /></div><Info k="Giá trị hợp đồng" v={`${fmt(project.contractValue)} VND`} /><Info k="Giá trị thực hiện" v={`${fmt(project.actualValue)} VND`} /></div></div>
       <div className="grid gap-4 p-5 xl:grid-cols-[1fr_.9fr]"><div className={`${panel} overflow-hidden`}><div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold">Vật tư liên quan</div><div className="max-h-80 overflow-auto"><table className="w-full text-left text-xs"><thead className="text-slate-500"><tr>{['Mã', 'Tên', 'SL', 'Giá trị'].map((h) => <th className="px-3 py-2" key={h}>{h}</th>)}</tr></thead><tbody>{materials.slice(0, 12).map((row) => <tr key={row.id} className="border-t border-slate-800"><td className="px-3 py-2 text-cyan-300">{row.materialCode}</td><td className="px-3 py-2">{row.materialName}</td><td className="px-3 py-2">{fmt(row.quantity)}</td><td className="px-3 py-2">{fmt(row.totalAmount)}</td></tr>)}</tbody></table>{!materials.length ? <Empty title="Chưa có vật tư theo công trình này." /> : null}</div></div><div className={`${panel} p-4`}><h3 className="text-sm font-semibold">Công việc sắp tới</h3><div className="mt-3 space-y-2 text-xs">{['Hoàn tất cấu kiện còn lại', 'Kiểm tra QC tổng thể', 'Cập nhật vật tư theo công trình', 'Xuất báo cáo tiến độ'].map((task, index) => <div key={task} className="flex justify-between rounded border border-slate-800 px-3 py-2"><span>{task}</span><span className="text-amber-300">T+{index + 1}</span></div>)}</div></div></div>
-    </section>
-  </div>
+    </> : null}
+  </ModuleDetailDrawer>
 }
 
-function KpiCard({ icon: Icon, title, value, note, tone = 'cyan' }: { icon: LucideIcon; title: string; value: string; note: string; tone?: 'cyan' | 'emerald' | 'amber' | 'purple' }) {
-  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-400 text-emerald-200' : tone === 'amber' ? 'from-amber-500 to-orange-400 text-amber-200' : tone === 'purple' ? 'from-purple-500 to-fuchsia-400 text-purple-200' : 'from-blue-500 to-cyan-400 text-cyan-200'
-  return <div className={`${panel} relative overflow-hidden p-4`}>
-    <div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`} />
-    <div className="flex items-center justify-between gap-3">
-      <span className={`grid h-11 w-11 place-items-center rounded-lg bg-gradient-to-br ${color} bg-opacity-15 text-white shadow-lg shadow-black/20`}><Icon size={20} /></span>
-      <span className="text-right text-[10px] uppercase tracking-[0.16em] text-slate-500">{note}</span>
-    </div>
-    <div className="mt-4 text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div>
-    <div className="mt-1 text-2xl font-semibold text-white">{value}</div>
-  </div>
+function KpiCard({ icon: Icon, title, value, note, tone = 'cyan', active, onClick }: { icon: LucideIcon; title: string; value: string; note: string; tone?: 'cyan' | 'emerald' | 'amber' | 'purple'; active?: boolean; onClick?: () => void }) {
+  return <ModuleKpiCard icon={<Icon size={18} />} title={title} value={value} note={note} tone={tone as ModuleTone} active={active} onClick={onClick} className="h-[112px]" />
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -488,7 +484,7 @@ function Info({ k, v }: { k: string; v: string }) {
 }
 
 function Empty({ title }: { title: string }) {
-  return <div className="p-8 text-center text-sm text-slate-500">{title}</div>
+  return <div className="p-3"><ModuleEmptyState title={title} /></div>
 }
 
 function filterMaterials(materials: ProjectMaterialRuntime[], projects: ProjectRuntimeRow[]) {

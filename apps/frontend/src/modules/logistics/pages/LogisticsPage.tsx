@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock, MapPin, PackageCheck, RefreshCw, Route, Search, Truck, type LucideIcon } from 'lucide-react'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { formatQuantity } from '@/shared/utils/number-format'
 
 type LogisticsTab = 'overview' | 'routes' | 'gps'
 
@@ -9,7 +10,7 @@ const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_
 const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
 const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
 const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
+const fmt = (value = 0) => formatQuantity(value, 0)
 
 const tabs: Array<[LogisticsTab, string]> = [
   ['overview', 'Tổng quan'],

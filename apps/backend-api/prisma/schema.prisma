@@ -160,6 +160,10 @@ enum AttachmentCategory {
   DOCUMENT
   DRAWING
   PHOTO
+  DATASHEET
+  CO
+  CQ
+  CATALOG
   QC
   CONTRACT
   OTHER
@@ -1746,9 +1750,18 @@ model Attachment {
   id               String             @id @default(cuid())
   title            String
   description      String?
+  module           String?
+  entityType       String?
+  entityId         String?
   category         AttachmentCategory @default(OTHER)
+  originalName     String?
+  storedName       String?
   mimeType         String
+  extension        String?
   fileSize         Int
+  checksum         String?
+  storagePath      String?
+  uploadedBy       String?
   uploaderId       String?
   tags             String[]           @default([])
   currentVersionId String?
@@ -1763,6 +1776,11 @@ model Attachment {
   links    AttachmentLink[]
   qcLinks  QcAttachment[]
 
+  @@index([module])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([module, entityType, entityId])
+  @@index([checksum])
   @@index([category])
   @@index([mimeType])
   @@index([uploaderId])

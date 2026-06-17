@@ -11,6 +11,7 @@ import {
 
 import { EventBusService } from '../../core/events/event-bus.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../common/utils/code-generator';
 import type {
   ApproveReturnRequestDto,
   CreateReturnRequestDto,
@@ -63,7 +64,7 @@ export class ReturnWorkflowService {
   async create(dto: CreateReturnRequestDto) {
     const request = await this.prisma.returnRequest.create({
       data: {
-        returnNo: dto.returnNo ?? this.generateReturnNo(dto.flowType),
+        returnNo: dto.returnNo ?? await this.generateReturnNo(dto.flowType),
         flowType: dto.flowType,
         projectId: dto.projectId,
         supplierId: dto.supplierId,
@@ -291,11 +292,8 @@ export class ReturnWorkflowService {
   }
 
   private generateReturnNo(flowType: string) {
-    return [
-      flowType,
-      Date.now(),
-      Math.random().toString(36).slice(2, 7).toUpperCase(),
-    ].join('-');
+    const prefix = flowType === 'PRODUCTION_RETURN' ? 'HT-SX' : flowType === 'SUPPLIER_RETURN' ? 'HT-NCC' : 'HT-CT';
+    return nextOperationalCode(this.prisma, 'returnRequest', 'returnNo', prefix);
   }
 
   private emit(action: string, id: string, returnNo: string) {

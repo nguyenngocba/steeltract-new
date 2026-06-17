@@ -4,7 +4,8 @@ import { X } from 'lucide-react'
 
 import type { ProductionBom, ProductionComponent } from '../api/production.api'
 import { useCreateProductionOrder } from '../hooks/useProductionCockpit'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { nextLocalCode } from '@/shared/utils/code-format'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function ManufacturingOrderModal({ components, boms, initialComponentId = '', onClose }: {
   components: ProductionComponent[]
@@ -32,7 +33,7 @@ export function ManufacturingOrderModal({ components, boms, initialComponentId =
     const parsedQuantity = parseLocaleNumber(quantity)
     if (!component || parsedQuantity <= 0) return toast.error('Chọn cấu kiện và số lượng hợp lệ')
     if (!selectedBom) return toast.error('Chọn Production BOM của cấu kiện trước khi tạo MO')
-    const orderNo = `MO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-5)}`
+    const orderNo = nextLocalCode('MO')
     try {
       await create.mutateAsync({
         orderNo,
@@ -59,7 +60,7 @@ export function ManufacturingOrderModal({ components, boms, initialComponentId =
       <div className="grid gap-4 p-5 md:grid-cols-2">
         <label className="text-xs text-slate-400">Cấu kiện<select value={componentId} onChange={(e) => { setComponentId(e.target.value); setBomId('') }} className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100"><option value="">Chọn cấu kiện</option>{components.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label>
         <label className="text-xs text-slate-400">Production BOM *<select value={bomId} onChange={(e) => setBomId(e.target.value)} className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100"><option value="">Chọn BOM bắt buộc</option>{matchingBoms.map((item) => <option value={item.id} key={item.id}>{item.bomNo} · {item.productName}</option>)}</select></label>
-        <label className="text-xs text-slate-400">Số lượng<input value={quantity} onChange={(e) => setQuantity(formatQuantityInput(e.target.value))} inputMode="decimal" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
+        <label className="text-xs text-slate-400">Số lượng<input value={quantity} onFocus={(e) => setQuantity(formatQuantityInput(e.target.value))} onBlur={(e) => setQuantity(formatQuantity(e.target.value))} onChange={(e) => setQuantity(formatQuantityInput(e.target.value))} inputMode="decimal" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
         <label className="text-xs text-slate-400">Ưu tiên<select value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100"><option>MEDIUM</option><option>HIGH</option><option>URGENT</option><option>LOW</option></select></label>
         <label className="text-xs text-slate-400">Ngày bắt đầu<input value={start} onChange={(e) => setStart(e.target.value)} type="datetime-local" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
         <label className="text-xs text-slate-400">Ngày đến hạn<input value={due} onChange={(e) => setDue(e.target.value)} type="datetime-local" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>

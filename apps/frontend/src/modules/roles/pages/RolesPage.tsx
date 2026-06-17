@@ -14,8 +14,9 @@ import {
 } from '@/modules/inventory/components/InventoryVisuals'
 import { systemApi, type RoleMatrix, type SystemRole } from '@/modules/system/api/system.api'
 import { getRoles } from '../api/roles.api'
+import { formatQuantity } from '@/shared/utils/number-format'
 
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
+const fmt = (value = 0) => formatQuantity(value, 0)
 const actionLabels: Record<string, string> = {
   view: 'Xem',
   create: 'Thêm',

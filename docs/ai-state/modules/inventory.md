@@ -68,10 +68,18 @@ Behavior:
 - Material Master create/edit uses `Kho chính` locations only and warns when a selected slot/floor is full.
 - Inventory inbound uses `Kho chính` locations only and warns when a selected slot/floor is full.
 - Material detail `Vị trí` tab can open a focused 2D preview for the selected slot/floor.
+- Sprint 13B.1 redesigns the Material Detail drawer UI only: shared Module Detail Drawer, header KPI strip, horizontal tabs, colored transaction type badges, location distribution donut/table, movement trend, forecast panel, project usage summary, and supplier purchase summary.
+- Sprint 13B.2 completes the Material Detail theme consistency pass: tabs now use the shared `ModuleTabs`, tables use shared module table tokens, and the focused 2D location preview uses `ModuleDetailDrawer` / `ModuleAnalyticsPanel` instead of a custom modal shell.
+- Sprint 11A.2 centralizes frontend quantity/currency formatting through shared helpers and removes direct frontend `toLocaleString('vi-VN')` / `Intl.NumberFormat` usage.
+- Sprint 13B.3 adds Material Detail image gallery readiness, Material Master image preview UI, and Material Analytics Cockpit panels for Inbound Trend, Outbound Trend, Inventory Trend, Forecast 7 Days, and Inventory Turnover.
+- Sprint 14A persists Material Detail photos through the shared Attachments module. `Hình ảnh vật tư` now has `Thêm ảnh`, uploads images to `/attachments/upload`, refreshes the gallery, and displays images served from filesystem storage.
+- Material Detail now includes `Tài liệu vật tư` for non-photo attachments and shows original filename, category, size, upload date, and download action.
+- Material attachment metadata is stored in PostgreSQL while file content is stored outside the repo under `STORAGE_ROOT` or `/data/steeltrack-storage/inventory/materials`.
 - Inventory transfer creation is limited to `Kho chính`, auto-fills source cell/floor from the selected material stock location, suggests a free destination cell/floor, and shows separate source/destination 2D location views instead of the legacy transfer diagram.
 - Sprint 9 stock mutation hardening validates and updates the exact full bucket `inventoryItemId + warehouseId + zoneId + slotId + level`, so new transaction paths keep `inventory_items.quantity` and `inventory_location_stocks` synchronized.
 - Sprint 11A decimal quantity pass lets Inventory inbound, outbound, transfer, stock-take, stock adjustment, Material Master minimum stock, and warehouse location capacity accept decimal values with `vi-VN` formatted typing.
 - Currency display uses whole-number VND formatting, for example `25.000.000 đ`.
+- Material photo upload is now persisted through shared attachments. Upload controls for datasheets, CO, CQ, and catalogs still need a dedicated non-photo document upload UI.
 
 Parent warehouses:
 
@@ -218,6 +226,13 @@ Shared UI primitives:
 - `InventoryPagination`
 - shared table shell/head/row classes
 - shared page stack and grid spacing classes
+
+Sprint 12A UI foundation:
+
+- Inventory Overview and Inventory Stock are the design reference for module cockpit screens.
+- Inventory visual wrappers now delegate to generic shared primitives in `apps/frontend/src/shared/ui/modules`.
+- Inventory behavior, API calls, filters, and stock workflows were not changed by this refactor.
+- Remaining Inventory-only chart and modal helpers should stay local until another module needs the same abstraction.
 
 Applied to:
 
@@ -487,6 +502,7 @@ Capacity semantics:
 - Inventory inbound/outbound/transfer workflows were not moved in this phase.
 - Database schema was not changed.
 - Supplier module was not touched.
+- Sprint 12C UI polish only added sticky shared filters and frontend KPI click-to-filter for Inventory Stock status; Inventory stock logic and APIs were not changed.
 
 ## Remaining Phase A Follow-Up
 

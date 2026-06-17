@@ -7,7 +7,7 @@ import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../../inventory/hooks/useInventoryTransactions'
 import { useProductionIssues } from '../../../production/hooks/useProductionCockpit'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
-import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type MaterialStockRow = {
   id: string
@@ -253,11 +253,11 @@ export function ComponentsMaterialStockPage() {
     <EnterpriseModulePage>
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
-          <ComponentsKpiCard title="Tổng mã vật tư SX" value={rows.length.toLocaleString('vi-VN')} />
+          <ComponentsKpiCard title="Tổng mã vật tư SX" value={formatQuantity(rows.length, 0)} />
           <ComponentsKpiCard title="Giá trị tồn kho SX" value={money(totalValue)} sub="đồng bộ từ giao dịch kho" />
           <ComponentsKpiCard title="Đã reserve BOM" value={formatQuantity(totalReserved)} sub="chờ allocation backend" />
           <ComponentsKpiCard title="Khả dụng sản xuất" value={formatQuantity(totalAvailable)} />
-          <ComponentsKpiCard title="Cảnh báo thiếu BOM" value={warningCount.toLocaleString('vi-VN')} sub="cần cấp phát" />
+          <ComponentsKpiCard title="Cảnh báo thiếu BOM" value={formatQuantity(warningCount, 0)} sub="cần cấp phát" />
           <ComponentsKpiCard title="Trạng thái dữ liệu" value="LIVE" sub="làm mới mỗi 5 giây" />
         </div>
 
@@ -362,7 +362,7 @@ export function ComponentsMaterialStockPage() {
                 {selectedHistory.map(({ transaction, line }: any) => (
                   <div key={`${transaction.id}-${line.id}`} className="mb-2 flex justify-between rounded border border-slate-800 px-2 py-1.5">
                     <span className={String(transaction.remarks ?? '').includes('RETURN') ? 'text-amber-300' : 'text-emerald-300'}>{transaction.transactionNo ?? transaction.code}</span>
-                    <span>{new Date(transaction.transactionDate ?? transaction.createdAt).toLocaleString('vi-VN')}</span>
+                    <span>{formatDateTime(transaction.transactionDate ?? transaction.createdAt)}</span>
                     <span>{formatQuantity(Math.abs(Number(line.quantity ?? 0)))} {selectedRow.unit}</span>
                   </div>
                 ))}
@@ -371,7 +371,7 @@ export function ComponentsMaterialStockPage() {
             </div>
             <div className="mt-4 grid gap-3 rounded border border-amber-900/60 bg-amber-950/10 p-4 md:grid-cols-3">
               <input type="datetime-local" value={returnForm.returnedAt} onChange={(event) => setReturnForm((prev) => ({ ...prev, returnedAt: event.target.value }))} className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
-              <input value={returnForm.quantity} onChange={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} inputMode="decimal" placeholder="Số lượng trả" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
+              <input value={returnForm.quantity} onFocus={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} onBlur={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantity(event.target.value) }))} onChange={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} inputMode="decimal" placeholder="Số lượng trả" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
               <input value={returnForm.note} onChange={(event) => setReturnForm((prev) => ({ ...prev, note: event.target.value }))} placeholder="Ghi chú trả kho" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
             </div>
             <div className="mt-4 flex justify-end gap-2">

@@ -24,6 +24,9 @@ Components covers steel component master records, production linkage, component 
 * Sprint 11 adds Component Cost Breakdown with planned BOM material rows, actual consumed/scrap material rows, KPI cards, and costing warnings.
 * Costing warnings detect `BOM_MATERIAL_NOT_CONSUMED`, `UNPLANNED_MATERIAL`, and `QUANTITY_VARIANCE`.
 * Sprint 11A formats component material stock costs as whole VND and supports decimal return quantities when returning production material back to Main Warehouse.
+* Sprint 12A migrates Components List and Components Stock presentation toward the Inventory cockpit baseline using shared module UI primitives.
+* Components lifecycle KPI strips now show `Tổng cấu kiện`, `READY`, `SHIPPED`, `DELIVERED`, and `INSTALLED` from existing frontend data.
+* Sprint 12C adds sticky filters, lifecycle KPI click-to-filter, shared empty/loading states, and standard `ModuleDetailDrawer` usage for Components List/Stock detail surfaces.
 
 ## Component Creation Audit
 
@@ -87,3 +90,4 @@ Fix:
 * Add stricter UI messaging that Production output creation requires issued material.
 * Add delivery and installation document numbers, signed handover evidence, and coordinate/drawing references if required by field operations.
 * Evaluate whether long-term component costing should move from `Float` to database decimal types if accounting-grade precision is required.
+* Continue UI standardization for remaining Components tabs after Sprint 12A review.

@@ -8,7 +8,7 @@ import {
   useMaterials,
 } from '../../hooks/useMaterials'
 import { useSuppliers } from '../../hooks/useSuppliers'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatCurrencyInput, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function InboundWizard() {
 
@@ -224,6 +224,16 @@ export function InboundWizard() {
 
         <input
           value={quantity}
+          onFocus={(e) =>
+            setQuantity(
+              formatQuantityInput(e.target.value),
+            )
+          }
+          onBlur={(e) =>
+            setQuantity(
+              formatQuantity(e.target.value),
+            )
+          }
           onChange={(e) =>
             setQuantity(
               formatQuantityInput(e.target.value),
@@ -247,10 +257,10 @@ export function InboundWizard() {
           value={unitPrice}
           onChange={(e) =>
             setUnitPrice(
-              formatQuantityInput(e.target.value),
+              formatCurrencyInput(e.target.value),
             )
           }
-          inputMode="decimal"
+          inputMode="numeric"
           placeholder="Unit Price"
           className="
             w-full

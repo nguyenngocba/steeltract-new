@@ -3,7 +3,7 @@ import { ArrowRight, Boxes, Construction, MapPinned, X } from 'lucide-react'
 
 import type { ComponentRecord } from '@/modules/components/api/contracts/components.contract'
 import { useProductionOrders, useStageProductionToYard } from '@/modules/production/hooks/useProductionCockpit'
-import { formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import { useMoveYardItem, useRemoveYardItem } from '../hooks/queries/useYardRuntime'
 import type { YardCrane, YardPlacement, YardSlotRuntime } from '../services/api/yard.api'
 
@@ -16,7 +16,7 @@ const labels = {
 } as const
 
 const input = 'w-full rounded border border-slate-700 bg-[#06111e] px-3 py-2 text-xs text-slate-100 outline-none focus:border-cyan-500'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value)
+const fmt = (value = 0) => formatQuantity(value, 3)
 
 type ActivePlacement = YardPlacement & { slot: YardSlotRuntime }
 

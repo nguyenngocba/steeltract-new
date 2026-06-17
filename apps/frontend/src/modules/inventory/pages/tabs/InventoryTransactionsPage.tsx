@@ -21,13 +21,14 @@ import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useProjects } from '../../hooks/useProjects'
 import { useSuppliers } from '../../hooks/useSuppliers'
 import { useZones } from '../../hooks/useZones'
+import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
 }
 function formatCurrency(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(v))
 }
 
 export function InventoryTransactionsPage() {
@@ -135,11 +136,11 @@ export function InventoryTransactionsPage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid grid-cols-1 xl:grid-cols-5 ${inventoryGridGap}`}>
-          <InventoryKpi title="Tổng giao dịch" value={kpis.total.toLocaleString('vi-VN')} note="Theo bộ lọc" tone="blue" />
-          <InventoryKpi title="Nhập kho" value={kpis.inbound.toLocaleString('vi-VN')} note="Phiếu nhập" tone="emerald" />
-          <InventoryKpi title="Xuất kho" value={kpis.outbound.toLocaleString('vi-VN')} note="Phiếu xuất" tone="amber" />
-          <InventoryKpi title="Điều chuyển" value={kpis.transfer.toLocaleString('vi-VN')} note="Nội bộ kho" tone="cyan" />
-          <InventoryKpi title="Kiểm kê" value={kpis.stockTake.toLocaleString('vi-VN')} note="Điều chỉnh tồn" tone="purple" />
+          <InventoryKpi title="Tổng giao dịch" value={formatQuantity(kpis.total, 0)} note="Theo bộ lọc" tone="blue" />
+          <InventoryKpi title="Nhập kho" value={formatQuantity(kpis.inbound, 0)} note="Phiếu nhập" tone="emerald" />
+          <InventoryKpi title="Xuất kho" value={formatQuantity(kpis.outbound, 0)} note="Phiếu xuất" tone="amber" />
+          <InventoryKpi title="Điều chuyển" value={formatQuantity(kpis.transfer, 0)} note="Nội bộ kho" tone="cyan" />
+          <InventoryKpi title="Kiểm kê" value={formatQuantity(kpis.stockTake, 0)} note="Điều chỉnh tồn" tone="purple" />
         </div>
 
         <InventoryPanel title="Bộ lọc giao dịch">
@@ -203,13 +204,13 @@ export function InventoryTransactionsPage() {
                       const line = x.items?.[0]
                       return (
                         <tr key={x.id} className={inventoryTableRow}>
-                          <td className="px-3 py-2">{new Date(x.transactionDate ?? x.createdAt).toLocaleString('vi-VN')}</td>
+                          <td className="px-3 py-2">{formatDateTime(x.transactionDate ?? x.createdAt)}</td>
                           <td className="px-3 py-2">{x.type}</td>
                           <td className="px-3 py-2 text-cyan-300">{x.transactionNo}</td>
                           <td className="px-3 py-2">{line?.inventoryItem?.code ?? '-'}</td>
                           <td className="px-3 py-2">{line?.inventoryItem?.name ?? '-'}</td>
                           <td className="px-3 py-2">{line?.zone?.code ?? '-'}</td>
-                          <td className="px-3 py-2">{Math.abs(num(line?.quantity)).toLocaleString('vi-VN')}</td>
+                          <td className="px-3 py-2">{formatQuantity(Math.abs(num(line?.quantity)), 0)}</td>
                           <td className="px-3 py-2">{formatCurrency(line?.unitPrice)}</td>
                           <td className="px-3 py-2">{formatCurrency(Math.abs(num(line?.totalAmount)))}</td>
                           <td className="px-3 py-2">{x.supplierName ?? x.projectName ?? '-'}</td>
@@ -226,10 +227,10 @@ export function InventoryTransactionsPage() {
 
           <div className="space-y-3 xl:col-span-3">
             <InventoryChartCard title="Thống kê giao dịch">
-              <CompactDonutSummary segments={typeSegments} centerValue={kpis.total.toLocaleString('vi-VN')} centerLabel="giao dịch" />
+              <CompactDonutSummary segments={typeSegments} centerValue={formatQuantity(kpis.total, 0)} centerLabel="giao dịch" />
             </InventoryChartCard>
             <InventoryChartCard title="Giao dịch theo ngày">
-              <HorizontalBars rows={dailyLoad.map(([day, count]) => [day.slice(5), count])} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+              <HorizontalBars rows={dailyLoad.map(([day, count]) => [day.slice(5), count])} valueFormatter={(value) => formatQuantity(value, 0)} />
             </InventoryChartCard>
             <InventoryChartCard title="Giao dịch gần đây">
               {recent.map((x: any) => (

@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../../common/utils/code-generator';
 import {
   CreateProductionReservationDto,
   ListProductionReservationsDto,
@@ -622,9 +623,8 @@ export class ProductionReservationService {
     ].join('|');
   }
 
-  private async nextReservationNo(orderNo: string) {
-    const suffix = (await this.prisma.productionMaterialReservation.count()) + 1;
-    return `RSV-${orderNo}-${String(suffix).padStart(4, '0')}`;
+  private async nextReservationNo(_orderNo: string) {
+    return nextOperationalCode(this.prisma, 'productionMaterialReservation', 'reservationNo', 'RSV');
   }
 
   private reservationInclude() {

@@ -12,6 +12,7 @@ import {
   useSuppliersQuery,
   useUpdateSupplierMutation,
 } from '../hooks/useSuppliersQuery'
+import { formatQuantity } from '@/shared/utils/number-format'
 import type {
   Supplier,
   SupplierEvaluationCockpit,
@@ -19,8 +20,8 @@ import type {
   SupplierPayload,
 } from '../api/suppliers.api'
 
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
-const money = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(value)
+const fmt = (value = 0) => formatQuantity(value, 2)
+const money = (value = 0) => formatQuantity(value, 0)
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
 const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
 const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'

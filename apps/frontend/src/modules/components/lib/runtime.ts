@@ -1,3 +1,4 @@
+import { formatQuantity } from '@/shared/utils/number-format'
 export function statusTone(status: string) {
   switch (status) {
     case 'completed':
@@ -46,7 +47,7 @@ export function progressFromComponent(
 }
 
 export function formatNumber(value: number) {
-  return new Intl.NumberFormat().format(value)
+  return formatQuantity(value, 0)
 }
 
 export function statusCount(

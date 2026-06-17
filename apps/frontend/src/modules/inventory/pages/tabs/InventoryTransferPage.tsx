@@ -20,13 +20,14 @@ import {
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useZones } from '../../hooks/useZones'
+import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
 }
 function formatCurrency(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(v))
 }
 
 export function InventoryTransferPage() {
@@ -105,10 +106,10 @@ export function InventoryTransferPage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid grid-cols-1 xl:grid-cols-6 ${inventoryGridGap}`}>
-          <InventoryKpi title="Tổng phiếu điều chuyển" value={kpis.total.toLocaleString('vi-VN')} note="Tất cả phiếu" tone="blue" />
-          <InventoryKpi title="Đang thực hiện" value={kpis.pending.toLocaleString('vi-VN')} note="Chờ hoàn tất" tone="amber" />
-          <InventoryKpi title="Hoàn thành" value={kpis.done.toLocaleString('vi-VN')} note="Đã ghi nhận" tone="emerald" />
-          <InventoryKpi title="Đã hủy" value={kpis.cancelled.toLocaleString('vi-VN')} note="Không hợp lệ" tone="red" />
+          <InventoryKpi title="Tổng phiếu điều chuyển" value={formatQuantity(kpis.total, 0)} note="Tất cả phiếu" tone="blue" />
+          <InventoryKpi title="Đang thực hiện" value={formatQuantity(kpis.pending, 0)} note="Chờ hoàn tất" tone="amber" />
+          <InventoryKpi title="Hoàn thành" value={formatQuantity(kpis.done, 0)} note="Đã ghi nhận" tone="emerald" />
+          <InventoryKpi title="Đã hủy" value={formatQuantity(kpis.cancelled, 0)} note="Không hợp lệ" tone="red" />
           <InventoryKpi title="Giá trị điều chuyển" value={formatCurrency(kpis.monthlyValue)} note="Theo giá trị xuất" tone="cyan" />
           <InventoryKpi title="Tỷ lệ hoàn tất" value={`${kpis.total ? ((kpis.done / kpis.total) * 100).toFixed(1) : '0.0'}%`} note="Phiếu hoàn thành" tone="purple" />
         </div>
@@ -177,7 +178,7 @@ export function InventoryTransferPage() {
                           <td className="px-3 py-2">{out?.zone?.code ?? '-'}</td>
                           <td className="px-3 py-2">{input?.zone?.code ?? '-'}</td>
                           <td className="px-3 py-2">{x.referenceType ?? 'Điều chuyển nội bộ'}</td>
-                          <td className="px-3 py-2">{Math.abs(num(out?.quantity)).toLocaleString('vi-VN')}</td>
+                          <td className="px-3 py-2">{formatQuantity(Math.abs(num(out?.quantity)), 0)}</td>
                           <td className="px-3 py-2">{formatCurrency(Math.abs(num(out?.totalAmount)))}</td>
                           <td className="px-3 py-2">
                             <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">{String(x.status ?? 'COMPLETED')}</span>
@@ -194,7 +195,7 @@ export function InventoryTransferPage() {
 
           <div className="space-y-3 xl:col-span-3">
             <InventoryChartCard title="Tổng quan điều chuyển">
-              <CompactDonutSummary segments={transferSegments} centerValue={kpis.total.toLocaleString('vi-VN')} centerLabel="phiếu" />
+              <CompactDonutSummary segments={transferSegments} centerValue={formatQuantity(kpis.total, 0)} centerLabel="phiếu" />
             </InventoryChartCard>
             <InventoryChartCard title="Giá trị điều chuyển theo kho">
               <HorizontalBars rows={zoneValue} valueFormatter={formatCurrency} />
@@ -203,7 +204,7 @@ export function InventoryTransferPage() {
               {recentActivities.map((x: any) => (
                 <div key={x.id} className="mb-2 rounded border border-white/10 p-2 text-xs text-slate-300">
                   <div className="text-cyan-300">{x.transactionNo}</div>
-                  <div>{new Date(x.transactionDate ?? x.createdAt).toLocaleString('vi-VN')}</div>
+                  <div>{formatDateTime(x.transactionDate ?? x.createdAt)}</div>
                 </div>
               ))}
             </InventoryChartCard>

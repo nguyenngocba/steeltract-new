@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 
-import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
 
@@ -12,12 +11,13 @@ import {
 
 @Injectable()
 export class LocalStorageService extends StorageService {
-  private readonly rootDir = join(process.cwd(), 'uploads');
+  private readonly rootDir =
+    process.env.STORAGE_ROOT || '/data/steeltrack-storage';
 
   async store(input: StoreFileInput) {
     const folder = input.folder ?? 'attachments';
     const extension = extname(input.originalName);
-    const filename = `${Date.now()}-${randomUUID()}${extension}`;
+    const filename = input.storedName ?? `${Date.now()}${extension}`;
     const storageKey = `${folder}/${filename}`;
     const absoluteDir = join(this.rootDir, folder);
     const absolutePath = join(this.rootDir, storageKey);

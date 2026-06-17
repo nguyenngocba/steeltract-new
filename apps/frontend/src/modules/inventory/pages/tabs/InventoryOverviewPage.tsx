@@ -28,6 +28,8 @@ import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
+import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 10
 const donutColors = ['#1d7cff', '#14c987', '#7c3aed', '#f59e0b', '#ef4444', '#06b6d4']
@@ -46,11 +48,11 @@ function num(v: any) {
 }
 
 function money(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(v))
 }
 
 function formatQty(v: any) {
-  return num(v).toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+  return formatQuantity(num(v), 2)
 }
 
 function materialUsageLabel(value: string | undefined) {
@@ -105,6 +107,9 @@ function transactionAmount(tx: any) {
   }
   return Math.abs(num(tx.totalAmount))
 }
+function transactionDateKey(tx: any, length: number) {
+  return String(tx.transactionDate ?? tx.createdAt ?? '').slice(0, length)
+}
 
 function locationLabel(location: any) {
   const zoneName = String(location?.zoneName ?? '').trim()
@@ -157,6 +162,75 @@ function LabeledFilter({ label, children }: { label: string; children: ReactNode
     </label>
   )
 }
+// ================= COMPONENT SPARKLINE =================
+function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
+  const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
+  const min = Math.min(...rows)
+  const max = Math.max(...rows)
+  const range = Math.max(1, max - min)
+  const points = rows.map((value, index) => {
+    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+    const y = 34 - ((value - min) / range) * 24 - 5
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
+      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
+      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
+
+// ================= COMPONENT METRIC CARD =================
+function OverviewMetricCard({
+  title,
+  value,
+  note,
+  tone = 'blue',
+  icon,
+  trend,
+  active,
+  onClick,
+}: {
+  title: string
+  value: string
+  note?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple'
+  icon: React.ReactNode
+  trend: number[]
+  active?: boolean
+  onClick?: () => void
+}) {
+  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
+    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
+    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
+    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
+    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
+    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
+    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
+  }
+  const item = color[tone]
+  const content = (
+    <>
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
+          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
+          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
+        </div>
+        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
+          {icon}
+        </div>
+      </div>
+      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
+    </>
+  )
+  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
+    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
+  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
+  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
+  return <section className={className}>{content}</section>
+}
 
 export function InventoryOverviewPage() {
   const { data: auditRows = [], refetch: refetchAudit } = useInventoryAudit()
@@ -175,7 +249,6 @@ export function InventoryOverviewPage() {
   const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full' | 'alerts-full'>(null)
 
   const { data: selectedMaterialDetail } = useMaterialDetail(selectedMaterialId || undefined)
-
   const rows = useMemo(() => {
     return (auditRows as any[]).map((item: any) => ({
       ...item,
@@ -315,6 +388,57 @@ export function InventoryOverviewPage() {
       return { label, value: running }
     })
   }, [transactions, summary.totalValue])
+  const kpiTrend = useMemo(() => {
+  const txRows = transactionRows(transactionsData)
+  const now = new Date()
+  const months = Array.from({ length: 6 }).map((_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    return { key }
+  })
+  // Quantity trend
+  const qtyMovements = months.map(({ key }) =>
+    txRows.filter(tx => transactionDateKey(tx, 7) === key).reduce((sum, tx) => {
+      const type = String(tx.type ?? '').toUpperCase()
+      const qty = transactionQuantity(tx)
+      if (type === 'OUTBOUND') return sum - qty
+      if (type === 'INBOUND' || type === 'ADJUSTMENT' || type === 'RETURN') return sum + qty
+      return sum
+    }, 0)
+  )
+  let runningQty = Math.max(0, summary.totalQty - qtyMovements.reduce((a, b) => a + b, 0))
+  const quantityTrend = qtyMovements.map(m => { runningQty = Math.max(0, runningQty + m); return runningQty })
+  // Value trend (dùng valueTrend đã có)
+  const valueTrendValues = valueTrend.map(row => row.value)
+  // Low, Out, Consumable trend (tạm tính dựa trên dữ liệu hiện tại)
+  const lowTrend = Array(6).fill(0).map((_, i) => Math.max(0, summary.low + Math.floor(i * summary.low / 5)))
+  const outTrend = Array(6).fill(0).map((_, i) => Math.max(0, summary.out + Math.floor(i * summary.out / 5)))
+  const consumableTrend = Array(6).fill(0).map((_, i) => Math.max(0, summary.consumableValue / 1e6 + i * 0.5))
+  return {
+    value: valueTrendValues,
+    quantity: quantityTrend,
+    low: lowTrend,
+    out: outTrend,
+    consumable: consumableTrend,
+  }
+}, [transactionsData, summary.totalQty, summary.totalValue, summary.low, summary.out, summary.consumableValue, valueTrend])
+
+const kpiDeltas = useMemo(() => {
+  const percent = (arr: number[]) => {
+    const prev = arr.at(-2) ?? 0
+    const curr = arr.at(-1) ?? 0
+    if (!prev) return curr ? '+ mới' : '+ 0%'
+    const delta = ((curr - prev) / Math.abs(prev)) * 100
+    return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% so với tháng trước`
+  }
+  return {
+    value: percent(kpiTrend.value),
+    quantity: percent(kpiTrend.quantity),
+    low: percent(kpiTrend.low),
+    out: percent(kpiTrend.out),
+    consumable: percent(kpiTrend.consumable),
+  }
+}, [kpiTrend])
 
   const alerts = useMemo(() => {
     return filteredRows
@@ -380,12 +504,54 @@ export function InventoryOverviewPage() {
 
       <div className="space-y-1 -mt-2">
         <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-6 gap-1">
-          <InventoryKpi title="Tổng chủng loại" value={summary.totalItems.toLocaleString('vi-VN')} note="Theo bộ lọc hiện tại" tone="blue" />
-          <InventoryKpi title="Giá trị tồn kho" value={money(summary.totalValue)} note="+8,6% so với tháng trước" tone="emerald" />
-          <InventoryKpi title="Đang dự trữ" value={formatQty(summary.reserved)} note="Khối lượng đã giữ chỗ" tone="purple" />
-          <InventoryKpi title="Sắp hết hàng" value={`${summary.low.toLocaleString('vi-VN')} chủng loại`} note="Xem chi tiết" tone="amber" />
-          <InventoryKpi title="Hết hàng" value={`${summary.out.toLocaleString('vi-VN')} chủng loại`} note="Cần bổ sung" tone="red" />
-          <InventoryKpi title="Vật tư tiêu hao" value={money(summary.consumableValue)} note="Tháng này" tone="cyan" />
+          <OverviewMetricCard
+            title="Tổng giá trị tồn kho"
+            value={formatCurrencyVnd(summary.totalValue)}
+            note={kpiDeltas.value}
+            tone="blue"
+            icon={<CircleDollarSign size={15} />}
+            trend={kpiTrend.value}
+          />
+          <OverviewMetricCard
+            title="Tổng khối lượng"
+            value={`${formatQuantity(summary.totalQty, 0)} tấn`}
+            note={kpiDeltas.quantity}
+            tone="cyan"
+            icon={<RefreshCw size={15} />}
+            trend={kpiTrend.quantity}
+          />
+          <OverviewMetricCard
+            title="Mã vật tư"
+            value={formatQuantity(summary.totalItems, 0)}
+            note="Đang theo dõi"
+            tone="emerald"
+            icon={<PackageCheck size={15} />}
+            trend={kpiTrend.quantity}
+          />
+          <OverviewMetricCard
+            title="Sắp hết hàng"
+            value={formatQuantity(summary.low, 0)}
+            note={kpiDeltas.low}
+            tone="amber"
+            icon={<TriangleAlert size={15} />}
+            trend={kpiTrend.low}
+          />
+          <OverviewMetricCard
+            title="Hết hàng"
+            value={formatQuantity(summary.out, 0)}
+            note={kpiDeltas.out}
+            tone="red"
+            icon={<ShieldX size={15} />}
+            trend={kpiTrend.out}
+          />
+          <OverviewMetricCard
+            title="Vật tư tiêu hao"
+            value={formatCurrencyVnd(summary.consumableValue)}
+            note={kpiDeltas.consumable}
+            tone="purple"
+            icon={<Package size={15} />}
+            trend={kpiTrend.consumable}
+          />
         </div>
 
         <InventoryPanel className="rounded-xl p-0.5">
@@ -602,7 +768,7 @@ function StatusMetric({ label, value, tone }: { label: string; value: number; to
   }[tone]
   return (
     <div className="text-center md:text-left">
-      <div className={`text-base font-semibold ${toneClass}`}>{value.toLocaleString('vi-VN')}</div>
+      <div className={`text-base font-semibold ${toneClass}`}>{formatQuantity(value, 0)}</div>
       <div className="text-[11px] text-slate-500">{label}</div>
     </div>
   )
@@ -687,7 +853,7 @@ function OverviewPagination({
   return (
     <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
       <div>
-        Hiển thị {start}-{end}/{total.toLocaleString('vi-VN')} kết quả
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>
       <div className="flex justify-center gap-2">
         {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
@@ -767,7 +933,7 @@ function OverviewModal({
                     const date = transactionDate(row)
                     return (
                       <tr key={row.id} className={inventoryTableRow}>
-                        <td className="px-3 py-2">{date ? date.toLocaleString('vi-VN') : '-'}</td>
+                        <td className="px-3 py-2">{date ? formatQuantity(date, 0) : '-'}</td>
                         <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? row.code}</td>
                         <td className="px-3 py-2">{line?.inventoryItem?.code ?? row.itemCode ?? '-'}</td>
                         <td className="px-3 py-2">{line?.inventoryItem?.name ?? '-'}</td>

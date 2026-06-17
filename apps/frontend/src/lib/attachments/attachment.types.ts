@@ -2,6 +2,10 @@ export type AttachmentCategory =
   | 'DOCUMENT'
   | 'DRAWING'
   | 'PHOTO'
+  | 'DATASHEET'
+  | 'CO'
+  | 'CQ'
+  | 'CATALOG'
   | 'QC'
   | 'CONTRACT'
   | 'OTHER'
@@ -38,6 +42,15 @@ export interface Attachment {
   title: string
   description?: string | null
   category: AttachmentCategory
+  module?: string | null
+  entityType?: string | null
+  entityId?: string | null
+  originalName?: string | null
+  storedName?: string | null
+  extension?: string | null
+  checksum?: string | null
+  storagePath?: string | null
+  uploadedBy?: string | null
   mimeType: string
   fileSize: number
   uploaderId?: string | null
@@ -59,6 +72,7 @@ export interface AttachmentListParams {
   category?: AttachmentCategory
   mimeType?: string
   module?: string
+  entityType?: string
   entityId?: string
   tag?: string
   includeDeleted?: boolean
@@ -75,6 +89,7 @@ export interface UploadAttachmentPayload {
   category?: AttachmentCategory
   tags?: string[]
   module?: string
+  entityType?: string
   entityId?: string
   purpose?: string
   metadata?: Record<string, unknown>

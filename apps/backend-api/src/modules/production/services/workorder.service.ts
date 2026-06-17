@@ -4,6 +4,8 @@ import {
 
 import { PrismaService }
 from '../../../core/prisma/prisma.service'
+import { nextOperationalCode }
+from '../../../common/utils/code-generator'
 
 @Injectable()
 export class WorkOrderService {
@@ -23,7 +25,7 @@ export class WorkOrderService {
       data: {
 
         workOrderNo:
-          `WO-${Date.now()}`,
+          await nextOperationalCode(this.prisma, 'workOrder', 'workOrderNo', 'WO'),
 
         productCode:
           body.productCode,

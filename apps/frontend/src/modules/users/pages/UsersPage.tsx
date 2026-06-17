@@ -26,9 +26,10 @@ import {
 } from '@/modules/inventory/components/InventoryVisuals'
 import { getUsers } from '../api/users.api'
 import type { SystemUser } from '@/modules/system/api/system.api'
+import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
-const date = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '-'
+const fmt = (value = 0) => formatQuantity(value, 0)
+const date = (value?: string | null) => value ? formatDateTime(value) : '-'
 
 const roleLabel = (user: SystemUser) => user.roles[0]?.name ?? 'Chưa gán vai trò'
 const displayName = (user: SystemUser) => user.fullName ?? user.username

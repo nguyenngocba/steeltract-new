@@ -19,6 +19,7 @@ import {
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useProjects } from '../../hooks/useProjects'
 import { useZones } from '../../hooks/useZones'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
 function num(v: any) {
   const n = Number(v ?? 0)
@@ -26,7 +27,7 @@ function num(v: any) {
 }
 
 function formatCurrency(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(v))
 }
 
 export function InventoryOutboundPage() {
@@ -115,10 +116,10 @@ export function InventoryOutboundPage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid grid-cols-1 xl:grid-cols-4 ${inventoryGridGap}`}>
-          <InventoryKpi title="Tổng xuất trong tháng" value={`${kpis.monthlyQty.toLocaleString('vi-VN')} tấn`} note="Theo phiếu xuất" tone="blue" />
+          <InventoryKpi title="Tổng xuất trong tháng" value={`${formatQuantity(kpis.monthlyQty, 0)} tấn`} note="Theo phiếu xuất" tone="blue" />
           <InventoryKpi title="Giá trị xuất trong tháng" value={formatCurrency(kpis.monthlyAmount)} note="Giá trị đã xuất" tone="emerald" />
-          <InventoryKpi title="Số phiếu xuất" value={kpis.docs.toLocaleString('vi-VN')} note="Trong tháng hiện tại" tone="cyan" />
-          <InventoryKpi title="Chờ duyệt" value={kpis.pending.toLocaleString('vi-VN')} note="Cần xử lý" tone="amber" />
+          <InventoryKpi title="Số phiếu xuất" value={formatQuantity(kpis.docs, 0)} note="Trong tháng hiện tại" tone="cyan" />
+          <InventoryKpi title="Chờ duyệt" value={formatQuantity(kpis.pending, 0)} note="Cần xử lý" tone="amber" />
         </div>
 
         <InventoryPanel title="Bộ lọc phiếu xuất">
@@ -168,7 +169,7 @@ export function InventoryOutboundPage() {
                           <td className="px-3 py-2">{x.referenceType ?? 'Xuất kho'}</td>
                           <td className="px-3 py-2">{x.projectName ?? '-'}</td>
                           <td className="px-3 py-2">{line?.zone?.code ?? '-'}</td>
-                          <td className="px-3 py-2">{Math.abs(num(line?.quantity)).toLocaleString('vi-VN')}</td>
+                          <td className="px-3 py-2">{formatQuantity(Math.abs(num(line?.quantity)), 0)}</td>
                           <td className="px-3 py-2">{formatCurrency(Math.abs(num(line?.totalAmount)))}</td>
                           <td className="px-3 py-2">
                             <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">{String(x.status ?? 'COMPLETED')}</span>
@@ -185,10 +186,10 @@ export function InventoryOutboundPage() {
 
           <div className="space-y-3 xl:col-span-3">
             <InventoryChartCard title="Phân bổ xuất theo kho">
-              <CompactDonutSummary segments={zoneSegments} centerValue={kpis.monthlyQty.toLocaleString('vi-VN')} centerLabel="tổng xuất" />
+              <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.monthlyQty, 0)} centerLabel="tổng xuất" />
             </InventoryChartCard>
             <InventoryChartCard title="Top vật tư xuất">
-              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.qty])} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.qty])} valueFormatter={(value) => formatQuantity(value, 0)} />
             </InventoryChartCard>
           </div>
         </div>

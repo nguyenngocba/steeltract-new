@@ -23,6 +23,8 @@ In Progress.
 * Project Components table displays installation Zone, Axis, Level, and Position.
 * Project component Actual Cost reflects `Component.actualCost`, which is updated by Component Costing recalculation.
 * Current project UI follows the Inventory visual baseline from the cross-module cockpit refresh.
+* Sprint 12B standardizes Projects page header, KPI strip, Project runtime cards, Components runtime cards, filter bar, table shell, and empty state with shared module UI primitives.
+* Sprint 12C adds sticky filters, frontend KPI click-to-filter for Projects/Project Components, and standard `ModuleDetailDrawer` usage for project detail.
 
 ## Database Models
 

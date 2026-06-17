@@ -4,6 +4,7 @@ import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/Enterprise
 import { useProductionOrders } from '../../../production/hooks/useProductionCockpit'
 import { useYardSlotsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
 import { useComponents } from '../../hooks/queries/useComponents'
+import { formatQuantity } from '@/shared/utils/number-format'
 import {
   ComponentsDonut,
   ComponentsFilterBar,
@@ -136,12 +137,12 @@ export function ComponentsOverviewPage() {
     <EnterpriseModulePage>
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <ComponentsKpiCard title="Tổng số cấu kiện" value={statusCounts.total.toLocaleString('vi-VN')} sub="+8,6% so với tháng trước" tone="blue" />
-          <ComponentsKpiCard title="Đang sản xuất" value={statusCounts.producing.toLocaleString('vi-VN')} sub="+18,2%" tone="purple" />
-          <ComponentsKpiCard title="Tồn kho cấu kiện" value={statusCounts.stock.toLocaleString('vi-VN')} sub="+43,2%" tone="amber" />
-          <ComponentsKpiCard title="Đã QC đạt" value={statusCounts.qcPass.toLocaleString('vi-VN')} sub="+77,1%" tone="emerald" />
-          <ComponentsKpiCard title="QC không đạt" value={statusCounts.qcFail.toLocaleString('vi-VN')} sub="+2,7%" tone="red" />
-          <ComponentsKpiCard title="Đang chuyển" value={statusCounts.transferring.toLocaleString('vi-VN')} sub="+6,0%" tone="cyan" />
+          <ComponentsKpiCard title="Tổng số cấu kiện" value={formatQuantity(statusCounts.total, 0)} sub="+8,6% so với tháng trước" tone="blue" />
+          <ComponentsKpiCard title="Đang sản xuất" value={formatQuantity(statusCounts.producing, 0)} sub="+18,2%" tone="purple" />
+          <ComponentsKpiCard title="Tồn kho cấu kiện" value={formatQuantity(statusCounts.stock, 0)} sub="+43,2%" tone="amber" />
+          <ComponentsKpiCard title="Đã QC đạt" value={formatQuantity(statusCounts.qcPass, 0)} sub="+77,1%" tone="emerald" />
+          <ComponentsKpiCard title="QC không đạt" value={formatQuantity(statusCounts.qcFail, 0)} sub="+2,7%" tone="red" />
+          <ComponentsKpiCard title="Đang chuyển" value={formatQuantity(statusCounts.transferring, 0)} sub="+6,0%" tone="cyan" />
         </div>
 
         <ComponentsFilterBar>
@@ -191,8 +192,8 @@ export function ComponentsOverviewPage() {
                           <td className="px-3 py-2">{row.project}</td>
                           <td className="px-3 py-2"><span className={`rounded-full border px-2 py-1 text-[11px] ${statusTone(row.status)}`}>{row.status}</span></td>
                           <td className="px-3 py-2">{row.location}</td>
-                          <td className="px-3 py-2">{row.quantity.toLocaleString('vi-VN')}</td>
-                          <td className="px-3 py-2 text-emerald-300">{row.qcQuantity.toLocaleString('vi-VN')}</td>
+                          <td className="px-3 py-2">{formatQuantity(row.quantity, 0)}</td>
+                          <td className="px-3 py-2 text-emerald-300">{formatQuantity(row.qcQuantity, 0)}</td>
                           <td className="px-3 py-2 text-slate-500">...</td>
                         </tr>
                       ))}
@@ -239,7 +240,7 @@ export function ComponentsOverviewPage() {
 
           <aside className="space-y-3">
             <ComponentsPanel title="Phân loại theo loại" action="Xem chi tiết">
-              <ComponentsDonut centerValue={rows.length.toLocaleString('vi-VN')} centerLabel="Tổng" segments={typeSegments.length ? typeSegments : [{ label: 'Chưa có dữ liệu', value: 1, color: '#334155' }]} />
+              <ComponentsDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="Tổng" segments={typeSegments.length ? typeSegments : [{ label: 'Chưa có dữ liệu', value: 1, color: '#334155' }]} />
             </ComponentsPanel>
             <ComponentsPanel title="Tiến độ sản xuất" action={<span className="text-[11px] text-slate-400">Tháng này</span>}>
               <ComponentsMiniBars values={[260, 520, 480, 660, 720, 890, 860, 980, 1210, 1180, 1360, 1480]} tone="emerald" />
@@ -252,7 +253,7 @@ export function ComponentsOverviewPage() {
                       <div className="truncate text-slate-200">{profile}</div>
                       <div className="mt-1 h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${Math.max(8, (value / maxTop) * 100)}%` }} /></div>
                     </div>
-                    <span className="text-right text-white">{value.toLocaleString('vi-VN')}</span>
+                    <span className="text-right text-white">{formatQuantity(value, 0)}</span>
                     <span className="text-right text-slate-400">{((value / Math.max(1, rows.reduce((sum, row) => sum + row.quantity, 0))) * 100).toFixed(1)}%</span>
                   </div>
                 ))}

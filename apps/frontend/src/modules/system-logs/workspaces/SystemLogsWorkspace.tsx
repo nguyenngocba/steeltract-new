@@ -15,9 +15,10 @@ import {
   inventoryTableShell,
 } from '@/modules/inventory/components/InventoryVisuals'
 import { systemApi, type ActivityLog, type ActivitySummary } from '@/modules/system/api/system.api'
+import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
-const date = (value?: string) => value ? new Date(value).toLocaleString('vi-VN') : '-'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN').format(value)
+const date = (value?: string) => value ? formatDateTime(value) : '-'
+const fmt = (value = 0) => formatQuantity(value, 0)
 const colors = ['#1d7cff', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#38bdf8']
 
 export function SystemLogsWorkspace() {

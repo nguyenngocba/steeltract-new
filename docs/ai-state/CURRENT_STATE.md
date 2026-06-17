@@ -17,19 +17,30 @@ Current architecture:
 - Warehouse locations are stored in `warehouse_zones` and linked to `master_warehouses` (`MAIN` / `PRODUCTION`).
 - Sprint 9 stock mutation paths use the full location bucket `inventoryItemId + warehouseId + zoneId + slotId + level` for exact location validation and location stock upsert.
 - Sprint 11A decimal pass supports locale-formatted quantity input in operational Inventory forms and keeps VND currency display rounded to whole dong.
+- Sprint 12A treats Inventory Overview/Stock as the UI design reference; Inventory visual wrappers now delegate to shared module UI primitives without changing Inventory behavior.
+- Sprint 12C adds sticky module filters and frontend KPI click-to-filter for Inventory stock status where matching filters exist.
+- Sprint 13B.1 redesigns the Material Detail drawer with shared module UI primitives, KPI strip, horizontal tabs, colored transaction badges, location distribution, movement trend, forecast, project usage, and supplier purchase summaries.
+- Sprint 13B.2 adds shared `ModuleTabs` and brings the Material Detail drawer to Module UI Foundation compliance for tabs, table tokens, drawer behavior, and focused 2D location preview.
+- Sprint 11A.2 centralizes frontend numeric formatting through shared quantity/currency helpers and removes ad-hoc `toLocaleString('vi-VN')` / `Intl.NumberFormat` usage from frontend source.
+- Sprint 13B.3 adds Material Detail image gallery readiness, Material Master image preview UI, and standardized Material Analytics Cockpit panels for inbound, outbound, inventory trend, 7-day forecast, and turnover.
+- Sprint 14A connects Material Detail image gallery to the shared Attachments backend. Material photos are uploaded through `/attachments/upload`, stored on filesystem under `STORAGE_ROOT`, and displayed from attachment metadata.
+- Material Detail now shows non-photo `Tài liệu vật tư` attachments with original filename, size, upload date, and download link.
+- Inventory Material Stock KPI sparklines use real monthly snapshots from Inventory audit rows, material `createdAt`, and Inventory transaction item movement history.
+- Operational code generation now follows `PREFIX-YYMMDD-###` for new Inventory, Production, Components, Projects, QC, material movement, and receiving codes; see `docs/ai-state/decisions/code-numbering-decisions.md`.
 
 Known limitations:
 
-- Some document numbers are still generated on the frontend.
+- Some document numbers are still suggested on the frontend, but now use the short shared code convention rather than timestamp/random suffixes.
 - Slot-level reconciliation is not yet a formal ledger rebuilt from immutable transaction history.
 - Sprint 8 audit found transaction-vs-location reconciliation mismatches and snapshot mismatches that need operator/admin review before any automated backfill.
 - Sprint 9 fixed active mutation paths that created new snapshot/location mismatches, but existing mismatched validation rows still require a dedicated reconciliation/backfill decision.
-- Some Inventory modal helpers remain locally embedded instead of shared visual components.
+- Some Inventory modal/chart helpers remain locally embedded instead of shared visual components.
+- Material photo upload is persisted through shared attachments. General non-photo document upload controls for datasheets, CO, CQ, and catalogs are still pending rollout beyond the current display/download section.
 
 Current focus:
 
 - Preserve transaction-first behavior.
-- Continue warehouse structure cleanup, persisted slot-level balance work, and Inventory UI component extraction.
+- Continue warehouse structure cleanup, persisted slot-level balance work, and Sprint 12B UI rollout to other modules.
 
 ## Production
 
@@ -51,6 +62,8 @@ Current architecture:
 - Sprint 10B automatically recalculates Component costing after production completion/component `READY`; costing failure is logged as a warning and does not roll back production completion.
 - Sprint 11 exposes Component costing material breakdown by BOM planned materials and actual production consumption, including variance warnings.
 - Sprint 11A decimal pass supports decimal BOM, MO, issue/return/consume, and Yard staging quantities in frontend workflows and backend DTO parsing.
+- Sprint 12B aligns the Production Cockpit presentation with the shared module UI foundation for KPI strip, analytics panels, filter bar, and the primary data grid.
+- Sprint 12C adds sticky filters, clickable status KPIs, shared loading states, and route-level frontend splitting around Production pages.
 - Production can create/mark a component from an MO only after material has been issued.
 - MO start auto-issues missing BOM material quantities from `Kho vật tư SX` and creates outbound Inventory movements.
 - Sprint 9 auto-issue planning preserves production warehouse slot/level and production issue transaction items carry the same warehouse/zone/slot/level into Inventory.
@@ -109,6 +122,8 @@ Current architecture:
 - Yard outbound removal for component placements now marks the linked Component as `SHIPPED`, preserves/infers `projectId`, and writes a component timeline entry.
 - Project delivery and installation confirmation now happen from Projects, after Yard outbound marks the component `SHIPPED`.
 - 2D cockpit/map concepts exist for operator visibility.
+- Sprint 12B aligns Yard cockpit page header, KPI strip, filter bar, occupancy analytics, shipment/operation analytics, and trend panels with the shared module UI foundation.
+- Sprint 12C lazy-loads Yard 2D/3D operational maps; the large 3D map chunk is isolated to the 3D tab.
 
 Known limitations:
 
@@ -153,12 +168,15 @@ Current architecture:
 - Project data participates in Dashboard, Inventory outbound, Production, QC grouping, and Yard workflow checks.
 - Projects runtime now exposes project-linked components from `components.projectId`.
 - Projects UI includes `Cấu kiện công trình` next to `Vật tư theo công trình`, with component status filters, summary cards, planned/installed dates, and estimated/actual cost columns.
+- Sprint 12B aligns Projects page header, KPI strip, Project runtime cards, Components runtime cards, filter bar, table shell, and empty state with the shared module UI foundation.
+- Sprint 12C adds frontend KPI click-to-filter for Project and Project Component runtime cards and moves Project detail to the standard module drawer.
 - Project Components actions can confirm receiving `SHIPPED` components into `DELIVERED` and confirm `DELIVERED` components into `INSTALLED`.
 - Project runtime separates `readyComponents`, `shippedComponents`, `deliveredComponents`, and `installedComponents`; delivered project counts include `DELIVERED` and `INSTALLED`, not in-transit `SHIPPED`.
 - Project Components installation confirmation requires Khu vực, Trục, Tầng, and Vị trí, and runtime returns these installation fields.
 - Project component Actual Cost is populated from Component costing recalculation when consumption data exists.
 - Project Components delivery and installation actions use the authenticated frontend API client and show success/error feedback.
 - Project Components row navigation opens the existing Component detail modal on the Components list when routed with a component id.
+- Components List and Components Stock now follow the Sprint 12A Inventory cockpit layout foundation with shared page headers, shared card/table primitives, and lifecycle KPI strips.
 - Sprint 8 audit found no installed-component `projectId` violations in current data.
 - Current project workflows support visible management context and integration points rather than full contract/schedule control.
 
@@ -185,15 +203,22 @@ Current architecture:
 - Main Dashboard uses `GET /dashboard/cockpit`.
 - The cockpit aggregates Projects, Production Orders, Components, Inventory, Yard, QC, Activity Logs, and Notifications.
 - UI follows the Inventory dark cockpit baseline.
+- Sprint 13 main Dashboard is now an Executive Dashboard with Inventory Forecast, Component Pipeline, Yard Occupancy, QC Quality Trend, Production Signal, and Executive Alerts.
+- Dashboard now adds material replenishment forecast panels that identify material codes needing purchase/import, projected 7-day balances, and recommended quantities from existing Inventory Audit and transaction data.
+- Dashboard now adds a 7-day component forecast from current Component lifecycle status and open Production Orders.
+- Executive Alerts include top material replenishment needs plus component delivery/installation backlog signals.
+- Forecasts and alerts are rules-based from existing operational data only; no AI/ML, API contract, schema, or workflow changes were introduced.
 
 Known limitations:
 
 - Persisted dashboard preferences do not exist yet.
 - Drill-through actions and notification/action mutation flows remain Phase S2.
+- Forecast accuracy is limited by currently available historical movement aggregates; panels display assumptions where detailed time-series data is incomplete.
+- Material recommendations are dashboard-only analytics and do not yet create procurement requests because Purchasing is not implemented.
 
 Current focus:
 
-- Add dashboard preferences, deeper drill-through links, and action mutations after System mutation APIs exist.
+- Add dashboard preferences, deeper drill-through links, procurement links for replenishment recommendations, and action mutations after System/Purchasing mutation APIs exist.
 
 ## System
 
@@ -204,6 +229,8 @@ Status:
 Current architecture:
 
 - Settings, Users, Roles & Permissions, System Logs, Notifications, and operational workflow health are API-backed.
+- Attachments are a shared metadata-first subsystem. PostgreSQL stores attachment metadata only; file bytes are stored under `STORAGE_ROOT` or `/data/steeltrack-storage` and served through `/uploads/*`.
+- Attachment upload validates MIME type and file size, computes SHA256 checksums, and reuses existing physical files for duplicate content while creating new metadata references.
 - Users/Roles/System Logs use real `User`, `Role`, `Permission`, and `ActivityLog` data.
 - Notifications read persisted notification rows through `/system/notifications`.
 - Frontend auth now uses the shared Zustand auth store, persisted access/refresh tokens, Axios auth interceptor, active `/login` route, and app route guard.
@@ -212,6 +239,7 @@ Current architecture:
 Known limitations:
 
 - User create/edit/lock/delete, role permission mutation, notification mark-read, audit export, backup execution, and persisted editable settings are not implemented.
+- Attachment deletion currently removes/soft-deletes metadata through the existing attachment lifecycle; physical file cleanup policy for deduped files remains a future operations decision.
 - Legacy archived auth/router files remain in the repository and should not be treated as active app entrypoints.
 
 Current focus:
@@ -227,6 +255,7 @@ Status:
 Current architecture:
 
 - Current status, module state, tasks, decisions, design guidance, and audits live under `docs/ai-state/`.
+- Sprint 12C records frontend route splitting and UI polish guidance in `docs/ai-state/design/ui-standardization-foundation.md`.
 - Legacy root docs have been audited and their useful content has been merged into ai-state decision, design, roadmap, workflow, and audit documents.
 - Historical overview/refactor docs are moved to `docs/archive/` when classified as archive.
 

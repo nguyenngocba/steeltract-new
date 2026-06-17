@@ -3,8 +3,9 @@ import { Boxes, Truck, X } from 'lucide-react'
 
 import { useRemoveYardItem } from '../hooks/queries/useYardRuntime'
 import type { YardSlotRuntime } from '../services/api/yard.api'
+import { formatQuantity } from '@/shared/utils/number-format'
 
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
+const fmt = (value = 0) => formatQuantity(value, 2)
 const tone = (slot: YardSlotRuntime) => {
   const rate = slot.maxStackLevel ? slot.currentStackLevel / slot.maxStackLevel : 0
   if (rate >= 1) return 'border-red-500 bg-red-950/55 text-red-200'

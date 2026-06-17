@@ -3,6 +3,8 @@ import toast from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState, ModulePageHeader } from '../../../../shared/ui/modules'
+import { nextLocalCode } from '@/shared/utils/code-format'
 import { useProjects } from '../../../inventory/hooks/useProjects'
 import { ManufacturingOrderModal } from '../../../production/components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../../../production/components/ProductionBomModal'
@@ -17,6 +19,7 @@ import {
   useProductionOrders,
   useRecalculateComponentCosting,
 } from '../../hooks/queries/useComponents'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 import {
   ComponentsDonut,
   ComponentsFilterBar,
@@ -45,6 +48,7 @@ type ComponentRow = {
   installLevel?: string | null
   installPosition?: string | null
   status: 'Tồn kho' | 'Đang SX' | 'Đã QC' | 'Chờ QC' | 'Không đạt'
+  rawStatus: string
   qty: number
   qc: number
   createdAt: string
@@ -150,6 +154,7 @@ export function ComponentsListPage() {
         installLevel: record.installLevel,
         installPosition: record.installPosition,
         status: statusMap[record.status] ?? 'Tồn kho',
+        rawStatus: record.status,
         qty: metadata.quantity ?? 1,
         qc: metadata.qcQuantity ?? (record.status === 'READY' ? metadata.quantity ?? 1 : 0),
         createdAt: record.createdAt
@@ -180,13 +185,21 @@ export function ComponentsListPage() {
   const filtered = useMemo(() => {
     return rows.filter((row) => {
       if (project && row.project !== project) return false
-      if (status && row.status !== status) return false
+      if (status && row.status !== status && row.rawStatus !== status) return false
       if (type && row.type !== type) return false
       if (location && row.location !== location) return false
       if (query && !`${row.code} ${row.name}`.toLowerCase().includes(query.toLowerCase())) return false
       return true
     })
   }, [rows, project, status, type, location, query])
+
+  const lifecycleCounts = useMemo(() => ({
+    total: componentRecords.length,
+    ready: componentRecords.filter((record) => record.status === 'READY').length,
+    shipped: componentRecords.filter((record) => record.status === 'SHIPPED').length,
+    delivered: componentRecords.filter((record) => record.status === 'DELIVERED').length,
+    installed: componentRecords.filter((record) => record.status === 'INSTALLED').length,
+  }), [componentRecords])
 
   function openDetail(row: ComponentRow) {
     setSelected(row)
@@ -208,7 +221,7 @@ export function ComponentsListPage() {
   }
 
   async function submitCreate() {
-    const code = `CPL-${Date.now().toString().slice(-8)}`
+    const code = nextLocalCode('CPL')
     const metadata: ComponentMetadata = {
       type: createForm.type,
       profile: createForm.profile || 'N/A',
@@ -276,13 +289,19 @@ export function ComponentsListPage() {
   return (
     <EnterpriseModulePage>
       <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
-          <ComponentsKpiCard title="Tổng số cấu kiện" value={rows.length.toLocaleString('vi-VN')} sub="+8,6% so với tháng trước" tone="blue" />
-          <ComponentsKpiCard title="Đang sản xuất" value={rows.filter((x) => x.status === 'Đang SX').length.toLocaleString('vi-VN')} tone="amber" />
-          <ComponentsKpiCard title="Đã QC" value={rows.filter((x) => x.status === 'Đã QC').length.toLocaleString('vi-VN')} tone="emerald" />
-          <ComponentsKpiCard title="Chờ QC" value={rows.filter((x) => x.status === 'Chờ QC').length.toLocaleString('vi-VN')} tone="purple" />
-          <ComponentsKpiCard title="Tồn kho cấu kiện" value={rows.filter((x) => x.status === 'Tồn kho').length.toLocaleString('vi-VN')} tone="cyan" />
-          <ComponentsKpiCard title="Lệnh SX mới" value={productionOrders.length.toLocaleString('vi-VN')} tone="emerald" />
+        <ModulePageHeader
+          eyebrow="Steel component lifecycle"
+          title="Cấu kiện"
+          description="Theo dõi cấu kiện từ sản xuất, QC, bãi, giao hàng đến lắp đặt."
+          action={<button onClick={() => setCreateOpen(true)} className={componentsPrimaryButton}>+ Tạo cấu kiện</button>}
+        />
+
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
+          <ComponentsKpiCard title="Tổng cấu kiện" value={formatQuantity(lifecycleCounts.total, 0)} tone="blue" active={!status} onClick={() => setStatus('')} />
+          <ComponentsKpiCard title="READY" value={formatQuantity(lifecycleCounts.ready, 0)} tone="emerald" active={status === 'READY'} onClick={() => setStatus('READY')} />
+          <ComponentsKpiCard title="SHIPPED" value={formatQuantity(lifecycleCounts.shipped, 0)} tone="cyan" active={status === 'SHIPPED'} onClick={() => setStatus('SHIPPED')} />
+          <ComponentsKpiCard title="DELIVERED" value={formatQuantity(lifecycleCounts.delivered, 0)} tone="purple" active={status === 'DELIVERED'} onClick={() => setStatus('DELIVERED')} />
+          <ComponentsKpiCard title="INSTALLED" value={formatQuantity(lifecycleCounts.installed, 0)} tone="amber" active={status === 'INSTALLED'} onClick={() => setStatus('INSTALLED')} />
         </div>
 
         <ComponentsFilterBar>
@@ -302,6 +321,10 @@ export function ComponentsListPage() {
             <option value="Tồn kho">Tồn kho</option>
             <option value="Đang SX">Đang SX</option>
             <option value="Đã QC">Đã QC</option>
+            <option value="READY">READY</option>
+            <option value="SHIPPED">SHIPPED</option>
+            <option value="DELIVERED">DELIVERED</option>
+            <option value="INSTALLED">INSTALLED</option>
             <option value="Chờ QC">Chờ QC</option>
             <option value="Không đạt">Không đạt</option>
           </ComponentsSelect>
@@ -320,9 +343,6 @@ export function ComponentsListPage() {
         </ComponentsFilterBar>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setCreateOpen(true)} className={componentsPrimaryButton}>
-            + Tạo cấu kiện
-          </button>
           <button onClick={() => openProductionFor()} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500">
             + Tạo lệnh sản xuất
           </button>
@@ -349,8 +369,8 @@ export function ComponentsListPage() {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={11} className="px-2 py-6 text-center text-slate-400">
-                          Đang tải dữ liệu cấu kiện...
+                        <td colSpan={11} className="px-2 py-6">
+                          <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
                         </td>
                       </tr>
                     ) : filtered.map((row) => (
@@ -366,8 +386,8 @@ export function ComponentsListPage() {
                         <td className="px-2 py-2">{row.project}</td>
                         <td className="px-2 py-2">{row.location}</td>
                         <td className="px-2 py-2">{row.status}</td>
-                        <td className="px-2 py-2">{row.qty.toLocaleString('vi-VN')}</td>
-                        <td className="px-2 py-2">{row.qc.toLocaleString('vi-VN')}</td>
+                        <td className="px-2 py-2">{formatQuantity(row.qty, 0)}</td>
+                        <td className="px-2 py-2">{formatQuantity(row.qc, 0)}</td>
                         <td className="px-2 py-2">{row.createdAt}</td>
                         <td className="px-2 py-2">
                           <button
@@ -386,6 +406,7 @@ export function ComponentsListPage() {
                 </table>
                 </div>
               </div>
+              {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState title="Không tìm thấy cấu kiện" description="Thử đổi từ khóa hoặc bộ lọc trạng thái/dự án." /></div> : null}
               <div className="mt-3 text-xs text-slate-400">Hiển thị 1 - {filtered.length} của {filtered.length} kết quả</div>
             </ComponentsPanel>
           </div>
@@ -393,12 +414,12 @@ export function ComponentsListPage() {
           <div className="space-y-4 xl:col-span-3">
             <ComponentsPanel title="Lệnh sản xuất mới tạo">
               {recentOrders.length === 0 ? (
-                <div className="text-sm text-slate-400">Chưa có lệnh mới.</div>
+                <ModuleEmptyState title="Chưa có lệnh mới" description="Lệnh sản xuất mới sẽ hiển thị tại đây." />
               ) : (
                 recentOrders.map((order) => (
                   <div key={order.orderNo} className="mb-3 rounded-xl border border-white/10 bg-white/[0.035] p-2 text-xs text-slate-300">
                     <div className="text-cyan-300">{order.orderNo}</div>
-                    <div>{rows.find((row) => row.id === order.componentId)?.code ?? order.title} - SL: {order.quantity.toLocaleString('vi-VN')}</div>
+                    <div>{rows.find((row) => row.id === order.componentId)?.code ?? order.title} - SL: {formatQuantity(order.quantity, 0)}</div>
                     <div>
                       Đích: {order.metadata?.destinationYard} / {order.metadata?.destinationZone} / {order.metadata?.destinationSlot} / {order.metadata?.destinationLevel}
                     </div>
@@ -416,7 +437,7 @@ export function ComponentsListPage() {
             </ComponentsPanel>
             <ComponentsPanel title="Cơ cấu trạng thái">
               <ComponentsDonut
-                centerValue={rows.length.toLocaleString('vi-VN')}
+                centerValue={formatQuantity(rows.length, 0)}
                 centerLabel="cấu kiện"
                 segments={[
                   { label: 'Tồn kho', value: rows.filter((x) => x.status === 'Tồn kho').length, color: '#1d7cff' },
@@ -470,22 +491,21 @@ export function ComponentsListPage() {
       {productionOpen ? <ManufacturingOrderModal components={productionComponents} boms={productionBoms} initialComponentId={productionComponentId} onClose={closeProductionModal} /> : null}
       {bomOpen ? <ProductionBomModal components={productionComponents} initialComponentId={bomComponentId} onClose={() => { setBomOpen(false); setBomComponentId('') }} /> : null}
 
-      {detailOpen && selected ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-[#071323]/95 p-5 shadow-2xl ring-1 ring-white/[0.03] backdrop-blur-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold text-white">{selected.name}</h3>
-                <div className="text-sm text-slate-400">{selected.code} · {selected.profile} · {selected.project}</div>
-              </div>
-              <div className="flex items-center gap-2">
+      <ModuleDetailDrawer
+        open={detailOpen && Boolean(selected)}
+        title={selected?.name ?? ''}
+        subtitle={selected ? `${selected.code} · ${selected.profile} · ${selected.project}` : undefined}
+        onClose={() => setDetailOpen(false)}
+        actions={selected ? (
+          <>
                 <button onClick={() => openBomFor(selected)} className={componentsMutedButton}>Tạo BOM</button>
                 <button onClick={() => openProductionFor(selected)} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">Sản xuất</button>
                 <button onClick={() => void handleDelete(selected)} className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-300">Xóa</button>
-                <button onClick={() => setDetailOpen(false)} className={componentsMutedButton}>Đóng</button>
-              </div>
-            </div>
-
+          </>
+        ) : null}
+      >
+        {selected ? (
+          <>
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Trạng thái</div>
@@ -493,7 +513,7 @@ export function ComponentsListPage() {
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Số lượng hiện tại</div>
-                <div className="mt-1 text-lg font-semibold text-white">{selected.qty.toLocaleString('vi-VN')} kiện</div>
+                <div className="mt-1 text-lg font-semibold text-white">{formatQuantity(selected.qty, 0)} kiện</div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Vị trí hiện tại</div>
@@ -544,7 +564,7 @@ export function ComponentsListPage() {
                       <td className="px-2 py-2">{bom.version}</td>
                       <td className="px-2 py-2">{bom.items.length}</td>
                       <td className="px-2 py-2">{bom.routingSteps.length} bước</td>
-                      <td className="px-2 py-2">{bom.estimatedWeight.toLocaleString('vi-VN')} kg</td>
+                      <td className="px-2 py-2">{formatQuantity(bom.estimatedWeight, 0)} kg</td>
                       <td className="px-2 py-2"><span className="rounded bg-emerald-950 px-2 py-1 text-xs text-emerald-300">{bom.status}</span></td>
                     </tr>
                   ))}
@@ -616,17 +636,15 @@ export function ComponentsListPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </ModuleDetailDrawer>
     </EnterpriseModulePage>
   )
 }
 
 function money(value?: number | null) {
-  return new Intl.NumberFormat('vi-VN', {
-    maximumFractionDigits: 0,
-  }).format(Number(value ?? 0))
+  return formatCurrencyVnd(value)
 }
 
 function CostMetric({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {
@@ -704,7 +722,5 @@ function CostWarnings({ warnings }: { warnings: ComponentCostingWarning[] }) {
 }
 
 function quantity(value?: number | null) {
-  return new Intl.NumberFormat('vi-VN', {
-    maximumFractionDigits: 3,
-  }).format(Number(value ?? 0))
+  return formatQuantity(value, 3)
 }

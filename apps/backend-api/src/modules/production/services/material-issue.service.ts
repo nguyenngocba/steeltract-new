@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { compactCodeDate, formatOperationalCode, nextOperationalCode } from '../../../common/utils/code-generator';
 import { InventoryService } from '../../inventory/inventory.service';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 import {
@@ -51,7 +52,7 @@ export class MaterialIssueService {
   async create(body: CreateMaterialIssueDto, actorId?: string) {
     const issue = await this.prisma.productionMaterialIssue.create({
       data: {
-        issueNo: body.issueNo ?? `ISS-${Date.now()}`,
+        issueNo: body.issueNo ?? await nextOperationalCode(this.prisma, 'productionMaterialIssue', 'issueNo', 'ISS'),
         productionOrderId: body.productionOrderId,
         reservationId: body.reservationId,
         reservationLineId: body.reservationLineId,
@@ -174,14 +175,17 @@ export class MaterialIssueService {
       await this.assertLocationStock(item.line, item.quantity);
     }
 
+    const issueBaseCount = await this.prisma.productionMaterialIssue.count({
+      where: { issueNo: { startsWith: `ISS-${compactCodeDate()}-` } },
+    });
+
     return this.prisma.$transaction(async (tx) => {
-      const timestamp = Date.now();
       const issues = [];
 
       for (const [index, item] of targetLines.entries()) {
         const issue = await tx.productionMaterialIssue.create({
           data: {
-            issueNo: `ISS-${reservation.reservationNo}-${timestamp}-${index + 1}`,
+            issueNo: formatOperationalCode('ISS', issueBaseCount + index + 1),
             productionOrderId: reservation.productionOrderId,
             reservationId: reservation.id,
             reservationLineId: item.line.id,
@@ -627,11 +631,11 @@ export class MaterialIssueService {
     quantity: number,
     actorId?: string,
   ) {
-    const timestamp = Date.now();
+    const codeDate = compactCodeDate();
     return tx.inventoryTransaction.create({
       data: {
-        code: `PM-RETURN-${timestamp}`,
-        transactionNo: `${issue.issueNo}-RETURN-${timestamp}`,
+        code: `${issue.issueNo}-RT-${codeDate}`,
+        transactionNo: `${issue.issueNo}-RT-${codeDate}`,
         type: TransactionType.RETURN,
         direction: 'IN',
         performedBy: actorId,
@@ -675,11 +679,12 @@ export class MaterialIssueService {
     quantity: number,
     actorId?: string,
   ) {
-    const timestamp = Date.now();
+    const codeDate = compactCodeDate();
+    const shortType = type === TransactionType.EXPORT ? 'XK' : type === TransactionType.RETURN ? 'HT' : 'NK';
     return tx.inventoryTransaction.create({
       data: {
-        code: `PM-${type}-${timestamp}`,
-        transactionNo: `${issue.issueNo}-${type}-${timestamp}`,
+        code: `${issue.issueNo}-${shortType}-${codeDate}`,
+        transactionNo: `${issue.issueNo}-${shortType}-${codeDate}`,
         type,
         direction: type === TransactionType.EXPORT ? 'OUT' : 'IN',
         performedBy: actorId,

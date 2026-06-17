@@ -18,13 +18,14 @@ import {
 } from '../../components/InventoryVisuals'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useZones } from '../../hooks/useZones'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
 }
 function formatCurrency(v: any) {
-  return `${Math.round(num(v)).toLocaleString('vi-VN')} đ`
+  return formatCurrencyVnd(num(v))
 }
 
 export function InventoryStockTakePage() {
@@ -98,9 +99,9 @@ export function InventoryStockTakePage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid grid-cols-1 xl:grid-cols-5 ${inventoryGridGap}`}>
-          <InventoryKpi title="Phiếu kiểm kê" value={metrics.total.toLocaleString('vi-VN')} note="Tổng phiếu" tone="blue" />
-          <InventoryKpi title="Khớp" value={metrics.matched.toLocaleString('vi-VN')} note="Không chênh lệch" tone="emerald" />
-          <InventoryKpi title="Chênh lệch" value={metrics.mismatch.toLocaleString('vi-VN')} note="Cần xử lý" tone="amber" />
+          <InventoryKpi title="Phiếu kiểm kê" value={formatQuantity(metrics.total, 0)} note="Tổng phiếu" tone="blue" />
+          <InventoryKpi title="Khớp" value={formatQuantity(metrics.matched, 0)} note="Không chênh lệch" tone="emerald" />
+          <InventoryKpi title="Chênh lệch" value={formatQuantity(metrics.mismatch, 0)} note="Cần xử lý" tone="amber" />
           <InventoryKpi title="Độ chính xác" value={`${metrics.accuracy.toFixed(2)}%`} note="Theo phiếu kiểm kê" tone="cyan" />
           <InventoryKpi title="Giá trị chênh lệch" value={formatCurrency(metrics.varianceValue)} note="Theo giá trị tồn" tone="red" />
         </div>
@@ -152,7 +153,7 @@ export function InventoryStockTakePage() {
                       <td className="px-3 py-2">{new Date(x.transactionDate ?? x.createdAt).toLocaleDateString('vi-VN')}</td>
                       <td className="px-3 py-2">{x.createdBy ?? 'Admin'}</td>
                       <td className="px-3 py-2">{String(x.status ?? 'COMPLETED')}</td>
-                      <td className={`px-3 py-2 ${num(x.items?.[0]?.quantity) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{num(x.items?.[0]?.quantity).toLocaleString('vi-VN')}</td>
+                      <td className={`px-3 py-2 ${num(x.items?.[0]?.quantity) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatQuantity(num(x.items?.[0]?.quantity), 0)}</td>
                       <td className="px-3 py-2">{metrics.accuracy.toFixed(2)}%</td>
                     </tr>
                   ))}
@@ -167,10 +168,10 @@ export function InventoryStockTakePage() {
               <CompactDonutSummary segments={accuracySegments} centerValue={`${metrics.accuracy.toFixed(1)}%`} centerLabel="chính xác" />
             </InventoryChartCard>
             <InventoryChartCard title="Chênh lệch theo kho">
-              <HorizontalBars rows={discrepancyByZone} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+              <HorizontalBars rows={discrepancyByZone} valueFormatter={(value) => formatQuantity(value, 0)} />
             </InventoryChartCard>
             <InventoryChartCard title="Phương pháp kiểm kê">
-              <HorizontalBars rows={methodDist} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+              <HorizontalBars rows={methodDist} valueFormatter={(value) => formatQuantity(value, 0)} />
             </InventoryChartCard>
           </div>
         </div>

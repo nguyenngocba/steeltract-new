@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { createHash } from 'crypto';
+import { extname, posix } from 'path';
 
 import { AttachmentCategory, Prisma } from '@prisma/client';
 
@@ -117,14 +118,32 @@ export class AttachmentsService {
       throw new BadRequestException('File is required');
     }
 
-    const stored = await this.storage.store({
-      buffer: file.buffer,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      folder: 'attachments',
-    });
+    this.validateFile(file);
 
     const checksum = createHash('sha256').update(file.buffer).digest('hex');
+    const extension = this.extensionFor(file.originalname);
+    const folder = this.folderFor(dto);
+    const storedName = this.storedNameFor(dto, checksum, extension);
+    const existingVersion =
+      await this.repository.findVersionByChecksum(checksum);
+
+    const stored = existingVersion
+      ? {
+          storageKey: existingVersion.storageKey,
+          publicUrl:
+            existingVersion.publicUrl ??
+            this.storage.getPublicUrl(existingVersion.storageKey),
+          fileSize: existingVersion.fileSize,
+          mimeType: existingVersion.mimeType,
+          originalName: file.originalname,
+        }
+      : await this.storage.store({
+          buffer: file.buffer,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          folder,
+          storedName,
+        });
 
     const attachment = await this.repository.transaction(async (tx) => {
       if (dto.attachmentId) {
@@ -142,15 +161,21 @@ export class AttachmentsService {
         {
           title: dto.title ?? file.originalname,
           description: dto.description,
+          module: dto.module,
+          entityType: dto.entityType,
+          entityId: dto.entityId,
           category: dto.category ?? this.detectCategory(file.mimetype),
+          originalName: file.originalname,
+          storedName: posix.basename(stored.storageKey),
           mimeType: file.mimetype,
+          extension,
           fileSize: file.size,
+          checksum,
+          storagePath: stored.storageKey,
+          uploadedBy: uploaderId,
           uploaderId,
           tags: dto.tags ?? [],
           metadata: this.toJson(dto.metadata),
-          ocrStatus: this.shouldPrepareOcr(file.mimetype)
-            ? 'PENDING'
-            : undefined,
         },
         tx,
       );
@@ -189,7 +214,7 @@ export class AttachmentsService {
           {
             module: dto.module,
             entityId: dto.entityId,
-            purpose: dto.purpose ?? '',
+            purpose: dto.purpose ?? dto.entityType ?? '',
             metadata: this.toJson(dto.metadata),
           },
           tx,
@@ -215,7 +240,6 @@ export class AttachmentsService {
     });
 
     await this.emitAttachmentEvent('attachment.uploaded', attachment);
-    await this.emitOcrHook(attachment);
 
     return attachment;
   }
@@ -381,8 +405,14 @@ export class AttachmentsService {
         title: dto.title,
         description: dto.description,
         category: dto.category,
+        originalName: stored.originalName,
+        storedName: posix.basename(stored.storageKey),
         mimeType: stored.mimeType,
+        extension: this.extensionFor(stored.originalName),
         fileSize: stored.fileSize,
+        checksum,
+        storagePath: stored.storageKey,
+        uploadedBy: uploaderId,
         tags: dto.tags,
         currentVersionId: version.id,
         metadata: this.toJson(dto.metadata),
@@ -486,7 +516,100 @@ export class AttachmentsService {
   }
 
   private shouldPrepareOcr(mimeType: string) {
-    return mimeType.startsWith('image/') || mimeType === 'application/pdf';
+    return false;
+  }
+
+  private validateFile(file: Express.Multer.File) {
+    const maxSize = Number(process.env.ATTACHMENT_MAX_FILE_SIZE ?? 25 * 1024 * 1024);
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ]);
+
+    if (file.size > maxSize) {
+      throw new BadRequestException(`File exceeds max size ${maxSize} bytes`);
+    }
+
+    if (!file.mimetype.startsWith('image/') && !allowedMimeTypes.has(file.mimetype)) {
+      throw new BadRequestException('Unsupported file type');
+    }
+  }
+
+  private extensionFor(originalName: string) {
+    return extname(originalName).toLowerCase();
+  }
+
+  private folderFor(dto: UploadAttachmentDto) {
+    const module = String(dto.module ?? 'attachments').toLowerCase();
+    const entityType = String(dto.entityType ?? '').toLowerCase();
+    const category = String(dto.category ?? '').toLowerCase();
+
+    if (module === 'inventory') {
+      if (entityType === 'material' || entityType === 'materials') return 'inventory/materials';
+      if (entityType === 'inbound') return 'inventory/inbound';
+      if (entityType === 'outbound') return 'inventory/outbound';
+      if (entityType === 'transfer' || entityType === 'transfers') return 'inventory/transfers';
+      if (entityType === 'adjustment' || entityType === 'adjustments') return 'inventory/adjustments';
+    }
+
+    if (module === 'components') {
+      if (category === 'photo' || category === 'photos') return 'components/photos';
+      if (category === 'drawing' || category === 'drawings') return 'components/drawings';
+      if (entityType === 'delivery') return 'components/delivery';
+      if (entityType === 'installation') return 'components/installation';
+    }
+
+    if (module === 'production') {
+      if (entityType === 'mo') return 'production/mo';
+      if (entityType === 'consume') return 'production/consume';
+      if (entityType === 'scrap') return 'production/scrap';
+      if (entityType === 'return') return 'production/return';
+    }
+
+    if (module === 'projects') {
+      if (category === 'contract' || entityType === 'contract') return 'projects/contracts';
+      if (category === 'drawing' || entityType === 'drawing') return 'projects/drawings';
+      if (entityType === 'handover') return 'projects/handover';
+    }
+
+    if (module === 'suppliers') {
+      if (category === 'co' || category === 'cq') return 'suppliers/cocq';
+      if (entityType === 'quotation' || category === 'quotation') return 'suppliers/quotation';
+      if (entityType === 'invoice' || category === 'invoice') return 'suppliers/invoices';
+    }
+
+    if (module === 'assets') {
+      if (entityType === 'equipment') return 'assets/equipment';
+      if (entityType === 'maintenance') return 'assets/maintenance';
+      if (entityType === 'calibration') return 'assets/calibration';
+    }
+
+    return 'attachments';
+  }
+
+  private storedNameFor(dto: UploadAttachmentDto, checksum: string, extension: string) {
+    const prefix = this.prefixFor(dto);
+    const entityId = this.safeName(dto.entityId ?? 'unlinked');
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return `${prefix}_${entityId}_${date}_${checksum.slice(0, 10)}${extension}`;
+  }
+
+  private prefixFor(dto: UploadAttachmentDto) {
+    const module = String(dto.module ?? 'ATT').toUpperCase();
+    const entityType = String(dto.entityType ?? 'FILE').toUpperCase();
+
+    if (module === 'INVENTORY' && entityType === 'MATERIAL') return 'INV_MAT';
+    if (module === 'INVENTORY' && entityType === 'INBOUND') return 'INV_IN';
+    if (module === 'INVENTORY' && entityType === 'OUTBOUND') return 'INV_OUT';
+    if (module === 'INVENTORY' && entityType === 'TRANSFER') return 'INV_TRF';
+    if (module === 'INVENTORY' && entityType === 'ADJUSTMENT') return 'INV_ADJ';
+
+    return `${module.slice(0, 3)}_${entityType.slice(0, 4)}`.replace(/[^A-Z0-9_]/g, '');
+  }
+
+  private safeName(value: string) {
+    return value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'entity';
   }
 
   private toJson(value: Record<string, unknown> | undefined) {

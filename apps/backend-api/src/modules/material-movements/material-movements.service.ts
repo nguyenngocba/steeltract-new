@@ -3,6 +3,8 @@ import { Injectable }
 
 import { PrismaService }
   from '../../core/prisma/prisma.service'
+import { nextOperationalCode }
+  from '../../common/utils/code-generator'
 
 @Injectable()
 export class MaterialMovementsService {
@@ -74,7 +76,9 @@ export class MaterialMovementsService {
       await this.prisma.inventoryTransaction.create({
         data: {
           code:
-            `ST-MOV-${Date.now()}`,
+            await nextOperationalCode(this.prisma, 'inventoryTransaction', 'code', 'MOV'),
+          transactionNo:
+            await nextOperationalCode(this.prisma, 'inventoryTransaction', 'transactionNo', 'MOV'),
           type:
             payload.type ?? 'TRANSFER',
           direction:

@@ -18,6 +18,7 @@ import {
 } from '../../components/InventoryVisuals'
 import { useInventoryItems } from '../../hooks/useInventoryItems'
 import { useZones } from '../../hooks/useZones'
+import { formatQuantity } from '@/shared/utils/number-format'
 
 function num(v: any) {
   const n = Number(v ?? 0)
@@ -101,12 +102,12 @@ export function InventoryAlertsPage() {
 
       <div className={inventoryPageStack}>
         <div className={`grid grid-cols-1 xl:grid-cols-6 ${inventoryGridGap}`}>
-          <InventoryKpi title="Cảnh báo nghiêm trọng" value={kpi.critical.toLocaleString('vi-VN')} note="Hết hàng" tone="red" />
-          <InventoryKpi title="Cảnh báo thấp tồn" value={kpi.low.toLocaleString('vi-VN')} note="Dưới ngưỡng" tone="amber" />
-          <InventoryKpi title="Sắp hết hạn" value={kpi.warning.toLocaleString('vi-VN')} note="Theo hạn dùng" tone="purple" />
-          <InventoryKpi title="Vượt mức tồn" value={kpi.over.toLocaleString('vi-VN')} note="Tồn quá cao" tone="cyan" />
-          <InventoryKpi title="Tổng cảnh báo" value={kpi.total.toLocaleString('vi-VN')} note="Đang theo dõi" tone="blue" />
-          <InventoryKpi title="Đã xử lý hôm nay" value={kpi.processed.toLocaleString('vi-VN')} note="Đã đóng" tone="emerald" />
+          <InventoryKpi title="Cảnh báo nghiêm trọng" value={formatQuantity(kpi.critical, 0)} note="Hết hàng" tone="red" />
+          <InventoryKpi title="Cảnh báo thấp tồn" value={formatQuantity(kpi.low, 0)} note="Dưới ngưỡng" tone="amber" />
+          <InventoryKpi title="Sắp hết hạn" value={formatQuantity(kpi.warning, 0)} note="Theo hạn dùng" tone="purple" />
+          <InventoryKpi title="Vượt mức tồn" value={formatQuantity(kpi.over, 0)} note="Tồn quá cao" tone="cyan" />
+          <InventoryKpi title="Tổng cảnh báo" value={formatQuantity(kpi.total, 0)} note="Đang theo dõi" tone="blue" />
+          <InventoryKpi title="Đã xử lý hôm nay" value={formatQuantity(kpi.processed, 0)} note="Đã đóng" tone="emerald" />
         </div>
 
         <InventoryPanel title="Bộ lọc cảnh báo">
@@ -151,8 +152,8 @@ export function InventoryAlertsPage() {
                       <td className="px-3 py-2 text-cyan-300">{x.code}</td>
                       <td className="px-3 py-2">{x.name}</td>
                       <td className="px-3 py-2">{x.zoneCode}</td>
-                      <td className="px-3 py-2">{x.qty.toLocaleString('vi-VN')}</td>
-                      <td className="px-3 py-2">{x.min.toLocaleString('vi-VN')}</td>
+                      <td className="px-3 py-2">{formatQuantity(x.qty, 0)}</td>
+                      <td className="px-3 py-2">{formatQuantity(x.min, 0)}</td>
                       <td className="px-3 py-2">{x.unit ?? '-'}</td>
                       <td className="px-3 py-2">{x.status}</td>
                       <td className="px-3 py-2 text-slate-400">⋯</td>
@@ -166,10 +167,10 @@ export function InventoryAlertsPage() {
 
           <div className="space-y-3 xl:col-span-3">
             <InventoryChartCard title="Phân bổ cảnh báo theo mức độ">
-              <CompactDonutSummary segments={levelSegments} centerValue={kpi.total.toLocaleString('vi-VN')} centerLabel="cảnh báo" />
+              <CompactDonutSummary segments={levelSegments} centerValue={formatQuantity(kpi.total, 0)} centerLabel="cảnh báo" />
             </InventoryChartCard>
             <InventoryChartCard title="Cảnh báo theo loại">
-              <HorizontalBars rows={byType} valueFormatter={(value) => value.toLocaleString('vi-VN')} />
+              <HorizontalBars rows={byType} valueFormatter={(value) => formatQuantity(value, 0)} />
             </InventoryChartCard>
             <InventoryChartCard title="Cảnh báo nghiêm trọng">
               {criticalList.map((x: any) => (

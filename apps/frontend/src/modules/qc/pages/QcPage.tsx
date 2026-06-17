@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChar
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
 import { approveInspection, completeInspection, createInspection, getQcCockpit, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
+import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 type QcTab = 'overview' | 'inspections' | 'plan' | 'standards' | 'ncr' | 'calibration' | 'reports'
 
@@ -22,8 +23,8 @@ const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold te
 const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
 const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
 const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
-const fmt = (value = 0) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value)
-const date = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '-'
+const fmt = (value = 0) => formatQuantity(value, 1)
+const date = (value?: string | null) => value ? formatDateTime(value) : '-'
 
 export function QcPage() {
   const [tab, setTab] = useState<QcTab>('overview')

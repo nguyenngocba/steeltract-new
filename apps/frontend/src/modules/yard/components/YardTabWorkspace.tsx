@@ -1,10 +1,14 @@
 import { Activity, AlertTriangle, Boxes, CheckCircle2, Construction, MoveRight, PackageCheck, Truck, type LucideIcon } from 'lucide-react'
+import { lazy, Suspense } from 'react'
 
 import type { YardTab } from '../config/yard-tabs'
 import type { YardOperationMode } from '../dialogs/YardOperationDialog'
-import { YardOperationalMap2D } from '../maps2d/YardOperationalMap2D'
-import { YardOperationalMap3D } from '../maps3d/YardOperationalMap3D'
 import type { YardCrane, YardMetrics, YardMovement, YardSlotRuntime, YardZoneRuntime } from '../services/api/yard.api'
+import { ModuleLoadingState } from '@/shared/ui/modules'
+import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
+
+const YardOperationalMap2D = lazy(() => import('../maps2d/YardOperationalMap2D').then((module) => ({ default: module.YardOperationalMap2D })))
+const YardOperationalMap3D = lazy(() => import('../maps3d/YardOperationalMap3D').then((module) => ({ default: module.YardOperationalMap3D })))
 
 const panel = 'rounded border border-slate-800 bg-[#071321]'
 
@@ -67,7 +71,7 @@ function MovementTable({ movements, title }: { movements: YardMovement[]; title:
         </thead>
         <tbody>
           {movements.slice(0, 10).map((movement) => <tr key={movement.id} className="border-t border-slate-800/70 hover:bg-cyan-950/10">
-            <td className="px-4 py-3 text-slate-400">{new Date(movement.createdAt).toLocaleString('vi-VN')}</td>
+            <td className="px-4 py-3 text-slate-400">{formatDateTime(movement.createdAt)}</td>
             <td className={`px-4 py-3 font-semibold ${movementTone[movement.type] ?? 'text-slate-300'}`}>{movementLabel[movement.type] ?? movement.type}</td>
             <td className="px-4 py-3 text-cyan-300">{movement.itemCode}</td>
             <td className="px-4 py-3 text-slate-300">{movement.fromSlot?.code ?? 'Xưởng / QC'}</td>
@@ -116,7 +120,7 @@ function SelectedZoneInsight({ slots, zoneId }: { slots: YardSlotRuntime[]; zone
     </div>
     <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
       <div className="rounded border border-slate-800 p-3"><span className="text-slate-500">Cấu kiện</span><b className="mt-1 block text-lg text-slate-100">{placements.length}</b></div>
-      <div className="rounded border border-slate-800 p-3"><span className="text-slate-500">Trọng lượng</span><b className="mt-1 block text-lg text-slate-100">{weight.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}</b></div>
+      <div className="rounded border border-slate-800 p-3"><span className="text-slate-500">Trọng lượng</span><b className="mt-1 block text-lg text-slate-100">{formatQuantity(weight, 1)}</b></div>
       <div className="col-span-2 rounded border border-slate-800 p-3">
         <div className="mb-2 flex justify-between"><span className="text-slate-500">Tầng sử dụng</span><b>{usedStack}/{maxStack}</b></div>
         <ProgressBar value={maxStack ? usedStack / maxStack * 100 : 0} tone="bg-cyan-500" />
@@ -193,8 +197,8 @@ function YardOverviewTab({
 
   return <div className="space-y-3">
     <div className="grid gap-2 md:grid-cols-4">
-      <MiniStat icon={Boxes} label="Cấu kiện trong bãi" value={placements.length.toLocaleString('vi-VN')} note="thành phẩm" />
-      <MiniStat icon={Activity} label="Tổng trọng lượng" value={`${totalWeight.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tấn`} note="runtime" />
+      <MiniStat icon={Boxes} label="Cấu kiện trong bãi" value={formatQuantity(placements.length, 0)} note="thành phẩm" />
+      <MiniStat icon={Activity} label="Tổng trọng lượng" value={`${formatQuantity(totalWeight, 1)} tấn`} note="runtime" />
       <MiniStat icon={MoveRight} label="Di chuyển nội bộ" value={transfers.length} note="30 ngày" />
       <MiniStat icon={Construction} label="Cầu trục hoạt động" value={cranes.filter((crane) => crane.status !== 'MAINTENANCE').length} note={`${cranes.length} thiết bị`} />
     </div>
@@ -209,7 +213,9 @@ function YardOverviewTab({
           <span className="rounded border border-cyan-700 px-2 py-1 text-[10px] text-cyan-300">Occupancy {metrics?.occupancyRate ?? 0}%</span>
         </div>
         <div className="max-h-[470px] overflow-hidden rounded border border-slate-800">
-          <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
+          <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ 2D..." variant="analytics" />}>
+            <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
+          </Suspense>
         </div>
       </div>
 
@@ -223,7 +229,7 @@ function YardOverviewTab({
               <div key={label} className="grid grid-cols-[74px_1fr_62px] items-center gap-3 text-xs">
                 <span className="text-slate-300">{label}</span>
                 <ProgressBar value={(value / maxDistribution) * 100} tone={['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500', 'bg-red-500'][index] ?? 'bg-cyan-500'} />
-                <span className="text-right text-slate-300">{value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}</span>
+                <span className="text-right text-slate-300">{formatQuantity(value, 1)}</span>
               </div>
             ))}
             {!distributionRows.length && <p className="text-xs text-slate-500">Chưa có cấu kiện trong bãi.</p>}
@@ -438,7 +444,9 @@ export function YardTabWorkspace({
         <div><h2 className="text-sm font-semibold">Sơ đồ 3D toàn bãi</h2><p className="mt-1 text-[11px] text-slate-500">Phóng to để kiểm tra cấu kiện, cầu trục và tầng xếp.</p></div>
         <span className="text-xs text-cyan-300">{slots.length} vị trí</span>
       </div>
-      <YardOperationalMap3D slots={slots} selectedSlotId={selectedSlotId} />
+      <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ 3D..." variant="analytics" />}>
+        <YardOperationalMap3D slots={slots} selectedSlotId={selectedSlotId} />
+      </Suspense>
     </div>
   }
 
@@ -448,7 +456,9 @@ export function YardTabWorkspace({
         <div><h2 className="text-sm font-semibold">Sơ đồ zone vận hành</h2><p className="mt-1 text-[11px] text-slate-500">Cụm zone → ô vị trí → tầng chứa cấu kiện.</p></div>
         <span className="text-xs text-cyan-300">{slots.length} vị trí</span>
       </div>
-      <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
+      <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ 2D..." variant="analytics" />}>
+        <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
+      </Suspense>
     </div>
     <div className="grid gap-3 lg:grid-cols-3">
       <SelectedZoneInsight slots={slots} zoneId={selectedZoneId} />

@@ -4,6 +4,8 @@ import {
 
 import { PrismaService }
 from '../../../core/prisma/prisma.service'
+import { nextOperationalCode }
+from '../../../common/utils/code-generator'
 
 @Injectable()
 export class PurchaseReceivingService {
@@ -23,7 +25,7 @@ export class PurchaseReceivingService {
       data: {
 
         receivingNo:
-          `RCV-${Date.now()}`,
+          await nextOperationalCode(this.prisma, 'purchaseReceiving', 'receivingNo', 'RCV'),
 
         supplierId:
           body.supplierId,

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { CreateBomDto, UpdateBomDto } from '../dto/production.dto';
 
 @Injectable()
@@ -34,7 +35,7 @@ export class BOMService {
 
     return this.prisma.bOM.create({
       data: {
-        bomNo: body.bomNo ?? `BOM-${Date.now()}`,
+        bomNo: body.bomNo ?? await nextOperationalCode(this.prisma, 'bOM', 'bomNo', 'BOM'),
         productCode: body.productCode,
         productName: body.productName,
         structureType: body.structureType,
@@ -87,10 +88,10 @@ export class BOMService {
 
   async clone(id: string) {
     const source = await this.findOne(id);
-    const timestamp = Date.now();
+    const cloneNo = await nextOperationalCode(this.prisma, 'bOM', 'bomNo', 'BOM');
 
     return this.create({
-      bomNo: `${source.bomNo}-COPY-${timestamp}`,
+      bomNo: cloneNo,
       productCode: source.productCode,
       productName: `${source.productName} (Copy)`,
       structureType: source.structureType ?? undefined,

@@ -218,3 +218,21 @@ Rules:
 - No spaces.
 - No generic names.
 - Event payloads must be lightweight.
+
+## AD-014: Attachment Binary Storage Outside Source Tree
+
+Decision:
+
+- SteelTrack stores attachment metadata in PostgreSQL and file bytes on filesystem storage outside the application source tree.
+- The storage root is configured by `STORAGE_ROOT` and defaults to `/data/steeltrack-storage`.
+
+Rationale:
+
+- Uploaded files should be backup-able, moveable, and later replaceable by NAS/MinIO/S3-style storage without coupling them to the frontend build, backend source tree, or repository history.
+
+Implications:
+
+- Do not store uploaded file bytes in PostgreSQL.
+- Do not store uploaded files under `apps/frontend/public`, repo-local `uploads`, or other source-code folders.
+- UI should display `originalName`; backend storage should use deterministic stored names plus checksum-based dedupe.
+- Duplicate content should reuse the existing physical file and create a separate metadata reference.
