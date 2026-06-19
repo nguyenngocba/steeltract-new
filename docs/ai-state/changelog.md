@@ -1,5 +1,126 @@
 # SteelTrack Changelog
 
+## 2026-06-19 Inventory Cost Integrity
+
+Fixed:
+
+- New Inventory transaction items now persist `unitPrice` and `totalAmount` at creation time.
+- Export, transfer, return, adjustment, production issue/return, and material movement write paths now store valuation fields instead of relying on read-time enrichment.
+- Historical missing transaction item valuations were backfilled with weighted average material cost.
+
+Verified:
+
+- IMPORT, EXPORT, TRANSFER, and RETURN all report `rows_with_amount = total_rows`.
+- Backend build passed.
+
+## 2026-06-19 Fix Outbound Inventory Value
+
+Fixed:
+
+- Inventory Outbound KPI `Giá trị xuất trong tháng` now sums all item lines.
+- Inventory Outbound table `Giá trị` now shows the total outbound document value.
+- Backend transaction responses now compute missing outbound line values from average inbound material cost.
+
+Verified:
+
+- `GET /inventory/transactions?type=OUTBOUND` returns computed `items.totalAmount`.
+- Backend build passed.
+- Frontend build passed.
+
+## 2026-06-19 Inventory Transactions UX 2.0
+
+Implemented:
+
+- Added `Hồ sơ` column to `Nhập kho`, `Xuất kho`, `Điều chuyển`, and `Kiểm kê`.
+- Clicking the `📎` count opens an attachment drawer.
+- Drawer header shows `📎 <count> tài liệu`.
+- Drawer lists filenames, metadata, download action, and image preview where applicable.
+
+Verified:
+
+- Frontend build passed.
+- No backend, API, storage, database, or workflow changes.
+
+## 2026-06-19 Attachment UX Refinement
+
+Fixed:
+
+- Removed image/document badges from the Inventory Materials list.
+- Material Detail Overview now contains the attachment summary card.
+- Material Detail transaction, project usage, and supplier tabs now show contextual attachment columns.
+- Material Documents now shows file source classification so users can distinguish Master Material files from inbound/outbound transaction documents.
+- Contextual attachment chips open a standard detail drawer.
+
+Verified:
+
+- Frontend build passed.
+- No backend, API, storage, database, or workflow changes.
+
+## 2026-06-18 Inventory Attachment UX Visibility
+
+Fixed:
+
+- Inventory Transactions now show a `📎` attachment count column.
+- Transaction detail now shows attachment count in the drawer header and a quick file panel in the Overview tab.
+- Inventory Materials now show `📷` image count and `📄` document count badges in the material list.
+- Material Detail now shows image/document counts in the header and Overview summary.
+
+Verified:
+
+- Frontend build passed.
+- No backend, API, storage, database, or workflow changes.
+
+## 2026-06-18 Attachment UI Binding Fix
+
+Fixed:
+
+- Material image gallery now resolves uploaded image URLs from attachment versions or storage path fallback.
+- Transaction attachment list now resolves download/preview URLs from attachment versions or storage path fallback.
+- Material attachment lookup now supports `id`, `materialId`, and `inventoryItemId`.
+- Added development console diagnostics for attachment query params, response payload, and mapped URLs.
+
+Verified:
+
+- Material attachment API returns mapped image URL.
+- Transaction attachment API returns mapped PDF URL.
+- Static `/uploads/...` URLs return `200 OK`.
+- Frontend build passed.
+- Backend build passed without backend code changes.
+
+## 2026-06-18 Attachment Runtime Fix
+
+Fixed:
+
+- Restored missing RBAC runtime data for guarded attachment endpoints.
+- Added idempotent migration to recreate admin role, base permissions, role-permission mappings, and admin user-role mapping.
+- Attachment upload now reaches the backend service instead of being blocked by 403.
+
+Verified:
+
+- `GET /attachments` with an authenticated admin token returns 200.
+- Material image upload returned 201 and created an attachment row.
+- Inventory transaction attachment upload returned 201 and created an attachment row.
+- Files exist under `/data/steeltrack-storage`.
+
+## 2026-06-18 Inventory Transaction Attachments
+
+Implemented:
+
+- Added Inventory transaction attachment categories: invoice, delivery note, packing list, report, CO, CQ, photo, and other.
+- Transaction attachments reuse the shared Attachment Engine.
+- Inventory transaction attachments are linked as `module=inventory`, `entityType=transaction`, `entityId=transactionId`.
+- Inbound, Outbound, Transfer, and Stock Take modals can select files before save; files upload after the transaction is saved.
+- Inventory Transactions page now has a transaction detail drawer with `Tài liệu đính kèm`.
+- Detail drawer shows original filename, category, upload date, size, download action, and image preview.
+- Files are stored under `/data/steeltrack-storage/inventory/transactions/<type>`.
+
+Verified:
+
+- Prisma generate passed.
+- Prisma migration deploy applied the new category migration.
+- Backend build passed.
+- Frontend build passed.
+
 ## 2026-06-17 Attachment & Image Foundation
 
 Implemented:
@@ -10,10 +131,13 @@ Implemented:
 - Added allowed file validation for images, PDF, DOCX, and XLSX.
 - Added Material Detail image upload in the `Hình ảnh vật tư` tab.
 - Added Material Detail document listing under `Tài liệu vật tư`.
+- Fixed the image-tab upload handler and attachment list filtering by `entityType`.
+- Initialized the standard filesystem storage folder tree under `/data/steeltrack-storage`.
 
 Verified:
 
 - Prisma generate passed.
+- Prisma migration deploy reported no pending migrations.
 - Backend build passed.
 - Frontend build passed.
 

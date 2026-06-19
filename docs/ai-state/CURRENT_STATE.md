@@ -25,6 +25,12 @@ Current architecture:
 - Sprint 13B.3 adds Material Detail image gallery readiness, Material Master image preview UI, and standardized Material Analytics Cockpit panels for inbound, outbound, inventory trend, 7-day forecast, and turnover.
 - Sprint 14A connects Material Detail image gallery to the shared Attachments backend. Material photos are uploaded through `/attachments/upload`, stored on filesystem under `STORAGE_ROOT`, and displayed from attachment metadata.
 - Material Detail now shows non-photo `Tài liệu vật tư` attachments with original filename, size, upload date, and download link.
+- Sprint 14B splits Inventory attachments into Material Master attachments and Inventory Transaction attachments. Transaction documents use `module=inventory`, `entityType=transaction`, and `entityId=inventoryTransactionId`.
+- Inventory Inbound, Outbound, Transfer, and Stock Take forms can upload attachments after the transaction is saved, and the Inventory Transactions page has a detail drawer with `Tài liệu đính kèm`.
+- Sprint 14B.5 refines attachment UX: Inventory Materials list stays focused on material/stock/location/status, while Material Detail owns attachment context with summary counts, contextual document columns in transaction/project/supplier tabs, and source-classified document rows.
+- Inventory Transactions UX 2.0 adds `Hồ sơ` columns to the dedicated Nhập kho, Xuất kho, Điều chuyển, and Kiểm kê lists; each `📎` count opens a transaction attachment drawer.
+- Sprint 15A fixes outbound value display: Inventory Outbound now sums all transaction item values, and transaction API responses compute missing outbound `unitPrice` / `totalAmount` from average inbound material cost for legacy rows.
+- Sprint 15B makes `inventory_transaction_items` the source of truth for transaction valuation. New transaction item writes persist `unitPrice` and `totalAmount`, direct Production/Material Movement writers do the same, and historical IMPORT/EXPORT/TRANSFER/RETURN rows were backfilled.
 - Inventory Material Stock KPI sparklines use real monthly snapshots from Inventory audit rows, material `createdAt`, and Inventory transaction item movement history.
 - Operational code generation now follows `PREFIX-YYMMDD-###` for new Inventory, Production, Components, Projects, QC, material movement, and receiving codes; see `docs/ai-state/decisions/code-numbering-decisions.md`.
 
@@ -35,7 +41,8 @@ Known limitations:
 - Sprint 8 audit found transaction-vs-location reconciliation mismatches and snapshot mismatches that need operator/admin review before any automated backfill.
 - Sprint 9 fixed active mutation paths that created new snapshot/location mismatches, but existing mismatched validation rows still require a dedicated reconciliation/backfill decision.
 - Some Inventory modal/chart helpers remain locally embedded instead of shared visual components.
-- Material photo upload is persisted through shared attachments. General non-photo document upload controls for datasheets, CO, CQ, and catalogs are still pending rollout beyond the current display/download section.
+- Material photo upload is persisted through shared attachments. Dedicated non-photo Material Master upload controls for datasheets, CO, CQ, and catalogs are still pending beyond the current display/download section.
+- Return transaction attachment upload depends on the active return UI path creating an Inventory transaction; the shared transaction attachment model and storage routing already support `RETURN`.
 
 Current focus:
 

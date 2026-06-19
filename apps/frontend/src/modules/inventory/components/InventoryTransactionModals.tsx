@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import toast from 'react-hot-toast'
 
 import { useCreateTransaction } from '../hooks/useCreateTransaction'
 import { useInventoryItems } from '../hooks/useInventoryItems'
@@ -8,6 +9,11 @@ import { useProjects } from '../hooks/useProjects'
 import { useSuppliers } from '../hooks/useSuppliers'
 import { useZones } from '../hooks/useZones'
 import { WarehouseMiniMap } from './material-table/MaterialDrawer'
+import {
+  InventoryAttachmentPicker,
+  uploadInventoryTransactionAttachments,
+  type InventoryAttachmentDraft,
+} from './InventoryAttachmentPanel'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatCurrencyInput, formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
@@ -184,6 +190,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     vat: '10',
     remark: '',
   })
+  const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
 
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const currentStock = num(selectedMaterial?.quantity)
@@ -247,7 +254,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     if (selectedInboundZoneFull) return
     if (selectedInboundCellOccupied) return
     const no = generateTransactionNo('NK')
-    await createTransaction.mutateAsync({
+    const transaction = await createTransaction.mutateAsync({
       type: 'INBOUND',
       transactionNo: no,
       transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
@@ -267,6 +274,14 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    try {
+      await uploadInventoryTransactionAttachments({
+        transaction,
+        files: attachmentFiles,
+      })
+    } catch {
+      toast.error('Phiếu đã lưu nhưng upload tài liệu nhập kho thất bại')
+    }
     setForm({
       transactionDate: new Date().toISOString().slice(0, 16),
       inventoryItemId: '',
@@ -279,6 +294,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       vat: '10',
       remark: '',
     })
+    setAttachmentFiles([])
     onClose()
   }
 
@@ -364,7 +380,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         <div className="mt-1 text-xl font-semibold text-white">Tổng thanh toán: <span className="text-cyan-300">{formatCurrency(total)}</span></div>
       </div>
       <div className="mt-3">
-        <input type="file" className="w-full rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-slate-100" />
+        <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
       </div>
       <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className={`${textareaClass} mt-3 w-full`} />
       <div className="mt-4 flex justify-end gap-2">
@@ -407,6 +423,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     quantity: '',
     remark: '',
   })
+  const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
   const { data: selectedMaterialDetail } = useMaterialDetail(form.inventoryItemId || undefined)
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const currentStock = num(selectedMaterial?.quantity)
@@ -585,7 +602,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     const no = generateTransactionNo('XK')
     const isProductionTarget = form.target === 'COMPONENT_PRODUCTION'
     const targetTag = isProductionTarget ? '[COMPONENT_PRODUCTION]' : '[PROJECT]'
-    await createTransaction.mutateAsync({
+    const transaction = await createTransaction.mutateAsync({
       type: isProductionTarget ? 'TRANSFER' : 'OUTBOUND',
       transactionNo: no,
       transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
@@ -623,6 +640,14 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    try {
+      await uploadInventoryTransactionAttachments({
+        transaction,
+        files: attachmentFiles,
+      })
+    } catch {
+      toast.error('Phiếu đã lưu nhưng upload tài liệu xuất kho thất bại')
+    }
     setForm({
       transactionDate: new Date().toISOString().slice(0, 16),
       target: 'PROJECT',
@@ -637,6 +662,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       quantity: '',
       remark: '',
     })
+    setAttachmentFiles([])
     onClose()
   }
 
@@ -779,7 +805,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         </div>
       )}
       <div className="mt-3">
-        <input type="file" className="w-full rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-slate-100" />
+        <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
       </div>
       <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className={`${textareaClass} mt-3 w-full`} />
       <div className="mt-4 flex justify-end gap-2">
@@ -848,6 +874,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     quantity: '',
     reason: '',
   })
+  const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
 
   const { data: selectedMaterialDetail } = useMaterialDetail(form.materialId || undefined)
   const selectedMaterial = materials.find((x: any) => x.id === form.materialId) as any
@@ -987,7 +1014,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     if (!canTransfer) return
 
     const no = generateTransactionNo('DC')
-    await createTx.mutateAsync({
+    const transaction = await createTx.mutateAsync({
       type: 'TRANSFER',
       transactionNo: no,
       transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
@@ -1009,6 +1036,14 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    try {
+      await uploadInventoryTransactionAttachments({
+        transaction,
+        files: attachmentFiles,
+      })
+    } catch {
+      toast.error('Phiếu đã lưu nhưng upload tài liệu điều chuyển thất bại')
+    }
 
     setForm({
       transactionDate: new Date().toISOString().slice(0, 16),
@@ -1022,6 +1057,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
       quantity: '',
       reason: '',
     })
+    setAttachmentFiles([])
     onClose()
   }
 
@@ -1136,6 +1172,9 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
               Gợi ý ô đích trống
             </button>
           </div> : null}
+          <div className="mt-3">
+            <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -1177,6 +1216,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
   const [methodFilter, setMethodFilter] = useState('')
   const [sessionNo, setSessionNo] = useState(generateTransactionNo('KK'))
   const [countRows, setCountRows] = useState<CountLine[]>([])
+  const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
 
   const countSheet = useMemo(() => {
     return countRows.map((row) => {
@@ -1201,13 +1241,22 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
         quantity: x.difference,
       }))
     if (items.length === 0) return
-    await createTx.mutateAsync({
+    const transaction = await createTx.mutateAsync({
       type: 'ADJUSTMENT',
       transactionNo: sessionNo,
       referenceType: methodFilter || 'Định kỳ',
       items,
     })
+    try {
+      await uploadInventoryTransactionAttachments({
+        transaction,
+        files: attachmentFiles,
+      })
+    } catch {
+      toast.error('Phiếu đã lưu nhưng upload tài liệu kiểm kê thất bại')
+    }
     setCountRows([])
+    setAttachmentFiles([])
     setSessionNo(generateTransactionNo('KK'))
     onClose()
   }
@@ -1277,6 +1326,10 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-3">
+        <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
       </div>
 
       <div className="mt-4 flex items-center justify-between">

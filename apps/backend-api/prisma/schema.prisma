@@ -164,6 +164,10 @@ enum AttachmentCategory {
   CO
   CQ
   CATALOG
+  INVOICE
+  DELIVERY_NOTE
+  PACKING_LIST
+  REPORT
   QC
   CONTRACT
   OTHER
@@ -1808,6 +1812,7 @@ model AttachmentVersion {
   @@unique([attachmentId, version])
   @@index([attachmentId])
   @@index([storageKey])
+  @@index([checksum])
   @@map("attachment_versions")
 }
 

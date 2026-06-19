@@ -72,6 +72,12 @@ export class MaterialMovementsService {
       throw new Error('Inventory item not found')
     }
 
+    const quantity = Number(payload.quantity ?? 0)
+    const unitPrice = await this.resolveInventoryUnitPrice(
+      item.id,
+    )
+    const totalAmount = Math.abs(quantity) * unitPrice
+
     const transaction =
       await this.prisma.inventoryTransaction.create({
         data: {
@@ -92,7 +98,9 @@ export class MaterialMovementsService {
                 inventoryItemId:
                   item.id,
                 quantity:
-                  Number(payload.quantity ?? 0),
+                  quantity,
+                unitPrice,
+                totalAmount,
               },
             ],
           },
@@ -107,5 +115,57 @@ export class MaterialMovementsService {
       })
 
     return transaction.items[0]
+  }
+
+  private async resolveInventoryUnitPrice(
+    inventoryItemId: string,
+  ) {
+    const lines =
+      await this.prisma.inventoryTransactionItem.findMany({
+        where: {
+          inventoryItemId,
+          quantity: {
+            gt: 0,
+          },
+          OR: [
+            {
+              unitPrice: {
+                gt: 0,
+              },
+            },
+            {
+              totalAmount: {
+                gt: 0,
+              },
+            },
+          ],
+        },
+        select: {
+          quantity: true,
+          unitPrice: true,
+          totalAmount: true,
+        },
+      })
+
+    let quantity = 0
+    let value = 0
+    for (const line of lines) {
+      const lineQuantity = Math.abs(
+        Number(line.quantity ?? 0),
+      )
+      if (lineQuantity <= 0) continue
+      const lineValue =
+        line.totalAmount != null
+          ? Math.abs(Number(line.totalAmount))
+          : line.unitPrice != null
+            ? Math.abs(Number(line.unitPrice)) *
+              lineQuantity
+            : 0
+      if (lineValue <= 0) continue
+      quantity += lineQuantity
+      value += lineValue
+    }
+
+    return quantity > 0 ? value / quantity : 0
   }
 }

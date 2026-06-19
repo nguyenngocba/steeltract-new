@@ -1,5 +1,171 @@
 # SteelTrack AI Changelog
 
+## 2026-06-19 Sprint 15B Inventory Cost Integrity
+
+Fixed:
+
+* Inventory transaction item creation now persists `unitPrice` and `totalAmount` for new IMPORT, EXPORT, TRANSFER, RETURN, and ADJUSTMENT rows.
+* `InventoryService.createTransaction()` now applies material valuation before writing transaction items, using provided line values first and weighted average material cost as fallback.
+* Production material issue/return direct Inventory transaction writers now persist valuation fields.
+* Material Movement direct transaction writer now persists valuation fields.
+* Created and executed one-time repair script `scripts/sql/backfill-inventory-transaction-item-costs.sql` to populate missing historical `unitPrice` / `totalAmount`.
+
+Root cause:
+
+* Transaction item normalization left valuation fields null when the client did not submit price data, especially for EXPORT rows and direct production/material movement writers.
+* Sprint 15A fixed read-time display but did not repair source rows.
+
+Verification:
+
+* Backfill updated 67 historical rows.
+* Verification SQL now reports `rows_with_amount = total_rows` and `rows_with_unit_price = total_rows` for IMPORT, EXPORT, TRANSFER, and RETURN.
+* Backend build passed.
+
+## 2026-06-19 Sprint 15A Fix Outbound Inventory Value
+
+Fixed:
+
+* Fixed Inventory Outbound value display so `Giá trị xuất trong tháng` and row-level `Giá trị` no longer depend on `items[0].totalAmount`.
+* Inventory Outbound now sums all transaction item quantities and values for each outbound document.
+* `/inventory/transactions` and `/inventory/transactions/:id` now enrich transaction item `unitPrice` / `totalAmount` from material average inbound cost when stored outbound transaction rows have missing amount fields.
+* Search/filter logic on Inventory Outbound now considers all item lines in a transaction instead of only the first line.
+
+Evidence:
+
+* PostgreSQL local validation showed `EXPORT` transaction item rows had `unitPrice` and `totalAmount` null, while `IMPORT` rows contained priced data.
+* After the service fix, `GET /inventory/transactions?type=OUTBOUND` returns computed `items.unitPrice` and `items.totalAmount`; sample `XK-260619-001` returned `totalAmount=3524043.9704058017`.
+
+Verification:
+
+* Backend build passed.
+* Frontend build passed.
+
+## 2026-06-19 Inventory Transactions UX 2.0
+
+Implemented:
+
+* Added shared Inventory transaction attachment controls for transaction-specific pages.
+* `Nhập kho`, `Xuất kho`, `Điều chuyển`, and `Kiểm kê` lists now include a `Hồ sơ` column with a `📎 count` action.
+* Clicking the `Hồ sơ` action opens a standard attachment drawer with header `📎 <count> tài liệu`.
+* Drawer lists the transaction files using the existing `InventoryAttachmentList`, including original filename, category, size, upload date, download action, and image preview.
+* Attachment matching reuses `module=inventory`, `entityType=transaction`, `entityId`, and transaction metadata such as `transactionNo`.
+
+Scope:
+
+* Frontend UX only.
+* No backend, API, Prisma, database, storage, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-19 Sprint 14B.5 Attachment UX Refinement
+
+Fixed:
+
+* Removed image/document attachment badges from Inventory Materials list and expanded material list to reduce visual noise in the stock cockpit.
+* Kept attachment context inside Material Detail, where users already inspect a specific material.
+* Material Detail Overview now shows a subtle `Hồ sơ vật tư` summary card with `Ảnh vật tư` and `Tài liệu` counts.
+* Material Detail `Nhập / Xuất` tab now includes a `Tài liệu` column for related Inventory transaction attachments.
+* Material Detail `Công trình` tab now includes `Hồ sơ liên quan` based on outbound transaction attachments where available.
+* Material Detail `Nhà cung cấp` tab now includes `Chứng từ` based on inbound transaction attachments where available.
+* Material Detail `Tài liệu vật tư` tab now classifies documents by source, including `Master Material`, `Inbound Transaction <no>`, and `Outbound Transaction <no>`.
+* Attachment chips now use subtle Module UI Foundation styling with `FileText` icon instead of emoji-heavy badges.
+* Clicking a contextual attachment chip opens a standard `ModuleDetailDrawer` with the file list and download/preview actions.
+
+Scope:
+
+* Frontend UX only.
+* No backend, API, Prisma, database, storage, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-18 Sprint 14B.4 Inventory Attachment UX Audit
+
+Fixed:
+
+* Improved attachment discoverability without changing backend, storage, API contracts, or upload workflow.
+* Inventory Transactions list now shows an attachment badge column (`📎 count`) so users can see files before opening the detail drawer.
+* Inventory transaction detail drawer now shows attachment count in the header subtitle and a quick attachment panel in the Overview tab, while keeping the dedicated `Tài liệu đính kèm` tab.
+* Inventory Materials list now shows material attachment badges (`📷 photo count`, `📄 document count`) for each material row and in the expanded list.
+* Material Detail drawer now shows photo/document counts in the header and an Overview attachment summary with direct shortcuts to `Hình ảnh vật tư` and `Tài liệu vật tư`.
+
+Audit finding:
+
+* Runtime attachment data was already persisted and served correctly, but users could not discover it easily because the transaction list had no attachment signal and transaction files were only visible inside a secondary tab.
+
+Verification:
+
+* Frontend build passed.
+* Backend was not changed.
+
+## 2026-06-18 Sprint 14B.3 Attachment UI Data Binding Fix
+
+Fixed:
+
+* Hardened Material Detail attachment binding so image URLs resolve from `currentVersion.publicUrl`, `versions[0].publicUrl`, direct `publicUrl` / `url`, `currentVersion` / `latestVersion`, or `storagePath`.
+* Hardened Transaction Attachment binding with the same URL fallback.
+* Material attachment query now resolves material id from `id`, `materialId`, or `inventoryItemId`, preventing empty queries while detail data is still loading.
+* Added development-only console diagnostics for Material and Transaction attachment query params, API response payload, and mapped UI objects.
+* Material document download now uses the same URL resolver as image rendering.
+
+Evidence:
+
+* Material attachment API response contains `versions[0].publicUrl=/uploads/inventory/materials/...jpg`.
+* Transaction attachment API response contains `versions[0].publicUrl=/uploads/inventory/transactions/inbound/...pdf`.
+* Frontend mapped URLs resolve to `http://172.168.53.116:3000/uploads/...`.
+* Static file requests for both mapped URLs return `200 OK`.
+
+Verification:
+
+* Frontend build passed.
+* Backend build passed with no backend code changes.
+
+## 2026-06-18 Sprint 14B.1 Attachment Engine Runtime Fix
+
+Fixed:
+
+* Restored runtime RBAC seed data required by guarded attachment endpoints.
+* Added migration `20260618094500_restore_rbac_foundation` to recreate the `admin` role, base permissions, role-permission mappings, and admin user-role mapping idempotently without changing passwords or business data.
+
+Root cause:
+
+* `permissions`, `roles`, `role_permissions`, and `user_roles` tables were empty, so `PermissionsGuard` rejected `/attachments` and `/attachments/upload` with 403 before `AttachmentsController` and `AttachmentsService.upload()` could run.
+
+Evidence after fix:
+
+* `permissions=27`, `roles=1`, `role_permissions=27`, `user_roles=1`.
+* JWT login payload includes `attachments.read` and `attachments.write`.
+* `GET /attachments?module=inventory&entityType=material&entityId=<materialId>` returns 200.
+* `POST /attachments/upload` for `VAL-MAT-002` returned 201 and inserted a `PHOTO` attachment.
+* `POST /attachments/upload` for an Inventory transaction returned 201 and inserted an `INVOICE` attachment.
+* `attachments` table contains uploaded records.
+* Files exist under `/data/steeltrack-storage/inventory/materials` and `/data/steeltrack-storage/inventory/transactions/inbound`.
+
+## 2026-06-18 Sprint 14B Inventory Transaction Attachments
+
+Implemented:
+
+* Extended the shared Attachment Engine to Inventory transaction documents without creating a new storage engine.
+* Added attachment categories for transaction documents: `INVOICE`, `DELIVERY_NOTE`, `PACKING_LIST`, and `REPORT`.
+* Added migration `20260618090000_inventory_transaction_attachment_categories`.
+* Inventory transaction attachments use `module=inventory`, `entityType=transaction`, and `entityId=inventoryTransactionId`.
+* Backend storage routing now saves transaction files under `/data/steeltrack-storage/inventory/transactions/<type>` for inbound, outbound, transfer, stocktake, return, and adjustment.
+* Added shared frontend `InventoryAttachmentPicker` and `InventoryAttachmentList`.
+* Inbound, Outbound, Transfer, and Stock Take transaction modals can select attachments while creating the transaction; files upload after the transaction save succeeds.
+* Inventory Transactions page now opens a transaction detail drawer by clicking transaction number.
+* Transaction detail drawer includes `Tài liệu đính kèm` tab showing original filename, category, upload date, size, download action, and image preview for image files.
+* Material image gallery remains filtered by `module=inventory&entityType=material&entityId=<materialId>`.
+
+Verification:
+
+* Prisma generate passed.
+* Prisma migration deploy applied Sprint 14B migration.
+* Backend build passed.
+* Frontend build passed.
+
 ## 2026-06-17 Sprint 14A Attachment & Image Foundation
 
 Implemented:
@@ -15,6 +181,12 @@ Implemented:
 * Material Detail `Hình ảnh vật tư` now uploads images through `/attachments/upload`, refreshes the gallery, preserves original filenames, and renders backend-served images.
 * Material Detail now includes `Tài liệu vật tư` for non-photo attachments with filename, size, upload date, and download link.
 
+Follow-up fix:
+
+* Fixed Material Detail `Hình ảnh vật tư` tab so its upload button calls the same image upload handler as the Overview gallery.
+* Fixed `/attachments` listing to pass `entityType` into repository filters so uploaded material photos are returned for `module=inventory&entityType=material&entityId=<materialId>`.
+* Backend storage now initializes the standard `/data/steeltrack-storage` folder tree on service startup when permissions allow.
+
 Storage:
 
 * Files are served from `/uploads/*` backed by `STORAGE_ROOT`, not `apps/frontend/public`, repo `uploads`, or source-code folders.
@@ -23,6 +195,7 @@ Storage:
 Verification:
 
 * Prisma generate passed.
+* Prisma migration deploy reported no pending migrations.
 * Backend build passed.
 * Frontend build passed.
 

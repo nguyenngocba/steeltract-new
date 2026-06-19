@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart3, Building2, Clock, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import { API_BASE_URL } from '@/lib/api'
@@ -29,9 +30,21 @@ type Props = {
   onEdit?: () => void
 }
 
-type TabKey = 'overview' | 'transactions' | 'locations' | 'analytics' | 'projects' | 'suppliers' | 'logs'
+type TabKey = 'overview' | 'transactions' | 'locations' | 'analytics' | 'projects' | 'suppliers' | 'images' | 'documents' | 'logs'
 
 type TableRow = ReactNode[]
+
+type AttachmentContext = {
+  title: string
+  subtitle: string
+  attachments: Attachment[]
+}
+
+type AttachmentSourceRow = {
+  attachment: Attachment
+  source: string
+  sourceDate: string
+}
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Tổng quan' },
@@ -40,6 +53,10 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'analytics', label: 'Phân tích' },
   { key: 'projects', label: 'Công trình' },
   { key: 'suppliers', label: 'Nhà cung cấp' },
+
+  { key: 'images', label: 'Hình ảnh vật tư' },
+  { key: 'documents', label: 'Tài liệu vật tư' },
+
   { key: 'logs', label: 'Lịch sử' },
 ]
 
@@ -83,7 +100,7 @@ function MaterialImageGallery({
   return (
     <ModuleAnalyticsPanel
       title="Hình ảnh vật tư"
-      note="Ảnh lưu trên filesystem, database chỉ lưu metadata"
+      note={`${formatQuantity(images.length, 0)} ảnh · filesystem lưu file, database lưu metadata`}
       action={
         <label className={`${moduleMutedButton} cursor-pointer`}>
           <Plus size={14} />
@@ -141,37 +158,152 @@ function MaterialImageGallery({
   )
 }
 
-function MaterialDocumentsPanel({ attachments }: { attachments: Attachment[] }) {
+function AttachmentCountChip({
+  attachments,
+  emptyLabel = 'Không có',
+  onOpen,
+}: {
+  attachments: Attachment[]
+  emptyLabel?: string
+  onOpen: () => void
+}) {
+  if (!attachments.length) {
+    return (
+      <span className="inline-flex rounded-lg border border-white/10 bg-white/[0.035] px-2 py-1 text-[11px] font-semibold text-slate-500">
+        {emptyLabel}
+      </span>
+    )
+  }
+
+  const first = attachments[0]
+  const label = attachments.length === 1
+    ? attachmentDisplayName(first)
+    : `${formatQuantity(attachments.length, 0)} tài liệu`
+
   return (
-    <ModuleAnalyticsPanel title="Tài liệu vật tư" note="Datasheet, CO, CQ, catalog và tài liệu liên quan">
-      {attachments.length ? (
-        <div className="space-y-2">
-          {attachments.map((attachment) => {
-            const version = currentAttachmentVersion(attachment)
-            return (
-              <div key={attachment.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2 text-sm">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10 text-cyan-200">
-                    <FileText size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold text-slate-100">{attachment.originalName ?? version?.originalName ?? attachment.title}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{attachment.category} · {formatFileSize(attachment.fileSize)} · {formatDateTime(attachment.createdAt)}</div>
-                  </div>
-                </div>
-                {version?.publicUrl ? (
-                  <a href={absoluteUploadUrl(version.publicUrl)} target="_blank" rel="noreferrer" className={moduleMutedButton}>
-                    <Download size={14} />
-                    Tải xuống
-                  </a>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="inline-flex max-w-[220px] items-center gap-1.5 rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-2 py-1 text-left text-[11px] font-semibold text-cyan-100 transition hover:border-cyan-300/45 hover:bg-cyan-400/15"
+      title={attachments.map(attachmentDisplayName).join('\n')}
+    >
+      <FileText size={13} className="shrink-0" />
+      <span className="truncate">{label}</span>
+    </button>
+  )
+}
+
+function MaterialDocumentsPanel({
+  rows,
+  onOpen,
+}: {
+  rows: AttachmentSourceRow[]
+  onOpen: (context: AttachmentContext) => void
+}) {
+  return (
+    <ModuleAnalyticsPanel title="Tài liệu vật tư" note={`${formatQuantity(rows.length, 0)} tài liệu theo nguồn phát sinh`}>
+      {rows.length ? (
+        <ModuleDataGrid>
+          <div className="overflow-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className={moduleTableHead}>
+                <tr>
+                  {['Tên file', 'Loại', 'Nguồn', 'Ngày tạo', 'Tải xuống'].map((header) => (
+                    <th key={header} className="px-3 py-3 text-left">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const publicUrl = attachmentPublicUrl(row.attachment)
+                  return (
+                    <tr key={row.attachment.id} className={moduleTableRow}>
+                      <td className="max-w-[280px] px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpen({
+                            title: attachmentDisplayName(row.attachment),
+                            subtitle: row.source,
+                            attachments: [row.attachment],
+                          })}
+                          className="flex max-w-full items-center gap-2 text-left font-semibold text-cyan-100 hover:text-cyan-50"
+                        >
+                          <FileText size={14} className="shrink-0 text-cyan-300" />
+                          <span className="truncate">{attachmentDisplayName(row.attachment)}</span>
+                        </button>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="rounded-lg border border-white/10 bg-white/[0.045] px-2 py-1 text-xs font-semibold text-slate-300">
+                          {row.attachment.category}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">{row.source}</td>
+                      <td className="px-3 py-2 text-slate-400">{row.sourceDate ? formatDateTime(row.sourceDate) : '-'}</td>
+                      <td className="px-3 py-2">
+                        {publicUrl ? (
+                          <a href={absoluteUploadUrl(publicUrl)} target="_blank" rel="noreferrer" className={moduleMutedButton}>
+                            <Download size={14} />
+                            Tải xuống
+                          </a>
+                        ) : (
+                          <span className="text-xs text-slate-500">Không có URL</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ModuleDataGrid>
       ) : (
-        <ModuleEmptyState icon={<FileText size={18} />} title="Chưa có tài liệu vật tư" description="Tài liệu sẽ xuất hiện sau khi upload DATASHEET, CO, CQ hoặc CATALOG." />
+        <ModuleEmptyState icon={<FileText size={18} />} title="Chưa có tài liệu vật tư" description="Tài liệu sẽ xuất hiện theo nguồn: Master Material, giao dịch nhập/xuất, công trình hoặc nhà cung cấp." />
       )}
+    </ModuleAnalyticsPanel>
+  )
+}
+
+function MaterialAttachmentSummary({
+  photoCount,
+  documentCount,
+  onOpenImages,
+  onOpenDocuments,
+}: {
+  photoCount: number
+  documentCount: number
+  onOpenImages: () => void
+  onOpenDocuments: () => void
+}) {
+  return (
+    <ModuleAnalyticsPanel title="Hồ sơ vật tư" note="Tóm tắt ảnh và tài liệu theo hồ sơ vật tư">
+      <div className="grid gap-2 md:grid-cols-2">
+        <button
+          type="button"
+          onClick={onOpenImages}
+          className="rounded-xl border border-emerald-300/15 bg-emerald-400/[0.055] p-3 text-left transition hover:border-emerald-300/35 hover:bg-emerald-400/10"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-slate-100">Ảnh vật tư</span>
+            <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-100">
+              {formatQuantity(photoCount, 0)}
+            </span>
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Mở gallery ảnh vật tư</div>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenDocuments}
+          className="rounded-xl border border-cyan-300/15 bg-cyan-400/[0.055] p-3 text-left transition hover:border-cyan-300/35 hover:bg-cyan-400/10"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-slate-100">Tài liệu</span>
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+              {formatQuantity(documentCount, 0)}
+            </span>
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Xem nguồn tài liệu liên quan</div>
+        </button>
+      </div>
     </ModuleAnalyticsPanel>
   )
 }
@@ -188,11 +320,63 @@ function ImagePreviewDialog({ src, onClose }: { src: string; onClose: () => void
   )
 }
 
+function AttachmentContextDrawer({
+  context,
+  onClose,
+}: {
+  context: AttachmentContext | null
+  onClose: () => void
+}) {
+  return (
+    <ModuleDetailDrawer
+      open={Boolean(context)}
+      title={context?.title ?? 'Tài liệu'}
+      subtitle={context?.subtitle ?? 'Hồ sơ liên quan'}
+      onClose={onClose}
+      widthClass="max-w-3xl"
+    >
+      <div className="space-y-2">
+        {(context?.attachments ?? []).map((attachment) => {
+          const publicUrl = attachmentPublicUrl(attachment)
+          return (
+            <div key={attachment.id} className="rounded-xl border border-white/10 bg-slate-950/45 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10 text-cyan-200">
+                    <FileText size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-100">{attachmentDisplayName(attachment)}</div>
+                    <div className="mt-1 text-xs text-slate-500">{attachment.category} · {formatFileSize(attachment.fileSize)} · {formatDateTime(attachment.createdAt)}</div>
+                  </div>
+                </div>
+                {publicUrl ? (
+                  <a href={absoluteUploadUrl(publicUrl)} target="_blank" rel="noreferrer" className={moduleMutedButton}>
+                    <Download size={14} />
+                    Tải xuống
+                  </a>
+                ) : null}
+              </div>
+              {attachment.mimeType.startsWith('image/') && publicUrl ? (
+                <img src={absoluteUploadUrl(publicUrl)} alt={attachmentDisplayName(attachment)} className="mt-3 max-h-72 w-full rounded-xl border border-white/10 object-contain" />
+              ) : null}
+            </div>
+          )
+        })}
+        {!context?.attachments?.length ? (
+          <ModuleEmptyState icon={<FileText size={18} />} title="Không có tài liệu" description="Nguồn này chưa có file đính kèm." />
+        ) : null}
+      </div>
+    </ModuleDetailDrawer>
+  )
+}
+
 export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [focusedLocation, setFocusedLocation] = useState<any | null>(null)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [attachmentContext, setAttachmentContext] = useState<AttachmentContext | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const queryClient = useQueryClient()
 
@@ -210,7 +394,15 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const projectRows = detail?.projectConsumptionHistory ?? []
   const supplierRows = detail?.supplierHistory ?? []
   const locationRows = detail?.locationBalances ?? []
-  const materialId = item.id ?? fallback?.id
+  const materialId =
+    item.id ??
+    item.materialId ??
+    item.inventoryItemId ??
+    detail?.materialId ??
+    detail?.inventoryItemId ??
+    fallback?.materialId ??
+    fallback?.inventoryItemId ??
+    fallback?.id
   const attachmentQueryKey = ['attachments', 'inventory', 'material', materialId]
   const { data: attachmentResult = [] } = useQuery({
     queryKey: attachmentQueryKey,
@@ -224,6 +416,47 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const productionQty = locationRows.filter((x: any) => x.warehouseCode === 'PRODUCTION').reduce((sum: number, x: any) => sum + num(x.quantity), 0)
   const supplier = supplierRows[0]?.supplierName ?? '-'
   const transactionRows = useMemo(() => buildTransactionRows(inbound, outbound), [inbound, outbound])
+  const { data: transactionAttachmentResult = [] } = useQuery({
+    queryKey: ['attachments', 'inventory', 'transaction', 'material-detail', materialId],
+    queryFn: () => getAttachments({ module: 'inventory', entityType: 'transaction' }),
+    enabled: Boolean(materialId),
+    staleTime: 10_000,
+  })
+  const allTransactionAttachments = normalizeAttachmentList(transactionAttachmentResult)
+  const transactionRowsById = useMemo(() => {
+    const map = new Map<string, any>()
+    transactionRows.forEach((row) => {
+      transactionEntityKeys(row).forEach((key) => map.set(key, row))
+    })
+    return map
+  }, [transactionRows])
+  const transactionAttachments = useMemo(() => {
+    return allTransactionAttachments.filter((attachment) => {
+      const entityId = String(attachment.entityId ?? '')
+      if (entityId && transactionRowsById.has(entityId)) return true
+      const transactionNo = String((attachment.metadata as any)?.transactionNo ?? '').trim()
+      return Boolean(transactionNo && transactionRows.some((row) => String(row.transactionNo ?? '').trim() === transactionNo))
+    })
+  }, [allTransactionAttachments, transactionRows, transactionRowsById])
+  const transactionAttachmentGroups = useMemo(() => groupTransactionAttachments(transactionAttachments, transactionRows), [transactionAttachments, transactionRows])
+  const documentSourceRows = useMemo<AttachmentSourceRow[]>(() => {
+    const materialRows = documentAttachments.map((attachment) => ({
+      attachment,
+      source: 'Master Material',
+      sourceDate: attachment.createdAt,
+    }))
+    const transactionRowsWithSource = transactionAttachments
+      .filter((attachment) => !isPhotoAttachment(attachment))
+      .map((attachment) => {
+        const sourceRow = findSourceTransactionRow(attachment, transactionRows)
+        return {
+          attachment,
+          source: sourceRow ? transactionSourceLabel(sourceRow) : 'Inventory Transaction',
+          sourceDate: attachment.createdAt,
+        }
+      })
+    return [...materialRows, ...transactionRowsWithSource]
+  }, [documentAttachments, transactionAttachments, transactionRows])
   const movementTrend = useMemo(() => buildMovementTrend(transactionRows), [transactionRows])
   const forecast = useMemo(() => buildForecast(currentStock, outbound), [currentStock, outbound])
   const imageUrls = useMemo(() => collectMaterialImages(detail, fallback, photoAttachments), [detail, fallback, photoAttachments])
@@ -232,8 +465,39 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const projectSummary = useMemo(() => buildUsageSummary(projectRows, averageCost), [projectRows, averageCost])
   const supplierSummary = useMemo(() => buildPurchaseSummary(supplierRows, averageCost), [supplierRows, averageCost])
 
+  useEffect(() => {
+    if (!import.meta.env.DEV || !open || !materialId) return
+
+    console.debug('[inventory.material.attachments]', {
+      queryParams: {
+        module: 'inventory',
+        entityType: 'material',
+        entityId: materialId,
+      },
+      response: attachmentResult,
+      mapped: {
+        attachments: attachments.map(debugAttachment),
+        imageUrls,
+        primaryImage,
+        documentAttachments: documentAttachments.map(debugAttachment),
+      },
+    })
+  }, [
+    attachmentResult,
+    attachments,
+    documentAttachments,
+    imageUrls,
+    materialId,
+    open,
+    primaryImage,
+  ])
+
   async function handleImageUpload(file: File) {
-    if (!materialId || !file) return
+    if (!materialId || !file) {
+      toast.error('Không xác định được vật tư để upload ảnh')
+      return
+    }
+
     setUploadingImage(true)
     try {
       await uploadAttachment({
@@ -250,6 +514,9 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
       })
       setSelectedImage(null)
       await queryClient.invalidateQueries({ queryKey: attachmentQueryKey })
+      toast.success('Đã thêm ảnh vật tư')
+    } catch {
+      toast.error('Không thể upload ảnh vật tư')
     } finally {
       setUploadingImage(false)
     }
@@ -262,7 +529,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
       <ModuleDetailDrawer
         open={open}
         title={`${code} · ${name}`}
-        subtitle={`${materialUsageLabel(materialUsageType)} · ${unit || 'Chưa có đơn vị'} · ${locationRows.length} vị trí lưu kho`}
+        subtitle={`${materialUsageLabel(materialUsageType)} · ${unit || 'Chưa có đơn vị'} · ${locationRows.length} vị trí lưu kho · ${formatQuantity(photoAttachments.length, 0)} ảnh · ${formatQuantity(documentSourceRows.length, 0)} tài liệu`}
         onClose={onClose}
         widthClass="max-w-7xl"
         actions={onEdit ? (
@@ -285,8 +552,13 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           {activeTab === 'overview' && (
             <div className="grid gap-3 xl:grid-cols-[.8fr_1.2fr]">
               <div className="space-y-3">
+                <MaterialAttachmentSummary
+                  photoCount={photoAttachments.length}
+                  documentCount={documentSourceRows.length}
+                  onOpenImages={() => setActiveTab('images')}
+                  onOpenDocuments={() => setActiveTab('documents')}
+                />
                 <MaterialImageGallery images={imageUrls} selectedImage={primaryImage} uploading={uploadingImage} onUpload={handleImageUpload} onSelect={setSelectedImage} onPreview={setPreviewImage} />
-                <MaterialDocumentsPanel attachments={documentAttachments} />
                 <ModuleAnalyticsPanel title="Thông tin vật tư" note="Thông tin tổng hợp từ dữ liệu vật tư hiện có">
                   <InfoGrid rows={[
                     ['Mã vật tư', code],
@@ -317,13 +589,22 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           {activeTab === 'transactions' && (
             <DetailTable
               title="Lịch sử giao dịch"
-              headers={['Thời gian', 'Loại', 'Đối tượng', 'Số lượng', 'Giá trị']}
+              headers={['Thời gian', 'Loại', 'Đối tượng', 'Số lượng', 'Giá trị', 'Tài liệu']}
               rows={transactionRows.slice(0, 18).map((row) => [
                 row.transactionDate ? formatDateTime(row.transactionDate) : '-',
                 <TransactionTypeBadge key="type" type={row.type} />,
                 row.counterparty,
                 `${fmt(row.quantity)} ${unit}`.trim(),
                 money(row.totalAmount),
+                <AttachmentCountChip
+                  key="attachments"
+                  attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                  onOpen={() => setAttachmentContext({
+                    title: row.transactionNo ?? 'Tài liệu giao dịch',
+                    subtitle: transactionSourceLabel(row),
+                    attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                  })}
+                />,
               ])}
             />
           )}
@@ -345,12 +626,21 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
               </ModuleKpiStrip>
               <DetailTable
                 title="Top projects"
-                headers={['Công trình', 'Đã xuất', 'Đã trả', 'Giá trị']}
+                headers={['Công trình', 'Đã xuất', 'Đã trả', 'Giá trị', 'Hồ sơ liên quan']}
                 rows={projectRows.slice(0, 12).map((row: any) => [
                   row.projectName ?? 'Không rõ',
                   `${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim(),
                   `${fmt(row.returnedQty)} ${unit}`.trim(),
                   money(row.issuedValue ?? num(row.quantity) * averageCost),
+                  <AttachmentCountChip
+                    key="project-files"
+                    attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                    onOpen={() => setAttachmentContext({
+                      title: row.projectName ?? 'Hồ sơ công trình',
+                      subtitle: 'Hồ sơ liên quan từ giao dịch xuất kho',
+                      attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                    })}
+                  />,
                 ])}
               />
             </div>
@@ -365,15 +655,40 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
               </ModuleKpiStrip>
               <DetailTable
                 title="Top suppliers"
-                headers={['Nhà cung cấp', 'Số lượng nhập', 'Đơn giá nhập', 'Tổng giá trị']}
+                headers={['Nhà cung cấp', 'Số lượng nhập', 'Đơn giá nhập', 'Tổng giá trị', 'Chứng từ']}
                 rows={supplierRows.slice(0, 12).map((row: any) => [
                   row.supplierName ?? 'Không rõ',
                   `${fmt(row.quantity)} ${unit}`.trim(),
                   money(row.unitPrice ?? row.latestUnitPrice ?? averageCost),
                   money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost)),
+                  <AttachmentCountChip
+                    key="supplier-files"
+                    attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                    onOpen={() => setAttachmentContext({
+                      title: row.supplierName ?? 'Chứng từ nhà cung cấp',
+                      subtitle: 'Chứng từ liên quan từ giao dịch nhập kho',
+                      attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                    })}
+                  />,
                 ])}
               />
             </div>
+          )}
+          {activeTab === 'images' && (
+            <MaterialImageGallery
+              images={imageUrls}
+              selectedImage={primaryImage}
+              uploading={uploadingImage}
+              onUpload={handleImageUpload}
+              onSelect={(src) => setSelectedImage(src)}
+              onPreview={(src) => setPreviewImage(src)}
+            />
+          )}
+          {activeTab === 'documents' && (
+            <MaterialDocumentsPanel
+              rows={documentSourceRows}
+              onOpen={setAttachmentContext}
+            />
           )}
 
           {activeTab === 'logs' && (
@@ -391,6 +706,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           )}
         </div>
       </ModuleDetailDrawer>
+      <AttachmentContextDrawer context={attachmentContext} onClose={() => setAttachmentContext(null)} />
       {focusedLocation ? <LocationFocusPreview location={focusedLocation} onClose={() => setFocusedLocation(null)} /> : null}
       {previewImage ? <ImagePreviewDialog src={previewImage} onClose={() => setPreviewImage(null)} /> : null}
     </>,
@@ -660,6 +976,88 @@ function buildTransactionRows(inbound: any[], outbound: any[]) {
   })).sort((a: any, b: any) => +new Date(b.transactionDate ?? b.createdAt ?? 0) - +new Date(a.transactionDate ?? a.createdAt ?? 0))
 }
 
+function transactionEntityKeys(row: any) {
+  return [
+    row?.id,
+    row?.transactionId,
+    row?.inventoryTransactionId,
+    row?.inventoryTransaction?.id,
+    row?.transaction?.id,
+    row?.transactionNo,
+    row?.documentNo,
+  ]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+}
+
+function attachmentTransactionNo(attachment: Attachment) {
+  return String(
+    (attachment.metadata as any)?.transactionNo ??
+    (attachment.metadata as any)?.documentNo ??
+    '',
+  ).trim()
+}
+
+function isPhotoAttachment(attachment: Attachment) {
+  return attachment.category === 'PHOTO' || attachment.mimeType.startsWith('image/')
+}
+
+function attachmentDisplayName(attachment: Attachment) {
+  const version = currentAttachmentVersion(attachment)
+  return attachment.originalName ?? version?.originalName ?? attachment.title ?? 'Tài liệu'
+}
+
+function transactionSourceLabel(row: any) {
+  const type = normalizeTransactionType(row?.type ?? row?.transactionType ?? row?.businessType)
+  const transactionNo = String(row?.transactionNo ?? row?.documentNo ?? '').trim()
+  const label = type === 'INBOUND'
+    ? 'Inbound Transaction'
+    : type === 'OUTBOUND'
+      ? 'Outbound Transaction'
+      : type === 'TRANSFER'
+        ? 'Transfer Transaction'
+        : 'Inventory Transaction'
+
+  return transactionNo ? `${label} ${transactionNo}` : label
+}
+
+function findSourceTransactionRow(attachment: Attachment, rows: any[]) {
+  const entityId = String(attachment.entityId ?? '').trim()
+  const transactionNo = attachmentTransactionNo(attachment)
+
+  return rows.find((row) => {
+    const keys = transactionEntityKeys(row)
+    if (entityId && keys.includes(entityId)) return true
+    return Boolean(transactionNo && keys.includes(transactionNo))
+  })
+}
+
+function groupTransactionAttachments(attachments: Attachment[], rows: any[]) {
+  const groups = new Map<string, Attachment[]>()
+
+  attachments.forEach((attachment) => {
+    const sourceRow = findSourceTransactionRow(attachment, rows)
+    const keys = sourceRow
+      ? transactionEntityKeys(sourceRow)
+      : [String(attachment.entityId ?? '').trim(), attachmentTransactionNo(attachment)].filter(Boolean)
+
+    keys.forEach((key) => {
+      const current = groups.get(key) ?? []
+      if (!current.some((item) => item.id === attachment.id)) {
+        current.push(attachment)
+      }
+      groups.set(key, current)
+    })
+  })
+
+  return groups
+}
+
+function attachmentsForTransactionRow(row: any, groups: Map<string, Attachment[]>) {
+  const found = transactionEntityKeys(row).flatMap((key) => groups.get(key) ?? [])
+  return Array.from(new Map(found.map((attachment) => [attachment.id, attachment])).values())
+}
+
 function normalizeTransactionType(value: string) {
   const type = String(value ?? '').toUpperCase()
   if (type.includes('IN') || type.includes('IMPORT') || type.includes('RECEIPT')) return 'INBOUND'
@@ -695,7 +1093,7 @@ function buildForecast(currentStock: number, outbound: any[]) {
 function collectMaterialImages(detail: any, fallback: any, attachments: Attachment[]) {
   const candidates = [
     ...attachments.map((attachment) => {
-      const publicUrl = currentAttachmentVersion(attachment)?.publicUrl
+      const publicUrl = attachmentPublicUrl(attachment)
       return publicUrl ? absoluteUploadUrl(publicUrl) : undefined
     }).filter(Boolean),
     detail?.item?.imageUrl,
@@ -718,7 +1116,23 @@ function normalizeAttachmentList(result: Awaited<ReturnType<typeof getAttachment
 }
 
 function currentAttachmentVersion(attachment: Attachment) {
-  return attachment.versions.find((version) => version.id === attachment.currentVersionId) ?? attachment.versions[0]
+  const versions = Array.isArray(attachment.versions) ? attachment.versions : []
+  return versions.find((version) => version.id === attachment.currentVersionId) ?? versions[0]
+}
+
+function attachmentPublicUrl(attachment: Attachment) {
+  const currentVersion = currentAttachmentVersion(attachment)
+  const directUrl =
+    (attachment as any).publicUrl ??
+    (attachment as any).url ??
+    (attachment as any).currentVersion?.publicUrl ??
+    (attachment as any).latestVersion?.publicUrl
+
+  if (currentVersion?.publicUrl) return currentVersion.publicUrl
+  if (directUrl) return String(directUrl)
+  if (attachment.storagePath) return `/uploads/${attachment.storagePath}`
+
+  return ''
 }
 
 function absoluteUploadUrl(url: string) {
@@ -731,6 +1145,20 @@ function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${formatQuantity(size / 1024 / 1024, 1)} MB`
   if (size >= 1024) return `${formatQuantity(size / 1024, 1)} KB`
   return `${formatQuantity(size, 0)} B`
+}
+
+function debugAttachment(attachment: Attachment) {
+  return {
+    id: attachment.id,
+    module: attachment.module,
+    entityType: attachment.entityType,
+    entityId: attachment.entityId,
+    category: attachment.category,
+    mimeType: attachment.mimeType,
+    storagePath: attachment.storagePath,
+    versionCount: Array.isArray(attachment.versions) ? attachment.versions.length : 0,
+    publicUrl: attachmentPublicUrl(attachment),
+  }
 }
 
 function buildMaterialAnalytics(

@@ -33,6 +33,8 @@ import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 10
 const donutColors = ['#1d7cff', '#14c987', '#7c3aed', '#f59e0b', '#ef4444', '#06b6d4']
+const compactInput =
+  'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
 
 function parseLocaleNumber(v: any) {
   if (typeof v === 'number') return v
@@ -314,7 +316,13 @@ export function InventoryOverviewPage() {
 
   const recentInboundRows = useMemo(() => transactions.filter((x: any) => String(x.type ?? '').toUpperCase() === 'INBOUND'), [transactions])
   const recentOutboundRows = useMemo(() => transactions.filter((x: any) => String(x.type ?? '').toUpperCase() === 'OUTBOUND'), [transactions])
-
+  const recentTransferRows = useMemo(
+    () =>
+      transactions.filter(
+        (x: any) => String(x.type ?? '').toUpperCase() === 'TRANSFER',
+      ),
+    [transactions],
+  )
   const summary = useMemo(() => {
     const totalQty = filteredRows.reduce((sum: number, item: any) => sum + num(item.quantity), 0)
     const totalValue = filteredRows.reduce((sum: number, item: any) => sum + num(item.inventoryValue), 0)
@@ -449,15 +457,43 @@ const kpiDeltas = useMemo(() => {
 
   const todayStats = useMemo(() => {
     const todayKey = new Date().toISOString().slice(0, 10)
-    const inboundToday = recentInboundRows.filter((tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey)
-    const outboundToday = recentOutboundRows.filter((tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey)
+
+    const inboundToday = recentInboundRows.filter(
+      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
+    )
+
+    const outboundToday = recentOutboundRows.filter(
+      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
+    )
+
+    const transferToday = recentTransferRows.filter(
+      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
+    )
+
     return {
       inboundDocs: inboundToday.length,
-      inboundQty: inboundToday.reduce((sum: number, tx: any) => sum + transactionQuantity(tx), 0),
+      inboundQty: inboundToday.reduce(
+        (sum: number, tx: any) => sum + transactionQuantity(tx),
+        0,
+      ),
+
       outboundDocs: outboundToday.length,
-      outboundQty: outboundToday.reduce((sum: number, tx: any) => sum + transactionQuantity(tx), 0),
+      outboundQty: outboundToday.reduce(
+        (sum: number, tx: any) => sum + transactionQuantity(tx),
+        0,
+      ),
+
+      transferDocs: transferToday.length,
+      transferQty: transferToday.reduce(
+        (sum: number, tx: any) => sum + transactionQuantity(tx),
+        0,
+      ),
     }
-  }, [recentInboundRows, recentOutboundRows])
+  }, [
+    recentInboundRows,
+    recentOutboundRows,
+    recentTransferRows,
+  ])
 
   const warehouseStatus = useMemo(() => {
     const bases = warehouseOptions.length ? warehouseOptions : [{ value: '', label: 'Tất cả kho' }]
@@ -554,70 +590,92 @@ const kpiDeltas = useMemo(() => {
           />
         </div>
 
-        <InventoryPanel className="rounded-xl p-0.5">
+        <InventoryPanel className="rounded-xl">
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
-            <LabeledFilter label="Kho">
-              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
+            <LabeledFilter label="">
+              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={compactInput}>
                 <option value="">Tất cả kho</option>
-                {warehouseOptions.map((warehouse) => <option key={warehouse.value} value={warehouse.value}>{warehouse.label}</option>)}
+                {warehouseOptions.map((warehouse) => 
+                <option key={warehouse.value} value={warehouse.value}>
+                  {warehouse.label}
+                </option>)}
               </select>
             </LabeledFilter>
-            <LabeledFilter label="Nhóm vật tư">
-              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
-                <option value="">Tất cả</option>
-                {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="Loại vật tư">
-              <select value={usageFilter} onChange={(e) => { setUsageFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
-                <option value="">Tất cả</option>
+			    <LabeledFilter label="">
+              <select
+                value={usageFilter}
+                onChange={(e) => {
+                  setUsageFilter(e.target.value)
+                  setPage(1)
+                }}
+                className={compactInput}
+              >
+                <option value="">Tất cả loại vật tư</option>
                 <option value="PRIMARY">Vật tư chính</option>
                 <option value="SECONDARY">Vật tư phụ</option>
                 <option value="CONSUMABLE">Vật tư tiêu hao</option>
               </select>
             </LabeledFilter>
-            <LabeledFilter label="Trạng thái">
-              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}>
-                <option value="">Tất cả</option>
+            <LabeledFilter label="">
+              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={compactInput}>
+                <option value="">Tất cả nhóm vật tư</option>
+                {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </LabeledFilter>
+            <LabeledFilter label="">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value)
+                  setPage(1)
+                }}
+                className={compactInput}
+              >
+                <option value="">Tất cả trạng thái</option>
                 <option value="NORMAL">Bình thường</option>
                 <option value="LOW">Sắp hết</option>
                 <option value="OUT">Hết hàng</option>
               </select>
             </LabeledFilter>
-            <LabeledFilter label="Tìm kiếm">
+            <LabeledFilter label="">
               <input
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') applySearch() }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applySearch()
+                }}
                 placeholder="Mã, tên, quy cách, nhà cung cấp..."
-                className={`${inventoryInput} h-5 rounded-md px-1.5 text-xs`}
+                className={compactInput}
               />
             </LabeledFilter>
-            <button onClick={applySearch} className="h-5 self-end rounded-md bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
+            <button onClick={applySearch} className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
               Tìm kiếm
             </button>
-            <button onClick={resetFilters} className="h-5 self-end rounded-md border border-white/10 bg-white/[0.055] px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10">
+            <button onClick={resetFilters} className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
               Làm mới
             </button>
           </div>
         </InventoryPanel>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-          <div className="space-y-1.5 xl:col-span-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
+          <div className="space-y-1 xl:col-span-8">
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr] gap-1">
               <InventoryChartCard title="Thao tác nhanh" className="p-1.5">
                 <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
                   <QuickActionButton label="Nhập kho" tone="blue" onClick={() => setTransactionModal('inbound')} />
-                  <QuickActionButton label="Xuất kho" tone="emerald" onClick={() => setTransactionModal('outbound')} />
-                  <QuickActionButton label="Điều chuyển" tone="amber" onClick={() => setTransactionModal('transfer')} />
-                  <QuickActionButton label="Kiểm kê" tone="purple" onClick={() => setTransactionModal('stock-take')} />
+                  <QuickActionButton label="Xuất kho" tone="amber" onClick={() => setTransactionModal('outbound')} />
+                  <QuickActionButton label="Điều chuyển" tone="purple" onClick={() => setTransactionModal('transfer')} />
+                  <QuickActionButton label="Kiểm kê" tone="emerald" onClick={() => setTransactionModal('stock-take')} />
                 </div>
               </InventoryChartCard>
-              <InventoryChartCard title="Nhập kho hôm nay" className="p-1.5">
+              <InventoryChartCard title="Nhập kho hôm nay" className="border-cyan-500/20 bg-cyan-500/5">
                 <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={recentInboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="cyan" />
               </InventoryChartCard>
-              <InventoryChartCard title="Xuất kho hôm nay" className="p-1.5">
+              <InventoryChartCard title="Xuất kho hôm nay" className="border-amber-500/20 bg-amber-500/5">
                 <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={recentOutboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="amber" />
+              </InventoryChartCard>
+              <InventoryChartCard title="Điều chuyển hôm nay" className="border-purple-500/20 bg-purple-500/5 p-1.5">
+                <TransactionSummary title="phiếu" count={todayStats.transferDocs} quantity={todayStats.transferQty} amount={0} tone="purple" />
               </InventoryChartCard>
             </div>
             <InventoryPanel>
@@ -645,8 +703,8 @@ const kpiDeltas = useMemo(() => {
                       const status = statusOf(item)
                       return (
                         <tr key={item.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setSelectedMaterialId(String(item.id))}>
-                          <td className="px-2 py-1.5 text-cyan-300">{item.code}</td>
-                          <td className="max-w-[180px] truncate px-2 py-1.5 text-white">{item.name}</td>
+                          <td className="max-w-[120px] truncate px-2 py-1.5 text-cyan-300" title={item.code}>{item.code}</td>
+                          <td className="max-w-[160px] truncate px-2 py-1.5 text-white" title={item.name}>{item.name}</td>
                           <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-300">{item.materialType ?? item.specification ?? '-'}</td>
                           <td className="px-2 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
                           <td className="px-2 py-1.5 text-right text-slate-200">{formatQty(item.quantity)}</td>
@@ -658,7 +716,15 @@ const kpiDeltas = useMemo(() => {
                             </span>
                           </td>
                           <td className="px-2 py-1.5">
-                            <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-1 text-red-300' : status === 'LOW' ? 'rounded bg-amber-500/10 px-2 py-1 text-amber-300' : 'rounded bg-emerald-500/10 px-2 py-1 text-emerald-300'}>
+                            <span
+                              className={`inline-flex rounded-lg border px-2 py-1 text-xs ${
+                                status === 'OUT'
+                                  ? 'border-red-400/30 bg-red-500/10 text-red-300'
+                                  : status === 'LOW'
+                                  ? 'border-amber-400/30 bg-amber-500/10 text-amber-300'
+                                  : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
+                              }`}
+                            >
                               {statusLabel(status)}
                             </span>
                           </td>
@@ -677,7 +743,7 @@ const kpiDeltas = useMemo(() => {
             </div>
           </div>
 
-          <div className="space-y-1.5 xl:col-span-4">
+          <div className="space-y-1 xl:col-span-4">
             <InventoryChartCard title="Tổng quan tồn kho" note="Theo vị trí thực tế">
               <CompactDonutSummary segments={zoneSegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
             </InventoryChartCard>
@@ -774,16 +840,32 @@ function StatusMetric({ label, value, tone }: { label: string; value: number; to
   )
 }
 
-function TransactionSummary({ title, count, quantity, amount, tone }: { title: string; count: number; quantity: number; amount: number; tone: 'cyan' | 'amber' }) {
+function TransactionSummary({ title, count, quantity, amount, tone }: { title: string; count: number; quantity: number; amount: number; tone: 'cyan' | 'amber' | 'purple' }) {
+  const toneClass = {
+    cyan: 'text-cyan-300',
+    amber: 'text-amber-300',
+    purple: 'text-purple-300',
+  }[tone]
   return (
     <div className="grid grid-cols-[auto_1fr] items-end gap-3">
       <div>
-        <div className="text-2xl font-semibold text-white">{count}</div>
-        <div className="text-[11px] text-slate-500">{title}</div>
+        <div className={`text-2xl font-semibold ${toneClass}`}>
+          {count}
+        </div>
+
+        <div className="text-[11px] text-slate-500">
+          {title}
+        </div>
       </div>
+
       <div className="text-right">
-        <div className={`text-base font-semibold ${tone === 'cyan' ? 'text-cyan-300' : 'text-amber-300'}`}>{formatQty(quantity)} tấn</div>
-        <div className="text-xs text-slate-400">{money(amount)}</div>
+        <div className={`text-base font-semibold ${toneClass}`}>
+          {formatQty(quantity)} tấn
+        </div>
+
+        <div className="text-xs text-slate-400">
+          {money(amount)}
+        </div>
       </div>
     </div>
   )
@@ -851,7 +933,7 @@ function OverviewPagination({
   const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
 
   return (
-    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
+    <div className="grid grid-cols-1 items-center gap-1 px-4 py-1 text-xs text-slate-400 md:grid-cols-3">
       <div>
         Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>

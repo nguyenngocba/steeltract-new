@@ -142,7 +142,7 @@ function displayLocation(item: any) {
 function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-slate-400">{label}</span>
+      <span className="mb-0 block text-[12px] font-medium text-slate-400">{label}</span>
       {children}
     </label>
   )
@@ -703,35 +703,7 @@ export function InventoryMaterialsPage() {
 
         <InventoryPanel className="rounded-xl">
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
-            <LabeledFilter label="Nhóm vật tư">
-              <select
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả</option>
-                {categories.map((category: any) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="Loại vật tư">
-              <select
-                value={usageFilter}
-                onChange={(e) => {
-                  setUsageFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả</option>
-                <option value="PRIMARY">Vật tư chính</option>
-                <option value="SECONDARY">Vật tư phụ</option>
-                <option value="CONSUMABLE">Vật tư tiêu hao</option>
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="Kho">
+			<LabeledFilter label="">
               <select
                 value={zoneFilter}
                 onChange={(e) => {
@@ -740,7 +712,7 @@ export function InventoryMaterialsPage() {
                 }}
                 className={compactInput}
               >
-                <option value="">Tất cả</option>
+                <option value="">Tất cả kho</option>
                 {warehouseOptions.map((warehouse) => (
                   <option key={warehouse.value} value={warehouse.value}>
                     {warehouse.label}
@@ -748,7 +720,35 @@ export function InventoryMaterialsPage() {
                 ))}
               </select>
             </LabeledFilter>
-            <LabeledFilter label="Trạng thái">
+            <LabeledFilter label="">
+              <select
+                value={usageFilter}
+                onChange={(e) => {
+                  setUsageFilter(e.target.value)
+                  setPage(1)
+                }}
+                className={compactInput}
+              >
+                <option value="">Tất cả loại vật tư</option>
+                <option value="PRIMARY">Vật tư chính</option>
+                <option value="SECONDARY">Vật tư phụ</option>
+                <option value="CONSUMABLE">Vật tư tiêu hao</option>
+              </select>
+            </LabeledFilter>
+            <LabeledFilter label="">
+              <select
+                value={categoryFilter}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value)
+                  setPage(1)
+                }}
+                className={compactInput}
+              >
+                <option value="">Tất cả nhóm vật tư</option>
+                {categories.map((category: any) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </LabeledFilter>
+            <LabeledFilter label="">
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -757,13 +757,13 @@ export function InventoryMaterialsPage() {
                 }}
                 className={compactInput}
               >
-                <option value="">Tất cả</option>
+                <option value="">Tất cả trạng thái</option>
                 <option value="NORMAL">Bình thường</option>
                 <option value="LOW">Sắp hết</option>
                 <option value="OUT">Hết hàng</option>
               </select>
             </LabeledFilter>
-            <LabeledFilter label="Tìm kiếm">
+            <LabeledFilter label="">
               <input
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
@@ -808,8 +808,8 @@ export function InventoryMaterialsPage() {
                   <tbody>
                     {pagedRows.map((item: any) => (
                       <tr key={item.id} onClick={() => openMaterial(item)} className={`cursor-pointer ${inventoryTableRow}`}>
-                        <td className="px-1.5 py-1 font-medium text-cyan-300">{item.materialCode}</td>
-                        <td className="max-w-[180px] truncate px-1.5 py-1 text-white">{item.materialName}</td>
+                        <td className="px-1.5 py-1"><div className="max-w-[120px] truncate font-medium text-cyan-300" title={item.materialCode}>{item.materialCode}</div></td>
+                        <td className="px-1.5 py-1"><div className="max-w-[160px] truncate font-medium text-white" title={item.materialName}>{item.materialName}</div></td>
                         <td className="max-w-[150px] truncate px-1.5 py-1 text-slate-300">{item.materialType ?? '-'}</td>
                         <td className="px-1.5 py-1 text-slate-300">{item.unit ?? '-'}</td>
                         <td className="px-1.5 py-1 text-right text-slate-200">{formatQuantity(Number(item.currentStock ?? 0), 0)}</td>

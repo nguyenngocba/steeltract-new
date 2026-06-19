@@ -75,11 +75,18 @@ Behavior:
 - Sprint 14A persists Material Detail photos through the shared Attachments module. `Hình ảnh vật tư` now has `Thêm ảnh`, uploads images to `/attachments/upload`, refreshes the gallery, and displays images served from filesystem storage.
 - Material Detail now includes `Tài liệu vật tư` for non-photo attachments and shows original filename, category, size, upload date, and download action.
 - Material attachment metadata is stored in PostgreSQL while file content is stored outside the repo under `STORAGE_ROOT` or `/data/steeltrack-storage/inventory/materials`.
+- Sprint 14B adds Inventory Transaction attachments for Inbound, Outbound, Transfer, and Stock Take forms. Attachments are selected during form entry and uploaded immediately after the transaction save succeeds.
+- Inventory transaction attachments use `module=inventory`, `entityType=transaction`, and `entityId=transactionId`; files are routed under `/data/steeltrack-storage/inventory/transactions/<type>`.
+- Inventory Transactions now has a detail drawer with a `Tài liệu đính kèm` tab showing original filename, category, size, upload date, download action, and image previews.
+- Sprint 14B.5 refines Inventory attachment UX: Inventory material rows no longer show attachment badges, Material Detail Overview shows image/document summary counts, transaction/project/supplier tabs expose contextual attachment columns, and the documents tab classifies file source by Master Material or related inventory transaction.
+- Inventory Transactions UX 2.0 adds a `Hồ sơ` column to dedicated Nhập kho, Xuất kho, Điều chuyển, and Kiểm kê pages. The `📎` action opens a standard attachment drawer for the selected transaction.
+- Sprint 15A fixes outbound value display. The Outbound page now aggregates all item lines for KPI and table values, and transaction API read responses compute missing outbound line value from average inbound cost when legacy `EXPORT` rows do not store `unitPrice` / `totalAmount`.
+- Sprint 15B fixes the source data path for Inventory transaction valuation. `InventoryService.createTransaction`, Production material issue/return direct writers, and Material Movement direct writer now persist `unitPrice` and `totalAmount` on transaction items. Historical missing values were repaired with `scripts/sql/backfill-inventory-transaction-item-costs.sql`.
 - Inventory transfer creation is limited to `Kho chính`, auto-fills source cell/floor from the selected material stock location, suggests a free destination cell/floor, and shows separate source/destination 2D location views instead of the legacy transfer diagram.
 - Sprint 9 stock mutation hardening validates and updates the exact full bucket `inventoryItemId + warehouseId + zoneId + slotId + level`, so new transaction paths keep `inventory_items.quantity` and `inventory_location_stocks` synchronized.
 - Sprint 11A decimal quantity pass lets Inventory inbound, outbound, transfer, stock-take, stock adjustment, Material Master minimum stock, and warehouse location capacity accept decimal values with `vi-VN` formatted typing.
 - Currency display uses whole-number VND formatting, for example `25.000.000 đ`.
-- Material photo upload is now persisted through shared attachments. Upload controls for datasheets, CO, CQ, and catalogs still need a dedicated non-photo document upload UI.
+- Material photo upload and Inventory transaction attachments are now persisted through shared attachments. Upload controls for Material Master datasheets, CO, CQ, and catalogs still need a dedicated non-photo document upload UI.
 
 Parent warehouses:
 
@@ -113,6 +120,7 @@ Build:
 - Backend build passed.
 - Frontend build passed.
 - Sprint 11A audit found no Inventory quantity/cost migration requirement because audited operational fields already use `Float`.
+- Sprint 15B backend build passed and verification SQL showed IMPORT, EXPORT, TRANSFER, and RETURN all have complete persisted `unitPrice` / `totalAmount` values.
 
 ## Implemented In Phase A
 

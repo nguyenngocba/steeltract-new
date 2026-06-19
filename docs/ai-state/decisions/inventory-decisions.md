@@ -189,3 +189,27 @@ Mitigations:
 - Keep snapshot auto-sync in transaction service.
 - Prefer location balance and transaction aggregates for new Inventory workflows.
 - Preserve historical baseline assumptions until a full ledger reconciliation exists.
+
+## INV-013: Transaction Item Valuation Is Persisted At Write Time
+
+Decision:
+
+- `inventory_transaction_items.unitPrice` and `inventory_transaction_items.totalAmount` are required operational valuation data for Inventory transaction lines.
+
+Rationale:
+
+- Inventory value, outbound value, project material cost, supplier history, and component costing should read valuation from transaction items instead of reconstructing it at runtime for normal records.
+
+Current implementation:
+
+- `InventoryService.createTransaction()` applies valuation before insert.
+- Provided line `unitPrice` / `totalAmount` is preserved.
+- If the client does not provide pricing, the service uses weighted average material cost from existing priced positive transaction lines.
+- If no historical cost exists, the line is persisted with `unitPrice = 0` and `totalAmount = 0` so the missing valuation is explicit rather than null.
+- Production material issue/return direct Inventory transaction writers and Material Movement direct writer also persist valuation fields.
+- Sprint 15B backfilled historical IMPORT, EXPORT, TRANSFER, and RETURN rows with missing valuation fields using `scripts/sql/backfill-inventory-transaction-item-costs.sql`.
+
+Implications:
+
+- New write paths must not insert Inventory transaction items with null `unitPrice` or null `totalAmount`.
+- Read-time valuation enrichment may remain as a defensive compatibility fallback, but it should not be required for newly created operational records.

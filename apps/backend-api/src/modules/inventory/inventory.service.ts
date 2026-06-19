@@ -789,12 +789,31 @@ export class InventoryService {
         supplier.name,
       ]),
     )
+    const averageCosts =
+      await this.averageCostsByMaterial(
+        Array.from(
+          new Set(
+            rows.flatMap((row) =>
+              row.items.map(
+                (line) => line.inventoryItemId,
+              ),
+            ),
+          ),
+        ),
+      )
 
     return rows.map((row) => {
       const businessType =
         this.toBusinessType(row.type)
+      const items = row.items.map((line) =>
+        this.withComputedLineAmount(
+          line,
+          averageCosts,
+        ),
+      )
       return {
         ...row,
+        items,
         rawType: row.type,
         type: businessType,
         businessType,
@@ -844,9 +863,21 @@ export class InventoryService {
 
     const businessType =
       this.toBusinessType(transaction.type)
+    const averageCosts =
+      await this.averageCostsByMaterial(
+        transaction.items.map(
+          (line) => line.inventoryItemId,
+        ),
+      )
 
     return {
       ...transaction,
+      items: transaction.items.map((line) =>
+        this.withComputedLineAmount(
+          line,
+          averageCosts,
+        ),
+      ),
       rawType: transaction.type,
       type: businessType,
       businessType,
@@ -882,13 +913,19 @@ export class InventoryService {
     const direction =
       this.toBusinessDirection(businessType)
 
-    const baseItems =
+    const resolvedItems =
       await this.resolveLineWarehouses(
         this.normalizeItems(
           payload,
           type,
         ),
       )
+    const baseItems = this.applyValuationToLines(
+      resolvedItems,
+      await this.averageCostsByMaterial(
+        resolvedItems.map((line) => line.inventoryItemId),
+      ),
+    )
     if (!baseItems.length) {
       throw new Error(
         'Transaction requires at least one item',
@@ -1202,9 +1239,10 @@ export class InventoryService {
       const totalAmount =
         parsedTotalAmount != null &&
         Number.isFinite(parsedTotalAmount)
-          ? parsedTotalAmount
+          ? Math.abs(parsedTotalAmount)
           : safeUnitPrice != null
-            ? safeUnitPrice * signedQuantity
+            ? Math.abs(signedQuantity) *
+              Math.abs(safeUnitPrice)
             : null
 
       return {
@@ -1266,6 +1304,170 @@ export class InventoryService {
           ? warehouseByZoneId.get(line.zoneId) ?? undefined
           : undefined),
     }))
+  }
+
+  private applyValuationToLines(
+    lines: NormalizedInventoryLine[],
+    averageCosts: Map<string, number>,
+  ): NormalizedInventoryLine[] {
+    return lines.map((line) => {
+      const quantity = Math.abs(
+        Number(line.quantity ?? 0),
+      )
+      const parsedUnitPrice =
+        line.unitPrice != null
+          ? Number(line.unitPrice)
+          : null
+      const parsedTotalAmount =
+        line.totalAmount != null
+          ? Math.abs(Number(line.totalAmount))
+          : null
+      const derivedUnitPrice =
+        parsedTotalAmount != null &&
+        Number.isFinite(parsedTotalAmount) &&
+        quantity > 0
+          ? parsedTotalAmount / quantity
+          : null
+      const fallbackUnitPrice =
+        averageCosts.get(line.inventoryItemId) ?? 0
+      const unitPrice =
+        parsedUnitPrice != null &&
+        Number.isFinite(parsedUnitPrice)
+          ? Math.abs(parsedUnitPrice)
+          : derivedUnitPrice != null &&
+              Number.isFinite(derivedUnitPrice)
+            ? derivedUnitPrice
+            : fallbackUnitPrice > 0
+              ? fallbackUnitPrice
+              : 0
+      const totalAmount =
+        parsedTotalAmount != null &&
+        Number.isFinite(parsedTotalAmount)
+          ? parsedTotalAmount
+          : quantity * unitPrice
+
+      return {
+        ...line,
+        unitPrice,
+        totalAmount,
+      }
+    })
+  }
+
+  private withComputedLineAmount<
+    T extends {
+      inventoryItemId: string
+      quantity: number | null
+      unitPrice: number | null
+      totalAmount: number | null
+    },
+  >(
+    line: T,
+    averageCosts: Map<string, number>,
+  ): T {
+    const quantity = Math.abs(
+      Number(line.quantity ?? 0),
+    )
+    const fallbackUnitPrice =
+      averageCosts.get(line.inventoryItemId) ?? 0
+    const unitPrice =
+      line.unitPrice != null
+        ? Number(line.unitPrice)
+        : fallbackUnitPrice > 0
+          ? fallbackUnitPrice
+          : null
+    const totalAmount =
+      line.totalAmount != null
+        ? Math.abs(Number(line.totalAmount))
+        : unitPrice != null
+          ? quantity * unitPrice
+          : null
+
+    return {
+      ...line,
+      unitPrice,
+      totalAmount,
+    }
+  }
+
+  private async averageCostsByMaterial(
+    materialIds: string[],
+  ) {
+    const costs = new Map<string, number>()
+    const ids = Array.from(new Set(materialIds.filter(Boolean)))
+    if (!ids.length) return costs
+
+    const inboundLines =
+      await this.prisma.inventoryTransactionItem.findMany({
+        where: {
+          inventoryItemId: {
+            in: ids,
+          },
+          quantity: {
+            gt: 0,
+          },
+          OR: [
+            {
+              unitPrice: {
+                gt: 0,
+              },
+            },
+            {
+              totalAmount: {
+                gt: 0,
+              },
+            },
+          ],
+        },
+        select: {
+          inventoryItemId: true,
+          quantity: true,
+          unitPrice: true,
+          totalAmount: true,
+        },
+      })
+
+    const totals = new Map<
+      string,
+      {
+        quantity: number
+        value: number
+      }
+    >()
+
+    inboundLines.forEach((line) => {
+      const quantity = Math.abs(
+        Number(line.quantity ?? 0),
+      )
+      if (quantity <= 0) return
+      const value =
+        line.totalAmount != null
+          ? Math.abs(Number(line.totalAmount))
+          : line.unitPrice != null
+            ? Math.abs(Number(line.unitPrice)) *
+              quantity
+            : 0
+      if (value <= 0) return
+      const current =
+        totals.get(line.inventoryItemId) ?? {
+          quantity: 0,
+          value: 0,
+        }
+      current.quantity += quantity
+      current.value += value
+      totals.set(line.inventoryItemId, current)
+    })
+
+    totals.forEach((total, materialId) => {
+      if (total.quantity > 0) {
+        costs.set(
+          materialId,
+          total.value / total.quantity,
+        )
+      }
+    })
+
+    return costs
   }
 
   private async getCurrentStock(

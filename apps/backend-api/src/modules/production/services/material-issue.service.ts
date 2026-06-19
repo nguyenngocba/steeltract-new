@@ -614,7 +614,7 @@ export class MaterialIssueService {
     };
   }
 
-  private createReturnToMainInventoryTransaction(
+  private async createReturnToMainInventoryTransaction(
     tx: Prisma.TransactionClient,
     issue: {
       id: string;
@@ -632,6 +632,11 @@ export class MaterialIssueService {
     actorId?: string,
   ) {
     const codeDate = compactCodeDate();
+    const unitPrice = await this.resolveInventoryUnitPrice(
+      tx,
+      issue.inventoryItemId,
+    );
+    const totalAmount = Math.abs(quantity) * unitPrice;
     return tx.inventoryTransaction.create({
       data: {
         code: `${issue.issueNo}-RT-${codeDate}`,
@@ -651,6 +656,8 @@ export class MaterialIssueService {
             {
               inventoryItemId: issue.inventoryItemId,
               quantity: Math.abs(quantity),
+              unitPrice,
+              totalAmount,
               warehouseId: destination.warehouseId,
               zoneId: destination.zoneId,
               slotId: destination.slotId,
@@ -662,7 +669,7 @@ export class MaterialIssueService {
     });
   }
 
-  private createInventoryTransaction(
+  private async createInventoryTransaction(
     tx: Prisma.TransactionClient,
     issue: {
       id: string;
@@ -681,6 +688,11 @@ export class MaterialIssueService {
   ) {
     const codeDate = compactCodeDate();
     const shortType = type === TransactionType.EXPORT ? 'XK' : type === TransactionType.RETURN ? 'HT' : 'NK';
+    const unitPrice = await this.resolveInventoryUnitPrice(
+      tx,
+      issue.inventoryItemId,
+    );
+    const totalAmount = Math.abs(quantity) * unitPrice;
     return tx.inventoryTransaction.create({
       data: {
         code: `${issue.issueNo}-${shortType}-${codeDate}`,
@@ -698,6 +710,8 @@ export class MaterialIssueService {
             {
               inventoryItemId: issue.inventoryItemId,
               quantity,
+              unitPrice,
+              totalAmount,
               warehouseId: issue.warehouseId,
               zoneId: issue.zoneId,
               slotId: issue.slotId,
@@ -707,6 +721,55 @@ export class MaterialIssueService {
         },
       },
     });
+  }
+
+  private async resolveInventoryUnitPrice(
+    tx: Prisma.TransactionClient,
+    inventoryItemId: string,
+  ) {
+    const lines = await tx.inventoryTransactionItem.findMany({
+      where: {
+        inventoryItemId,
+        quantity: {
+          gt: 0,
+        },
+        OR: [
+          {
+            unitPrice: {
+              gt: 0,
+            },
+          },
+          {
+            totalAmount: {
+              gt: 0,
+            },
+          },
+        ],
+      },
+      select: {
+        quantity: true,
+        unitPrice: true,
+        totalAmount: true,
+      },
+    });
+
+    let quantity = 0;
+    let value = 0;
+    for (const line of lines) {
+      const lineQuantity = Math.abs(Number(line.quantity ?? 0));
+      if (lineQuantity <= 0) continue;
+      const lineValue =
+        line.totalAmount != null
+          ? Math.abs(Number(line.totalAmount))
+          : line.unitPrice != null
+            ? Math.abs(Number(line.unitPrice)) * lineQuantity
+            : 0;
+      if (lineValue <= 0) continue;
+      quantity += lineQuantity;
+      value += lineValue;
+    }
+
+    return quantity > 0 ? value / quantity : 0;
   }
 
   private sum(values: number[]) {

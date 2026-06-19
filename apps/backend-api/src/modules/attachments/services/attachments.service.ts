@@ -55,6 +55,7 @@ export class AttachmentsService {
         category: query.category,
         mimeType: query.mimeType,
         module: query.module,
+        entityType: query.entityType,
         entityId: query.entityId,
         tag: query.tag,
         includeDeleted: query.includeDeleted,
@@ -71,6 +72,7 @@ export class AttachmentsService {
         category: query.category,
         mimeType: query.mimeType,
         module: query.module,
+        entityType: query.entityType,
         entityId: query.entityId,
         tag: query.tag,
         includeDeleted: query.includeDeleted,
@@ -82,6 +84,7 @@ export class AttachmentsService {
         category: query.category,
         mimeType: query.mimeType,
         module: query.module,
+        entityType: query.entityType,
         entityId: query.entityId,
         tag: query.tag,
         includeDeleted: query.includeDeleted,
@@ -547,6 +550,17 @@ export class AttachmentsService {
 
     if (module === 'inventory') {
       if (entityType === 'material' || entityType === 'materials') return 'inventory/materials';
+      if (entityType === 'transaction' || entityType === 'transactions') {
+        const transactionType = this.metadataString(dto, 'transactionType') ?? this.metadataString(dto, 'businessType') ?? String(dto.purpose ?? '').toLowerCase();
+
+        if (transactionType.includes('inbound') || transactionType.includes('import')) return 'inventory/transactions/inbound';
+        if (transactionType.includes('outbound') || transactionType.includes('export')) return 'inventory/transactions/outbound';
+        if (transactionType.includes('transfer')) return 'inventory/transactions/transfer';
+        if (transactionType.includes('stock') || transactionType.includes('adjust')) return 'inventory/transactions/stocktake';
+        if (transactionType.includes('return')) return 'inventory/transactions/return';
+
+        return 'inventory/transactions';
+      }
       if (entityType === 'inbound') return 'inventory/inbound';
       if (entityType === 'outbound') return 'inventory/outbound';
       if (entityType === 'transfer' || entityType === 'transfers') return 'inventory/transfers';
@@ -600,6 +614,7 @@ export class AttachmentsService {
     const entityType = String(dto.entityType ?? 'FILE').toUpperCase();
 
     if (module === 'INVENTORY' && entityType === 'MATERIAL') return 'INV_MAT';
+    if (module === 'INVENTORY' && entityType === 'TRANSACTION') return 'INV_TX';
     if (module === 'INVENTORY' && entityType === 'INBOUND') return 'INV_IN';
     if (module === 'INVENTORY' && entityType === 'OUTBOUND') return 'INV_OUT';
     if (module === 'INVENTORY' && entityType === 'TRANSFER') return 'INV_TRF';
@@ -610,6 +625,11 @@ export class AttachmentsService {
 
   private safeName(value: string) {
     return value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'entity';
+  }
+
+  private metadataString(dto: UploadAttachmentDto, key: string) {
+    const value = dto.metadata?.[key];
+    return typeof value === 'string' ? value.toLowerCase() : undefined;
   }
 
   private toJson(value: Record<string, unknown> | undefined) {
