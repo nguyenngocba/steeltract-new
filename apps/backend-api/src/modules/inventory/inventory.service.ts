@@ -246,7 +246,7 @@ export class InventoryService {
           transactionNo:
             tx.transactionNo ?? tx.code,
           transactionDate: tx.transactionDate,
-          quantity: Math.abs(Number(line.quantity)),
+          quantity: Number(line.quantity),
           signedQuantity: Number(line.quantity),
           unitPrice:
             line.unitPrice != null
@@ -254,7 +254,7 @@ export class InventoryService {
               : null,
           totalAmount:
             line.totalAmount != null
-              ? Math.abs(Number(line.totalAmount))
+              ? Number(line.totalAmount)
               : null,
           unit:
             line.unit?.code ??
@@ -932,8 +932,11 @@ export class InventoryService {
       )
     }
 
-    return this.inventoryRepository.transaction(
-      async (tx) => {
+    const maxAttempts = 3
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await this.inventoryRepository.transaction(
+          async (tx) => {
         for (const line of baseItems) {
           const item =
             await this.inventoryRepository.findItemById(
@@ -985,15 +988,18 @@ export class InventoryService {
           'transactionNo',
           inventoryCodePrefix(type),
         )
+        console.log('[inventory.transaction-numbering]', {
+          generatedNo,
+          finalCode: generatedNo,
+          finalTransactionNo: generatedNo,
+          transactionType: type,
+          attempt,
+        })
         const transaction =
           await this.inventoryRepository.createTransaction(
             {
-              code:
-                payload.code ??
-                generatedNo,
-              transactionNo:
-                payload.transactionNo ??
-                generatedNo,
+              code: generatedNo,
+              transactionNo: generatedNo,
               type,
               direction,
               note: payload.note,
@@ -1149,7 +1155,29 @@ export class InventoryService {
         )
 
         return transaction
-      },
+          },
+        )
+      } catch (error) {
+        if (
+          this.isUniqueInventoryNumberError(error) &&
+          attempt < maxAttempts
+        ) {
+          console.warn(
+            '[inventory.transaction-numbering] duplicate generated number, retrying',
+            {
+              transactionType: type,
+              attempt,
+              target: (error as any)?.meta?.target,
+            },
+          )
+          continue
+        }
+        throw error
+      }
+    }
+
+    throw new Error(
+      'Unable to create inventory transaction number after retries',
     )
   }
 
@@ -1170,6 +1198,23 @@ export class InventoryService {
       unitPrice:
         payload.unitPrice,
     })
+  }
+
+  private isUniqueInventoryNumberError(error: unknown) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== 'P2002'
+    ) {
+      return false
+    }
+
+    const target = Array.isArray(error.meta?.target)
+      ? error.meta.target.map(String)
+      : [String(error.meta?.target ?? '')]
+
+    return target.some((field) =>
+      ['code', 'transactionNo'].includes(field),
+    )
   }
 
   private normalizeItems(

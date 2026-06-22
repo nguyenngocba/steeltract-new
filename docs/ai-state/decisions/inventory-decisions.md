@@ -213,3 +213,26 @@ Implications:
 
 - New write paths must not insert Inventory transaction items with null `unitPrice` or null `totalAmount`.
 - Read-time valuation enrichment may remain as a defensive compatibility fallback, but it should not be required for newly created operational records.
+
+## INV-014: Stock Health Uses Main Warehouse Balance
+
+Decision:
+
+- Inventory stock health, low-stock counts, out-of-stock counts, and purchasing alerts must use `Kho chính` / `MAIN` stock, not total stock across all warehouses.
+
+Rationale:
+
+- Production warehouse material is already allocated to production operations and should not hide main-warehouse purchasing shortages.
+
+Current implementation:
+
+- Inventory Overview and Inventory Materials compute `mainWarehouseStock`, `productionWarehouseStock`, and `totalWarehouseStock` from `item.locationBalances`.
+- `MAIN` is detected by `warehouseCode === 'MAIN'` or warehouse name containing `Kho chính`.
+- `PRODUCTION` is detected by `warehouseCode === 'PRODUCTION'` or warehouse name containing `sản xuất`.
+- `statusOf()` / stock alert logic uses only `mainWarehouseStock`.
+
+Implications:
+
+- A material with `MAIN = 0`, `PRODUCTION = 250`, and `TOTAL = 250` is still `Hết hàng` for purchasing.
+- A material with `MAIN <= minimumStock` is `Sắp hết hàng` even if production stock is high.
+- Tables and detail views should display main, production, and total stock separately so users can see why the status was assigned.

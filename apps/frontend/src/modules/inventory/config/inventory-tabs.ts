@@ -50,6 +50,13 @@ export const inventoryTabs = [
   },
 
   {
+    key: 'adjustments',
+    label: 'Adjustments',
+    vi: 'Điều chỉnh tồn kho',
+    path: '/inventory/adjustments',
+  },
+
+  {
     key: 'transactions',
     label: 'Transactions',
     vi: 'Lịch sử giao dịch',

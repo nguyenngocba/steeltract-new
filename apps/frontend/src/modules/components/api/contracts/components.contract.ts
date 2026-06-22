@@ -147,8 +147,40 @@ export interface ProductionOrderRecord
   id: string
   createdAt?: string
   updatedAt?: string
+  bomId?: string | null
   currentStageCode?: string | null
   metadata?: CreateProductionOrderPayload['metadata'] | null
+  bom?: {
+    id: string
+    bomNo: string
+    productCode: string
+    productName: string
+    estimatedWeight?: number
+    version: string
+    status: string
+    items: Array<{
+      id: string
+      materialId: string
+      quantity: number
+      wastePercent: number
+      category: string
+      material?: {
+        id?: string
+        code: string
+        name: string
+        unit?: string
+        unitMaster?: { symbol?: string }
+      }
+    }>
+  } | null
+  materialIssues?: Array<{
+    id: string
+    productionOrderId: string
+    inventoryItemId: string
+    issuedQty: number
+    returnedQty?: number
+    status: string
+  }>
   status:
     | 'DRAFT'
     | 'PLANNED'

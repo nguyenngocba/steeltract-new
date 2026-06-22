@@ -1,6 +1,9 @@
 import { Injectable }
   from '@nestjs/common'
 
+import { Prisma, TransactionType }
+  from '@prisma/client'
+
 import { PrismaService }
   from '../../core/prisma/prisma.service'
 import { nextOperationalCode }
@@ -78,43 +81,79 @@ export class MaterialMovementsService {
     )
     const totalAmount = Math.abs(quantity) * unitPrice
 
-    const transaction =
-      await this.prisma.inventoryTransaction.create({
-        data: {
-          code:
-            await nextOperationalCode(this.prisma, 'inventoryTransaction', 'code', 'MOV'),
-          transactionNo:
-            await nextOperationalCode(this.prisma, 'inventoryTransaction', 'transactionNo', 'MOV'),
-          type:
-            payload.type ?? 'TRANSFER',
-          direction:
-            payload.type ?? 'INTERNAL',
-          remarks:
-            payload.remarks ??
-            'Material movement created from runtime page',
-          items: {
-            create: [
-              {
-                inventoryItemId:
-                  item.id,
-                quantity:
-                  quantity,
-                unitPrice,
-                totalAmount,
-              },
-            ],
-          },
-        },
-        include: {
-          items: {
-            include: {
-              inventoryItem: true,
-            },
-          },
-        },
+    const type = normalizeInventoryTransactionType(payload.type)
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const generatedNo =
+        await nextOperationalCode(
+          this.prisma,
+          'inventoryTransaction',
+          'transactionNo',
+          inventoryCodePrefix(type),
+        )
+      console.log('[inventory.transaction-numbering]', {
+        generatedNo,
+        finalCode: generatedNo,
+        finalTransactionNo: generatedNo,
+        transactionType: type,
+        attempt,
       })
 
-    return transaction.items[0]
+      try {
+        const transaction =
+          await this.prisma.inventoryTransaction.create({
+            data: {
+              code: generatedNo,
+              transactionNo: generatedNo,
+              type,
+              direction:
+                type === TransactionType.TRANSFER
+                  ? 'INTERNAL'
+                  : type === TransactionType.EXPORT
+                    ? 'OUT'
+                    : 'IN',
+              remarks:
+                payload.remarks ??
+                'Material movement created from runtime page',
+              items: {
+                create: [
+                  {
+                    inventoryItemId:
+                      item.id,
+                    quantity:
+                      quantity,
+                    unitPrice,
+                    totalAmount,
+                  },
+                ],
+              },
+            },
+            include: {
+              items: {
+                include: {
+                  inventoryItem: true,
+                },
+              },
+            },
+          })
+
+        return transaction.items[0]
+      } catch (error) {
+        if (isUniqueInventoryNumberError(error) && attempt < 3) {
+          console.warn(
+            '[inventory.transaction-numbering] duplicate generated number, retrying',
+            {
+              transactionType: type,
+              attempt,
+              target: (error as any)?.meta?.target,
+            },
+          )
+          continue
+        }
+        throw error
+      }
+    }
+
+    throw new Error('Unable to create material movement number after retries')
   }
 
   private async resolveInventoryUnitPrice(
@@ -168,4 +207,41 @@ export class MaterialMovementsService {
 
     return quantity > 0 ? value / quantity : 0
   }
+}
+
+function normalizeInventoryTransactionType(value: unknown) {
+  const type = String(value ?? 'TRANSFER').toUpperCase()
+  if (type === 'INBOUND') return TransactionType.IMPORT
+  if (type === 'OUTBOUND') return TransactionType.EXPORT
+  if (
+    type === TransactionType.IMPORT ||
+    type === TransactionType.EXPORT ||
+    type === TransactionType.TRANSFER ||
+    type === TransactionType.RETURN ||
+    type === TransactionType.ADJUSTMENT
+  ) {
+    return type as TransactionType
+  }
+  return TransactionType.TRANSFER
+}
+
+function inventoryCodePrefix(type: TransactionType) {
+  if (type === TransactionType.IMPORT) return 'NK'
+  if (type === TransactionType.EXPORT) return 'XK'
+  if (type === TransactionType.TRANSFER) return 'DC'
+  if (type === TransactionType.ADJUSTMENT) return 'KK'
+  return 'INV'
+}
+
+function isUniqueInventoryNumberError(error: unknown) {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2002'
+  ) {
+    return false
+  }
+  const target = Array.isArray(error.meta?.target)
+    ? error.meta.target.map(String)
+    : [String(error.meta?.target ?? '')]
+  return target.some((field) => ['code', 'transactionNo'].includes(field))
 }

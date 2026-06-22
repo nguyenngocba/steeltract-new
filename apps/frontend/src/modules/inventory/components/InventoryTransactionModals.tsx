@@ -28,6 +28,16 @@ type CountLine = {
   zoneId: string
 }
 
+const ADJUSTMENT_REASONS = [
+  'Kiểm kê định kỳ',
+  'Sai lệch nhập liệu',
+  'Hư hỏng',
+  'Thất thoát',
+  'Hoàn trả',
+  'Điều chỉnh đầu kỳ',
+  'Khác',
+]
+
 const INTERNAL_CELLS = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((row) =>
   ['01', '02', '03', '04', '05', '06'].map((column) => `${row}${column}`),
 )
@@ -1204,6 +1214,325 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         <button disabled={!canTransfer} onClick={submitTransfer} className={primaryButtonClass}>
           Tạo phiếu điều chuyển
         </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
+  const { data: materials = [] } = useInventoryItems()
+  const { data: zones = [] } = useZones()
+  const createTx = useCreateTransaction()
+  const [sessionNo, setSessionNo] = useState(generateTransactionNo('KK'))
+  const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
+  const [form, setForm] = useState({
+    transactionDate: new Date().toISOString().slice(0, 16),
+    materialId: '',
+    zoneId: '',
+    slotId: '',
+    level: 'L1',
+    actualQty: '',
+    reason: ADJUSTMENT_REASONS[0],
+    customReason: '',
+  })
+
+  const selectedMaterial = materials.find((item: any) => String(item.id) === String(form.materialId)) as any
+  const { data: selectedMaterialDetail } = useMaterialDetail(form.materialId || undefined)
+  const materialDetail = (selectedMaterialDetail as any) ?? selectedMaterial
+  const locationRows = useMemo(() => {
+    const rows = Array.isArray(materialDetail?.locationBalances)
+      ? materialDetail.locationBalances
+      : []
+    return rows
+      .filter((row: any) => num(row.quantity) > 0)
+      .sort((a: any, b: any) => {
+        const warehouseCompare = String(a.warehouseCode ?? a.warehouseName ?? '').localeCompare(String(b.warehouseCode ?? b.warehouseName ?? ''))
+        if (warehouseCompare !== 0) return warehouseCompare
+        const zoneCompare = String(a.zoneCode ?? a.zoneName ?? '').localeCompare(String(b.zoneCode ?? b.zoneName ?? ''))
+        if (zoneCompare !== 0) return zoneCompare
+        const slotCompare = String(a.slotId ?? '').localeCompare(String(b.slotId ?? ''))
+        if (slotCompare !== 0) return slotCompare
+        return normalizeLevel(a.level).localeCompare(normalizeLevel(b.level))
+      })
+  }, [materialDetail])
+  const zoneOptions = useMemo(() => {
+    const zoneIds = uniqueStrings(locationRows.map((row: any) => String(row.zoneId ?? '')))
+    return zoneIds
+      .map((zoneId) => {
+        const row = locationRows.find((location: any) => String(location.zoneId) === zoneId)
+        const zone = zones.find((item: any) => String(item.id) === zoneId)
+        return {
+          id: zoneId,
+          label: `${row?.warehouseCode ?? zone?.warehouse?.code ?? row?.warehouseName ?? 'Kho'} · ${row?.zoneCode ?? zone?.code ?? 'ZONE'}${row?.zoneName || zone?.name ? ` - ${row?.zoneName ?? zone?.name}` : ''}`,
+        }
+      })
+  }, [locationRows, zones])
+
+  const selectedLocation = locationRows.find((row: any) =>
+    String(row.zoneId ?? '') === String(form.zoneId) &&
+    String(row.slotId ?? '') === String(form.slotId) &&
+    normalizeLevel(row.level) === normalizeLevel(form.level),
+  )
+  const selectedFullZone = zones.find((zone: any) => String(zone.id) === String(form.zoneId))
+  const systemQty = selectedLocation ? num(selectedLocation.quantity) : 0
+  const actualQty = parseLocaleNumber(form.actualQty)
+  const hasActualQty = Number.isFinite(actualQty)
+  const difference = hasActualQty ? actualQty - systemQty : 0
+  const averageCost = num(materialDetail?.averageCost ?? selectedMaterial?.averageCost ?? materialDetail?.unitPrice ?? selectedMaterial?.unitPrice)
+  const varianceValue = difference * averageCost
+  const unitLabel = materialDetail?.unitMaster?.symbol ?? materialDetail?.unit ?? selectedMaterial?.unit ?? ''
+  const reasonText = form.reason === 'Khác' ? form.customReason.trim() : form.reason
+  const canSubmit =
+    Boolean(form.materialId) &&
+    Boolean(form.zoneId) &&
+    Boolean(form.slotId) &&
+    Boolean(form.level) &&
+    Boolean(reasonText) &&
+    hasActualQty &&
+    Math.abs(difference) > 0.000001
+
+  useEffect(() => {
+    if (!form.materialId || !locationRows.length) return
+    const stillExists = locationRows.some((row: any) =>
+      String(row.zoneId ?? '') === String(form.zoneId) &&
+      String(row.slotId ?? '') === String(form.slotId) &&
+      normalizeLevel(row.level) === normalizeLevel(form.level),
+    )
+    if (stillExists) return
+    const first = locationRows[0]
+    setForm((prev) => ({
+      ...prev,
+      zoneId: String(first.zoneId ?? ''),
+      slotId: String(first.slotId ?? ''),
+      level: normalizeLevel(first.level),
+    }))
+  }, [form.materialId, form.zoneId, form.slotId, form.level, locationRows])
+
+  function selectLocation(row: any) {
+    setForm((prev) => ({
+      ...prev,
+      zoneId: String(row.zoneId ?? ''),
+      slotId: String(row.slotId ?? ''),
+      level: normalizeLevel(row.level),
+    }))
+  }
+
+  async function submitAdjustment() {
+    if (!canSubmit) return
+    const auditNote = JSON.stringify({
+      kind: 'INVENTORY_ADJUSTMENT_AUDIT',
+      systemQty,
+      actualQty,
+      difference,
+      varianceValue,
+      reason: reasonText,
+      warehouseId: selectedLocation?.warehouseId,
+      warehouseCode: selectedLocation?.warehouseCode,
+      zoneId: form.zoneId,
+      zoneCode: selectedLocation?.zoneCode,
+      slotId: form.slotId,
+      level: form.level,
+    })
+
+    const transaction = await createTx.mutateAsync({
+      type: 'ADJUSTMENT',
+      transactionNo: sessionNo,
+      transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
+      warehouseId: selectedLocation?.warehouseId || selectedFullZone?.warehouseId || undefined,
+      zoneId: form.zoneId,
+      remarks: reasonText,
+      note: auditNote,
+      items: [
+        {
+          inventoryItemId: form.materialId,
+          warehouseId: selectedLocation?.warehouseId || selectedFullZone?.warehouseId || undefined,
+          zoneId: form.zoneId,
+          slotId: form.slotId,
+          level: form.level,
+          quantity: difference,
+          unitPrice: averageCost || undefined,
+          totalAmount: averageCost ? Math.abs(difference) * averageCost : undefined,
+        },
+      ],
+    })
+
+    try {
+      await uploadInventoryTransactionAttachments({
+        transaction,
+        files: attachmentFiles,
+      })
+    } catch {
+      toast.error('Phiếu đã lưu nhưng upload tài liệu điều chỉnh thất bại')
+    }
+
+    toast.success('Đã tạo phiếu điều chỉnh tồn kho')
+    setSessionNo(generateTransactionNo('KK'))
+    setAttachmentFiles([])
+    setForm({
+      transactionDate: new Date().toISOString().slice(0, 16),
+      materialId: '',
+      zoneId: '',
+      slotId: '',
+      level: 'L1',
+      actualQty: '',
+      reason: ADJUSTMENT_REASONS[0],
+      customReason: '',
+    })
+    onClose()
+  }
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="Điều chỉnh tồn kho" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(430px,0.78fr)_minmax(740px,1.22fr)]">
+        <div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <input type="datetime-local" value={form.transactionDate} onChange={(event) => setForm((prev) => ({ ...prev, transactionDate: event.target.value }))} className={fieldClass} />
+            <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
+              Phiếu: <span className="ml-1 font-semibold text-cyan-200">{sessionNo}</span>
+            </div>
+            <select value={form.materialId} onChange={(event) => setForm((prev) => ({ ...prev, materialId: event.target.value, zoneId: '', slotId: '', level: 'L1', actualQty: '' }))} className={`${fieldClass} md:col-span-2`}>
+              <option value="">Chọn vật tư</option>
+              {materials.map((item: any) => (
+                <option key={item.id} value={item.id}>
+                  {item.code} - {item.name}
+                </option>
+              ))}
+            </select>
+            <select value={form.zoneId} onChange={(event) => setForm((prev) => ({ ...prev, zoneId: event.target.value, slotId: '', level: 'L1' }))} className={fieldClass}>
+              <option value="">Chọn zone từ tồn vị trí</option>
+              {zoneOptions.map((zone) => (
+                <option key={zone.id} value={zone.id}>{zone.label}</option>
+              ))}
+            </select>
+            <select
+              value={`${form.zoneId}|${form.slotId}|${form.level}`}
+              onChange={(event) => {
+                const row = locationRows.find((location: any) => [location.zoneId, location.slotId, normalizeLevel(location.level)].join('|') === event.target.value)
+                if (row) selectLocation(row)
+              }}
+              className={fieldClass}
+            >
+              <option value="">Chọn ô / tầng</option>
+              {locationRows.filter((row: any) => !form.zoneId || String(row.zoneId) === String(form.zoneId)).map((row: any) => (
+                <option key={`${row.zoneId}-${row.slotId}-${row.level}`} value={[row.zoneId, row.slotId, normalizeLevel(row.level)].join('|')}>
+                  {row.zoneCode ?? row.zoneName ?? 'ZONE'} / {row.slotId ?? '-'} / {normalizeLevel(row.level)} - tồn {formatQuantity(row.quantity)}
+                </option>
+              ))}
+            </select>
+            <input readOnly value={`${formatQuantity(systemQty)} ${unitLabel}`.trim()} className={`${fieldClass} cursor-not-allowed text-slate-300`} placeholder="System Qty" />
+            <input
+              value={form.actualQty}
+              onFocus={(event) => setForm((prev) => ({ ...prev, actualQty: formatQuantityInput(event.target.value) }))}
+              onBlur={(event) => setForm((prev) => ({ ...prev, actualQty: formatQuantity(event.target.value) }))}
+              onChange={(event) => setForm((prev) => ({ ...prev, actualQty: formatQuantityInput(event.target.value) }))}
+              inputMode="decimal"
+              placeholder="Actual Qty"
+              className={fieldClass}
+            />
+            <input readOnly value={`${difference > 0 ? '+' : ''}${formatQuantity(difference)} ${unitLabel}`.trim()} className={`${fieldClass} cursor-not-allowed ${difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`} placeholder="Difference" />
+            <input readOnly value={formatCurrencyVnd(varianceValue)} className={`${fieldClass} cursor-not-allowed text-cyan-200`} placeholder="Variance Value" />
+            <select value={form.reason} onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))} className={fieldClass}>
+              {ADJUSTMENT_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+            </select>
+            {form.reason === 'Khác' ? (
+              <input value={form.customReason} onChange={(event) => setForm((prev) => ({ ...prev, customReason: event.target.value }))} placeholder="Ghi rõ lý do khác" className={fieldClass} />
+            ) : (
+              <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.04] px-3 text-sm text-slate-400">
+                Lý do sẽ lưu vào phiếu điều chỉnh.
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+            <MetricBox title="System Qty" value={`${formatQuantity(systemQty)} ${unitLabel}`.trim()} />
+            <MetricBox title="Actual Qty" value={hasActualQty ? `${formatQuantity(actualQty)} ${unitLabel}`.trim() : '-'} />
+            <MetricBox title="Variance Value" value={formatCurrencyVnd(varianceValue)} />
+          </div>
+
+          {form.materialId && locationRows.length === 0 ? (
+            <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
+              Vật tư này chưa có tồn vị trí khả dụng để điều chỉnh.
+            </div>
+          ) : null}
+
+          <div className="mt-3">
+            <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
+          </div>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={onClose} className={secondaryButtonClass}>Hủy</button>
+            <button disabled={!canSubmit || createTx.isPending} onClick={submitAdjustment} className={primaryButtonClass}>
+              {createTx.isPending ? 'Đang lưu...' : 'Tạo phiếu điều chỉnh'}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 2xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-white">Vị trí vật tư</div>
+                <div className="mt-0.5 text-xs text-slate-400">Click dòng để lấy đúng System Qty theo bucket.</div>
+              </div>
+              <div className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-200">
+                {formatQuantity(locationRows.length, 0)} vị trí
+              </div>
+            </div>
+            <div className="max-h-[520px] overflow-auto rounded-lg border border-white/10">
+              <table className="w-full min-w-[680px] text-sm">
+                <thead className="sticky top-0 bg-slate-950/95 text-xs uppercase tracking-[0.08em] text-slate-400">
+                  <tr>
+                    {['Kho', 'Zone', 'Slot', 'Level', 'Qty'].map((header) => (
+                      <th key={header} className="px-3 py-2 text-left font-medium">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {locationRows.length ? locationRows.map((row: any) => {
+                    const active =
+                      String(row.zoneId ?? '') === String(form.zoneId) &&
+                      String(row.slotId ?? '') === String(form.slotId) &&
+                      normalizeLevel(row.level) === normalizeLevel(form.level)
+                    return (
+                      <tr
+                        key={`${row.zoneId}-${row.slotId}-${row.level}`}
+                        onClick={() => selectLocation(row)}
+                        className={`cursor-pointer border-t border-white/10 transition hover:bg-white/[0.07] ${active ? 'bg-cyan-400/12 text-cyan-100' : 'text-slate-300'}`}
+                      >
+                        <td className="px-3 py-2">{row.warehouseCode ?? row.warehouseName ?? '-'}</td>
+                        <td className="px-3 py-2">{row.zoneCode ?? row.zoneName ?? '-'}</td>
+                        <td className="px-3 py-2">{row.slotId ?? '-'}</td>
+                        <td className="px-3 py-2">{normalizeLevel(row.level)}</td>
+                        <td className="px-3 py-2 font-semibold text-white">{formatQuantity(row.quantity)} {unitLabel}</td>
+                      </tr>
+                    )
+                  }) : (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-8 text-center text-sm text-slate-500">Chọn vật tư để xem tồn theo vị trí.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
+            <div className="mb-3 text-sm font-semibold text-white">Sơ đồ vị trí</div>
+            <WarehouseMiniMap
+              compact
+              zone={selectedFullZone}
+              slotId={form.slotId}
+              level={form.level}
+              onSelect={(cell: string, selectedLevel: string) =>
+                setForm((prev) => ({
+                  ...prev,
+                  slotId: cell,
+                  level: selectedLevel,
+                }))
+              }
+            />
+          </div>
+        </div>
       </div>
     </ModalShell>
   )

@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BarChart3, Building2, Clock, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react'
-import toast from 'react-hot-toast'
-
-import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
-import { API_BASE_URL } from '@/lib/api'
-import { getAttachments, uploadAttachment } from '@/lib/attachments/attachments-api'
-import type { Attachment } from '@/lib/attachments/attachment.types'
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { BarChart3, Building2, Clock, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { formatCurrencyVnd, formatDateTime, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format';
+import { API_BASE_URL } from '@/lib/api';
+import { getAttachments, uploadAttachment } from '@/lib/attachments/attachments-api';
+import type { Attachment } from '@/lib/attachments/attachment.types';
 import {
   ModuleAnalyticsPanel,
   ModuleDataGrid,
@@ -20,7 +19,7 @@ import {
   moduleTableHead,
   moduleTableRow,
   type ModuleTone,
-} from '@/shared/ui/modules'
+} from '@/shared/ui/modules';
 
 type Props = {
   open: boolean
@@ -61,7 +60,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 ]
 
 function num(value: any) {
-  const n = Number(value ?? 0)
+  const n = parseLocaleNumber(value)
   return Number.isFinite(n) ? n : 0
 }
 
@@ -71,6 +70,22 @@ function fmt(value: any, digits = 3) {
 
 function money(value: any) {
   return formatCurrencyVnd(num(value))
+}
+
+function isMainWarehouseLocation(location: any) {
+  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
+  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+}
+
+function isProductionWarehouseLocation(location: any) {
+  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
+  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+}
+
+function sumLocationQty(rows: any[]) {
+  return rows.reduce((sum: number, row: any) => sum + num(row.quantity), 0)
 }
 
 function materialUsageLabel(value: string | undefined) {
@@ -100,10 +115,10 @@ function MaterialImageGallery({
   return (
     <ModuleAnalyticsPanel
       title="Hình ảnh vật tư"
-      note={`${formatQuantity(images.length, 0)} ảnh · filesystem lưu file, database lưu metadata`}
+      note={`${formatQuantity(images.length, 0)}. UI đã sẵn sàng hiển thị gallery khi Material Master có imageUrl hoặc danh sách ảnh.`}
       action={
-        <label className={`${moduleMutedButton} cursor-pointer`}>
-          <Plus size={14} />
+        <label className={`${moduleMutedButton} cursor-pointer whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1`}>
+          <Plus size={12} />
           {uploading ? 'Đang tải...' : 'Thêm ảnh'}
           <input
             type="file"
@@ -111,9 +126,9 @@ function MaterialImageGallery({
             className="hidden"
             disabled={uploading}
             onChange={(event) => {
-              const file = event.target.files?.[0]
-              event.target.value = ''
-              if (file) void onUpload(file)
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void onUpload(file);
             }}
           />
         </label>
@@ -370,6 +385,77 @@ function AttachmentContextDrawer({
     </ModuleDetailDrawer>
   )
 }
+// ================= COMPONENT SPARKLINE =================
+function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
+  const rows = values.length ? values : [0, 0, 0, 0, 0, 0];
+  const min = Math.min(...rows);
+  const max = Math.max(...rows);
+  const range = Math.max(1, max - min);
+  const points = rows.map((value, index) => {
+    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100;
+    const y = 34 - ((value - min) / range) * 24 - 5;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
+      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
+      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+// ================= COMPONENT METRIC CARD =================
+function InventoryMetricCard({
+  title,
+  value,
+  note,
+  tone = 'blue',
+  icon,
+  trend,
+  active,
+  onClick,
+  compact = false,
+}: {
+  title: string;
+  value: string;
+  note?: string;
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple';
+  icon: React.ReactNode;
+  trend: number[];
+  active?: boolean;
+  onClick?: () => void;
+  compact?: boolean;
+}) {
+  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
+    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
+    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
+    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
+    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
+    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
+    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
+  };
+  const item = color[tone];
+  const content = (
+    <>
+      <div className={`relative z-10 flex items-start justify-between gap-2 ${compact ? 'gap-1' : 'gap-3'}`}>
+        <div className="min-w-0">
+          <div className={`truncate font-bold uppercase tracking-[0.12em] text-slate-400 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>{title}</div>
+          <div className={`mt-1 truncate font-semibold tracking-tight text-white ${compact ? 'text-sm' : 'text-xl'}`}>{value}</div>
+          {note ? <div className={`mt-0.5 truncate font-semibold ${item.note} ${compact ? 'text-[9px]' : 'text-[11px]'}`}>{note}</div> : null}
+        </div>
+        <div className={`grid shrink-0 place-items-center rounded-lg ${item.bg} ${item.text} ${compact ? 'h-6 w-6' : 'h-8 w-8'}`}>
+          {icon}
+        </div>
+      </div>
+      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
+    </>
+  );
+  const className = `relative overflow-hidden rounded-xl border bg-slate-950/45 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
+    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
+  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''} ${compact ? 'h-[120px] p-3' : 'h-[108px] p-3'}`;
+  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>;
+  return <section className={className}>{content}</section>;
+}
 
 export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -379,6 +465,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const [attachmentContext, setAttachmentContext] = useState<AttachmentContext | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const queryClient = useQueryClient()
+  const [transactionPage, setTransactionPage] = useState(1);
+  const transactionPageSize = 12;
 
   const item = detail?.item ?? fallback ?? {}
   const code = item.code ?? fallback?.materialCode ?? fallback?.code ?? '-'
@@ -412,10 +500,31 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const attachments = normalizeAttachmentList(attachmentResult)
   const photoAttachments = attachments.filter((attachment) => attachment.category === 'PHOTO' || attachment.mimeType.startsWith('image/'))
   const documentAttachments = attachments.filter((attachment) => !photoAttachments.some((photo) => photo.id === attachment.id))
-  const mainQty = locationRows.filter((x: any) => x.warehouseCode !== 'PRODUCTION').reduce((sum: number, x: any) => sum + num(x.quantity), 0)
-  const productionQty = locationRows.filter((x: any) => x.warehouseCode === 'PRODUCTION').reduce((sum: number, x: any) => sum + num(x.quantity), 0)
+  const mainLocationRows = locationRows.filter(isMainWarehouseLocation)
+  const productionLocationRows = locationRows.filter(isProductionWarehouseLocation)
+  const mainQty = sumLocationQty(mainLocationRows)
+  const productionQty = sumLocationQty(productionLocationRows)
   const supplier = supplierRows[0]?.supplierName ?? '-'
-  const transactionRows = useMemo(() => buildTransactionRows(inbound, outbound), [inbound, outbound])
+  const transactionRows = useMemo(() => {
+  const rows = buildTransactionRows(inbound, outbound)
+
+      console.log(
+        'KK ROWS',
+        rows.filter(
+          (r: any) =>
+            r.type === 'ADJUSTMENT'
+        )
+      )
+
+      return rows
+    }, [inbound, outbound])
+
+    const pagedTransactionRows = useMemo(() => {
+      const start = (transactionPage - 1) * transactionPageSize;
+      return transactionRows.slice(start, start + transactionPageSize);
+    }, [transactionRows, transactionPage]);
+
+  const totalTransactionPages = Math.ceil(transactionRows.length / transactionPageSize);
   const { data: transactionAttachmentResult = [] } = useQuery({
     queryKey: ['attachments', 'inventory', 'transaction', 'material-detail', materialId],
     queryFn: () => getAttachments({ module: 'inventory', entityType: 'transaction' }),
@@ -464,7 +573,17 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const materialAnalytics = useMemo(() => buildMaterialAnalytics(movementTrend, currentStock, forecast), [movementTrend, currentStock, forecast])
   const projectSummary = useMemo(() => buildUsageSummary(projectRows, averageCost), [projectRows, averageCost])
   const supplierSummary = useMemo(() => buildPurchaseSummary(supplierRows, averageCost), [supplierRows, averageCost])
+  // Lấy trend từ materialAnalytics (đã có sẵn)
+  const stockTrend = materialAnalytics.inventoryTrend.slice(-6).map(d => d.value)
+  const inboundTrend = materialAnalytics.inboundTrend.slice(-6).map(d => d.value)
+  const outboundTrend = materialAnalytics.outboundTrend.slice(-6).map(d => d.value)
+  const valueTrend = materialAnalytics.inventoryTrend.slice(-6).map(d => d.value * averageCost)
+  // Cost trend: giả định ổn định (hoặc có thể lấy từ dữ liệu chi tiết nếu có)
+  const costTrend = Array.from({ length: 6 }, () => averageCost)
 
+  // Tổng nhập/xuất gần đây (từ transactionRows)
+  const totalInbound = transactionRows.filter(tx => tx.type === 'INBOUND').reduce((sum, tx) => sum + tx.quantity, 0)
+  const totalOutbound = transactionRows.filter(tx => tx.type === 'OUTBOUND').reduce((sum, tx) => sum + tx.quantity, 0)
   useEffect(() => {
     if (!import.meta.env.DEV || !open || !materialId) return
 
@@ -539,74 +658,205 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           </button>
         ) : null}
       >
-        <div className="space-y-3">
-          <ModuleKpiStrip className="md:grid-cols-2 xl:grid-cols-4">
-            <ModuleKpiCard icon={<Package size={18} />} title="Current Stock" value={`${fmt(currentStock)} ${unit}`.trim()} note={`Tối thiểu ${fmt(minimumStock)}`} tone={currentStock <= minimumStock ? 'amber' : 'blue'} />
-            <ModuleKpiCard icon={<DollarSign size={18} />} title="Average Cost" value={money(averageCost)} note="Đơn giá trung bình" tone="cyan" />
-            <ModuleKpiCard icon={<BarChart3 size={18} />} title="Inventory Value" value={money(inventoryValue)} note="Tồn x giá trung bình" tone="emerald" />
-            <ModuleKpiCard icon={<MapPinned size={18} />} title="Storage Locations" value={fmt(locationRows.length, 0)} note={`Kho chính ${fmt(mainQty)} · SX ${fmt(productionQty)}`} tone="purple" />
-          </ModuleKpiStrip>
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1 mb-1 -mt-4">
+          <InventoryMetricCard
+            compact
+            title="Tồn hiện tại"                      // thay Current Stock
+            value={`${fmt(currentStock)} ${unit}`.trim()}
+            note={`Tối thiểu ${fmt(minimumStock)}`}
+            tone={currentStock <= minimumStock ? 'amber' : 'blue'}
+            icon={<Package size={12} />}
+            trend={stockTrend.length ? stockTrend : [0,0,0,0,0,0]}
+          />
+          <InventoryMetricCard
+            compact
+            title="Đơn giá trung bình"               // thay Average Cost
+            value={money(averageCost)}
+            note="Đơn giá trung bình"
+            tone="cyan"
+            icon={<DollarSign size={12} />}
+            trend={costTrend}
+          />
+          <InventoryMetricCard
+            compact
+            title="Giá trị tồn kho"                  // thay Inventory Value
+            value={money(inventoryValue)}
+            note="Tồn x giá trung bình"
+            tone="emerald"
+            icon={<BarChart3 size={12} />}
+            trend={valueTrend.length ? valueTrend : [0,0,0,0,0,0]}
+          />
+          <InventoryMetricCard
+            compact
+            title="Số vị trí lưu kho"                // thay Storage Locations
+            value={fmt(locationRows.length, 0)}
+            note={`Kho chính ${fmt(mainQty)} · SX ${fmt(productionQty)}`}
+            tone="purple"
+            icon={<MapPinned size={12} />}
+            trend={[0,0,0,0,0,0]}
+          />
+          <InventoryMetricCard
+            compact
+            title="Nhập (30 ngày)"                  // thay Inbound (30d)
+            value={`${fmt(totalInbound)} ${unit}`.trim()}
+            note="Tổng nhập gần đây"
+            tone="emerald"
+            icon={<PackagePlus size={12} />}
+            trend={inboundTrend.length ? inboundTrend : [0,0,0,0,0,0]}
+          />
+          <InventoryMetricCard
+            compact
+            title="Xuất (30 ngày)"                  // thay Outbound (30d)
+            value={`${fmt(totalOutbound)} ${unit}`.trim()}
+            note="Tổng xuất gần đây"
+            tone="red"
+            icon={<Truck size={12} />}
+            trend={outboundTrend.length ? outboundTrend : [0,0,0,0,0,0]}
+          />
+        </div>
 
           <ModuleTabs tabs={tabs} active={activeTab} onChange={(tab) => setActiveTab(tab as TabKey)} />
 
           {activeTab === 'overview' && (
-            <div className="grid gap-3 xl:grid-cols-[.8fr_1.2fr]">
-              <div className="space-y-3">
+            <div className="grid gap-1 xl:grid-cols-[1fr_1fr] mt-1">
+              {/* Cột trái: Hồ sơ vật tư + Hình ảnh vật tư */}
+              <div className="space-y-1">
                 <MaterialAttachmentSummary
                   photoCount={photoAttachments.length}
                   documentCount={documentSourceRows.length}
                   onOpenImages={() => setActiveTab('images')}
                   onOpenDocuments={() => setActiveTab('documents')}
                 />
-                <MaterialImageGallery images={imageUrls} selectedImage={primaryImage} uploading={uploadingImage} onUpload={handleImageUpload} onSelect={setSelectedImage} onPreview={setPreviewImage} />
+                <MaterialImageGallery
+                  images={imageUrls}
+                  selectedImage={primaryImage}
+                  uploading={uploadingImage}
+                  onUpload={handleImageUpload}
+                  onSelect={setSelectedImage}
+                  onPreview={setPreviewImage}
+                />
+              </div>
+
+              {/* Cột phải: Tồn theo kho + Thông tin vật tư */}
+              <div className="space-y-1">
+                <ModuleAnalyticsPanel title="Tồn theo kho" note="Phân tách kho chính và kho vật tư sản xuất">
+                  <div className="grid gap-3 md:grid-cols-[160px_1fr]">
+                    <Donut
+                      rows={[
+                        { label: 'Kho chính', value: mainQty, color: '#22c55e' },
+                        { label: 'Kho SX', value: productionQty, color: '#f59e0b' },
+                      ]}
+                      center={fmt(currentStock)}
+                      label={unit || 'tổng'}
+                      compact
+                    />
+                    <div className="space-y-1">
+                      <MetricLine label="Kho chính" value={`${fmt(mainQty)} ${unit}`.trim()} tone="emerald" />
+                      <MetricLine label="Kho vật tư SX" value={`${fmt(productionQty)} ${unit}`.trim()} tone="amber" />
+                      <MetricLine label="Trạng thái kho chính" value={mainQty <= 0 ? 'Hết hàng' : mainQty <= minimumStock ? 'Cảnh báo' : 'Bình thường'} tone={mainQty <= minimumStock ? 'amber' : 'emerald'} />
+                    </div>
+                  </div>
+                </ModuleAnalyticsPanel>
+
                 <ModuleAnalyticsPanel title="Thông tin vật tư" note="Thông tin tổng hợp từ dữ liệu vật tư hiện có">
-                  <InfoGrid rows={[
-                    ['Mã vật tư', code],
-                    ['Tên vật tư', name],
-                    ['Loại vật tư', materialUsageLabel(materialUsageType)],
-                    ['Đơn vị', unit || '-'],
-                    ['Tồn tối thiểu', fmt(minimumStock)],
-                    ['Nhà cung cấp gần nhất', supplier],
-                  ]} />
+                  <div className="space-y-2">
+                    <InfoGrid rows={[
+                      ['Mã vật tư', code],
+                      ['Tên vật tư', name],
+                      ['Loại vật tư', materialUsageLabel(materialUsageType)],
+                      ['Đơn vị', unit || '-'],
+                      ['Nhóm vật tư', item.category ?? fallback?.category ?? '-'],
+                      ['Quy cách', item.materialType ?? item.specification ?? fallback?.materialType ?? '-'],
+                      ['Tồn tối thiểu', fmt(minimumStock)],
+                      ['Nhà cung cấp gần nhất', supplier],
+                    ]} />
+                    {/* Ghi chú - chiếm full width */}
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2">
+                      <div className="text-[11px] text-slate-500">Ghi chú</div>
+                      <div className="mt-1 text-sm text-slate-100">{item.note ?? fallback?.note ?? 'Chưa có ghi chú'}</div>
+                    </div>
+                  </div>
                 </ModuleAnalyticsPanel>
               </div>
-              <ModuleAnalyticsPanel title="Tồn theo kho" note="Phân tách kho chính và kho vật tư sản xuất">
-                <div className="grid gap-3 md:grid-cols-[180px_1fr]">
-                  <Donut rows={[
-                    { label: 'Kho chính', value: mainQty, color: '#22c55e' },
-                    { label: 'Kho SX', value: productionQty, color: '#f59e0b' },
-                  ]} center={fmt(currentStock)} label={unit || 'tồn'} />
-                  <div className="space-y-2">
-                    <MetricLine label="Kho chính" value={`${fmt(mainQty)} ${unit}`.trim()} tone="emerald" />
-                    <MetricLine label="Kho vật tư SX" value={`${fmt(productionQty)} ${unit}`.trim()} tone="amber" />
-                    <MetricLine label="Trạng thái" value={currentStock <= 0 ? 'Hết hàng' : currentStock <= minimumStock ? 'Cảnh báo' : 'Bình thường'} tone={currentStock <= minimumStock ? 'amber' : 'emerald'} />
-                  </div>
-                </div>
-              </ModuleAnalyticsPanel>
             </div>
           )}
 
           {activeTab === 'transactions' && (
-            <DetailTable
-              title="Lịch sử giao dịch"
-              headers={['Thời gian', 'Loại', 'Đối tượng', 'Số lượng', 'Giá trị', 'Tài liệu']}
-              rows={transactionRows.slice(0, 18).map((row) => [
-                row.transactionDate ? formatDateTime(row.transactionDate) : '-',
-                <TransactionTypeBadge key="type" type={row.type} />,
-                row.counterparty,
-                `${fmt(row.quantity)} ${unit}`.trim(),
-                money(row.totalAmount),
-                <AttachmentCountChip
-                  key="attachments"
-                  attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
-                  onOpen={() => setAttachmentContext({
-                    title: row.transactionNo ?? 'Tài liệu giao dịch',
-                    subtitle: transactionSourceLabel(row),
-                    attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
-                  })}
-                />,
-              ])}
-            />
+            <div className="space-y-1 mt-1">
+              <DetailTable
+                title="Lịch sử giao dịch"
+                headers={['Mã giao dịch', 'Thời gian', 'Loại', 'Đối tượng', 'Số lượng', 'Giá trị', 'Tài liệu']}
+                rows={pagedTransactionRows.map((row) => {
+                  // Xác định màu chữ dựa trên loại giao dịch
+                  const isAdjustment = row.type === 'ADJUSTMENT';
+                  const colorClass = isAdjustment
+                    ? row.quantity >= 0
+                      ? 'text-emerald-400'
+                      : 'text-red-400'
+                    : row.type === 'INBOUND'
+                      ? 'text-emerald-400'
+                      : row.type === 'OUTBOUND'
+                        ? 'text-amber-400'
+                        : row.type === 'TRANSFER'
+                          ? 'text-purple-400'
+                          : 'text-slate-300';
+
+                  const displayQty = isAdjustment
+                    ? `${row.quantity > 0 ? '+' : ''}${fmt(row.quantity)}`
+                    : fmt(Math.abs(row.quantity));
+                  return [
+                    row.transactionNo ?? '-',
+                    row.transactionDate ? formatDateTime(row.transactionDate) : '-',
+                    <TransactionTypeBadge
+                      key="type"
+                      type={row.type}
+                      isPositive={row.quantity >= 0}
+                    />,
+                    row.counterparty,
+                    <span className={`font-mono tabular-nums font-semibold ${colorClass}`}>
+                      {`${displayQty} ${unit}`.trim()}
+                    </span>,
+                    <span className={`font-mono tabular-nums font-semibold ${colorClass}`}>
+                      {money(row.totalAmount)}
+                    </span>,
+                    <AttachmentCountChip
+                      key="attachments"
+                      attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                      onOpen={() => setAttachmentContext({
+                        title: row.transactionNo ?? 'Tài liệu giao dịch',
+                        subtitle: transactionSourceLabel(row),
+                        attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                      })}
+                    />,
+                  ];
+                })}
+              />
+              {totalTransactionPages > 1 && (
+                <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400">
+                  <span>
+                    Hiển thị {(transactionPage - 1) * transactionPageSize + 1}-
+                    {Math.min(transactionPage * transactionPageSize, transactionRows.length)}/{transactionRows.length} giao dịch
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setTransactionPage((p) => Math.max(1, p - 1))}
+                      disabled={transactionPage <= 1}
+                      className={moduleMutedButton}
+                    >
+                      Trước
+                    </button>
+                    <span className="px-2 py-1 text-slate-300">{transactionPage}/{totalTransactionPages}</span>
+                    <button
+                      onClick={() => setTransactionPage((p) => Math.min(totalTransactionPages, p + 1))}
+                      disabled={transactionPage >= totalTransactionPages}
+                      className={moduleMutedButton}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'locations' && (
@@ -704,7 +954,6 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
               </div>
             </ModuleAnalyticsPanel>
           )}
-        </div>
       </ModuleDetailDrawer>
       <AttachmentContextDrawer context={attachmentContext} onClose={() => setAttachmentContext(null)} />
       {focusedLocation ? <LocationFocusPreview location={focusedLocation} onClose={() => setFocusedLocation(null)} /> : null}
@@ -739,38 +988,69 @@ function MetricLine({ label, value, tone = 'cyan' }: { label: string; value: str
 
 function LocationBalancePanel({ rows, unit, onFocus }: { rows: any[]; unit: string; onFocus: (row: any) => void }) {
   const distribution = buildLocationDistribution(rows)
+  const mainRows = rows.filter(isMainWarehouseLocation)
+  const productionRows = rows.filter(isProductionWarehouseLocation)
+  const otherRows = rows.filter((row) => !isMainWarehouseLocation(row) && !isProductionWarehouseLocation(row))
   return (
     <div className="grid gap-3 xl:grid-cols-[360px_1fr]">
       <ModuleAnalyticsPanel title="Donut distribution" note="Phân bổ tồn theo kho/vị trí">
         <Donut rows={distribution} center={fmt(rows.reduce((sum, row) => sum + num(row.quantity), 0))} label={unit || 'tồn'} />
       </ModuleAnalyticsPanel>
-      <DetailTable
-        title="Location table"
-        headers={['Kho', 'Zone', 'Ô', 'Tầng', 'Số lượng', 'Cập nhật', '2D']}
-        rows={rows.map((row, index) => [
-          row.warehouseName ?? '-',
-          <span key="zone" className="text-cyan-300">{row.zoneName ?? row.zoneCode ?? '-'}</span>,
-          row.slotId ?? '-',
-          row.level ?? '-',
-          `${fmt(row.quantity)} ${unit}`.trim(),
-          row.updatedAt ? formatDateTime(row.updatedAt) : '-',
-          <button key={`${row.zoneId ?? index}-focus`} type="button" onClick={() => onFocus(row)} className={moduleMutedButton}>Xem 2D</button>,
-        ])}
-      />
+      <ModuleAnalyticsPanel title="Location table" note="Tách tồn kho chính và kho sản xuất">
+        <div className="space-y-3">
+          <LocationGroup title="Kho chính" rows={mainRows} unit={unit} onFocus={onFocus} />
+          <LocationGroup title="Kho sản xuất" rows={productionRows} unit={unit} onFocus={onFocus} />
+          {otherRows.length ? <LocationGroup title="Kho khác" rows={otherRows} unit={unit} onFocus={onFocus} /> : null}
+        </div>
+      </ModuleAnalyticsPanel>
     </div>
   )
 }
 
-function TransactionTypeBadge({ type }: { type: string }) {
-  const normalized = normalizeTransactionType(type)
+function LocationGroup({ title, rows, unit, onFocus }: { title: string; rows: any[]; unit: string; onFocus: (row: any) => void }) {
+  return (
+    <section className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">{title}</h4>
+        <span className="text-xs font-semibold text-slate-300">{fmt(sumLocationQty(rows))} {unit}</span>
+      </div>
+      {rows.length ? (
+        <div className="space-y-2">
+          {rows.map((row, index) => (
+            <div key={`${title}-${row.zoneId ?? index}-${row.slotId ?? ''}-${row.level ?? ''}`} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-sm">
+              <div className="min-w-0">
+                <div className="truncate font-medium text-slate-100">{row.zoneName ?? row.zoneCode ?? '-'}</div>
+                <div className="mt-0.5 text-xs text-slate-500">{row.slotId ?? '-'} · {row.level ?? '-'}</div>
+              </div>
+              <div className="font-mono tabular-nums text-cyan-300">{fmt(row.quantity)} {unit}</div>
+              <button type="button" onClick={() => onFocus(row)} className={moduleMutedButton}>2D</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ModuleEmptyState title="Không có tồn kho" description={`${title} chưa có tồn kho cho vật tư này.`} />
+      )}
+    </section>
+  )
+}
+
+function TransactionTypeBadge({ type, isPositive }: { type: string; isPositive?: boolean }) {
+  const normalized = normalizeTransactionType(type);
   const config: Record<string, { label: string; className: string }> = {
-    INBOUND: { label: 'Inbound', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' },
-    OUTBOUND: { label: 'Outbound', className: 'border-red-500/30 bg-red-500/10 text-red-200' },
-    TRANSFER: { label: 'Transfer', className: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200' },
-    ADJUSTMENT: { label: 'Adjustment', className: 'border-amber-500/30 bg-amber-500/10 text-amber-200' },
-  }
-  const item = config[normalized] ?? config.ADJUSTMENT
-  return <span className={`inline-flex rounded-lg border px-2 py-1 text-[11px] font-semibold ${item.className}`}>{item.label}</span>
+    INBOUND: { label: 'Nhập kho', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' },
+    OUTBOUND: { label: 'Xuất kho', className: 'border-amber-500/30 bg-amber-500/10 text-amber-200' },
+    TRANSFER: { label: 'Điều chuyển', className: 'border-purple-500/30 bg-purple-500/10 text-purple-200' },
+    ADJUSTMENT: { 
+      label: 'Điều chỉnh', 
+      className: isPositive !== undefined
+        ? isPositive
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+          : 'border-red-500/30 bg-red-500/10 text-red-200'
+        : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+    },
+  };
+  const item = config[normalized] ?? config.ADJUSTMENT;
+  return <span className={`inline-flex rounded-lg border px-2 py-1 text-[11px] font-semibold ${item.className}`}>{item.label}</span>;
 }
 
 function MaterialAnalyticsCockpit({
@@ -898,7 +1178,17 @@ function FoundationLineChart({ rows, color }: { rows: Array<{ label: string; val
     </div>
   )
 }
-function Donut({ rows, center, label }: { rows: Array<{ label: string; value: number; color: string }>; center: string; label: string }) {
+function Donut({
+  rows,
+  center,
+  label,
+  compact = false,
+}: {
+  rows: Array<{ label: string; value: number; color: string }>;
+  center: string;
+  label: string;
+  compact?: boolean;
+}) {
   const filtered = rows.filter((row) => row.value > 0)
   const chartRows = filtered.length ? filtered : [{ label: 'No data', value: 1, color: '#334155' }]
   const total = Math.max(1, chartRows.reduce((sum, row) => sum + row.value, 0))
@@ -909,16 +1199,27 @@ function Donut({ rows, center, label }: { rows: Array<{ label: string; value: nu
     cursor = end
     return `${row.color} ${start}% ${end}%`
   }).join(', ')
+
+  // Kích thước khi compact
+  const donutSize = compact ? 'h-20 w-20' : 'h-28 w-28'
+  const inset = compact ? 'inset-2' : 'inset-3'
+  const centerText = compact ? 'text-base' : 'text-xl'
+  const labelText = compact ? 'text-[8px]' : 'text-[10px]'
+  const gridCols = compact ? 'grid-cols-[100px_1fr]' : 'grid-cols-[136px_1fr]'
+  const gap = compact ? 'gap-2' : 'gap-4'
+  const spaceY = compact ? 'space-y-1' : 'space-y-1.5'
+  const itemText = compact ? 'text-[10px]' : 'text-[11px]'
+
   return (
-    <div className="grid grid-cols-[136px_1fr] items-center gap-4">
-      <div className="relative h-32 w-32 rounded-full" style={{ background: `conic-gradient(${gradient})` }}>
-        <div className="absolute inset-4 rounded-full bg-[#08111f]" />
+    <div className={`grid ${gridCols} items-center ${gap}`}>
+      <div className={`relative ${donutSize} rounded-full`} style={{ background: `conic-gradient(${gradient})` }}>
+        <div className={`absolute ${inset} rounded-full bg-[#08111f]`} />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="text-xl font-semibold text-white">{center}</div>
-          <div className="text-[10px] text-slate-500">{label}</div>
+          <div className={`font-semibold text-white ${centerText}`}>{center}</div>
+          <div className={`text-slate-500 ${labelText}`}>{label}</div>
         </div>
       </div>
-      <div className="space-y-1.5 overflow-hidden text-[11px]">
+      <div className={`${spaceY} overflow-hidden ${itemText}`}>
         {chartRows.slice(0, 7).map((row) => (
           <div key={row.label} className="flex justify-between gap-2">
             <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
@@ -938,16 +1239,29 @@ function DetailTable({ title, headers, rows }: { title: string; headers: string[
     <ModuleDataGrid>
       <div className="border-b border-white/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</div>
       <div className="overflow-auto">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[1000px] text-sm table-fixed">
           <thead className={moduleTableHead}>
             <tr>
-              {headers.map((header) => <th key={header} className="px-3 py-3 text-left">{header}</th>)}
+              {headers.map((header) => (
+                <th key={header} className="px-3 py-3 text-left">{header}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr key={index} className={moduleTableRow}>
-                {row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2 align-middle">{cell}</td>)}
+                {row.map((cell, cellIndex) => {
+                  const isString = typeof cell === 'string'
+                  return (
+                    <td
+                      key={cellIndex}
+                      className="px-3 py-2 align-middle truncate"
+                      title={isString ? cell : undefined}
+                    >
+                      {cell}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
             {!rows.length && (
@@ -966,14 +1280,49 @@ function DetailTable({ title, headers, rows }: { title: string; headers: string[
 
 function buildTransactionRows(inbound: any[], outbound: any[]) {
   return [
-    ...inbound.map((x: any) => ({ ...x, type: normalizeTransactionType(x.type ?? x.transactionType ?? 'INBOUND') })),
-    ...outbound.map((x: any) => ({ ...x, type: normalizeTransactionType(x.type ?? x.transactionType ?? 'OUTBOUND') })),
-  ].map((row: any) => ({
-    ...row,
-    counterparty: row.supplierName ?? row.projectName ?? row.targetName ?? row.transactionNo ?? '-',
-    quantity: Math.abs(num(row.quantity)),
-    totalAmount: num(row.totalAmount ?? row.totalValue ?? num(row.quantity) * num(row.unitPrice)),
-  })).sort((a: any, b: any) => +new Date(b.transactionDate ?? b.createdAt ?? 0) - +new Date(a.transactionDate ?? a.createdAt ?? 0))
+    ...inbound.map((x: any) => ({
+      ...x,
+      type: normalizeTransactionType(
+        x.type ?? x.transactionType ?? 'INBOUND',
+      ),
+    })),
+    ...outbound.map((x: any) => ({
+      ...x,
+      type: normalizeTransactionType(
+        x.type ?? x.transactionType ?? 'OUTBOUND',
+      ),
+    })),
+  ]
+    .map((row: any) => ({
+      ...row,
+      counterparty:
+        row.supplierName ??
+        row.projectName ??
+        row.targetName ??
+        row.transactionNo ??
+        '-',
+
+      quantity: num(row.quantity),
+
+      totalAmount: num(
+        row.totalAmount ??
+        row.totalValue ??
+        num(row.quantity) * num(row.unitPrice),
+      ),
+    }))
+    .sort(
+      (a: any, b: any) =>
+        +new Date(
+          b.transactionDate ??
+          b.createdAt ??
+          0,
+        ) -
+        +new Date(
+          a.transactionDate ??
+          a.createdAt ??
+          0,
+        ),
+    )
 }
 
 function transactionEntityKeys(row: any) {

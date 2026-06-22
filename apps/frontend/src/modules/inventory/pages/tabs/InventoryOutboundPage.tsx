@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } from 'lucide-react'
+import { CircleDollarSign, PackageCheck, RefreshCw, Target, TriangleAlert } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
@@ -119,7 +120,7 @@ function MaterialsPagination({
   return (
     <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
       <div>
-        Hiển thị {start}-{end}/{total.toLocaleString('vi-VN')} kết quả
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>
       <div className="flex justify-center gap-2">
         {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
@@ -167,26 +168,63 @@ function formatCurrency(v: any) {
   return formatCurrencyVnd(num(v))
 }
 
-function transactionItems(tx: any) {
-  return Array.isArray(tx.items) ? tx.items : []
+function formatDate(value: any) {
+  const date = new Date(value ?? '')
+  if (Number.isNaN(date.getTime())) return '-'
+  return [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    date.getFullYear(),
+  ].join('/')
 }
 
-function transactionQuantity(tx: any) {
+function dateKey(value: any) {
+  const date = new Date(value ?? '')
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+function monthKey(value: any) {
+  const key = dateKey(value)
+  return key ? key.slice(0, 7) : ''
+}
+
+function startOfWeek(date: Date) {
+  const d = new Date(date)
+  const day = d.getDay() || 7
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - day + 1)
+  return d
+}
+
+function sumTransactionAmount(rows: any[]) {
+  return rows.reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)
+}
+
+function sumTransactionQuantity(rows: any[]) {
+  return rows.reduce((sum: number, tx: any) => sum + transactionQuantity(tx), 0)
+}
+
+function transactionItems(tx?: any | null) {
+  return Array.isArray(tx?.items) ? tx.items : []
+}
+
+function transactionQuantity(tx?: any | null) {
   return transactionItems(tx).reduce(
     (sum: number, line: any) =>
-      sum + Math.abs(num(line.quantity)),
+      sum + Math.abs(num(line?.quantity)),
     0,
   )
 }
 
-function lineAmount(line: any) {
-  const quantity = Math.abs(num(line.quantity))
-  const totalAmount = num(line.totalAmount)
+function lineAmount(line?: any | null) {
+  const quantity = Math.abs(num(line?.quantity))
+  const totalAmount = num(line?.totalAmount)
   if (totalAmount) return Math.abs(totalAmount)
-  return quantity * num(line.unitPrice)
+  return quantity * num(line?.unitPrice)
 }
 
-function transactionAmount(tx: any) {
+function transactionAmount(tx?: any | null) {
   return transactionItems(tx).reduce(
     (sum: number, line: any) =>
       sum + lineAmount(line),
@@ -201,6 +239,180 @@ function transactionZoneCodes(tx: any) {
   return Array.from(new Set(codes))
 }
 
+function transactionProjectName(tx: any) {
+  return tx?.projectName ?? tx?.project?.name ?? '-'
+}
+
+function transactionActor(tx: any) {
+  return tx?.createdBy ?? tx?.performedBy ?? tx?.approvedBy ?? 'Admin'
+}
+
+function lineUnit(line: any) {
+  return line?.unit?.symbol ?? line?.unit?.code ?? line?.inventoryItem?.unit ?? '-'
+}
+
+function outboundPurpose(tx: any) {
+  const text = [
+    tx?.referenceType,
+    tx?.referenceModule,
+    tx?.remarks,
+    tx?.note,
+    tx?.projectName,
+    tx?.customerName,
+  ].filter(Boolean).join(' ').toLowerCase()
+  if (tx?.projectId || tx?.project || text.includes('project') || text.includes('công trình')) return 'project'
+  if (text.includes('production') || text.includes('sản xuất') || text.includes('mo') || text.includes('lệnh sản xuất')) return 'production'
+  if (text.includes('customer') || text.includes('khách')) return 'customer'
+  return 'other'
+}
+
+function purposeLabel(purpose: string) {
+  const labels: Record<string, string> = {
+    project: 'Công trình',
+    production: 'Sản xuất',
+    customer: 'Khách hàng',
+    other: 'Khác',
+  }
+  return labels[purpose] ?? purpose
+}
+
+function TrendPanel({ rows, valueFormatter = formatCurrency }: { rows: { label: string; value: number }[]; valueFormatter?: (value: number) => string }) {
+  const max = Math.max(1, ...rows.map((row) => row.value))
+  return (
+    <div className="space-y-3">
+      <div className="flex h-32 items-end gap-2 rounded-xl border border-white/10 bg-slate-950/35 px-3 pb-3 pt-4">
+        {rows.map((row) => (
+          <div key={row.label} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+            <div
+              className="w-full rounded-t-lg bg-gradient-to-t from-blue-500/75 to-cyan-300/85 shadow-[0_0_18px_rgba(34,211,238,0.18)]"
+              style={{ height: `${Math.max(6, (row.value / max) * 100)}%` }}
+              title={`${row.label}: ${valueFormatter(row.value)}`}
+            />
+            <div className="w-full truncate text-center text-[10px] text-slate-500">{row.label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+        {rows.slice(-4).map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2 py-1.5">
+            <span className="truncate">{row.label}</span>
+            <span className="shrink-0 font-semibold text-slate-100">{valueFormatter(row.value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FinancialKpiRows({ today, week, month, year }: { today: number; week: number; month: number; year: number }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {[
+        ['Hôm nay', today],
+        ['Tuần này', week],
+        ['Tháng này', month],
+        ['Năm nay', year],
+      ].map(([label, value]) => (
+        <div key={label as string} className="rounded-xl border border-white/10 bg-white/[0.045] p-3">
+          <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
+          <div className="mt-2 text-lg font-semibold text-white">{formatCurrency(value)}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function OutboundTransactionDetailDrawer({
+  transaction,
+  onClose,
+}: {
+  transaction: any | null
+  onClose: () => void
+}) {
+  if (!transaction) return null
+
+  const items = transactionItems(transaction)
+  const totalQuantity = transactionQuantity(transaction)
+  const totalValue = transactionAmount(transaction)
+
+  return (
+    <ModuleDetailDrawer
+      open={Boolean(transaction)}
+      title={transaction?.transactionNo ?? 'Chi tiết phiếu xuất'}
+      subtitle="Chi tiết xuất kho vật tư"
+      onClose={onClose}
+      widthClass="max-w-5xl"
+    >
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-cyan-300/15 bg-cyan-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Tổng khối lượng</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(totalQuantity, 0)}</div>
+            </div>
+            <div className="rounded-xl border border-emerald-300/15 bg-emerald-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Tổng giá trị</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatCurrency(totalValue)}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Số dòng vật tư</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(items.length, 0)}</div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="grid gap-2 text-sm md:grid-cols-2">
+              <InfoLine label="Mã phiếu" value={transaction?.transactionNo ?? '-'} />
+              <InfoLine label="Ngày xuất" value={formatDate(transaction?.transactionDate ?? transaction?.createdAt)} />
+              <InfoLine label="Công trình / đơn vị nhận" value={transactionProjectName(transaction)} />
+              <InfoLine label="Người tạo" value={transactionActor(transaction)} />
+              <InfoLine label="Kho xuất" value={transactionZoneCodes(transaction).join(', ') || '-'} />
+              <InfoLine label="Ghi chú" value={transaction?.remarks ?? transaction?.note ?? '-'} />
+            </div>
+          </div>
+
+          <div className="overflow-auto rounded-xl border border-white/10 bg-slate-950/35">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
+                <tr>
+                  {['Mã vật tư', 'Tên vật tư', 'Số lượng', 'Đơn vị', 'Đơn giá', 'Thành tiền'].map((header) => (
+                    <th key={header} className="px-3 py-2 text-left font-medium">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.length ? items.map((line: any) => (
+                  <tr key={line.id ?? `${line.inventoryItemId}-${line.quantity}`} className="border-t border-white/10 text-slate-300">
+                    <td className="px-3 py-2 font-medium text-cyan-300">{line?.inventoryItem?.code ?? '-'}</td>
+                    <td className="px-3 py-2 text-slate-100">{line?.inventoryItem?.name ?? '-'}</td>
+                    <td className="px-3 py-2">{formatQuantity(Math.abs(num(line.quantity)), 3)}</td>
+                    <td className="px-3 py-2">{lineUnit(line)}</td>
+                    <td className="px-3 py-2">{formatCurrency(line.unitPrice)}</td>
+                    <td className="px-3 py-2 font-semibold text-emerald-300">{formatCurrency(lineAmount(line))}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-slate-500">
+                      Phiếu xuất chưa có dòng vật tư.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+    </ModuleDetailDrawer>
+  )
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-sm font-medium text-slate-100">{value}</div>
+    </div>
+  )
+}
+
 export function InventoryOutboundPage() {
   const { data: projects = [] } = useProjects()
   const { data: zones = [] } = useZones()
@@ -209,11 +421,25 @@ export function InventoryOutboundPage() {
   const [date, setDate] = useState('')
   const [projectId, setProjectId] = useState('')
   const [zoneId, setZoneId] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
   const pageSize = 10
   const attachmentMap = useInventoryTransactionAttachmentMap()
+  const applySearch = () => {
+    setSearch(searchDraft)
+    setPage(1)
+  }
+  const resetFilters = () => {
+    setSearchDraft('')
+    setSearch('')
+    setDate('')
+    setProjectId('')
+    setZoneId('')
+    setPage(1)
+  }
 
   const rows = useMemo(() => {
     return (tx as any[])
@@ -245,12 +471,26 @@ export function InventoryOutboundPage() {
     const now = new Date()
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const inMonth = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 7) === monthKey)
-    const qty = inMonth.reduce((s: number, x: any) => s + transactionQuantity(x), 0)
-    const amount = inMonth.reduce((s: number, x: any) => s + transactionAmount(x), 0)
+    const todayKey = now.toISOString().slice(0, 10)
+    const todayRows = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 10) === todayKey)
+    const weekStart = startOfWeek(now)
+    const weekRows = rows.filter((x: any) => {
+      const d = new Date(x.transactionDate ?? x.createdAt)
+      return !Number.isNaN(d.getTime()) && d >= weekStart && d <= now
+    })
+    const yearRows = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 4) === String(now.getFullYear()))
+    const qty = sumTransactionQuantity(inMonth)
+    const amount = sumTransactionAmount(inMonth)
+    const todayAmount = sumTransactionAmount(todayRows)
+    const weekAmount = sumTransactionAmount(weekRows)
+    const yearAmount = sumTransactionAmount(yearRows)
     const pending = rows.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING').length
     return {
       monthlyQty: qty,
       monthlyAmount: amount,
+      todayAmount,
+      weekAmount,
+      yearAmount,
       docs: inMonth.length,
       pending,
     }
@@ -268,16 +508,27 @@ export function InventoryOutboundPage() {
   }, [rows])
 
   const topMaterials = useMemo(() => {
-    const m = new Map<string, { code: string; qty: number }>()
+    const m = new Map<string, { code: string; amount: number }>()
     rows.forEach((x: any) => {
       transactionItems(x).forEach((line: any) => {
         const code = line?.inventoryItem?.code ?? 'NA'
-        const prev = m.get(code) ?? { code, qty: 0 }
-        prev.qty += Math.abs(num(line?.quantity))
+        const prev = m.get(code) ?? { code, amount: 0 }
+        prev.amount += lineAmount(line)
         m.set(code, prev)
       })
     })
-    return Array.from(m.values()).sort((a, b) => b.qty - a.qty).slice(0, 5)
+    return Array.from(m.values()).sort((a, b) => b.amount - a.amount).slice(0, 5)
+  }, [rows])
+
+  const topProjects = useMemo(() => {
+    const m = new Map<string, { name: string; amount: number }>()
+    rows.forEach((x: any) => {
+      const name = transactionProjectName(x)
+      const prev = m.get(name) ?? { name, amount: 0 }
+      prev.amount += transactionAmount(x)
+      m.set(name, prev)
+    })
+    return Array.from(m.values()).sort((a, b) => b.amount - a.amount).slice(0, 5)
   }, [rows])
 
   const zoneSegments = useMemo(() => byZone.map(([label, value], index) => ({
@@ -286,7 +537,133 @@ export function InventoryOutboundPage() {
     color: ['#1d7cff', '#14c987', '#f59e0b', '#7c3aed', '#ef4444', '#06b6d4'][index % 6],
   })), [byZone])
 
-  const paged = useMemo(() => {
+  const projectConsumption = useMemo(() => {
+    const totalValue = Math.max(1, sumTransactionAmount(rows))
+    const m = new Map<string, { name: string; docs: Set<string>; quantity: number; value: number }>()
+    rows.forEach((x: any) => {
+      const name = transactionProjectName(x)
+      const prev = m.get(name) ?? { name, docs: new Set<string>(), quantity: 0, value: 0 }
+      prev.docs.add(String(x.id ?? x.transactionNo))
+      prev.quantity += transactionQuantity(x)
+      prev.value += transactionAmount(x)
+      m.set(name, prev)
+    })
+    return Array.from(m.values())
+      .map((item) => ({
+        name: item.name,
+        docs: item.docs.size,
+        quantity: item.quantity,
+        value: item.value,
+        percentage: (item.value / totalValue) * 100,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6)
+  }, [rows])
+
+  const materialConsumption = useMemo(() => {
+    const m = new Map<string, { code: string; name: string; quantity: number; value: number; issues: Set<string> }>()
+    rows.forEach((x: any) => {
+      transactionItems(x).forEach((line: any) => {
+        const code = line?.inventoryItem?.code ?? 'NA'
+        const prev = m.get(code) ?? {
+          code,
+          name: line?.inventoryItem?.name ?? '-',
+          quantity: 0,
+          value: 0,
+          issues: new Set<string>(),
+        }
+        prev.quantity += Math.abs(num(line.quantity))
+        prev.value += lineAmount(line)
+        prev.issues.add(String(x.id ?? x.transactionNo))
+        m.set(code, prev)
+      })
+    })
+    return Array.from(m.values())
+      .map((item) => ({ ...item, issueCount: item.issues.size }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6)
+  }, [rows])
+
+  const dailyTrend = useMemo(() => {
+    const m = new Map<string, number>()
+    rows.forEach((x: any) => {
+      const key = dateKey(x.transactionDate ?? x.createdAt)
+      if (key) m.set(key, (m.get(key) ?? 0) + transactionAmount(x))
+    })
+    return Array.from(m.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-10)
+      .map(([key, value]) => ({ label: key.slice(5), value }))
+  }, [rows])
+
+  const monthlyTrend = useMemo(() => {
+    const m = new Map<string, number>()
+    rows.forEach((x: any) => {
+      const key = monthKey(x.transactionDate ?? x.createdAt)
+      if (key) m.set(key, (m.get(key) ?? 0) + transactionAmount(x))
+    })
+    return Array.from(m.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-8)
+      .map(([key, value]) => ({ label: key.slice(5), value }))
+  }, [rows])
+
+  const purposeSegments = useMemo(() => {
+    const m = new Map<string, number>()
+    rows.forEach((x: any) => {
+      const key = outboundPurpose(x)
+      m.set(key, (m.get(key) ?? 0) + transactionAmount(x))
+    })
+    const colors = ['#1d7cff', '#14c987', '#f59e0b', '#ef4444']
+    return Array.from(m.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], index) => ({
+        label: purposeLabel(label),
+        value,
+        color: colors[index % colors.length],
+      }))
+  }, [rows])
+
+  const abnormalAlerts = useMemo(() => {
+    const materialStats = new Map<string, { qtyTotal: number; valueTotal: number; count: number }>()
+    rows.forEach((x: any) => {
+      transactionItems(x).forEach((line: any) => {
+        const code = line?.inventoryItem?.code ?? 'NA'
+        const prev = materialStats.get(code) ?? { qtyTotal: 0, valueTotal: 0, count: 0 }
+        prev.qtyTotal += Math.abs(num(line.quantity))
+        prev.valueTotal += lineAmount(line)
+        prev.count += 1
+        materialStats.set(code, prev)
+      })
+    })
+    const alerts: { key: string; material: string; reason: string; quantity: number; value: number }[] = []
+    rows.forEach((x: any) => {
+      transactionItems(x).forEach((line: any) => {
+        const code = line?.inventoryItem?.code ?? 'NA'
+        const stats = materialStats.get(code)
+        if (!stats || stats.count < 2) return
+        const qty = Math.abs(num(line.quantity))
+        const value = lineAmount(line)
+        const avgQty = stats.qtyTotal / stats.count
+        const avgValue = stats.valueTotal / stats.count
+        if (qty > avgQty * 1.8 || value > avgValue * 1.8) {
+          alerts.push({
+            key: `${x.id}-${line.id ?? code}`,
+            material: `${code} - ${line?.inventoryItem?.name ?? '-'}`,
+            reason: qty > avgQty * 1.8 ? 'Khối lượng vượt nền tiêu thụ' : 'Giá trị vượt nền tiêu thụ',
+            quantity: qty,
+            value,
+          })
+        }
+      })
+    })
+    return alerts.sort((a, b) => b.value - a.value).slice(0, 5)
+  }, [rows])
+
+    const filterInput =
+      'h-9 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+  
+    const paged = useMemo(() => {
     const start = (page - 1) * pageSize
     return rows.slice(start, start + pageSize)
   }, [rows, page])
@@ -297,7 +674,7 @@ export function InventoryOutboundPage() {
       <InventoryTabWorkspace />
 
       <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-1.5">
           <OverviewMetricCard
             title="Tổng xuất trong tháng"
             value={`${formatQuantity(kpis.monthlyQty, 0)} tấn`}
@@ -311,6 +688,14 @@ export function InventoryOutboundPage() {
             value={formatCurrency(kpis.monthlyAmount)}
             note="Giá trị đã xuất"
             tone="emerald"
+            icon={<CircleDollarSign size={15} />}
+            trend={[0,0,0,0,0,0]}
+          />
+          <OverviewMetricCard
+            title="Giá trị xuất hôm nay"
+            value={formatCurrency(kpis.todayAmount)}
+            note="Theo ngày hiện tại"
+            tone="purple"
             icon={<CircleDollarSign size={15} />}
             trend={[0,0,0,0,0,0]}
           />
@@ -332,26 +717,55 @@ export function InventoryOutboundPage() {
           />
         </div>
 
-        <InventoryPanel title="Bộ lọc phiếu xuất" className="p-2">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inventoryInput} />
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inventoryInput}>
+        <InventoryPanel className="rounded-xl p-0.5">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={filterInput}
+            />
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Đơn vị nhận</option>
               {projects.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className={inventoryInput}>
+            <select
+              value={zoneId}
+              onChange={(e) => setZoneId(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Kho xuất</option>
               {zones.map((z: any) => (
-                <option key={z.id} value={z.id}>
-                  {z.code}
-                </option>
+                <option key={z.id} value={z.id}>{z.code}</option>
               ))}
             </select>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã phiếu, vật tư, đơn vị nhận..." className={`${inventoryInput} xl:col-span-3`} />
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch()
+              }}
+              placeholder="Tìm mã phiếu, vật tư, đơn vị nhận..."
+              className={filterInput}
+            />
+            <button
+              onClick={applySearch}
+              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              onClick={resetFilters}
+              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
           </div>
         </InventoryPanel>
 
@@ -373,15 +787,19 @@ export function InventoryOutboundPage() {
                     paged.map((x: any) => {
                       const zoneCodes = transactionZoneCodes(x)
                       return (
-                        <tr key={x.id} className={inventoryTableRow}>
+                        <tr
+                          key={x.id}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                          onClick={() => setSelectedTransaction(x)}
+                        >
                           <td className="px-3 py-1.5 text-cyan-300">{x.transactionNo}</td>
-                          <td className="px-3 py-1.5">{new Date(x.transactionDate ?? x.createdAt).toLocaleDateString('vi-VN')}</td>
+                          <td className="px-3 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
                           <td className="px-3 py-1.5">{x.referenceType ?? 'Xuất kho'}</td>
-                          <td className="px-3 py-1.5">{x.projectName ?? '-'}</td>
+                          <td className="px-3 py-1.5">{transactionProjectName(x)}</td>
                           <td className="px-3 py-1.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
                           <td className="px-3 py-1.5">{formatQuantity(transactionQuantity(x), 0)}</td>
                           <td className="px-3 py-1.5">{formatCurrency(transactionAmount(x))}</td>
-                          <td className="px-3 py-1.5">
+                          <td className="px-3 py-1.5" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
@@ -406,9 +824,123 @@ export function InventoryOutboundPage() {
               <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.monthlyQty, 0)} centerLabel="tổng xuất" />
             </InventoryChartCard>
             <InventoryChartCard title="Top vật tư xuất" className="p-2">
-              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.qty])} valueFormatter={(value) => formatQuantity(value, 0)} />
+              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.amount])} valueFormatter={(value) => formatCurrency(value)} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Top công trình theo giá trị xuất" className="p-2">
+              <HorizontalBars rows={topProjects.map((p) => [p.name, p.amount])} valueFormatter={(value) => formatCurrency(value)} />
             </InventoryChartCard>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-12">
+          <InventoryChartCard title="KPI tài chính xuất kho" className="p-3 xl:col-span-4">
+            <FinancialKpiRows
+              today={kpis.todayAmount}
+              week={kpis.weekAmount}
+              month={kpis.monthlyAmount}
+              year={kpis.yearAmount}
+            />
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Xu hướng xuất theo ngày" className="p-3 xl:col-span-4">
+            <TrendPanel rows={dailyTrend} />
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Xu hướng xuất theo tháng" className="p-3 xl:col-span-4">
+            <TrendPanel rows={monthlyTrend} />
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Tiêu thụ theo công trình" className="p-3 xl:col-span-6">
+            <div className="space-y-2">
+              {projectConsumption.length ? projectConsumption.map((item) => (
+                <div key={item.name} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-100">{item.name}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {formatQuantity(item.docs, 0)} hồ sơ · {formatQuantity(item.quantity, 3)} lượng xuất
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-semibold text-emerald-300">{formatCurrency(item.value)}</div>
+                      <div className="text-xs text-cyan-300">{item.percentage.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, item.percentage)}%` }} />
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
+                  Chưa có dữ liệu xuất theo công trình.
+                </div>
+              )}
+            </div>
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Tiêu thụ theo vật tư" className="p-3 xl:col-span-6">
+            <div className="overflow-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[620px] text-sm">
+                <thead className={inventoryTableHead}>
+                  <tr>
+                    {['Mã vật tư', 'Khối lượng', 'Giá trị', 'Số lần xuất'].map((header) => (
+                      <th key={header} className="px-3 py-2 text-left font-medium">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {materialConsumption.length ? materialConsumption.map((item) => (
+                    <tr key={item.code} className="border-t border-white/10 text-slate-300">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-cyan-300">{item.code}</div>
+                        <div className="truncate text-xs text-slate-500">{item.name}</div>
+                      </td>
+                      <td className="px-3 py-2">{formatQuantity(item.quantity, 3)}</td>
+                      <td className="px-3 py-2 font-semibold text-emerald-300">{formatCurrency(item.value)}</td>
+                      <td className="px-3 py-2">{formatQuantity(item.issueCount, 0)}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-8 text-center text-sm text-slate-500">Chưa có dữ liệu vật tư xuất.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Mục đích xuất kho" className="p-3 xl:col-span-5">
+            <CompactDonutSummary
+              segments={purposeSegments}
+              centerValue={formatCurrency(sumTransactionAmount(rows))}
+              centerLabel="tổng giá trị"
+            />
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Cảnh báo tiêu thụ bất thường" className="p-3 xl:col-span-7">
+            <div className="space-y-2">
+              {abnormalAlerts.length ? abnormalAlerts.map((alert) => (
+                <div key={alert.key} className="flex items-start justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-500/[0.055] p-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <TriangleAlert size={15} className="text-amber-300" />
+                      <span className="truncate font-medium text-slate-100">{alert.material}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-amber-200/80">{alert.reason}</div>
+                  </div>
+                  <div className="shrink-0 text-right text-xs">
+                    <div className="font-semibold text-white">{formatQuantity(alert.quantity, 3)}</div>
+                    <div className="mt-1 text-emerald-300">{formatCurrency(alert.value)}</div>
+                  </div>
+                </div>
+              )) : (
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-500/[0.045] p-6 text-sm text-emerald-200">
+                  <Target size={16} />
+                  Chưa phát hiện tiêu thụ bất thường trong bộ lọc hiện tại.
+                </div>
+              )}
+            </div>
+          </InventoryChartCard>
         </div>
       </div>
       <InventoryTransactionAttachmentDrawer
@@ -417,6 +949,12 @@ export function InventoryOutboundPage() {
         attachments={attachmentDrawer?.attachments ?? []}
         onClose={() => setAttachmentDrawer(null)}
       />
+      {selectedTransaction ? (
+        <OutboundTransactionDetailDrawer
+          transaction={selectedTransaction}
+          onClose={() => setSelectedTransaction(null)}
+        />
+      ) : null}
     </EnterpriseModulePage>
   )
 }

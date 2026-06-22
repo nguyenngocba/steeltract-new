@@ -79,6 +79,10 @@ export const navigation = [
         path: '/inventory/stock-take',
       },
       {
+        title: 'Điều chỉnh tồn kho',
+        path: '/inventory/adjustments',
+      },
+      {
         title: 'Lịch sử giao dịch',
         path: '/inventory/transactions',
       },

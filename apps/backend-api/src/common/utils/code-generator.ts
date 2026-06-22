@@ -6,7 +6,7 @@ export function compactCodeDate(value = new Date()) {
 }
 
 export function formatOperationalCode(prefix: string, sequence: number, value = new Date()) {
-  return `${prefix}-${compactCodeDate(value)}-${String(Math.max(1, sequence)).padStart(3, '0')}`;
+  return `${prefix}-${compactCodeDate(value)}-${String(Math.max(1, sequence)).padStart(5, '0')}`;
 }
 
 export async function nextOperationalCode(
@@ -17,12 +17,20 @@ export async function nextOperationalCode(
   value = new Date(),
 ) {
   const dayPrefix = `${prefix}-${compactCodeDate(value)}-`;
-  const count = await prisma[modelName].count({
+  const rows = await prisma[modelName].findMany({
     where: {
       [fieldName]: {
         startsWith: dayPrefix,
       },
     },
+    select: {
+      [fieldName]: true,
+    },
   });
-  return formatOperationalCode(prefix, count + 1, value);
+  const maxSequence = rows.reduce((max: number, row: Record<string, unknown>) => {
+    const code = String(row[fieldName] ?? '');
+    const suffix = Number(code.slice(dayPrefix.length));
+    return Number.isFinite(suffix) ? Math.max(max, suffix) : max;
+  }, 0);
+  return formatOperationalCode(prefix, maxSequence + 1, value);
 }

@@ -18,15 +18,15 @@ import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
-import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
+import { formatCurrencyVnd, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format'
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 16
 const CHART_PAGE_SIZE = 6
 const compactInput =
   'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
 
 function num(value: any) {
-  const parsed = Number(value ?? 0)
+  const parsed = parseLocaleNumber(value)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
@@ -44,7 +44,7 @@ function materialUsageLabel(value: string | undefined) {
 }
 
 function stockStatus(item: any) {
-  const currentStock = Number(item.currentStock ?? 0)
+  const currentStock = mainWarehouseStock(item)
   if (currentStock <= 0) return 'OUT'
   if (currentStock <= Number(item.minimumStock ?? 5)) return 'LOW'
   return 'NORMAL'
@@ -130,6 +130,42 @@ function rowLocations(item: any) {
 
   const fallback = item.position ?? item.zone
   return fallback ? [{ zoneName: fallback, quantity: item.currentStock }] : []
+}
+
+function isMainWarehouseLocation(location: any) {
+  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
+  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+}
+
+function isProductionWarehouseLocation(location: any) {
+  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
+  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+}
+
+function allLocationBalances(item: any) {
+  return Array.isArray(item.locationBalances) ? item.locationBalances : []
+}
+
+function mainWarehouseStock(item: any) {
+  return allLocationBalances(item)
+    .filter(isMainWarehouseLocation)
+    .reduce((sum: number, location: any) => sum + num(location.quantity), 0)
+}
+
+function productionWarehouseStock(item: any) {
+  return allLocationBalances(item)
+    .filter(isProductionWarehouseLocation)
+    .reduce((sum: number, location: any) => sum + num(location.quantity), 0)
+}
+
+function totalWarehouseStock(item: any) {
+  const balances = allLocationBalances(item)
+  if (balances.length) {
+    return balances.reduce((sum: number, location: any) => sum + num(location.quantity), 0)
+  }
+  return num(item.currentStock ?? item.quantity)
 }
 
 function displayLocation(item: any) {
@@ -368,9 +404,9 @@ export function InventoryMaterialsPage() {
 
   const kpis = useMemo(() => {
     const totalValue = filteredRows.reduce((acc: number, row: any) => acc + Number(row.inventoryValue ?? 0), 0)
-    const totalQty = filteredRows.reduce((acc: number, row: any) => acc + Number(row.currentStock ?? 0), 0)
-    const low = filteredRows.filter((row: any) => Number(row.currentStock ?? 0) > 0 && Number(row.currentStock ?? 0) <= 5).length
-    const out = filteredRows.filter((row: any) => Number(row.currentStock ?? 0) <= 0).length
+    const totalQty = filteredRows.reduce((acc: number, row: any) => acc + totalWarehouseStock(row), 0)
+    const low = filteredRows.filter((row: any) => stockStatus(row) === 'LOW').length
+    const out = filteredRows.filter((row: any) => stockStatus(row) === 'OUT').length
     return {
       totalValue,
       totalQty,
@@ -420,7 +456,7 @@ export function InventoryMaterialsPage() {
     filteredRows.forEach((row: any) => {
       const locations = rowLocations(row)
       if (!locations.length) {
-        map.set('KHU MẶC ĐỊNH', (map.get('KHU MẶC ĐỊNH') ?? 0) + num(row.currentStock))
+        map.set('KHU MẶC ĐỊNH', (map.get('KHU MẶC ĐỊNH') ?? 0) + totalWarehouseStock(row))
         return
       }
       locations.forEach((location: any) => {
@@ -443,9 +479,9 @@ export function InventoryMaterialsPage() {
   const alerts = useMemo(() => {
     return filteredRows
       .map((row: any) => {
-        const stock = num(row.currentStock)
+        const stock = mainWarehouseStock(row)
         const min = num(row.minimumStock || 5)
-        const level = stock <= 0 ? 'Hết hàng' : stock <= min || stock <= 5 ? 'Sắp hết' : ''
+        const level = stock <= 0 ? 'Hết hàng' : stock <= min ? 'Sắp hết' : ''
         return { ...row, stock, level }
       })
       .filter((row: any) => row.level)
@@ -531,7 +567,7 @@ export function InventoryMaterialsPage() {
       const afterEnd = movements
         .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > endDate)
         .reduce((sum: number, line: any) => sum + num(line.quantity), 0)
-      return num(row.currentStock) - afterEnd
+      return totalWarehouseStock(row) - afterEnd
     }
     const snapshots = months.map(({ end }) => {
       let quantity = 0
@@ -702,126 +738,265 @@ export function InventoryMaterialsPage() {
         </div>
 
         <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
-			<LabeledFilter label="">
-              <select
-                value={zoneFilter}
-                onChange={(e) => {
-                  setZoneFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả kho</option>
-                {warehouseOptions.map((warehouse) => (
-                  <option key={warehouse.value} value={warehouse.value}>
-                    {warehouse.label}
-                  </option>
-                ))}
-              </select>
-            </LabeledFilter>
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
             <LabeledFilter label="">
-              <select
-                value={usageFilter}
-                onChange={(e) => {
-                  setUsageFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả loại vật tư</option>
-                <option value="PRIMARY">Vật tư chính</option>
-                <option value="SECONDARY">Vật tư phụ</option>
-                <option value="CONSUMABLE">Vật tư tiêu hao</option>
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="">
-              <select
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả nhóm vật tư</option>
-                {categories.map((category: any) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả trạng thái</option>
-                <option value="NORMAL">Bình thường</option>
-                <option value="LOW">Sắp hết</option>
-                <option value="OUT">Hết hàng</option>
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="">
-              <input
-                value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') applySearch()
-                }}
-                placeholder="Mã, tên, quy cách, nhà cung cấp..."
-                className={compactInput}
-              />
-            </LabeledFilter>
-            <button onClick={applySearch} className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
-              Tìm kiếm
-            </button>
-            <button onClick={resetFilters} className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
-              Làm mới
-            </button>
-          </div>
-        </InventoryPanel>
+                    <select
+                      value={zoneFilter}
+                      onChange={(e) => {
+                        setZoneFilter(e.target.value)
+                        setPage(1)
+                      }}
+                      className={compactInput}
+                    >
+                      <option value="">Tất cả kho</option>
+                      {warehouseOptions.map((warehouse) => (
+                        <option key={warehouse.value} value={warehouse.value}>
+                          {warehouse.label}
+                        </option>
+                      ))}
+                    </select>
+                  </LabeledFilter>
+                  <LabeledFilter label="">
+                    <select
+                      value={usageFilter}
+                      onChange={(e) => {
+                        setUsageFilter(e.target.value)
+                        setPage(1)
+                      }}
+                      className={compactInput}
+                    >
+                      <option value="">Tất cả loại vật tư</option>
+                      <option value="PRIMARY">Vật tư chính</option>
+                      <option value="SECONDARY">Vật tư phụ</option>
+                      <option value="CONSUMABLE">Vật tư tiêu hao</option>
+                    </select>
+                  </LabeledFilter>
+                  <LabeledFilter label="">
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => {
+                        setCategoryFilter(e.target.value)
+                        setPage(1)
+                      }}
+                      className={compactInput}
+                    >
+                      <option value="">Tất cả nhóm vật tư</option>
+                      {categories.map((category: any) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                    </select>
+                  </LabeledFilter>
+                  <LabeledFilter label="">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value)
+                        setPage(1)
+                      }}
+                      className={compactInput}
+                    >
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="NORMAL">Bình thường</option>
+                      <option value="LOW">Sắp hết</option>
+                      <option value="OUT">Hết hàng</option>
+                    </select>
+                  </LabeledFilter>
+                  <LabeledFilter label="">
+                    <input
+                      value={searchDraft}
+                      onChange={(e) => setSearchDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') applySearch()
+                      }}
+                      placeholder="Mã, tên, quy cách, nhà cung cấp..."
+                      className={compactInput}
+                    />
+                  </LabeledFilter>
+                  <button onClick={applySearch} className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
+                    Tìm kiếm
+                  </button>
+                  <button onClick={resetFilters} className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+                    Làm mới
+                  </button>
+                </div>
+              </InventoryPanel>
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-            <InventoryPanel className="xl:col-span-8 p-0 pb-0">
-              <div className="mb-1 flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách tồn kho</h3>
-                <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
+                    <InventoryPanel className="xl:col-span-9 p-0 pb-0">
+                      <div className="mb-1 flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách tồn kho</h3>
+                        <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
+                      </div>
+                      {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
+                      <div className={`${inventoryTableShell} h-[520px] overflow-auto`}>
+                        <table className="w-full min-w-[1150px] text-sm table-fixed">
+                          <colgroup>
+                            <col className="w-[100px]" />   {/* Mã vật tư */}
+                            <col className="w-[140px]" />   {/* Tên vật tư */}
+                            <col className="w-[100px]" />   {/* Quy cách */}
+                            <col className="w-[40px]" />    {/* ĐVT */}
+                            <col className="w-[100px]" />   {/* Kho chính */}
+                            <col className="w-[100px]" />   {/* Kho SX */}
+                            <col className="w-[100px]" />   {/* Tổng tồn */}
+                            <col className="w-[110px]" />   {/* Đơn giá */}
+                            <col className="w-[130px]" />   {/* Giá trị */}
+                            <col className="w-[150px]" />   {/* Vị trí */}
+                            <col className="w-[100px]" />   {/* Trạng thái */}
+                          </colgroup>
+                          <thead className={inventoryTableHead}>
+                            <tr>
+                              <th className="px-1.5 py-0.5 text-left font-medium">Mã vật tư</th>
+                              <th className="px-1.5 py-0.5 text-left font-medium">Tên vật tư</th>
+                              <th className="px-1.5 py-0.5 text-left font-medium">Quy cách</th>
+                              <th className="px-1.5 py-0.5 text-left font-medium">ĐVT</th>
+                              <th className="px-1.5 py-0.5 text-right font-medium">Kho chính</th>
+                              <th className="px-1.5 py-0.5 text-right font-medium">Kho SX</th>
+                              <th className="px-1.5 py-0.5 text-right font-medium">Tổng tồn</th>
+                              <th className="px-1.5 py-0.5 text-right font-medium">Đơn giá</th>
+                              <th className="px-1.5 py-0.5 text-right font-medium">Giá trị</th>
+                              <th className="px-1.5 py-0.5 text-left font-medium">Vị trí</th>
+                              <th className="px-1.5 py-0.5 text-left font-medium">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pagedRows.map((item: any) => (
+                              <tr key={item.id} onClick={() => openMaterial(item)} className={`cursor-pointer ${inventoryTableRow}`}>
+                                <td className="truncate px-1.5 py-0.5 text-cyan-300" title={item.materialCode}>{item.materialCode}</td>
+                                <td className="truncate px-1.5 py-0.5 text-white" title={item.materialName}>{item.materialName}</td>
+                                <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? '-'}>{item.materialType ?? '-'}</td>
+                                <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-amber-300" title={formatQuantity(productionWarehouseStock(item), 3)}>{formatQuantity(productionWarehouseStock(item), 3)}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right text-slate-300" title={money(Number(item.averageCost ?? 0))}>{money(Number(item.averageCost ?? 0))}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-medium text-cyan-300" title={money(Number(item.inventoryValue ?? 0))}>{money(Number(item.inventoryValue ?? 0))}</td>
+                                <td className="truncate px-1.5 py-0.5">
+                                  <span
+                                    title={rowLocations(item).map(locationLabel).join('\n')}
+                                    className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[10px] text-cyan-100"
+                                  >
+                                    {displayLocation(item)}
+                                  </span>
+                                </td>
+                                <td className="px-1.5 py-0.5">
+                                  <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${stockStatusClass(stockStatus(item))}`}>
+                                    {stockStatusLabel(stockStatus(item))}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+                    </InventoryPanel>
+
+                    <div className="space-y-1 xl:col-span-3">
+                      <ChartCard title="Phân bố tồn kho theo kho" note="Đơn vị: tấn" page={pagedZoneDistribution.page} pageCount={pagedZoneDistribution.pageCount} onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))} onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}>
+                        <CompactDonut
+                          segments={pagedZoneSegments}
+                          centerValue={formatQuantity(kpis.totalQty, 0)}
+                          centerLabel="tấn"
+                        />
+                      </ChartCard>
+
+                      <ChartCard title="Biến động tồn kho" note="Giá trị: tỷ đồng">
+                        <StockTrendChart rows={monthlyTrend} />
+                      </ChartCard>
+
+                      <ChartCard title="Cảnh báo tồn kho" action={<button onClick={() => setShowAllAlerts(true)} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>} page={pagedAlerts.page} pageCount={pagedAlerts.pageCount} onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))} onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}>
+                        <div className="h-[154px] space-y-1.5 overflow-hidden text-xs">
+                          {pagedAlerts.rows.map((row: any) => (
+                            <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
+                              <span className={row.level === 'Hết hàng' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
+                              <span className="text-slate-400">Kho chính: {formatQuantity(row.stock, 3)}</span>
+                              <span className={`rounded px-2 py-0.5 ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
+                            </div>
+                          ))}
+                          {alerts.length === 0 && <div className="rounded border border-white/10 bg-white/[0.04] px-3 py-4 text-center text-slate-500">Không có cảnh báo tồn kho.</div>}
+                        </div>
+                      </ChartCard>
+                    </div>
+                  </div>
+
+                <section className="rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_16px_52px_rgba(0,0,0,0.2)]">
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-white">Thống kê nhanh</h3>
+                  <div className="grid grid-cols-1 divide-y divide-white/10 md:grid-cols-5 md:divide-x md:divide-y-0">
+                    {quickStats.map((item) => (
+                      <div key={item.title} className="px-3 py-1.5 first:pl-0 last:pr-0">
+                        <div className="text-xs text-slate-400">{item.title}</div>
+                        <div className={`mt-0.5 text-base font-semibold ${item.tone}`}>{item.value}</div>
+                        <div className="text-xs text-slate-500">{item.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </div>
-              {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
-              <div className={`${inventoryTableShell} h-[520px] overflow-auto`}>
-                <table className="w-full min-w-[980px] text-xs">
-                  <thead className={inventoryTableHead}>
+
+              {showAll && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
+                  <div className="max-h-[90vh] w-full max-w-[95vw] overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-white">
+                        Toàn bộ danh sách tồn kho ({filteredRows.length} vật tư)
+                      </h3>
+                      <button
+                        onClick={() => setShowAll(false)}
+                        className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white"
+                      >
+                        Đóng
+                      </button>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-white/10">
+                      <table className="w-full min-w-[1400px] text-sm table-fixed">
+                        <colgroup>
+                          <col className="w-[140px]" />
+                          <col className="w-[180px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[100px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[140px]" />
+                          <col className="w-[150px]" />
+                          <col className="w-[120px]" />
+                        </colgroup>
+                  <thead className="bg-white/[0.06]">
                     <tr>
-                      <th className="px-1.5 py-1.5 text-left font-medium">Mã vật tư</th>
-                      <th className="px-1.5 py-1.5 text-left font-medium">Tên vật tư</th>
-                      <th className="px-1.5 py-1.5 text-left font-medium">Quy cách</th>
-                      <th className="px-1.5 py-1.5 text-left font-medium">ĐVT</th>
-                      <th className="px-1.5 py-1.5 text-right font-medium">Tồn</th>
-                      <th className="px-1.5 py-1.5 text-right font-medium">Đơn giá</th>
-                      <th className="px-1.5 py-1.5 text-right font-medium">Giá trị</th>
-                      <th className="px-1.5 py-1.5 text-left font-medium">Vị trí</th>
-                      <th className="px-1.5 py-1.5 text-left font-medium">Trạng thái</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Mã vật tư</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Tên vật tư</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Quy cách</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">ĐVT</th>
+                      <th className="px-3 py-1.5 text-right text-slate-400">Kho chính</th>
+                      <th className="px-3 py-1.5 text-right text-slate-400">Kho SX</th>
+                      <th className="px-3 py-1.5 text-right text-slate-400">Tổng tồn</th>
+                      <th className="px-3 py-1.5 text-right text-slate-400">Đơn giá</th>
+                      <th className="px-3 py-1.5 text-right text-slate-400">Giá trị</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Vị trí</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pagedRows.map((item: any) => (
-                      <tr key={item.id} onClick={() => openMaterial(item)} className={`cursor-pointer ${inventoryTableRow}`}>
-                        <td className="px-1.5 py-1"><div className="max-w-[120px] truncate font-medium text-cyan-300" title={item.materialCode}>{item.materialCode}</div></td>
-                        <td className="px-1.5 py-1"><div className="max-w-[160px] truncate font-medium text-white" title={item.materialName}>{item.materialName}</div></td>
-                        <td className="max-w-[150px] truncate px-1.5 py-1 text-slate-300">{item.materialType ?? '-'}</td>
-                        <td className="px-1.5 py-1 text-slate-300">{item.unit ?? '-'}</td>
-                        <td className="px-1.5 py-1 text-right text-slate-200">{formatQuantity(Number(item.currentStock ?? 0), 0)}</td>
-                        <td className="px-1.5 py-1 text-right text-slate-300">{money(Number(item.averageCost ?? 0))}</td>
-                        <td className="px-1.5 py-1 text-right font-medium text-cyan-300">{money(Number(item.inventoryValue ?? 0))}</td>
-                        <td className="px-1.5 py-1">
-                          <span title={rowLocations(item).map(locationLabel).join('\n')} className="inline-flex max-w-44 items-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100">
+                    {filteredRows.map((item: any) => (
+                      <tr key={item.id} onClick={() => openMaterial(item)} className="cursor-pointer border-t border-white/10 hover:bg-white/[0.06]">
+                        <td className="truncate px-3 py-1.5 text-cyan-300" title={item.materialCode}>{item.materialCode}</td>
+                        <td className="truncate px-3 py-1.5 text-white" title={item.materialName}>{item.materialName}</td>
+                        <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? '-'}>{item.materialType ?? '-'}</td>
+                        <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-amber-300" title={formatQuantity(productionWarehouseStock(item), 3)}>{formatQuantity(productionWarehouseStock(item), 3)}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
+                        <td className="truncate px-3 py-1.5 text-right text-slate-300" title={money(Number(item.averageCost ?? 0))}>{money(Number(item.averageCost ?? 0))}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium text-cyan-300" title={money(Number(item.inventoryValue ?? 0))}>{money(Number(item.inventoryValue ?? 0))}</td>
+                        <td className="truncate px-3 py-1.5">
+                          <span
+                            title={rowLocations(item).map(locationLabel).join('\n')}
+                            className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-100"
+                          >
                             {displayLocation(item)}
                           </span>
                         </td>
-                        <td className="px-1.5 py-1">
-                          <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${stockStatusClass(stockStatus(item))}`}>
+                        <td className="px-3 py-1.5">
+                          <span className={`inline-flex rounded-lg border px-3 py-0.5 text-xs ${stockStatusClass(stockStatus(item))}`}>
                             {stockStatusLabel(stockStatus(item))}
                           </span>
                         </td>
@@ -830,93 +1005,9 @@ export function InventoryMaterialsPage() {
                   </tbody>
                 </table>
               </div>
-              <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            </InventoryPanel>
-
-            <div className="space-y-1 xl:col-span-4">
-              <ChartCard title="Phân bố tồn kho theo kho" note="Đơn vị: tấn" page={pagedZoneDistribution.page} pageCount={pagedZoneDistribution.pageCount} onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))} onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}>
-                <CompactDonut
-                  segments={pagedZoneSegments}
-                  centerValue={formatQuantity(kpis.totalQty, 0)}
-                  centerLabel="tấn"
-                />
-              </ChartCard>
-
-              <ChartCard title="Biến động tồn kho" note="Giá trị: tỷ đồng">
-                <StockTrendChart rows={monthlyTrend} />
-              </ChartCard>
-
-              <ChartCard title="Cảnh báo tồn kho" action={<button onClick={() => setShowAllAlerts(true)} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>} page={pagedAlerts.page} pageCount={pagedAlerts.pageCount} onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))} onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}>
-                <div className="h-[154px] space-y-1.5 overflow-hidden text-xs">
-                  {pagedAlerts.rows.map((row: any) => (
-                    <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
-                      <span className={row.level === 'Hết hàng' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
-                      <span className="text-slate-400">Tồn còn: {formatQuantity(row.stock, 0)}</span>
-                      <span className={`rounded px-2 py-0.5 ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
-                    </div>
-                  ))}
-                  {alerts.length === 0 && <div className="rounded border border-white/10 bg-white/[0.04] px-3 py-4 text-center text-slate-500">Không có cảnh báo tồn kho.</div>}
-                </div>
-              </ChartCard>
             </div>
           </div>
-
-        <section className="rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_16px_52px_rgba(0,0,0,0.2)]">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-white">Thống kê nhanh</h3>
-          <div className="grid grid-cols-1 divide-y divide-white/10 md:grid-cols-5 md:divide-x md:divide-y-0">
-            {quickStats.map((item) => (
-              <div key={item.title} className="px-3 py-1.5 first:pl-0 last:pr-0">
-                <div className="text-xs text-slate-400">{item.title}</div>
-                <div className={`mt-0.5 text-base font-semibold ${item.tone}`}>{item.value}</div>
-                <div className="text-xs text-slate-500">{item.note}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {showAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
-          <div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Toàn bộ danh sách tồn kho</h3>
-              <button onClick={() => setShowAll(false)} className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white">Đóng</button>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-white/10">
-              <table className="w-full">
-                <thead className="bg-white/[0.06]">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Mã</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Tên</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Loại vật tư</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Tồn</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Giá trị</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Vị trí</th>
-                    <th className="px-3 py-2 text-left text-xs text-slate-400">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRows.map((item: any) => (
-                    <tr key={item.id} onClick={() => openMaterial(item)} className="cursor-pointer border-t border-white/10 hover:bg-white/[0.06]">
-                      <td className="px-3 py-2 text-cyan-300">{item.materialCode}</td>
-                      <td className="px-3 py-2 text-white">{item.materialName}</td>
-                      <td className="px-3 py-2 text-slate-300">{materialUsageLabel(item.materialUsageType)}</td>
-                      <td className="px-3 py-2 text-slate-200">{formatQuantity(Number(item.currentStock ?? 0), 0)}</td>
-                      <td className="px-3 py-2 text-cyan-300">{money(Number(item.inventoryValue ?? 0))}</td>
-                      <td className="px-3 py-2 text-slate-300">{displayLocation(item)}</td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${stockStatusClass(stockStatus(item))}`}>
-                          {stockStatusLabel(stockStatus(item))}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
 
       {showAllAlerts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
@@ -936,7 +1027,7 @@ export function InventoryMaterialsPage() {
                       <th className="px-3 py-2 text-left">Mã vật tư</th>
                       <th className="px-3 py-2 text-left">Tên vật tư</th>
                       <th className="px-3 py-2 text-left">Nhóm</th>
-                      <th className="px-3 py-2 text-right">Tồn còn</th>
+                      <th className="px-3 py-2 text-right">Kho chính</th>
                       <th className="px-3 py-2 text-right">Tồn tối thiểu</th>
                       <th className="px-3 py-2 text-left">Mức cảnh báo</th>
                       <th className="px-3 py-2 text-left">Vị trí</th>
@@ -948,7 +1039,7 @@ export function InventoryMaterialsPage() {
                         <td className="px-3 py-2 text-cyan-300">{row.materialCode}</td>
                         <td className="px-3 py-2">{row.materialName}</td>
                         <td className="px-3 py-2 text-slate-400">{row.category ?? '-'}</td>
-                        <td className="px-3 py-2 text-right">{formatQuantity(row.stock, 0)}</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">{formatQuantity(row.stock, 3)}</td>
                         <td className="px-3 py-2 text-right">{formatQuantity(num(row.minimumStock || 5), 0)}</td>
                         <td className="px-3 py-2">
                           <span className={`rounded px-2 py-1 text-xs ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>

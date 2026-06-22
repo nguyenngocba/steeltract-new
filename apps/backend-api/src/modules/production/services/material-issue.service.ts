@@ -631,16 +631,28 @@ export class MaterialIssueService {
     quantity: number,
     actorId?: string,
   ) {
-    const codeDate = compactCodeDate();
     const unitPrice = await this.resolveInventoryUnitPrice(
       tx,
       issue.inventoryItemId,
     );
     const totalAmount = Math.abs(quantity) * unitPrice;
+    const generatedNo = await nextOperationalCode(
+      tx,
+      'inventoryTransaction',
+      'transactionNo',
+      inventoryCodePrefix(TransactionType.RETURN),
+    );
+    console.log('[inventory.transaction-numbering]', {
+      generatedNo,
+      finalCode: generatedNo,
+      finalTransactionNo: generatedNo,
+      transactionType: TransactionType.RETURN,
+      referenceModule: 'production_material_issue',
+    });
     return tx.inventoryTransaction.create({
       data: {
-        code: `${issue.issueNo}-RT-${codeDate}`,
-        transactionNo: `${issue.issueNo}-RT-${codeDate}`,
+        code: generatedNo,
+        transactionNo: generatedNo,
         type: TransactionType.RETURN,
         direction: 'IN',
         performedBy: actorId,
@@ -686,17 +698,28 @@ export class MaterialIssueService {
     quantity: number,
     actorId?: string,
   ) {
-    const codeDate = compactCodeDate();
-    const shortType = type === TransactionType.EXPORT ? 'XK' : type === TransactionType.RETURN ? 'HT' : 'NK';
     const unitPrice = await this.resolveInventoryUnitPrice(
       tx,
       issue.inventoryItemId,
     );
     const totalAmount = Math.abs(quantity) * unitPrice;
+    const generatedNo = await nextOperationalCode(
+      tx,
+      'inventoryTransaction',
+      'transactionNo',
+      inventoryCodePrefix(type),
+    );
+    console.log('[inventory.transaction-numbering]', {
+      generatedNo,
+      finalCode: generatedNo,
+      finalTransactionNo: generatedNo,
+      transactionType: type,
+      referenceModule: 'production_material_issue',
+    });
     return tx.inventoryTransaction.create({
       data: {
-        code: `${issue.issueNo}-${shortType}-${codeDate}`,
-        transactionNo: `${issue.issueNo}-${shortType}-${codeDate}`,
+        code: generatedNo,
+        transactionNo: generatedNo,
         type,
         direction: type === TransactionType.EXPORT ? 'OUT' : 'IN',
         performedBy: actorId,
@@ -803,4 +826,12 @@ export class MaterialIssueService {
       },
     });
   }
+}
+
+function inventoryCodePrefix(type: TransactionType) {
+  if (type === TransactionType.IMPORT) return 'NK';
+  if (type === TransactionType.EXPORT) return 'XK';
+  if (type === TransactionType.TRANSFER) return 'DC';
+  if (type === TransactionType.ADJUSTMENT) return 'KK';
+  return 'INV';
 }

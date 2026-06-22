@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
@@ -166,6 +167,205 @@ function formatCurrency(v: any) {
   return formatCurrencyVnd(num(v))
 }
 
+function formatDate(value: any) {
+  const date = new Date(value ?? '')
+  if (Number.isNaN(date.getTime())) return '-'
+  return [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    date.getFullYear(),
+  ].join('/')
+}
+
+function transactionItems(tx: any) {
+  return Array.isArray(tx?.items) ? tx.items : []
+}
+
+function outboundLines(tx: any) {
+  return transactionItems(tx).filter((line: any) => num(line.quantity) < 0)
+}
+
+function inboundLines(tx: any) {
+  return transactionItems(tx).filter((line: any) => num(line.quantity) > 0)
+}
+
+function lineAmount(line: any) {
+  const quantity = Math.abs(num(line?.quantity))
+  const totalAmount = Math.abs(num(line?.totalAmount))
+  if (totalAmount) return totalAmount
+  return quantity * Math.abs(num(line?.unitPrice))
+}
+
+function transferAmount(tx: any) {
+  const outbound = outboundLines(tx)
+  const sourceLines = outbound.length ? outbound : transactionItems(tx)
+  return sourceLines.reduce((sum: number, line: any) => sum + lineAmount(line), 0)
+}
+
+function transferQuantity(tx: any) {
+  const outbound = outboundLines(tx)
+  const sourceLines = outbound.length ? outbound : transactionItems(tx)
+  return sourceLines.reduce((sum: number, line: any) => sum + Math.abs(num(line.quantity)), 0)
+}
+
+function lineUnit(line: any) {
+  return line?.unit?.symbol ?? line?.unit?.code ?? line?.inventoryItem?.unit ?? '-'
+}
+
+function lineWarehouse(line: any) {
+  return line?.warehouse?.name ?? line?.warehouse?.code ?? line?.zone?.warehouse?.name ?? line?.zone?.warehouse?.code ?? '-'
+}
+
+function lineZone(line: any) {
+  return line?.zone?.code ?? line?.zone?.name ?? '-'
+}
+
+function locationKey(line: any) {
+  return [
+    lineWarehouse(line),
+    lineZone(line),
+    line?.slotId ?? '-',
+    line?.level ?? '-',
+  ].join(' / ')
+}
+
+function transferRoute(tx: any) {
+  const source = outboundLines(tx)[0]
+  const destination = inboundLines(tx)[0]
+  return {
+    source,
+    destination,
+    label: `${lineZone(source)} -> ${lineZone(destination)}`,
+  }
+}
+
+function transactionActor(tx: any) {
+  return tx?.createdBy ?? tx?.performedBy ?? tx?.approvedBy ?? 'Admin'
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-sm font-medium text-slate-100">{value}</div>
+    </div>
+  )
+}
+
+function TransferDetailDrawer({
+  transaction,
+  onClose,
+}: {
+  transaction: any | null
+  onClose: () => void
+}) {
+  const items = transactionItems(transaction)
+  const route = transferRoute(transaction)
+
+  return (
+    <ModuleDetailDrawer
+      open={Boolean(transaction)}
+      title={transaction?.transactionNo ?? 'Chi tiết điều chuyển'}
+      subtitle="Chi tiết phiếu điều chuyển kho"
+      onClose={onClose}
+      widthClass="max-w-6xl"
+    >
+      {transaction ? (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-cyan-300/15 bg-cyan-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Tuyến điều chuyển</div>
+              <div className="mt-2 truncate text-xl font-semibold text-white">{route.label}</div>
+            </div>
+            <div className="rounded-xl border border-emerald-300/15 bg-emerald-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Giá trị</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatCurrency(transferAmount(transaction))}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Số lượng</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(transferQuantity(transaction), 3)}</div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="grid gap-2 text-sm md:grid-cols-2 lg:grid-cols-3">
+              <InfoLine label="Mã phiếu" value={transaction.transactionNo ?? '-'} />
+              <InfoLine label="Ngày điều chuyển" value={formatDate(transaction.transactionDate ?? transaction.createdAt)} />
+              <InfoLine label="Loại điều chuyển" value={transaction.referenceType ?? 'Điều chuyển nội bộ'} />
+              <InfoLine label="Người tạo" value={transactionActor(transaction)} />
+              <InfoLine label="Trạng thái" value={String(transaction.status ?? 'COMPLETED')} />
+              <InfoLine label="Ghi chú" value={transaction.remarks ?? transaction.note ?? '-'} />
+            </div>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-red-300/15 bg-red-400/[0.045] p-3">
+              <div className="mb-2 text-sm font-semibold text-red-100">Vị trí nguồn</div>
+              <div className="grid gap-2 text-sm md:grid-cols-2">
+                <InfoLine label="Warehouse" value={lineWarehouse(route.source)} />
+                <InfoLine label="Zone" value={lineZone(route.source)} />
+                <InfoLine label="Slot" value={route.source?.slotId ?? '-'} />
+                <InfoLine label="Level" value={route.source?.level ?? '-'} />
+              </div>
+            </div>
+            <div className="rounded-xl border border-emerald-300/15 bg-emerald-400/[0.045] p-3">
+              <div className="mb-2 text-sm font-semibold text-emerald-100">Vị trí đích</div>
+              <div className="grid gap-2 text-sm md:grid-cols-2">
+                <InfoLine label="Warehouse" value={lineWarehouse(route.destination)} />
+                <InfoLine label="Zone" value={lineZone(route.destination)} />
+                <InfoLine label="Slot" value={route.destination?.slotId ?? '-'} />
+                <InfoLine label="Level" value={route.destination?.level ?? '-'} />
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-auto rounded-xl border border-white/10 bg-slate-950/35">
+            <table className="w-full min-w-[1100px] text-sm">
+              <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">
+                <tr>
+                  {['Hướng', 'Mã vật tư', 'Tên vật tư', 'Warehouse', 'Zone', 'Slot', 'Level', 'Số lượng', 'Đơn vị', 'Đơn giá', 'Giá trị'].map((header) => (
+                    <th key={header} className="px-3 py-2 text-left font-medium">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.length ? items.map((line: any) => {
+                  const isOut = num(line.quantity) < 0
+                  return (
+                    <tr key={line.id ?? `${line.inventoryItemId}-${line.quantity}-${lineZone(line)}`} className="border-t border-white/10 text-slate-300">
+                      <td className="px-3 py-2">
+                        <span className={`rounded border px-2 py-0.5 text-xs ${isOut ? 'border-red-300/30 bg-red-400/10 text-red-200' : 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200'}`}>
+                          {isOut ? 'Xuất' : 'Nhập'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-medium text-cyan-300">{line?.inventoryItem?.code ?? '-'}</td>
+                      <td className="px-3 py-2 text-slate-100">{line?.inventoryItem?.name ?? '-'}</td>
+                      <td className="px-3 py-2">{lineWarehouse(line)}</td>
+                      <td className="px-3 py-2">{lineZone(line)}</td>
+                      <td className="px-3 py-2">{line?.slotId ?? '-'}</td>
+                      <td className="px-3 py-2">{line?.level ?? '-'}</td>
+                      <td className="px-3 py-2">{formatQuantity(Math.abs(num(line.quantity)), 3)}</td>
+                      <td className="px-3 py-2">{lineUnit(line)}</td>
+                      <td className="px-3 py-2">{formatCurrency(line.unitPrice)}</td>
+                      <td className="px-3 py-2 font-semibold text-emerald-300">{formatCurrency(lineAmount(line))}</td>
+                    </tr>
+                  )
+                }) : (
+                  <tr>
+                    <td colSpan={11} className="px-3 py-8 text-center text-sm text-slate-500">
+                      Phiếu điều chuyển chưa có dòng vật tư.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+    </ModuleDetailDrawer>
+  )
+}
+
 export function InventoryTransferPage() {
   const { data: materials = [] } = useInventoryItems()
   const { data: zones = [] } = useZones()
@@ -177,8 +377,30 @@ export function InventoryTransferPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
+  const [selectedTransfer, setSelectedTransfer] = useState<any | null>(null)
   const pageSize = 10
   const attachmentMap = useInventoryTransactionAttachmentMap()
+
+  // Các state cần có (nếu chưa có):
+  const [searchDraft, setSearchDraft] = useState('')
+  const [search, setSearch] = useState('')
+
+  // Hàm áp dụng tìm kiếm
+  const applySearch = () => {
+    setSearch(searchDraft)
+    setPage(1)
+  }
+
+  // Hàm reset toàn bộ filter
+  const resetFilters = () => {
+    setSearchDraft('')
+    setSearch('')
+    setDate('')
+    setMaterialFilter('')
+    setFromZoneFilter('')
+    setStatusFilter('')
+    setPage(1)
+  }
 
   const rows = useMemo(() => {
     return (tx as any[])
@@ -197,29 +419,72 @@ export function InventoryTransferPage() {
   }, [tx, date, materialFilter, fromZoneFilter, statusFilter])
 
   const kpis = useMemo(() => {
+    const now = new Date()
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const todayKey = now.toISOString().slice(0, 10)
+    const inMonth = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 7) === monthKey)
+    const todayRows = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 10) === todayKey)
     const total = rows.length
     const pending = rows.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING').length
     const done = rows.filter((x: any) => String(x.status ?? 'COMPLETED').toUpperCase() === 'COMPLETED').length
     const cancelled = rows.filter((x: any) => String(x.status ?? '').toUpperCase() === 'CANCELLED').length
-    const monthlyValue = rows.reduce((s: number, x: any) => s + Math.abs(num(x.items?.[0]?.totalAmount)), 0)
-    return { total, pending, done, cancelled, monthlyValue }
+    const monthlyValue = inMonth.reduce((s: number, x: any) => s + transferAmount(x), 0)
+    const todayValue = todayRows.reduce((s: number, x: any) => s + transferAmount(x), 0)
+    return { total, pending, done, cancelled, monthlyValue, todayValue, monthlyDocs: inMonth.length }
   }, [rows])
 
   const zoneValue = useMemo(() => {
     const m = new Map<string, number>()
     rows.forEach((x: any) => {
-      const out = x.items?.find((line: any) => num(line.quantity) < 0)
-      const key = out?.zone?.code ?? 'NA'
-      m.set(key, (m.get(key) ?? 0) + Math.abs(num(out?.totalAmount)))
+      const out = outboundLines(x)[0]
+      const key = lineZone(out)
+      m.set(key, (m.get(key) ?? 0) + transferAmount(x))
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
   }, [rows])
 
-  const transferTypes = useMemo(() => {
+  const topMaterials = useMemo(() => {
+    const m = new Map<string, { code: string; value: number }>()
+    rows.forEach((x: any) => {
+      outboundLines(x).forEach((line: any) => {
+        const code = line?.inventoryItem?.code ?? 'NA'
+        const current = m.get(code) ?? { code, value: 0 }
+        current.value += lineAmount(line)
+        m.set(code, current)
+      })
+    })
+    return Array.from(m.values()).sort((a, b) => b.value - a.value).slice(0, 5)
+  }, [rows])
+
+  const topRoutes = useMemo(() => {
+    const m = new Map<string, { label: string; count: number; quantity: number; value: number }>()
+    rows.forEach((x: any) => {
+      const route = transferRoute(x)
+      const current = m.get(route.label) ?? { label: route.label, count: 0, quantity: 0, value: 0 }
+      current.count += 1
+      current.quantity += transferQuantity(x)
+      current.value += transferAmount(x)
+      m.set(route.label, current)
+    })
+    return Array.from(m.values()).sort((a, b) => b.value - a.value).slice(0, 5)
+  }, [rows])
+
+  const topSourceLocations = useMemo(() => {
     const m = new Map<string, number>()
     rows.forEach((x: any) => {
-      const t = x.referenceType ?? 'Điều chuyển nội bộ'
-      m.set(t, (m.get(t) ?? 0) + 1)
+      const source = outboundLines(x)[0]
+      const key = locationKey(source)
+      m.set(key, (m.get(key) ?? 0) + transferAmount(x))
+    })
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [rows])
+
+  const topDestinationLocations = useMemo(() => {
+    const m = new Map<string, number>()
+    rows.forEach((x: any) => {
+      const destination = inboundLines(x)[0]
+      const key = locationKey(destination)
+      m.set(key, (m.get(key) ?? 0) + transferAmount(x))
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [rows])
@@ -238,6 +503,10 @@ export function InventoryTransferPage() {
   }, [rows, page])
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
 
+  const filterInput =
+  'h-9 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+
+
   return (
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
@@ -245,11 +514,27 @@ export function InventoryTransferPage() {
       <div className="space-y-1 -mt-2">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-1.5">
           <OverviewMetricCard
-            title="Tổng phiếu điều chuyển"
-            value={formatQuantity(kpis.total, 0)}
-            note="Tất cả phiếu"
+            title="Phiếu điều chuyển tháng"
+            value={formatQuantity(kpis.monthlyDocs, 0)}
+            note={`${formatQuantity(kpis.total, 0)} phiếu đang lọc`}
             tone="blue"
             icon={<PackageCheck size={15} />}
+            trend={[0,0,0,0,0,0]}
+          />
+          <OverviewMetricCard
+            title="Giá trị tháng này"
+            value={formatCurrency(kpis.monthlyValue)}
+            note="Theo dòng xuất nguồn"
+            tone="emerald"
+            icon={<CircleDollarSign size={15} />}
+            trend={[0,0,0,0,0,0]}
+          />
+          <OverviewMetricCard
+            title="Giá trị hôm nay"
+            value={formatCurrency(kpis.todayValue)}
+            note="Theo ngày hiện tại"
+            tone="purple"
+            icon={<CircleDollarSign size={15} />}
             trend={[0,0,0,0,0,0]}
           />
           <OverviewMetricCard
@@ -261,14 +546,6 @@ export function InventoryTransferPage() {
             trend={[0,0,0,0,0,0]}
           />
           <OverviewMetricCard
-            title="Hoàn thành"
-            value={formatQuantity(kpis.done, 0)}
-            note="Đã ghi nhận"
-            tone="emerald"
-            icon={<CircleDollarSign size={15} />}
-            trend={[0,0,0,0,0,0]}
-          />
-          <OverviewMetricCard
             title="Đã hủy"
             value={formatQuantity(kpis.cancelled, 0)}
             note="Không hợp lệ"
@@ -277,27 +554,28 @@ export function InventoryTransferPage() {
             trend={[0,0,0,0,0,0]}
           />
           <OverviewMetricCard
-            title="Giá trị điều chuyển"
-            value={formatCurrency(kpis.monthlyValue)}
-            note="Theo giá trị xuất"
-            tone="cyan"
-            icon={<CircleDollarSign size={15} />}
-            trend={[0,0,0,0,0,0]}
-          />
-          <OverviewMetricCard
             title="Tỷ lệ hoàn tất"
             value={`${kpis.total ? ((kpis.done / kpis.total) * 100).toFixed(1) : '0.0'}%`}
             note="Phiếu hoàn thành"
-            tone="purple"
+            tone="cyan"
             icon={<TriangleAlert size={15} />}
             trend={[0,0,0,0,0,0]}
           />
         </div>
 
-        <InventoryPanel title="Bộ lọc điều chuyển" className="p-2">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inventoryInput} />
-            <select value={materialFilter} onChange={(e) => setMaterialFilter(e.target.value)} className={inventoryInput}>
+        <InventoryPanel className="rounded-xl p-0.5">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={filterInput}
+            />
+            <select
+              value={materialFilter}
+              onChange={(e) => setMaterialFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
                 <option key={m.id} value={m.id}>
@@ -305,7 +583,11 @@ export function InventoryTransferPage() {
                 </option>
               ))}
             </select>
-            <select value={fromZoneFilter} onChange={(e) => setFromZoneFilter(e.target.value)} className={inventoryInput}>
+            <select
+              value={fromZoneFilter}
+              onChange={(e) => setFromZoneFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Kho xuất</option>
               {zones.map((z: any) => (
                 <option key={z.id} value={z.id}>
@@ -313,20 +595,34 @@ export function InventoryTransferPage() {
                 </option>
               ))}
             </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inventoryInput}>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Trạng thái</option>
               <option value="COMPLETED">Hoàn thành</option>
               <option value="PENDING">Đang thực hiện</option>
               <option value="CANCELLED">Đã hủy</option>
             </select>
-            <button
-              onClick={() => {
-                setDate('')
-                setMaterialFilter('')
-                setFromZoneFilter('')
-                setStatusFilter('')
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch()
               }}
-              className={`${inventoryMutedButton} h-9`}
+              placeholder="Tìm mã phiếu, vật tư, kho..."
+              className={filterInput}
+            />
+            <button
+              onClick={applySearch}
+              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              onClick={resetFilters}
+              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
             >
               Làm mới
             </button>
@@ -349,18 +645,22 @@ export function InventoryTransferPage() {
                 <tbody>
                   {!isLoading &&
                     paged.map((x: any) => {
-                      const out = x.items?.find((line: any) => num(line.quantity) < 0)
-                      const input = x.items?.find((line: any) => num(line.quantity) > 0)
+                      const out = outboundLines(x)[0]
+                      const input = inboundLines(x)[0]
                       return (
-                        <tr key={x.id} className={inventoryTableRow}>
+                        <tr
+                          key={x.id}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                          onClick={() => setSelectedTransfer(x)}
+                        >
                           <td className="px-3 py-1.5 text-cyan-300">{x.transactionNo}</td>
-                          <td className="px-3 py-1.5">{new Date(x.transactionDate ?? x.createdAt).toLocaleDateString('vi-VN')}</td>
-                          <td className="px-3 py-1.5">{out?.zone?.code ?? '-'}</td>
-                          <td className="px-3 py-1.5">{input?.zone?.code ?? '-'}</td>
+                          <td className="px-3 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-3 py-1.5">{lineZone(out)}</td>
+                          <td className="px-3 py-1.5">{lineZone(input)}</td>
                           <td className="px-3 py-1.5">{x.referenceType ?? 'Điều chuyển nội bộ'}</td>
-                          <td className="px-3 py-1.5">{formatQuantity(Math.abs(num(out?.quantity)), 0)}</td>
-                          <td className="px-3 py-1.5">{formatCurrency(Math.abs(num(out?.totalAmount)))}</td>
-                          <td className="px-3 py-1.5">
+                          <td className="px-3 py-1.5">{formatQuantity(transferQuantity(x), 3)}</td>
+                          <td className="px-3 py-1.5">{formatCurrency(transferAmount(x))}</td>
+                          <td className="px-3 py-1.5" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
@@ -387,6 +687,29 @@ export function InventoryTransferPage() {
             <InventoryChartCard title="Giá trị điều chuyển theo kho" className="p-2">
               <HorizontalBars rows={zoneValue} valueFormatter={formatCurrency} />
             </InventoryChartCard>
+            <InventoryChartCard title="Top vật tư theo giá trị" className="p-2">
+              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.value])} valueFormatter={formatCurrency} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Top tuyến điều chuyển" className="p-2">
+              <div className="space-y-2">
+                {topRoutes.map((route) => (
+                  <div key={route.label} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
+                    <div className="truncate font-semibold text-cyan-100">{route.label}</div>
+                    <div className="mt-1 grid grid-cols-3 gap-2 text-slate-400">
+                      <span>{formatQuantity(route.count, 0)} phiếu</span>
+                      <span>{formatQuantity(route.quantity, 3)}</span>
+                      <span className="text-right text-emerald-300">{formatCurrency(route.value)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </InventoryChartCard>
+            <InventoryChartCard title="Top vị trí nguồn" className="p-2">
+              <HorizontalBars rows={topSourceLocations} valueFormatter={formatCurrency} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Top vị trí đích" className="p-2">
+              <HorizontalBars rows={topDestinationLocations} valueFormatter={formatCurrency} />
+            </InventoryChartCard>
             <InventoryChartCard title="Hoạt động gần đây" className="p-2">
               {recentActivities.map((x: any) => (
                 <div key={x.id} className="mb-1.5 rounded border border-white/10 p-2 text-xs text-slate-300">
@@ -403,6 +726,10 @@ export function InventoryTransferPage() {
         transaction={attachmentDrawer?.transaction}
         attachments={attachmentDrawer?.attachments ?? []}
         onClose={() => setAttachmentDrawer(null)}
+      />
+      <TransferDetailDrawer
+        transaction={selectedTransfer}
+        onClose={() => setSelectedTransfer(null)}
       />
     </EnterpriseModulePage>
   )

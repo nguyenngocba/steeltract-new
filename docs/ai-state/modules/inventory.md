@@ -82,6 +82,21 @@ Behavior:
 - Inventory Transactions UX 2.0 adds a `Hồ sơ` column to dedicated Nhập kho, Xuất kho, Điều chuyển, and Kiểm kê pages. The `📎` action opens a standard attachment drawer for the selected transaction.
 - Sprint 15A fixes outbound value display. The Outbound page now aggregates all item lines for KPI and table values, and transaction API read responses compute missing outbound line value from average inbound cost when legacy `EXPORT` rows do not store `unitPrice` / `totalAmount`.
 - Sprint 15B fixes the source data path for Inventory transaction valuation. `InventoryService.createTransaction`, Production material issue/return direct writers, and Material Movement direct writer now persist `unitPrice` and `totalAmount` on transaction items. Historical missing values were repaired with `scripts/sql/backfill-inventory-transaction-item-costs.sql`.
+- Sprint 16A adds an Outbound transaction detail drawer, `Giá trị xuất hôm nay` KPI, value-based top material ranking, and top project ranking by outbound value without changing API or schema.
+- Sprint 16B adds a Transfer transaction detail drawer, source/destination warehouse-zone-slot-level visibility, transfer value KPIs, top routes, and source/destination location rankings without changing API or schema.
+- Sprint 16C adds an Inbound transaction detail drawer, all-line inbound KPI/ranking aggregation, top supplier analytics, price increase/decrease monitoring, and shared larger filter spacing for Inbound/Outbound/Transfer without changing API or schema.
+- Sprint 16D expands Outbound analytics with project consumption share, daily/monthly outbound trends, material consumption by value/issue count, outbound-purpose distribution, financial KPIs for today/week/month/year, and abnormal consumption alerts using existing transaction API data only.
+- Sprint 17A expands Stock Take with a stocktake session list, row detail drawer, variance KPIs, top variance material/location analytics, and adjustment preview columns (`SystemQty`, `ActualQty`, `VarianceQty`, `UnitPrice`, `VarianceValue`) using existing adjustment transaction data only.
+- Sprint 17B expands Inventory Locations with occupancy percentage, free/occupied slot KPIs, inventory value by location, value-ranked occupied slot analytics, slot material drill-down, and transfer source/destination slot movement analytics using existing frontend APIs only.
+- Sprint 17E hardens Inventory document numbering. New Inventory transactions use backend-owned `code = transactionNo`, five-digit date sequences (`NK/XK/DC/KK/INV-YYMMDD-00001`), max-suffix generation instead of `count() + 1`, and duplicate retry on Prisma `P2002`.
+- Sprint 17F separates main warehouse stock, production warehouse stock, and total stock in Inventory Overview, Inventory Materials, and Material Detail. Stock health and purchasing alerts now use only `Kho chính` / `MAIN` balances from `locationBalances`; production warehouse balances are displayed separately and do not mask main-warehouse shortages.
+- Sprint 19D refactors Inventory Adjustments into the same center pattern as Inbound, Outbound, and Transfer. The page now uses an Inventory-style KPI strip, analytics panels, primary adjustment table, row detail drawer, and `+ Điều chỉnh tồn kho` modal.
+- Sprint 19D removes direct delta entry from the adjustment form. Users enter Material, Zone, Slot, Level, readonly System Qty, Actual Qty, Reason, and Attachments; Difference is auto-calculated and posted as the adjustment quantity.
+- Sprint 19D uses `KK` prefix for adjustment transaction numbers in the frontend request, keeping adjustment/stocktake numbering aligned with Inventory document rules.
+- Sprint 19E adds `Điều chỉnh tồn kho` to Inventory navigation below `Kiểm kê` and makes the global `Khác -> Điều chỉnh tồn kho` action open the adjustment modal directly.
+- Sprint 19E moves adjustment creation into shared `AdjustmentTransactionModal`, reusing the Inventory transaction modal foundation with attachments and `WarehouseMiniMap`.
+- Sprint 19E adjustment creation reads Material Detail `locationBalances`, displays selectable warehouse/zone/slot/level rows, calculates System Qty from the exact selected bucket, and writes new System Qty / Actual Qty audit context into the existing transaction `note` field.
+- Inventory stock quantity display uses shared locale parsing/formatting and tabular numeric styling so integer quantities such as `700` display correctly while decimal stock remains supported.
 - Inventory transfer creation is limited to `Kho chính`, auto-fills source cell/floor from the selected material stock location, suggests a free destination cell/floor, and shows separate source/destination 2D location views instead of the legacy transfer diagram.
 - Sprint 9 stock mutation hardening validates and updates the exact full bucket `inventoryItemId + warehouseId + zoneId + slotId + level`, so new transaction paths keep `inventory_items.quantity` and `inventory_location_stocks` synchronized.
 - Sprint 11A decimal quantity pass lets Inventory inbound, outbound, transfer, stock-take, stock adjustment, Material Master minimum stock, and warehouse location capacity accept decimal values with `vi-VN` formatted typing.
@@ -121,6 +136,7 @@ Build:
 - Frontend build passed.
 - Sprint 11A audit found no Inventory quantity/cost migration requirement because audited operational fields already use `Float`.
 - Sprint 15B backend build passed and verification SQL showed IMPORT, EXPORT, TRANSFER, and RETURN all have complete persisted `unitPrice` / `totalAmount` values.
+- Sprint 17F frontend build passed.
 
 ## Implemented In Phase A
 

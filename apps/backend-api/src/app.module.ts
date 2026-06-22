@@ -42,6 +42,7 @@ import { TelemetryModule } from './core/telemetry/telemetry.module'
 import { MaterialMovementsModule } from './modules/material-movements/material-movements.module'
 import { RuntimeModule } from './modules/runtime/runtime.module'
 import { SystemModule } from './modules/system/system.module'
+import { CostingModule } from './modules/costing/costing.module'
 @Module({
   imports: [
     EventsModule,
@@ -86,6 +87,7 @@ import { SystemModule } from './modules/system/system.module'
     MaterialMovementsModule,
     RuntimeModule,
     SystemModule,
+    CostingModule,
   ],
   controllers: [
   AppController,

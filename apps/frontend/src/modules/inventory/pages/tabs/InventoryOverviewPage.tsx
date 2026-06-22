@@ -4,6 +4,7 @@ import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/Enterprise
 import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
+  AdjustmentTransactionModal,
   InboundTransactionModal,
   OutboundTransactionModal,
   StockTakeTransactionModal,
@@ -31,7 +32,7 @@ import { useZones } from '../../hooks/useZones'
 import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
 import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 13
 const donutColors = ['#1d7cff', '#14c987', '#7c3aed', '#f59e0b', '#ef4444', '#06b6d4']
 const compactInput =
   'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
@@ -54,7 +55,7 @@ function money(v: any) {
 }
 
 function formatQty(v: any) {
-  return formatQuantity(num(v), 2)
+  return formatQuantity(num(v), 3)
 }
 
 function materialUsageLabel(value: string | undefined) {
@@ -66,12 +67,47 @@ function materialUsageLabel(value: string | undefined) {
   return map[String(value ?? 'PRIMARY')] ?? 'Vật tư chính'
 }
 
+function isMainWarehouseLocation(location: any) {
+  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
+  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+}
+
+function isProductionWarehouseLocation(location: any) {
+  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
+  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+}
+
+function allLocationBalances(item: any) {
+  return Array.isArray(item.locationBalances) ? item.locationBalances : []
+}
+
+function mainWarehouseStock(item: any) {
+  return allLocationBalances(item)
+    .filter(isMainWarehouseLocation)
+    .reduce((sum: number, location: any) => sum + num(location.quantity), 0)
+}
+
+function productionWarehouseStock(item: any) {
+  return allLocationBalances(item)
+    .filter(isProductionWarehouseLocation)
+    .reduce((sum: number, location: any) => sum + num(location.quantity), 0)
+}
+
+function totalWarehouseStock(item: any) {
+  const balances = allLocationBalances(item)
+  if (balances.length) {
+    return balances.reduce((sum: number, location: any) => sum + num(location.quantity), 0)
+  }
+  return num(item.currentStock ?? item.quantity)
+}
+
 function statusOf(item: any) {
-  const stock = num(item.currentStock ?? item.quantity)
+  const stock = mainWarehouseStock(item)
   const min = num(item.minimumStock ?? 5)
-  const raw = String(item.status ?? '').toUpperCase()
-  if (raw.includes('CRITICAL') || raw.includes('OUT') || stock <= 0) return 'OUT'
-  if (raw.includes('LOW') || (min > 0 && stock <= min)) return 'LOW'
+  if (stock <= 0) return 'OUT'
+  if (min > 0 && stock <= min) return 'LOW'
   return 'NORMAL'
 }
 
@@ -247,20 +283,29 @@ export function InventoryOverviewPage() {
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
-  const [transactionModal, setTransactionModal] = useState<null | 'inbound' | 'outbound' | 'transfer' | 'stock-take'>(null)
+  const [transactionModal, setTransactionModal] = useState<null | 'inbound' | 'outbound' | 'transfer' | 'stock-take' | 'adjustment'>(null)
   const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full' | 'alerts-full'>(null)
 
   const { data: selectedMaterialDetail } = useMaterialDetail(selectedMaterialId || undefined)
   const rows = useMemo(() => {
-    return (auditRows as any[]).map((item: any) => ({
-      ...item,
-      id: item.materialId ?? item.inventoryItemId ?? item.id,
-      code: item.materialCode ?? item.code,
-      name: item.materialName ?? item.name,
-      quantity: num(item.currentStock ?? item.quantity),
-      averageCost: num(item.averageCost ?? item.unitPrice),
-      inventoryValue: num(item.inventoryValue ?? num(item.currentStock ?? item.quantity) * num(item.averageCost ?? item.unitPrice)),
-    }))
+    return (auditRows as any[]).map((item: any) => {
+      const averageCost = num(item.averageCost ?? item.unitPrice)
+      const mainStock = mainWarehouseStock(item)
+      const productionStock = productionWarehouseStock(item)
+      const totalStock = totalWarehouseStock(item)
+      return {
+        ...item,
+        id: item.materialId ?? item.inventoryItemId ?? item.id,
+        code: item.materialCode ?? item.code,
+        name: item.materialName ?? item.name,
+        quantity: totalStock,
+        mainStock,
+        productionStock,
+        totalStock,
+        averageCost,
+        inventoryValue: num(item.inventoryValue ?? totalStock * averageCost),
+      }
+    })
   }, [auditRows])
 
   const categoryOptions = useMemo(() => {
@@ -325,6 +370,8 @@ export function InventoryOverviewPage() {
   )
   const summary = useMemo(() => {
     const totalQty = filteredRows.reduce((sum: number, item: any) => sum + num(item.quantity), 0)
+    const mainQty = filteredRows.reduce((sum: number, item: any) => sum + mainWarehouseStock(item), 0)
+    const productionQty = filteredRows.reduce((sum: number, item: any) => sum + productionWarehouseStock(item), 0)
     const totalValue = filteredRows.reduce((sum: number, item: any) => sum + num(item.inventoryValue), 0)
     const low = filteredRows.filter((item: any) => statusOf(item) === 'LOW').length
     const out = filteredRows.filter((item: any) => statusOf(item) === 'OUT').length
@@ -335,6 +382,8 @@ export function InventoryOverviewPage() {
     return {
       totalItems: filteredRows.length,
       totalQty,
+      mainQty,
+      productionQty,
       totalValue,
       low,
       out,
@@ -452,7 +501,7 @@ const kpiDeltas = useMemo(() => {
     return filteredRows
       .map((item: any) => ({ ...item, stockStatus: statusOf(item) }))
       .filter((item: any) => item.stockStatus !== 'NORMAL')
-      .sort((a: any, b: any) => num(a.quantity) - num(b.quantity))
+      .sort((a: any, b: any) => mainWarehouseStock(a) - mainWarehouseStock(b))
   }, [filteredRows])
 
   const todayStats = useMemo(() => {
@@ -539,7 +588,7 @@ const kpiDeltas = useMemo(() => {
       <InventoryTabWorkspace />
 
       <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-6 gap-1">
+        <div className="grid grid-cols-1 md:grid-cols-4 2xl:grid-cols-8 gap-1">
           <OverviewMetricCard
             title="Tổng giá trị tồn kho"
             value={formatCurrencyVnd(summary.totalValue)}
@@ -554,6 +603,22 @@ const kpiDeltas = useMemo(() => {
             note={kpiDeltas.quantity}
             tone="cyan"
             icon={<RefreshCw size={15} />}
+            trend={kpiTrend.quantity}
+          />
+          <OverviewMetricCard
+            title="Main Warehouse Stock"
+            value={`${formatQty(summary.mainQty)} tấn`}
+            note="Chỉ kho chính"
+            tone="emerald"
+            icon={<PackageCheck size={15} />}
+            trend={kpiTrend.quantity}
+          />
+          <OverviewMetricCard
+            title="Production Stock"
+            value={`${formatQty(summary.productionQty)} tấn`}
+            note="Kho sản xuất"
+            tone="purple"
+            icon={<Package size={15} />}
             trend={kpiTrend.quantity}
           />
           <OverviewMetricCard
@@ -591,7 +656,7 @@ const kpiDeltas = useMemo(() => {
         </div>
 
         <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
             <LabeledFilter label="">
               <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={compactInput}>
                 <option value="">Tất cả kho</option>
@@ -658,7 +723,7 @@ const kpiDeltas = useMemo(() => {
         </InventoryPanel>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-          <div className="space-y-1 xl:col-span-8">
+          <div className="space-y-1 xl:col-span-9">
             <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr] gap-1">
               <InventoryChartCard title="Thao tác nhanh" className="p-1.5">
                 <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
@@ -683,19 +748,34 @@ const kpiDeltas = useMemo(() => {
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Tồn kho vật tư</h3>
                 <button onClick={() => setOverviewPopup('stock-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
               </div>
-              <div className={`${inventoryTableShell} h-[425px] overflow-auto`}>
-                <table className="w-full min-w-[980px] text-xs">
+              <div className={`${inventoryTableShell} h-[430px] overflow-auto`}>
+                <table className="w-full min-w-[1150px] text-sm table-fixed">
+                  <colgroup>
+                    <col className="w-[100px]" />
+                    <col className="w-[140px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[40px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[150px]" />
+                    <col className="w-[100px]" />
+                  </colgroup>
                   <thead className={inventoryTableHead}>
                     <tr>
-                      <th className="px-2 py-2 text-left font-medium">Mã vật tư</th>
-                      <th className="px-2 py-2 text-left font-medium">Tên vật tư</th>
-                      <th className="px-2 py-2 text-left font-medium">Quy cách</th>
-                      <th className="px-2 py-2 text-left font-medium">ĐVT</th>
-                      <th className="px-2 py-2 text-right font-medium">Tồn kho</th>
-                      <th className="px-2 py-2 text-right font-medium">Đơn giá</th>
-                      <th className="px-2 py-2 text-right font-medium">Giá trị</th>
-                      <th className="px-2 py-2 text-left font-medium">Vị trí</th>
-                      <th className="px-2 py-2 text-left font-medium">Trạng thái</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Mã vật tư</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Tên vật tư</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Quy cách</th>
+                      <th className="px-1.5 py-1 text-left font-medium">ĐVT</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Kho chính</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Kho SX</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Tổng tồn</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Đơn giá</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Giá trị</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Vị trí</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -703,21 +783,26 @@ const kpiDeltas = useMemo(() => {
                       const status = statusOf(item)
                       return (
                         <tr key={item.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setSelectedMaterialId(String(item.id))}>
-                          <td className="max-w-[120px] truncate px-2 py-1.5 text-cyan-300" title={item.code}>{item.code}</td>
-                          <td className="max-w-[160px] truncate px-2 py-1.5 text-white" title={item.name}>{item.name}</td>
-                          <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-300">{item.materialType ?? item.specification ?? '-'}</td>
-                          <td className="px-2 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
-                          <td className="px-2 py-1.5 text-right text-slate-200">{formatQty(item.quantity)}</td>
-                          <td className="px-2 py-1.5 text-right text-slate-300">{money(item.averageCost)}</td>
-                          <td className="px-2 py-1.5 text-right font-medium text-cyan-300">{money(item.inventoryValue)}</td>
-                          <td className="px-2 py-1.5">
-                            <span title={rowLocations(item).map(locationLabel).join('\n')} className="inline-flex max-w-44 rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-cyan-100">
+                          <td className="truncate px-1.5 py-0.5 text-cyan-300" title={item.code}>{item.code}</td>
+                          <td className="truncate px-1.5 py-0.5 text-white" title={item.name}>{item.name}</td>
+                          <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
+                          <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right text-slate-300" title={money(item.averageCost)}>{money(item.averageCost)}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-medium text-cyan-300" title={money(item.inventoryValue)}>{money(item.inventoryValue)}</td>
+                          <td className="truncate px-1.5 py-0.5">
+                            <span
+                              title={rowLocations(item).map(locationLabel).join('\n')}
+                              className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[10px] text-cyan-100"
+                            >
                               {displayLocation(item)}
                             </span>
                           </td>
-                          <td className="px-2 py-1.5">
+                          <td className="px-1.5 py-0.5">
                             <span
-                              className={`inline-flex rounded-lg border px-2 py-1 text-xs ${
+                              className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${
                                 status === 'OUT'
                                   ? 'border-red-400/30 bg-red-500/10 text-red-300'
                                   : status === 'LOW'
@@ -743,7 +828,7 @@ const kpiDeltas = useMemo(() => {
             </div>
           </div>
 
-          <div className="space-y-1 xl:col-span-4">
+          <div className="space-y-1 xl:col-span-3">
             <InventoryChartCard title="Tổng quan tồn kho" note="Theo vị trí thực tế">
               <CompactDonutSummary segments={zoneSegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
             </InventoryChartCard>
@@ -804,6 +889,7 @@ const kpiDeltas = useMemo(() => {
       <OutboundTransactionModal open={transactionModal === 'outbound'} onClose={() => setTransactionModal(null)} />
       <TransferTransactionModal open={transactionModal === 'transfer'} onClose={() => setTransactionModal(null)} />
       <StockTakeTransactionModal open={transactionModal === 'stock-take'} onClose={() => setTransactionModal(null)} />
+      <AdjustmentTransactionModal open={transactionModal === 'adjustment'} onClose={() => setTransactionModal(null)} />
     </EnterpriseModulePage>
   )
 }
@@ -902,7 +988,7 @@ function AlertRows({ rows }: { rows: any[] }) {
         return (
           <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
             <span className={status === 'OUT' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.name ?? row.code}</span>
-            <span className="text-slate-400">Tồn còn: {formatQty(row.quantity)}</span>
+            <span className="text-slate-400">Kho chính: {formatQty(mainWarehouseStock(row))}</span>
             <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-0.5 text-red-300' : 'rounded bg-amber-500/10 px-2 py-0.5 text-amber-300'}>{statusLabel(status)}</span>
           </div>
         )
@@ -983,16 +1069,18 @@ function OverviewModal({
   const title = {
     'recent-inbound': 'Toàn bộ nhập kho gần đây',
     'recent-outbound': 'Toàn bộ xuất kho gần đây',
-    'stock-full': 'Tồn kho vật tư',
+    'stock-full': 'Toàn bộ danh sách tồn kho',
     'alerts-full': 'Tất cả cảnh báo tồn kho',
   }[type]
   const txRows = type === 'recent-inbound' ? inboundRows : outboundRows
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-      <div className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+      <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <h3 className="text-lg font-semibold text-white">
+            {type === 'stock-full' ? `Toàn bộ danh sách tồn kho (${rows.length} vật tư)` : title}
+          </h3>
           <button onClick={onClose} className={inventoryMutedButton}>Đóng</button>
         </div>
         <div className="max-h-[74vh] overflow-auto p-4">
@@ -1031,61 +1119,70 @@ function OverviewModal({
 
           {type === 'stock-full' ? (
             <div className="overflow-hidden rounded-xl border border-white/10">
-              <table className="w-full min-w-[980px] text-sm">
-                <thead className={inventoryTableHead}>
+              <table className="w-full min-w-[1400px] text-sm table-fixed">
+                <colgroup>
+                  <col className="w-[140px]" />
+                  <col className="w-[180px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[140px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[120px]" />
+                </colgroup>
+                 <thead className={inventoryTableHead}>
                   <tr>
-                    <th className="px-3 py-2 text-left">Mã vật tư</th>
-                    <th className="px-3 py-2 text-left">Tên vật tư</th>
-                    <th className="px-3 py-2 text-left">Loại vật tư</th>
-                    <th className="px-3 py-2 text-left">Quy cách</th>
-                    <th className="px-3 py-2 text-right">Tồn</th>
-                    <th className="px-3 py-2 text-right">Giá trị</th>
-                    <th className="px-3 py-2 text-left">Vị trí</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Mã vật tư</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Tên vật tư</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Quy cách</th>
+                    <th className="px-3 py-1.5 text-left font-medium">ĐVT</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Kho chính</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Kho SX</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Tổng tồn</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Đơn giá</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Giá trị</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Vị trí</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((item: any) => (
-                    <tr key={item.id} className={inventoryTableRow}>
-                      <td className="px-3 py-2 text-cyan-300">{item.code}</td>
-                      <td className="px-3 py-2">{item.name}</td>
-                      <td className="px-3 py-2">{materialUsageLabel(item.materialUsageType)}</td>
-                      <td className="px-3 py-2">{item.materialType ?? item.specification ?? '-'}</td>
-                      <td className="px-3 py-2 text-right">{formatQty(item.quantity)}</td>
-                      <td className="px-3 py-2 text-right text-cyan-300">{money(item.inventoryValue)}</td>
-                      <td className="px-3 py-2">{displayLocation(item)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-
-          {type === 'alerts-full' ? (
-            <div className="overflow-hidden rounded-xl border border-white/10">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead className={inventoryTableHead}>
-                  <tr>
-                    <th className="px-3 py-2 text-left">Mã vật tư</th>
-                    <th className="px-3 py-2 text-left">Tên vật tư</th>
-                    <th className="px-3 py-2 text-right">Tồn còn</th>
-                    <th className="px-3 py-2 text-right">Tồn tối thiểu</th>
-                    <th className="px-3 py-2 text-left">Mức cảnh báo</th>
-                    <th className="px-3 py-2 text-left">Vị trí</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alerts.map((item: any) => {
-                    const status = item.stockStatus ?? statusOf(item)
+                  {rows.map((item: any) => {
+                    const status = statusOf(item)
                     return (
                       <tr key={item.id} className={inventoryTableRow}>
-                        <td className="px-3 py-2 text-cyan-300">{item.code}</td>
-                        <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-right">{formatQty(item.quantity)}</td>
-                        <td className="px-3 py-2 text-right">{formatQty(item.minimumStock ?? 5)}</td>
-                        <td className="px-3 py-2">
-                          <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-1 text-red-300' : 'rounded bg-amber-500/10 px-2 py-1 text-amber-300'}>{statusLabel(status)}</span>
+                        <td className="truncate px-3 py-1.5 text-cyan-300" title={item.code}>{item.code}</td>
+                        <td className="truncate px-3 py-1.5 text-white" title={item.name}>{item.name}</td>
+                        <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
+                        <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
+                        <td className="truncate px-3 py-1.5 text-right text-slate-300" title={money(item.averageCost)}>{money(item.averageCost)}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium text-cyan-300" title={money(item.inventoryValue)}>{money(item.inventoryValue)}</td>
+                        <td className="truncate px-3 py-1.5">
+                          <span
+                            title={rowLocations(item).map(locationLabel).join('\n')}
+                            className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-100"
+                          >
+                            {displayLocation(item)}
+                          </span>
                         </td>
-                        <td className="px-3 py-2">{displayLocation(item)}</td>
+                        <td className="px-3 py-1.5">
+                          <span
+                            className={`inline-flex rounded-lg border px-3 py-0.5 text-xs ${
+                              status === 'OUT'
+                                ? 'border-red-400/30 bg-red-500/10 text-red-300'
+                                : status === 'LOW'
+                                ? 'border-amber-400/30 bg-amber-500/10 text-amber-300'
+                                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
+                            }`}
+                          >
+                            {statusLabel(status)}
+                          </span>
+                        </td>
                       </tr>
                     )
                   })}
@@ -1093,6 +1190,7 @@ function OverviewModal({
               </table>
             </div>
           ) : null}
+
         </div>
       </div>
     </div>

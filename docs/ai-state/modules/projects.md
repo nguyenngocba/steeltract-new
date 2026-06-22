@@ -22,6 +22,8 @@ In Progress.
 * Installation confirmation opens a required mapping modal for Khu vực, Trục, Tầng, and Vị trí.
 * Project Components table displays installation Zone, Axis, Level, and Position.
 * Project component Actual Cost reflects `Component.actualCost`, which is updated by Component Costing recalculation.
+* Sprint 20A adds a read-only Project Cost summary API that aggregates project-linked Components and direct project Production Orders.
+* `GET /projects/:id/cost` returns project material cost, component count, production order count, component cost summaries, and production order cost summaries.
 * Current project UI follows the Inventory visual baseline from the cross-module cockpit refresh.
 * Sprint 12B standardizes Projects page header, KPI strip, Project runtime cards, Components runtime cards, filter bar, table shell, and empty state with shared module UI primitives.
 * Sprint 12C adds sticky filters, frontend KPI click-to-filter for Projects/Project Components, and standard `ModuleDetailDrawer` usage for project detail.
@@ -40,6 +42,7 @@ Currently documented through active integrations:
 
 * Project APIs used by the frontend project and Inventory outbound workflows.
 * `GET /projects/runtime` includes project-linked components, installation location fields, and ready/shipped/delivered/installed counters.
+* `GET /projects/:id/cost`
 * `POST /components/:id/deliver`
 * `POST /components/:id/install`
 * `GET /dashboard/cockpit`
@@ -54,6 +57,7 @@ Currently documented through active integrations:
 * Add persisted project contract fields.
 * Add milestones.
 * Add project material budgets.
+* Use Sprint 20A Project Cost summary as the backend foundation for Sprint 20C Project Cost Control.
 * Add planned/actual schedule baselines.
 * Add project document and photo attachments.
 * Add formal project return workflow across Yard and Inventory.

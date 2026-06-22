@@ -3,13 +3,23 @@ import toast from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState, ModulePageHeader } from '../../../../shared/ui/modules'
+import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleKpiStrip, ModuleLoadingState, ModulePageHeader } from '../../../../shared/ui/modules'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { useProjects } from '../../../inventory/hooks/useProjects'
+import {
+  InventoryChartCard,
+  InventoryKpi,
+  inventoryGridGap,
+  inventoryInput,
+  inventoryPageStack,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '../../../inventory/components/InventoryVisuals'
 import { ManufacturingOrderModal } from '../../../production/components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../../../production/components/ProductionBomModal'
-import { useProductionBoms } from '../../../production/hooks/useProductionCockpit'
-import type { ComponentCostingWarning } from '../../api/contracts/components.contract'
+import { useProductionBoms, useProductionIssues } from '../../../production/hooks/useProductionCockpit'
+import type { ComponentCostingWarning, ProductionOrderRecord } from '../../api/contracts/components.contract'
+import { calculateComponentMaterialReadiness } from '../../lib/material-readiness'
 import {
   useComponents,
   useComponentCostingBreakdown,
@@ -22,17 +32,11 @@ import {
 import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 import {
   ComponentsDonut,
-  ComponentsFilterBar,
-  ComponentsKpiCard,
   ComponentsMiniBars,
-  ComponentsPanel,
   ComponentsSelect,
   componentsInput,
   componentsMutedButton,
   componentsPrimaryButton,
-  componentsTableHead,
-  componentsTableRow,
-  componentsTableShell,
 } from './ComponentsCockpitShared'
 
 type ComponentRow = {
@@ -51,6 +55,17 @@ type ComponentRow = {
   rawStatus: string
   qty: number
   qc: number
+  weight: number
+  progress: number
+  materialReady: number
+  requiredQty: number
+  issuedQty: number
+  remainingQty: number
+  hasBom: boolean
+  hasProductionOrder: boolean
+  workOrder: string
+  dueDate?: string
+  productionStatus?: string
   createdAt: string
 }
 
@@ -65,6 +80,42 @@ type ComponentsListRouteState = {
   componentId?: string
 } | null
 
+const runningStatuses = new Set(['IN_PROGRESS', 'RUNNING', 'ACTIVE', 'CUTTING', 'WELDING', 'PAINTING'])
+const completedStatuses = new Set(['DONE', 'COMPLETED', 'FINISHED', 'READY', 'SHIPPED', 'DELIVERED', 'INSTALLED'])
+
+function isRunningStatus(status?: string) {
+  return runningStatuses.has(String(status ?? '').toUpperCase())
+}
+
+function isCompletedStatus(status?: string) {
+  return completedStatuses.has(String(status ?? '').toUpperCase())
+}
+
+function isDelayed(dueDate?: string, status?: string) {
+  if (!dueDate || isCompletedStatus(status)) return false
+  const due = new Date(dueDate)
+  return !Number.isNaN(due.getTime()) && due < new Date()
+}
+
+function progressOf(status?: string, order?: ProductionOrderRecord) {
+  const normalized = String(status ?? order?.status ?? '').toUpperCase()
+  if (isCompletedStatus(normalized)) return 100
+  if (normalized === 'PAINTING') return 75
+  if (normalized === 'WELDING') return 50
+  if (normalized === 'CUTTING' || normalized === 'IN_PROGRESS' || normalized === 'RUNNING' || normalized === 'ACTIVE') return 25
+  if (order?.status === 'IN_PROGRESS') return 50
+  return 0
+}
+
+function componentTypeBucket(type: string) {
+  const raw = type.toLowerCase()
+  if (raw.includes('beam') || raw.includes('dầm')) return 'Beam'
+  if (raw.includes('column') || raw.includes('cột')) return 'Column'
+  if (raw.includes('brace') || raw.includes('giằng')) return 'Brace'
+  if (raw.includes('plate') || raw.includes('bản')) return 'Plate'
+  return 'Assembly'
+}
+
 export function ComponentsListPage() {
   const routeLocation = useLocation()
   const routeComponentId =
@@ -74,6 +125,7 @@ export function ComponentsListPage() {
   const { data: productionOrders = [] } = useProductionOrders()
   const { data: projects = [] } = useProjects()
   const { data: productionBoms = [] } = useProductionBoms()
+  const { data: productionIssues = [] } = useProductionIssues()
   const createComponent = useCreateComponent()
   const deleteComponent = useDeleteComponent()
   const recalculateCosting = useRecalculateComponentCosting()
@@ -140,6 +192,16 @@ export function ComponentsListPage() {
         DELIVERED: 'Tồn kho',
         INSTALLED: 'Tồn kho',
       }
+      const order = productionOrders.find((item) => item.componentId === record.id)
+      const quantity = metadata.quantity ?? 1
+      const readiness = calculateComponentMaterialReadiness({
+        componentCode: record.code,
+        fallbackQuantity: quantity,
+        order,
+        boms: productionBoms,
+        issues: productionIssues,
+      })
+      const weight = Number(readiness.bom?.estimatedWeight ?? 0)
 
       return {
         id: record.id,
@@ -155,14 +217,25 @@ export function ComponentsListPage() {
         installPosition: record.installPosition,
         status: statusMap[record.status] ?? 'Tồn kho',
         rawStatus: record.status,
-        qty: metadata.quantity ?? 1,
+        qty: quantity,
         qc: metadata.qcQuantity ?? (record.status === 'READY' ? metadata.quantity ?? 1 : 0),
+        weight,
+        progress: progressOf(record.status, order),
+        materialReady: readiness.readinessPercent,
+        requiredQty: readiness.requiredQty,
+        issuedQty: readiness.issuedQty,
+        remainingQty: readiness.remainingQty,
+        hasBom: readiness.hasBom,
+        hasProductionOrder: readiness.hasProductionOrder,
+        workOrder: order?.orderNo ?? '-',
+        dueDate: order?.plannedEndAt,
+        productionStatus: order?.status,
         createdAt: record.createdAt
           ? new Date(record.createdAt).toLocaleDateString('vi-VN')
           : '-',
       }
     })
-  }, [componentRecords])
+  }, [componentRecords, productionBoms, productionIssues, productionOrders])
 
   useEffect(() => {
     if (
@@ -193,13 +266,25 @@ export function ComponentsListPage() {
     })
   }, [rows, project, status, type, location, query])
 
-  const lifecycleCounts = useMemo(() => ({
-    total: componentRecords.length,
-    ready: componentRecords.filter((record) => record.status === 'READY').length,
-    shipped: componentRecords.filter((record) => record.status === 'SHIPPED').length,
-    delivered: componentRecords.filter((record) => record.status === 'DELIVERED').length,
-    installed: componentRecords.filter((record) => record.status === 'INSTALLED').length,
-  }), [componentRecords])
+  const cockpitKpis = useMemo(() => ({
+    total: rows.length,
+    running: rows.filter((row) => isRunningStatus(row.rawStatus) || isRunningStatus(row.productionStatus)).length,
+    completed: rows.filter((row) => isCompletedStatus(row.rawStatus) || isCompletedStatus(row.productionStatus)).length,
+    waitingMaterial: rows.filter((row) => row.hasBom && row.materialReady < 100).length,
+    delayed: rows.filter((row) => isDelayed(row.dueDate, row.productionStatus ?? row.rawStatus)).length,
+    weight: rows.reduce((sum, row) => sum + Number(row.weight ?? 0), 0),
+  }), [rows])
+  const componentAnalytics = useMemo(() => {
+    const topWeight = [...rows].sort((a, b) => Number(b.weight ?? 0) - Number(a.weight ?? 0)).slice(0, 5)
+    const delayedRows = rows.filter((row) => isDelayed(row.dueDate, row.productionStatus ?? row.rawStatus)).slice(0, 5)
+    const materialShortage = rows.filter((row) => row.hasBom && row.materialReady < 100).sort((a, b) => a.materialReady - b.materialReady).slice(0, 5)
+    const structure = ['Beam', 'Column', 'Brace', 'Plate', 'Assembly'].map((label) => ({
+      label,
+      value: rows.filter((row) => componentTypeBucket(row.type) === label).length,
+      color: { Beam: '#1d7cff', Column: '#14c987', Brace: '#f59e0b', Plate: '#7c3aed', Assembly: '#06b6d4' }[label] ?? '#06b6d4',
+    }))
+    return { topWeight, delayedRows, materialShortage, structure }
+  }, [rows])
 
   function openDetail(row: ComponentRow) {
     setSelected(row)
@@ -274,7 +359,6 @@ export function ComponentsListPage() {
     }
   }
 
-  const recentOrders = productionOrders.slice(0, 4)
   const productionComponents = componentRecords.map((record) => ({
     id: record.id,
     code: record.code,
@@ -282,34 +366,44 @@ export function ComponentsListPage() {
     projectId: record.projectId,
     project: record.project,
   }))
-  const selectedBoms = selected
-    ? productionBoms.filter((bom) => bom.productCode === selected.code && bom.status !== 'ARCHIVED')
+  const selectedOrders = selected
+    ? productionOrders.filter((order) => order.componentId === selected.id)
     : []
+  const selectedBoms = selected
+    ? productionBoms.filter((bom) =>
+        bom.status !== 'ARCHIVED' &&
+        (bom.productCode === selected.code || selectedOrders.some((order) => order.bomId === bom.id)),
+      )
+    : []
+  const selectedRequiredQty = selected?.requiredQty ?? 0
+  const selectedIssuedQty = selected?.issuedQty ?? 0
+  const selectedRemainingQty = selected?.remainingQty ?? 0
 
   return (
     <EnterpriseModulePage>
-      <div className="space-y-4">
+      <div className={inventoryPageStack}>
         <ModulePageHeader
           eyebrow="Steel component lifecycle"
-          title="Cấu kiện"
-          description="Theo dõi cấu kiện từ sản xuất, QC, bãi, giao hàng đến lắp đặt."
+          title="Trung tâm điều hành cấu kiện"
+          description="Theo dõi cấu kiện từ BOM, lệnh sản xuất, QC, bãi, giao hàng đến lắp đặt."
           action={<button onClick={() => setCreateOpen(true)} className={componentsPrimaryButton}>+ Tạo cấu kiện</button>}
         />
 
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
-          <ComponentsKpiCard title="Tổng cấu kiện" value={formatQuantity(lifecycleCounts.total, 0)} tone="blue" active={!status} onClick={() => setStatus('')} />
-          <ComponentsKpiCard title="READY" value={formatQuantity(lifecycleCounts.ready, 0)} tone="emerald" active={status === 'READY'} onClick={() => setStatus('READY')} />
-          <ComponentsKpiCard title="SHIPPED" value={formatQuantity(lifecycleCounts.shipped, 0)} tone="cyan" active={status === 'SHIPPED'} onClick={() => setStatus('SHIPPED')} />
-          <ComponentsKpiCard title="DELIVERED" value={formatQuantity(lifecycleCounts.delivered, 0)} tone="purple" active={status === 'DELIVERED'} onClick={() => setStatus('DELIVERED')} />
-          <ComponentsKpiCard title="INSTALLED" value={formatQuantity(lifecycleCounts.installed, 0)} tone="amber" active={status === 'INSTALLED'} onClick={() => setStatus('INSTALLED')} />
-        </div>
+        <ModuleKpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          <InventoryKpi title="Tổng cấu kiện" value={formatQuantity(cockpitKpis.total, 0)} note="Toàn bộ cấu kiện" tone="blue" />
+          <InventoryKpi title="Đang sản xuất" value={formatQuantity(cockpitKpis.running, 0)} note="IN_PROGRESS / RUNNING" tone="cyan" />
+          <InventoryKpi title="Hoàn thành" value={formatQuantity(cockpitKpis.completed, 0)} note="DONE / COMPLETED / READY+" tone="emerald" />
+          <InventoryKpi title="Chờ vật tư" value={formatQuantity(cockpitKpis.waitingMaterial, 0)} note="Issued / Required < 100%" tone="amber" />
+          <InventoryKpi title="Trễ tiến độ" value={formatQuantity(cockpitKpis.delayed, 0)} note="Quá hạn chưa hoàn thành" tone="red" />
+          <InventoryKpi title="Khối lượng cấu kiện" value={`${formatQuantity(cockpitKpis.weight, 3)} kg`} note="Theo BOM hiện có" tone="purple" />
+        </ModuleKpiStrip>
 
-        <ComponentsFilterBar>
+        <ModuleFilterBar>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Tìm theo mã, tên, profile, dự án, vị trí..."
-            className={`${componentsInput} xl:col-span-4`}
+            className={`${inventoryInput} xl:col-span-4`}
           />
           <ComponentsSelect value={project} onChange={setProject} className="xl:col-span-2">
             <option value="">Dự án</option>
@@ -340,7 +434,7 @@ export function ComponentsListPage() {
             <option value="Workshop A">Workshop A</option>
             <option value="QC nội bộ">QC nội bộ</option>
           </ComponentsSelect>
-        </ComponentsFilterBar>
+        </ModuleFilterBar>
 
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => openProductionFor()} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500">
@@ -353,13 +447,13 @@ export function ComponentsListPage() {
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="xl:col-span-9">
-            <ComponentsPanel title={`Danh sách cấu kiện (${filtered.length})`}>
-              <div className={componentsTableShell}>
+            <InventoryChartCard title={`Danh sách cấu kiện (${filtered.length})`} note="Production cockpit grid">
+              <ModuleDataGrid>
                 <div className="overflow-auto">
-                <table className="w-full min-w-[1080px] text-sm">
-                  <thead className={componentsTableHead}>
+                <table className="w-full min-w-[1320px] text-sm">
+                  <thead className={inventoryTableHead}>
                     <tr>
-                      {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Vị trí hiện tại', 'Trạng thái', 'SL', 'Đã QC', 'Ngày tạo', 'Thao tác'].map((h) => (
+                      {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Work Order', 'Progress', 'Material Ready', 'Vị trí hiện tại', 'Trạng thái', 'Khối lượng', 'Ngày tạo', 'Thao tác'].map((h) => (
                         <th key={h} className="px-2 py-2 text-left font-medium">
                           {h}
                         </th>
@@ -369,7 +463,7 @@ export function ComponentsListPage() {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={11} className="px-2 py-6">
+                        <td colSpan={13} className="px-2 py-6">
                           <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
                         </td>
                       </tr>
@@ -377,17 +471,19 @@ export function ComponentsListPage() {
                       <tr
                         key={row.code}
                         onClick={() => openDetail(row)}
-                        className={`cursor-pointer ${componentsTableRow}`}
+                        className={`cursor-pointer ${inventoryTableRow}`}
                       >
                         <td className="px-2 py-2 text-cyan-300">{row.code}</td>
                         <td className="px-2 py-2">{row.name}</td>
                         <td className="px-2 py-2">{row.profile}</td>
                         <td className="px-2 py-2">{row.type}</td>
                         <td className="px-2 py-2">{row.project}</td>
+                        <td className="px-2 py-2 text-cyan-300">{row.workOrder}</td>
+                        <td className="px-2 py-2"><ProgressMeter value={row.progress} /></td>
+                        <td className="px-2 py-2"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
                         <td className="px-2 py-2">{row.location}</td>
                         <td className="px-2 py-2">{row.status}</td>
-                        <td className="px-2 py-2">{formatQuantity(row.qty, 0)}</td>
-                        <td className="px-2 py-2">{formatQuantity(row.qc, 0)}</td>
+                        <td className="px-2 py-2 font-mono tabular-nums">{formatQuantity(row.weight, 3)} kg</td>
                         <td className="px-2 py-2">{row.createdAt}</td>
                         <td className="px-2 py-2">
                           <button
@@ -405,51 +501,32 @@ export function ComponentsListPage() {
                   </tbody>
                 </table>
                 </div>
-              </div>
+              </ModuleDataGrid>
               {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState title="Không tìm thấy cấu kiện" description="Thử đổi từ khóa hoặc bộ lọc trạng thái/dự án." /></div> : null}
               <div className="mt-3 text-xs text-slate-400">Hiển thị 1 - {filtered.length} của {filtered.length} kết quả</div>
-            </ComponentsPanel>
+            </InventoryChartCard>
           </div>
 
           <div className="space-y-4 xl:col-span-3">
-            <ComponentsPanel title="Lệnh sản xuất mới tạo">
-              {recentOrders.length === 0 ? (
-                <ModuleEmptyState title="Chưa có lệnh mới" description="Lệnh sản xuất mới sẽ hiển thị tại đây." />
-              ) : (
-                recentOrders.map((order) => (
-                  <div key={order.orderNo} className="mb-3 rounded-xl border border-white/10 bg-white/[0.035] p-2 text-xs text-slate-300">
-                    <div className="text-cyan-300">{order.orderNo}</div>
-                    <div>{rows.find((row) => row.id === order.componentId)?.code ?? order.title} - SL: {formatQuantity(order.quantity, 0)}</div>
-                    <div>
-                      Đích: {order.metadata?.destinationYard} / {order.metadata?.destinationZone} / {order.metadata?.destinationSlot} / {order.metadata?.destinationLevel}
-                    </div>
-                  </div>
-                ))
-              )}
-            </ComponentsPanel>
-
-            <ComponentsPanel title="Hoạt động gần đây" action="Xem tất cả">
-              {['CPL-PLT-000457 đã QC đạt', 'CPL-BEAM-001256 nhập kho cấu kiện', 'Tạo mới cấu kiện CPL-BASE-000241'].map((line) => (
-                <div key={line} className="mb-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-slate-300">
-                  {line}
-                </div>
-              ))}
-            </ComponentsPanel>
-            <ComponentsPanel title="Cơ cấu trạng thái">
+            <InventoryChartCard title="Top cấu kiện theo khối lượng" note="Theo BOM hiện có">
+              <RankList rows={componentAnalytics.topWeight.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.weight, 3)} kg` }))} />
+            </InventoryChartCard>
+            <InventoryChartCard title="Top cấu kiện chậm tiến độ" note="Due date < Today">
+              <RankList rows={componentAnalytics.delayedRows.map((row) => ({ id: row.id, title: row.code, subtitle: row.dueDate ? new Date(row.dueDate).toLocaleDateString('vi-VN') : '-', value: row.workOrder }))} empty="Không có cấu kiện trễ tiến độ" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Cấu kiện thiếu vật tư" note="BOM required - issued">
+              <RankList rows={componentAnalytics.materialShortage.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.materialReady, 0)}%` }))} empty="Chưa phát hiện thiếu vật tư" />
+            </InventoryChartCard>
+            <InventoryChartCard title="Cơ cấu cấu kiện" note="Beam / Column / Brace / Plate / Assembly">
               <ComponentsDonut
                 centerValue={formatQuantity(rows.length, 0)}
                 centerLabel="cấu kiện"
-                segments={[
-                  { label: 'Tồn kho', value: rows.filter((x) => x.status === 'Tồn kho').length, color: '#1d7cff' },
-                  { label: 'Đang SX', value: rows.filter((x) => x.status === 'Đang SX').length, color: '#f59e0b' },
-                  { label: 'Đã QC', value: rows.filter((x) => x.status === 'Đã QC').length, color: '#14c987' },
-                  { label: 'Chờ QC', value: rows.filter((x) => x.status === 'Chờ QC').length, color: '#7c3aed' },
-                ]}
+                segments={componentAnalytics.structure}
               />
-            </ComponentsPanel>
-            <ComponentsPanel title="Nhịp tạo cấu kiện">
+            </InventoryChartCard>
+            <InventoryChartCard title="Nhịp tạo cấu kiện" note="Xu hướng 12 kỳ gần nhất">
               <ComponentsMiniBars values={[18, 24, 16, 31, 28, 35, 42, 38, 44, 49, 46, 52]} />
-            </ComponentsPanel>
+            </InventoryChartCard>
           </div>
         </div>
       </div>
@@ -522,6 +599,18 @@ export function ComponentsListPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-3 text-sm font-semibold text-white">Thông tin cấu kiện</div>
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+                <CostMetric title="Code" value={selected.code} />
+                <CostMetric title="Name" value={selected.name} />
+                <CostMetric title="Type" value={selected.type} />
+                <CostMetric title="Project" value={selected.project} />
+                <CostMetric title="Weight" value={`${formatQuantity(selected.weight, 3)} kg`} />
+                <CostMetric title="Status" value={selected.rawStatus} />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
               <div className="mb-3">
                 <div className="text-sm font-semibold text-white">Vị trí lắp đặt</div>
                 <div className="mt-1 text-xs text-slate-500">Thông tin được ghi khi xác nhận lắp đặt tại công trình.</div>
@@ -570,6 +659,56 @@ export function ComponentsListPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="mb-3">
+                  <div className="text-sm font-semibold text-white">Vật tư</div>
+                  <div className="mt-1 text-xs text-slate-500">Tính theo BOM required và Production Material Issue đã cấp phát.</div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <CostMetric title="Required" value={quantity(selectedRequiredQty)} />
+                  <CostMetric title="Issued" value={quantity(selectedIssuedQty)} tone="text-emerald-300" />
+                  <CostMetric title="Remaining" value={quantity(selectedRemainingQty)} tone={selectedRemainingQty > 0 ? 'text-amber-300' : 'text-cyan-300'} />
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="mb-3 text-sm font-semibold text-white">Tiến độ</div>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                  {['Planning', 'Cutting', 'Assembly', 'Welding', 'Painting', 'Finished'].map((step, index) => {
+                    const active = selected.progress >= [0, 25, 35, 50, 75, 100][index]
+                    return <div key={step} className={`rounded-xl border px-3 py-2 text-xs ${active ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/[0.035] text-slate-500'}`}>{step}</div>
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-3 text-sm font-semibold text-white">Work Orders</div>
+              <ModuleDataGrid>
+                <table className="w-full text-sm">
+                  <thead className={inventoryTableHead}>
+                    <tr>
+                      {['MO', 'Title', 'Status', 'Qty', 'Start', 'Due'].map((head) => <th key={head} className="px-3 py-2 text-left">{head}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedOrders.length ? selectedOrders.map((order) => (
+                      <tr key={order.id} className={inventoryTableRow}>
+                        <td className="px-3 py-2 text-cyan-300">{order.orderNo}</td>
+                        <td className="px-3 py-2">{order.title}</td>
+                        <td className="px-3 py-2">{order.status}</td>
+                        <td className="px-3 py-2">{formatQuantity(order.quantity, 3)}</td>
+                        <td className="px-3 py-2">{order.plannedStartAt ? new Date(order.plannedStartAt).toLocaleDateString('vi-VN') : '-'}</td>
+                        <td className="px-3 py-2">{order.plannedEndAt ? new Date(order.plannedEndAt).toLocaleDateString('vi-VN') : '-'}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={6} className="px-3 py-5 text-center text-slate-500">Chưa có work order liên quan.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </ModuleDataGrid>
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
@@ -645,6 +784,43 @@ export function ComponentsListPage() {
 
 function money(value?: number | null) {
   return formatCurrencyVnd(value)
+}
+
+function ProgressMeter({ value, tone = 'cyan' }: { value: number; tone?: 'cyan' | 'emerald' | 'amber' | 'red' }) {
+  const color = tone === 'emerald' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : tone === 'red' ? 'bg-red-500' : 'bg-cyan-500'
+  return (
+    <div className="min-w-[120px]">
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      </div>
+      <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(value, 0)}%</div>
+    </div>
+  )
+}
+
+function RankList({
+  rows,
+  empty = 'Chưa có dữ liệu',
+}: {
+  rows: Array<{ id: string; title: string; subtitle?: string; value: string }>
+  empty?: string
+}) {
+  if (!rows.length) {
+    return <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-center text-sm text-slate-500">{empty}</div>
+  }
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-cyan-300">{row.title}</div>
+            {row.subtitle ? <div className="mt-0.5 truncate text-slate-500">{row.subtitle}</div> : null}
+          </div>
+          <div className="font-mono tabular-nums text-slate-200">{row.value}</div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function CostMetric({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {

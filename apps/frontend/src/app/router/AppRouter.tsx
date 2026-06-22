@@ -208,7 +208,9 @@ export function AppRouter() {
 
       <Route path="/production/boms" element={<ProductionPage />} />
       <Route path="/production/orders" element={<ProductionPage />} />
+      <Route path="/production/execution" element={<ProductionPage />} />
       <Route path="/production/reservations" element={<ProductionPage />} />
+      <Route path="/production/warehouse" element={<ProductionPage />} />
       <Route path="/production/material-ledger" element={<ProductionPage />} />
       <Route path="/production/material-issues" element={<ProductionPage />} />
       <Route path="/production/consumptions" element={<ProductionPage />} />

@@ -162,9 +162,28 @@ export function InventoryAlertsPage() {
   const { data: zones = [] } = useZones()
   const [severityFilter, setSeverityFilter] = useState('')
   const [zoneFilter, setZoneFilter] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 10
+  // Hàm tìm kiếm
+  const applySearch = () => {
+    setSearch(searchDraft)
+    setPage(1)
+  }
+  const [statusFilter, setStatusFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+
+  // Hàm reset
+  const resetFilters = () => {
+    setSearchDraft('')
+    setSearch('')
+    setSeverityFilter('')
+    setZoneFilter('')
+    setStatusFilter('')
+    setTypeFilter('')
+    setPage(1)
+  }
 
   const alerts = useMemo(() => {
     return (materials as any[])
@@ -186,13 +205,15 @@ export function InventoryAlertsPage() {
       .filter((x: any) => {
         if (severityFilter && x.level !== severityFilter) return false
         if (zoneFilter && x.zoneCode !== zoneFilter) return false
+        if (statusFilter && x.status !== statusFilter) return false
+        if (typeFilter && x.alertType !== typeFilter) return false   // thêm dòng này
         if (search.trim()) {
           const q = search.toLowerCase()
           return `${x.code} ${x.name}`.toLowerCase().includes(q)
         }
         return true
       })
-  }, [materials, zones, severityFilter, zoneFilter, search])
+    }, [materials, zones, severityFilter, zoneFilter, statusFilter, search])
 
   const kpi = useMemo(() => {
     const critical = alerts.filter((x: any) => x.level === 'Nghiêm trọng').length
@@ -227,7 +248,10 @@ export function InventoryAlertsPage() {
     return alerts.slice(start, start + pageSize)
   }, [alerts, page])
   const pageCount = Math.max(1, Math.ceil(alerts.length / pageSize))
+  const filterInput =
+  'h-9 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
 
+  
   return (
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
@@ -284,22 +308,67 @@ export function InventoryAlertsPage() {
           />
         </div>
 
-        <InventoryPanel title="Bộ lọc cảnh báo" className="p-2">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className={inventoryInput}>
+        <InventoryPanel className="rounded-xl p-0.5">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Mức độ cảnh báo</option>
               <option value="Nghiêm trọng">Nghiêm trọng</option>
               <option value="Thấp">Thấp</option>
             </select>
-            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className={inventoryInput}>
+            <select
+              value={zoneFilter}
+              onChange={(e) => setZoneFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Kho</option>
               {[...new Set(alerts.map((a: any) => a.zoneCode))].map((z) => (
-                <option key={z} value={z}>
-                  {z}
-                </option>
+                <option key={z} value={z}>{z}</option>
               ))}
             </select>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã vật tư, tên vật tư..." className={`${inventoryInput} xl:col-span-4`} />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={filterInput}
+            >
+              <option value="">Trạng thái</option>
+              <option value="Chưa xử lý">Chưa xử lý</option>
+              <option value="Đã xử lý">Đã xử lý</option>
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className={filterInput}
+            >
+              <option value="">Loại cảnh báo</option>
+              <option value="Hết hàng">Hết hàng</option>
+              <option value="Thấp tồn">Thấp tồn</option>
+              <option value="Vượt mức tồn">Vượt mức tồn</option>
+            </select>
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch()
+              }}
+              placeholder="Tìm mã vật tư, tên vật tư..."
+              className={filterInput}
+            />
+            <button
+              onClick={applySearch}
+              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              onClick={resetFilters}
+              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
           </div>
         </InventoryPanel>
 

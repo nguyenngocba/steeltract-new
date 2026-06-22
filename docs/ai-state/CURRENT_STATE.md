@@ -31,8 +31,17 @@ Current architecture:
 - Inventory Transactions UX 2.0 adds `Hồ sơ` columns to the dedicated Nhập kho, Xuất kho, Điều chuyển, and Kiểm kê lists; each `📎` count opens a transaction attachment drawer.
 - Sprint 15A fixes outbound value display: Inventory Outbound now sums all transaction item values, and transaction API responses compute missing outbound `unitPrice` / `totalAmount` from average inbound material cost for legacy rows.
 - Sprint 15B makes `inventory_transaction_items` the source of truth for transaction valuation. New transaction item writes persist `unitPrice` and `totalAmount`, direct Production/Material Movement writers do the same, and historical IMPORT/EXPORT/TRANSFER/RETURN rows were backfilled.
+- Sprint 16A enhances Inventory Outbound with a transaction detail drawer, outbound value today KPI, value-based top material ranking, and top project ranking by outbound value using existing transaction API data.
+- Sprint 16B enhances Inventory Transfer with a transaction detail drawer, source/destination location visibility, transfer value KPIs, route analytics, and source/destination location rankings using existing transaction API data.
+- Sprint 16C enhances Inventory Inbound with a transaction detail drawer, all-line inbound aggregation, supplier/value analytics, price monitoring, and shared larger filter spacing across Inbound, Outbound, and Transfer tabs.
+- Sprint 16D enhances Inventory Outbound analytics with project consumption share, daily/monthly outbound trend charts, material consumption value/issue counts, outbound-purpose distribution, financial KPIs for today/week/month/year, and abnormal consumption alerts using existing transaction API data only.
+- Sprint 17A enhances Inventory Stock Take with session-level detail drawers, variance KPI cards, top variance materials/locations, and adjustment preview rows derived from existing adjustment transaction items.
+- Sprint 17B enhances Inventory Locations with occupancy/free/occupied slot KPIs, inventory value by location, top occupied slots, click-through slot material drawer, and transfer movement route analytics using existing zone, audit, and transaction API data.
+- Sprint 17E hardens Inventory document numbering: backend-owned `code = transactionNo`, five-digit `PREFIX-YYMMDD-00001` format, max-suffix generation instead of `count() + 1`, and retry on `P2002` duplicate collisions.
+- Sprint 17F separates main warehouse, production warehouse, and total stock in Inventory Overview, Inventory Materials, and Material Detail. Stock health and purchasing alerts now use only `Kho chính` / `MAIN` balances so production stock cannot hide main-warehouse shortages.
+- Sprint 19D/19E align Inventory Adjustments with the Inventory transaction workflow: sidebar route `/inventory/adjustments`, direct global action modal launch, shared `AdjustmentTransactionModal`, location-balance table, `WarehouseMiniMap`, location-specific System Qty, Actual Qty, auto Difference, Variance Value, reason presets, attachments, adjustment history grid, analytics, and row detail drawer.
 - Inventory Material Stock KPI sparklines use real monthly snapshots from Inventory audit rows, material `createdAt`, and Inventory transaction item movement history.
-- Operational code generation now follows `PREFIX-YYMMDD-###` for new Inventory, Production, Components, Projects, QC, material movement, and receiving codes; see `docs/ai-state/decisions/code-numbering-decisions.md`.
+- Operational code generation now follows `PREFIX-YYMMDD-00001`; Inventory transactions are backend-owned and write matching `code` / `transactionNo`; see `docs/ai-state/decisions/code-numbering-decisions.md`.
 
 Known limitations:
 
@@ -41,8 +50,12 @@ Known limitations:
 - Sprint 8 audit found transaction-vs-location reconciliation mismatches and snapshot mismatches that need operator/admin review before any automated backfill.
 - Sprint 9 fixed active mutation paths that created new snapshot/location mismatches, but existing mismatched validation rows still require a dedicated reconciliation/backfill decision.
 - Some Inventory modal/chart helpers remain locally embedded instead of shared visual components.
+- Dedicated Inbound/Outbound/Transfer/Stock Take pages now have richer analytics, but several local transaction detail helpers should still be extracted into shared Inventory transaction components after operator review.
+- Location value analytics depend on currently available material average/unit cost data; rows without cost data display zero value until costing is available in the frontend source.
 - Material photo upload is persisted through shared attachments. Dedicated non-photo Material Master upload controls for datasheets, CO, CQ, and catalogs are still pending beyond the current display/download section.
 - Return transaction attachment upload depends on the active return UI path creating an Inventory transaction; the shared transaction attachment model and storage routing already support `RETURN`.
+- Inventory stock status assumes `locationBalances` is present and warehouse names/codes correctly identify `MAIN` and `PRODUCTION`.
+- New adjustment rows store System Qty / Actual Qty audit context in the existing transaction `note` field for UI display; historical adjustment rows created before Sprint 19E remain variance-only unless backfilled.
 
 Current focus:
 
@@ -71,6 +84,20 @@ Current architecture:
 - Sprint 11A decimal pass supports decimal BOM, MO, issue/return/consume, and Yard staging quantities in frontend workflows and backend DTO parsing.
 - Sprint 12B aligns the Production Cockpit presentation with the shared module UI foundation for KPI strip, analytics panels, filter bar, and the primary data grid.
 - Sprint 12C adds sticky filters, clickable status KPIs, shared loading states, and route-level frontend splitting around Production pages.
+- Sprint 18A refactors Production Cockpit toward the Inventory operational theme with Inventory-style KPI cards, filter bar, analytics panels, Production Orders progress/readiness/delay grid, and shared drawers for Production Orders, BOM detail, and Material Issues.
+- Sprint 18A also applies Inventory-style grid/table treatment to Production BOM, Reservations, Material Ledger, Material Issues, Consumptions, and Logs.
+- Sprint 18D turns `/production/orders` into a Work Order Cockpit with Work Order KPIs, Inventory-style grid, BOM Intelligence Material Ready %, drawer sections, and analytics panels.
+- Sprint 18E turns `/production/material-issues` into a Production Material Control Center with issue KPIs, Inventory-style grid, Required/Issued/Returned/Remaining/Readiness indicators, drawer sections, and analytics panels.
+- Sprint 19A adds `/production/warehouse` as a Production Warehouse Cockpit for `PRODUCTION` / `Kho vật tư SX`, using existing Inventory location balances, audit cost, Production Orders, Reservations, and Consumptions.
+- Production Warehouse Cockpit calculates `Available = Production Stock - Reserved`, `Shortage = Required - Available`, and status from production warehouse availability rather than total stock.
+- Sprint 19B adds `/production/execution` as a Production Execution Board with Kanban columns for Planning, Ready Material, Cutting, Assembly, Welding, Painting, and Completed.
+- Execution Board reuses BOM/Issue material readiness, delay detection, stage/progress estimation, issue history, and reservation summaries from existing Production data.
+- Sprint 19C adds a MES data audit in `docs/ai-state/audits/mes-data-audit.md` and concludes current data is stronger for Costing than deeper Shopfloor development.
+- Shopfloor has partial foundations through Production Orders, Stages, Tasks, Logs, Work Centers, and Machines, but lacks canonical immutable transition history, runtime/downtime capture, production-line queues, and labor/machine rate data.
+- Costing has stronger foundations through BOM planned materials, Production Material Consumption, Inventory Transaction Item `unitPrice` / `totalAmount`, and ComponentCosting.
+- Sprint 20A adds a read-only Costing Engine backend module with Production Order, Component, and Project cost summaries.
+- Costing Engine material cost uses actual Production Material Issue Inventory transaction valuation first and falls back to weighted average Inventory transaction item cost.
+- Sprint 20A exposes `GET /production/orders/:id/cost`, `GET /components/:id/cost`, and `GET /projects/:id/cost`; these endpoints do not mutate `ComponentCosting` or workflow state.
 - Production can create/mark a component from an MO only after material has been issued.
 - MO start auto-issues missing BOM material quantities from `Kho vật tư SX` and creates outbound Inventory movements.
 - Sprint 9 auto-issue planning preserves production warehouse slot/level and production issue transaction items carry the same warehouse/zone/slot/level into Inventory.
@@ -81,6 +108,8 @@ Known limitations:
 - Material issue from reservation is implemented, but approval-oriented multi-line issue/return documents are still future work.
 - Ledger records `RESERVE`, `RELEASE`, `ISSUE`, `RETURN`, and `CONSUME`; adjust writers remain future work.
 - Production material warehouse balance is still tied to Inventory transactions and issue rows, not a fully independent receipt/ledger model.
+- Production Warehouse Cockpit is a frontend composition over existing data; it is not yet a persisted production warehouse ledger.
+- Production Execution Board uses fallback stage mapping when backend stage data is absent or not canonical; a formal shopfloor stage model remains future work.
 - Component costing persists material actuals and exposes material-level breakdown; labor, machine, overhead, QC rework, and Yard handling cost are currently zero/manual future inputs.
 - Delivery and installation now complete the component lifecycle after Yard outbound with `SHIPPED -> DELIVERED -> INSTALLED`.
 - Installation mapping stores exact project placement fields on Component: `installZone`, `installAxis`, `installLevel`, and `installPosition`.
@@ -88,10 +117,40 @@ Known limitations:
 - Historical production issue rows that were created before Sprint 9 may still be missing exact slot/level transaction location and require reconciliation rather than silent mutation.
 - Historical issue/consume rows may remain partially unreconciled until a clean validation dataset or approved backfill is run; Sprint 10A fixed the active return path only.
 - Runtime integrity currently still reports one historical invalid reservation bucket created before Sprint 10C; no silent data backfill was performed.
+- Some repeated Production table/detail helper logic is still local and should be extracted only after operator review approves the Sprint 18A presentation.
+- Work Order material value analytics currently use required quantity as a proxy because current frontend data does not expose unit material cost per WO issue/BOM line.
+- Material Issue value KPI is shown as unavailable because current Material Issue API responses do not expose unit material cost or total line value.
+- Sprint 19C recommends deferring deeper Shopfloor dashboards until execution history/runtime data is canonical.
 
 Current focus:
 
-- Add material issue/return approval documents, adjust ledger writers, and richer production costing inputs.
+- Validate Sprint 20A Costing Engine against more real orders, then continue with 20B Component Cost Analysis and 20C Project Cost Control before deeper Shopfloor expansion.
+- Continue validating Sprint 18D/18E/19A/19B Work Order, Material Issue, Production Warehouse, and Execution Board cockpits with operators while keeping Shopfloor modeling gaps explicit.
+
+## Components
+
+Status:
+
+- In progress operational cockpit.
+
+Current architecture:
+
+- Components cover steel component master records, production linkage, lifecycle status, costing, QC/Yard handoff, and Project delivery/installation visibility.
+- Component lifecycle supports `READY -> SHIPPED -> DELIVERED -> INSTALLED` through existing APIs and Project/Yard integration.
+- Component costing persists estimated/actual cost from Production consumption and Inventory average cost, with material-level costing breakdown and variance warnings.
+- Components List and Components Stock follow the Sprint 12A Inventory cockpit layout foundation with shared page headers, shared card/table primitives, lifecycle KPI strips, shared empty/loading states, and shared detail drawers.
+- Sprint 18B turns Components List into a Component Management Cockpit with Inventory-style KPI strip, operational component grid, shared detail drawer, and analytics panels for weight, delay, material shortage, structure mix, and creation rhythm.
+- Sprint 18C adds BOM Intelligence mapping for Component material readiness and computes `Material Ready` from BOM required quantity versus Production Material Issue net issued quantity.
+
+Known limitations:
+
+- Component material readiness is currently aggregated in the frontend from existing Production/BOM/Issue responses; a backend readiness API may be useful if the same calculation spreads to more modules.
+- Component detail still lives as a drawer/modal surface on list pages rather than a dedicated `/components/:id` route.
+- Labor, machine, overhead, QC rework, Yard handling cost, approvals, and costing history snapshots remain future costing work.
+
+Current focus:
+
+- Validate Sprint 18B/18C cockpit and material readiness calculations with operators before extracting shared backend readiness endpoints.
 
 ## QC
 

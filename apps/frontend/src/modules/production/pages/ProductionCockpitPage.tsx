@@ -1,28 +1,39 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Activity, Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench, X } from 'lucide-react'
+import { Archive, Boxes, CheckCircle2, ClipboardList, Factory, FileStack, Gauge, PackageCheck, PackageX, Search, TriangleAlert, Wrench } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
-import { ModuleDataGrid, ModuleFilterBar, ModuleKpiStrip, ModulePageHeader } from '@/shared/ui/modules'
+import { ModuleDataGrid, ModuleDetailDrawer, ModuleFilterBar, ModuleKpiCard, ModuleKpiStrip, ModulePageHeader } from '@/shared/ui/modules'
+import {
+  InventoryChartCard,
+  InventoryKpi,
+  inventoryGridGap,
+  inventoryInput,
+  inventoryMutedButton,
+  inventoryPageStack,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '@/modules/inventory/components/InventoryVisuals'
 
-import type { ProductionBom, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
+import type { ProductionBom, ProductionComponent, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
+import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
   Meter,
   ProductionDonut,
-  ProductionKpi,
   ProductionMiniBars,
   ProductionPanel,
   StatusChip,
   productionMutedButton,
   productionPrimaryButton,
-  productionTableHead,
-  productionTableRow,
 } from '../components/ProductionCockpitShared'
+import { ProductionExecutionBoard } from '../components/ProductionExecutionBoard'
 import { ManufacturingOrderModal } from '../components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../components/ProductionBomModal'
 import { productionTabs } from '../config/production-tabs'
-import { formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
+import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
+import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import {
   useMaterialRequirements,
   useArchiveProductionBom,
@@ -54,6 +65,94 @@ import {
 const number = (value = 0) => formatQuantity(value, 3)
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
 
+function sameDay(value?: string) {
+  if (!value) return false
+  const input = new Date(value)
+  if (Number.isNaN(input.getTime())) return false
+  const now = new Date()
+  return input.getFullYear() === now.getFullYear() && input.getMonth() === now.getMonth() && input.getDate() === now.getDate()
+}
+
+function isDelayedOrder(order: ProductionOrder) {
+  if (['COMPLETED', 'CANCELLED'].includes(order.status)) return false
+  if (order.status === 'DELAYED') return true
+  if (!order.plannedEndAt) return false
+  const end = new Date(order.plannedEndAt)
+  return !Number.isNaN(end.getTime()) && end < new Date()
+}
+
+function orderProgress(order: ProductionOrder) {
+  if (order.status === 'COMPLETED') return 100
+  const stages = order.stages ?? []
+  if (stages.length) {
+    const completed = stages.filter((stage) => stage.status === 'COMPLETED').length
+    const running = stages.some((stage) => stage.status === 'IN_PROGRESS' || stage.status === 'READY') ? 0.5 : 0
+    return Math.min(99, Math.round(((completed + running) / stages.length) * 100))
+  }
+  if (order.status === 'IN_PROGRESS') return 58
+  if (isDelayedOrder(order)) return 22
+  return 12
+}
+
+function orderStatusTone(order: ProductionOrder) {
+  if (order.status === 'COMPLETED') return 'bg-emerald-500'
+  if (isDelayedOrder(order)) return 'bg-red-500'
+  if (order.status === 'IN_PROGRESS') return 'bg-cyan-500'
+  return 'bg-amber-500'
+}
+
+function orderMaterialReadiness(order: ProductionOrder) {
+  const readiness = workOrderReadiness(order)
+  if (!readiness.hasBom) return { label: 'Thiếu BOM', className: 'border-red-500/40 bg-red-500/10 text-red-300', readiness }
+  if (readiness.readinessPercent >= 100) return { label: 'READY TO RELEASE', className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', readiness }
+  if (readiness.readinessPercent >= 80) return { label: 'Gần đủ vật tư', className: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300', readiness }
+  if (readiness.readinessPercent >= 50) return { label: 'Thiếu một phần', className: 'border-amber-500/40 bg-amber-500/10 text-amber-300', readiness }
+  return { label: 'Thiếu vật tư', className: 'border-red-500/40 bg-red-500/10 text-red-300', readiness }
+}
+
+function stageFamily(value?: string) {
+  const raw = String(value ?? '').toLowerCase()
+  if (raw.includes('cut') || raw.includes('cắt')) return 'Cutting'
+  if (raw.includes('assembl') || raw.includes('lắp')) return 'Assembly'
+  if (raw.includes('weld') || raw.includes('hàn')) return 'Welding'
+  if (raw.includes('paint') || raw.includes('sơn')) return 'Painting'
+  if (raw.includes('finish') || raw.includes('hoàn')) return 'Finished'
+  return 'Waiting'
+}
+
+function workOrderReadiness(order: ProductionOrder, issues: ProductionMaterialIssue[] = []) {
+  return calculateComponentMaterialReadiness({
+    componentCode: order.component?.code ?? order.bom?.productCode ?? order.orderNo,
+    fallbackQuantity: Number(order.quantity ?? 1),
+    order,
+    boms: order.bom ? [order.bom] : [],
+    issues,
+  })
+}
+
+function readinessTone(percent: number) {
+  if (percent >= 100) return 'emerald'
+  if (percent >= 80) return 'cyan'
+  if (percent >= 50) return 'amber'
+  return 'red'
+}
+
+function readinessBarClass(percent: number) {
+  if (percent >= 100) return 'bg-emerald-500'
+  if (percent >= 80) return 'bg-cyan-500'
+  if (percent >= 50) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function workOrderStageProgress(order: ProductionOrder) {
+  const stages = ['Planning', 'Cutting', 'Assembly', 'Welding', 'Painting', 'Finished']
+  const progress = orderProgress(order)
+  return stages.map((stage, index) => ({
+    stage,
+    active: progress >= [0, 25, 35, 50, 75, 100][index],
+  }))
+}
+
 export function ProductionCockpitPage() {
   const location = useLocation()
   const [search, setSearch] = useState('')
@@ -78,6 +177,8 @@ export function ProductionCockpitPage() {
   const { data: ledger = [] } = useProductionMaterialLedger(ledgerQueryParams)
   const { data: logs = [] } = useProductionLogs()
   const { data: components = [] } = useProductionComponents()
+  const { data: inventoryItems = [] } = useInventoryItems()
+  const { data: inventoryAudit = [] } = useInventoryAudit()
 
   const view = location.pathname.split('/').at(-1) ?? 'production'
   const mode = view === 'production' ? 'overview' : view
@@ -90,7 +191,14 @@ export function ProductionCockpitPage() {
 
   const completed = orders.filter((item) => item.status === 'COMPLETED').length
   const inProgress = orders.filter((item) => item.status === 'IN_PROGRESS').length
-  const delayed = orders.filter((item) => item.status === 'DELAYED').length
+  const planned = orders.filter((item) => item.status === 'PLANNED').length
+  const released = orders.filter((item) => item.status === 'RELEASED').length
+  const completedToday = orders.filter((item) => item.status === 'COMPLETED' && sameDay(item.plannedEndAt)).length
+  const waitingMaterial = orders.filter((item) => item.bom && !(item.materialIssues ?? []).length && item.status !== 'COMPLETED').length
+  const delayed = orders.filter(isDelayedOrder).length
+  const runningComponents = orders.filter((item) => item.status === 'IN_PROGRESS' && item.component).length
+  const productionWeight = orders.reduce((sum, item) => sum + Number(item.quantity ?? 0) * Number(item.bom?.estimatedWeight ?? 0), 0)
+  const isWorkOrderMode = mode === 'orders'
 
   return <OperationalShell>
     <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
@@ -114,32 +222,47 @@ export function ProductionCockpitPage() {
         </div>
       </nav>
 
-      <ModuleKpiStrip className="grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
-        <ProductionKpi label="Tổng lệnh SX" value={number(orders.length)} note="Tất cả manufacturing order" tone="blue" active={!statusFilter} onClick={() => setStatusFilter('')} />
-        <ProductionKpi label="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="green" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} />
-        <ProductionKpi label="Hoàn thành" value={number(completed)} note="Đã sẵn sàng chuyển bãi" tone="green" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} />
-        <ProductionKpi label="Quá hạn" value={number(delayed)} note="Cần điều phối lại" tone="red" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} />
-        <ProductionKpi label="Production BOM" value={number(boms.length)} note="Định mức đang quản lý" tone="amber" />
-        <ProductionKpi label="Giữ chỗ vật tư" value={number(reservations.filter((item) => item.status === 'RESERVED').length)} note="Không trừ kho SX" tone="purple" />
+      <ModuleKpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        {isWorkOrderMode ? (
+          <>
+            <InventoryKpi title="Total Work Orders" value={number(orders.length)} note="Tất cả WO/MO" tone="blue" />
+            <InventoryKpi title="Planned" value={number(planned)} note="Đã lập kế hoạch" tone="purple" />
+            <InventoryKpi title="Released" value={number(released)} note="Sẵn sàng phát hành" tone="cyan" />
+            <InventoryKpi title="In Progress" value={number(inProgress)} note="Đang sản xuất" tone="emerald" />
+            <InventoryKpi title="Completed" value={number(completed)} note="Đã hoàn thành" tone="emerald" />
+            <InventoryKpi title="Delayed" value={number(delayed)} note="Quá hạn/chậm tiến độ" tone="red" />
+          </>
+        ) : (
+          <>
+            <ModuleKpiCard icon={<Gauge size={18} />} title="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="cyan" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} />
+            <ModuleKpiCard icon={<CheckCircle2 size={18} />} title="Hoàn thành hôm nay" value={number(completedToday)} note={`${number(completed)} hoàn thành tổng`} tone="emerald" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} />
+            <ModuleKpiCard icon={<PackageX size={18} />} title="Chờ vật tư" value={number(waitingMaterial)} note="MO chưa có issue" tone="amber" />
+            <ModuleKpiCard icon={<TriangleAlert size={18} />} title="Trễ tiến độ" value={number(delayed)} note="Quá hạn hoặc delayed" tone="red" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} />
+            <ModuleKpiCard icon={<PackageCheck size={18} />} title="Cấu kiện đang chạy" value={number(runningComponents)} note="Đang sản xuất" tone="purple" />
+            <ModuleKpiCard icon={<Factory size={18} />} title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} note="Theo BOM x MO" tone="blue" />
+          </>
+        )}
       </ModuleKpiStrip>
 
       <ModuleFilterBar className="my-3">
         <div className="flex min-w-64 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-5">
           <Search size={15} className="text-cyan-400" />
           <input value={search} onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" />
+            placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className={`${inventoryInput} w-full border-0 bg-transparent px-0 focus:border-0 focus:bg-transparent`} />
         </div>
-        <button onClick={() => setStatusFilter('')} className={`${productionMutedButton} xl:col-span-1 ${!statusFilter ? 'border-cyan-400/50 text-cyan-200' : ''}`}>Trạng thái: Tất cả</button>
+        <button onClick={() => setStatusFilter('')} className={`${inventoryMutedButton} xl:col-span-1 ${!statusFilter ? 'border-cyan-400/50 text-cyan-200' : ''}`}>Trạng thái: Tất cả</button>
         {['Xưởng: Tất cả', 'Dự án: Tất cả', 'Ưu tiên: Tất cả'].map((text) =>
-          <button key={text} className={`${productionMutedButton} xl:col-span-1`}>{text}</button>)}
+          <button key={text} className={`${inventoryMutedButton} xl:col-span-1`}>{text}</button>)}
       </ModuleFilterBar>
 
-      {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} onOpen={setSelectedOrder} />}
+      {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} reservations={reservations} issues={issues} components={components} onOpen={setSelectedOrder} />}
       {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
       {mode === 'orders' && <Orders rows={filteredOrders} onOpen={setSelectedOrder} />}
+      {mode === 'execution' && <ProductionExecutionBoard orders={orders} issues={issues} reservations={reservations} />}
       {mode === 'reservations' && <Reservations rows={reservations} orders={orders} onOpen={setSelectedOrder} />}
+      {mode === 'warehouse' && <ProductionWarehouseCockpit inventoryItems={inventoryItems as InventoryItemLike[]} auditRows={inventoryAudit as InventoryAuditLike[]} orders={orders} reservations={reservations} consumptions={consumptions} />}
       {mode === 'material-ledger' && <MaterialLedger rows={ledger} orders={orders} filters={ledgerFilters} onFiltersChange={setLedgerFilters} />}
-      {mode === 'material-issues' && <Issues rows={issues} consumptions={consumptions} />}
+      {mode === 'material-issues' && <Issues rows={issues} consumptions={consumptions} orders={orders} />}
       {mode === 'consumptions' && <Consumptions issues={issues} consumptions={consumptions} />}
       {mode === 'logs' && <Logs rows={logs} />}
 
@@ -152,83 +275,182 @@ export function ProductionCockpitPage() {
   </OperationalShell>
 }
 
-function Overview({ orders, logs, onOpen }: { orders: ProductionOrder[]; logs: ReturnType<typeof useProductionLogs>['data']; onOpen: (row: ProductionOrder) => void }) {
-  return <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
-    <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-3">
-        <ProductionPanel title="Thao tác nhanh">
-          <ActionCards compact />
-        </ProductionPanel>
-        <ProductionPanel title="MO hôm nay">
-          <div className="grid grid-cols-[auto_1fr] items-end gap-4">
-            <div className="text-4xl font-semibold text-white">{orders.slice(0, 8).length}</div>
-            <div className="text-right text-sm text-slate-300">
-              <div>{formatQuantity(orders.filter((row) => row.status === 'IN_PROGRESS').length, 0)} đang chạy</div>
-              <div className="mt-1 text-xs text-blue-300">Xem chi tiết</div>
-            </div>
-          </div>
-        </ProductionPanel>
-        <ProductionPanel title="BOM đang dùng">
-          <div className="grid grid-cols-[auto_1fr] items-end gap-4">
-            <div className="text-4xl font-semibold text-white">{orders.filter((row) => row.bom).length}</div>
-            <div className="text-right text-sm text-slate-300">
-              <div>{formatQuantity(orders.length, 0)} MO</div>
-              <div className="mt-1 text-xs text-emerald-300">Đồng bộ BOM</div>
-            </div>
-          </div>
-        </ProductionPanel>
-      </div>
-      <ProductionPanel title="Tiến độ sản xuất theo ngày">
-        <div className="grid h-44 grid-cols-12 items-end gap-2 border-b border-l border-slate-800 px-3 pb-3">
-          {[34, 48, 43, 58, 66, 72, 63, 81, 77, 86, 82, 94].map((value, index) =>
-            <div key={index} className="rounded-t bg-cyan-500/80" style={{ height: `${value}%` }} />)}
-        </div>
-      </ProductionPanel>
-      <Orders rows={orders.slice(0, 8)} onOpen={onOpen} embedded />
-      <div className="grid gap-3 md:grid-cols-3">
-        {[
-          ['Cắt', 82, '14 job đang chạy'],
-          ['Hàn', 91, 'Áp lực cao, 6 job chờ'],
-          ['Sơn', 64, '8 job đang chạy'],
-        ].map(([name, load, note]) => <ProductionPanel key={String(name)} title={`Xưởng ${name}`}>
-          <Meter value={Number(load)} tone={Number(load) > 85 ? 'bg-amber-500' : 'bg-cyan-500'} />
-          <div className="mt-3 flex justify-between text-xs"><span className="text-slate-400">{note}</span><span>{load}%</span></div>
-        </ProductionPanel>)}
-      </div>
-    </div>
-    <aside className="space-y-3">
-      <ProductionPanel title="Phân bổ trạng thái">
+function Overview({
+  orders,
+  logs,
+  reservations,
+  issues,
+  components,
+  onOpen,
+}: {
+  orders: ProductionOrder[]
+  logs: ReturnType<typeof useProductionLogs>['data']
+  reservations: ProductionReservation[]
+  issues: ProductionMaterialIssue[]
+  components: ProductionComponent[]
+  onOpen: (row: ProductionOrder) => void
+}) {
+  const running = orders.filter((row) => row.status === 'IN_PROGRESS').length
+  const pending = orders.filter((row) => !['IN_PROGRESS', 'COMPLETED'].includes(row.status) && !isDelayedOrder(row)).length
+  const completed = orders.filter((row) => row.status === 'COMPLETED').length
+  const stageRows = ['Cutting', 'Assembly', 'Welding', 'Painting', 'Finished'].map((label) => [
+    label,
+    orders.filter((row) => stageFamily(row.currentStageCode ?? row.stages?.find((stage) => stage.status === 'IN_PROGRESS' || stage.status === 'READY')?.name) === label).length,
+  ] as [string, number])
+  const issuedOrders = new Set(issues.map((issue) => issue.productionOrderId))
+  const reservedOrders = new Set(reservations.filter((row) => ['RESERVED', 'PARTIALLY_ISSUED'].includes(row.status)).map((row) => row.productionOrderId))
+  const issued = orders.filter((row) => issuedOrders.has(row.id)).length
+  const waiting = orders.filter((row) => !issuedOrders.has(row.id) && reservedOrders.has(row.id)).length
+  const shortage = orders.filter((row) => row.bom && !issuedOrders.has(row.id) && !reservedOrders.has(row.id) && row.status !== 'COMPLETED').length
+  const activeComponents = components
+    .filter((component) => orders.some((order) => order.component?.id === component.id && order.status !== 'COMPLETED'))
+    .slice(0, 5)
+
+  return <div className={inventoryPageStack}>
+    <Orders rows={orders} onOpen={onOpen} embedded />
+    <div className={`grid ${inventoryGridGap} xl:grid-cols-2`}>
+      <InventoryChartCard title="Tiến độ sản xuất" note="Running / Pending / Completed">
         <ProductionDonut
           centerValue={formatQuantity(orders.length, 0)}
-          centerLabel="lệnh SX"
+          centerLabel="MO"
           segments={[
-            { label: 'Hoàn thành', value: orders.filter((row) => row.status === 'COMPLETED').length, color: '#14c987' },
-            { label: 'Đang SX', value: orders.filter((row) => row.status === 'IN_PROGRESS').length, color: '#1d7cff' },
-            { label: 'Quá hạn', value: orders.filter((row) => row.status === 'DELAYED').length, color: '#ef4444' },
-            { label: 'Khác', value: orders.filter((row) => !['COMPLETED', 'IN_PROGRESS', 'DELAYED'].includes(row.status)).length, color: '#f59e0b' },
+            { label: 'Running', value: running, color: '#06b6d4' },
+            { label: 'Pending', value: pending, color: '#f59e0b' },
+            { label: 'Completed', value: completed, color: '#14c987' },
           ]}
         />
-      </ProductionPanel>
-      <ProductionPanel title="Tải xưởng">
-        <ProductionMiniBars values={[42, 48, 51, 63, 58, 72, 69, 81, 75, 88, 84, 92]} />
-      </ProductionPanel>
-      <ProductionPanel title="Hoạt động gần đây">
+      </InventoryChartCard>
+      <InventoryChartCard title="Công đoạn sản xuất" note="Phân bổ theo công đoạn hiện tại">
+        <ProductionMiniBars values={stageRows.map(([, value]) => value || 1)} />
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
+          {stageRows.map(([label, value]) => <Info key={label} k={label} v={formatQuantity(value, 0)} />)}
+        </div>
+      </InventoryChartCard>
+      <InventoryChartCard title="Vật tư cấp phát" note="Theo issue/reservation hiện có">
+        <ProductionDonut
+          centerValue={formatQuantity(orders.length, 0)}
+          centerLabel="MO"
+          segments={[
+            { label: 'Đã cấp phát', value: issued, color: '#14c987' },
+            { label: 'Chờ cấp phát', value: waiting, color: '#f59e0b' },
+            { label: 'Thiếu vật tư', value: shortage, color: '#ef4444' },
+          ]}
+        />
+      </InventoryChartCard>
+      <InventoryChartCard title="Cấu kiện đang sản xuất" note="Top 5 theo lệnh đang mở">
+        <div className="space-y-2">
+          {activeComponents.length ? activeComponents.map((component) => (
+            <div key={component.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="truncate font-semibold text-cyan-300">{component.code}</div>
+                <div className="truncate text-slate-400">{component.name}</div>
+              </div>
+              <StatusChip status="RUNNING" />
+            </div>
+          )) : <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-400">Chưa có cấu kiện đang sản xuất</div>}
+        </div>
+      </InventoryChartCard>
+    </div>
+    <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_330px]`}>
+      <InventoryChartCard title="Hoạt động gần đây" note="Nhật ký thực thi sản xuất">
         <ActivityList logs={logs ?? []} />
-      </ProductionPanel>
-    </aside>
+      </InventoryChartCard>
+      <InventoryChartCard title="Thao tác nhanh" note="Lối tắt vận hành">
+        <ActionCards compact />
+      </InventoryChartCard>
+    </div>
   </div>
 }
 
 function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; onOpen: (row: ProductionOrder) => void; embedded?: boolean }) {
-  return <ProductionPanel title={embedded ? 'Lệnh sản xuất đang hoạt động' : 'Danh sách manufacturing order'} action={<span className="text-[11px] text-cyan-300">1-10 / {rows.length}</span>}>
-    <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[940px] text-left text-xs">
-      <thead className={productionTableHead}><tr>{['MO Number', 'Kết cấu', 'BOM', 'Số lượng', 'Ưu tiên', 'Công đoạn', 'Tiến độ', 'Bắt đầu', 'Đến hạn', 'Trạng thái'].map((x) => <th key={x} className="px-3 py-2 text-left font-medium">{x}</th>)}</tr></thead>
-      <tbody>{rows.slice(0, 10).map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${productionTableRow}`}>
-        <td className="py-3 pr-3 text-cyan-300">{row.orderNo}</td><td>{row.title}</td><td>{row.bom?.bomNo ?? '-'}</td><td>{number(row.quantity)}</td><td>{row.priority}</td><td>{row.currentStageCode ?? 'WAITING'}</td>
-        <td className="w-28 pr-3"><Meter value={row.status === 'COMPLETED' ? 100 : row.status === 'IN_PROGRESS' ? 58 : 15} /></td><td>{date(row.plannedStartAt)}</td><td>{date(row.plannedEndAt)}</td><td><StatusChip status={row.status} /></td>
-      </tr>)}</tbody>
-    </table></div></ModuleDataGrid>
-  </ProductionPanel>
+  const enriched = rows.map((row) => {
+    const readiness = orderMaterialReadiness(row)
+    const progress = orderProgress(row)
+    return {
+      row,
+      readiness,
+      progress,
+      materialValueProxy: readiness.readiness.requiredQty,
+    }
+  })
+  const topValue = [...enriched].sort((a, b) => b.materialValueProxy - a.materialValueProxy).slice(0, 5)
+  const topShortage = enriched
+    .filter((item) => item.readiness.readiness.hasBom && item.readiness.readiness.remainingQty > 0)
+    .sort((a, b) => b.readiness.readiness.remainingQty - a.readiness.readiness.remainingQty)
+    .slice(0, 5)
+  const upcomingDelayed = enriched
+    .filter((item) => !['COMPLETED', 'CANCELLED'].includes(item.row.status) && item.row.plannedEndAt)
+    .sort((a, b) => new Date(a.row.plannedEndAt ?? '').getTime() - new Date(b.row.plannedEndAt ?? '').getTime())
+    .slice(0, 5)
+  const progressSegments = [
+    { label: 'Planning', value: enriched.filter((item) => item.progress < 25).length, color: '#64748b' },
+    { label: 'Cutting', value: enriched.filter((item) => item.progress >= 25 && item.progress < 50).length, color: '#06b6d4' },
+    { label: 'Welding', value: enriched.filter((item) => item.progress >= 50 && item.progress < 75).length, color: '#f59e0b' },
+    { label: 'Painting', value: enriched.filter((item) => item.progress >= 75 && item.progress < 100).length, color: '#7c3aed' },
+    { label: 'Finished', value: enriched.filter((item) => item.progress >= 100).length, color: '#14c987' },
+  ]
+  const readinessSegments = [
+    { label: '0-49%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent < 50).length, color: '#ef4444' },
+    { label: '50-79%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent >= 50 && item.readiness.readiness.readinessPercent < 80).length, color: '#f59e0b' },
+    { label: '80-99%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent >= 80 && item.readiness.readiness.readinessPercent < 100).length, color: '#06b6d4' },
+    { label: '100%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent >= 100).length, color: '#14c987' },
+  ]
+
+  const grid = (
+    <InventoryChartCard title={embedded ? 'Production Orders' : 'Work Order Cockpit'} note="WO No, Component, Project, Material Ready, Progress, Due Date" action={<span className="text-[11px] text-cyan-300">1-10 / {rows.length}</span>}>
+      <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1180px] text-left text-xs">
+        <thead className={inventoryTableHead}><tr>{['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((x) => <th key={x} className="px-3 py-2 text-left font-medium">{x}</th>)}</tr></thead>
+        <tbody>{enriched.slice(0, 10).map(({ row, readiness, progress }) => (
+          <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+            <td className="px-3 py-3 font-semibold text-cyan-300">{row.orderNo}<div className="mt-1 text-[10px] text-slate-500">{row.title}</div></td>
+            <td className="px-3 py-3">{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
+            <td className="px-3 py-3">{row.projectId ?? row.component?.project?.code ?? '-'}</td>
+            <td className="px-3 py-3 font-mono tabular-nums">{number(row.quantity)}</td>
+            <td className="w-44 px-3 py-3">
+              <Meter value={readiness.readiness.readinessPercent} tone={readinessBarClass(readiness.readiness.readinessPercent)} />
+              <div className={`mt-1 text-[10px] ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                {formatQuantity(readiness.readiness.readinessPercent, 0)}% · {readiness.label}
+              </div>
+            </td>
+            <td className="w-40 px-3 py-3">
+              <Meter value={progress} tone={orderStatusTone(row)} />
+              <div className="mt-1 text-[10px] text-slate-500">{progress}%</div>
+            </td>
+            <td className="px-3 py-3">{date(row.plannedEndAt)}{isDelayedOrder(row) ? <div className="mt-1 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
+            <td className="px-3 py-3"><StatusChip status={row.status} /></td>
+          </tr>
+        ))}</tbody>
+      </table></div></ModuleDataGrid>
+    </InventoryChartCard>
+  )
+
+  if (embedded) return grid
+
+  return (
+    <div className={inventoryPageStack}>
+      {grid}
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-5`}>
+        <InventoryChartCard title="Top WO theo giá trị vật tư" note="Proxy theo required qty do API chưa có unit cost">
+          <RankList rows={topValue.map((item) => ({ id: item.row.id, title: item.row.orderNo, subtitle: item.row.title, value: number(item.materialValueProxy) }))} />
+        </InventoryChartCard>
+        <InventoryChartCard title="Top WO thiếu vật tư" note="Remaining required qty">
+          <RankList rows={topShortage.map((item) => ({ id: item.row.id, title: item.row.orderNo, subtitle: item.row.title, value: number(item.readiness.readiness.remainingQty) }))} empty="Không có WO thiếu vật tư" />
+        </InventoryChartCard>
+        <InventoryChartCard title="WO sắp trễ" note="Sắp xếp theo Due Date">
+          <RankList rows={upcomingDelayed.map((item) => ({ id: item.row.id, title: item.row.orderNo, subtitle: item.row.title, value: date(item.row.plannedEndAt) }))} empty="Chưa có WO có hạn" />
+        </InventoryChartCard>
+        <InventoryChartCard title="Tiến độ sản xuất" note="Planning → Finished">
+          <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="WO" segments={progressSegments} />
+        </InventoryChartCard>
+        <InventoryChartCard title="Material readiness distribution" note="0-49 / 50-79 / 80-99 / 100">
+          <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="WO" segments={readinessSegments} />
+        </InventoryChartCard>
+      </div>
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+        READY TO RELEASE hiện chỉ là cảnh báo UI: Work Order có Material Readiness &gt;= 100%. Workflow chưa bị khóa.
+      </div>
+    </div>
+  )
 }
 
 function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row: ProductionBom) => void; onCreate: () => void }) {
@@ -253,20 +475,494 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
     }
   }
 
-  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]"><ProductionPanel title="Production BOM Registry" action={<button onClick={onCreate} className={productionMutedButton}>+ Tạo BOM</button>}>
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[950px] text-left text-xs"><thead className={productionTableHead}><tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-    <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className={`cursor-pointer ${productionTableRow}`}><td className="px-3 py-3">{index+1}</td><td className="px-3 py-3 text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td>{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td><div className="flex gap-2 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td></tr>)}</tbody></table></div></div>
-  </ProductionPanel><aside className="space-y-3"><ProductionPanel title="Phân loại BOM"><ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={[{ label: 'Dầm chính', value: 42, color: '#1d7cff' }, { label: 'Cột thép', value: 28, color: '#14c987' }, { label: 'Bản mã', value: 18, color: '#f59e0b' }, { label: 'Giằng', value: 12, color: '#7c3aed' }]} /></ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside></div>
+  const active = rows.filter((row) => row.status !== 'ARCHIVED').length
+  const totalMaterials = rows.reduce((sum, row) => sum + row.items.length, 0)
+  const totalWeight = rows.reduce((sum, row) => sum + Number(row.estimatedWeight ?? 0), 0)
+
+  return <div className={inventoryPageStack}>
+    <ModuleKpiStrip className="grid-cols-2 md:grid-cols-4">
+      <InventoryKpi title="Tổng BOM" value={formatQuantity(rows.length, 0)} note="Định mức sản xuất" tone="blue" />
+      <InventoryKpi title="Đang dùng" value={formatQuantity(active, 0)} note="Không archive" tone="emerald" />
+      <InventoryKpi title="Dòng vật tư" value={formatQuantity(totalMaterials, 0)} note="Tổng BOM items" tone="cyan" />
+      <InventoryKpi title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} note="Tổng estimated weight" tone="purple" />
+    </ModuleKpiStrip>
+    <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_320px]`}>
+      <InventoryChartCard title="Production BOM Registry" note="Danh sách định mức sản xuất" action={<button onClick={onCreate} className={inventoryMutedButton}>+ Tạo BOM</button>}>
+        <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs"><thead className={inventoryTableHead}><tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+        <tbody>{rows.slice(0,10).map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}><td className="px-3 py-3">{index+1}</td><td className="px-3 py-3 font-semibold text-cyan-300">{row.bomNo}</td><td>{row.productCode}</td><td>{row.productName}</td><td>{row.structureType??'-'}</td><td>{row.projectId??'-'}</td><td>{row.unit??'-'}</td><td>{row.items.length}</td><td className="font-mono tabular-nums">{number(row.estimatedWeight)} kg</td><td><StatusChip status={row.status}/></td><td>{date(row.createdAt)}</td><td><div className="flex gap-2 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td></tr>)}</tbody></table></div></ModuleDataGrid>
+      </InventoryChartCard>
+      <aside className="space-y-3"><ProductionPanel title="Phân loại BOM"><ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={[{ label: 'Dầm chính', value: 42, color: '#1d7cff' }, { label: 'Cột thép', value: 28, color: '#14c987' }, { label: 'Bản mã', value: 18, color: '#f59e0b' }, { label: 'Giằng', value: 12, color: '#7c3aed' }]} /></ProductionPanel><ProductionPanel title="Thao tác nhanh"><ActionCards /></ProductionPanel></aside>
+    </div>
+  </div>
+}
+
+type LocationBalanceLike = {
+  warehouseId?: string
+  warehouseCode?: string
+  warehouseName?: string
+  zoneId?: string
+  zoneCode?: string
+  zoneName?: string
+  slotId?: string
+  level?: string | number
+  quantity?: number | string
+}
+
+type InventoryItemLike = {
+  id: string
+  code?: string
+  name?: string
+  unit?: string
+  unitPrice?: number | string
+  averageCost?: number | string
+  minimumStock?: number | string
+  unitMaster?: { symbol?: string }
+  locationBalances?: LocationBalanceLike[]
+}
+
+type InventoryAuditLike = {
+  materialId?: string
+  inventoryItemId?: string
+  averageCost?: number | string
+}
+
+type ProductionWarehouseMaterialRow = {
+  id: string
+  code: string
+  name: string
+  unit: string
+  mainStock: number
+  productionStock: number
+  reserved: number
+  available: number
+  required: number
+  shortage: number
+  averageCost: number
+  inventoryValue: number
+  readiness: number
+  status: 'OUT' | 'LOW' | 'NORMAL'
+  locations: LocationBalanceLike[]
+}
+
+function numeric(value: unknown) {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function isMainWarehouseBalance(location: LocationBalanceLike) {
+  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location.warehouseName ?? '').trim().toLowerCase()
+  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+}
+
+function isProductionWarehouseBalance(location: LocationBalanceLike) {
+  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location.warehouseName ?? '').trim().toLowerCase()
+  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+}
+
+function stockFromLocations(item: InventoryItemLike, predicate: (location: LocationBalanceLike) => boolean) {
+  return (item.locationBalances ?? [])
+    .filter(predicate)
+    .reduce((sum, location) => sum + numeric(location.quantity), 0)
+}
+
+function productionLocationLabel(location: LocationBalanceLike) {
+  const zone = [location.zoneCode, location.zoneName].filter(Boolean).join(' - ') || location.zoneId || 'Production Zone'
+  const slot = location.slotId ? ` / ${location.slotId}` : ''
+  const level = location.level ? ` / ${String(location.level).startsWith('L') ? location.level : `L${location.level}`}` : ''
+  return `${zone}${slot}${level}`
+}
+
+function buildProductionWarehouseRows({
+  inventoryItems,
+  auditRows,
+  orders,
+  reservations,
+}: {
+  inventoryItems: InventoryItemLike[]
+  auditRows: InventoryAuditLike[]
+  orders: ProductionOrder[]
+  reservations: ProductionReservation[]
+}) {
+  const auditByItem = new Map(
+    auditRows.map((row) => [String(row.materialId ?? row.inventoryItemId), row]),
+  )
+  const requiredByItem = new Map<string, number>()
+  const reservedByItem = new Map<string, number>()
+
+  orders
+    .filter((order) => !['COMPLETED', 'CANCELLED'].includes(order.status))
+    .forEach((order) => {
+      const orderQty = numeric(order.quantity) || 1
+      ;(order.bom?.items ?? []).forEach((item) => {
+        const materialId = String(item.materialId ?? item.material?.id ?? '')
+        if (!materialId) return
+        const required = numeric(item.quantity) * (1 + numeric(item.wastePercent) / 100) * orderQty
+        requiredByItem.set(materialId, (requiredByItem.get(materialId) ?? 0) + required)
+      })
+    })
+
+  reservations
+    .filter((reservation) => ['RESERVED', 'PARTIALLY_ISSUED'].includes(reservation.status))
+    .forEach((reservation) => {
+      reservation.lines.forEach((line) => {
+        const reserved = Math.max(0, numeric(line.reservedQty) - numeric(line.issuedQty))
+        reservedByItem.set(line.inventoryItemId, (reservedByItem.get(line.inventoryItemId) ?? 0) + reserved)
+      })
+    })
+
+  return inventoryItems
+    .map<ProductionWarehouseMaterialRow>((item) => {
+      const productionLocations = (item.locationBalances ?? []).filter(isProductionWarehouseBalance)
+      const mainStock = stockFromLocations(item, isMainWarehouseBalance)
+      const productionStock = productionLocations.reduce((sum, location) => sum + numeric(location.quantity), 0)
+      const reserved = reservedByItem.get(item.id) ?? 0
+      const required = requiredByItem.get(item.id) ?? 0
+      const available = Math.max(0, productionStock - reserved)
+      const shortage = Math.max(0, required - available)
+      const minimumStock = numeric(item.minimumStock)
+      const averageCost = numeric(auditByItem.get(item.id)?.averageCost ?? item.averageCost ?? item.unitPrice)
+      const readiness = required > 0 ? Math.min(100, (available / required) * 100) : available > 0 ? 100 : 0
+      const status: ProductionWarehouseMaterialRow['status'] = available <= 0
+        ? 'OUT'
+        : shortage > 0 || (minimumStock > 0 && available <= minimumStock)
+          ? 'LOW'
+          : 'NORMAL'
+      return {
+        id: item.id,
+        code: item.code ?? item.id,
+        name: item.name ?? '-',
+        unit: item.unitMaster?.symbol ?? item.unit ?? '-',
+        mainStock,
+        productionStock,
+        reserved,
+        available,
+        required,
+        shortage,
+        averageCost,
+        inventoryValue: productionStock * averageCost,
+        readiness,
+        status,
+        locations: productionLocations,
+      }
+    })
+    .filter((row) => row.productionStock > 0 || row.required > 0 || row.reserved > 0)
+}
+
+function statusText(status: ProductionWarehouseMaterialRow['status']) {
+  if (status === 'OUT') return 'OUT'
+  if (status === 'LOW') return 'LOW'
+  return 'NORMAL'
+}
+
+function statusToneClass(status: ProductionWarehouseMaterialRow['status']) {
+  if (status === 'OUT') return 'border-red-500/40 bg-red-500/10 text-red-300'
+  if (status === 'LOW') return 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+  return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+}
+
+function ProductionWarehouseCockpit({
+  inventoryItems,
+  auditRows,
+  orders,
+  reservations,
+  consumptions,
+}: {
+  inventoryItems: InventoryItemLike[]
+  auditRows: InventoryAuditLike[]
+  orders: ProductionOrder[]
+  reservations: ProductionReservation[]
+  consumptions: ProductionMaterialConsumption[]
+}) {
+  const [selectedRow, setSelectedRow] = useState<ProductionWarehouseMaterialRow | null>(null)
+  const rows = useMemo(
+    () => buildProductionWarehouseRows({ inventoryItems, auditRows, orders, reservations }),
+    [inventoryItems, auditRows, orders, reservations],
+  )
+  const productionStock = rows.reduce((sum, row) => sum + row.productionStock, 0)
+  const reserved = rows.reduce((sum, row) => sum + row.reserved, 0)
+  const available = rows.reduce((sum, row) => sum + row.available, 0)
+  const shortageRisk = rows.filter((row) => row.shortage > 0 || row.status === 'OUT').length
+  const inventoryValue = rows.reduce((sum, row) => sum + row.inventoryValue, 0)
+  const materialCount = rows.filter((row) => row.productionStock > 0).length
+  const orderById = new Map(orders.map((order) => [order.id, order]))
+  const topWoConsumption = Array.from(consumptions.reduce((map, row) => {
+    const current = map.get(row.productionOrderId) ?? 0
+    map.set(row.productionOrderId, current + numeric(row.consumedQty) + numeric(row.scrapQty))
+    return map
+  }, new Map<string, number>()).entries())
+    .map(([id, value]) => ({ id, title: orderById.get(id)?.orderNo ?? id, subtitle: orderById.get(id)?.title ?? 'Production consumption', value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5)
+  const readinessRows = [...rows]
+    .sort((a, b) => a.readiness - b.readiness)
+    .slice(0, 5)
+  const productionLocations = rows
+    .flatMap((row) => row.locations.map((location) => ({
+      id: `${row.id}-${location.zoneId ?? 'zone'}-${location.slotId ?? 'slot'}-${location.level ?? 'level'}`,
+      material: `${row.code} · ${row.name}`,
+      location: productionLocationLabel(location),
+      quantity: numeric(location.quantity),
+      unit: row.unit,
+      value: numeric(location.quantity) * row.averageCost,
+    })))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 10)
+  const shortageRows = rows.filter((row) => row.shortage > 0).sort((a, b) => b.shortage - a.shortage).slice(0, 8)
+
+  return (
+    <div className={inventoryPageStack}>
+      <ModuleKpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        <InventoryKpi title="Production Stock" value={number(productionStock)} note="Chỉ Kho vật tư SX" tone="blue" />
+        <InventoryKpi title="Materials in Production" value={formatQuantity(materialCount, 0)} note="Có tồn SX" tone="cyan" />
+        <InventoryKpi title="Reserved for WO" value={number(reserved)} note="Reserved chưa issue" tone="purple" />
+        <InventoryKpi title="Available for WO" value={number(available)} note="Production - Reserved" tone="emerald" />
+        <InventoryKpi title="Shortage Risk" value={formatQuantity(shortageRisk, 0)} note="Required > Available" tone={shortageRisk > 0 ? 'red' : 'emerald'} />
+        <InventoryKpi title="Inventory Value" value={formatCurrencyVnd(inventoryValue)} note="Nếu có cost" tone="amber" />
+      </ModuleKpiStrip>
+
+      <InventoryChartCard title="Production Warehouse Material Grid" note="Không dùng Total Stock; trạng thái dựa trên Available tại Kho vật tư SX">
+        <ModuleDataGrid>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1280px] text-left text-xs">
+              <thead className={inventoryTableHead}>
+                <tr>{['Material', 'Main Stock', 'Production Stock', 'Reserved', 'Available', 'Required', 'Shortage', 'Status'].map((head) => <th key={head} className="px-3 py-2 text-left font-medium">{head}</th>)}</tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 20).map((row) => (
+                  <tr key={row.id} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+                    <td className="px-3 py-3 text-cyan-300">{row.code}<div className="mt-1 text-[10px] text-slate-500">{row.name}</div></td>
+                    <td className="font-mono tabular-nums">{number(row.mainStock)} {row.unit}</td>
+                    <td className="font-mono tabular-nums text-cyan-300">{number(row.productionStock)} {row.unit}</td>
+                    <td className="font-mono tabular-nums text-purple-300">{number(row.reserved)} {row.unit}</td>
+                    <td className="font-mono tabular-nums text-emerald-300">{number(row.available)} {row.unit}</td>
+                    <td className="font-mono tabular-nums">{number(row.required)} {row.unit}</td>
+                    <td className={row.shortage > 0 ? 'font-mono tabular-nums text-red-300' : 'font-mono tabular-nums text-slate-500'}>{number(row.shortage)} {row.unit}</td>
+                    <td><span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${statusToneClass(row.status)}`}>{statusText(row.status)}</span></td>
+                  </tr>
+                ))}
+                {!rows.length ? <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500">Chưa có dữ liệu kho vật tư sản xuất.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+        </ModuleDataGrid>
+      </InventoryChartCard>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-4`}>
+        <InventoryChartCard title="Top WO tiêu thụ vật tư" note="Consumed + Scrap">
+          <RankList rows={topWoConsumption.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có tiêu hao vật tư" />
+        </InventoryChartCard>
+        <InventoryChartCard title="Readiness theo vật tư" note="Available / Required">
+          <RankList rows={readinessRows.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.readiness, 0)}%` }))} empty="Chưa có nhu cầu BOM" />
+        </InventoryChartCard>
+        <InventoryChartCard title="Production Locations" note="Production Zone / Slot / Level">
+          <RankList rows={productionLocations.slice(0, 5).map((row) => ({ id: row.id, title: row.location, subtitle: row.material, value: `${number(row.quantity)} ${row.unit}` }))} empty="Chưa có vị trí SX" />
+        </InventoryChartCard>
+        <InventoryChartCard title="Shortage Board" note="Required > Available">
+          <RankList rows={shortageRows.map((row) => ({ id: row.id, title: row.code, subtitle: `${row.name} · Required ${number(row.required)} / Available ${number(row.available)}`, value: number(row.shortage) }))} empty="Không có thiếu hụt" />
+        </InventoryChartCard>
+      </div>
+
+      <InventoryChartCard title="Production Zone / Slot / Level Detail" note="Nhóm tồn Kho vật tư SX theo vị trí">
+        <ModuleDataGrid>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-xs">
+              <thead className={inventoryTableHead}>
+                <tr>{['Material', 'Production Location', 'Quantity', 'Value'].map((head) => <th key={head} className="px-3 py-2 text-left font-medium">{head}</th>)}</tr>
+              </thead>
+              <tbody>
+                {productionLocations.map((row) => (
+                  <tr key={row.id} className={inventoryTableRow}>
+                    <td className="px-3 py-3 text-cyan-300">{row.material}</td>
+                    <td>{row.location}</td>
+                    <td className="font-mono tabular-nums">{number(row.quantity)} {row.unit}</td>
+                    <td className="font-mono tabular-nums text-amber-300">{formatCurrencyVnd(row.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ModuleDataGrid>
+      </InventoryChartCard>
+
+      <ProductionWarehouseDrawer row={selectedRow} onClose={() => setSelectedRow(null)} />
+    </div>
+  )
+}
+
+function ProductionWarehouseDrawer({ row, onClose }: { row: ProductionWarehouseMaterialRow | null; onClose: () => void }) {
+  if (!row) return null
+  return (
+    <ModuleDetailDrawer open title={row.name} subtitle={row.code} onClose={onClose} widthClass="max-w-4xl">
+      <div className="grid gap-3 md:grid-cols-4">
+        <InventoryKpi title="Production Stock" value={`${number(row.productionStock)} ${row.unit}`} note="Kho vật tư SX" tone="blue" />
+        <InventoryKpi title="Reserved" value={`${number(row.reserved)} ${row.unit}`} note="WO reservation" tone="purple" />
+        <InventoryKpi title="Available" value={`${number(row.available)} ${row.unit}`} note="Có thể cấp WO" tone="emerald" />
+        <InventoryKpi title="Shortage" value={`${number(row.shortage)} ${row.unit}`} note="Required - Available" tone={row.shortage > 0 ? 'red' : 'emerald'} />
+      </div>
+      <div className="mt-3 grid gap-3 xl:grid-cols-2">
+        <InventoryChartCard title="Production Locations" note="Nhóm vị trí sản xuất">
+          <div className="space-y-2">
+            {row.locations.map((location) => (
+              <div key={`${location.zoneId}-${location.slotId}-${location.level}`} className="grid grid-cols-[1fr_auto] gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+                <span className="text-slate-300">{productionLocationLabel(location)}</span>
+                <span className="font-mono tabular-nums text-cyan-300">{number(numeric(location.quantity))} {row.unit}</span>
+              </div>
+            ))}
+            {!row.locations.length ? <div className="rounded-xl border border-white/10 bg-white/[0.035] p-5 text-center text-sm text-slate-500">Không có tồn kho sản xuất.</div> : null}
+          </div>
+        </InventoryChartCard>
+        <InventoryChartCard title="Readiness" note="Available / Required">
+          <ProductionDonut centerValue={`${formatQuantity(row.readiness, 0)}%`} centerLabel="ready" segments={[
+            { label: 'Available', value: row.available, color: '#14c987' },
+            { label: 'Shortage', value: row.shortage, color: '#ef4444' },
+            { label: 'Reserved', value: row.reserved, color: '#7c3aed' },
+          ]} />
+        </InventoryChartCard>
+      </div>
+    </ModuleDetailDrawer>
+  )
+}
+
+type IssueControlRow = {
+  issue: ProductionMaterialIssue
+  issueNo: string
+  order?: ProductionOrder
+  orderNo: string
+  orderTitle: string
+  component: string
+  material: string
+  requiredQty: number
+  issuedQty: number
+  returnedQty: number
+  netIssuedQty: number
+  remainingQty: number
+  readinessPercent: number
+  returnableQty: number
+  location: string
+}
+
+function issueKey(issue: ProductionMaterialIssue) {
+  return `${issue.productionOrderId}:${issue.inventoryItemId}`
+}
+
+function issueLocation(issue: ProductionMaterialIssue) {
+  const level = issue.level ? String(issue.level).startsWith('L') ? String(issue.level) : `L${issue.level}` : undefined
+  return [issue.warehouseId, issue.zoneId, issue.slotId, level].filter(Boolean).join(' / ') || '-'
+}
+
+function requiredQtyForIssue(issue: ProductionMaterialIssue, order?: ProductionOrder) {
+  const bomItems = order?.bom?.items ?? issue.productionOrder?.bom?.items ?? []
+  const orderQty = Number(order?.quantity ?? issue.productionOrder?.quantity ?? 1) || 1
+  const matchingItems = bomItems.filter((item) => item.materialId === issue.inventoryItemId || item.material?.id === issue.inventoryItemId)
+  const required = matchingItems.reduce((sum, item) => {
+    const wasteRatio = 1 + Number(item.wastePercent ?? 0) / 100
+    return sum + Number(item.quantity ?? 0) * wasteRatio * orderQty
+  }, 0)
+  return required > 0 ? required : Number(issue.issuedQty ?? 0)
+}
+
+function buildIssueControlRows(
+  issues: ProductionMaterialIssue[],
+  orders: ProductionOrder[],
+  remainingByMaterial: Map<string, number>,
+): IssueControlRow[] {
+  const ordersById = new Map(orders.map((order) => [order.id, order]))
+  const netIssuedByMaterial = new Map<string, number>()
+
+  issues.forEach((issue) => {
+    const key = issueKey(issue)
+    const net = Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0)
+    netIssuedByMaterial.set(key, (netIssuedByMaterial.get(key) ?? 0) + net)
+  })
+
+  return issues.map((issue) => {
+    const order = ordersById.get(issue.productionOrderId) ?? issue.productionOrder
+    const requiredQty = requiredQtyForIssue(issue, order)
+    const netIssuedQty = Math.max(0, netIssuedByMaterial.get(issueKey(issue)) ?? 0)
+    const remainingQty = Math.max(0, requiredQty - netIssuedQty)
+    const readinessPercent = requiredQty > 0 ? Math.min(100, (netIssuedQty / requiredQty) * 100) : 0
+    const material = issue.inventoryItem ? `${issue.inventoryItem.code} · ${issue.inventoryItem.name}` : issue.inventoryItemId
+    const component = order?.component ? `${order.component.code} · ${order.component.name}` : order?.bom?.productCode ?? '-'
+    return {
+      issue,
+      issueNo: issue.issueNo,
+      order,
+      orderNo: order?.orderNo ?? issue.productionOrder?.orderNo ?? issue.productionOrderId,
+      orderTitle: order?.title ?? issue.productionOrder?.title ?? '-',
+      component,
+      material,
+      requiredQty,
+      issuedQty: Number(issue.issuedQty ?? 0),
+      returnedQty: Number(issue.returnedQty ?? 0),
+      netIssuedQty,
+      remainingQty,
+      readinessPercent,
+      returnableQty: getIssueReturnableQty(issue, remainingByMaterial),
+      location: issueLocation(issue),
+    }
+  })
+}
+
+function aggregateIssueRows(rows: IssueControlRow[], field: 'issuedQty' | 'returnedQty') {
+  const map = new Map<string, { id: string; title: string; subtitle: string; value: number }>()
+  rows.forEach((row) => {
+    const id = row.issue.inventoryItemId
+    const current = map.get(id) ?? { id, title: row.material, subtitle: row.issue.inventoryItem?.unit ?? '', value: 0 }
+    current.value += row[field]
+    map.set(id, current)
+  })
+  return Array.from(map.values()).sort((a, b) => b.value - a.value)
+}
+
+function aggregateShortageWorkOrders(rows: IssueControlRow[]) {
+  const map = new Map<string, { id: string; title: string; subtitle: string; value: number }>()
+  rows.forEach((row) => {
+    const id = row.issue.productionOrderId
+    const current = map.get(id) ?? { id, title: row.orderNo, subtitle: row.orderTitle, value: 0 }
+    current.value += row.remainingQty
+    map.set(id, current)
+  })
+  return Array.from(map.values()).filter((row) => row.value > 0).sort((a, b) => b.value - a.value)
+}
+
+function aggregateReadinessByWorkOrder(rows: IssueControlRow[]) {
+  const map = new Map<string, { id: string; title: string; subtitle: string; required: number; netIssued: number }>()
+  rows.forEach((row) => {
+    const id = row.issue.productionOrderId
+    const current = map.get(id) ?? { id, title: row.orderNo, subtitle: row.orderTitle, required: 0, netIssued: 0 }
+    current.required += row.requiredQty
+    current.netIssued += Math.max(0, row.netIssuedQty)
+    map.set(id, current)
+  })
+  return Array.from(map.values())
+    .map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: row.required > 0 ? Math.min(100, (row.netIssued / row.required) * 100) : 0 }))
+    .sort((a, b) => a.value - b.value)
+}
+
+function aggregateSourceLocations(rows: IssueControlRow[]) {
+  const map = new Map<string, { id: string; title: string; subtitle: string; value: number }>()
+  rows.forEach((row) => {
+    const id = row.location
+    const current = map.get(id) ?? { id, title: id, subtitle: 'Nguồn xuất thực tế', value: 0 }
+    current.value += row.issuedQty
+    map.set(id, current)
+  })
+  return Array.from(map.values()).sort((a, b) => b.value - a.value)
 }
 
 function Issues({
   rows,
   consumptions,
+  orders,
 }: {
   rows: ReturnType<typeof useProductionIssues>['data']
   consumptions: ProductionMaterialConsumption[]
+  orders: ProductionOrder[]
 }) {
   const returnIssue = useReturnProductionMaterialIssue()
+  const [selectedIssue, setSelectedIssue] = useState<IssueControlRow | null>(null)
   const consumptionRows = useMemo(
     () => buildConsumptionRows(rows ?? [], consumptions),
     [rows, consumptions],
@@ -278,6 +974,10 @@ function Issues({
     })
     return map
   }, [consumptionRows])
+  const issueRows = useMemo(
+    () => buildIssueControlRows(rows ?? [], orders, remainingByMaterial),
+    [rows, orders, remainingByMaterial],
+  )
 
   async function runReturn(row: NonNullable<ReturnType<typeof useProductionIssues>['data']>[number]) {
     const returnable = getIssueReturnableQty(row, remainingByMaterial)
@@ -315,36 +1015,161 @@ function Issues({
     }
   }
 
-  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]">
-    <ProductionPanel title="Phiếu cấp vật tư cho MO" action={<button className={productionMutedButton}>+ Tạo phiếu cấp</button>}>
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-xs">
-        <thead className={productionTableHead}><tr>{['Issue No','MO Number','Material','Issued','Returned','Returnable','Location','Issued Date','Status','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-        <tbody>{(rows??[]).slice(0,12).map(row=>{
-          const returned = Number(row.returnedQty ?? 0)
-          const returnable = getIssueReturnableQty(row, remainingByMaterial)
-          const location = [row.warehouseId, row.zoneId, row.slotId, row.level ? `L${row.level}` : undefined].filter(Boolean).join(' / ') || '-'
-          return <tr className={productionTableRow} key={row.id}>
+  const issuedTotal = (rows ?? []).reduce((sum, row) => sum + Number(row.issuedQty ?? 0), 0)
+  const returnedTotal = (rows ?? []).reduce((sum, row) => sum + Number(row.returnedQty ?? 0), 0)
+  const returnableTotal = (rows ?? []).reduce((sum, row) => sum + getIssueReturnableQty(row, remainingByMaterial), 0)
+  const requiredTotal = issueRows.reduce((sum, row) => sum + row.requiredQty, 0)
+  const remainingTotal = issueRows.reduce((sum, row) => sum + row.remainingQty, 0)
+  const issuedOrders = new Set(issueRows.map((row) => row.issue.productionOrderId)).size
+  const completionRate = requiredTotal > 0
+    ? Math.min(100, (issueRows.reduce((sum, row) => sum + row.netIssuedQty, 0) / requiredTotal) * 100)
+    : 0
+  const topIssuedMaterials = aggregateIssueRows(issueRows, 'issuedQty').slice(0, 5)
+  const topReturnedMaterials = aggregateIssueRows(issueRows, 'returnedQty').filter((row) => row.value > 0).slice(0, 5)
+  const shortageWorkOrders = aggregateShortageWorkOrders(issueRows).slice(0, 5)
+  const readinessByWorkOrder = aggregateReadinessByWorkOrder(issueRows).slice(0, 5)
+  const sourceLocations = aggregateSourceLocations(issueRows).slice(0, 5)
+  const readinessSegments = [
+    { label: '0-49%', value: issueRows.filter((row) => row.readinessPercent < 50).length, color: '#ef4444' },
+    { label: '50-79%', value: issueRows.filter((row) => row.readinessPercent >= 50 && row.readinessPercent < 80).length, color: '#f59e0b' },
+    { label: '80-99%', value: issueRows.filter((row) => row.readinessPercent >= 80 && row.readinessPercent < 100).length, color: '#06b6d4' },
+    { label: '100%', value: issueRows.filter((row) => row.readinessPercent >= 100).length, color: '#14c987' },
+  ]
+
+  return <div className={inventoryPageStack}>
+    <ModuleKpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+      <InventoryKpi title="Phiếu cấp phát" value={formatQuantity((rows ?? []).length, 0)} note="Material issues" tone="blue" />
+      <InventoryKpi title="Giá trị cấp phát" value="--" note="API issue chưa có unit cost" tone="purple" />
+      <InventoryKpi title="Vật tư đã cấp" value={number(issuedTotal)} note="Tổng issued qty" tone="cyan" />
+      <InventoryKpi title="Vật tư hoàn trả" value={number(returnedTotal)} note="Đã trả về kho chính" tone="amber" />
+      <InventoryKpi title="WO được cấp phát" value={formatQuantity(issuedOrders, 0)} note="Work Orders có issue" tone="emerald" />
+      <InventoryKpi title="Tỷ lệ hoàn thành" value={`${formatQuantity(completionRate, 0)}%`} note={`Còn thiếu ${number(remainingTotal)}`} tone={readinessTone(completionRate)} />
+    </ModuleKpiStrip>
+    <InventoryChartCard title="Production Material Control Center" note="Issue No, Work Order, Component, Required, Issued, Returned, Remaining, Readiness" action={<button className={inventoryMutedButton}>+ Tạo phiếu cấp</button>}>
+      <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1320px] text-left text-xs">
+        <thead className={inventoryTableHead}><tr>{['Issue No','Date','Work Order','Component','Required','Issued','Returned','Remaining','Readiness','Status','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+        <tbody>{issueRows.slice(0,15).map(row=>{
+          const issue = row.issue
+          return <tr className={`cursor-pointer ${inventoryTableRow}`} key={issue.id} onClick={() => setSelectedIssue(row)}>
             <td className="px-3 py-3 text-cyan-300">{row.issueNo}</td>
-            <td>{row.productionOrder?.orderNo}</td>
-            <td>{row.inventoryItem?.code} · {row.inventoryItem?.name}</td>
-            <td>{number(row.issuedQty)}</td>
-            <td>{number(returned)}</td>
-            <td className={returnable > 0 ? 'text-emerald-300' : 'text-slate-500'}>{number(returnable)}</td>
-            <td>{location}<div className="mt-1 text-[10px] text-slate-500">Hoàn dư về Kho chính</div></td>
-            <td>{date(row.issuedDate)}</td>
-            <td><StatusChip status={row.status}/></td>
-            <td>{returnable > 0 ? <button disabled={returnIssue.isPending} onClick={() => void runReturn(row)} className="text-amber-300 disabled:opacity-50">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
+            <td>{date(issue.issuedDate)}</td>
+            <td>{row.orderNo}<div className="mt-1 text-[10px] text-slate-500">{row.orderTitle}</div></td>
+            <td>{row.component}</td>
+            <td className="font-mono tabular-nums">{number(row.requiredQty)}</td>
+            <td className="font-mono tabular-nums text-cyan-300">{number(row.issuedQty)}</td>
+            <td className="font-mono tabular-nums text-amber-300">{number(row.returnedQty)}</td>
+            <td className={row.remainingQty > 0 ? 'font-mono tabular-nums text-red-300' : 'font-mono tabular-nums text-emerald-300'}>{number(row.remainingQty)}</td>
+            <td className="w-44">
+              <Meter value={row.readinessPercent} tone={readinessBarClass(row.readinessPercent)} />
+              <div className={`mt-1 text-[10px] ${row.readinessPercent >= 100 ? 'text-emerald-300' : row.readinessPercent >= 80 ? 'text-cyan-300' : row.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>{formatQuantity(row.readinessPercent, 0)}%</div>
+            </td>
+            <td><StatusChip status={issue.status}/></td>
+            <td>{row.returnableQty > 0 ? <button disabled={returnIssue.isPending} onClick={(event) => { event.stopPropagation(); void runReturn(issue) }} className="text-amber-300 disabled:opacity-50">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
           </tr>
         })}</tbody>
-      </table></div></div>
-    </ProductionPanel>
-    <aside className="space-y-3">
-      <ProductionPanel title="Luồng cấp phát">
-        <div className="space-y-3 text-xs text-slate-300"><div>Reservation</div><div className="text-cyan-300">↓ Issue</div><div>Kho vật tư sản xuất giảm tồn</div><div className="text-amber-300">↓ Return dư</div><div>Kho chính tăng lại, ledger ghi RETURN</div></div>
-      </ProductionPanel>
-      <ProductionPanel title="Tỷ lệ cấp phát"><ProductionMiniBars values={[22, 34, 29, 44, 51, 47, 62, 58]} tone="emerald" /></ProductionPanel>
-    </aside>
+      </table></div></ModuleDataGrid>
+    </InventoryChartCard>
+    <div className={`grid ${inventoryGridGap} xl:grid-cols-5`}>
+      <InventoryChartCard title="Top vật tư được cấp phát" note="Xếp theo issued qty">
+        <RankList rows={topIssuedMaterials.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} />
+      </InventoryChartCard>
+      <InventoryChartCard title="Top vật tư hoàn trả" note="Xếp theo returned qty">
+        <RankList rows={topReturnedMaterials.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có vật tư hoàn trả" />
+      </InventoryChartCard>
+      <InventoryChartCard title="WO thiếu vật tư" note="Remaining = Required - NetIssued">
+        <RankList rows={shortageWorkOrders.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Không có WO thiếu vật tư" />
+      </InventoryChartCard>
+      <InventoryChartCard title="Readiness theo WO" note="NetIssued / Required">
+        <RankList rows={readinessByWorkOrder.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: `${formatQuantity(row.value, 0)}%` }))} empty="Chưa có dữ liệu readiness" />
+      </InventoryChartCard>
+      <InventoryChartCard title="Nguồn xuất kho sản xuất" note="Warehouse / Zone / Slot / Level">
+        <RankList rows={sourceLocations.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có vị trí xuất" />
+      </InventoryChartCard>
+    </div>
+    <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_330px]`}>
+      <InventoryChartCard title="Readiness distribution" note="Theo dòng cấp phát vật tư">
+        <ProductionDonut centerValue={`${formatQuantity(completionRate, 0)}%`} centerLabel="ready" segments={readinessSegments} />
+      </InventoryChartCard>
+      <InventoryChartCard title="Business indicators" note="NetIssued = Issued - Returned">
+        <div className="space-y-3 text-xs text-slate-300">
+          <Info k="Required" v={number(requiredTotal)} />
+          <Info k="Net issued" v={number(issuedTotal - returnedTotal)} />
+          <Info k="Remaining" v={number(remainingTotal)} />
+          <Info k="Returnable" v={number(returnableTotal)} />
+          <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-slate-400">
+            Giá trị cấp phát chưa tính được từ frontend vì API material issue hiện chưa trả unit cost/totalAmount.
+          </div>
+        </div>
+      </InventoryChartCard>
+    </div>
+    <IssueDetailDrawer row={selectedIssue} onClose={() => setSelectedIssue(null)} />
   </div>
+}
+
+function IssueDetailDrawer({
+  row,
+  onClose,
+}: {
+  row: IssueControlRow | null
+  onClose: () => void
+}) {
+  if (!row) return null
+  const issue = row.issue
+  return <ModuleDetailDrawer open title={issue.issueNo} subtitle={issue.productionOrder?.orderNo ?? issue.productionOrderId} onClose={onClose} widthClass="max-w-3xl">
+    <div className="grid gap-3 md:grid-cols-3">
+      <InventoryKpi title="Required" value={number(row.requiredQty)} note="Theo BOM/MO" tone="blue" />
+      <InventoryKpi title="Net Issued" value={number(row.netIssuedQty)} note="Issued - Returned" tone="emerald" />
+      <InventoryKpi title="Readiness" value={`${formatQuantity(row.readinessPercent, 0)}%`} note={row.remainingQty > 0 ? `Còn thiếu ${number(row.remainingQty)}` : 'Đã đủ'} tone={readinessTone(row.readinessPercent)} />
+    </div>
+    <div className="mt-3 grid gap-3 xl:grid-cols-2">
+      <ProductionPanel title="Section A · Thông tin phiếu">
+        <div className="space-y-3 text-xs">
+          <Info k="Issue No" v={issue.issueNo} />
+          <Info k="WO" v={row.orderNo} />
+          <Info k="Component" v={row.component} />
+          <Info k="Người thực hiện" v={issue.issuedBy ?? '-'} />
+          <Info k="Ngày cấp phát" v={date(issue.issuedDate)} />
+          <Info k="Status" v={issue.status} />
+        </div>
+      </ProductionPanel>
+      <ProductionPanel title="Section C · Warehouse Source">
+        <div className="space-y-3 text-xs">
+          <Info k="Kho" v={issue.warehouseId ?? '-'} />
+          <Info k="Zone" v={issue.zoneId ?? '-'} />
+          <Info k="Slot" v={issue.slotId ?? '-'} />
+          <Info k="Level" v={issue.level ? `L${issue.level}` : '-'} />
+        </div>
+      </ProductionPanel>
+    </div>
+    <div className="mt-3 grid gap-3 xl:grid-cols-2">
+      <ProductionPanel title="Section B · Danh sách vật tư">
+        <ModuleDataGrid>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-xs">
+              <thead className={inventoryTableHead}><tr>{['Material','Required','Issued','Returned','Remaining'].map((head) => <th key={head} className="px-3 py-2 text-left font-medium">{head}</th>)}</tr></thead>
+              <tbody>
+                <tr className={inventoryTableRow}>
+                  <td className="px-3 py-3 text-cyan-300">{row.material}</td>
+                  <td>{number(row.requiredQty)}</td>
+                  <td>{number(row.issuedQty)}</td>
+                  <td>{number(row.returnedQty)}</td>
+                  <td className={row.remainingQty > 0 ? 'text-red-300' : 'text-emerald-300'}>{number(row.remainingQty)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ModuleDataGrid>
+      </ProductionPanel>
+      <ProductionPanel title="Section D · Issue Timeline">
+        <div className="space-y-3 text-xs">
+          <Info k="Ngày cấp phát" v={date(issue.issuedDate)} />
+          <Info k="Ngày hoàn trả" v={row.returnedQty > 0 ? 'Đã ghi nhận hoàn trả (API chưa trả ngày riêng)' : '-'} />
+          <Info k="Lịch sử phát sinh" v={issue.remarks ?? 'Không có ghi chú.'} />
+          <Info k="Returnable" v={number(row.returnableQty)} />
+        </div>
+      </ProductionPanel>
+    </div>
+  </ModuleDetailDrawer>
 }
 
 type ConsumptionSummaryRow = {
@@ -401,16 +1226,16 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
   return <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-5">
-        <ProductionKpi label="Issued" value={number(issued)} note="Đã cấp phát" tone="blue" />
-        <ProductionKpi label="Returned" value={number(returned)} note="Đã hoàn trả" tone="amber" />
-        <ProductionKpi label="Consumed" value={number(consumed)} note="Đã tiêu hao" tone="green" />
-        <ProductionKpi label="Scrap" value={number(scrap)} note="Phế phẩm" tone="red" />
-        <ProductionKpi label="Remaining" value={number(remaining)} note="Còn treo tại sản xuất" tone="purple" />
+        <InventoryKpi title="Issued" value={number(issued)} note="Đã cấp phát" tone="blue" />
+        <InventoryKpi title="Returned" value={number(returned)} note="Đã hoàn trả" tone="amber" />
+        <InventoryKpi title="Consumed" value={number(consumed)} note="Đã tiêu hao" tone="emerald" />
+        <InventoryKpi title="Scrap" value={number(scrap)} note="Phế phẩm" tone="red" />
+        <InventoryKpi title="Remaining" value={number(remaining)} note="Còn treo tại sản xuất" tone="purple" />
       </div>
-      <ProductionPanel title="Production Consumption" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng vật tư</span>}>
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left text-xs">
-          <thead className={productionTableHead}><tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-          <tbody>{rows.slice(0,50).map(row=><tr className={productionTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
+      <InventoryChartCard title="Production Consumption" note="Issued = Returned + Consumed + Scrap + Remaining" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng vật tư</span>}>
+        <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left text-xs">
+          <thead className={inventoryTableHead}><tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+          <tbody>{rows.slice(0,50).map(row=><tr className={inventoryTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
             <td className="px-3 py-3 text-cyan-300">{row.orderNo}<div className="mt-1 text-[10px] text-slate-500">{row.title}</div></td>
             <td>{row.material}</td>
             <td>{number(row.issuedQty)}</td>
@@ -421,8 +1246,8 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
             <td>{row.unit ?? '-'}</td>
             <td>{row.remainingQty > 0 && <button onClick={() => void runConsume(row)} className="text-cyan-300">Consume</button>}</td>
           </tr>)}</tbody>
-        </table></div></div>
-      </ProductionPanel>
+        </table></div></ModuleDataGrid>
+      </InventoryChartCard>
     </div>
     <aside className="space-y-3">
       <ProductionPanel title="Nguyên tắc tiêu hao">
@@ -460,17 +1285,28 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
     }
   }
 
-  return <div className="grid gap-3 xl:grid-cols-[1fr_320px]">
-    <ProductionPanel title="Giữ chỗ vật tư sản xuất" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} reservation</span>}>
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[1020px] text-left text-xs">
-        <thead className={productionTableHead}><tr>{['Reservation','MO Number','BOM','Dòng VT','Required','Reserved','Issued','Vị trí','Ngày giữ','Trạng thái','Thao tác'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+  const requiredTotal = rows.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.requiredQty ?? 0), 0), 0)
+  const reservedTotal = rows.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.reservedQty ?? 0), 0), 0)
+  const issuedTotal = rows.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.issuedQty ?? 0), 0), 0)
+
+  return <div className={inventoryPageStack}>
+    <ModuleKpiStrip className="grid-cols-2 md:grid-cols-4">
+      <InventoryKpi title="Reservations" value={formatQuantity(rows.length, 0)} note="Tổng phiếu giữ chỗ" tone="blue" />
+      <InventoryKpi title="Required" value={number(requiredTotal)} note="Nhu cầu BOM" tone="cyan" />
+      <InventoryKpi title="Reserved" value={number(reservedTotal)} note="Đã giữ chỗ" tone="emerald" />
+      <InventoryKpi title="Issued" value={number(issuedTotal)} note="Đã cấp phát" tone="purple" />
+    </ModuleKpiStrip>
+    <div className="grid gap-3 xl:grid-cols-[1fr_320px]">
+    <InventoryChartCard title="Giữ chỗ vật tư sản xuất" note="Reservation theo kho sản xuất" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} reservation</span>}>
+      <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1020px] text-left text-xs">
+        <thead className={inventoryTableHead}><tr>{['Reservation','MO Number','BOM','Dòng VT','Required','Reserved','Issued','Vị trí','Ngày giữ','Trạng thái','Thao tác'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
         <tbody>{rows.slice(0,12).map((row)=>{
           const requiredQty = row.lines.reduce((sum, line) => sum + Number(line.requiredQty ?? 0), 0)
           const reservedQty = row.lines.reduce((sum, line) => sum + Number(line.reservedQty ?? 0), 0)
           const issuedQty = row.lines.reduce((sum, line) => sum + Number(line.issuedQty ?? 0), 0)
           const locations = new Set(row.lines.map((line) => [line.warehouse?.code, line.zone?.code, line.slotId, line.level].filter(Boolean).join('/')).filter(Boolean))
           const order = orders.find((item) => item.id === row.productionOrderId)
-          return <tr className={productionTableRow} key={row.id}>
+          return <tr className={inventoryTableRow} key={row.id}>
             <td className="px-3 py-3 text-cyan-300">{row.reservationNo}</td>
             <td>{order ? <button className="text-left text-cyan-300" onClick={() => onOpen(order)}>{row.productionOrder?.orderNo ?? order.orderNo}</button> : row.productionOrder?.orderNo}</td>
             <td>{row.bom?.bomNo ?? '-'}</td>
@@ -489,8 +1325,8 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
             </div></td>
           </tr>
         })}</tbody>
-      </table></div></div>
-    </ProductionPanel>
+      </table></div></ModuleDataGrid>
+    </InventoryChartCard>
     <aside className="space-y-3">
       <ProductionPanel title="Nguyên tắc giữ chỗ">
         <div className="space-y-3 text-xs text-slate-300">
@@ -508,6 +1344,7 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
         ]} />
       </ProductionPanel>
     </aside>
+    </div>
   </div>
 }
 
@@ -532,26 +1369,26 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
     <div className="space-y-3">
       <ProductionPanel title="Bộ lọc sổ vật tư sản xuất">
         <div className="grid gap-2 md:grid-cols-5">
-          <select value={filters.productionOrderId ?? ''} onChange={(event) => update('productionOrderId', event.target.value)} className="h-10 rounded border border-slate-700 bg-slate-950 px-2 text-xs">
+          <select value={filters.productionOrderId ?? ''} onChange={(event) => update('productionOrderId', event.target.value)} className={inventoryInput}>
             <option value="">Tất cả lệnh SX</option>
             {orders.map((order) => <option key={order.id} value={order.id}>{order.orderNo} · {order.title}</option>)}
           </select>
-          <select value={filters.inventoryItemId ?? ''} onChange={(event) => update('inventoryItemId', event.target.value)} className="h-10 rounded border border-slate-700 bg-slate-950 px-2 text-xs">
+          <select value={filters.inventoryItemId ?? ''} onChange={(event) => update('inventoryItemId', event.target.value)} className={inventoryInput}>
             <option value="">Tất cả vật tư</option>
             {materials.map((material) => <option key={material.id} value={material.id}>{material.code} · {material.name}</option>)}
           </select>
-          <select value={filters.eventType ?? ''} onChange={(event) => update('eventType', event.target.value)} className="h-10 rounded border border-slate-700 bg-slate-950 px-2 text-xs">
+          <select value={filters.eventType ?? ''} onChange={(event) => update('eventType', event.target.value)} className={inventoryInput}>
             <option value="">Tất cả event</option>
             {eventTypes.map((eventType) => <option key={eventType} value={eventType}>{eventType}</option>)}
           </select>
-          <input type="date" value={filters.fromDate ?? ''} onChange={(event) => update('fromDate', event.target.value)} className="h-10 rounded border border-slate-700 bg-slate-950 px-2 text-xs" />
-          <input type="date" value={filters.toDate ?? ''} onChange={(event) => update('toDate', event.target.value)} className="h-10 rounded border border-slate-700 bg-slate-950 px-2 text-xs" />
+          <input type="date" value={filters.fromDate ?? ''} onChange={(event) => update('fromDate', event.target.value)} className={inventoryInput} />
+          <input type="date" value={filters.toDate ?? ''} onChange={(event) => update('toDate', event.target.value)} className={inventoryInput} />
         </div>
       </ProductionPanel>
-      <ProductionPanel title="Production Material Ledger" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng</span>}>
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left text-xs">
-          <thead className={productionTableHead}><tr>{['Thời gian','Event','MO','Reservation','Material','Vị trí','Quantity','Created By','Remark'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-          <tbody>{rows.slice(0,50).map((row)=><tr key={row.id} className={productionTableRow}>
+      <InventoryChartCard title="Production Material Ledger" note="Sổ vật tư sản xuất theo event" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng</span>}>
+        <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left text-xs">
+          <thead className={inventoryTableHead}><tr>{['Thời gian','Event','MO','Reservation','Material','Vị trí','Quantity','Created By','Remark'].map((x)=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+          <tbody>{rows.slice(0,50).map((row)=><tr key={row.id} className={inventoryTableRow}>
             <td className="px-3 py-3">{formatDateTime(row.eventDate)}</td>
             <td><StatusChip status={row.eventType}/></td>
             <td className="text-cyan-300">{row.productionOrder?.orderNo ?? row.productionOrderId}</td>
@@ -562,8 +1399,8 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
             <td>{row.createdBy ?? '-'}</td>
             <td>{row.remark ?? '-'}</td>
           </tr>)}</tbody>
-        </table></div></div>
-      </ProductionPanel>
+        </table></div></ModuleDataGrid>
+      </InventoryChartCard>
     </div>
     <aside className="space-y-3">
       <ProductionPanel title="Tổng quan ledger">
@@ -586,7 +1423,9 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
 }
 
 function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) {
-  return <ProductionPanel title="Nhật ký thực thi sản xuất"><div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className={productionTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,20).map(row=><tr className={productionTableRow} key={row.id}><td className="px-3 py-3">{formatDateTime(row.createdAt)}</td><td className="text-cyan-300">{row.productionOrder.orderNo}</td><td>{row.productionOrder.title}</td><td>{row.stage?.name??row.type}</td><td>{row.workerId??'-'}</td><td>{row.stage?.name??'-'}</td><td><StatusChip status={row.type}/></td><td>{row.message}</td></tr>)}</tbody></table></div></div></ProductionPanel>
+  return <InventoryChartCard title="Nhật ký thực thi sản xuất" note="Production logs">
+    <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className={inventoryTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{(rows??[]).slice(0,20).map(row=><tr className={inventoryTableRow} key={row.id}><td className="px-3 py-3">{formatDateTime(row.createdAt)}</td><td className="text-cyan-300">{row.productionOrder.orderNo}</td><td>{row.productionOrder.title}</td><td>{row.stage?.name??row.type}</td><td>{row.workerId??'-'}</td><td>{row.stage?.name??'-'}</td><td><StatusChip status={row.type}/></td><td>{row.message}</td></tr>)}</tbody></table></div></ModuleDataGrid>
+  </InventoryChartCard>
 }
 
 function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: () => void }) {
@@ -621,6 +1460,11 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
     (sum, issue) => sum + Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0),
     0,
   )
+  const materialReadiness = workOrderReadiness(latest)
+  const orderIssueRows = latest.materialIssues ?? []
+  const reservedQty = orderReservations.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.reservedQty ?? 0), 0), 0)
+  const reservationIssuedQty = orderReservations.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.issuedQty ?? 0), 0), 0)
+  const availableQty = reservationPreview?.totalAvailableQty ?? 0
   const canCreateComponentFromOrder = netIssuedMaterialQty > 0
   const stageDisabledReason = !slotId
     ? 'Chọn slot còn tầng trống trước khi chuyển bãi.'
@@ -678,13 +1522,91 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
     )
   }
 
-  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4">
-    <div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#04101d] shadow-2xl">
-      <header className="flex items-start justify-between border-b border-slate-800 p-5">
-        <div><p className="text-xs text-cyan-300">{latest.orderNo}</p><h2 className="mt-1 text-2xl font-semibold">{latest.title}</h2><div className="mt-2"><StatusChip status={canStageToYard ? 'COMPLETED' : latest.status}/></div></div>
-        <button onClick={onClose}><X/></button>
-      </header>
-      <div className="grid gap-3 p-5 xl:grid-cols-[1fr_340px]">
+  return <ModuleDetailDrawer
+    open
+    title={latest.title}
+    subtitle={latest.orderNo}
+    actions={<StatusChip status={canStageToYard ? 'COMPLETED' : latest.status} />}
+    onClose={onClose}
+    widthClass="max-w-7xl"
+  >
+      <div className={inventoryPageStack}>
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_340px]`}>
+        <div className="space-y-3">
+          <InventoryChartCard title="Thông tin WO" note="Section A">
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <InfoCard title="WO No" value={latest.orderNo} />
+              <InfoCard title="Component" value={latest.component ? `${latest.component.code} · ${latest.component.name}` : '-'} />
+              <InfoCard title="Project" value={latest.projectId ?? latest.component?.project?.code ?? '-'} />
+              <InfoCard title="Quantity" value={number(latest.quantity)} />
+              <InfoCard title="Status" value={latest.status} />
+              <InfoCard title="Due Date" value={date(latest.plannedEndAt)} tone={isDelayedOrder(latest) ? 'text-red-300' : 'text-white'} />
+            </div>
+          </InventoryChartCard>
+          <InventoryChartCard title="Material Status" note="Section B · BOM required vs net issued">
+            <div className="grid gap-3 md:grid-cols-4">
+              <InventoryKpi title="Required" value={number(materialReadiness.requiredQty)} note="BOM demand" tone="blue" />
+              <InventoryKpi title="Issued" value={number(materialReadiness.issuedQty)} note="Issue - return" tone="emerald" />
+              <InventoryKpi title="Remaining" value={number(materialReadiness.remainingQty)} note="Còn thiếu" tone={materialReadiness.remainingQty > 0 ? 'amber' : 'emerald'} />
+              <InventoryKpi title="Readiness" value={`${formatQuantity(materialReadiness.readinessPercent, 0)}%`} note={materialReadiness.readinessPercent >= 100 ? 'READY TO RELEASE' : 'Chưa đủ vật tư'} tone={readinessTone(materialReadiness.readinessPercent)} />
+            </div>
+            <div className="mt-3">
+              <Meter value={materialReadiness.readinessPercent} tone={readinessBarClass(materialReadiness.readinessPercent)} />
+            </div>
+          </InventoryChartCard>
+          <InventoryChartCard title="Production Progress" note="Section C">
+            <div className="grid gap-2 md:grid-cols-6">
+              {workOrderStageProgress(latest).map((item) => (
+                <div key={item.stage} className={`rounded-xl border px-3 py-2 text-xs ${item.active ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/[0.035] text-slate-500'}`}>
+                  {item.stage}
+                </div>
+              ))}
+            </div>
+          </InventoryChartCard>
+          <InventoryChartCard title="Material Issues" note="Section D">
+            <ModuleDataGrid>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-xs">
+                  <thead className={inventoryTableHead}><tr>{['Issue No', 'Date', 'Qty', 'Value'].map((head) => <th key={head} className="px-3 py-2 text-left font-medium">{head}</th>)}</tr></thead>
+                  <tbody>
+                    {orderIssueRows.length ? orderIssueRows.map((issueRow) => (
+                      <tr key={issueRow.id} className={inventoryTableRow}>
+                        <td className="px-3 py-3 text-cyan-300">{issueRow.issueNo}</td>
+                        <td>{date(issueRow.issuedDate)}</td>
+                        <td>{number(issueRow.issuedQty)}</td>
+                        <td className="text-slate-500">Chưa có unit cost</td>
+                      </tr>
+                    )) : <tr><td colSpan={4} className="px-3 py-5 text-center text-slate-500">Chưa có phiếu cấp phát vật tư.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </ModuleDataGrid>
+          </InventoryChartCard>
+          <InventoryChartCard title="Reservations" note="Section E">
+            <div className="grid gap-3 md:grid-cols-3">
+              <InventoryKpi title="Reserved Qty" value={number(reservedQty)} note="Đã giữ chỗ" tone="cyan" />
+              <InventoryKpi title="Issued Qty" value={number(reservationIssuedQty)} note="Đã xuất từ reservation" tone="emerald" />
+              <InventoryKpi title="Available Qty" value={number(availableQty)} note="Kho SX khả dụng" tone="blue" />
+            </div>
+          </InventoryChartCard>
+        </div>
+        <aside className="space-y-3">
+          <ProductionPanel title="Release readiness">
+            <div className="space-y-3 text-xs text-slate-300">
+              <Info k="Material Ready" v={`${formatQuantity(materialReadiness.readinessPercent, 0)}%`} />
+              <Info k="Rule" v=">= 100% = READY TO RELEASE" />
+              <Info k="Workflow lock" v="Chưa khóa, chỉ cảnh báo UI" />
+            </div>
+          </ProductionPanel>
+          <ProductionPanel title="Tổng quan nhanh">
+            <ProductionDonut centerValue={`${formatQuantity(materialReadiness.readinessPercent, 0)}%`} centerLabel="ready" segments={[
+              { label: 'Issued', value: materialReadiness.issuedQty, color: '#14c987' },
+              { label: 'Remaining', value: materialReadiness.remainingQty, color: '#f59e0b' },
+            ]} />
+          </ProductionPanel>
+        </aside>
+      </div>
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_340px]`}>
         <div className="space-y-3">
           <ProductionPanel title="Tiến độ công đoạn">
             <div className="grid gap-2 md:grid-cols-4">{(latest.stages??[]).map(item=><div key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3"><div className="text-xs text-slate-400">Bước {item.sequence}</div><div className="mt-1 text-sm">{item.name}</div><div className="mt-2"><StatusChip status={item.status}/></div></div>)}</div>
@@ -769,12 +1691,22 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
           </ProductionPanel>}
         </aside>
       </div>
-    </div>
-  </div>
+      </div>
+  </ModuleDetailDrawer>
 }
 
 function BomWorkspace({ bom, onClose }: { bom: ProductionBom; onClose: () => void }) {
-  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"><div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#04101d]"><header className="flex justify-between border-b border-slate-800 p-5"><div><p className="text-xs text-cyan-300">{bom.bomNo}</p><h2 className="mt-1 text-2xl font-semibold">{bom.productName}</h2></div><button onClick={onClose}><X/></button></header><div className="p-5"><div className="mb-4 flex gap-2 text-xs text-slate-300">{['Information','Drawings','Materials','Production Process','History'].map(x=><span className="rounded border border-slate-700 px-3 py-2" key={x}>{x}</span>)}</div><div className="grid gap-3 xl:grid-cols-2"><ProductionPanel title="Materials Grid"><table className="w-full text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Material','Spec','Unit','Required','Waste','Net','Category'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr></thead><tbody>{bom.items.map(row=><tr className="border-t border-slate-800" key={row.id}><td className="py-3 text-cyan-300">{row.material.code} · {row.material.name}</td><td>-</td><td>{row.material.unitMaster?.symbol??row.material.unit}</td><td>{number(row.quantity)}</td><td>{row.wastePercent}%</td><td>{number(row.quantity*(1+row.wastePercent/100))}</td><td>{row.category}</td></tr>)}</tbody></table></ProductionPanel><ProductionPanel title="Production Routing">{bom.routingSteps.map(step=><div key={step.id} className="mb-2 flex items-center gap-3 rounded border border-slate-800 bg-slate-950 p-3 text-xs"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-950 text-cyan-300">{step.stepNo}</span><span className="flex-1">{step.stepName}</span><span>{step.workshop??'-'}</span><span>{step.expectedHours}h</span>{step.qcRequired&&<StatusChip status="QC"/>}</div>)}</ProductionPanel></div></div></div></div>
+  return <ModuleDetailDrawer open title={bom.productName} subtitle={bom.bomNo} onClose={onClose} widthClass="max-w-6xl">
+    <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-300">{['Information','Drawings','Materials','Production Process','History'].map(x=><span className="rounded-xl border border-cyan-300/15 bg-white/[0.045] px-3 py-2" key={x}>{x}</span>)}</div>
+    <div className="grid gap-3 xl:grid-cols-2">
+      <ProductionPanel title="Materials Grid">
+        <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className={inventoryTableHead}><tr>{['Material','Spec','Unit','Required','Waste','Net','Category'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{bom.items.map(row=><tr className={inventoryTableRow} key={row.id}><td className="px-3 py-3 text-cyan-300">{row.material.code} · {row.material.name}</td><td>-</td><td>{row.material.unitMaster?.symbol??row.material.unit}</td><td>{number(row.quantity)}</td><td>{row.wastePercent}%</td><td>{number(row.quantity*(1+row.wastePercent/100))}</td><td>{row.category}</td></tr>)}</tbody></table></div></ModuleDataGrid>
+      </ProductionPanel>
+      <ProductionPanel title="Production Routing">
+        {bom.routingSteps.map(step=><div key={step.id} className="mb-2 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs"><span className="flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-950 text-cyan-300">{step.stepNo}</span><span className="flex-1">{step.stepName}</span><span>{step.workshop??'-'}</span><span>{step.expectedHours}h</span>{step.qcRequired&&<StatusChip status="QC"/>}</div>)}
+      </ProductionPanel>
+    </div>
+  </ModuleDetailDrawer>
 }
 
 function ActivityList({ logs }: { logs: NonNullable<ReturnType<typeof useProductionLogs>['data']> }) { return <div className="space-y-3">{logs.slice(0,7).map(row=><div key={row.id} className="border-l border-cyan-700 pl-3 text-xs"><div className="text-cyan-300">{row.productionOrder.orderNo}</div><div className="mt-1 text-slate-300">{row.message}</div></div>)}</div> }
@@ -865,3 +1797,37 @@ function ActionCards({ compact = false }: { compact?: boolean }) {
   )
 }
 function Info({ k, v }: { k: string; v: string }) { return <div className="flex justify-between gap-3"><span className="text-slate-500">{k}</span><span className="text-right text-slate-200">{v}</span></div> }
+
+function InfoCard({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-950/55 p-3">
+      <div className="text-[11px] text-slate-500">{title}</div>
+      <div className={`mt-1 truncate text-sm font-semibold ${tone}`}>{value}</div>
+    </div>
+  )
+}
+
+function RankList({
+  rows,
+  empty = 'Chưa có dữ liệu',
+}: {
+  rows: Array<{ id: string; title: string; subtitle?: string; value: string }>
+  empty?: string
+}) {
+  if (!rows.length) {
+    return <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-center text-sm text-slate-500">{empty}</div>
+  }
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-cyan-300">{row.title}</div>
+            {row.subtitle ? <div className="mt-0.5 truncate text-slate-500">{row.subtitle}</div> : null}
+          </div>
+          <div className="font-mono tabular-nums text-slate-200">{row.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}

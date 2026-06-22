@@ -51,3 +51,41 @@ Inventory Transactions UX 2.0 on 2026-06-19 did not change module percentages. I
 Sprint 15A on 2026-06-19 did not change module percentages. It fixed Inventory Outbound value reporting by aggregating all item lines in the frontend and computing missing outbound line values in transaction API responses from average inbound cost, with no schema or migration changes.
 
 Sprint 15B on 2026-06-19 did not change module percentages. It fixed Inventory cost integrity at the source by persisting `unitPrice` and `totalAmount` during transaction item creation, repairing direct Production/Material Movement writers, and backfilling historical missing values without schema changes.
+
+Sprint 16A on 2026-06-19 did not change module percentages. It enhanced the Inventory Outbound frontend with row detail drawer, outbound value today KPI, top materials by value, and top projects by outbound value using existing Inventory transaction API data only.
+
+Sprint 16B on 2026-06-19 did not change module percentages. It enhanced the Inventory Transfer frontend with row detail drawer, transfer value KPIs, value-based top materials, top transfer routes, and source/destination location rankings using existing Inventory transaction API data only.
+
+Sprint 16C on 2026-06-20 did not change module percentages. It enhanced the Inventory Inbound frontend with row detail drawer, all-line aggregation, inbound value/supplier KPIs, supplier/material value analytics, price monitoring, and shared filter spacing across Inbound/Outbound/Transfer using existing Inventory transaction API data only.
+
+Sprint 16D on 2026-06-20 did not change module percentages. It enhanced the Inventory Outbound frontend with project consumption analytics, daily/monthly outbound trends, material consumption analytics, outbound-purpose distribution, today/week/month/year financial KPIs, and abnormal consumption alerts using existing Inventory transaction API data only.
+
+Sprint 17A on 2026-06-20 did not change module percentages. It enhanced the Inventory Stock Take frontend with stocktake sessions, session detail drawer, variance KPIs, top variance material/location analytics, and adjustment preview using existing adjustment transaction API data only.
+
+Sprint 17B on 2026-06-20 did not change module percentages. It enhanced the Inventory Locations frontend with occupancy/free/occupied slot KPIs, inventory value by location, top occupied slots with drill-down material list, and transfer movement route analytics using existing zone, audit, and transaction API data only.
+
+Sprint 17E on 2026-06-20 did not change module percentages. It hardened Inventory document numbering by replacing `count() + 1` generation with max-suffix generation, enforcing backend-owned matching `code` / `transactionNo`, adding duplicate retry on `P2002`, and adding a diagnostic SQL report for historical mismatches.
+
+Sprint 17F on 2026-06-20 did not change module percentages. It changed Inventory stock health presentation so Overview, Materials, and Material Detail separate `Kho chính`, `Kho SX`, and total stock; low/out-of-stock status now uses `MAIN` stock only, with frontend build passing and no backend/schema changes.
+
+Sprint 18A on 2026-06-20 did not change module percentages. It refactored Production Cockpit UI toward the Inventory operational theme with Inventory-style KPI cards, filter bar, analytics panels, Production Orders progress/readiness/delay grid, and shared detail drawers for Production Orders, BOM detail, and Material Issues. A follow-up pass extended the same treatment to Production BOM, Reservations, Material Ledger, Material Issues, Consumptions, and Logs; frontend build passed with no backend/schema/workflow changes.
+
+Sprint 18B on 2026-06-20 did not change module percentages. It refactored Components List into a Component Management Cockpit with Inventory-style KPI strip, operational component grid, shared detail drawer, and analytics panels. The initial material-readiness fallback was superseded by Sprint 18C; frontend build passed with no backend/schema/workflow changes.
+
+Sprint 18C on 2026-06-20 did not change module percentages. It audited Component/BOM/Material Issue data relationships, documented the mapping in `docs/ai-state/audits/bom-intelligence-audit.md`, and replaced the Component Cockpit material-readiness fallback with a real frontend helper using BOM required quantity and Production Material Issue net issued quantity. Frontend build passed with no backend/schema/workflow changes.
+
+Sprint 18D on 2026-06-20 did not change module percentages. It refactored `/production/orders` into a Work Order Cockpit with KPI strip, Material Ready integration from Sprint 18C, Inventory-style grid, drawer sections, and analytics panels. `READY TO RELEASE` is UI-only, and material value ranking uses required quantity as a proxy because current responses do not expose unit material cost. Frontend build passed with no backend/schema/workflow changes.
+
+Sprint 18E on 2026-06-20 did not change module percentages. It refactored `/production/material-issues` into a Production Material Control Center with issue KPIs, Inventory-style grid, BOM/Issue readiness calculations, drawer sections, and analytics panels. Material issue value remains unavailable because current issue responses do not expose unit material cost or line total. Frontend build passed with no backend/schema/workflow changes.
+
+Sprint 19A on 2026-06-22 did not change module percentages. It added `/production/warehouse` as a Production Warehouse Cockpit for `PRODUCTION` warehouse balances, with production-stock KPIs, material grid, shortage/readiness analytics, WO consumption analytics, and Production Zone / Slot / Level detail using existing Inventory and Production data only. Frontend build passed with no backend/schema/workflow changes.
+
+Sprint 19B on 2026-06-22 did not change module percentages. It added `/production/execution` as a Production Execution Board Kanban with stage columns, Work Order cards, bottleneck analytics, delay detection, material readiness integration, and Work Order drawer sections using existing Production data only. Frontend build passed with no backend/schema/workflow changes.
+
+Sprint 19C on 2026-06-22 did not change module percentages. It created `docs/ai-state/audits/mes-data-audit.md` and concluded that current MES data is stronger for Costing than deeper Shopfloor development. Production has partial shopfloor foundations (`ProductionStage`, `ProductionTask`, `ProductionLog`, `WorkCenter`, `Machine`), but lacks canonical immutable stage transition history, runtime/downtime capture, production-line queues, and labor/machine rate data. The next recommended sequence is 20A Costing Engine, 20B Component Cost Analysis, and 20C Project Cost Control.
+
+Sprint 20A on 2026-06-22 did not change module percentages because it added backend read models rather than a new visible workflow. It added a read-only Costing Engine module with `GET /production/orders/:id/cost`, `GET /components/:id/cost`, and `GET /projects/:id/cost`. Material cost uses actual Production Material Issue inventory transaction valuation when available and falls back to weighted average Inventory cost. Three real Work Orders were verified against SQL issue transaction valuation with 0% variance. No Prisma schema change or migration was introduced.
+
+Sprint 19D on 2026-06-22 did not change module percentages. It refactored Inventory Adjustments to match the Inbound/Outbound/Transfer UX pattern, removed the inline Quick Adjustment Wizard, added a `+ Điều chỉnh tồn kho` modal, moved adjustment history into the primary table flow, added row detail drawer, KPI strip, and analytics panels. No backend, API, schema, migration, or workflow change was introduced.
+
+Sprint 19E on 2026-06-22 did not change module percentages. It unified Inventory Adjustment with the wider Inventory workspace by adding the sidebar tab, opening the adjustment modal directly from Global Actions, moving creation into shared `AdjustmentTransactionModal`, using Material Detail `locationBalances` for exact bucket System Qty, adding a location table and `WarehouseMiniMap`, and preserving attachments/reason presets. Frontend build passed with no backend/API/schema/migration change.

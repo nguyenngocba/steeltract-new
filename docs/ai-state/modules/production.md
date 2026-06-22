@@ -43,6 +43,24 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * Production UI includes `/production/consumptions` with Issued, Returned, Consumed, Scrap, and Remaining summaries.
 * Sprint 12B standardizes Production Cockpit presentation with shared module UI primitives for KPI strip, analytics panels, filter bar, and the primary Manufacturing Order data grid.
 * Sprint 12C adds sticky Production filters and frontend status KPI click-to-filter without changing Production APIs or workflow logic.
+* Sprint 18A aligns Production Cockpit more closely with the Inventory operational theme: Inventory-style KPI cards, filter controls, analytics panels, primary Production Orders grid, progress/readiness/delay indicators, and shared detail drawers for Production Orders, BOM detail, and Material Issues.
+* Sprint 18A extended the Inventory-style data-grid/table treatment to Production BOM, Reservations, Material Ledger, Material Issues, Consumptions, and Logs without changing Production APIs or workflows.
+* Sprint 18C confirms existing Production Order responses expose BOM items and material issues enough for frontend Component Material Readiness calculations.
+* Sprint 18D turns `/production/orders` into a Work Order Cockpit with KPI strip, Inventory-style Work Order grid, BOM Intelligence Material Ready %, drawer sections, and analytics panels.
+* Work Order `READY TO RELEASE` is currently UI-only and appears when Material Readiness reaches 100%; it does not lock or change backend workflow.
+* Sprint 18E turns `/production/material-issues` into a Production Material Control Center with KPI strip, Inventory-style issue grid, Required/Issued/Returned/Remaining/Readiness indicators, detail drawer sections, and analytics panels.
+* Material Issue readiness is computed in the frontend from existing BOM required quantities and Production Material Issue net issued quantities; no backend API or workflow change was introduced.
+* Sprint 19A adds `/production/warehouse` as a Production Warehouse Cockpit focused only on `PRODUCTION` / `Kho vật tư SX` balances.
+* Production Warehouse Cockpit computes `Available = Production Stock - Reserved`, `Shortage = Required - Available`, and status from available production stock rather than total stock.
+* Production Warehouse Cockpit groups location balances by Production Zone / Slot / Level and adds shortage, readiness, and WO consumption analytics using existing Inventory/Production data.
+* Sprint 19B adds `/production/execution` as a Production Execution Board with Kanban columns for Planning, Ready Material, Cutting, Assembly, Welding, Painting, and Completed.
+* Execution Board cards reuse BOM/Issue material readiness, delay detection, progress estimation, issue history, and reservation summaries from existing Production data.
+* Execution Board prefers actual active stage data and falls back to status/readiness mapping until backend exposes a canonical shopfloor stage model.
+* Sprint 19C MES Data Audit documents current Shopfloor and Costing readiness in `docs/ai-state/audits/mes-data-audit.md`.
+* Sprint 19C concludes Costing should be prioritized next because BOM, consumption, inventory valuation, and ComponentCosting data are more complete than canonical shopfloor runtime history.
+* Sprint 20A adds a read-only Costing Engine summary for Production Orders.
+* `GET /production/orders/:id/cost` returns required, issued, returned, net issued, consumed, scrap, material cost, cost per unit, and material-level cost source rows.
+* Production Order material cost uses actual issue Inventory transaction valuation where available and weighted average Inventory cost as fallback.
 * Production-to-Yard staging is gated by linked QC inspection status `PASSED` or `APPROVED`.
 
 ## Database Models
@@ -95,6 +113,7 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * `GET /production/:id/material-ledger`
 * `GET /production/consumptions`
 * `GET /production/:id/consumptions`
+* `GET /production/orders/:id/cost`
 * `POST /production/:id/consume`
 * `POST /production/:id/component`
 * `GET /production/logs`
@@ -104,7 +123,9 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * `/production`
 * `/production/boms`
 * `/production/orders`
+* `/production/execution`
 * `/production/reservations`
+* `/production/warehouse`
 * `/production/material-ledger`
 * `/production/material-issues`
 * `/production/consumptions`
@@ -121,3 +142,11 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * Add richer production costing inputs for labor, machine, overhead, QC rework, and Yard handling cost.
 * Add richer production scheduling, work-center capacity, machine assignment, and operator workflow.
 * Consider replacing `Float` with decimal-safe database types only if future financial/weight precision requirements exceed current operational tolerance.
+* Continue Sprint 18 UI review with operators and extract repeated Production transaction/detail table helpers if the new cockpit patterns are approved.
+* Consider exposing unit material cost on Work Order material readiness/value APIs if operators need true value-based WO ranking instead of required-quantity proxy analytics.
+* Consider exposing unit material cost or total line value on Material Issue APIs if operators need true issue-value KPIs and value-based material issue analytics.
+* Consider a persisted production warehouse receipt/balance ledger if operators need auditable production-stock history independent from current Inventory location balances and reservation rows.
+* Consider exposing canonical shopfloor stage/status data if operators need the Execution Board to reflect real machine/work-center queues rather than UI fallback mapping.
+* Review Sprint 20A Costing Engine with more real Production Orders and decide whether issue/return costs should move from read model to persisted costing snapshots.
+* Prioritize 20B Component Cost Analysis and 20C Project Cost Control before deeper Shopfloor dashboard expansion.
+* Add immutable stage transition history, actual runtime/downtime capture, production-line queues, and labor/machine rate data before treating Shopfloor analytics as authoritative MES data.

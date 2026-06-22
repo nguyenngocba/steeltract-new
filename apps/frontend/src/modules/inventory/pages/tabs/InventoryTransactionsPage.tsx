@@ -323,6 +323,19 @@ export function InventoryTransactionsPage() {
     a.click()
     URL.revokeObjectURL(url)
   }
+  // Đầu component
+  const filterInput =
+    'h-9 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+
+  // Hàm reset (nếu chưa có)
+  const resetFilters = () => {
+    setFromDate('')
+    setToDate('')
+    setType('')
+    setSupplierId('')
+    setProjectId('')
+    setZoneId('')
+  }
 
   return (
     <EnterpriseModulePage>
@@ -372,11 +385,25 @@ export function InventoryTransactionsPage() {
           />
         </div>
 
-        <InventoryPanel title="Bộ lọc giao dịch" className="p-2">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-8">
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={inventoryInput} />
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className={inventoryInput} />
-            <select value={type} onChange={(e) => setType(e.target.value)} className={inventoryInput}>
+        <InventoryPanel className="rounded-xl p-0.5">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[165px_165px_180px_180px_180px_180px_130px_120px]">
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className={filterInput}
+            />
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className={filterInput}
+            />
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Loại giao dịch</option>
               <option value="INBOUND">INBOUND</option>
               <option value="OUTBOUND">OUTBOUND</option>
@@ -384,44 +411,46 @@ export function InventoryTransactionsPage() {
               <option value="ADJUSTMENT">ADJUSTMENT</option>
               <option value="RETURN">RETURN</option>
             </select>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inventoryInput}>
+            <select
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Nhà cung cấp</option>
               {suppliers.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inventoryInput}>
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Công trình</option>
               {projects.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className={inventoryInput}>
+            <select
+              value={zoneId}
+              onChange={(e) => setZoneId(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Kho</option>
               {zones.map((z: any) => (
-                <option key={z.id} value={z.id}>
-                  {z.code}
-                </option>
+                <option key={z.id} value={z.id}>{z.code}</option>
               ))}
             </select>
             <button
-              onClick={() => {
-                setFromDate('')
-                setToDate('')
-                setSupplierId('')
-                setProjectId('')
-                setType('')
-                setZoneId('')
-              }}
-              className={inventoryMutedButton}
+              onClick={resetFilters}
+              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
             >
               Làm mới
             </button>
-            <button onClick={exportCsv} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">
+            <button
+              onClick={exportCsv}
+              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
               Xuất CSV
             </button>
           </div>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 
 import {
+  AdjustmentTransactionModal,
   InboundTransactionModal,
   OutboundTransactionModal,
   StockTakeTransactionModal,
@@ -23,7 +24,7 @@ export function InventoryGlobalActionBar() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const [materialDrawerOpen, setMaterialDrawerOpen] = useState(false)
-  const [transactionModal, setTransactionModal] = useState<null | 'inbound' | 'outbound' | 'transfer' | 'stock-take'>(null)
+  const [transactionModal, setTransactionModal] = useState<null | 'inbound' | 'outbound' | 'transfer' | 'stock-take' | 'adjustment'>(null)
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -51,7 +52,7 @@ export function InventoryGlobalActionBar() {
   const moreActions: MoreAction[] = [
     { label: 'Điều chuyển', action: () => setTransactionModal('transfer') },
     { label: 'Kiểm kê', action: () => setTransactionModal('stock-take') },
-    { label: 'Điều chỉnh tồn kho', path: '/inventory/adjustments' },
+    { label: 'Điều chỉnh tồn kho', action: () => setTransactionModal('adjustment') },
     {
       label: 'Tạo vật tư mới',
       action: () => setMaterialDrawerOpen(true),
@@ -85,6 +86,10 @@ export function InventoryGlobalActionBar() {
       />
       <StockTakeTransactionModal
         open={transactionModal === 'stock-take'}
+        onClose={() => setTransactionModal(null)}
+      />
+      <AdjustmentTransactionModal
+        open={transactionModal === 'adjustment'}
         onClose={() => setTransactionModal(null)}
       />
 

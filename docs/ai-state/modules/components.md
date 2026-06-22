@@ -27,6 +27,13 @@ Components covers steel component master records, production linkage, component 
 * Sprint 12A migrates Components List and Components Stock presentation toward the Inventory cockpit baseline using shared module UI primitives.
 * Components lifecycle KPI strips now show `Tổng cấu kiện`, `READY`, `SHIPPED`, `DELIVERED`, and `INSTALLED` from existing frontend data.
 * Sprint 12C adds sticky filters, lifecycle KPI click-to-filter, shared empty/loading states, and standard `ModuleDetailDrawer` usage for Components List/Stock detail surfaces.
+* Sprint 18B turns Components List into a Component Management Cockpit using the Inventory visual foundation, including KPI strip, operational component grid, shared detail drawer, and analytics panels.
+* Component Cockpit grid now surfaces Project, Work Order, Progress, Material Ready, and Weight alongside existing component fields.
+* Component Cockpit detail drawer includes component info, BOM summary, material required/issued/remaining, related Work Orders, and production progress.
+* Sprint 18C adds BOM Intelligence mapping and computes Component Material Ready from BOM required quantity and Production Material Issue net issued quantity.
+* Material readiness no longer falls back to `100%`; components without BOM/required material do not silently appear fully ready.
+* Sprint 20A adds a read-only Costing Engine summary for Components.
+* `GET /components/:id/cost` aggregates linked Production Order cost summaries into Component material cost and cost per unit without overwriting persisted `ComponentCosting`.
 
 ## Component Creation Audit
 
@@ -73,6 +80,7 @@ Fix:
 * `GET /components/:id/timeline`
 * `GET /components/:id/costing`
 * `GET /components/:id/costing/breakdown`
+* `GET /components/:id/cost`
 * `POST /components`
 * `POST /components/:id/deliver`
 * `POST /components/:id/install` with `installZone`, `installAxis`, `installLevel`, `installPosition`
@@ -87,7 +95,9 @@ Fix:
 
 * Decide whether component master creation should remain separate from production-output creation long term.
 * Add richer costing inputs for labor, machine, overhead, QC rework, and Yard handling.
+* Compare Sprint 20A read-model component cost with persisted `ComponentCosting` during Sprint 20B Component Cost Analysis.
 * Add stricter UI messaging that Production output creation requires issued material.
 * Add delivery and installation document numbers, signed handover evidence, and coordinate/drawing references if required by field operations.
 * Evaluate whether long-term component costing should move from `Float` to database decimal types if accounting-grade precision is required.
 * Continue UI standardization for remaining Components tabs after Sprint 12A review.
+* Consider adding a backend `GET /components/:id/material-readiness` API if multiple modules need the same readiness aggregation and frontend duplication becomes too high.

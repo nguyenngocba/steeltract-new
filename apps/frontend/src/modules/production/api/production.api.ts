@@ -50,10 +50,11 @@ export type ProductionBom = {
   createdAt: string
   items: Array<{
     id: string
+    materialId: string
     quantity: number
     wastePercent: number
     category: string
-    material: { code: string; name: string; unit?: string; unitMaster?: { symbol?: string } }
+    material: { id?: string; code: string; name: string; unit?: string; unitMaster?: { symbol?: string } }
   }>
   routingSteps: Array<{
     id: string

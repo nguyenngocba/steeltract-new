@@ -229,3 +229,29 @@ Implications:
 
 - Project component Actual Cost reads the synchronized `Component.actualCost`.
 - Future labor, machine, overhead, QC rework, and Yard handling cost should extend `ComponentCosting` rather than replacing the material-cost formula.
+
+## PROD-013: Costing Engine Read Models Do Not Mutate Workflow State
+
+Decision:
+
+- Sprint 20A Costing Engine exposes read-only cost summaries for Production Orders, Components, and Projects.
+- These summaries do not overwrite `ComponentCosting`, `Component.actualCost`, Inventory transactions, Production issues, or workflow status.
+
+Rationale:
+
+- Operators need a reliable cost aggregation layer before adding costing UI and project cost control.
+- Read models allow verification against real Inventory transaction valuation without changing closed production or inventory records.
+
+Current implementation:
+
+- `GET /production/orders/:id/cost` calculates Production Order material cost from Production Material Issues.
+- `GET /components/:id/cost` aggregates linked Production Order cost summaries for the Component.
+- `GET /projects/:id/cost` aggregates project-linked Components and direct project Production Orders.
+- Material cost uses actual Production Material Issue Inventory `EXPORT` transaction items when available:
+  `SUM(abs(quantity) * unitPrice)` or persisted `totalAmount`.
+- If issue transaction valuation is missing, the engine falls back to weighted average Inventory cost from positive `inventory_transaction_items` quantity/value rows.
+
+Implications:
+
+- Sprint 20B should compare this read model with persisted `ComponentCosting` and decide what should become the official accounting snapshot.
+- Sprint 20C should build Project Cost Control on the read model first, then add persisted project cost snapshots only after variance rules are approved.

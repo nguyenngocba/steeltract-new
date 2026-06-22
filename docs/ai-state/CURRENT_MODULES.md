@@ -57,6 +57,16 @@
 - Automatic Component Costing Sprint 10B now recalculates ComponentCosting during production completion/component READY workflows without requiring a manual Recalculate button.
 - Reservation Allocation Integrity Sprint 10C now allocates reservations from active exact `inventory_location_stocks` production buckets only and exposes invalid reservation buckets in Runtime Integrity.
 - Component Costing Breakdown Sprint 11 now exposes material-level planned vs actual costing rows and warnings in Component Detail.
+- BOM Intelligence Sprint 18C now maps Component -> Production Order -> BOM -> BOM Items -> Production Material Issues and calculates Component Material Ready from required versus net issued quantity in the frontend cockpit.
+- Work Order Cockpit Sprint 18D now upgrades `/production/orders` with Work Order KPIs, Material Ready %, Inventory-style grid, detail drawer sections, analytics panels, and UI-only `READY TO RELEASE` signaling.
+- Material Issue Dashboard Sprint 18E now upgrades `/production/material-issues` into a Production Material Control Center with issue KPIs, BOM/Issue readiness calculations, Inventory-style grid, drawer sections, and analytics panels.
+- Production Warehouse Sprint 19A now adds `/production/warehouse` for `PRODUCTION` warehouse stock KPIs, material availability, shortage/readiness analytics, WO consumption analytics, and Production Zone / Slot / Level detail.
+- Production Execution Board Sprint 19B now adds `/production/execution` as a Kanban shopfloor board with stage columns, Work Order cards, bottleneck analytics, delay detection, material readiness, and Work Order drawer sections.
+- MES Data Audit Sprint 19C documents current MES readiness in `docs/ai-state/audits/mes-data-audit.md` and recommends Costing Engine work before deeper Shopfloor development.
+- Current Shopfloor data has usable skeletons (`ProductionStage`, `ProductionTask`, `ProductionLog`, `WorkCenter`, `Machine`) but still lacks canonical immutable transition history, runtime/downtime capture, production-line queues, and labor/machine rate data.
+- Current Costing data is stronger because BOM planned materials, Production Material Consumption, Inventory Transaction Item valuation, and ComponentCosting already support the next material-costing phase.
+- Costing Engine Sprint 20A now adds read-only backend cost summaries for Production Orders, Components, and Projects without schema or workflow changes.
+- Sprint 20A material cost uses actual production issue Inventory transaction valuation first, then falls back to weighted average Inventory cost.
 - Approval-oriented issue/return documents, adjust ledger writers, richer consumption entry UX, labor/machine/overhead costing inputs, and costing approvals remain backlog work.
 
 ## 2026-06-11 Documentation Notes

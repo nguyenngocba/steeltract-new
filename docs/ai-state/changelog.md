@@ -1,5 +1,332 @@
 # SteelTrack Changelog
 
+## 2026-06-22 Inventory Adjustment Workflow Unification
+
+Implemented:
+
+- Added `Điều chỉnh tồn kho` as an Inventory sidebar/tab entry directly below `Kiểm kê`.
+- `Khác -> Điều chỉnh tồn kho` now opens the adjustment modal directly from the global action bar.
+- Added a shared `AdjustmentTransactionModal` beside the existing Inbound, Outbound, Transfer, and Stock Take modals.
+- Adjustment modal now uses Material Detail `locationBalances`, displays selectable location rows, and calculates System Qty from the exact selected zone/slot/level bucket.
+- Added `WarehouseMiniMap` to the adjustment modal for synchronized 2D cell/floor selection.
+- Added reason presets, custom reason field, realtime Difference, Variance Value, and attachment upload.
+- Adjustment detail drawer can display System Qty and Actual Qty for new rows using metadata stored in the existing transaction `note` field.
+
+Verified:
+
+- Frontend build passed.
+- No backend, API, schema, migration, or business workflow changes.
+
+## 2026-06-22 Inventory Adjustment Center
+
+Implemented:
+
+- Refactored Inventory Adjustments to match Inbound, Outbound, and Transfer UX.
+- Removed the inline Quick Adjustment Wizard from the page body.
+- Added `+ Điều chỉnh tồn kho` action that opens a modal form.
+- Form now uses Material, Zone, Slot, Level, System Qty, Actual Qty, auto Difference, Reason, and Attachment.
+- Difference is auto-calculated; users no longer type delta directly.
+- Adjustment requests now use `KK` prefix instead of `DC`.
+- Added Inventory-style KPI cards, analytics panels, primary table, row detail drawer, and attachment visibility.
+
+Verified:
+
+- Frontend build passed.
+- No backend, API, schema, migration, or workflow changes.
+
+## 2026-06-22 Costing Engine
+
+Implemented:
+
+- Added read-only backend Costing Engine module.
+- Added read-only endpoints:
+  - `GET /production/orders/:id/cost`
+  - `GET /components/:id/cost`
+  - `GET /projects/:id/cost`
+- Production Order cost now aggregates required, issued, returned, net issued, consumed, scrap, material cost, and cost per unit.
+- Component cost aggregates linked Production Orders.
+- Project cost aggregates project Components and direct project Production Orders.
+
+Verified:
+
+- 3 real Work Orders matched SQL inventory issue transaction valuation with 0% variance.
+- No schema, migration, frontend UI, or workflow changes.
+
+## 2026-06-22 MES Data Audit
+
+Created:
+
+- Added `docs/ai-state/audits/mes-data-audit.md`.
+
+Findings:
+
+- Existing Production data has partial Shopfloor foundations: actual order/stage/task times, worker assignment fields, machine/work-center references, and production logs.
+- Shopfloor data is not yet canonical enough for the next major development track because it lacks immutable stage transition history, downtime/runtime capture, production-line queues, and labor/machine rate data.
+- Costing data is more complete today: BOM planned materials, Production Material Consumption, Inventory Transaction Item unit prices/totals, and ComponentCosting already support material-cost calculation.
+
+Decision:
+
+- Prioritize `20A Costing Engine`, `20B Component Cost Analysis`, and `20C Project Cost Control`.
+- Defer deeper Shopfloor dashboards until the execution timeline and work-center runtime model are formalized.
+
+Verified:
+
+- Documentation-only audit.
+- No API, backend, frontend workflow, schema, migration, or business workflow changes.
+
+## 2026-06-22 Production Execution Board
+
+Implemented:
+
+- Added `/production/execution` as a Production Execution Board tab.
+- Created a separated Kanban board component for shopfloor-style Work Order tracking.
+- Added columns: Planning, Ready Material, Cutting, Assembly, Welding, Painting, Completed.
+- Work Order cards show WO, Component, Project, Qty, Material Ready %, Progress %, Due Date, and delay state.
+- Added bottleneck analytics, waiting-material count, delayed count, and stage distribution.
+- Click card opens drawer with Work Order info, Material Status, Production Progress, Material Issues, and Reservations.
+- Reused existing BOM/Issue material readiness calculation.
+
+Verified:
+
+- Frontend build passed.
+- No API, backend, schema, migration, or workflow changes.
+
+## 2026-06-22 Production Warehouse Cockpit
+
+Implemented:
+
+- Added `/production/warehouse` as a new Production tab for `Kho vật tư SX`.
+- Added KPI cards for Production Stock, Materials in Production, Reserved for WO, Available for WO, Shortage Risk, and Inventory Value.
+- Added material grid showing Material, Main Stock, Production Stock, Reserved, Available, Required, Shortage, and Status.
+- Availability and status are calculated from Production warehouse stock only, not total stock.
+- Required demand uses open Production Order BOM quantities; reserved stock uses active reservation lines.
+- Added analytics for top WO material consumption, material readiness, production locations, and shortage board.
+- Added location detail view grouped by Production Zone / Slot / Level.
+
+Verified:
+
+- Frontend build passed.
+- No API, backend, schema, migration, or workflow changes.
+
+## 2026-06-20 Material Issue Dashboard
+
+Implemented:
+
+- `/production/material-issues` now works as a Production Material Control Center instead of a simple issue list.
+- Added KPI cards for issue count, issue value placeholder, issued quantity, returned quantity, issued Work Orders, and completion readiness.
+- Material Issue grid now shows Issue No, Date, Work Order, Component, Required, Issued, Returned, Remaining, Readiness, Status, and Return action.
+- Readiness uses existing BOM required quantities and Production Material Issue net issued quantities.
+- Material Issue drawer now includes issue information, material lines, warehouse source, and issue timeline sections.
+- Added analytics panels for issued materials, returned materials, missing-material Work Orders, readiness by Work Order, source locations, and readiness distribution.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, backend, or workflow changes.
+
+Note:
+
+- Issue value cannot be calculated accurately yet because current Material Issue API responses do not expose unit material cost or total line value.
+
+## 2026-06-20 Work Order Cockpit
+
+Implemented:
+
+- `/production/orders` now renders as a Work Order Cockpit instead of a basic Manufacturing Order list.
+- Added Work Order KPI cards for total, planned, released, in progress, completed, and delayed.
+- Integrated BOM Intelligence material readiness into Work Order rows and drawer.
+- Work Order grid now shows WO No, Component, Project, Qty, Material Ready, Progress, Due Date, and Status.
+- Work Order drawer now includes WO information, Material Status, Production Progress, Material Issues, and Reservations sections.
+- Added analytics panels for material-value proxy, missing material, upcoming due dates, production progress, and readiness distribution.
+- `READY TO RELEASE` is shown as a UI warning when readiness is 100%; workflow is not locked.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, backend, or workflow changes.
+
+Note:
+
+- Material value ranking uses required quantity as a proxy because current Work Order/Issue API responses do not expose unit material cost.
+
+## 2026-06-20 BOM Intelligence
+
+Implemented:
+
+- Added a BOM Intelligence audit mapping Component -> Production Order -> BOM -> BOM Items -> Production Material Issues.
+- Added frontend material-readiness helper for Components.
+- Removed the temporary `Material Ready = 100%` fallback from the Component Management Cockpit.
+- Material readiness now calculates from BOM required quantity and net issued quantity.
+- Component detail drawer now shows Required, Issued, and Remaining from the same calculation.
+- Updated frontend type definitions for existing response fields used by readiness.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, backend, or workflow changes.
+
+## 2026-06-20 Component Management Cockpit
+
+Implemented:
+
+- Components List now works as `Trung tâm điều hành cấu kiện` instead of a simple list.
+- Added Inventory-style KPI cards for total, running, completed, waiting-material, delayed, and total weight.
+- Component table now uses Inventory table styling and includes Project, Work Order, Progress, Material Ready, and Weight.
+- Component detail now opens in the shared drawer with component info, BOM, material required/issued/remaining, related Work Orders, and production progress.
+- Added analytics panels for top component weight, delayed components, material shortage, component structure mix, and creation rhythm.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, backend, or workflow changes.
+
+Note:
+
+- The initial Material Readiness fallback was superseded by Sprint 18C BOM Intelligence.
+
+## 2026-06-20 Production UI Refactor
+
+Implemented:
+
+- Production Cockpit now follows the Inventory cockpit visual system for KPI cards, filter bar, analytics panels, spacing, and data-grid styling.
+- Reworked the overview layout around Production Orders plus four analytics panels: production progress, stage mix, material issue readiness, and running components.
+- Production Orders now show progress, material readiness, delay warning, and status in one operational grid.
+- Production Order detail now opens in a shared drawer.
+- Material Issue rows now open a detail drawer without changing existing return behavior.
+- Production BOM, Reservations, Material Ledger, Material Issues, Consumptions, and Logs now use Inventory-style KPI/data-grid/table treatment more consistently.
+- BOM detail now opens in the shared drawer shell.
+
+Verified:
+
+- Frontend build passed.
+- Frontend build passed again after extending the rollout across the remaining Production tabs.
+- No API, schema, migration, backend, or workflow changes.
+
+## 2026-06-20 Main Warehouse Stock Status
+
+Implemented:
+
+- Inventory stock health now uses `Kho chính` / `MAIN` stock instead of total stock across all warehouses.
+- Overview low-stock and out-of-stock KPIs now reflect purchasing risk in the main warehouse.
+- Overview and Materials stock tables now show `Kho chính`, `Kho SX`, and `Tổng tồn` separately.
+- Material Detail location balances are grouped by main warehouse, production warehouse, and other warehouses.
+- Inventory stock quantity display now uses shared numeric parsing/formatting so values such as `700` remain visible as `700`.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, backend, or workflow changes.
+
+## 2026-06-20 Inventory Document Numbering Hardening
+
+Implemented:
+
+- Inventory document numbers now use five-digit date sequences, for example `NK-260620-00001`.
+- Number generation now uses max existing suffix for the same day prefix instead of `count() + 1`.
+- Inventory transaction creation now ignores frontend-supplied code values.
+- New Inventory transactions now persist `code = transactionNo`.
+- Inventory transaction creation retries on Prisma `P2002` duplicate number collisions.
+- Production material issue and material movement direct Inventory writers now use the same numbering engine.
+- Added diagnostic SQL for historical `code <> transactionNo` records.
+
+Verified:
+
+- Backend build passed.
+- No Prisma schema change or migration.
+
+## 2026-06-20 Inventory Locations Visualization
+
+Implemented:
+
+- Inventory Locations now shows occupancy percentage, free slots, occupied slots, and inventory value.
+- Added occupancy and value columns to the location table.
+- Added Top Occupied Slots with quantity and value.
+- Clicking a slot opens a material list drawer.
+- Added transfer movement analytics with source slot, destination slot, movement count, quantity, and movement value.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, or workflow changes.
+
+## 2026-06-20 Inventory Stocktake Enhancement
+
+Implemented:
+
+- Clicking a stocktake row now opens a session detail drawer.
+- Added stocktake KPIs for total sessions, pending approval, variance materials, accuracy, and variance value.
+- Added variance analytics for top materials and top locations.
+- Added adjustment preview rows with positive/negative variance and variance value.
+- Detail drawer shows Material, SystemQty, ActualQty, VarianceQty, UnitPrice, and VarianceValue.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, or workflow changes.
+
+## 2026-06-20 Inventory Outbound Analytics Enhancement
+
+Implemented:
+
+- Added project consumption analytics with document count, quantity, value, and percentage.
+- Added daily and monthly outbound trend charts.
+- Added material consumption analytics with quantity, value, and issue count.
+- Added outbound-purpose distribution.
+- Added financial KPI panel for today, week, month, and year.
+- Added abnormal consumption alerts for outlier export quantity/value.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, or workflow changes.
+
+## 2026-06-20 Inventory Inbound Enhancement
+
+Implemented:
+
+- Clicking an inbound transaction row now opens a detail drawer.
+- Detail drawer shows inbound header information and material lines with warehouse, zone, slot, and level.
+- Added today's inbound value, monthly inbound value, monthly inbound document count, and monthly active supplier count KPIs.
+- Added top suppliers by inbound value, top suppliers by inbound quantity, and price monitoring for top material price increases/decreases.
+- Top materials now ranks by inbound value instead of quantity.
+- Inbound calculations now aggregate all transaction item lines.
+- Inbound, Outbound, and Transfer filter bars now use the larger shared spacing rhythm for search/dropdown controls.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, or workflow changes.
+
+## 2026-06-19 Inventory Transfer Enhancement
+
+Implemented:
+
+- Clicking a transfer row now opens a detail drawer.
+- Detail drawer shows transaction info, material lines, and source/destination warehouse, zone, slot, and level.
+- Added monthly transfer value, today's transfer value, and monthly transfer document count KPIs.
+- Top materials ranking now sorts by transfer value.
+- Added top transfer routes plus top source and destination locations.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, or workflow changes.
+
+## 2026-06-19 Inventory Outbound Enhancement
+
+Implemented:
+
+- Clicking an outbound transaction row now opens a detail drawer.
+- Detail drawer shows transaction header information and item lines with quantity, unit, unit price, and total amount.
+- Added Outbound value today KPI.
+- Top materials ranking now sorts by outbound value.
+- Added top projects by outbound value.
+
+Verified:
+
+- Frontend build passed.
+- No API, schema, migration, or workflow changes.
+
 ## 2026-06-19 Inventory Cost Integrity
 
 Fixed:

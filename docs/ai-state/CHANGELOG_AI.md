@@ -1,5 +1,478 @@
 # SteelTrack AI Changelog
 
+## 2026-06-22 Sprint 19E Inventory Adjustment Workflow Unification
+
+Implemented:
+
+* Added `Điều chỉnh tồn kho` to the Inventory navigation directly below `Kiểm kê`.
+* Updated Inventory Global Actions so `Khác -> Điều chỉnh tồn kho` opens the adjustment modal directly instead of routing to the page first.
+* Added shared `AdjustmentTransactionModal` in `InventoryTransactionModals.tsx` alongside Inbound, Outbound, Transfer, and Stock Take modals.
+* Adjustment creation now loads Material Detail `locationBalances`, shows a location-balance table, and calculates System Qty from the selected `warehouse/zone/slot/level` bucket only.
+* Integrated `WarehouseMiniMap` into the adjustment modal for 2D slot/level selection synchronized with the selected bucket.
+* Added reason dropdown presets and custom reason handling.
+* Added realtime Difference and Variance Value display using the material average/unit cost available to the frontend.
+* Adjustment detail drawer now reads new adjustment audit metadata from the existing `note` field when available, while legacy rows remain variance-only.
+
+Scope:
+
+* Frontend UI/UX only.
+* No backend change.
+* No API contract change.
+* No Prisma schema change.
+* No migration.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-22 Sprint 19D Inventory Adjustment Center Refactor
+
+Implemented:
+
+* Refactored `InventoryAdjustmentsPage.tsx` to match the Inventory Inbound, Outbound, and Transfer UX pattern.
+* Removed the inline Quick Adjustment Wizard from the page body.
+* Added toolbar action `+ Điều chỉnh tồn kho` that opens an adjustment modal.
+* Adjustment form now captures Material, Zone, Slot, Level, readonly System Qty, Actual Qty, auto-calculated Difference, Reason, and Attachment.
+* Delta quantity is no longer directly editable in the UI.
+* Adjustment numbers now use `KK` prefix in the frontend request instead of `DC`.
+* Main adjustment table now sits in the primary page flow with Inventory table tokens and row-click detail drawer.
+* Added adjustment detail drawer with Adjustment No, Material, Location, Difference, Variance Value, Reason, material lines, and attachment list.
+* Added KPI strip for Adjustment Today, Adjustment Month, Increase Qty, Decrease Qty, Net Adjustment, and Abnormal Adjustments.
+* Added analytics panels for Adjustment Trend, Top Variance Materials, Top Variance Locations, and Financial Impact.
+
+Scope:
+
+* Frontend UI/UX only.
+* No backend change.
+* No API contract change.
+* No Prisma schema change.
+* No migration.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-22 Sprint 20A Costing Engine
+
+Implemented:
+
+* Added a read-only backend Costing Engine module at `apps/backend-api/src/modules/costing`.
+* Added `CostingEngineService` for Production Order, Component, and Project cost aggregation.
+* Added read-only API endpoints:
+  * `GET /production/orders/:id/cost`
+  * `GET /components/:id/cost`
+  * `GET /projects/:id/cost`
+* Production Order cost summary now returns Required Qty, Issued Qty, Returned Qty, Net Issued Qty, Consumed Qty, Scrap Qty, Material Cost, Cost Per Unit, and material-level cost rows.
+* Component cost summary aggregates linked Production Orders and returns Material Cost and Cost Per Unit.
+* Project cost summary aggregates project-linked Components and direct project Production Orders.
+
+Costing rules:
+
+* Material Cost uses actual Production Material Issue inventory transaction valuation when available.
+* Fallback cost uses weighted average Inventory cost from `inventory_transaction_items.unitPrice` / `totalAmount`.
+* No existing `ComponentCosting` rows are overwritten by these read models.
+
+Verification:
+
+* Verified 3 real Work Orders against SQL issue transaction valuation:
+  * `MO-20260613-49982`: engine `85,585,910.28811619`, SQL `85,585,910.28811619`.
+  * `MO-20260612-21547`: engine `16,906,102.615384612`, SQL `16,906,102.615384612`.
+  * `MO-S3-1781194119`: engine `155,006.24301933107`, SQL `155,006.24301933107`.
+* Error variance: 0% for the sampled Work Orders.
+
+Scope:
+
+* Backend read model/API only.
+* No frontend UI change.
+* No Prisma schema change.
+* No migration.
+* No workflow mutation.
+
+## 2026-06-22 Sprint 19C MES Data Audit
+
+Created:
+
+* Added `docs/ai-state/audits/mes-data-audit.md`.
+
+Findings:
+
+* Shopfloor data foundation exists through `ProductionOrder`, `ProductionStage`, `ProductionTask`, `ProductionLog`, `WorkCenter`, and `Machine`.
+* Shopfloor is not yet full MES-ready because immutable stage transition history, actual runtime/downtime, production line queues, operator rate data, and work-center costing are incomplete.
+* Costing data is stronger: BOM planned material, Production Material Consumption, Inventory Transaction Item `unitPrice` / `totalAmount`, and ComponentCosting already form a usable material-costing path.
+* Project cost is partially derivable from shipped/installed Components, ComponentCosting, and Inventory project transactions, but still needs a formal project cost ledger/control layer.
+
+Decision:
+
+* Prioritize Costing path first:
+  * 20A Costing Engine
+  * 20B Component Cost Analysis
+  * 20C Project Cost Control
+* Defer deeper Shopfloor dashboards until stage transition history and runtime/operator/machine data are canonical.
+
+Scope:
+
+* Documentation audit only.
+* No frontend code change.
+* No backend code change.
+* No API, Prisma schema, migration, or workflow change.
+
+## 2026-06-22 Sprint 19B Production Execution Board
+
+Implemented:
+
+* Added `/production/execution` as a new Production Execution Board tab.
+* Created a separated `ProductionExecutionBoard` component for Kanban/shopfloor-style tracking.
+* Added Kanban columns: Planning, Ready Material, Cutting, Assembly, Welding, Painting, and Completed.
+* Work Order cards show WO No, Component, Project, Qty, Material Ready %, Progress %, Due Date, and delay badge.
+* Stage mapping prefers existing active stage data and falls back to status/readiness mapping when backend stage is not canonical.
+* Reused Sprint 18C material readiness logic to show `Waiting Material` versus `Ready To Release`.
+* Added bottleneck analytics with per-stage counts, current bottleneck, waiting-material count, delayed count, and stage distribution donut.
+* Added Work Order drawer sections for Work Order info, material status, production progress, material issue history, and reservations.
+
+Scope:
+
+* Frontend UI/data composition only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-22 Sprint 19A Production Warehouse
+
+Implemented:
+
+* Added a new `/production/warehouse` Production Warehouse Cockpit route and Production tab.
+* Built a frontend-only `PRODUCTION` warehouse view from existing Inventory item `locationBalances`, Inventory audit cost, Production Orders, Reservations, and Consumption data.
+* Added KPI strip for Production Stock, Materials in Production, Reserved for WO, Available for WO, Shortage Risk, and Inventory Value.
+* Added material grid columns: Material, Main Stock, Production Stock, Reserved, Available, Required, Shortage, and Status.
+* Status now uses Production `Available = Production Stock - Reserved`, not total stock.
+* Required demand is derived from open Production Order BOM quantities with waste and MO quantity.
+* Reserved quantity is derived from active reservation lines as `reservedQty - issuedQty`.
+* Added analytics panels for top WO material consumption, material readiness, production locations, and shortage board.
+* Added Production Zone / Slot / Level detail table and row drawer for material-level production warehouse locations.
+
+Scope:
+
+* Frontend UI/data composition only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 18E Material Issue Dashboard
+
+Implemented:
+
+* Refactored `/production/material-issues` from a transaction list into a Production Material Control Center using the Inventory visual foundation.
+* Added Material Issue KPI strip for issue count, issue value placeholder, issued material quantity, returned material quantity, issued Work Orders, and completion readiness rate.
+* Material Issue grid now shows Issue No, Date, Work Order, Component, Required, Issued, Returned, Remaining, Readiness, Status, and Return action.
+* Required/Remaining/Readiness are computed from existing Production Order BOM quantities and Production Material Issue net issued quantities.
+* Material Issue drawer now has sections for issue information, material lines, warehouse source, and issue timeline.
+* Added analytics panels for top issued materials, top returned materials, Work Orders missing material, readiness by Work Order, production warehouse source locations, readiness distribution, and business indicators.
+* Preserved the existing material return action and validation behavior.
+
+Notes:
+
+* Current Material Issue API responses do not expose unit material cost or line total, so the issue value KPI is shown as unavailable instead of deriving a misleading value.
+
+Scope:
+
+* Frontend UI/UX only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 18D Work Order Cockpit
+
+Implemented:
+
+* Refactored `/production/orders` from a Manufacturing Order list into a Work Order Cockpit using the Inventory visual foundation.
+* Added Work Order KPI strip for Total Work Orders, Planned, Released, In Progress, Completed, and Delayed.
+* Integrated Sprint 18C BOM Intelligence readiness into Work Orders, using BOM required quantity versus Production Material Issue net issued quantity.
+* Work Order grid now shows WO No, Component, Project, Qty, Material Ready, Progress, Due Date, and Status.
+* Material Ready uses percentage bands: 0-49 red, 50-79 amber, 80-99 cyan, and 100 emerald.
+* Work Order drawer now has sections for WO information, material status, production progress, material issues, and reservations.
+* Added Work Order analytics panels for material-value proxy, material shortages, upcoming due dates, production progress, and material readiness distribution.
+* Added UI-only `READY TO RELEASE` warning when Material Readiness is at least 100%; no workflow lock was introduced.
+
+Notes:
+
+* Current Production Order / Material Issue responses do not expose unit material cost, so the "Top WO theo giá trị vật tư" panel uses required material quantity as a visible proxy and labels this limitation in the UI.
+
+Scope:
+
+* Frontend UI/UX only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 18C BOM Intelligence
+
+Implemented:
+
+* Audited the real Component -> Production Order -> BOM -> BOM Item -> Production Material Issue data path.
+* Added `docs/ai-state/audits/bom-intelligence-audit.md` documenting actual models, relationships, missing frontend type fields, and optional future API shape.
+* Added frontend helper `calculateComponentMaterialReadiness()` to compute required, issued, remaining, and readiness percent from existing data.
+* Removed the Sprint 18B `Material Ready = 100%` fallback from the Component Management Cockpit.
+* Component material readiness now uses BOM required quantities and net Production Material Issue quantities (`issuedQty - returnedQty`).
+* Component detail drawer material metrics now show real Required, Issued, and Remaining quantities from the same helper.
+* Updated frontend production/component type definitions to include existing response fields required for readiness: `bomId`, embedded `bom`, embedded `materialIssues`, and `BOMItem.materialId`.
+
+Scope:
+
+* Frontend helper and type alignment only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 18B Component Management Cockpit
+
+Implemented:
+
+* Components List is now positioned as `Trung tâm điều hành cấu kiện` instead of a plain CRUD list.
+* Added Inventory-style KPI strip for total components, running components, completed components, waiting-material components, delayed components, and total component weight.
+* Component table now uses the Inventory grid/table visual foundation and adds Project, Work Order, Progress, Material Ready, and Weight columns.
+* Component rows open the shared `ModuleDetailDrawer` with operational sections for component information, BOM, material required/issued/remaining, related Work Orders, and production progress.
+* Added Inventory-style analytics panels for top component weight, delayed components, material-shortage components, component structure mix, and creation rhythm.
+* Initial Material Readiness used a safe frontend fallback; Sprint 18C superseded this with real BOM/Issue aggregation.
+
+Scope:
+
+* Frontend UI/UX only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 18A Production UI Refactor
+
+Implemented:
+
+* Production Cockpit now uses the Inventory visual foundation for KPI cards, filter bar controls, analytics panels, spacing, and primary data-grid styling.
+* Reworked the Production overview into an operational cockpit layout: KPI strip, Production Orders grid, and analytics panels.
+* Added Production KPI cards for running orders, completed today, waiting material, delayed orders, running components, and estimated production weight.
+* Production Orders grid now shows progress, status badge, material readiness, and delay warning.
+* Added overview analytics panels for production progress, production stages, material issue readiness, and top running components using existing frontend data only.
+* Production Order detail now opens in the shared `ModuleDetailDrawer` instead of the previous full-screen modal shell.
+* Material Issue rows now open a detail drawer while preserving the existing return action behavior.
+* Extended the Inventory-style treatment to Production BOM, Reservations, Material Ledger, Material Issues, Consumptions, and Logs tabs.
+* BOM registry now has KPI cards and uses the shared data-grid/table shell; BOM detail now opens in a shared drawer.
+* Reservation, Ledger, Issue, Consumption, and Log tables now use Inventory table tokens and shared module panels instead of local CRUD-style table shells.
+
+Scope:
+
+* Frontend UI/UX only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+* No business workflow change.
+
+Verification:
+
+* Frontend build passed.
+* Frontend build passed again after the extended tab rollout.
+
+## 2026-06-20 Sprint 17F Main Warehouse Stock Status
+
+Implemented:
+
+* Inventory Overview stock status now uses `Kho chính` / `MAIN` stock from `locationBalances`, not total stock across all warehouses.
+* Overview KPIs for low-stock and out-of-stock materials now derive from the `MAIN` warehouse status rule.
+* Inventory Overview stock tables now show `Kho chính`, `Kho SX`, and `Tổng tồn` as separate columns.
+* Inventory Materials list now uses the same `MAIN`-based status rule and shows separate main/production/total stock columns.
+* Material Detail `Vị trí` tab now groups location balances into `Kho chính`, `Kho sản xuất`, and optional `Kho khác`.
+* Quantity display in Inventory stock tables uses the shared locale parser/formatter and tabular numeric styling so values such as `700` are not visually truncated or rounded away.
+
+Scope:
+
+* Frontend only.
+* No backend API change.
+* No Prisma schema change.
+* No migration.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 17E Inventory Document Numbering Hardening
+
+Implemented:
+
+* Operational code formatting now uses five-digit date-scoped sequences, for example `NK-260620-00001`.
+* `nextOperationalCode` no longer uses `count() + 1`; it scans current-day prefix rows, extracts numeric suffixes, and generates `max(sequence) + 1`.
+* Inventory transaction creation now ignores frontend-supplied `code` and `transactionNo`.
+* Inventory transaction creation writes `code = transactionNo = generatedNo`.
+* Inventory transaction creation retries up to three times on Prisma `P2002` duplicate collisions for `code` / `transactionNo`.
+* Material Movement direct Inventory transaction writer now uses the same Inventory numbering prefixes.
+* Production Material Issue direct Inventory transaction writers now use the same Inventory numbering prefixes.
+* Added diagnostic SQL report `scripts/sql/validate-inventory-transaction-numbering.sql` for historical `code <> transactionNo` rows.
+
+Scope:
+
+* Backend numbering logic only.
+* No Prisma schema change.
+* No migration.
+* Historical mismatched records are reported, not overwritten.
+
+Verification:
+
+* Backend build passed.
+
+## 2026-06-20 Sprint 17B Inventory Locations & Material Movement Visualization
+
+Implemented:
+
+* Inventory Locations now shows occupancy percentage, free slots, occupied slots, and inventory value by location.
+* Location list now includes occupancy and value columns.
+* Added value-by-location analytics using existing material cost/audit data when available.
+* Added Top Occupied Slots with quantity and value.
+* Clicking a top occupied slot opens a material list drawer for that slot.
+* Added movement route analytics for transfer transactions with source slot, destination slot, movement count, quantity, and value.
+
+Scope:
+
+* Frontend only.
+* Reused existing Inventory zones, audit, and transaction APIs.
+* No schema, migration, backend API, or workflow changes.
+* Inventory value is only as complete as the available material average/unit cost data in current frontend sources.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 17A Inventory Stocktake Enhancement
+
+Implemented:
+
+* Inventory Stock Take rows now open a session detail drawer.
+* Session detail shows stocktake header information and all material variance lines.
+* Added stocktake KPIs for total sessions, pending approval, variance materials, accuracy, and variance value.
+* Stocktake analytics now includes top variance materials, top variance locations, and adjustment preview.
+* Detail line columns include Material, SystemQty, ActualQty, VarianceQty, UnitPrice, and VarianceValue.
+* Existing adjustment transaction fields are used when available; when `SystemQty` / `ActualQty` are absent, the UI falls back to variance-only display.
+
+Scope:
+
+* Frontend only.
+* Reused existing Inventory adjustment transaction API.
+* No schema, migration, backend API, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 16D Inventory Outbound Analytics Enhancement
+
+Implemented:
+
+* Inventory Outbound now includes project consumption analytics with document count, quantity, value, and value percentage.
+* Added daily and monthly outbound trend charts.
+* Added material consumption analytics with quantity, value, and issue count.
+* Added outbound-purpose distribution for project, production, customer, and other.
+* Added financial KPI panel for today, week, month, and year.
+* Added abnormal consumption alerts based on material-level quantity/value outliers in the current filtered dataset.
+
+Scope:
+
+* Frontend only.
+* Reused existing Inventory transaction API.
+* No schema, migration, backend API, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-20 Sprint 16C Inventory Inbound Enhancement
+
+Implemented:
+
+* Inventory Inbound rows now open a detail drawer with inbound header info and all material lines.
+* Inbound detail shows material code, material name, quantity, unit, unit price, line amount, warehouse, zone, slot, and level.
+* Inbound KPI strip now includes today's inbound value, monthly inbound value, monthly inbound document count, and monthly active supplier count.
+* Inbound analytics now includes top suppliers by inbound value, top suppliers by inbound quantity, value-ranked top materials, and price monitoring panels for top increases/decreases.
+* Inbound calculations now aggregate all transaction item lines instead of using only `items[0]`.
+* Attachment button clicks on Inbound rows now open only the attachment drawer and no longer trigger row detail.
+* Inventory Inbound, Outbound, and Transfer filter bars now use the same larger spacing rhythm (`p-3`, `gap-3`) for search/dropdown controls.
+
+Scope:
+
+* Frontend only.
+* Reused existing Inventory transaction API.
+* No schema, migration, backend API, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+* Build output includes Inventory Outbound, Inbound, and Transfer route chunks, so the reported Outbound page issue is not caused by a frontend build/lazy-route failure.
+
+## 2026-06-19 Sprint 16B Inventory Transfer Enhancement
+
+Implemented:
+
+* Inventory Transfer rows now open a detail drawer with transaction info, source/destination locations, and material lines.
+* Transfer detail shows warehouse, zone, slot, and level for source and destination lines.
+* Added transfer KPIs for monthly transfer value, today's transfer value, and monthly transfer document count.
+* Changed Top Materials ranking to sort by transfer value instead of quantity.
+* Added top transfer routes with route count, quantity, and value.
+* Added top source locations and top destination locations by transfer value.
+
+Scope:
+
+* Frontend only.
+* Reused existing Inventory transaction API.
+* No schema, migration, backend API, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+
+## 2026-06-19 Sprint 16A Inventory Outbound Enhancement
+
+Implemented:
+
+* Inventory Outbound rows now open a detail drawer showing document header fields, project/receiver, actor, remarks, and item lines.
+* Outbound detail item table shows material code, material name, quantity, unit, unit price, and total amount using existing Inventory transaction API data.
+* Added `Giá trị xuất hôm nay` KPI to the Outbound KPI strip.
+* Changed Top Materials ranking to sort by total outbound value instead of outbound quantity.
+* Added Top Projects ranking aggregated by outbound value.
+
+Scope:
+
+* Frontend only.
+* Reused existing Inventory transaction API.
+* No schema, migration, backend API, or workflow changes.
+
+Verification:
+
+* Frontend build passed.
+
 ## 2026-06-19 Sprint 15B Inventory Cost Integrity
 
 Fixed:

@@ -25,7 +25,7 @@ import {
 import { activateZone, createZone, deactivateZone, deleteZone, getZoneDetail, updateZone, type WarehouseLocation, type WarehouseLocationDetail } from '../../api/zones.api'
 import { useZones } from '../../hooks/useZones'
 import { useWarehouses } from '../../hooks/useWarehouses'
-import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 10
 const LOCATION_ROWS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -46,6 +46,24 @@ type LocationForm = {
   warehouseId: string
 }
 
+type SlotMaterialView = {
+  id: string
+  label: string
+  zoneCode: string
+  slotId: string
+  level: string
+  quantity: number
+  value: number
+  materials: Array<{
+    id: string
+    code: string
+    name: string
+    quantity: number
+    unit?: string | null
+    value: number
+  }>
+}
+
 const emptyForm: LocationForm = {
   code: '',
   name: '',
@@ -61,6 +79,42 @@ const emptyForm: LocationForm = {
 function n(value: unknown) {
   const parsed = parseLocaleNumber(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatCurrency(value: unknown) {
+  return formatCurrencyVnd(n(value))
+}
+
+function transactionRows(data: any) {
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.data)) return data.data
+  return []
+}
+
+function transactionItems(tx: any) {
+  return Array.isArray(tx?.items) ? tx.items : []
+}
+
+function lineAmount(line: any) {
+  const explicit = Math.abs(n(line?.totalAmount))
+  if (explicit) return explicit
+  return Math.abs(n(line?.quantity)) * n(line?.unitPrice)
+}
+
+function lineLocationLabel(line: any) {
+  return [
+    line?.zone?.code ?? line?.zoneCode,
+    line?.slot?.code ?? line?.slotId,
+    line?.level,
+  ].filter(Boolean).join('/') || 'Không rõ vị trí'
+}
+
+function materialCodeFromAudit(row: any) {
+  return String(row?.materialCode ?? row?.code ?? row?.inventoryItem?.code ?? '').trim()
+}
+
+function materialCostFromAudit(row: any) {
+  return n(row?.averageCost ?? row?.avgCost ?? row?.unitPrice ?? row?.costPrice ?? row?.inventoryItem?.averageCost)
 }
 
 function auditZone(zone: WarehouseLocation) {
@@ -279,6 +333,7 @@ export function InventoryLocationsPage() {
   const [page, setPage] = useState(1)
   const [form, setForm] = useState<LocationForm | null>(null)
   const [detailId, setDetailId] = useState('')
+  const [selectedSlot, setSelectedSlot] = useState<SlotMaterialView | null>(null)
   const { data: detail } = useQuery({
     queryKey: ['inventory-zone-detail', detailId],
     queryFn: () => getZoneDetail(detailId),
@@ -332,6 +387,64 @@ export function InventoryLocationsPage() {
   }, [zones, query, status, audit])
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const pagedRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const materialCostByCode = useMemo(() => {
+    const map = new Map<string, number>()
+    ;(auditRows as any[]).forEach((row) => {
+      const code = materialCodeFromAudit(row)
+      if (!code) return
+      map.set(code, materialCostFromAudit(row))
+    })
+    return map
+  }, [auditRows])
+
+  const slotViews = useMemo<SlotMaterialView[]>(() => rows.flatMap((zone) => (zone.cellOccupancy ?? [])
+    .filter((cell) => n(cell.totalQuantity) > 0 || n(cell.materialCount) > 0)
+    .map((cell) => {
+      const materials = (cell.materials ?? []).map((material) => {
+        const quantity = n(material.quantity)
+        const value = quantity * (materialCostByCode.get(material.code) ?? 0)
+        return {
+          id: material.id,
+          code: material.code,
+          name: material.name,
+          quantity,
+          unit: material.unit,
+          value,
+        }
+      })
+      const quantity = materials.length
+        ? materials.reduce((sum, material) => sum + material.quantity, 0)
+        : n(cell.totalQuantity)
+      const value = materials.reduce((sum, material) => sum + material.value, 0)
+      const slotId = cell.slotId || zone.code
+      const level = cell.level || 'L1'
+      return {
+        id: `${zone.id}-${slotId}-${level}`,
+        label: `${zone.code}/${slotId}/${level}`,
+        zoneCode: zone.code,
+        slotId,
+        level,
+        quantity,
+        value,
+        materials,
+      }
+    })), [materialCostByCode, rows])
+
+  const valueByZone = useMemo(() => {
+    const map = new Map<string, number>()
+    slotViews.forEach((slot) => {
+      map.set(slot.zoneCode, (map.get(slot.zoneCode) ?? 0) + slot.value)
+    })
+    return map
+  }, [slotViews])
+
+  const occupiedSlots = slotViews.length
+  const totalSlotCapacity = Math.max(1, rows.length * TOTAL_CELL_LEVELS)
+  const freeSlots = Math.max(0, totalSlotCapacity - occupiedSlots)
+  const occupancyPercent = totalSlotCapacity > 0 ? (occupiedSlots / totalSlotCapacity) * 100 : 0
+  const inventoryValue = Array.from(valueByZone.values()).reduce((sum, value) => sum + value, 0)
+
   const stats = useMemo(() => ({
     total: (zones as WarehouseLocation[]).length,
     active: (zones as WarehouseLocation[]).filter((zone) => zone.active).length,
@@ -340,7 +453,11 @@ export function InventoryLocationsPage() {
     real: (zones as WarehouseLocation[]).filter((zone) => auditZone(zone) === 'Real storage location').length,
     materialCount: (zones as WarehouseLocation[]).filter(isRealStorageLocation).reduce((sum, zone) => sum + n(zone.materialCount), 0),
     stock: (zones as WarehouseLocation[]).filter(isRealStorageLocation).reduce((sum, zone) => sum + n(zone.totalStockQuantity), 0),
-  }), [zones])
+    occupiedSlots,
+    freeSlots,
+    occupancyPercent,
+    inventoryValue,
+  }), [freeSlots, inventoryValue, occupancyPercent, occupiedSlots, zones])
 
   const locationSegments = useMemo(() => [
     { label: 'Đang hoạt động', value: stats.active, color: '#14c987' },
@@ -353,6 +470,39 @@ export function InventoryLocationsPage() {
     .sort((a, b) => n(b.totalStockQuantity) - n(a.totalStockQuantity))
     .slice(0, 6)
     .map((zone) => [zone.code, n(zone.totalStockQuantity)] as [string, number]), [rows])
+
+  const valueByLocation = useMemo(() => rows
+    .map((zone) => ({ code: zone.code, value: valueByZone.get(zone.code) ?? 0 }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6), [rows, valueByZone])
+
+  const topOccupiedSlots = useMemo(() => slotViews
+    .slice()
+    .sort((a, b) => b.value - a.value || b.quantity - a.quantity)
+    .slice(0, 8), [slotViews])
+
+  const movementRoutes = useMemo(() => {
+    const map = new Map<string, { source: string; destination: string; count: number; quantity: number; value: number }>()
+    transactionRows(transactionsData)
+      .filter((tx: any) => String(tx?.type ?? tx?.transactionType ?? '').toUpperCase().includes('TRANSFER'))
+      .forEach((tx: any) => {
+        const sourceLines = transactionItems(tx).filter((line: any) => n(line?.quantity) < 0)
+        const destinationLines = transactionItems(tx).filter((line: any) => n(line?.quantity) > 0)
+        sourceLines.forEach((sourceLine: any) => {
+          destinationLines.forEach((destinationLine: any) => {
+            const source = lineLocationLabel(sourceLine)
+            const destination = lineLocationLabel(destinationLine)
+            const key = `${source}->${destination}`
+            const previous = map.get(key) ?? { source, destination, count: 0, quantity: 0, value: 0 }
+            previous.count += 1
+            previous.quantity += Math.min(Math.abs(n(sourceLine.quantity)), Math.abs(n(destinationLine.quantity)))
+            previous.value += Math.max(lineAmount(sourceLine), lineAmount(destinationLine))
+            map.set(key, previous)
+          })
+        })
+      })
+    return Array.from(map.values()).sort((a, b) => b.value - a.value || b.count - a.count).slice(0, 8)
+  }, [transactionsData])
 
   const warehouseOptions = useMemo(() => {
     const byId = new Map<string, { id: string; code: string; name: string }>()
@@ -472,7 +622,7 @@ const topMaterials = useMemo(() => {
   return <EnterpriseModulePage>
     <div className="space-y-1 -mt-2">
       <InventoryTabWorkspace />
-      <div className="grid gap-1.5 md:grid-cols-4">
+      <div className="grid gap-1.5 md:grid-cols-5">
         <OverviewMetricCard
           title="Tổng vị trí"
           value={formatQuantity(stats.total, 0)}
@@ -482,25 +632,33 @@ const topMaterials = useMemo(() => {
           trend={[0,0,0,0,0,0]}
         />
         <OverviewMetricCard
-          title="Vị trí lưu kho thật"
-          value={formatQuantity(stats.real, 0)}
-          note="A01/A02/row/column/level"
+          title="Occupancy"
+          value={`${stats.occupancyPercent.toFixed(1)}%`}
+          note={`${formatQuantity(stats.occupiedSlots, 0)} occupied slots`}
           tone="emerald"
           icon={<Layers3 size={15} />}
           trend={[0,0,0,0,0,0]}
         />
         <OverviewMetricCard
-          title="Vật tư đang gán"
-          value={formatQuantity(stats.materialCount, 0)}
-          note="theo Material Master"
+          title="Free slots"
+          value={formatQuantity(stats.freeSlots, 0)}
+          note={`${formatQuantity(stats.occupiedSlots, 0)} đã dùng`}
           tone="cyan"
           icon={<Package size={15} />}
           trend={[0,0,0,0,0,0]}
         />
         <OverviewMetricCard
+          title="Occupied slots"
+          value={formatQuantity(stats.occupiedSlots, 0)}
+          note={`${formatQuantity(stats.materialCount, 0)} vật tư`}
+          tone="purple"
+          icon={<Warehouse size={15} />}
+          trend={[0,0,0,0,0,0]}
+        />
+        <OverviewMetricCard
           title="Tổng tồn theo vị trí"
-          value={formatQuantity(stats.stock, 0)}
-          note="quantity snapshot"
+          value={formatCurrency(stats.inventoryValue)}
+          note={`${formatQuantity(stats.stock, 0)} quantity`}
           tone="amber"
           icon={<Warehouse size={15} />}
           trend={[0,0,0,0,0,0]}
@@ -528,7 +686,7 @@ const topMaterials = useMemo(() => {
         <div className="flex flex-col gap-1.5">
           <InventoryPanel title="Danh sách vị trí kho" className="!p-0 pb-0">
             <div className={`${inventoryTableShell} h-[240px] overflow-auto`}>
-              <table className="w-full min-w-[980px] text-xs">
+              <table className="w-full min-w-[1160px] text-xs">
                 <thead className={inventoryTableHead}>
                   <tr>
                     <th className="px-2 py-2 text-left font-medium">Mã vị trí</th>
@@ -539,14 +697,20 @@ const topMaterials = useMemo(() => {
                     <th className="px-2 py-2 text-left font-medium">Tầng</th>
                     <th className="px-2 py-2 text-right font-medium">Sức chứa</th>
                     <th className="px-2 py-2 text-right font-medium">Ô/tầng</th>
+                    <th className="px-2 py-2 text-right font-medium">Occupancy</th>
                     <th className="px-2 py-2 text-right font-medium">Vật tư</th>
                     <th className="px-2 py-2 text-right font-medium">Tồn</th>
+                    <th className="px-2 py-2 text-right font-medium">Giá trị</th>
                     <th className="px-2 py-2 text-left font-medium">Trạng thái</th>
                     <th className="px-2 py-2 text-center font-medium">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedRows.map((zone) => (
+                  {pagedRows.map((zone) => {
+                    const zoneOccupied = countOccupiedFromOccupancy(zone.cellOccupancy)
+                    const zoneOccupancy = TOTAL_CELL_LEVELS > 0 ? (zoneOccupied / TOTAL_CELL_LEVELS) * 100 : 0
+                    const zoneValue = valueByZone.get(zone.code) ?? 0
+                    return (
                     <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
                       <td className="px-2 py-1.5 font-medium text-cyan-300">{zone.code}</td>
                       <td className="px-2 py-1.5 text-white">{zone.name}</td>
@@ -555,9 +719,11 @@ const topMaterials = useMemo(() => {
                       <td className="px-2 py-1.5 text-slate-300">{zone.column ?? '-'}</td>
                       <td className="px-2 py-1.5 text-slate-300">{zone.level ?? '-'}</td>
                       <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.capacity), 0)} t</td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(countOccupiedFromOccupancy(zone.cellOccupancy), 0)} / {formatQuantity(TOTAL_CELL_LEVELS, 0)}</td>
+                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(zoneOccupied, 0)} / {formatQuantity(TOTAL_CELL_LEVELS, 0)}</td>
+                      <td className="px-2 py-1.5 text-right text-cyan-300">{zoneOccupancy.toFixed(1)}%</td>
                       <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.materialCount), 0)}</td>
                       <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.totalStockQuantity), 0)}</td>
+                      <td className="px-2 py-1.5 text-right text-emerald-300">{formatCurrency(zoneValue)}</td>
                       <td className="px-2 py-1.5">
                         <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${zone.active ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-600 bg-slate-800/50 text-slate-400'}`}>
                           {zone.active ? 'Hoạt động' : 'Ngưng dùng'}
@@ -574,7 +740,8 @@ const topMaterials = useMemo(() => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -632,6 +799,56 @@ const topMaterials = useMemo(() => {
               </div>
             </InventoryChartCard>
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
+            <InventoryChartCard title="Top occupied slots" className="p-2">
+              <div className="space-y-2">
+                {topOccupiedSlots.length ? topOccupiedSlots.map((slot, index) => (
+                  <button
+                    key={slot.id}
+                    type="button"
+                    onClick={() => setSelectedSlot(slot)}
+                    className="block w-full rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-cyan-300">#{index + 1} {slot.label}</div>
+                        <div className="mt-1 text-xs text-slate-500">{slot.materials.length} vật tư trong slot</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="font-semibold text-slate-100">{formatQuantity(slot.quantity, 3)}</div>
+                        <div className="mt-1 text-xs text-emerald-300">{formatCurrency(slot.value)}</div>
+                      </div>
+                    </div>
+                  </button>
+                )) : (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
+                    Chưa có slot đang chứa vật tư.
+                  </div>
+                )}
+              </div>
+            </InventoryChartCard>
+
+            <InventoryChartCard title="Luồng điều chuyển theo slot" className="p-2">
+              <div className="space-y-2">
+                {movementRoutes.length ? movementRoutes.map((route) => (
+                  <div key={`${route.source}-${route.destination}`} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-100">{route.source} → {route.destination}</div>
+                        <div className="mt-1 text-xs text-slate-500">{formatQuantity(route.count, 0)} lần · {formatQuantity(route.quantity, 3)} lượng</div>
+                      </div>
+                      <div className="shrink-0 text-right text-emerald-300">{formatCurrency(route.value)}</div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
+                    Chưa có giao dịch điều chuyển đủ source/destination slot.
+                  </div>
+                )}
+              </div>
+            </InventoryChartCard>
+          </div>
         </div>
 
         {/* Cột phải: 3 chart cũ */}
@@ -656,6 +873,12 @@ const topMaterials = useMemo(() => {
                 );
               })}
             </div>
+          </InventoryChartCard>
+          <InventoryChartCard title="Giá trị tồn theo vị trí" className="p-2">
+            <HorizontalBars
+              rows={valueByLocation.map((item) => [item.code, item.value])}
+              valueFormatter={(value) => formatCurrency(value)}
+            />
           </InventoryChartCard>
           <InventoryChartCard title="Top 5 vật tư tồn cao nhất" className="p-2">
             <div className="space-y-2">
@@ -696,7 +919,7 @@ const topMaterials = useMemo(() => {
                       <div className="flex justify-between text-xs">
                         <span className="text-slate-300">{zone.code}</span>
                         <span className="text-cyan-300">
-                          {used.toLocaleString('vi-VN')} / {capacity.toLocaleString('vi-VN')} tấn
+                          {formatQuantity(used, 0)} / {formatQuantity(capacity, 0)} tấn
                           <span className="ml-2 text-slate-500">({percent.toFixed(0)}%)</span>
                         </span>
                       </div>
@@ -717,7 +940,59 @@ const topMaterials = useMemo(() => {
     </div>
     {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
+    {selectedSlot ? <SlotMaterialDrawer slot={selectedSlot} onClose={() => setSelectedSlot(null)} /> : null}
   </EnterpriseModulePage>
+}
+
+function SlotMaterialDrawer({ slot, onClose }: { slot: SlotMaterialView; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+      <aside className="h-full w-full max-w-3xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#071321]/95 px-6 py-5 backdrop-blur">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Vật tư trong slot</p>
+            <h2 className="mt-1 text-2xl font-bold">{slot.label}</h2>
+            <p className="mt-1 text-sm text-slate-400">{formatQuantity(slot.quantity, 3)} tổng lượng · {formatCurrency(slot.value)}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg border border-slate-700 p-2.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><X size={18} /></button>
+        </header>
+
+        <div className="space-y-4 p-6">
+          <div className="grid gap-3 md:grid-cols-3">
+            <InfoBox label="Zone" value={slot.zoneCode} />
+            <InfoBox label="Slot" value={slot.slotId} />
+            <InfoBox label="Tầng" value={slot.level} />
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-slate-800">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="bg-slate-900/80 text-[11px] uppercase tracking-[0.12em] text-slate-400">
+                <tr>
+                  <th className="px-4 py-3">Mã vật tư</th>
+                  <th className="px-4 py-3">Tên vật tư</th>
+                  <th className="px-4 py-3 text-right">Số lượng</th>
+                  <th className="px-4 py-3">Đơn vị</th>
+                  <th className="px-4 py-3 text-right">Giá trị</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slot.materials.map((material) => (
+                  <tr key={material.id} className="border-t border-slate-800/80 hover:bg-slate-900/45">
+                    <td className="px-4 py-3 font-semibold text-cyan-300">{material.code}</td>
+                    <td className="px-4 py-3">{material.name}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{formatQuantity(material.quantity, 3)}</td>
+                    <td className="px-4 py-3">{material.unit ?? '-'}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-300">{formatCurrency(material.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!slot.materials.length ? <p className="border-t border-slate-800 px-4 py-6 text-center text-sm text-slate-500">Slot này chưa có danh sách vật tư chi tiết từ API.</p> : null}
+          </div>
+        </div>
+      </aside>
+    </div>
+  )
 }
 
 function IconButton({ title, onClick, children }: { title: string; onClick: (event: React.MouseEvent<HTMLButtonElement>) => void; children: ReactNode }) {

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert, ClipboardList } from 'lucide-react'
+import { CircleDollarSign, RefreshCw, ShieldX, TriangleAlert, ClipboardList } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
@@ -118,7 +119,7 @@ function MaterialsPagination({
   return (
     <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
       <div>
-        Hiển thị {start}-{end}/{total.toLocaleString('vi-VN')} kết quả
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>
       <div className="flex justify-center gap-2">
         {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
@@ -165,6 +166,180 @@ function formatCurrency(v: any) {
   return formatCurrencyVnd(num(v))
 }
 
+function formatDate(value: any) {
+  const date = new Date(value ?? '')
+  if (Number.isNaN(date.getTime())) return '-'
+  return [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    date.getFullYear(),
+  ].join('/')
+}
+
+function transactionItems(tx: any) {
+  return Array.isArray(tx?.items) ? tx.items : []
+}
+
+function lineQuantity(line: any) {
+  return num(line?.quantity)
+}
+
+function lineUnitPrice(line: any) {
+  const explicit = num(line?.unitPrice)
+  if (explicit) return explicit
+  const quantity = Math.abs(lineQuantity(line))
+  const amount = Math.abs(num(line?.totalAmount))
+  return quantity > 0 ? amount / quantity : 0
+}
+
+function varianceValue(line: any) {
+  const explicit = Math.abs(num(line?.totalAmount))
+  if (explicit) return explicit
+  return Math.abs(lineQuantity(line)) * lineUnitPrice(line)
+}
+
+function sessionVarianceQuantity(tx: any) {
+  return transactionItems(tx).reduce((sum: number, line: any) => sum + lineQuantity(line), 0)
+}
+
+function sessionVarianceValue(tx: any) {
+  return transactionItems(tx).reduce((sum: number, line: any) => sum + varianceValue(line), 0)
+}
+
+function sessionZoneCodes(tx: any) {
+  const codes = transactionItems(tx)
+    .map((line: any) => line?.zone?.code)
+    .filter(Boolean)
+  return Array.from(new Set(codes))
+}
+
+function materialCode(line: any) {
+  return line?.inventoryItem?.code ?? line?.materialCode ?? '-'
+}
+
+function materialName(line: any) {
+  return line?.inventoryItem?.name ?? line?.materialName ?? '-'
+}
+
+function lineUnit(line: any) {
+  return line?.unit?.symbol ?? line?.unit?.code ?? line?.inventoryItem?.unit ?? '-'
+}
+
+function systemQty(line: any) {
+  const candidates = [line?.systemQty, line?.expectedQty, line?.beforeQty, line?.bookQty]
+  const value = candidates.find((candidate) => candidate !== undefined && candidate !== null)
+  return value === undefined ? null : num(value)
+}
+
+function actualQty(line: any) {
+  const candidates = [line?.actualQty, line?.countedQty, line?.afterQty]
+  const value = candidates.find((candidate) => candidate !== undefined && candidate !== null)
+  const system = systemQty(line)
+  if (value !== undefined) return num(value)
+  if (system !== null) return system + lineQuantity(line)
+  return null
+}
+
+function StockTakeDetailDrawer({
+  session,
+  onClose,
+}: {
+  session: any | null
+  onClose: () => void
+}) {
+  const items = transactionItems(session)
+  return (
+    <ModuleDetailDrawer
+      open={Boolean(session)}
+      title={session?.transactionNo ?? 'Chi tiết kiểm kê'}
+      subtitle="Phiên kiểm kê và chênh lệch vật tư"
+      onClose={onClose}
+      widthClass="max-w-6xl"
+    >
+      {session ? (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-xl border border-cyan-300/15 bg-cyan-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Dòng kiểm kê</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(items.length, 0)}</div>
+            </div>
+            <div className="rounded-xl border border-amber-300/15 bg-amber-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Chênh lệch lượng</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(sessionVarianceQuantity(session), 3)}</div>
+            </div>
+            <div className="rounded-xl border border-red-300/15 bg-red-400/[0.055] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Giá trị chênh lệch</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{formatCurrency(sessionVarianceValue(session))}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Kho / khu vực</div>
+              <div className="mt-2 truncate text-2xl font-semibold text-white">{sessionZoneCodes(session).join(', ') || '-'}</div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="grid gap-2 text-sm md:grid-cols-2">
+              <InfoLine label="Mã kiểm kê" value={session.transactionNo ?? '-'} />
+              <InfoLine label="Ngày kiểm kê" value={formatDate(session.transactionDate ?? session.createdAt)} />
+              <InfoLine label="Phương pháp" value={session.referenceType ?? 'Định kỳ'} />
+              <InfoLine label="Trạng thái" value={String(session.status ?? 'COMPLETED')} />
+              <InfoLine label="Người tạo" value={session.createdBy ?? 'Admin'} />
+              <InfoLine label="Ghi chú" value={session.remarks ?? session.note ?? '-'} />
+            </div>
+          </div>
+
+          <div className="overflow-auto rounded-xl border border-white/10 bg-slate-950/35">
+            <table className="w-full min-w-[1050px] text-sm">
+              <thead className={inventoryTableHead}>
+                <tr>
+                  {['Material', 'SystemQty', 'ActualQty', 'VarianceQty', 'UnitPrice', 'VarianceValue'].map((header) => (
+                    <th key={header} className="px-3 py-2 text-left font-medium">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.length ? items.map((line: any) => {
+                  const sys = systemQty(line)
+                  const actual = actualQty(line)
+                  const variance = lineQuantity(line)
+                  return (
+                    <tr key={line.id ?? `${line.inventoryItemId}-${line.quantity}`} className="border-t border-white/10 text-slate-300">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-cyan-300">{materialCode(line)}</div>
+                        <div className="truncate text-xs text-slate-500">{materialName(line)}</div>
+                      </td>
+                      <td className="px-3 py-2">{sys === null ? '-' : `${formatQuantity(sys, 3)} ${lineUnit(line)}`}</td>
+                      <td className="px-3 py-2">{actual === null ? '-' : `${formatQuantity(actual, 3)} ${lineUnit(line)}`}</td>
+                      <td className={`px-3 py-2 font-semibold ${variance >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatQuantity(variance, 3)}</td>
+                      <td className="px-3 py-2">{formatCurrency(lineUnitPrice(line))}</td>
+                      <td className="px-3 py-2 font-semibold text-amber-300">{formatCurrency(varianceValue(line))}</td>
+                    </tr>
+                  )
+                }) : (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-slate-500">
+                      Phiên kiểm kê chưa có dòng vật tư.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+    </ModuleDetailDrawer>
+  )
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-sm font-medium text-slate-100">{value}</div>
+    </div>
+  )
+}
+
 export function InventoryStockTakePage() {
   const { data: zones = [] } = useZones()
   const { data: adjustments = [] } = useInventoryTransactions({ type: 'ADJUSTMENT' })
@@ -175,18 +350,38 @@ export function InventoryStockTakePage() {
   const [methodFilter, setMethodFilter] = useState('')
   const [page, setPage] = useState(1)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
+  const [selectedSession, setSelectedSession] = useState<any | null>(null)
   const pageSize = 10
   const attachmentMap = useInventoryTransactionAttachmentMap()
+  // State cho tìm kiếm
+  const [searchDraft, setSearchDraft] = useState('')
+  const [search, setSearch] = useState('')
+
+  // Áp dụng tìm kiếm
+  const applySearch = () => {
+    setSearch(searchDraft)
+    setPage(1)
+  }
+
+  // Reset toàn bộ bộ lọc
+  const resetFilters = () => {
+    setSearchDraft('')
+    setSearch('')
+    setDate('')
+    setZoneFilter('')
+    setStatusFilter('')
+    setMethodFilter('')
+    setPage(1)
+  }
 
   const rows = useMemo(() => {
     return (adjustments as any[])
       .filter((x: any) => {
-        const line = x.items?.[0]
         if (date) {
           const d = new Date(x.transactionDate ?? x.createdAt).toISOString().slice(0, 10)
           if (d !== date) return false
         }
-        if (zoneFilter && String(line?.zoneId ?? '') !== zoneFilter) return false
+        if (zoneFilter && !transactionItems(x).some((line: any) => String(line?.zoneId ?? '') === zoneFilter)) return false
         if (statusFilter && String(x.status ?? 'COMPLETED').toUpperCase() !== statusFilter) return false
         if (methodFilter && String(x.referenceType ?? '') !== methodFilter) return false
         return true
@@ -196,18 +391,23 @@ export function InventoryStockTakePage() {
 
   const metrics = useMemo(() => {
     const total = rows.length
-    const mismatch = rows.filter((x: any) => Math.abs(num(x.items?.[0]?.quantity)) > 0).length
+    const pending = rows.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING').length
+    const varianceLines = rows.flatMap((x: any) => transactionItems(x)).filter((line: any) => Math.abs(lineQuantity(line)) > 0)
+    const varianceMaterials = new Set(varianceLines.map((line: any) => line?.inventoryItemId ?? materialCode(line))).size
+    const mismatch = rows.filter((x: any) => Math.abs(sessionVarianceQuantity(x)) > 0).length
     const matched = Math.max(0, total - mismatch)
     const accuracy = total === 0 ? 100 : (matched / total) * 100
-    const varianceValue = rows.reduce((s: number, x: any) => s + Math.abs(num(x.items?.[0]?.totalAmount)), 0)
-    return { total, matched, mismatch, accuracy, varianceValue }
+    const varianceValue = rows.reduce((s: number, x: any) => s + sessionVarianceValue(x), 0)
+    return { total, pending, matched, mismatch, accuracy, varianceValue, varianceMaterials }
   }, [rows])
 
   const discrepancyByZone = useMemo(() => {
     const m = new Map<string, number>()
     rows.forEach((x: any) => {
-      const key = x.items?.[0]?.zone?.code ?? 'NA'
-      m.set(key, (m.get(key) ?? 0) + Math.abs(num(x.items?.[0]?.quantity)))
+      transactionItems(x).forEach((line: any) => {
+        const key = line?.zone?.code ?? 'NA'
+        m.set(key, (m.get(key) ?? 0) + Math.abs(lineQuantity(line)))
+      })
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
   }, [rows])
@@ -226,6 +426,52 @@ export function InventoryStockTakePage() {
     { label: 'Chênh lệch', value: metrics.mismatch, color: '#f59e0b' },
   ], [metrics.matched, metrics.mismatch])
 
+  const topVarianceMaterials = useMemo(() => {
+    const m = new Map<string, { code: string; name: string; quantity: number; value: number }>()
+    rows.forEach((x: any) => {
+      transactionItems(x).forEach((line: any) => {
+        const code = materialCode(line)
+        const prev = m.get(code) ?? { code, name: materialName(line), quantity: 0, value: 0 }
+        prev.quantity += Math.abs(lineQuantity(line))
+        prev.value += varianceValue(line)
+        m.set(code, prev)
+      })
+    })
+    return Array.from(m.values()).sort((a, b) => b.value - a.value).slice(0, 6)
+  }, [rows])
+
+  const topVarianceLocations = useMemo(() => {
+    const m = new Map<string, { location: string; quantity: number; value: number }>()
+    rows.forEach((x: any) => {
+      transactionItems(x).forEach((line: any) => {
+        const location = [line?.warehouse?.name ?? line?.warehouse?.code, line?.zone?.code, line?.slot?.code, line?.level]
+          .filter(Boolean)
+          .join(' / ') || 'NA'
+        const prev = m.get(location) ?? { location, quantity: 0, value: 0 }
+        prev.quantity += Math.abs(lineQuantity(line))
+        prev.value += varianceValue(line)
+        m.set(location, prev)
+      })
+    })
+    return Array.from(m.values()).sort((a, b) => b.value - a.value).slice(0, 6)
+  }, [rows])
+
+  const adjustmentPreview = useMemo(() => {
+    return rows
+      .flatMap((x: any) => transactionItems(x).map((line: any) => ({
+        key: `${x.id}-${line.id ?? materialCode(line)}`,
+        transactionNo: x.transactionNo,
+        material: `${materialCode(line)} - ${materialName(line)}`,
+        quantity: lineQuantity(line),
+        value: varianceValue(line),
+      })))
+      .filter((line: any) => Math.abs(line.quantity) > 0)
+      .sort((a: any, b: any) => b.value - a.value)
+      .slice(0, 8)
+  }, [rows])
+  const filterInput =
+  'h-9 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize
     return rows.slice(start, start + pageSize)
@@ -239,7 +485,7 @@ export function InventoryStockTakePage() {
       <div className="space-y-1 -mt-2">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-1.5">
           <OverviewMetricCard
-            title="Phiếu kiểm kê"
+            title="Total Sessions"
             value={formatQuantity(metrics.total, 0)}
             note="Tổng phiếu"
             tone="blue"
@@ -247,18 +493,18 @@ export function InventoryStockTakePage() {
             trend={[0,0,0,0,0,0]}
           />
           <OverviewMetricCard
-            title="Khớp"
-            value={formatQuantity(metrics.matched, 0)}
-            note="Không chênh lệch"
-            tone="emerald"
-            icon={<PackageCheck size={15} />}
+            title="Pending Approval"
+            value={formatQuantity(metrics.pending, 0)}
+            note="Chờ xử lý"
+            tone="amber"
+            icon={<ShieldX size={15} />}
             trend={[0,0,0,0,0,0]}
           />
           <OverviewMetricCard
-            title="Chênh lệch"
-            value={formatQuantity(metrics.mismatch, 0)}
-            note="Cần xử lý"
-            tone="amber"
+            title="Variance Materials"
+            value={formatQuantity(metrics.varianceMaterials, 0)}
+            note="Có chênh lệch"
+            tone="cyan"
             icon={<TriangleAlert size={15} />}
             trend={[0,0,0,0,0,0]}
           />
@@ -271,7 +517,7 @@ export function InventoryStockTakePage() {
             trend={[0,0,0,0,0,0]}
           />
           <OverviewMetricCard
-            title="Giá trị chênh lệch"
+            title="Variance Value"
             value={formatCurrency(metrics.varianceValue)}
             note="Theo giá trị tồn"
             tone="red"
@@ -280,36 +526,61 @@ export function InventoryStockTakePage() {
           />
         </div>
 
-        <InventoryPanel title="Bộ lọc kiểm kê" className="p-2">
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inventoryInput} />
-            <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className={inventoryInput}>
+        <InventoryPanel className="rounded-xl p-0.5">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={filterInput}
+            />
+            <select
+              value={zoneFilter}
+              onChange={(e) => setZoneFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Kho</option>
               {zones.map((z: any) => (
-                <option key={z.id} value={z.id}>
-                  {z.code}
-                </option>
+                <option key={z.id} value={z.id}>{z.code}</option>
               ))}
             </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inventoryInput}>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Trạng thái</option>
               <option value="COMPLETED">Hoàn thành</option>
               <option value="PENDING">Đang thực hiện</option>
             </select>
-            <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className={inventoryInput}>
+            <select
+              value={methodFilter}
+              onChange={(e) => setMethodFilter(e.target.value)}
+              className={filterInput}
+            >
               <option value="">Phương pháp</option>
               <option value="Định kỳ">Định kỳ</option>
               <option value="Bất thường">Bất thường</option>
               <option value="Kiểm kê theo khu vực">Kiểm kê theo khu vực</option>
             </select>
-            <button
-              onClick={() => {
-                setDate('')
-                setZoneFilter('')
-                setStatusFilter('')
-                setMethodFilter('')
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch()
               }}
-              className={`${inventoryMutedButton} h-10`}
+              placeholder="Tìm mã phiếu, vật tư, kho..."
+              className={filterInput}
+            />
+            <button
+              onClick={applySearch}
+              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              onClick={resetFilters}
+              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
             >
               Làm mới
             </button>
@@ -331,11 +602,11 @@ export function InventoryStockTakePage() {
                 </thead>
                 <tbody>
                   {paged.map((x: any) => (
-                    <tr key={x.id} className={inventoryTableRow}>
+                    <tr key={x.id} className={`${inventoryTableRow} cursor-pointer`} onClick={() => setSelectedSession(x)}>
                       <td className="px-3 py-1.5 text-cyan-300">{x.transactionNo}</td>
-                      <td className="px-3 py-1.5">{x.items?.[0]?.zone?.code ?? '-'}</td>
+                      <td className="px-3 py-1.5">{sessionZoneCodes(x).join(', ') || '-'}</td>
                       <td className="px-3 py-1.5">{x.referenceType ?? 'Định kỳ'}</td>
-                      <td className="px-3 py-1.5">{new Date(x.transactionDate ?? x.createdAt).toLocaleDateString('vi-VN')}</td>
+                      <td className="px-3 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
                       <td className="px-3 py-1.5">{x.createdBy ?? 'Admin'}</td>
                       <td className="px-3 py-1.5">
                         <span className={`rounded border px-2 py-0.5 text-xs ${
@@ -346,11 +617,11 @@ export function InventoryStockTakePage() {
                           {String(x.status ?? 'COMPLETED')}
                         </span>
                       </td>
-                      <td className={`px-3 py-1.5 ${num(x.items?.[0]?.quantity) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                        {formatQuantity(num(x.items?.[0]?.quantity), 0)}
+                      <td className={`px-3 py-1.5 ${sessionVarianceQuantity(x) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                        {formatQuantity(sessionVarianceQuantity(x), 3)}
                       </td>
                       <td className="px-3 py-1.5">{metrics.accuracy.toFixed(2)}%</td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-1.5" onClick={(event) => event.stopPropagation()}>
                         <InventoryTransactionAttachmentButton
                           transaction={x}
                           attachmentMap={attachmentMap}
@@ -378,12 +649,84 @@ export function InventoryStockTakePage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-12">
+          <InventoryChartCard title="Top vật tư chênh lệch" className="p-3 xl:col-span-4">
+            <div className="space-y-2">
+              {topVarianceMaterials.length ? topVarianceMaterials.map((item) => (
+                <div key={item.code} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-cyan-300">{item.code}</div>
+                      <div className="truncate text-xs text-slate-500">{item.name}</div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-semibold text-amber-300">{formatCurrency(item.value)}</div>
+                      <div className="text-xs text-slate-500">{formatQuantity(item.quantity, 3)}</div>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
+                  Chưa có vật tư chênh lệch.
+                </div>
+              )}
+            </div>
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Top vị trí chênh lệch" className="p-3 xl:col-span-4">
+            <div className="space-y-2">
+              {topVarianceLocations.length ? topVarianceLocations.map((item) => (
+                <div key={item.location} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-100">{item.location}</div>
+                      <div className="mt-1 text-xs text-slate-500">{formatQuantity(item.quantity, 3)} chênh lệch</div>
+                    </div>
+                    <div className="shrink-0 font-semibold text-amber-300">{formatCurrency(item.value)}</div>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
+                  Chưa có vị trí chênh lệch.
+                </div>
+              )}
+            </div>
+          </InventoryChartCard>
+
+          <InventoryChartCard title="Adjustment preview" className="p-3 xl:col-span-4">
+            <div className="space-y-2">
+              {adjustmentPreview.length ? adjustmentPreview.map((line: any) => (
+                <div key={line.key} className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-slate-100">{line.material}</div>
+                    <div className="mt-1 text-xs text-slate-500">{line.transactionNo}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className={`font-semibold ${line.quantity >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                      {line.quantity >= 0 ? '+' : ''}{formatQuantity(line.quantity, 3)}
+                    </div>
+                    <div className="mt-1 text-xs text-amber-300">{formatCurrency(line.value)}</div>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
+                  Chưa có điều chỉnh chênh lệch để xem trước.
+                </div>
+              )}
+            </div>
+          </InventoryChartCard>
+        </div>
+
       </div>
       <InventoryTransactionAttachmentDrawer
         open={Boolean(attachmentDrawer)}
         transaction={attachmentDrawer?.transaction}
         attachments={attachmentDrawer?.attachments ?? []}
         onClose={() => setAttachmentDrawer(null)}
+      />
+      <StockTakeDetailDrawer
+        session={selectedSession}
+        onClose={() => setSelectedSession(null)}
       />
     </EnterpriseModulePage>
   )
