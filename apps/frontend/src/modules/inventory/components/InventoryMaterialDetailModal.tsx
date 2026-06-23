@@ -987,43 +987,90 @@ function MetricLine({ label, value, tone = 'cyan' }: { label: string; value: str
 }
 
 function LocationBalancePanel({ rows, unit, onFocus }: { rows: any[]; unit: string; onFocus: (row: any) => void }) {
-  const distribution = buildLocationDistribution(rows)
-  const mainRows = rows.filter(isMainWarehouseLocation)
-  const productionRows = rows.filter(isProductionWarehouseLocation)
-  const otherRows = rows.filter((row) => !isMainWarehouseLocation(row) && !isProductionWarehouseLocation(row))
+  const distribution = buildLocationDistribution(rows);
+  const mainRows = rows.filter(isMainWarehouseLocation);
+  const productionRows = rows.filter(isProductionWarehouseLocation);
+  const otherRows = rows.filter((row) => !isMainWarehouseLocation(row) && !isProductionWarehouseLocation(row));
+  const totalQty = rows.reduce((sum, row) => sum + num(row.quantity), 0);
+
+  // Thêm dữ liệu phân bố theo tầng (nếu có)
+  const levelDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach((row) => {
+      const level = row.level ?? 'Khác';
+      map.set(level, (map.get(level) || 0) + num(row.quantity));
+    });
+    return Array.from(map.entries()).map(([label, value]) => ({ label, value, color: ['#38bdf8', '#f59e0b', '#ef4444', '#8b5cf6'][Math.floor(Math.random() * 4)] }));
+  }, [rows]);
+
   return (
-    <div className="grid gap-3 xl:grid-cols-[360px_1fr]">
-      <ModuleAnalyticsPanel title="Donut distribution" note="Phân bổ tồn theo kho/vị trí">
-        <Donut rows={distribution} center={fmt(rows.reduce((sum, row) => sum + num(row.quantity), 0))} label={unit || 'tồn'} />
-      </ModuleAnalyticsPanel>
-      <ModuleAnalyticsPanel title="Location table" note="Tách tồn kho chính và kho sản xuất">
+    <div className="grid gap-1 xl:grid-cols-[400px_1fr]">
+      <div className="space-y-3 mt-1">
+        <ModuleAnalyticsPanel title="Phân bố tồn theo vị trí" note="Donut biểu thị tỷ lệ" className="min-h-[240px]">
+          <Donut rows={distribution} center={fmt(totalQty)} label={unit || 'tồn'} />
+        </ModuleAnalyticsPanel>
+        {levelDistribution.length > 1 && (
+          <ModuleAnalyticsPanel title="Phân bố theo tầng" note="Số lượng theo tầng lưu trữ">
+            <div className="space-y-1">
+              {levelDistribution.map((item) => (
+                <div key={item.label} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-slate-300">{item.label}</span>
+                  </span>
+                  <span className="font-mono text-slate-100">{fmt(item.value)}</span>
+                </div>
+              ))}
+            </div>
+          </ModuleAnalyticsPanel>
+        )}
+      </div>
+      <div className="mt-1">
+      <ModuleAnalyticsPanel title="Danh sách vị trí lưu kho" note="Tổng hợp theo từng khu vực">
         <div className="space-y-3">
           <LocationGroup title="Kho chính" rows={mainRows} unit={unit} onFocus={onFocus} />
           <LocationGroup title="Kho sản xuất" rows={productionRows} unit={unit} onFocus={onFocus} />
-          {otherRows.length ? <LocationGroup title="Kho khác" rows={otherRows} unit={unit} onFocus={onFocus} /> : null}
+          {otherRows.length > 0 && <LocationGroup title="Kho khác" rows={otherRows} unit={unit} onFocus={onFocus} />}
         </div>
       </ModuleAnalyticsPanel>
+      </div>
     </div>
-  )
+  );
 }
 
 function LocationGroup({ title, rows, unit, onFocus }: { title: string; rows: any[]; unit: string; onFocus: (row: any) => void }) {
+  const total = sumLocationQty(rows);
   return (
     <section className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">{title}</h4>
-        <span className="text-xs font-semibold text-slate-300">{fmt(sumLocationQty(rows))} {unit}</span>
+        <span className="text-xs font-semibold text-slate-300">{fmt(total)} {unit}</span>
       </div>
       {rows.length ? (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {rows.map((row, index) => (
-            <div key={`${title}-${row.zoneId ?? index}-${row.slotId ?? ''}-${row.level ?? ''}`} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <div className="truncate font-medium text-slate-100">{row.zoneName ?? row.zoneCode ?? '-'}</div>
-                <div className="mt-0.5 text-xs text-slate-500">{row.slotId ?? '-'} · {row.level ?? '-'}</div>
+            <div
+              key={`${title}-${row.zoneId ?? index}-${row.slotId ?? ''}-${row.level ?? ''}`}
+              className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-sm"
+            >
+              <div className="min-w-0 overflow-hidden">
+                <div className="truncate font-medium text-slate-100" title={row.zoneName ?? row.zoneCode ?? '-'}>
+                  {row.zoneName ?? row.zoneCode ?? '-'}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {row.slotId ?? '-'} · {row.level ?? '-'}
+                </div>
               </div>
-              <div className="font-mono tabular-nums text-cyan-300">{fmt(row.quantity)} {unit}</div>
-              <button type="button" onClick={() => onFocus(row)} className={moduleMutedButton}>2D</button>
+              <div className="font-mono tabular-nums text-cyan-300 whitespace-nowrap">
+                {fmt(row.quantity)} {unit}
+              </div>
+              <button
+                type="button"
+                onClick={() => onFocus(row)}
+                className={moduleMutedButton}
+              >
+                2D
+              </button>
             </div>
           ))}
         </div>
@@ -1031,7 +1078,7 @@ function LocationGroup({ title, rows, unit, onFocus }: { title: string; rows: an
         <ModuleEmptyState title="Không có tồn kho" description={`${title} chưa có tồn kho cho vật tư này.`} />
       )}
     </section>
-  )
+  );
 }
 
 function TransactionTypeBadge({ type, isPositive }: { type: string; isPositive?: boolean }) {
@@ -1064,45 +1111,109 @@ function MaterialAnalyticsCockpit({
   unit: string
   minimumStock: number
 }) {
+  const getTrend = (rows: Array<{ label: string; value: number }>) => {
+  if (rows.length < 2) return null;
+  const last = rows[rows.length - 1].value;      
+  const previous = rows[rows.length - 2].value;
+
+  if (previous === 0) {
+    if (last === 0) return null;
+    return {
+      direction: last > 0 ? '↑' : '↓',
+      percent: '∞',
+      color: last > 0 ? 'text-emerald-400' : 'text-red-400'
+    };
+  }
+
+  const change = ((last - previous) / Math.abs(previous)) * 100;
+  const direction = change > 0 ? '↑' : change < 0 ? '↓' : '→';
+  const percent = Math.abs(change).toFixed(1);
+  const color = change >= 0 ? 'text-emerald-400' : 'text-red-400';
+  return { direction, percent, color };
+};
+
+  // Dữ liệu đã reverse
+  const inboundRows = [...analytics.inboundTrend].reverse();
+  const outboundRows = [...analytics.outboundTrend].reverse();
+  const inventoryRows = [...analytics.inventoryTrend].reverse();
+
+  // Tính trend cho từng chuỗi
+  const inboundTrend = getTrend(inboundRows);
+  const outboundTrend = getTrend(outboundRows);
+  const inventoryTrend = getTrend(inventoryRows);
+
   return (
-    <div className="grid gap-3 xl:grid-cols-2">
+    <div className="grid gap-1 xl:grid-cols-2 mt-1">
       <TrendPanel
-        title="Inbound Trend"
-        note="Khối lượng nhập theo ngày"
-        rows={analytics.inboundTrend}
-        color="#22c55e"
-        footer={`${fmt(analytics.inboundTotal)} ${unit}`.trim()}
-      />
+          title="Xu hướng nhập kho"
+          rows={inboundRows}
+          color="#38bdf8"
+          unit={unit}
+          footer={
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-white">{fmt(analytics.inboundTotal)} {unit}</span>
+              {inboundTrend && (
+                <span className={`text-sm font-bold ${inboundTrend.color}`}>
+                  {inboundTrend.direction} {inboundTrend.percent !== '∞' ? `(${inboundTrend.percent}%)` : ''}
+                </span>
+              )}
+            </div>
+          }
+        />
+        <TrendPanel
+          title="Xu hướng xuất kho"
+          rows={outboundRows}
+          color="#f59e0b"
+          unit={unit}
+          footer={
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-white">{fmt(analytics.outboundTotal)} {unit}</span>
+              {outboundTrend && (
+                <span className={`text-sm font-bold ${outboundTrend.color}`}>
+                  {outboundTrend.direction} {outboundTrend.percent !== '∞' ? `(${outboundTrend.percent}%)` : ''}
+                </span>
+              )}
+            </div>
+          }
+        />
+        <TrendPanel
+          title="Xu hướng tồn kho"
+          rows={inventoryRows}
+          color="#f83838"
+          unit={unit}
+          footer={
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-white">{fmt(analytics.currentStock)} {unit}</span>
+              {inventoryTrend && (
+                <span className={`text-sm font-bold ${inventoryTrend.color}`}>
+                  {inventoryTrend.direction} {inventoryTrend.percent !== '∞' ? `(${inventoryTrend.percent}%)` : ''}
+                </span>
+              )}
+            </div>
+          }
+        />
       <TrendPanel
-        title="Outbound Trend"
-        note="Khối lượng xuất theo ngày"
-        rows={analytics.outboundTrend}
-        color="#ef4444"
-        footer={`${fmt(analytics.outboundTotal)} ${unit}`.trim()}
-      />
-      <TrendPanel
-        title="Inventory Trend"
-        note="Tồn kho ước tính sau nhập/xuất"
-        rows={analytics.inventoryTrend}
-        color="#38bdf8"
-        footer={`${fmt(analytics.currentStock)} ${unit}`.trim()}
-      />
-      <TrendPanel
-        title="Forecast 7 Days"
-        note="Tồn dự kiến nếu tốc độ xuất giữ nguyên"
+        title="Dự báo 7 ngày"
         rows={analytics.forecastTrend}
-        color={forecast.projected7d <= minimumStock ? '#f59e0b' : '#1d7cff'}
-        footer={`${fmt(forecast.projected7d)} ${unit}`.trim()}
+        color={forecast.projected7d <= minimumStock ? '#42f50b' : '#1d7cff'}
+        unit={unit}
+        footer={
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-white">{fmt(forecast.projected7d)} {unit}</span>
+            {forecast.projected7d < analytics.currentStock ? (
+              <span className="text-sm font-bold text-red-400">↓ (-{((1 - forecast.projected7d / analytics.currentStock) * 100).toFixed(1)}%)</span>
+            ) : (
+              <span className="text-sm font-bold text-emerald-400">↑ (+{((forecast.projected7d / analytics.currentStock - 1) * 100).toFixed(1)}%)</span>
+            )}
+          </div>
+        }
       />
-      <ModuleAnalyticsPanel title="Inventory Turnover" note="Tỷ lệ xuất / tồn bình quân từ dữ liệu hiện có" className="xl:col-span-2">
-        <div className="grid gap-3 md:grid-cols-4">
+      <ModuleAnalyticsPanel title="Tỷ lệ xuất / tồn bình quân" className="xl:col-span-2">
+        <div className="grid gap-1 md:grid-cols-4">
           <MetricLine label="Xuất trung bình/ngày" value={`${fmt(forecast.outboundDaily)} ${unit}`.trim()} tone="amber" />
-          <MetricLine label="Days of cover" value={`${fmt(forecast.daysOfCover, 1)} ngày`} tone={forecast.daysOfCover < 7 ? 'amber' : 'cyan'} />
-          <MetricLine label="Turnover" value={`${fmt(analytics.turnover, 2)} vòng`} tone="purple" />
+          <MetricLine label="Số ngày bao phủ" value={`${fmt(forecast.daysOfCover, 1)} ngày`} tone={forecast.daysOfCover < 7 ? 'amber' : 'cyan'} />
+          <MetricLine label="Vòng quay" value={`${fmt(analytics.turnover, 2)} vòng`} tone="purple" />
           <MetricLine label="Tồn bình quân" value={`${fmt(analytics.averageStock)} ${unit}`.trim()} tone="blue" />
-        </div>
-        <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-400">
-          Forecast và turnover là analytics frontend từ lịch sử nhập/xuất hiện có; không tạo yêu cầu mua hàng hoặc thay đổi workflow.
         </div>
       </ModuleAnalyticsPanel>
     </div>
@@ -1111,35 +1222,48 @@ function MaterialAnalyticsCockpit({
 
 function TrendPanel({
   title,
-  note,
   rows,
   color,
   footer,
+  unit,
 }: {
-  title: string
-  note: string
-  rows: Array<{ label: string; value: number }>
-  color: string
-  footer: string
+  title: string;
+  rows: Array<{ label: string; value: number }>;
+  color: string;
+  footer: ReactNode;
+  unit: string;
 }) {
   return (
-    <ModuleAnalyticsPanel title={title} note={note} action={footer}>
+    <ModuleAnalyticsPanel title={title} action={footer}>
       {rows.length ? (
-        <FoundationLineChart rows={rows} color={color} />
+        <FoundationLineChart rows={rows} color={color} unit={unit} />
       ) : (
-        <ModuleEmptyState title="Chưa đủ dữ liệu" description="Biểu đồ sẽ hiển thị khi vật tư có lịch sử giao dịch." />
+        <ModuleEmptyState title="Chưa đủ dữ liệu" description="Biểu đồ sẽ hiển thị khi có lịch sử." />
       )}
     </ModuleAnalyticsPanel>
-  )
+  );
 }
 
-function FoundationLineChart({ rows, color }: { rows: Array<{ label: string; value: number }>; color: string }) {
+
+function FoundationLineChart({ rows, color, unit }: { rows: Array<{ label: string; value: number }>; color: string; unit: string }) {
   const width = 720
   const height = 220
   const padding = 28
   const max = Math.max(1, ...rows.map((row) => row.value))
   const min = Math.min(0, ...rows.map((row) => row.value))
   const span = Math.max(1, max - min)
+
+  const formatFullDate = (label: string) => {
+    const parts = label.split('-')
+    if (parts.length === 2) {
+      const month = parts[0]
+      const day = parts[1]
+      const year = new Date().getFullYear()
+      return `${day}/${month}/${year}`
+    }
+    return label
+  }
+
   const point = (row: { value: number }, index: number) => {
     const x = padding + (index / Math.max(1, rows.length - 1)) * (width - padding * 2)
     const y = height - padding - ((row.value - min) / span) * (height - padding * 2)
@@ -1150,7 +1274,7 @@ function FoundationLineChart({ rows, color }: { rows: Array<{ label: string; val
   const area = `${path} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z`
 
   return (
-    <div className="h-[260px] rounded-xl border border-white/10 bg-slate-950/35 p-3">
+    <div className="h-[200px] rounded-xl border border-white/10 bg-slate-950/35 p-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible">
         <defs>
           <linearGradient id={`area-${color.replace('#', '')}`} x1="0" x2="0" y1="0" y2="1">
@@ -1158,23 +1282,43 @@ function FoundationLineChart({ rows, color }: { rows: Array<{ label: string; val
             <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
+
+        {/* Đường kẻ ngang */}
         {[0, 1, 2, 3].map((line) => {
           const y = padding + line * ((height - padding * 2) / 3)
           return <line key={line} x1={padding} x2={width - padding} y1={y} y2={y} stroke="rgba(148,163,184,0.12)" strokeWidth="1" />
         })}
+
+        {/* Vùng diện tích và đường */}
         <path d={area} fill={`url(#area-${color.replace('#', '')})`} />
         <path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
         {points.map((p, index) => (
           <g key={`${rows[index].label}-${index}`}>
+            {/* Vùng bắt sự kiện rộng */}
+            <rect
+              x={p.x - 20}
+              y={padding}
+              width="40"
+              height={height - padding * 2}
+              fill="transparent"
+              stroke="none"
+              style={{ pointerEvents: 'all', cursor: 'pointer' }}
+            >
+              {/* Tooltip với ngày đầy đủ và số lượng in đậm */}
+              <title>{`Ngày: ${formatFullDate(rows[index].label)}\nSố lượng: ${fmt(rows[index].value)} ${unit}`}</title>
+            </rect>
+
+            {/* Điểm tròn nhỏ trang trí */}
             <circle cx={p.x} cy={p.y} r="4" fill="#08111f" stroke={color} strokeWidth="2" />
-            <text x={p.x} y={height - 7} textAnchor="middle" className="fill-slate-500 text-[10px]">{rows[index].label}</text>
+
+            {/* Nhãn ngày */}
+            <text x={p.x} y={height - 7} textAnchor="middle" className="fill-slate-500 text-[10px]">
+              {rows[index].label}
+            </text>
           </g>
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-[11px] text-slate-500">
-        <span>{rows[0]?.label ?? '-'}</span>
-        <span>{fmt(max)}</span>
-      </div>
     </div>
   )
 }

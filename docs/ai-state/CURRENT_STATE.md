@@ -98,6 +98,8 @@ Current architecture:
 - Sprint 20A adds a read-only Costing Engine backend module with Production Order, Component, and Project cost summaries.
 - Costing Engine material cost uses actual Production Material Issue Inventory transaction valuation first and falls back to weighted average Inventory transaction item cost.
 - Sprint 20A exposes `GET /production/orders/:id/cost`, `GET /components/:id/cost`, and `GET /projects/:id/cost`; these endpoints do not mutate `ComponentCosting` or workflow state.
+- Sprint 20A.5 adds a reusable `DEMO20A5-*` demo dataset seeder with 20 suppliers, 20 projects, 20 inventory items, 20 components, 20 BOMs, 20 production work orders, inventory stock/movements, reservations, material issues, consumptions, ledgers, and 20 component costing rows.
+- The Sprint 20A.5 seed includes Production Material Issue-linked Inventory EXPORT transactions so the Costing Engine can read actual issue valuation instead of relying only on average-cost fallback.
 - Production can create/mark a component from an MO only after material has been issued.
 - MO start auto-issues missing BOM material quantities from `Kho vật tư SX` and creates outbound Inventory movements.
 - Sprint 9 auto-issue planning preserves production warehouse slot/level and production issue transaction items carry the same warehouse/zone/slot/level into Inventory.
@@ -125,6 +127,7 @@ Known limitations:
 Current focus:
 
 - Validate Sprint 20A Costing Engine against more real orders, then continue with 20B Component Cost Analysis and 20C Project Cost Control before deeper Shopfloor expansion.
+- Use the Sprint 20A.5 demo dataset for repeatable QA of Inventory, Production, and Costing dashboard analytics.
 - Continue validating Sprint 18D/18E/19A/19B Work Order, Material Issue, Production Warehouse, and Execution Board cockpits with operators while keeping Shopfloor modeling gaps explicit.
 
 ## Components

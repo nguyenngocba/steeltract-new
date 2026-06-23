@@ -61,6 +61,7 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * Sprint 20A adds a read-only Costing Engine summary for Production Orders.
 * `GET /production/orders/:id/cost` returns required, issued, returned, net issued, consumed, scrap, material cost, cost per unit, and material-level cost source rows.
 * Production Order material cost uses actual issue Inventory transaction valuation where available and weighted average Inventory cost as fallback.
+* Sprint 20A.5 adds a runnable demo dataset seeder that creates 20 work orders with full material readiness, linked reservations, material issues, consumptions, ledger rows, Inventory issue valuation, and ComponentCosting rows for all 20 seeded components.
 * Production-to-Yard staging is gated by linked QC inspection status `PASSED` or `APPROVED`.
 
 ## Database Models
@@ -147,6 +148,6 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * Consider exposing unit material cost or total line value on Material Issue APIs if operators need true issue-value KPIs and value-based material issue analytics.
 * Consider a persisted production warehouse receipt/balance ledger if operators need auditable production-stock history independent from current Inventory location balances and reservation rows.
 * Consider exposing canonical shopfloor stage/status data if operators need the Execution Board to reflect real machine/work-center queues rather than UI fallback mapping.
-* Review Sprint 20A Costing Engine with more real Production Orders and decide whether issue/return costs should move from read model to persisted costing snapshots.
+* Review Sprint 20A Costing Engine with both the Sprint 20A.5 demo dataset and more real Production Orders, then decide whether issue/return costs should move from read model to persisted costing snapshots.
 * Prioritize 20B Component Cost Analysis and 20C Project Cost Control before deeper Shopfloor dashboard expansion.
 * Add immutable stage transition history, actual runtime/downtime capture, production-line queues, and labor/machine rate data before treating Shopfloor analytics as authoritative MES data.

@@ -1,5 +1,35 @@
 # SteelTrack Changelog
 
+## 2026-06-23 Demo Dataset Seeder
+
+Implemented:
+
+- Created database backup before seeding:
+  - `backups/steeltrack_before_sprint20a5_20260623_082210.dump`
+- Added transactional purge script:
+  - `scripts/sql/sprint20a5-purge-transactional-data.sql`
+- Added runnable backend Prisma seeder:
+  - `apps/backend-api/prisma/seeds/sprint20a5-demo.seed.ts`
+- Seeded `DEMO20A5-*` operational dataset:
+  - 20 suppliers
+  - 20 projects
+  - 20 inventory items
+  - 20 components
+  - 20 BOMs
+  - 20 production work orders
+  - inventory stock and movement transactions
+  - reservations, material issues, consumptions, ledgers
+  - component costing for all seeded components
+
+Verified:
+
+- 20/20 components have costing.
+- 20/20 work orders have full material readiness.
+- Inventory, Production, and Costing dashboards now have demo operational data.
+- Backend build passed.
+- Frontend build passed.
+- No schema, API, or migration changes.
+
 ## 2026-06-22 Inventory Adjustment Workflow Unification
 
 Implemented:
