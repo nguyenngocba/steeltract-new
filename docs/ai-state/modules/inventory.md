@@ -102,6 +102,10 @@ Behavior:
 - Sprint 11A decimal quantity pass lets Inventory inbound, outbound, transfer, stock-take, stock adjustment, Material Master minimum stock, and warehouse location capacity accept decimal values with `vi-VN` formatted typing.
 - Currency display uses whole-number VND formatting, for example `25.000.000 đ`.
 - Material photo upload and Inventory transaction attachments are now persisted through shared attachments. Upload controls for Material Master datasheets, CO, CQ, and catalogs still need a dedicated non-photo document upload UI.
+- Sprint 20I.3 redesigned the Inventory Overview KPI strip to display 8 custom cards (Tổng giá trị tồn kho, Tổng khối lượng, Mã vật tư, Sắp hết hàng, Vật tư chính, Vật tư phụ, Vật tư tiêu hao, Hết hàng) with custom colored tones and loading skeletons.
+- Sprint 20I.3B/C/D/E/F/G/N implemented real 12-month historical stock snapshots using transaction ledger rollbacks and transaction-based existence dates (`firstTransactionDate`), rendering real monthly sparkline trends for yearly age scales, and comparing current month with the previous month dynamically (e.g. `▲/▼ X% với tháng trước`).
+- Sprint 20I.3G/H enhanced the category KPI cards (Vật tư chính, Vật tư phụ, Vật tư tiêu hao) to show `X (Y tấn)` (e.g., `6 (700 tấn)`) with the delta percentages calculated from quantity in tons (`Y tấn`) rather than item count, formatted without spaces after the arrow for integers (e.g., `▲40%`), and using compact typography.
+
 
 Parent warehouses:
 

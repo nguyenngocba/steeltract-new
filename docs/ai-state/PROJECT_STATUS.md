@@ -14,6 +14,24 @@ Dashboard        45%
 
 Percentages represent implemented operational foundations and visible workflows, not final polish.
 
+Inventory Overview historical material existence fix on 2026-06-25 (Sprint 20I.3N) completed. Changed existence check to transaction-based minimum timestamp logic. Recalculated May/June snapshots and deltas, verifying that the forced ▲100% delta notes disappeared. Frontend build passed.
+
+Inventory Overview KPI cards compacted on 2026-06-25 (Sprint 20I.3H) completed. Changed category values from `X mã (Y tấn)` to `X (Y tấn)`. Changed note suffixes from month-specific to `với tháng trước`. Reduced note typography size to `text-[10px]` within `OverviewMetricCard`. Frontend build passed.
+
+Inventory Overview category KPI quantity delta calculations on 2026-06-25 (Sprint 20I.3G) completed. Changed category KPI values to `X mã (Y tấn)` format and configured category delta percentage calculations to be computed from stock quantity in tons rather than item counts. Frontend build passed.
+
+Inventory Overview snapshot numeric verification on 2026-06-25 (Sprint 20I.3F) completed. Selected material VT-NEW-00001 (Thép hình 10mm) and verified its transaction ledger records (IMPORT, EXPORT, TRANSFER, ADJUSTMENT) and stock rollback calculations at previous month, 6 months ago, and 12 months ago with 0 variance. Confirmed that historical value calculation is approximate.
+
+Inventory Overview yearly KPI audit on 2026-06-25 (Sprint 20I.3E) completed. Conducted a complete logic verification of the historical monthly trend snapshots, dynamic data age scale detection, material creation filters, and transaction rollbacks. Verified that no semantic bugs exist and documented the findings.
+
+Inventory Overview monthly historical KPI trends on 2026-06-25 (Sprint 20I.3D) completed. Configured 12-point end-of-month snapshots using transaction ledger rollbacks. Configured sparkline rendering to output real monthly trends when data age is >= 12 months, and flat placeholder lines when it is < 12 months. Added dynamic monthly comparison delta notes with semantic text coloring (emerald/red) indicating positive/negative changes. Frontend and backend builds passed.
+
+Inventory KPI sparklines restore on 2026-06-25 (Sprint 20I.3C) completed. Restored all 8 KPI sparklines and delta percentages using dynamic data age detection and historical snapshot rollbacks. Enabled flat placeholder lines for age < 30 days and real recent/yearly trends for ages >= 30 and >= 365 days. Frontend and backend builds passed.
+
+Inventory KPI semantics fix on 2026-06-25 (Sprint 20I.3B) completed. Corrected material usage cards to display unique material counts. Disabled sparklines for count metrics lacking historical data, and set their delta label fallback to "Chưa có dữ liệu lịch sử". Frontend build passed.
+
+Inventory Overview KPI redesign on 2026-06-25 (Sprint 20I.3) completed. Replaced original 8 cards with Tổng giá trị tồn kho, Tổng khối lượng, Mã vật tư, Sắp hết hàng, Vật tư chính, Vật tư phụ, Vật tư tiêu hao, and Hết hàng. Added tones (indigo, violet, orange) and pulsing loading skeletons. Frontend build passed.
+
 Component UI audit on 2026-06-25 (Sprint 20B.1) completed. Documented file inventory, reusable UI primitives, existing UI and chart patterns, and recommended implementation approaches. Frontend build passed.
 
 Date-time refresh fix on 2026-06-25 did not change module percentages. It standardized frontend `datetime-local` initialization/focus behavior for Inventory transaction modals, Component production material return, and Production MO creation so forms use the current local date/time rather than UTC-derived stale values. Frontend build passed.

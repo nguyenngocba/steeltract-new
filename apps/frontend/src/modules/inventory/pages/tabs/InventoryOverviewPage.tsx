@@ -73,6 +73,14 @@ function isMainWarehouseLocation(location: any) {
   return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
 }
 
+function isMainWarehouseLine(line: any) {
+  const warehouse = line?.warehouse ?? line?.zone?.warehouse
+  if (!warehouse) return true
+  const code = String(warehouse.code ?? '').trim().toUpperCase()
+  const name = String(warehouse.name ?? '').trim().toLowerCase()
+  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+}
+
 function isProductionWarehouseLocation(location: any) {
   const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
   const name = String(location?.warehouseName ?? '').trim().toLowerCase()
@@ -224,20 +232,24 @@ function OverviewMetricCard({
   title,
   value,
   note,
+  noteClassName,
   tone = 'blue',
   icon,
   trend,
   active,
   onClick,
+  isLoading,
 }: {
   title: string
   value: string
   note?: string
-  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple'
+  noteClassName?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
   icon: React.ReactNode
-  trend: number[]
+  trend?: number[]
   active?: boolean
   onClick?: () => void
+  isLoading?: boolean
 }) {
   const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
     blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
@@ -246,21 +258,41 @@ function OverviewMetricCard({
     amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
     red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
     purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
+    indigo: { text: 'text-indigo-300', bg: 'bg-indigo-500/10', line: '#6366f1', fill: 'rgba(99,102,241,0.22)', note: 'text-emerald-400' },
+    violet: { text: 'text-violet-300', bg: 'bg-violet-500/10', line: '#8b5cf6', fill: 'rgba(139,92,246,0.22)', note: 'text-emerald-400' },
+    orange: { text: 'text-orange-300', bg: 'bg-orange-500/10', line: '#f97316', fill: 'rgba(249,115,22,0.22)', note: 'text-red-400' },
   }
-  const item = color[tone]
+
+  if (isLoading) {
+    return (
+      <section className="relative h-[108px] overflow-hidden rounded-xl border border-white/10 bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] animate-pulse">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2 min-w-0 flex-1">
+            <div className="h-2 w-16 rounded bg-white/10" />
+            <div className="h-5 w-24 rounded bg-white/10" />
+            <div className="h-2 w-20 rounded bg-white/10" />
+          </div>
+          <div className="h-8 w-8 rounded-lg bg-white/10 shrink-0" />
+        </div>
+        <div className="absolute inset-x-3 bottom-1 h-3 rounded bg-white/5" />
+      </section>
+    )
+  }
+
+  const item = color[tone] || color.blue
   const content = (
     <>
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
           <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
+          {note ? <div className={`mt-1 truncate text-[10px] font-semibold ${noteClassName ?? item.note}`}>{note}</div> : null}
         </div>
         <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
           {icon}
         </div>
       </div>
-      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
+      {trend && trend.length > 0 && <KpiSparkline values={trend} line={item.line} fill={item.fill} />}
     </>
   )
   const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
@@ -271,9 +303,10 @@ function OverviewMetricCard({
 }
 
 export function InventoryOverviewPage() {
-  const { data: auditRows = [], refetch: refetchAudit } = useInventoryAudit()
+  const { data: auditRows = [], isLoading: isLoadingAudit, refetch: refetchAudit } = useInventoryAudit()
   const { data: zones = [] } = useZones()
-  const { data: transactionsData = [] } = useInventoryTransactions({})
+  const { data: transactionsData = [], isLoading: isLoadingTransactions } = useInventoryTransactions({})
+  const isLoading = isLoadingAudit || isLoadingTransactions
 
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
   const [searchDraft, setSearchDraft] = useState('')
@@ -381,9 +414,29 @@ export function InventoryOverviewPage() {
     const low = filteredRows.filter((item: any) => statusOf(item) === 'LOW').length
     const out = filteredRows.filter((item: any) => statusOf(item) === 'OUT').length
     const reserved = filteredRows.reduce((sum: number, item: any) => sum + num(item.reservedQuantity ?? item.reservedStock), 0)
-    const consumableValue = filteredRows
-      .filter((item: any) => String(item.materialUsageType ?? '').toUpperCase() === 'CONSUMABLE')
-      .reduce((sum: number, item: any) => sum + num(item.inventoryValue), 0)
+
+    let primaryCount = 0
+    let primaryQty = 0
+    let secondaryCount = 0
+    let secondaryQty = 0
+    let consumableCount = 0
+    let consumableQty = 0
+
+    filteredRows.forEach((item: any) => {
+      const usage = String(item.materialUsageType ?? 'PRIMARY').toUpperCase()
+      const qty = num(item.quantity)
+      if (usage === 'PRIMARY') {
+        primaryCount += 1
+        primaryQty += qty
+      } else if (usage === 'SECONDARY') {
+        secondaryCount += 1
+        secondaryQty += qty
+      } else if (usage === 'CONSUMABLE') {
+        consumableCount += 1
+        consumableQty += qty
+      }
+    })
+
     return {
       totalItems: filteredRows.length,
       totalQty,
@@ -393,7 +446,12 @@ export function InventoryOverviewPage() {
       low,
       out,
       reserved,
-      consumableValue,
+      primaryCount,
+      primaryQty,
+      secondaryCount,
+      secondaryQty,
+      consumableCount,
+      consumableQty,
     }
   }, [filteredRows])
 
@@ -450,57 +508,228 @@ export function InventoryOverviewPage() {
       return { label, value: running }
     })
   }, [transactions, summary.totalValue])
-  const kpiTrend = useMemo(() => {
-  const txRows = transactionRows(transactionsData)
-  const now = new Date()
-  const months = Array.from({ length: 6 }).map((_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    return { key }
-  })
-  // Quantity trend
-  const qtyMovements = months.map(({ key }) =>
-    txRows.filter(tx => transactionDateKey(tx, 7) === key).reduce((sum, tx) => {
-      const type = String(tx.type ?? '').toUpperCase()
-      const qty = transactionQuantity(tx)
-      if (type === 'OUTBOUND') return sum - qty
-      if (type === 'INBOUND' || type === 'ADJUSTMENT' || type === 'RETURN') return sum + qty
-      return sum
-    }, 0)
-  )
-  let runningQty = Math.max(0, summary.totalQty - qtyMovements.reduce((a, b) => a + b, 0))
-  const quantityTrend = qtyMovements.map(m => { runningQty = Math.max(0, runningQty + m); return runningQty })
-  // Value trend (dùng valueTrend đã có)
-  const valueTrendValues = valueTrend.map(row => row.value)
-  // Low, Out, Consumable trend (tạm tính dựa trên dữ liệu hiện tại)
-  const lowTrend = Array(6).fill(0).map((_, i) => Math.max(0, summary.low + Math.floor(i * summary.low / 5)))
-  const outTrend = Array(6).fill(0).map((_, i) => Math.max(0, summary.out + Math.floor(i * summary.out / 5)))
-  const consumableTrend = Array(6).fill(0).map((_, i) => Math.max(0, summary.consumableValue / 1e6 + i * 0.5))
-  return {
-    value: valueTrendValues,
-    quantity: quantityTrend,
-    low: lowTrend,
-    out: outTrend,
-    consumable: consumableTrend,
-  }
-}, [transactionsData, summary.totalQty, summary.totalValue, summary.low, summary.out, summary.consumableValue, valueTrend])
+  const dateAgeInfo = useMemo(() => {
+    const dates: Date[] = []
 
-const kpiDeltas = useMemo(() => {
-  const percent = (arr: number[]) => {
-    const prev = arr.at(-2) ?? 0
-    const curr = arr.at(-1) ?? 0
-    if (!prev) return curr ? '+ mới' : '+ 0%'
-    const delta = ((curr - prev) / Math.abs(prev)) * 100
-    return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% so với tháng trước`
-  }
-  return {
-    value: percent(kpiTrend.value),
-    quantity: percent(kpiTrend.quantity),
-    low: percent(kpiTrend.low),
-    out: percent(kpiTrend.out),
-    consumable: percent(kpiTrend.consumable),
-  }
-}, [kpiTrend])
+    // 1. Transaction dates
+    const txRows = transactionRows(transactionsData)
+    txRows.forEach((tx: any) => {
+      const d = transactionDate(tx)
+      if (d && !isNaN(d.getTime())) {
+        dates.push(d)
+      }
+    })
+
+    // 2. Material creation dates
+    auditRows.forEach((row: any) => {
+      const d = row.createdAt ? new Date(row.createdAt) : null
+      if (d && !isNaN(d.getTime())) {
+        dates.push(d)
+      }
+    })
+
+    if (dates.length === 0) {
+      return { oldestDate: new Date(), ageInDays: 0 }
+    }
+
+    const oldest = new Date(Math.min(...dates.map(d => d.getTime())))
+    const now = new Date()
+    const ageInMs = now.getTime() - oldest.getTime()
+    const ageInDays = ageInMs / (1000 * 60 * 60 * 24)
+
+    return { oldestDate: oldest, ageInDays }
+  }, [transactionsData, auditRows])
+
+  const { kpiTrend, kpiDeltas, kpiNoteColors } = useMemo(() => {
+    const ageInDays = dateAgeInfo.ageInDays
+
+    const now = new Date()
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const prevMonthLabel = `Tháng ${prevMonthDate.getMonth() + 1}/${prevMonthDate.getFullYear()}`
+
+    // 12 snapshot dates: last day of month going back 11 months to current month-end (capped at now)
+    const snapshotDates = Array.from({ length: 12 }).map((_, index) => {
+      const monthsBack = 11 - index
+      const date = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0, 23, 59, 59, 999)
+      return date > now ? now : date
+    })
+
+    const selectedIds = new Set(filteredRows.map((row: any) => String(row.id)))
+    const txRows = transactionRows(transactionsData)
+    const movements = txRows.flatMap((tx: any) => {
+      const txDate = transactionDate(tx)
+      if (!txDate) return []
+      const items = Array.isArray(tx.items) ? tx.items : []
+      return items
+        .map((line: any) => ({
+          inventoryItemId: String(line.inventoryItemId ?? line.inventoryItem?.id ?? ''),
+          quantity: num(line.quantity),
+          transactionDate: txDate,
+          rawLine: line,
+        }))
+        .filter((line: any) => line.inventoryItemId && selectedIds.has(line.inventoryItemId))
+    })
+
+    const firstTxDateMap = new Map<string, Date>()
+    movements.forEach((m: any) => {
+      const itemId = m.inventoryItemId
+      const mDate = m.transactionDate
+      if (mDate) {
+        const currentMin = firstTxDateMap.get(itemId)
+        if (!currentMin || mDate < currentMin) {
+          firstTxDateMap.set(itemId, mDate)
+        }
+      }
+    })
+
+    const getHistoricalSummary = (targetDate: Date) => {
+      let totalQty = 0
+      let totalValue = 0
+      let low = 0
+      let out = 0
+      let primaryCount = 0
+      let primaryQty = 0
+      let secondaryCount = 0
+      let secondaryQty = 0
+      let consumableCount = 0
+      let consumableQty = 0
+      let totalItems = 0
+
+      filteredRows.forEach((row: any) => {
+        const itemId = String(row.id)
+        const firstTxDate = firstTxDateMap.get(itemId)
+        const existed = firstTxDate && firstTxDate <= targetDate
+        if (!existed) return
+
+        totalItems += 1
+
+        const afterEndTotal = movements
+          .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > targetDate)
+          .reduce((sum: number, line: any) => sum + line.quantity, 0)
+        const totalStock = Math.max(0, totalWarehouseStock(row) - afterEndTotal)
+
+        const afterEndMain = movements
+          .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > targetDate && isMainWarehouseLine(line.rawLine))
+          .reduce((sum: number, line: any) => sum + line.quantity, 0)
+        const mainStock = Math.max(0, mainWarehouseStock(row) - afterEndMain)
+
+        const averageCost = num(row.averageCost)
+        totalQty += totalStock
+        totalValue += totalStock * averageCost
+
+        const usage = String(row.materialUsageType ?? 'PRIMARY').toUpperCase()
+        if (usage === 'PRIMARY') {
+          primaryCount += 1
+          primaryQty += totalStock
+        } else if (usage === 'SECONDARY') {
+          secondaryCount += 1
+          secondaryQty += totalStock
+        } else if (usage === 'CONSUMABLE') {
+          consumableCount += 1
+          consumableQty += totalStock
+        }
+
+        const min = num(row.minimumStock ?? 5)
+        if (mainStock <= 0) {
+          out += 1
+        } else if (min > 0 && mainStock <= min) {
+          low += 1
+        }
+      })
+
+      return {
+        totalItems,
+        totalQty,
+        totalValue,
+        low,
+        out,
+        primaryCount,
+        primaryQty,
+        secondaryCount,
+        secondaryQty,
+        consumableCount,
+        consumableQty,
+      }
+    }
+
+    const snapshots = snapshotDates.map(date => getHistoricalSummary(date))
+
+    const realTrend = {
+      value: snapshots.map(s => s.totalValue),
+      quantity: snapshots.map(s => s.totalQty),
+      low: snapshots.map(s => s.low),
+      out: snapshots.map(s => s.out),
+      primary: snapshots.map(s => s.primaryQty),
+      secondary: snapshots.map(s => s.secondaryQty),
+      consumable: snapshots.map(s => s.consumableQty),
+      items: snapshots.map(s => s.totalItems),
+    }
+
+    const flat = (val: number) => Array.from({ length: 12 }, () => val)
+    const trend = ageInDays >= 365 ? realTrend : {
+      value: flat(summary.totalValue),
+      quantity: flat(summary.totalQty),
+      low: flat(summary.low),
+      out: flat(summary.out),
+      primary: flat(summary.primaryQty),
+      secondary: flat(summary.secondaryQty),
+      consumable: flat(summary.consumableQty),
+      items: flat(summary.totalItems),
+    }
+
+    const percent = (curr: number, prev: number) => {
+      if (!prev) {
+        if (!curr) return '0% với tháng trước'
+        return '▲100% với tháng trước'
+      }
+      const delta = ((curr - prev) / Math.abs(prev)) * 100
+      if (delta === 0) return '0% với tháng trước'
+      const arrow = delta > 0 ? '▲' : '▼'
+      const formattedDelta = delta % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(1)
+      return `${arrow}${formattedDelta}% với tháng trước`
+    }
+
+    const count = (curr: number, prev: number, suffix: string) => {
+      const diff = curr - prev
+      if (diff === 0) return `0 ${suffix} với tháng trước`
+      const arrow = diff > 0 ? '▲' : '▼'
+      return `${arrow} ${Math.abs(diff)} ${suffix} với tháng trước`
+    }
+
+    const deltas = {
+      value: percent(snapshots[11].totalValue, snapshots[10].totalValue),
+      quantity: percent(snapshots[11].totalQty, snapshots[10].totalQty),
+      low: count(snapshots[11].low, snapshots[10].low, 'mã sắp hết'),
+      out: count(snapshots[11].out, snapshots[10].out, 'mã hết hàng'),
+      primary: percent(snapshots[11].primaryQty, snapshots[10].primaryQty),
+      secondary: percent(snapshots[11].secondaryQty, snapshots[10].secondaryQty),
+      consumable: percent(snapshots[11].consumableQty, snapshots[10].consumableQty),
+      items: count(snapshots[11].totalItems, snapshots[10].totalItems, 'mã vật tư'),
+    }
+
+    const getNoteColorClass = (curr: number, prev: number, isAlertMetric: boolean) => {
+      const diff = curr - prev
+      if (diff === 0) return 'text-slate-400'
+      if (isAlertMetric) {
+        return diff < 0 ? 'text-emerald-400' : 'text-red-400'
+      } else {
+        return diff > 0 ? 'text-emerald-400' : 'text-red-400'
+      }
+    }
+
+    const noteColors = {
+      value: getNoteColorClass(snapshots[11].totalValue, snapshots[10].totalValue, false),
+      quantity: getNoteColorClass(snapshots[11].totalQty, snapshots[10].totalQty, false),
+      items: getNoteColorClass(snapshots[11].totalItems, snapshots[10].totalItems, false),
+      primary: getNoteColorClass(snapshots[11].primaryQty, snapshots[10].primaryQty, false),
+      secondary: getNoteColorClass(snapshots[11].secondaryQty, snapshots[10].secondaryQty, false),
+      consumable: getNoteColorClass(snapshots[11].consumableQty, snapshots[10].consumableQty, false),
+      low: getNoteColorClass(snapshots[11].low, snapshots[10].low, true),
+      out: getNoteColorClass(snapshots[11].out, snapshots[10].out, true),
+    }
+
+    return { kpiTrend: trend, kpiDeltas: deltas, kpiNoteColors: noteColors }
+  }, [dateAgeInfo, filteredRows, transactionsData, summary])
 
   const alerts = useMemo(() => {
     return filteredRows
@@ -598,65 +827,81 @@ const kpiDeltas = useMemo(() => {
             title="Tổng giá trị tồn kho"
             value={formatCurrencyVnd(summary.totalValue)}
             note={kpiDeltas.value}
-            tone="blue"
+            noteClassName={kpiNoteColors.value}
+            tone="emerald"
             icon={<CircleDollarSign size={15} />}
             trend={kpiTrend.value}
+            isLoading={isLoading}
           />
           <OverviewMetricCard
             title="Tổng khối lượng"
             value={`${formatQuantity(summary.totalQty, 0)} tấn`}
             note={kpiDeltas.quantity}
+            noteClassName={kpiNoteColors.quantity}
             tone="cyan"
             icon={<RefreshCw size={15} />}
             trend={kpiTrend.quantity}
-          />
-          <OverviewMetricCard
-            title="Main Warehouse Stock"
-            value={`${formatQty(summary.mainQty)} tấn`}
-            note="Chỉ kho chính"
-            tone="emerald"
-            icon={<PackageCheck size={15} />}
-            trend={kpiTrend.quantity}
-          />
-          <OverviewMetricCard
-            title="Production Stock"
-            value={`${formatQty(summary.productionQty)} tấn`}
-            note="Kho sản xuất"
-            tone="purple"
-            icon={<Package size={15} />}
-            trend={kpiTrend.quantity}
+            isLoading={isLoading}
           />
           <OverviewMetricCard
             title="Mã vật tư"
             value={formatQuantity(summary.totalItems, 0)}
-            note="Đang theo dõi"
-            tone="emerald"
+            note={kpiDeltas.items}
+            noteClassName={kpiNoteColors.items}
+            tone="indigo"
             icon={<PackageCheck size={15} />}
-            trend={kpiTrend.quantity}
+            trend={kpiTrend.items}
+            isLoading={isLoading}
+          />
+          <OverviewMetricCard
+            title="Vật tư chính"
+            value={`${formatQuantity(summary.primaryCount, 0)} (${formatQuantity(summary.primaryQty, 0)} tấn)`}
+            note={kpiDeltas.primary}
+            noteClassName={kpiNoteColors.primary}
+            tone="blue"
+            icon={<PackageCheck size={15} />}
+            trend={kpiTrend.primary}
+            isLoading={isLoading}
+          />
+          <OverviewMetricCard
+            title="Vật tư phụ"
+            value={`${formatQuantity(summary.secondaryCount, 0)} (${formatQuantity(summary.secondaryQty, 0)} tấn)`}
+            note={kpiDeltas.secondary}
+            noteClassName={kpiNoteColors.secondary}
+            tone="violet"
+            icon={<Package size={15} />}
+            trend={kpiTrend.secondary}
+            isLoading={isLoading}
+          />
+          <OverviewMetricCard
+            title="Vật tư tiêu hao"
+            value={`${formatQuantity(summary.consumableCount, 0)} (${formatQuantity(summary.consumableQty, 0)} tấn)`}
+            note={kpiDeltas.consumable}
+            noteClassName={kpiNoteColors.consumable}
+            tone="orange"
+            icon={<Package size={15} />}
+            trend={kpiTrend.consumable}
+            isLoading={isLoading}
           />
           <OverviewMetricCard
             title="Sắp hết hàng"
             value={formatQuantity(summary.low, 0)}
             note={kpiDeltas.low}
+            noteClassName={kpiNoteColors.low}
             tone="amber"
             icon={<TriangleAlert size={15} />}
             trend={kpiTrend.low}
+            isLoading={isLoading}
           />
           <OverviewMetricCard
             title="Hết hàng"
             value={formatQuantity(summary.out, 0)}
             note={kpiDeltas.out}
+            noteClassName={kpiNoteColors.out}
             tone="red"
             icon={<ShieldX size={15} />}
             trend={kpiTrend.out}
-          />
-          <OverviewMetricCard
-            title="Vật tư tiêu hao"
-            value={formatCurrencyVnd(summary.consumableValue)}
-            note={kpiDeltas.consumable}
-            tone="purple"
-            icon={<Package size={15} />}
-            trend={kpiTrend.consumable}
+            isLoading={isLoading}
           />
         </div>
 

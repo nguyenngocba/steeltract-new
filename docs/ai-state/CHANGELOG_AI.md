@@ -1,5 +1,141 @@
 # SteelTrack AI Changelog
 
+## 2026-06-25 Sprint 20I.3N Historical Material Existence Fix
+
+Completed:
+
+* Replaced the metadata-based existence check (`material.createdAt`) in the monthly snapshot generator with a transaction-based existence check (`firstTransactionDate`).
+* Calculated `firstTransactionDate` for each material as the minimum of the material's transaction transactionDate, falling back to transaction createdAt if transactionDate is absent.
+* Evaluated historical material existence at each monthly snapshot date as:
+  `firstTransactionDate <= snapshotDate`
+* Recalculated monthly snapshot values and deltas for totalItems, totalQty, primaryQty, secondaryQty, consumableQty, lowStockCount, and outOfStockCount.
+* Verified that the previous month snapshot (May 31, 2026) has non-zero quantities, causing the forced `▲100%` delta notes to disappear and show real percentage changes:
+  * totalQty: `▲48.3%`
+  * primaryQty: `▲94.8%`
+  * secondaryQty: `▲47.7%`
+  * consumableQty: `▲34.5%`
+
+Verification:
+
+* Verified the frontend application compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-25 Sprint 20I.3H Compact Inventory KPI Cards
+
+Completed:
+
+* Compacted the category cards value presentation format from `X mã (Y tấn)` to `X (Y tấn)` (e.g. `6 (2.053 tấn)`).
+* Refactored the KPI note comparison suffix: changed the month-specific suffix (e.g. `so với Tháng 5/2026`) to the generic `với tháng trước` for both percentage and count delta notes.
+* Reduced typography scales across the OverviewMetricCard component:
+  * Title remains `text-[10px]`
+  * Value remains `text-xl`
+  * Note reduced from `text-[11px]` to `text-[10px]`
+* Preserved the dark cockpit theme, responsive layouts, and sparkline rendering.
+
+Verification:
+
+* Verified the frontend application compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-25 Sprint 20I.3G Category KPI Quantity Enhancements
+
+Completed:
+
+* Enhanced the category KPI cards (Vật tư chính, Vật tư phụ, Vật tư tiêu hao) to show both unique material counts and total quantity in tons.
+* Refactored delta calculations for category KPI cards to be calculated from quantity in tons (`Y tấn`), not from unique material count.
+* Delta notes are formatted as `▲/▼ X% với tháng trước` or `▲/▼ X.X% với tháng trước` (no space after arrow for integers, e.g. `▲40%`).
+* Mapped category sparkline trends to historical quantities in tons (`primaryQty`, `secondaryQty`, `consumableQty`) for visual consistency with the delta note direction.
+
+Verification:
+
+* Verified the frontend application compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-25 Sprint 20I.3F Inventory Overview Snapshots Numeric Verification
+
+Completed:
+
+* Conducted a detailed database-level numeric verification of monthly stock snapshots for `VT-NEW-00001` (Thép hình 10mm).
+* Created the verification report [inventory_snapshots_numeric_verification.md](file:///root/.gemini/antigravity-cli/brain/50ac5739-b85e-404c-b2bd-897dca8ea7c0/inventory_snapshots_numeric_verification.md).
+* Verified exact calculations for current stock, and snapshot stocks at previous month, 6 months ago, and 12 months ago with 0 variance.
+* Audited transaction types: `IMPORT` (inbound), `EXPORT` (outbound), `TRANSFER`, and `ADJUSTMENT`.
+* Audited value trend accuracy and confirmed that `historicalValue = historicalQty * currentAverageCost` is an **approximate** calculation.
+
+## 2026-06-25 Sprint 20I.3E Inventory Overview KPI Audit
+
+Completed:
+
+* Audited the yearly KPI trend implementation and sparkline data logic for the Inventory Overview page.
+* Created the audit report [inventory_overview_audit.md](file:///root/.gemini/antigravity-cli/brain/50ac5739-b85e-404c-b2bd-897dca8ea7c0/inventory_overview_audit.md).
+* Verified data age calculations, snapshot date generation, material creation filters, and stock quantity rollbacks.
+
+## 2026-06-25 Sprint 20I.3D Inventory Overview KPI Monthly Sparklines
+
+Completed:
+
+* Implemented 12-point monthly end-of-month snapshots using real transaction ledger data rollbacks and material creation dates.
+* Configured the sparkline trend vectors to render only when >= 12 months history exists (otherwise showing a flat line placeholder at the current metric level with no data fabrication).
+* Refactored KPI delta notes comparing current month vs previous month, in the exact format:
+  * Value & Quantity: `▲/▼ X.X% so với Tháng 5/2026`
+  * Unique Item Count, Primary, Secondary, Consumable: `▲/▼ X mã vật tư so với Tháng 5/2026`
+  * Low Stock: `▲/▼ X mã sắp hết so với Tháng 5/2026`
+  * Out of Stock: `▲/▼ X mã hết hàng so với Tháng 5/2026`
+* Added dynamic semantic coloring to note containers:
+  * Positive inventory metrics (value, quantity, counts) increases -> emerald, decreases -> red.
+  * Low stock / out of stock increases -> red, reductions -> emerald.
+  * No change -> slate-400 (neutral).
+* Modified `OverviewMetricCard` component to accept a `noteClassName?: string` parameter to dynamically style the text color of the notes.
+
+## 2026-06-25 Sprint 20I.3C Restore KPI Sparklines
+
+Completed:
+
+* Restored all 8 KPI sparkline trends and delta percentage logic in `InventoryOverviewPage` based on real historical data age and stock rollbacks without data fabrication.
+* Added data age detection: scans oldest dates from both transaction ledger and material creation to compute age in days relative to `new Date()`.
+* Implemented automatic scale switching:
+  * `<30 days`: Displays flat placeholder sparklines (all points set to current value) and sets delta text to `"Chưa có dữ liệu lịch sử"`.
+  * `>=30 days`: Shows real historical trends with 5-day intervals, calculating percentage delta compared to the previous period.
+  * `>=365 days`: Shows real yearly line trends with 60-day intervals, calculating percentage delta compared to the previous period.
+* Reconstructed historical inventory snapshots: rolls back material stocks to each snapshot date by subtracting later transaction item quantities (properly filtering for warehouse classification on low/out stock checks), computing exact metrics for total value, quantity, unique item code count, low stock, out of stock, primary, secondary, and consumable counts.
+
+## 2026-06-25 Sprint 20I.3B Inventory KPI Semantics Fix
+
+Completed:
+
+* Fixed semantic value mappings in the Inventory Overview KPI strip:
+  * Changed value displays for `Vật tư chính`, `Vật tư phụ`, and `Vật tư tiêu hao` from total VND value to unique material counts.
+  * Replaced `primaryValue`, `secondaryValue`, and `consumableValue` with `primaryCount`, `secondaryCount`, and `consumableCount` inside `summary` calculations.
+* Fixed KPI trend sparkline logic:
+  * Disabled sparkline rendering (returning `undefined` trend arrays) for count-based metrics (`Mã vật tư`, `Sắp hết hàng`, `Hết hàng`, `Vật tư chính`, `Vật tư phụ`, `Vật tư tiêu hao`) since historical database records for counts are unavailable.
+  * Preserved real historical line trends for `Tổng giá trị tồn kho` and `Tổng khối lượng` computed from actual transaction movements.
+  * Modified `OverviewMetricCard` to make `trend` optional and conditionally render the `KpiSparkline` component only when trend data is present.
+* Fixed KPI delta label logic:
+  * Removed fake linear progress percentages derived from current count datasets.
+  * Made deltas show `"Chưa có dữ liệu lịch sử"` for all count metrics and when transaction history does not exist.
+
+Verification:
+
+* Verified the frontend application compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-25 Sprint 20I.3 Inventory Overview KPI Redesign
+
+Completed:
+
+* Redesigned the Inventory Overview KPI strip to replace the old 8 metrics (including main/production warehouse split) with the requested 8 cards:
+  1. **Tổng giá trị tồn kho** (total value, tone: `emerald`, icon: `CircleDollarSign`)
+  2. **Tổng khối lượng** (total weight/quantity, tone: `cyan`, icon: `RefreshCw`)
+  3. **Mã vật tư** (unique material code count, tone: `indigo`, icon: `PackageCheck`)
+  4. **Sắp hết hàng** (low stock count, tone: `amber`, icon: `TriangleAlert`)
+  5. **Vật tư chính** (value of primary usage materials, tone: `blue`, icon: `PackageCheck`)
+  6. **Vật tư phụ** (value of secondary usage materials, tone: `violet`, icon: `Package`)
+  7. **Vật tư tiêu hao** (value of consumable usage materials, tone: `orange`, icon: `Package`)
+  8. **Hết hàng** (out of stock count, tone: `red`, icon: `ShieldX`)
+* Added support for `indigo`, `violet`, and `orange` tones inside the `OverviewMetricCard` color dictionary.
+* Implemented clean pulsing skeleton loading states when data queries are pending.
+* Extended the `summary` metadata calculations to compute `primaryValue` and `secondaryValue` dynamically (using `'PRIMARY'` default usage type fallback).
+* Adjusted sparkline trend and delta percentage calculations for all new KPI fields.
+
+Verification:
+
+* Verified the frontend application compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-25 Sprint 20B.1 Component UI Audit
 
 Completed:
