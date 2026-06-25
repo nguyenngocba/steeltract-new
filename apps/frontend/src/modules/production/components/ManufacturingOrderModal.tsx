@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import type { ProductionBom, ProductionComponent } from '../api/production.api'
 import { useCreateProductionOrder } from '../hooks/useProductionCockpit'
 import { nextLocalCode } from '@/shared/utils/code-format'
+import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 export function ManufacturingOrderModal({ components, boms, initialComponentId = '', onClose }: {
@@ -18,12 +19,16 @@ export function ManufacturingOrderModal({ components, boms, initialComponentId =
   const [bomId, setBomId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [priority, setPriority] = useState('MEDIUM')
-  const [start, setStart] = useState('')
+  const [start, setStart] = useState(formatLocalDateTimeInput())
   const [due, setDue] = useState('')
   const component = components.find((item) => item.id === componentId)
   const matchingBoms = useMemo(() => boms.filter((bom) =>
     bom.status !== 'ARCHIVED' && (!component || bom.productCode === component.code)), [boms, component])
   const selectedBom = matchingBoms.find((bom) => bom.id === bomId)
+
+  useEffect(() => {
+    setStart(formatLocalDateTimeInput())
+  }, [])
 
   useEffect(() => {
     if (matchingBoms.length === 1) setBomId(matchingBoms[0].id)
@@ -62,8 +67,8 @@ export function ManufacturingOrderModal({ components, boms, initialComponentId =
         <label className="text-xs text-slate-400">Production BOM *<select value={bomId} onChange={(e) => setBomId(e.target.value)} className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100"><option value="">Chọn BOM bắt buộc</option>{matchingBoms.map((item) => <option value={item.id} key={item.id}>{item.bomNo} · {item.productName}</option>)}</select></label>
         <label className="text-xs text-slate-400">Số lượng<input value={quantity} onFocus={(e) => setQuantity(formatQuantityInput(e.target.value))} onBlur={(e) => setQuantity(formatQuantity(e.target.value))} onChange={(e) => setQuantity(formatQuantityInput(e.target.value))} inputMode="decimal" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
         <label className="text-xs text-slate-400">Ưu tiên<select value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100"><option>MEDIUM</option><option>HIGH</option><option>URGENT</option><option>LOW</option></select></label>
-        <label className="text-xs text-slate-400">Ngày bắt đầu<input value={start} onChange={(e) => setStart(e.target.value)} type="datetime-local" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
-        <label className="text-xs text-slate-400">Ngày đến hạn<input value={due} onChange={(e) => setDue(e.target.value)} type="datetime-local" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
+        <label className="text-xs text-slate-400">Ngày bắt đầu<input value={start} onFocus={() => setStart(formatLocalDateTimeInput())} onChange={(e) => setStart(e.target.value)} type="datetime-local" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
+        <label className="text-xs text-slate-400">Ngày đến hạn<input value={due} onFocus={() => setDue(formatLocalDateTimeInput())} onChange={(e) => setDue(e.target.value)} type="datetime-local" className="mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-slate-100" /></label>
       </div>
       <div className="mx-5 mb-5 rounded border border-slate-800 bg-slate-950 p-4">
         {!component ? <p className="text-xs text-slate-500">Chọn cấu kiện để lọc BOM tương ứng.</p> : !selectedBom ? <p className="text-xs text-amber-300">Cấu kiện chưa có BOM được chọn. Hãy tạo BOM trước khi phát hành lệnh sản xuất.</p> : <div className="grid gap-4 md:grid-cols-2">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { useCreateTransaction } from '../../../inventory/hooks/useCreateTransaction'
@@ -7,6 +7,7 @@ import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../../inventory/hooks/useInventoryTransactions'
 import { useProductionIssues } from '../../../production/hooks/useProductionCockpit'
 import { ComponentsFilterBar, ComponentsKpiCard, ComponentsPanel } from './ComponentsCockpitShared'
+import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type MaterialStockRow = {
@@ -80,7 +81,16 @@ export function ComponentsMaterialStockPage() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [selectedRow, setSelectedRow] = useState<MaterialStockRow | null>(null)
-  const [returnForm, setReturnForm] = useState({ returnedAt: new Date().toISOString().slice(0, 16), quantity: '', note: '' })
+  const [returnForm, setReturnForm] = useState({ returnedAt: formatLocalDateTimeInput(), quantity: '', note: '' })
+
+  useEffect(() => {
+    if (!selectedRow) return
+
+    setReturnForm((prev) => ({
+      ...prev,
+      returnedAt: formatLocalDateTimeInput(),
+    }))
+  }, [selectedRow])
 
   const rows = useMemo<MaterialStockRow[]>(() => {
     const auditById = new Map(
@@ -246,7 +256,7 @@ export function ComponentsMaterialStockPage() {
       ],
     })
     setSelectedRow(null)
-    setReturnForm({ returnedAt: new Date().toISOString().slice(0, 16), quantity: '', note: '' })
+    setReturnForm({ returnedAt: formatLocalDateTimeInput(), quantity: '', note: '' })
   }
 
   return (
@@ -370,7 +380,7 @@ export function ComponentsMaterialStockPage() {
               </div>
             </div>
             <div className="mt-4 grid gap-3 rounded border border-amber-900/60 bg-amber-950/10 p-4 md:grid-cols-3">
-              <input type="datetime-local" value={returnForm.returnedAt} onChange={(event) => setReturnForm((prev) => ({ ...prev, returnedAt: event.target.value }))} className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
+              <input type="datetime-local" value={returnForm.returnedAt} onFocus={() => setReturnForm((prev) => ({ ...prev, returnedAt: formatLocalDateTimeInput() }))} onChange={(event) => setReturnForm((prev) => ({ ...prev, returnedAt: event.target.value }))} className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
               <input value={returnForm.quantity} onFocus={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} onBlur={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantity(event.target.value) }))} onChange={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} inputMode="decimal" placeholder="Số lượng trả" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
               <input value={returnForm.note} onChange={(event) => setReturnForm((prev) => ({ ...prev, note: event.target.value }))} placeholder="Ghi chú trả kho" className="h-10 rounded border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100" />
             </div>

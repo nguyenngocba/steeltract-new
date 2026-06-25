@@ -1,5 +1,10 @@
 # Next Tasks
 
+Current dataset note:
+
+- The real/demo business data was cleaned on 2026-06-24. Operators should recreate materials, suppliers, projects, components, BOMs, production orders, QC records, yard placements, and transport records manually before workflow validation. Reference/configuration data remains available; see `docs/ai-state/audits/business-data-cleanup-20260624.md`.
+- Date-time inputs in active Inventory transaction forms, Component production material return, and Production MO creation now refresh to current local time when opened/focused. Continue watching other future transaction forms for ad-hoc UTC `datetime-local` formatting.
+
 Inventory foundation order locked after Material Master, Inventory Transactions, and Warehouse Locations:
 
 1. Warehouse Structure Cleanup:

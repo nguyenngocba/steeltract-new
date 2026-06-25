@@ -15,6 +15,7 @@ import {
   type InventoryAttachmentDraft,
 } from './InventoryAttachmentPanel'
 import { nextLocalCode } from '@/shared/utils/code-format'
+import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatCurrencyInput, formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 type ModalProps = {
@@ -189,7 +190,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const createTransaction = useCreateTransaction()
 
   const [form, setForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
+    transactionDate: formatLocalDateTimeInput(),
     inventoryItemId: '',
     supplierId: '',
     zoneId: '',
@@ -221,6 +222,15 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const selectedInboundZoneFull = isZoneFull(selectedInboundZone)
   const selectedInboundCellOccupied = isCellOccupied(selectedInboundZone, form.slotId, form.level)
   const inboundEmptyCell = findEmptyCell(selectedInboundZone)
+
+  useEffect(() => {
+    if (!open) return
+
+    setForm((prev) => ({
+      ...prev,
+      transactionDate: formatLocalDateTimeInput(),
+    }))
+  }, [open])
   
   useEffect(() => {
     if (!form.inventoryItemId) return
@@ -293,7 +303,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       toast.error('Phiếu đã lưu nhưng upload tài liệu nhập kho thất bại')
     }
     setForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
+      transactionDate: formatLocalDateTimeInput(),
       inventoryItemId: '',
       supplierId: '',
       zoneId: '',
@@ -313,7 +323,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_420px]">
       <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+        <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
         <select value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
           <option value="">Nhà cung cấp</option>
           {suppliers.map((s: any) => (
@@ -420,7 +430,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   const createTransaction = useCreateTransaction()
 
   const [form, setForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
+    transactionDate: formatLocalDateTimeInput(),
     target: 'PROJECT',
     projectId: '',
     inventoryItemId: '',
@@ -459,6 +469,16 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           )
       : []
   }, [selectedMaterialDetail])
+
+  useEffect(() => {
+    if (!open) return
+
+    setForm((prev) => ({
+      ...prev,
+      transactionDate: formatLocalDateTimeInput(),
+    }))
+  }, [open])
+
   const selectedInboundZone = useMemo(() => {
     if (!form.zoneId) return null
     return zones.find((zone: any) => String(zone.id) === String(form.zoneId) && isRealStorageZone(zone)) || null
@@ -659,7 +679,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       toast.error('Phiếu đã lưu nhưng upload tài liệu xuất kho thất bại')
     }
     setForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
+      transactionDate: formatLocalDateTimeInput(),
       target: 'PROJECT',
       projectId: '',
       inventoryItemId: '',
@@ -681,7 +701,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
       <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+        <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
         <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className={fieldClass}>
           <option value="PROJECT">Xuất cho công trình</option>
           <option value="COMPONENT_PRODUCTION">Xuất cho sản xuất cấu kiện</option>
@@ -873,7 +893,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const realZones = useMemo(() => zones.filter((zone: any) => isRealStorageZone(zone) && isMainWarehouseZone(zone)), [zones])
   const createTx = useCreateTransaction()
   const [form, setForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
+    transactionDate: formatLocalDateTimeInput(),
     materialId: '',
     fromZoneId: '',
     toZoneId: '',
@@ -979,6 +999,15 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     transferQty > 0 &&
     transferQty <= sourceQty &&
     !destinationCellOccupied
+
+  useEffect(() => {
+    if (!open) return
+
+    setForm((prev) => ({
+      ...prev,
+      transactionDate: formatLocalDateTimeInput(),
+    }))
+  }, [open])
   
   useEffect(() => {
     if (!form.materialId) return
@@ -1056,7 +1085,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     }
 
     setForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
+      transactionDate: formatLocalDateTimeInput(),
       materialId: '',
       fromZoneId: '',
       toZoneId: '',
@@ -1092,7 +1121,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
         <div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <input type="datetime-local" value={form.transactionDate} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
             <select value={form.materialId} onChange={(e) => setForm((f) => ({ ...f, materialId: e.target.value, fromZoneId: '', fromSlotId: '', fromLevel: '', toZoneId: '', toSlotId: '', toLevel: '' }))} className={fieldClass}>
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
@@ -1226,7 +1255,7 @@ export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
   const [sessionNo, setSessionNo] = useState(generateTransactionNo('KK'))
   const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
   const [form, setForm] = useState({
-    transactionDate: new Date().toISOString().slice(0, 16),
+    transactionDate: formatLocalDateTimeInput(),
     materialId: '',
     zoneId: '',
     slotId: '',
@@ -1290,6 +1319,16 @@ export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
     Boolean(reasonText) &&
     hasActualQty &&
     Math.abs(difference) > 0.000001
+
+  useEffect(() => {
+    if (!open) return
+
+    setForm((prev) => ({
+      ...prev,
+      transactionDate: formatLocalDateTimeInput(),
+    }))
+    setSessionNo(generateTransactionNo('KK'))
+  }, [open])
 
   useEffect(() => {
     if (!form.materialId || !locationRows.length) return
@@ -1369,7 +1408,7 @@ export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
     setSessionNo(generateTransactionNo('KK'))
     setAttachmentFiles([])
     setForm({
-      transactionDate: new Date().toISOString().slice(0, 16),
+      transactionDate: formatLocalDateTimeInput(),
       materialId: '',
       zoneId: '',
       slotId: '',
@@ -1386,7 +1425,7 @@ export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(430px,0.78fr)_minmax(740px,1.22fr)]">
         <div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <input type="datetime-local" value={form.transactionDate} onChange={(event) => setForm((prev) => ({ ...prev, transactionDate: event.target.value }))} className={fieldClass} />
+            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((prev) => ({ ...prev, transactionDate: formatLocalDateTimeInput() }))} onChange={(event) => setForm((prev) => ({ ...prev, transactionDate: event.target.value }))} className={fieldClass} />
             <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
               Phiếu: <span className="ml-1 font-semibold text-cyan-200">{sessionNo}</span>
             </div>

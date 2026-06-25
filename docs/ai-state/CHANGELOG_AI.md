@@ -1,5 +1,48 @@
 # SteelTrack AI Changelog
 
+## 2026-06-25 Transaction Date-Time Refresh
+
+Fixed:
+
+* Added shared `formatLocalDateTimeInput()` helper for `datetime-local` fields so forms use local date/time instead of UTC-derived `toISOString().slice(0, 16)`.
+* Inventory transaction modals now refresh `transactionDate` to the current local date/time when opened and again when the date-time input receives focus:
+  * Nhập kho;
+  * Xuất kho;
+  * Điều chuyển;
+  * Điều chỉnh tồn kho.
+* Component Production Material Stock return modal refreshes return date/time when a return drawer opens and when the date-time input receives focus.
+* Production Manufacturing Order modal initializes planned start with current local date/time and refreshes start/due date-time fields on focus.
+* Fixed a pre-existing Material Detail build error by allowing `MetricLine` to accept an optional icon prop.
+
+Verification:
+
+* Frontend build passed with the existing Vite `NODE_ENV` and large chunk warnings.
+
+## 2026-06-24 Business Data Cleanup
+
+Executed:
+
+* Backed up the database before cleanup:
+  * `backups/steeltrack_before_business_data_cleanup_20260624_092729.dump`
+* Added and executed cleanup SQL:
+  * `scripts/sql/business-data-cleanup-20260624.sql`
+* Added cleanup audit:
+  * `docs/ai-state/audits/business-data-cleanup-20260624.md`
+* Cleared business/runtime data for materials, components, projects, suppliers, vehicles, Inventory transactions/balances, Production BOM/MO/material activity, QC runtime records, Yard placements/movements/snapshots, attachments metadata, notifications, analytics/runtime logs, and workflow instances/actions.
+* Preserved configuration/reference foundations: users, roles, permissions, categories, material types, units, warehouses, warehouse zones, yard layout, QC checklist templates, workflow definitions/steps, work centers, and machines.
+
+Verification:
+
+* Confirmed zero rows in `inventory_items`, `components`, `projects`, `Supplier`, `vehicles`, `inventory_transactions`, `inventory_location_stocks`, `BOM`, `production_orders`, `ProductionMaterialIssue`, `qc_inspections`, `yard_item_placements`, `yard_movements`, `attachments`, and `notifications`.
+* Confirmed preserved rows remain in `inventory_categories`, `material_types`, `master_units`, `master_warehouses`, `warehouse_zones`, `yard_slots`, `qc_checklists`, `users`, and `roles`.
+* Confirmed all 93 Yard slots are `AVAILABLE` with `currentStackLevel = 0`.
+
+Scope:
+
+* No Prisma schema change.
+* No API change.
+* No application code change.
+
 ## 2026-06-23 Sprint 20A.5 Demo Dataset Seeder
 
 Implemented:

@@ -347,6 +347,11 @@ export function InventoryOverviewPage() {
         displayLocation(item),
       ].join(' ').toLowerCase().includes(q)
     })
+    .sort((a: any, b: any) => {
+      const codeA = a.code ?? '';
+      const codeB = b.code ?? '';
+      return codeA.localeCompare(codeB);
+    });
   }, [rows, search, categoryFilter, usageFilter, warehouseFilter, statusFilter])
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
@@ -749,11 +754,10 @@ const kpiDeltas = useMemo(() => {
                 <button onClick={() => setOverviewPopup('stock-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
               </div>
               <div className={`${inventoryTableShell} h-[430px] overflow-auto`}>
-                <table className="w-full min-w-[1150px] text-sm table-fixed">
+                <table className="w-full min-w-[1050px] text-sm table-fixed">
                   <colgroup>
-                    <col className="w-[100px]" />
                     <col className="w-[140px]" />
-                    <col className="w-[100px]" />
+                    <col className="w-[140px]" />
                     <col className="w-[40px]" />
                     <col className="w-[100px]" />
                     <col className="w-[100px]" />
@@ -765,7 +769,6 @@ const kpiDeltas = useMemo(() => {
                   </colgroup>
                   <thead className={inventoryTableHead}>
                     <tr>
-                      <th className="px-1.5 py-1 text-left font-medium">Mã vật tư</th>
                       <th className="px-1.5 py-1 text-left font-medium">Tên vật tư</th>
                       <th className="px-1.5 py-1 text-left font-medium">Quy cách</th>
                       <th className="px-1.5 py-1 text-left font-medium">ĐVT</th>
@@ -783,7 +786,6 @@ const kpiDeltas = useMemo(() => {
                       const status = statusOf(item)
                       return (
                         <tr key={item.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setSelectedMaterialId(String(item.id))}>
-                          <td className="truncate px-1.5 py-0.5 text-cyan-300" title={item.code}>{item.code}</td>
                           <td className="truncate px-1.5 py-0.5 text-white" title={item.name}>{item.name}</td>
                           <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
                           <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
@@ -1076,14 +1078,16 @@ function OverviewModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-      <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+      <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+        <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">
             {type === 'stock-full' ? `Toàn bộ danh sách tồn kho (${rows.length} vật tư)` : title}
           </h3>
-          <button onClick={onClose} className={inventoryMutedButton}>Đóng</button>
+          <button onClick={onClose} className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white">
+            Đóng
+          </button>
         </div>
-        <div className="max-h-[74vh] overflow-auto p-4">
+        <div className="max-h-[74vh] overflow-auto">
           {(type === 'recent-inbound' || type === 'recent-outbound') ? (
             <div className="overflow-hidden rounded-xl border border-white/10">
               <table className="w-full min-w-[820px] text-sm">
@@ -1121,10 +1125,12 @@ function OverviewModal({
             <div className="overflow-hidden rounded-xl border border-white/10">
               <table className="w-full min-w-[1400px] text-sm table-fixed">
                 <colgroup>
-                  <col className="w-[140px]" />
+                  <col className="w-[120px]" />
                   <col className="w-[180px]" />
                   <col className="w-[120px]" />
                   <col className="w-[120px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[50px]" />
                   <col className="w-[100px]" />
                   <col className="w-[120px]" />
                   <col className="w-[120px]" />
@@ -1133,19 +1139,21 @@ function OverviewModal({
                   <col className="w-[150px]" />
                   <col className="w-[120px]" />
                 </colgroup>
-                 <thead className={inventoryTableHead}>
+                 <thead className="bg-white/[0.06]">
                   <tr>
-                    <th className="px-3 py-1.5 text-left font-medium">Mã vật tư</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Tên vật tư</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Quy cách</th>
-                    <th className="px-3 py-1.5 text-left font-medium">ĐVT</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Kho chính</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Kho SX</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Tổng tồn</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Đơn giá</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Giá trị</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Vị trí</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Trạng thái</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Mã vật tư</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Tên vật tư</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Loại vật tư</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Nhóm vật tư</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Quy cách</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">ĐVT</th>
+                    <th className="px-3 py-1.5 text-right text-slate-400">Kho chính</th>
+                    <th className="px-3 py-1.5 text-right text-slate-400">Kho SX</th>
+                    <th className="px-3 py-1.5 text-right text-slate-400">Tổng tồn</th>
+                    <th className="px-3 py-1.5 text-right text-slate-400">Đơn giá</th>
+                    <th className="px-3 py-1.5 text-right text-slate-400">Giá trị</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Vị trí</th>
+                    <th className="px-3 py-1.5 text-left text-slate-400">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1155,6 +1163,8 @@ function OverviewModal({
                       <tr key={item.id} className={inventoryTableRow}>
                         <td className="truncate px-3 py-1.5 text-cyan-300" title={item.code}>{item.code}</td>
                         <td className="truncate px-3 py-1.5 text-white" title={item.name}>{item.name}</td>
+                        <td className="truncate px-3 py-2 text-slate-300" title={materialUsageLabel(item.materialUsageType)}>{materialUsageLabel(item.materialUsageType)}</td>
+                        <td className="truncate px-3 py-2 text-slate-300" title={item.category}>{item.category ?? '-'}</td>
                         <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
                         <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
                         <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>

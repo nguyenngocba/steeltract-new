@@ -399,7 +399,12 @@ export function InventoryMaterialsPage() {
         if (status !== statusFilter) return false
       }
       return true
-    })
+     })
+    .sort((a: any, b: any) => {
+      const codeA = a.materialCode ?? '';
+      const codeB = b.materialCode ?? '';
+      return codeA.localeCompare(codeB);
+    });
   }, [rows, search, categoryFilter, usageFilter, zoneFilter, statusFilter])
 
   const kpis = useMemo(() => {
@@ -827,11 +832,10 @@ export function InventoryMaterialsPage() {
                       </div>
                       {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
                       <div className={`${inventoryTableShell} h-[520px] overflow-auto`}>
-                        <table className="w-full min-w-[1150px] text-sm table-fixed">
+                        <table className="w-full min-w-[1050px] text-sm table-fixed">
                           <colgroup>
-                            <col className="w-[100px]" />   {/* Mã vật tư */}
                             <col className="w-[140px]" />   {/* Tên vật tư */}
-                            <col className="w-[100px]" />   {/* Quy cách */}
+                            <col className="w-[140px]" />   {/* Quy cách */}
                             <col className="w-[40px]" />    {/* ĐVT */}
                             <col className="w-[100px]" />   {/* Kho chính */}
                             <col className="w-[100px]" />   {/* Kho SX */}
@@ -843,7 +847,6 @@ export function InventoryMaterialsPage() {
                           </colgroup>
                           <thead className={inventoryTableHead}>
                             <tr>
-                              <th className="px-1.5 py-0.5 text-left font-medium">Mã vật tư</th>
                               <th className="px-1.5 py-0.5 text-left font-medium">Tên vật tư</th>
                               <th className="px-1.5 py-0.5 text-left font-medium">Quy cách</th>
                               <th className="px-1.5 py-0.5 text-left font-medium">ĐVT</th>
@@ -859,7 +862,6 @@ export function InventoryMaterialsPage() {
                           <tbody>
                             {pagedRows.map((item: any) => (
                               <tr key={item.id} onClick={() => openMaterial(item)} className={`cursor-pointer ${inventoryTableRow}`}>
-                                <td className="truncate px-1.5 py-0.5 text-cyan-300" title={item.materialCode}>{item.materialCode}</td>
                                 <td className="truncate px-1.5 py-0.5 text-white" title={item.materialName}>{item.materialName}</td>
                                 <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? '-'}>{item.materialType ?? '-'}</td>
                                 <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
@@ -948,10 +950,12 @@ export function InventoryMaterialsPage() {
                     <div className="overflow-hidden rounded-xl border border-white/10">
                       <table className="w-full min-w-[1400px] text-sm table-fixed">
                         <colgroup>
-                          <col className="w-[140px]" />
+                          <col className="w-[120px]" />
                           <col className="w-[180px]" />
                           <col className="w-[120px]" />
                           <col className="w-[120px]" />
+                          <col className="w-[120px]" />
+                          <col className="w-[50px]" />
                           <col className="w-[100px]" />
                           <col className="w-[120px]" />
                           <col className="w-[120px]" />
@@ -964,6 +968,8 @@ export function InventoryMaterialsPage() {
                     <tr>
                       <th className="px-3 py-1.5 text-left text-slate-400">Mã vật tư</th>
                       <th className="px-3 py-1.5 text-left text-slate-400">Tên vật tư</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Loại vật tư</th>
+                      <th className="px-3 py-1.5 text-left text-slate-400">Nhóm vật tư</th>
                       <th className="px-3 py-1.5 text-left text-slate-400">Quy cách</th>
                       <th className="px-3 py-1.5 text-left text-slate-400">ĐVT</th>
                       <th className="px-3 py-1.5 text-right text-slate-400">Kho chính</th>
@@ -980,6 +986,8 @@ export function InventoryMaterialsPage() {
                       <tr key={item.id} onClick={() => openMaterial(item)} className="cursor-pointer border-t border-white/10 hover:bg-white/[0.06]">
                         <td className="truncate px-3 py-1.5 text-cyan-300" title={item.materialCode}>{item.materialCode}</td>
                         <td className="truncate px-3 py-1.5 text-white" title={item.materialName}>{item.materialName}</td>
+                        <td className="truncate px-3 py-2 text-slate-300" title={materialUsageLabel(item.materialUsageType)}>{materialUsageLabel(item.materialUsageType)}</td>
+                        <td className="truncate px-3 py-2 text-slate-300" title={item.category}>{item.category ?? '-'}</td>
                         <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? '-'}>{item.materialType ?? '-'}</td>
                         <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
                         <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>

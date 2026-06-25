@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, Building2, Clock, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react';
+import { BarChart3, Building2, Clock, RefreshCw, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrencyVnd, formatDateTime, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format';
 import { API_BASE_URL } from '@/lib/api';
@@ -458,6 +458,7 @@ function InventoryMetricCard({
 }
 
 export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, onEdit }: Props) {
+  // ===== 1. STATE =====
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [focusedLocation, setFocusedLocation] = useState<any | null>(null)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -465,9 +466,24 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const [attachmentContext, setAttachmentContext] = useState<AttachmentContext | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const queryClient = useQueryClient()
-  const [transactionPage, setTransactionPage] = useState(1);
-  const transactionPageSize = 12;
 
+  // Phân trang giao dịch
+  const [transactionPage, setTransactionPage] = useState(1)
+  const transactionPageSize = 15
+
+  // Phân trang công trình
+  const [projectPage, setProjectPage] = useState(1)
+  const projectPageSize = 10
+
+  // Phân trang nhà cung cấp
+  const [supplierPage, setSupplierPage] = useState(1);
+  const supplierPageSize = 10
+
+  // Phân trang lịch sử
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 15
+
+  // ===== 2. LẤY DỮ LIỆU TỪ PROPS =====
   const item = detail?.item ?? fallback ?? {}
   const code = item.code ?? fallback?.materialCode ?? fallback?.code ?? '-'
   const name = item.name ?? fallback?.materialName ?? fallback?.name ?? '-'
@@ -491,6 +507,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
     fallback?.materialId ??
     fallback?.inventoryItemId ??
     fallback?.id
+
+  // ===== 3. QUERY ATTACHMENTS =====
   const attachmentQueryKey = ['attachments', 'inventory', 'material', materialId]
   const { data: attachmentResult = [] } = useQuery({
     queryKey: attachmentQueryKey,
@@ -500,31 +518,31 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const attachments = normalizeAttachmentList(attachmentResult)
   const photoAttachments = attachments.filter((attachment) => attachment.category === 'PHOTO' || attachment.mimeType.startsWith('image/'))
   const documentAttachments = attachments.filter((attachment) => !photoAttachments.some((photo) => photo.id === attachment.id))
+
+  // ===== 4. TÍNH TOÁN KHO =====
   const mainLocationRows = locationRows.filter(isMainWarehouseLocation)
   const productionLocationRows = locationRows.filter(isProductionWarehouseLocation)
   const mainQty = sumLocationQty(mainLocationRows)
   const productionQty = sumLocationQty(productionLocationRows)
   const supplier = supplierRows[0]?.supplierName ?? '-'
-  const transactionRows = useMemo(() => {
-  const rows = buildTransactionRows(inbound, outbound)
 
-      console.log(
-        'KK ROWS',
-        rows.filter(
-          (r: any) =>
-            r.type === 'ADJUSTMENT'
-        )
-      )
+  // ===== 5. TRANSACTIONS (useMemo) =====
+  const transactionRows = useMemo(() => buildTransactionRows(inbound, outbound), [inbound, outbound])
+  const pagedTransactionRows = useMemo(() => {
+    const start = (transactionPage - 1) * transactionPageSize
+    return transactionRows.slice(start, start + transactionPageSize)
+  }, [transactionRows, transactionPage])
+  const totalTransactionPages = Math.ceil(transactionRows.length / transactionPageSize)
 
-      return rows
-    }, [inbound, outbound])
+  // Phân trang logs
+  const pagedLogRows = useMemo(() => {
+    const start = (logPage - 1) * logPageSize;
+    return transactionRows.slice(start, start + logPageSize);
+  }, [transactionRows, logPage]);
 
-    const pagedTransactionRows = useMemo(() => {
-      const start = (transactionPage - 1) * transactionPageSize;
-      return transactionRows.slice(start, start + transactionPageSize);
-    }, [transactionRows, transactionPage]);
+  const totalLogPages = Math.ceil(transactionRows.length / logPageSize);
 
-  const totalTransactionPages = Math.ceil(transactionRows.length / transactionPageSize);
+  // ===== 6. TRANSACTION ATTACHMENTS =====
   const { data: transactionAttachmentResult = [] } = useQuery({
     queryKey: ['attachments', 'inventory', 'transaction', 'material-detail', materialId],
     queryFn: () => getAttachments({ module: 'inventory', entityType: 'transaction' }),
@@ -548,6 +566,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
     })
   }, [allTransactionAttachments, transactionRows, transactionRowsById])
   const transactionAttachmentGroups = useMemo(() => groupTransactionAttachments(transactionAttachments, transactionRows), [transactionAttachments, transactionRows])
+
+  // ===== 7. DOCUMENT SOURCE ROWS =====
   const documentSourceRows = useMemo<AttachmentSourceRow[]>(() => {
     const materialRows = documentAttachments.map((attachment) => ({
       attachment,
@@ -566,27 +586,89 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
       })
     return [...materialRows, ...transactionRowsWithSource]
   }, [documentAttachments, transactionAttachments, transactionRows])
+
+  // ===== 8. ANALYTICS & FORECAST (useMemo) =====
   const movementTrend = useMemo(() => buildMovementTrend(transactionRows), [transactionRows])
   const forecast = useMemo(() => buildForecast(currentStock, outbound), [currentStock, outbound])
   const imageUrls = useMemo(() => collectMaterialImages(detail, fallback, photoAttachments), [detail, fallback, photoAttachments])
   const primaryImage = selectedImage && imageUrls.includes(selectedImage) ? selectedImage : imageUrls[0]
   const materialAnalytics = useMemo(() => buildMaterialAnalytics(movementTrend, currentStock, forecast), [movementTrend, currentStock, forecast])
+
+  // ===== 9. PROJECTS (useMemo) =====
   const projectSummary = useMemo(() => buildUsageSummary(projectRows, averageCost), [projectRows, averageCost])
+
+  // BOM Usage (phân bố theo công trình)
+  const bomUsage = useMemo(() => {
+    const map = new Map<string, number>()
+    projectRows.forEach((row) => {
+      const projectName = row.projectName ?? 'Khác'
+      map.set(projectName, (map.get(projectName) || 0) + num(row.quantity ?? row.issuedQty ?? 0))
+    })
+    if (!map.size) {
+      return [{ label: 'Chưa có dữ liệu', value: 1, color: '#334155' }]
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, value], index) => ({
+        label,
+        value,
+        color: ['#1d7cff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5],
+      }))
+  }, [projectRows])
+
+  // Phân trang cho Project rows
+  const pagedProjectRows = useMemo(() => {
+    const start = (projectPage - 1) * projectPageSize
+    return projectRows.slice(start, start + projectPageSize)
+  }, [projectRows, projectPage])
+  const totalProjectPages = Math.ceil(projectRows.length / projectPageSize)
+
+
+  // Dữ liệu Donut cho Suppliers
+  const supplierDonutData = useMemo(() => {
+    const map = new Map<string, number>();
+    supplierRows.forEach((row) => {
+      const name = row.supplierName ?? 'Khác';
+      map.set(name, (map.get(name) || 0) + num(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost)));
+    });
+    if (!map.size) {
+      return [{ label: 'Chưa có dữ liệu', value: 1, color: '#334155' }];
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, value], index) => ({
+        label,
+        value,
+        color: ['#1d7cff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5],
+      }));
+  }, [supplierRows, averageCost]);
+
+  // Phân trang cho supplierRows
+  const pagedSupplierRows = useMemo(() => {
+    const start = (supplierPage - 1) * supplierPageSize;
+    return supplierRows.slice(start, start + supplierPageSize);
+  }, [supplierRows, supplierPage]);
+
+  const totalSupplierPages = Math.ceil(supplierRows.length / supplierPageSize);
+    // ===== 10. SUPPLIERS (useMemo) =====
   const supplierSummary = useMemo(() => buildPurchaseSummary(supplierRows, averageCost), [supplierRows, averageCost])
-  // Lấy trend từ materialAnalytics (đã có sẵn)
+
+  // ===== 11. KPI TRENDS =====
   const stockTrend = materialAnalytics.inventoryTrend.slice(-6).map(d => d.value)
   const inboundTrend = materialAnalytics.inboundTrend.slice(-6).map(d => d.value)
   const outboundTrend = materialAnalytics.outboundTrend.slice(-6).map(d => d.value)
   const valueTrend = materialAnalytics.inventoryTrend.slice(-6).map(d => d.value * averageCost)
-  // Cost trend: giả định ổn định (hoặc có thể lấy từ dữ liệu chi tiết nếu có)
   const costTrend = Array.from({ length: 6 }, () => averageCost)
 
-  // Tổng nhập/xuất gần đây (từ transactionRows)
+  // Tổng nhập/xuất gần đây
   const totalInbound = transactionRows.filter(tx => tx.type === 'INBOUND').reduce((sum, tx) => sum + tx.quantity, 0)
   const totalOutbound = transactionRows.filter(tx => tx.type === 'OUTBOUND').reduce((sum, tx) => sum + tx.quantity, 0)
+
+  // ===== 12. EFFECTS & HANDLERS =====
   useEffect(() => {
     if (!import.meta.env.DEV || !open || !materialId) return
-
     console.debug('[inventory.material.attachments]', {
       queryParams: {
         module: 'inventory',
@@ -601,22 +683,13 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
         documentAttachments: documentAttachments.map(debugAttachment),
       },
     })
-  }, [
-    attachmentResult,
-    attachments,
-    documentAttachments,
-    imageUrls,
-    materialId,
-    open,
-    primaryImage,
-  ])
+  }, [attachmentResult, attachments, documentAttachments, imageUrls, materialId, open, primaryImage])
 
   async function handleImageUpload(file: File) {
     if (!materialId || !file) {
       toast.error('Không xác định được vật tư để upload ảnh')
       return
     }
-
     setUploadingImage(true)
     try {
       await uploadAttachment({
@@ -643,6 +716,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
   if (!open) return null
 
+  // ===== 13. RENDER =====
   return createPortal(
     <>
       <ModuleDetailDrawer
@@ -658,10 +732,11 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           </button>
         ) : null}
       >
+        {/* 6 KPI cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1 mb-1 -mt-4">
           <InventoryMetricCard
             compact
-            title="Tồn hiện tại"                      // thay Current Stock
+            title="Tồn hiện tại"
             value={`${fmt(currentStock)} ${unit}`.trim()}
             note={`Tối thiểu ${fmt(minimumStock)}`}
             tone={currentStock <= minimumStock ? 'amber' : 'blue'}
@@ -670,7 +745,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           />
           <InventoryMetricCard
             compact
-            title="Đơn giá trung bình"               // thay Average Cost
+            title="Đơn giá trung bình"
             value={money(averageCost)}
             note="Đơn giá trung bình"
             tone="cyan"
@@ -679,7 +754,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           />
           <InventoryMetricCard
             compact
-            title="Giá trị tồn kho"                  // thay Inventory Value
+            title="Giá trị tồn kho"
             value={money(inventoryValue)}
             note="Tồn x giá trung bình"
             tone="emerald"
@@ -688,7 +763,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           />
           <InventoryMetricCard
             compact
-            title="Số vị trí lưu kho"                // thay Storage Locations
+            title="Số vị trí lưu kho"
             value={fmt(locationRows.length, 0)}
             note={`Kho chính ${fmt(mainQty)} · SX ${fmt(productionQty)}`}
             tone="purple"
@@ -697,7 +772,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           />
           <InventoryMetricCard
             compact
-            title="Nhập (30 ngày)"                  // thay Inbound (30d)
+            title="Nhập (30 ngày)"
             value={`${fmt(totalInbound)} ${unit}`.trim()}
             note="Tổng nhập gần đây"
             tone="emerald"
@@ -706,7 +781,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           />
           <InventoryMetricCard
             compact
-            title="Xuất (30 ngày)"                  // thay Outbound (30d)
+            title="Xuất (30 ngày)"
             value={`${fmt(totalOutbound)} ${unit}`.trim()}
             note="Tổng xuất gần đây"
             tone="red"
@@ -715,7 +790,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           />
         </div>
 
-          <ModuleTabs tabs={tabs} active={activeTab} onChange={(tab) => setActiveTab(tab as TabKey)} />
+        <ModuleTabs tabs={tabs} active={activeTab} onChange={(tab) => setActiveTab(tab as TabKey)} />
 
           {activeTab === 'overview' && (
             <div className="grid gap-1 xl:grid-cols-[1fr_1fr] mt-1">
@@ -868,60 +943,264 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           )}
 
           {activeTab === 'projects' && (
-            <div className="space-y-3">
-              <ModuleKpiStrip className="md:grid-cols-3">
-                <ModuleKpiCard icon={<Building2 size={18} />} title="Usage summary" value={`${fmt(projectSummary.totalQty)} ${unit}`.trim()} note={`${fmt(projectSummary.projectCount, 0)} công trình`} tone="blue" />
-                <ModuleKpiCard icon={<Truck size={18} />} title="Returned" value={`${fmt(projectSummary.returnedQty)} ${unit}`.trim()} note="Vật tư đã trả" tone="amber" />
-                <ModuleKpiCard icon={<DollarSign size={18} />} title="Usage value" value={money(projectSummary.totalValue)} note="Giá trị xuất công trình" tone="emerald" />
-              </ModuleKpiStrip>
-              <DetailTable
-                title="Top projects"
-                headers={['Công trình', 'Đã xuất', 'Đã trả', 'Giá trị', 'Hồ sơ liên quan']}
-                rows={projectRows.slice(0, 12).map((row: any) => [
-                  row.projectName ?? 'Không rõ',
-                  `${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim(),
-                  `${fmt(row.returnedQty)} ${unit}`.trim(),
-                  money(row.issuedValue ?? num(row.quantity) * averageCost),
-                  <AttachmentCountChip
-                    key="project-files"
-                    attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
-                    onOpen={() => setAttachmentContext({
-                      title: row.projectName ?? 'Hồ sơ công trình',
-                      subtitle: 'Hồ sơ liên quan từ giao dịch xuất kho',
-                      attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
-                    })}
-                  />,
-                ])}
-              />
+            <div className="space-y-1 mt-1">
+              {/* 3 KPI cards - Sử dụng InventoryMetricCard đồng bộ với các card khác */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                <InventoryMetricCard
+                  title="Tổng xuất"
+                  value={`${fmt(projectSummary.totalQty)} ${unit}`.trim()}
+                  note={`${fmt(projectSummary.projectCount, 0)} công trình`}
+                  tone="blue"
+                  icon={<Building2 size={15} />}
+                  trend={[0,0,0,0,0,0]}
+                />
+                <InventoryMetricCard
+                  title="Đã trả lại"
+                  value={`${fmt(projectSummary.returnedQty)} ${unit}`.trim()}
+                  note="Vật tư đã trả"
+                  tone="amber"
+                  icon={<Truck size={15} />}
+                  trend={[0,0,0,0,0,0]}
+                />
+                <InventoryMetricCard
+                  title="Giá trị xuất"
+                  value={money(projectSummary.totalValue)}
+                  note="Tổng giá trị đã xuất"
+                  tone="emerald"
+                  icon={<DollarSign size={15} />}
+                  trend={[0,0,0,0,0,0]}
+                />
+              </div>
+
+              {/* Donut + Bảng - sát lại và cao hơn */}
+              <div className="grid gap-1 xl:grid-cols-[280px_1fr]">
+              {/* Donut tỷ lệ sử dụng */}
+              <ModuleAnalyticsPanel title="Tỷ lệ sử dụng" note="Phân bổ theo công trình" className="min-h-[240px]">
+                <Donut
+                  rows={bomUsage}
+                  center={fmt(bomUsage.reduce((sum, item) => sum + item.value, 0))}
+                  label={unit}
+                  compact={false}
+                />
+              </ModuleAnalyticsPanel>
+
+              {/* Bảng Top projects */}
+              <ModuleAnalyticsPanel title="Danh sách công trình" note="Top 10 công trình sử dụng nhiều nhất" className="min-h-[540px]">
+                <div className="overflow-auto h-[440px]">
+                  <table className="w-full min-w-[700px] text-sm table-fixed">
+                    <colgroup>
+                      <col className="w-[120px]" />
+                      <col className="w-[100px]" />
+                      <col className="w-[100px]" />
+                      <col className="w-[120px]" />
+                      <col className="w-[100px]" />
+                    </colgroup>
+                    <thead className={moduleTableHead}>
+                      <tr>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Công trình</th>
+                        <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đã xuất</th>
+                        <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đã trả</th>
+                        <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Giá trị</th>
+                        <th className="px-2 py-1.5 text-center font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Hồ sơ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedProjectRows.map((row: any) => (
+                        <tr key={row.projectId ?? row.id ?? Math.random()} className={moduleTableRow}>
+                          <td className="truncate px-2 py-1.5 text-slate-200" title={row.projectName ?? 'Không rõ'}>
+                            {row.projectName ?? 'Không rõ'}
+                          </td>
+                          <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-400" title={`${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim()}>
+                            {`${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim()}
+                          </td>
+                          <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums text-amber-400" title={`${fmt(row.returnedQty)} ${unit}`.trim()}>
+                            {`${fmt(row.returnedQty)} ${unit}`.trim()}
+                          </td>
+                          <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-cyan-300" title={money(row.issuedValue ?? num(row.quantity) * averageCost)}>
+                            {money(row.issuedValue ?? num(row.quantity) * averageCost)}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <AttachmentCountChip
+                              attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                              onOpen={() => setAttachmentContext({
+                                title: row.projectName ?? 'Hồ sơ công trình',
+                                subtitle: 'Hồ sơ liên quan từ giao dịch xuất kho',
+                                attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                              })}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                      {!pagedProjectRows.length && (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-8 text-center">
+                            <ModuleEmptyState title="Chưa có dữ liệu" description="Chưa có công trình sử dụng vật tư này." />
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Phân trang */}
+                {totalProjectPages > 1 && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
+                    <span>
+                      Hiển thị {(projectPage - 1) * projectPageSize + 1}-
+                      {Math.min(projectPage * projectPageSize, projectRows.length)}/{projectRows.length} công trình
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setProjectPage((p) => Math.max(1, p - 1))}
+                        disabled={projectPage <= 1}
+                        className={moduleMutedButton}
+                      >
+                        Trước
+                      </button>
+                      <span className="px-2 py-1 text-slate-300">{projectPage}/{totalProjectPages}</span>
+                      <button
+                        onClick={() => setProjectPage((p) => Math.min(totalProjectPages, p + 1))}
+                        disabled={projectPage >= totalProjectPages}
+                        className={moduleMutedButton}
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </ModuleAnalyticsPanel>
+            </div>
             </div>
           )}
 
           {activeTab === 'suppliers' && (
-            <div className="space-y-3">
-              <ModuleKpiStrip className="md:grid-cols-3">
-                <ModuleKpiCard icon={<PackagePlus size={18} />} title="Purchase summary" value={`${fmt(supplierSummary.totalQty)} ${unit}`.trim()} note={`${fmt(supplierSummary.supplierCount, 0)} nhà cung cấp`} tone="cyan" />
-                <ModuleKpiCard icon={<DollarSign size={18} />} title="Purchase value" value={money(supplierSummary.totalValue)} note="Tổng giá trị nhập" tone="emerald" />
-                <ModuleKpiCard icon={<Clock size={18} />} title="Latest supplier" value={supplier} note="Theo lịch sử nhập gần nhất" tone="purple" />
-              </ModuleKpiStrip>
-              <DetailTable
-                title="Top suppliers"
-                headers={['Nhà cung cấp', 'Số lượng nhập', 'Đơn giá nhập', 'Tổng giá trị', 'Chứng từ']}
-                rows={supplierRows.slice(0, 12).map((row: any) => [
-                  row.supplierName ?? 'Không rõ',
-                  `${fmt(row.quantity)} ${unit}`.trim(),
-                  money(row.unitPrice ?? row.latestUnitPrice ?? averageCost),
-                  money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost)),
-                  <AttachmentCountChip
-                    key="supplier-files"
-                    attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
-                    onOpen={() => setAttachmentContext({
-                      title: row.supplierName ?? 'Chứng từ nhà cung cấp',
-                      subtitle: 'Chứng từ liên quan từ giao dịch nhập kho',
-                      attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
-                    })}
-                  />,
-                ])}
-              />
+            <div className="space-y-1 mt-1">
+              {/* 3 KPI cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                <InventoryMetricCard
+                  title="Tổng nhập"
+                  value={`${fmt(supplierSummary.totalQty)} ${unit}`.trim()}
+                  note={`${fmt(supplierSummary.supplierCount, 0)} nhà cung cấp`}
+                  tone="cyan"
+                  icon={<PackagePlus size={15} />}
+                  trend={[0,0,0,0,0,0]}
+                />
+                <InventoryMetricCard
+                  title="Giá trị nhập"
+                  value={money(supplierSummary.totalValue)}
+                  note="Tổng giá trị đã nhập"
+                  tone="emerald"
+                  icon={<DollarSign size={15} />}
+                  trend={[0,0,0,0,0,0]}
+                />
+                <InventoryMetricCard
+                  title="Nhà cung cấp mới nhất"
+                  value={supplier}
+                  note="Theo lịch sử nhập gần nhất"
+                  tone="purple"
+                  icon={<Clock size={15} />}
+                  trend={[0,0,0,0,0,0]}
+                />
+              </div>
+
+              {/* Donut + Bảng */}
+              <div className="grid gap-1 xl:grid-cols-[280px_1fr]">
+                {/* Donut phân bổ nhà cung cấp */}
+                <ModuleAnalyticsPanel title="Phân bổ theo nhà cung cấp" note="Theo giá trị nhập" className="min-h-[240px]">
+                  <Donut
+                    rows={supplierDonutData}
+                    center={money(supplierDonutData.reduce((sum, item) => sum + item.value, 0))}
+                    label="VNĐ"
+                    compact={false}
+                  />
+                </ModuleAnalyticsPanel>
+
+                {/* Bảng danh sách nhà cung cấp */}
+                <ModuleAnalyticsPanel title="Danh sách nhà cung cấp" note="Top 10 nhà cung cấp chính" className="min-h-[540px]">
+                  <div className="overflow-auto h-[440px]">
+                    <table className="w-full min-w-[700px] text-sm table-fixed">
+                      <colgroup>
+                        <col className="w-[160px]" />
+                        <col className="w-[100px]" />
+                        <col className="w-[120px]" />
+                        <col className="w-[140px]" />
+                        <col className="w-[100px]" />
+                      </colgroup>
+                      <thead className={moduleTableHead}>
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Nhà cung cấp</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Số lượng</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đơn giá</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Tổng giá trị</th>
+                          <th className="px-2 py-1.5 text-center font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Chứng từ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedSupplierRows.map((row: any) => (
+                          <tr key={row.supplierId ?? row.id ?? Math.random()} className={moduleTableRow}>
+                            <td className="truncate px-2 py-1.5 text-slate-200" title={row.supplierName ?? 'Không rõ'}>
+                              {row.supplierName ?? 'Không rõ'}
+                            </td>
+                            <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-400" title={`${fmt(row.quantity)} ${unit}`.trim()}>
+                              {`${fmt(row.quantity)} ${unit}`.trim()}
+                            </td>
+                            <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={money(row.unitPrice ?? row.latestUnitPrice ?? averageCost)}>
+                              {money(row.unitPrice ?? row.latestUnitPrice ?? averageCost)}
+                            </td>
+                            <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-cyan-300" title={money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}>
+                              {money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}
+                            </td>
+                            <td className="px-2 py-1.5 text-center">
+                              <AttachmentCountChip
+                                attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                                onOpen={() => setAttachmentContext({
+                                  title: row.supplierName ?? 'Chứng từ nhà cung cấp',
+                                  subtitle: 'Chứng từ liên quan từ giao dịch nhập kho',
+                                  attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                                })}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                        {!pagedSupplierRows.length && (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-8 text-center">
+                              <ModuleEmptyState title="Chưa có dữ liệu" description="Chưa có nhà cung cấp cho vật tư này." />
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Phân trang */}
+                  {totalSupplierPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
+                      <span>
+                        Hiển thị {(supplierPage - 1) * supplierPageSize + 1}-
+                        {Math.min(supplierPage * supplierPageSize, supplierRows.length)}/{supplierRows.length} nhà cung cấp
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
+                          disabled={supplierPage <= 1}
+                          className={moduleMutedButton}
+                        >
+                          Trước
+                        </button>
+                        <span className="px-2 py-1 text-slate-300">{supplierPage}/{totalSupplierPages}</span>
+                        <button
+                          onClick={() => setSupplierPage((p) => Math.min(totalSupplierPages, p + 1))}
+                          disabled={supplierPage >= totalSupplierPages}
+                          className={moduleMutedButton}
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </ModuleAnalyticsPanel>
+              </div>
             </div>
           )}
           {activeTab === 'images' && (
@@ -942,17 +1221,78 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           )}
 
           {activeTab === 'logs' && (
-            <ModuleAnalyticsPanel title="Lịch sử thay đổi" note="Tổng hợp nhanh từ giao dịch nhập/xuất gần nhất">
-              <div className="space-y-2">
-                {transactionRows.slice(0, 10).map((row, index) => (
-                  <div key={`${row.transactionNo}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2 text-sm text-slate-300">
-                    <span className="min-w-0 truncate">{row.transactionNo ?? 'Giao dịch'} · {row.counterparty}</span>
-                    <span className="shrink-0 text-xs text-slate-500">{row.transactionDate ? formatDateTime(row.transactionDate) : '-'}</span>
+            <div className="space-y-1 mt-1">
+              <ModuleAnalyticsPanel title="Lịch sử thay đổi" note="Tổng hợp từ các giao dịch nhập/xuất gần nhất">
+                <div className="overflow-auto">
+                  <table className="w-full min-w-[700px] text-sm">
+                    <thead className="bg-white/[0.06] text-xs uppercase tracking-[0.08em] text-slate-400">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Thời gian</th>
+                        <th className="px-3 py-2 text-left">Loại</th>
+                        <th className="px-3 py-2 text-left">Mã giao dịch</th>
+                        <th className="px-3 py-2 text-left">Đối tượng</th>
+                        <th className="px-3 py-2 text-right">Số lượng</th>
+                        <th className="px-3 py-2 text-right">Giá trị</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedLogRows.map((row) => (
+                        <tr key={row.transactionNo ?? row.id ?? Math.random()} className="border-t border-white/10 hover:bg-white/[0.04]">
+                          <td className="px-3 py-2 text-slate-300">
+                            {row.transactionDate ? formatDateTime(row.transactionDate) : '-'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <TransactionTypeBadge type={row.type} isPositive={row.quantity >= 0} />
+                          </td>
+                          <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? '-'}</td>
+                          <td className="px-3 py-2 text-slate-200">{row.counterparty}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-white">
+                            {`${fmt(row.quantity)} ${unit}`.trim()}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-cyan-300">
+                            {money(row.totalAmount)}
+                          </td>
+                        </tr>
+                      ))}
+                      {!pagedLogRows.length && (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-8 text-center">
+                            <ModuleEmptyState title="Chưa có lịch sử thay đổi" description="Lịch sử sẽ xuất hiện khi vật tư có giao dịch." />
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Phân trang */}
+                {totalLogPages > 1 && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
+                    <span>
+                      Hiển thị {(logPage - 1) * logPageSize + 1}-
+                      {Math.min(logPage * logPageSize, transactionRows.length)}/{transactionRows.length} giao dịch
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                        disabled={logPage <= 1}
+                        className={moduleMutedButton}
+                      >
+                        Trước
+                      </button>
+                      <span className="px-2 py-1 text-slate-300">{logPage}/{totalLogPages}</span>
+                      <button
+                        onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
+                        disabled={logPage >= totalLogPages}
+                        className={moduleMutedButton}
+                      >
+                        Sau
+                      </button>
+                    </div>
                   </div>
-                ))}
-                {!transactionRows.length && <ModuleEmptyState title="Chưa có lịch sử thay đổi" description="Lịch sử sẽ xuất hiện khi vật tư có giao dịch." />}
-              </div>
-            </ModuleAnalyticsPanel>
+                )}
+              </ModuleAnalyticsPanel>
+            </div>
           )}
       </ModuleDetailDrawer>
       <AttachmentContextDrawer context={attachmentContext} onClose={() => setAttachmentContext(null)} />
@@ -976,11 +1316,24 @@ function InfoGrid({ rows }: { rows: Array<[string, string]> }) {
   )
 }
 
-function MetricLine({ label, value, tone = 'cyan' }: { label: string; value: string; tone?: ModuleTone }) {
+function MetricLine({
+  label,
+  value,
+  tone = 'cyan',
+  icon,
+}: {
+  label: string
+  value: string
+  tone?: ModuleTone
+  icon?: ReactNode
+}) {
   const color = tone === 'red' ? 'text-red-300' : tone === 'emerald' ? 'text-emerald-300' : tone === 'amber' ? 'text-amber-300' : tone === 'blue' ? 'text-blue-300' : tone === 'purple' ? 'text-purple-300' : 'text-cyan-300'
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
-      <span className="text-slate-400">{label}</span>
+      <span className="flex items-center gap-2 text-slate-400">
+        {icon ? <span className={color}>{icon}</span> : null}
+        {label}
+      </span>
       <b className={color}>{value}</b>
     </div>
   )
@@ -1209,11 +1562,42 @@ function MaterialAnalyticsCockpit({
         }
       />
       <ModuleAnalyticsPanel title="Tỷ lệ xuất / tồn bình quân" className="xl:col-span-2">
-        <div className="grid gap-1 md:grid-cols-4">
-          <MetricLine label="Xuất trung bình/ngày" value={`${fmt(forecast.outboundDaily)} ${unit}`.trim()} tone="amber" />
-          <MetricLine label="Số ngày bao phủ" value={`${fmt(forecast.daysOfCover, 1)} ngày`} tone={forecast.daysOfCover < 7 ? 'amber' : 'cyan'} />
-          <MetricLine label="Vòng quay" value={`${fmt(analytics.turnover, 2)} vòng`} tone="purple" />
-          <MetricLine label="Tồn bình quân" value={`${fmt(analytics.averageStock)} ${unit}`.trim()} tone="blue" />
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <MetricLine
+            label="Xuất trung bình/ngày"
+            value={`${fmt(forecast.outboundDaily)} ${unit}`.trim()}
+            tone="amber"
+            icon={<Truck size={14} />}
+          />
+          <MetricLine
+            label="Số ngày bao phủ"
+            value={`${fmt(forecast.daysOfCover, 1)} ngày`}
+            tone={forecast.daysOfCover < 7 ? 'red' : forecast.daysOfCover < 14 ? 'amber' : 'emerald'}
+            icon={<Clock size={14} />}
+          />
+          <MetricLine
+            label="Vòng quay"
+            value={`${fmt(analytics.turnover, 2)} vòng`}
+            tone={analytics.turnover > 2 ? 'emerald' : analytics.turnover > 1 ? 'amber' : 'red'}
+            icon={<RefreshCw size={14} />}
+          />
+          <MetricLine
+            label="Tồn bình quân"
+            value={`${fmt(analytics.averageStock)} ${unit}`.trim()}
+            tone="blue"
+            icon={<Package size={14} />}
+          />
+        </div>
+
+        {/* Dòng trạng thái tổng hợp */}
+        <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-400">
+          {forecast.daysOfCover < 7 ? (
+            <span className="text-red-300 font-semibold">⚠️ Cảnh báo: Tồn kho chỉ đủ dùng trong {fmt(forecast.daysOfCover, 1)} ngày, cần bổ sung.</span>
+          ) : forecast.daysOfCover < 14 ? (
+            <span className="text-amber-300 font-semibold">⚡ Lưu ý: Tồn kho đủ dùng trong {fmt(forecast.daysOfCover, 1)} ngày, nên lên kế hoạch nhập sớm.</span>
+          ) : (
+            <span className="text-emerald-300 font-semibold">✅ Tồn kho ổn định, đủ dùng trong {fmt(forecast.daysOfCover, 1)} ngày.</span>
+          )}
         </div>
       </ModuleAnalyticsPanel>
     </div>
@@ -1364,15 +1748,20 @@ function Donut({
         </div>
       </div>
       <div className={`${spaceY} overflow-hidden ${itemText}`}>
-        {chartRows.slice(0, 7).map((row) => (
-          <div key={row.label} className="flex justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
-              <i className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
-              <span className="truncate">{row.label}</span>
-            </span>
-            <b className="text-slate-100">{fmt(row.value)}</b>
-          </div>
-        ))}
+        {chartRows.slice(0, 7).map((row) => {
+          const percent = ((row.value / total) * 100).toFixed(1)
+          return (
+            <div key={row.label} className="flex justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
+                <i className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
+                <span className="truncate">{row.label}</span>
+              </span>
+              <b className="text-slate-100 whitespace-nowrap">
+                {fmt(row.value)} <span className="text-slate-500 font-normal">({percent}%)</span>
+              </b>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

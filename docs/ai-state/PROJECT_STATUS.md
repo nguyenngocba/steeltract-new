@@ -14,6 +14,10 @@ Dashboard        45%
 
 Percentages represent implemented operational foundations and visible workflows, not final polish.
 
+Date-time refresh fix on 2026-06-25 did not change module percentages. It standardized frontend `datetime-local` initialization/focus behavior for Inventory transaction modals, Component production material return, and Production MO creation so forms use the current local date/time rather than UTC-derived stale values. Frontend build passed.
+
+Database cleanup on 2026-06-24 did not change module implementation percentages. It backed up the current database to `backups/steeltrack_before_business_data_cleanup_20260624_092729.dump`, executed `scripts/sql/business-data-cleanup-20260624.sql`, and cleared business/runtime data for materials, components, projects, suppliers, vehicles, Inventory transactions/balances, Production BOM/MO/material activity, QC runtime, Yard placements/movements, attachments metadata, analytics/runtime logs, and notifications. Configuration/reference foundations remain in place: users, roles, permissions, categories, material types, units, warehouses, warehouse zones, yard layout, QC checklist templates, workflow definitions, work centers, and machines. Details are in `docs/ai-state/audits/business-data-cleanup-20260624.md`.
+
 Latest Inventory UI polish pass completed on 2026-06-03; follow-up dark cockpit cleanup removed remaining white/light surfaces and added stock-health donut analytics. Inventory Sprint B Warehouse Locations completed on 2026-06-05 with location CRUD, row/column/level/capacity fields, active/soft-delete lifecycle, location stock statistics, and current `warehouse_zones` audit. Operational percentage remains 100%.
 
 Dashboard increased to 45% on 2026-06-07 after replacing the placeholder overview with a real API-backed cockpit using Projects, Production, Components, Inventory, Yard, QC, Activity Logs, and Notifications data. System detail pages remain Settings 55% because mutation workflows for users, roles, settings, audit export, backup execution, and notification read-state are still Phase S2.

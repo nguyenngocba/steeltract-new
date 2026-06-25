@@ -1,5 +1,62 @@
 # SteelTrack Changelog
 
+## 2026-06-25 Transaction Date-Time Refresh
+
+Fixed:
+
+- Added shared frontend helper for local `datetime-local` values.
+- Inventory create forms now refresh date/time to the current local time when opened and when the date-time field is focused:
+  - inbound
+  - outbound
+  - transfer
+  - adjustment
+- Component production material return and Production MO date-time inputs now use the same local-time refresh behavior.
+- Fixed Material Detail `MetricLine` icon typing so frontend build succeeds.
+
+Verified:
+
+- Frontend build passed.
+
+## 2026-06-24 Business Data Cleanup
+
+Executed:
+
+- Created database backup:
+  - `backups/steeltrack_before_business_data_cleanup_20260624_092729.dump`
+- Added and executed cleanup script:
+  - `scripts/sql/business-data-cleanup-20260624.sql`
+- Added cleanup audit:
+  - `docs/ai-state/audits/business-data-cleanup-20260624.md`
+- Cleared business data for:
+  - materials
+  - components
+  - projects
+  - suppliers
+  - vehicles
+  - inventory transactions and balances
+  - production BOM/MO/material activity
+  - QC runtime records
+  - Yard placements/movements/snapshots
+  - attachments metadata
+  - notifications and runtime analytics/logs
+
+Preserved:
+
+- users, roles, permissions
+- categories, material types, units
+- warehouses and warehouse zones
+- Yard layout zones/rows/slots/cranes
+- QC checklist templates
+- workflow definitions/steps
+- work centers and machines
+
+Verified:
+
+- Cleared business/runtime tables now have 0 rows.
+- Preserved reference/configuration tables still contain data.
+- All 93 Yard slots are `AVAILABLE`.
+- No schema, API, or application code changes.
+
 ## 2026-06-23 Demo Dataset Seeder
 
 Implemented:

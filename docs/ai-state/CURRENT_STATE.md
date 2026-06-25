@@ -1,6 +1,28 @@
 # Current State
 
-This document summarizes the current operational state of SteelTrack as of 2026-06-13. Percentages and detailed task ordering remain tracked in `PROJECT_STATUS.md` and `NEXT_TASKS.md`.
+This document summarizes the current operational state of SteelTrack as of 2026-06-24. Percentages and detailed task ordering remain tracked in `PROJECT_STATUS.md` and `NEXT_TASKS.md`.
+
+## Runtime Dataset
+
+Status:
+
+- Business data was intentionally cleaned on 2026-06-24 so operators can recreate clean records manually.
+
+Current architecture:
+
+- The cleanup preserved system/configuration foundations: users, roles, permissions, inventory categories, material types, units, warehouses, warehouse zones, yard layout slots, QC checklist templates, workflow definitions, work centers, and machines.
+- The cleanup cleared business/runtime data: materials, components, projects, suppliers, vehicles, inventory transactions and balances, production BOMs/orders/material activity, QC inspections/results/issues/NCRs, Yard placements/movements/snapshots, attachments metadata, notifications, analytics snapshots, and runtime logs.
+- Backup before cleanup: `backups/steeltrack_before_business_data_cleanup_20260624_092729.dump`.
+- Executed cleanup script: `scripts/sql/business-data-cleanup-20260624.sql`.
+- Detailed audit: `docs/ai-state/audits/business-data-cleanup-20260624.md`.
+
+Known limitations:
+
+- Physical files under `/data/steeltrack-storage` were not deleted by SQL; attachment metadata in the database is now empty.
+
+Current focus:
+
+- Recreate clean master/business records manually from the preserved configuration foundation before validating workflows again.
 
 ## Inventory
 
@@ -42,6 +64,7 @@ Current architecture:
 - Sprint 19D/19E align Inventory Adjustments with the Inventory transaction workflow: sidebar route `/inventory/adjustments`, direct global action modal launch, shared `AdjustmentTransactionModal`, location-balance table, `WarehouseMiniMap`, location-specific System Qty, Actual Qty, auto Difference, Variance Value, reason presets, attachments, adjustment history grid, analytics, and row detail drawer.
 - Inventory Material Stock KPI sparklines use real monthly snapshots from Inventory audit rows, material `createdAt`, and Inventory transaction item movement history.
 - Operational code generation now follows `PREFIX-YYMMDD-00001`; Inventory transactions are backend-owned and write matching `code` / `transactionNo`; see `docs/ai-state/decisions/code-numbering-decisions.md`.
+- As of the 2026-06-24 business-data cleanup, Inventory material rows, transactions, and location balances are empty; categories, material types, units, warehouses, and warehouse zones are preserved.
 
 Known limitations:
 
