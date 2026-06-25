@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
 
+import { BadRequestException } from '@nestjs/common';
+
 type DbClient = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
@@ -311,6 +313,42 @@ export class InventoryRepository {
 
     if (data.quantity <= 0) {
       return null
+    }
+    if (data.quantity > 0 &&
+        data.zoneId &&
+        data.slotId &&
+        data.level) {
+      const occupied =
+        await db.inventoryLocationStock.findFirst({
+          where: {
+            warehouseId: data.warehouseId ?? null,
+            zoneId: data.zoneId ?? null,
+            slotId: data.slotId ?? null,
+            level: data.level ?? null,
+            quantity: {
+              gt: 0,
+            },
+            inventoryItemId: {
+              not: data.inventoryItemId,
+            },
+          },
+          include: {
+            inventoryItem: {
+              select: {
+                code: true,
+                name: true,
+              },
+            },
+          },
+        })
+
+      if (occupied) {
+        throw new BadRequestException(
+          `Vị trí ${data.slotId ?? ''}/${data.level ?? ''} đang chứa vật tư ${
+            occupied.inventoryItem?.code ?? ''
+          }`,
+        )
+      }
     }
 
     return db.inventoryLocationStock.create({

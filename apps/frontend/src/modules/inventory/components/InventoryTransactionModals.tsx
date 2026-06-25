@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
-
+import { useQueryClient } from '@tanstack/react-query'
 import { useCreateTransaction } from '../hooks/useCreateTransaction'
 import { useInventoryItems } from '../hooks/useInventoryItems'
 import { useMaterialDetail } from '../hooks/useMaterialDetail'
@@ -136,7 +136,39 @@ const fieldClass =
   'h-11 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-100 placeholder:text-slate-500'
 const textareaClass =
   'min-h-24 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500'
+async function refreshInventoryCache(
+  queryClient: any,
+) {
+  await queryClient.invalidateQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey.some(
+        (k) =>
+          typeof k === 'string' &&
+          (
+            k.includes('inventory') ||
+            k.includes('material') ||
+            k.includes('zone') ||
+            k.includes('warehouse')
+          ),
+      ),
+  })
 
+  await queryClient.refetchQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey.some(
+        (k) =>
+          typeof k === 'string' &&
+          (
+            k.includes('inventory') ||
+            k.includes('material') ||
+            k.includes('zone') ||
+            k.includes('warehouse')
+          ),
+      ),
+  })
+}
 function ModalShell({
   open,
   onClose,
@@ -188,7 +220,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const { data: zones = [] } = useZones()
   const mainZones = useMemo(() => zones.filter(isMainWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
-
+  const queryClient = useQueryClient()
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
     inventoryItemId: '',
@@ -294,6 +326,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    await refreshInventoryCache(queryClient)
     try {
       await uploadInventoryTransactionAttachments({
         transaction,
@@ -428,7 +461,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   const { data: zones = [] } = useZones()
   const productionZones = useMemo(() => zones.filter(isProductionWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
-
+  const queryClient = useQueryClient()
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
     target: 'PROJECT',
@@ -670,6 +703,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    await refreshInventoryCache(queryClient)
     try {
       await uploadInventoryTransactionAttachments({
         transaction,
@@ -892,6 +926,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const { data: zones = [] } = useZones()
   const realZones = useMemo(() => zones.filter((zone: any) => isRealStorageZone(zone) && isMainWarehouseZone(zone)), [zones])
   const createTx = useCreateTransaction()
+  const queryClient = useQueryClient()
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
     materialId: '',
@@ -1075,6 +1110,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    await refreshInventoryCache(queryClient)
     try {
       await uploadInventoryTransactionAttachments({
         transaction,
@@ -1252,6 +1288,7 @@ export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
   const { data: materials = [] } = useInventoryItems()
   const { data: zones = [] } = useZones()
   const createTx = useCreateTransaction()
+  const queryClient = useQueryClient()
   const [sessionNo, setSessionNo] = useState(generateTransactionNo('KK'))
   const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
   const [form, setForm] = useState({
@@ -1394,6 +1431,7 @@ export function AdjustmentTransactionModal({ open, onClose }: ModalProps) {
         },
       ],
     })
+    await refreshInventoryCache(queryClient)
 
     try {
       await uploadInventoryTransactionAttachments({
@@ -1581,6 +1619,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
   const { data: materials = [] } = useInventoryItems()
   const { data: zones = [] } = useZones()
   const createTx = useCreateTransaction()
+  const queryClient = useQueryClient()
   const [methodFilter, setMethodFilter] = useState('')
   const [sessionNo, setSessionNo] = useState(generateTransactionNo('KK'))
   const [countRows, setCountRows] = useState<CountLine[]>([])
@@ -1599,7 +1638,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
       }
     })
   }, [countRows, materials])
-
+  
   async function submitCount() {
     const items = countSheet
       .filter((x) => x.item && x.difference !== 0)
@@ -1615,6 +1654,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
       referenceType: methodFilter || 'Định kỳ',
       items,
     })
+    await refreshInventoryCache(queryClient)
     try {
       await uploadInventoryTransactionAttachments({
         transaction,

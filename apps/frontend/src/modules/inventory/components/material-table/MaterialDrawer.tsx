@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ImageIcon, Upload, X } from 'lucide-react'
-
+import { uploadAttachment } from '@/lib/attachments/attachments-api'
 import { useCreateMaterial } from '../../hooks/useCreateMaterial'
 import { useUpdateMaterial } from '../../hooks/useUpdateMaterial'
 import { useCategories } from '../../hooks/useCategories'
@@ -9,7 +9,7 @@ import { useUnits } from '../../hooks/useUnits'
 import { useMaterialTypes } from '../../hooks/useMaterialTypes'
 import { useZones } from '../../hooks/useZones'
 import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
-
+import { useQueryClient } from '@tanstack/react-query'
 type Props = {
   open: boolean
   material?: any | null
@@ -91,6 +91,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const [slotId, setSlotId] = useState('')
   const [level, setLevel] = useState('')
   const [imagePreview, setImagePreview] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageName, setImageName] = useState('')
   const [error, setError] = useState('')
   const { data: materialTypes = [] } = useMaterialTypes()
@@ -104,6 +105,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const selectedZoneEmptyCell = findEmptyCell(selectedZone, material?.id)
   const createMaterialMutation = useCreateMaterial()
   const updateMaterialMutation = useUpdateMaterial()
+  const queryClient = useQueryClient()
   const isEditMode = Boolean(material)
   useEffect(() => {
     setError('')
@@ -121,6 +123,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setLevel('')
       setImagePreview('')
       setImageName('')
+      setImageFile(null)
       return
     }
     setCode(material.code ?? '')
@@ -136,6 +139,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     setLevel(material.level ?? '')
     setImagePreview(material.imageUrl ?? material.photoUrl ?? material.thumbnailUrl ?? '')
     setImageName(material.imageUrl || material.photoUrl ? 'Ảnh hiện có' : '')
+    setImageFile(null)
   }, [material])
 
   useEffect(() => {
@@ -199,12 +203,47 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     }
 
     try {
-      if (isEditMode && material?.id) {
-        await updateMaterialMutation.mutateAsync({ id: material.id, payload })
-      } else {
-        await createMaterialMutation.mutateAsync(payload)
-      }
-      onClose()
+      let savedMaterial
+
+        if (isEditMode && material?.id) {
+          savedMaterial =
+            await updateMaterialMutation.mutateAsync({
+              id: material.id,
+              payload,
+            })
+        } else {
+          savedMaterial =
+            await createMaterialMutation.mutateAsync(
+              payload,
+            )
+            console.log(savedMaterial)
+        }
+
+        if (imageFile && savedMaterial?.id) {
+          await uploadAttachment({
+            module: 'inventory',
+            entityType: 'material',
+            entityId: savedMaterial.id,
+            file: imageFile,
+            category: 'PHOTO',
+          })
+          await queryClient.invalidateQueries({
+            queryKey: ['inventory-items'],
+          })
+
+          await queryClient.invalidateQueries({
+            queryKey: [
+              'attachments',
+              'inventory',
+              'material',
+              savedMaterial.id,
+            ],
+          })
+        }
+
+        setImageFile(null)
+        setImageName('')
+        onClose()
     } catch (err) {
       console.error(err)
       setError('Không thể lưu vật tư. Vui lòng kiểm tra lại dữ liệu.')
@@ -322,10 +361,14 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0]
-                  if (!file) return
-                  if (imagePreview.startsWith('blob:')) URL.revokeObjectURL(imagePreview)
-                  setImagePreview(URL.createObjectURL(file))
-                  setImageName(file.name)
+                    if (!file) return
+
+                    if (imagePreview.startsWith('blob:'))
+                      URL.revokeObjectURL(imagePreview)
+
+                    setImageFile(file)
+                    setImagePreview(URL.createObjectURL(file))
+                    setImageName(file.name)
                 }}
               />
             </label>
