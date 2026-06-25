@@ -43,7 +43,9 @@ Backlog after the locked order:
 9f. Review Sprint 19B Production Execution Board with shopfloor operators. The board currently uses available stage/status data with UI fallback mapping; follow-up should decide whether backend should expose canonical work-center stage queues and TV-mode preferences.
 9g. Sprint 19C MES Data Audit recommends Costing before deeper Shopfloor work. Shopfloor foundations exist, but immutable stage transition history, actual runtime/downtime, production-line queues, and labor/machine rate data are not canonical enough for the next major track.
 10. Review Sprint 20A Costing Engine with seeded and real cost data. Sprint 20A.5 now provides a runnable `DEMO20A5-*` demo dataset with 20/20 component costing and 20/20 full-readiness work orders; use it for dashboard/costing QA, then validate against real operator data.
-11. 20B Component Cost Analysis: expose component-level estimated/actual/variance analysis with drill-down by BOM material, consumed/scrap quantity, issue transaction cost source, and persisted ComponentCosting comparison.
+11. 20B Component Cost Analysis:
+    - (Done) 20B.1: Audit existing Component module UI patterns.
+    - 20B.2: Expose component-level estimated/actual/variance analysis UI with drill-down by BOM material, consumed/scrap quantity, issue transaction cost source, and persisted ComponentCosting comparison.
 12. 20C Project Cost Control: roll component costing and project inventory transaction values into project-level cost control, budget variance, project material budgets, and project cost summaries.
 13. Backfill or reconcile legacy Production Material Ledger gaps for issue rows that predate ledger automation or came from non-ledger issue paths.
 14. Add formal Yard outbound/shipment, project receiving, and installation certificate documents on top of the current `SHIPPED -> DELIVERED -> INSTALLED` component status workflow and text-based install mapping.
