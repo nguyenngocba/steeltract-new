@@ -1,5 +1,176 @@
 # SteelTrack AI Changelog
 
+## 2026-06-26 Sprint 20I.4F Inventory Materials Parity Audit & Visual Rhythm
+
+Completed:
+
+* **Parity Verification & Synchronization**:
+  * Audited the snapshot engine in `InventoryMaterialsPage.tsx` and synchronized it with the 12-month transaction-based rollback logic of `InventoryOverviewPage.tsx`.
+  * Updated `kpiTrend` inside `InventoryMaterialsPage.tsx` to compute 12 end-of-month snapshots instead of 6, ensuring the sparkline shapes are identical between both pages.
+  * Replicated the `dateAgeInfo` logic to apply a flat placeholder sparkline when historical data age is less than 365 days.
+  * Corrected the existence logic (`existed = firstTxDate && firstTxDate <= end`) and implemented main warehouse rollback filter logic for low stock/out of stock alerts to ensure absolute consistency.
+  * Confirmed snapshot values match (May 2026: ~7.711.783.211 đ value / ~10.767 tons weight; June 2026: 14.168.720.116 đ value / ~15.542.5 tons weight today) and that no more +100% bug is present.
+* **Visual Audit & Rhythm**:
+  * Verified that the first three dashboard cards (Phân bố tồn kho, Biến động tồn kho, Cảnh báo tồn kho) are correctly styled at `h-[170px]` using dynamic `p-3` padding.
+  * Confirmed that `CompactDonut` and `StockTrendChart` internals are preserved at original sizes using scroll containment viewports (`h-[82px] overflow-y-auto`) to avoid any vertical text clipping, SVG compression, or label overlapping.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+* Verified the backend compiles and builds successfully using `pnpm -C apps/backend-api build`.
+
+## 2026-06-26 Sprint 20I.4E (Part 2) Inventory Materials Snapshot Synchronization and Chart Height Reduction
+
+Completed:
+
+* **KPI Snapshot Engine Synchronization**:
+  * Built `firstTransactionDateMap` in `kpiTrend` using the minimum transaction date (`transactionDate` / `createdAt`) with a fallback to `row.createdAt` for every material.
+  * Replaced the record creation date checks with the Map-resolved minimum transaction dates inside the historical snapshots generator and monthly code-count filters.
+  * Corrected May 2026 snapshot values to match Inventory Overview (eliminating the forced +100% delta).
+* **Dashboard Chart Height Adjustment**:
+  * Parameterized `ChartCard`, `CompactDonut`, and `StockTrendChart` to support custom dimensions, font sizing, and row limits.
+  * Reduced the visual height of Cards 1 (Phân bố tồn kho), 2 (Biến động tồn kho), and 3 (Cảnh báo tồn kho) to `h-[170px]` (charts content set to `h-[74px]`), while preserving Cards 4 and 5 inside the alerts sidebar drawer at `h-[260px]`.
+  * Configured `CompactDonut` to render a smaller circle (`h-16 w-16`) and display up to 3 segments in a condensed two-column format.
+  * Configured `StockTrendChart` to render with a height of `h-[74px]`.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-26 Sprint 20I.4E Inventory Materials KPI cards visual/behavior parity
+
+Completed:
+
+* Aligned the first 5 KPI cards in the Inventory Materials tab to be visually and behaviorally identical to the Inventory Overview KPI cards:
+  * **Card Containers**: Configured `rounded-2xl`, `border-slate-800`, `bg-slate-950/60`, equal height `h-[108px]`, and `p-4` padding.
+  * **Typography**: Applied title class `text-[10px] uppercase tracking-[0.12em] text-slate-400`, value class `text-2xl font-semibold text-white mt-1`, and note class `text-[10px] font-semibold mt-1`.
+  * **Delta Formatting**: Formatted value metrics with Vietnamese locale decimal commas (e.g. `▲5.203,5 tấn (+48,3%)`) and count metrics (e.g. `▲3 mã`, `▼2 mã`).
+  * **Fallback Deltas**: Completely removed "+ mới so với tháng trước" / "Chưa có dữ liệu lịch sử" fallbacks.
+  * **Semantic Colors**: Standardized note text color class mapping and card tones to match the Overview page exactly (emerald, cyan, indigo, amber, red).
+* Spacing: Configured the metric cards grid container to use a gap spacing of `gap-1` to align with the Overview cockpit layout.
+* Cleaned up unused `formatPercentDelta` helper.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-26 Sprint 20I.4D Inventory Materials KPI-Style Values
+
+Completed:
+
+* Restructured the visual value rows and subtitles of all 5 Inventory Materials dashboard cards to conform to the KPI-style value presentation:
+  * **Phân bố tồn kho**: Renders value `15.970,5 tấn` and subtitle `6 kho hoạt động`.
+  * **Biến động tồn kho**: Renders value `15.970,5 tấn` and subtitle `▲5.203,5 tấn (+48,3%)`.
+  * **Cảnh báo tồn kho**: Renders value `12` and subtitle `▲2 với tháng trước` (dynamically compiled from alert difference).
+  * **Theo mức độ**: Renders value `3` and subtitle `3 mức`.
+  * **Top tồn thấp**: Renders value `6` and subtitle `Dưới định mức`.
+* Ensured value styling matches `text-2xl font-semibold text-white mt-1` and subtitle styling matches `text-[10px] text-slate-400 mt-1`.
+* Cleaned up redundant `className` prop from Card 1 `ChartCard` call.
+* Preserved calculations, datasets, chart components, responsive grid architecture, and card heights.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-26 Sprint 20I.4C Align Materials Dashboard Card Vertical Rhythm
+
+Completed:
+
+* Redesigned the header container of `ChartCard` to a fixed height of `h-[64px]` with `flex flex-col justify-start` visual classes.
+* Aligned all 5 Inventory Materials dashboard cards to begin their chart contents precisely below the same header height.
+* Styled the card header values and subtitles using the exact spacing rhythm of the Overview KPI cards:
+  * Main value: `mt-1 text-2xl font-semibold text-white leading-none`
+  * Subtitle: `mt-1 text-[10px] text-slate-400`
+* Updated subtitles for all 5 cards to use compact formats:
+  * Phân bố tồn kho: `${warehouseOptions.length} kho hoạt động` (e.g. `6 kho hoạt động`).
+  * Biến động tồn kho: `▲5.203,5 tấn (+48,3%)` (dynamically compiled from quantity delta calculations).
+  * Cảnh báo tồn kho: `▲2 với tháng trước` (dynamically compiled from alert difference calculations).
+  * Theo mức độ: `3 mức cảnh báo` (fixed string as requested).
+  * Top tồn thấp: `Dưới định mức`.
+* Preserved calculations, datasets, chart components, and grid layout.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-26 Sprint 20I.4A Restyle Inventory Materials Dashboard Cards
+
+Completed:
+
+* Restyled all 5 Inventory Materials dashboard cards to visually match the Inventory Overview KPI visual guidelines.
+* Set card containers to `rounded-2xl`, `border-slate-800`, `bg-slate-950/60`, and equal height of `h-[260px]` with premium shadow tokens.
+* Redesigned the card header typography:
+  * Title: `text-[10px] uppercase tracking-[0.12em] text-slate-400`
+  * Primary number: `text-2xl font-semibold text-white`
+  * Secondary note: `text-[10px] text-slate-400`
+* Styled and laid out headers for all 5 cards:
+  1. **Phân bố tồn kho**: Renders title "Phân bố tồn kho", primary number `${formatQuantity(kpis.totalQty, 1)} tấn`, and secondary note `Tổng tồn · ${warehouseOptions.length} kho`, reusing existing `CompactDonut`.
+  2. **Biến động tồn kho**: Renders title "Biến động tồn kho", primary number `${formatQuantity(kpis.totalQty, 1)} tấn`, and secondary note with dynamic quantity delta percentage `▲/▼ X tấn (+/- Y%)`, reusing existing `StockTrendChart`.
+  3. **Cảnh báo tồn kho**: Renders title "Cảnh báo tồn kho", primary number `${alerts.length} cảnh báo`, and secondary note with alert difference, improving typography and spacing of the alert list.
+  4. **Theo mức độ**: Wrapped the severity chart in `ChartCard` with title "Theo mức độ", primary number `${alerts.length} cảnh báo`, secondary note "Mức độ cảnh báo tồn", and improved typography.
+  5. **Top tồn thấp**: Wrapped the low stock chart in `ChartCard` with title "Top tồn thấp", primary number `${alerts.slice(0, 6).length} vật tư gần ngưỡng`, secondary note "Vật tư dưới mức tối thiểu", and displayed quantity beside material code in the chart labels (e.g. `VT-00001 (X tấn)`).
+* Restructured `AlertMiniChart` to remove internal cards/background borders and render clean progress bars directly within the unified `ChartCard` wrapper.
+* Preserved all calculations, monthly trend logics, datasets, responsive grid architecture, and filter layouts.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-25 Sprint 20I.3S Polish Overview Category KPI Typography
+
+Completed:
+
+* Refactored the `percent` helper in `kpiDeltas` calculation to display percentage changes inside parentheses instead of pipes, i.e. from `▲999 tấn | +94,8%` to `▲999 tấn (+94,8%)`.
+* Changed `OverviewMetricCard` parameter type for `value` from `string` to `React.ReactNode`.
+* Updated category cards (`Vật tư chính`, `Vật tư phụ`, `Vật tư tiêu hao`) to render the count as `text-white font-semibold` and the quantity as `text-slate-400 font-normal text-[14px]` inline (e.g. `6 (2.053 tấn)`).
+* Preserved the dark cockpit theme, responsive layout grid, sparkline trends, colors, delta calculations, snapshot rollback logic, and equal visual card heights (`h-[108px]`).
+
+Verification:
+
+* Verified the frontend and backend applications build successfully using `pnpm -C apps/frontend build` and `pnpm -C apps/backend-api build`.
+
+## 2026-06-25 Sprint 20I.3R Simplify Overview Category KPI Cards
+
+Completed:
+
+* Removed the `compositionText` prop and all composition subtitle rendering from the `OverviewMetricCard` component.
+* Updated the category cards (`Vật tư chính`, `Vật tư phụ`, `Vật tư tiêu hao`) to remove calculations and prop passes for category composition percentages.
+* Ensured all 8 KPI cards maintain equal visual height matching `h-[108px]`.
+* Preserved the dark cockpit theme, responsive layout grid, sparkline trends, KPI colors, delta calculations, and real 12-month historical stock snapshots.
+
+Verification:
+
+* Verified the frontend and backend applications build successfully using `pnpm -C apps/frontend build` and `pnpm -C apps/backend-api build`.
+
+## 2026-06-25 Sprint 20I.3Q Remove KPI Composition Progress Bars
+
+Completed:
+
+* Removed the thin composition progress bar, its wrapper, and percentage bar display elements from `OverviewMetricCard`.
+* Added `compositionText` prop to the `OverviewMetricCard` component to allow rendering small helper text (e.g. `"12,9% tổng tồn"`) without progress bars.
+* Configured the category KPI cards (`Vật tư chính`, `Vật tư phụ`, `Vật tư tiêu hao`) to calculate and display the exact composition percentage format `"X,X% tổng tồn"` using `formatQuantity(percentage, 1)`.
+* Preserved the dark cockpit cockpit layout, responsive grid, sparkline trends, metric colors, and delta calculations.
+
+Verification:
+
+* Verified the frontend and backend applications build successfully using `pnpm -C apps/frontend build` and `pnpm -C apps/backend-api build`.
+
+## 2026-06-25 Sprint 20I.3P Enhanced Overview KPI Cards
+
+Completed:
+
+* Enhanced OverviewMetricCard component to support rendering a thin, color-matched composition progress bar.
+* Calculated and rendered compact composition progress percentages on the category KPI cards (primaryQty/totalQty, secondaryQty/totalQty, consumableQty/totalQty).
+* Refactored KPI delta line presentation:
+  * Percentage-based metrics (totalValue, totalQty, primaryQty, secondaryQty, consumableQty) now display absolute diff and percentage change (e.g. `▲5.203,5 tấn | +48,3%`).
+  * Count-based metrics (totalItems, lowStockCount, outOfStockCount) now display absolute counts change only (e.g. `▲3 mã`, `▼2 mã`).
+* Kept category value formats aligned to `X (Y tấn)` (e.g. `6 (2.053 tấn)`).
+* Preserved the dark cockpit styling, responsive layout grid, and real 12-month historical snapshots.
+
+Verification:
+
+* Verified the frontend application compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-25 Sprint 20I.3N Historical Material Existence Fix
 
 Completed:

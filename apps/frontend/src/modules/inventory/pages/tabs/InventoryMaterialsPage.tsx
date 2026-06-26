@@ -104,15 +104,6 @@ function monthEnd(date: Date, now = new Date()) {
   return end > now ? now : end
 }
 
-function formatPercentDelta(current: number, previous: number) {
-  if (!previous) {
-    if (!current) return '+ 0% so với tháng trước'
-    return '+ mới so với tháng trước'
-  }
-  const value = ((current - previous) / Math.abs(previous)) * 100
-  return `${value >= 0 ? '+' : ''} ${value.toFixed(1)}% so với tháng trước`
-}
-
 function locationLabel(location: any) {
   const zoneName = String(location?.zoneName ?? '').trim()
   if (zoneName) return zoneName
@@ -186,43 +177,55 @@ function LabeledFilter({ label, children }: { label: string; children: ReactNode
 
 function ChartCard({
   title,
-  note,
+  value,
+  delta,
+  deltaColorClass = 'text-slate-400',
   action,
   page,
   pageCount,
   onPrev,
   onNext,
   children,
+  className = 'h-[260px]',
+  chartHeightClass = 'h-[150px]',
 }: {
   title: string
-  note?: string
+  value?: string
+  delta?: string
+  deltaColorClass?: string
   action?: ReactNode
   page?: number
   pageCount?: number
   onPrev?: () => void
   onNext?: () => void
   children: ReactNode
+  className?: string
+  chartHeightClass?: string
 }) {
   const hasPages = Boolean(page && pageCount && pageCount > 1)
+  const isShorter = className.includes('h-[170px]')
   return (
-    <section className="h-[202px] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_18px_56px_rgba(0,0,0,0.22)] ring-1 ring-white/[0.025] backdrop-blur-2xl">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</h3>
-          {note ? <p className="mt-0.5 text-[11px] text-slate-500">{note}</p> : null}
+    <section className={`overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] text-left flex flex-col justify-between ${isShorter ? 'p-3' : 'p-4'} ${className}`}>
+      <div className="flex items-start justify-between gap-3 shrink-0">
+        <div className="h-[64px] flex flex-col justify-start min-w-0 flex-1">
+          <h3 className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</h3>
+          {value !== undefined && <div className="mt-1 truncate text-2xl font-semibold text-white leading-none">{value}</div>}
+          {delta !== undefined && <div className={`mt-1 truncate text-[10px] ${deltaColorClass}`}>{delta}</div>}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {action}
-          {hasPages ? (
-            <div className="flex items-center gap-1 text-[11px] text-slate-500">
-              <button onClick={onPrev} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-300 hover:bg-white/10">‹</button>
-              <span>{page}/{pageCount}</span>
-              <button onClick={onNext} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-300 hover:bg-white/10">›</button>
-            </div>
-          ) : null}
-        </div>
+        {action || hasPages ? (
+          <div className="flex shrink-0 items-center gap-2 mt-1">
+            {action}
+            {hasPages ? (
+              <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono">
+                <button type="button" onClick={onPrev} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-300 hover:bg-white/10 transition">‹</button>
+                <span>{page}/{pageCount}</span>
+                <button type="button" onClick={onNext} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-300 hover:bg-white/10 transition">›</button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      <div className="h-[154px] overflow-hidden">{children}</div>
+      <div className={`overflow-hidden shrink-0 ${chartHeightClass}`}>{children}</div>
     </section>
   )
 }
@@ -231,6 +234,7 @@ function InventoryMetricCard({
   title,
   value,
   note,
+  noteClassName,
   tone = 'blue',
   icon,
   trend,
@@ -238,9 +242,10 @@ function InventoryMetricCard({
   onClick,
 }: {
   title: string
-  value: string
+  value: ReactNode
   note?: string
-  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red'
+  noteClassName?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
   icon: ReactNode
   trend: number[]
   active?: boolean
@@ -252,15 +257,19 @@ function InventoryMetricCard({
     cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
     amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
     red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
+    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
+    indigo: { text: 'text-indigo-300', bg: 'bg-indigo-500/10', line: '#6366f1', fill: 'rgba(99,102,241,0.22)', note: 'text-emerald-400' },
+    violet: { text: 'text-violet-300', bg: 'bg-violet-500/10', line: '#8b5cf6', fill: 'rgba(139,92,246,0.22)', note: 'text-emerald-400' },
+    orange: { text: 'text-orange-300', bg: 'bg-orange-500/10', line: '#f97316', fill: 'rgba(249,115,22,0.22)', note: 'text-red-400' },
   }
-  const item = color[tone]
+  const item = color[tone] || color.blue
   const content = (
     <>
       <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[10px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
+          <div className="mt-1 truncate text-2xl font-semibold text-white leading-none">{value}</div>
+          {note ? <div className={`mt-1 truncate text-[10px] font-semibold ${noteClassName ?? item.note}`}>{note}</div> : null}
         </div>
         <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
           {icon}
@@ -270,9 +279,9 @@ function InventoryMetricCard({
     </>
   )
 
-  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
-    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
-  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
+  const className = `relative h-[108px] overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-cyan-400/[0.055] text-left p-4 transition ${
+  active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
+} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`;
 
   if (onClick) {
     return <button type="button" onClick={onClick} className={className}>{content}</button>
@@ -299,6 +308,7 @@ function KpiSparkline({ values, line, fill }: { values: number[]; line: string; 
     </svg>
   )
 }
+
 
 function CompactDonut({ segments, centerValue, centerLabel }: { segments: Array<{ label: string; value: number; color: string }>; centerValue: string; centerLabel: string }) {
   const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
@@ -550,23 +560,70 @@ export function InventoryMaterialsPage() {
   const kpiTrend = useMemo(() => {
     const txRows = transactionRows(transactions)
     const now = new Date()
-    const months = Array.from({ length: 6 }).map((_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
-      return {
-        key: monthKey(date),
-        end: monthEnd(date, now),
+
+    // Compute oldest data age in days
+    const dates: Date[] = []
+    txRows.forEach((tx: any) => {
+      const raw = tx.transactionDate ?? tx.createdAt
+      const d = raw ? new Date(raw) : null
+      if (d && !isNaN(d.getTime())) {
+        dates.push(d)
       }
     })
+    filteredRows.forEach((row: any) => {
+      const d = row.createdAt ? new Date(row.createdAt) : null
+      if (d && !isNaN(d.getTime())) {
+        dates.push(d)
+      }
+    })
+    const oldest = dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : new Date()
+    const ageInDays = (now.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24)
+
+    // 12 snapshot dates (match InventoryOverviewPage exactly)
+    const snapshotDates = Array.from({ length: 12 }).map((_, index) => {
+      const monthsBack = 11 - index
+      const date = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0, 23, 59, 59, 999)
+      return date > now ? now : date
+    })
+
     const selectedIds = new Set(filteredRows.map((row: any) => String(row.materialId ?? row.inventoryItemId ?? row.id)))
     const movements = txRows.flatMap((tx: any) => {
       const txDate = new Date(tx.transactionDate ?? tx.createdAt ?? 0)
-      return transactionItemRows(tx)
-        .filter((line: any) => selectedIds.has(line.inventoryItemId))
+      const items = Array.isArray(tx.items) ? tx.items : []
+      return items
         .map((line: any) => ({
-          ...line,
+          inventoryItemId: String(line.inventoryItemId ?? line.inventoryItem?.id ?? ''),
+          quantity: num(line.quantity),
           transactionDate: txDate,
+          rawLine: line,
         }))
+        .filter((line: any) => line.inventoryItemId && selectedIds.has(line.inventoryItemId))
     })
+
+    // PART 1: Build firstTransactionDateMap
+    const firstTransactionDateMap = new Map<string, Date>()
+    filteredRows.forEach((row: any) => {
+      const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
+      const itemTxRows = movements.filter((m: any) => m.inventoryItemId === itemId)
+      if (itemTxRows.length > 0) {
+        const minTxDate = new Date(Math.min(...itemTxRows.map((m: any) => m.transactionDate.getTime())))
+        firstTransactionDateMap.set(itemId, minTxDate)
+      } else {
+        const createdAt = row.createdAt ? new Date(row.createdAt) : null
+        if (createdAt && !isNaN(createdAt.getTime())) {
+          firstTransactionDateMap.set(itemId, createdAt)
+        }
+      }
+    })
+
+    const isMainWarehouseLine = (line: any) => {
+      const warehouse = line?.warehouse ?? line?.zone?.warehouse
+      if (!warehouse) return true
+      const code = String(warehouse.code ?? '').trim().toUpperCase()
+      const name = String(warehouse.name ?? '').trim().toLowerCase()
+      return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+    }
+
     const stockAt = (row: any, endDate: Date) => {
       const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
       const afterEnd = movements
@@ -574,7 +631,17 @@ export function InventoryMaterialsPage() {
         .reduce((sum: number, line: any) => sum + num(line.quantity), 0)
       return totalWarehouseStock(row) - afterEnd
     }
-    const snapshots = months.map(({ end }) => {
+
+    const mainStockAt = (row: any, endDate: Date) => {
+      const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
+      const afterEnd = movements
+        .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > endDate && isMainWarehouseLine(line.rawLine))
+        .reduce((sum: number, line: any) => sum + num(line.quantity), 0)
+      return mainWarehouseStock(row) - afterEnd
+    }
+
+    // PART 2 & PART 3: Replace material existence logic and rebuild snapshots
+    const snapshots = snapshotDates.map((end) => {
       let quantity = 0
       let value = 0
       let codes = 0
@@ -582,18 +649,20 @@ export function InventoryMaterialsPage() {
       let out = 0
 
       filteredRows.forEach((row: any) => {
-        const createdAt = row.createdAt ? new Date(row.createdAt) : null
-        const existed = !createdAt || createdAt <= end
+        const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
+        const firstTxDate = firstTransactionDateMap.get(itemId)
+        const existed = firstTxDate && firstTxDate <= end
         if (!existed) return
 
         codes += 1
         const stock = stockAt(row, end)
+        const mainStock = mainStockAt(row, end)
         const averageCost = num(row.averageCost)
         const minimumStock = num(row.minimumStock || 5)
         quantity += stock
         value += stock * averageCost
-        if (stock <= 0) out += 1
-        else if (stock <= minimumStock || stock <= 5) low += 1
+        if (mainStock <= 0) out += 1
+        else if (minimumStock > 0 && mainStock <= minimumStock) low += 1
       })
 
       return {
@@ -605,33 +674,128 @@ export function InventoryMaterialsPage() {
       }
     })
 
-    return {
+    const realTrend = {
       value: snapshots.map((row) => row.value),
       quantity: snapshots.map((row) => row.quantity),
       codes: snapshots.map((row) => row.codes),
       low: snapshots.map((row) => row.low),
       out: snapshots.map((row) => row.out),
+    }
+
+    const flat = (val: number) => Array.from({ length: 12 }, () => val)
+    const trend = ageInDays >= 365 ? realTrend : {
+      value: flat(kpis.totalValue),
+      quantity: flat(kpis.totalQty),
+      codes: flat(kpis.totalCodes),
+      low: flat(kpis.low),
+      out: flat(kpis.out),
+    }
+
+    // PART 4: Replace code-count month calculations using firstTransactionDateMap
+    return {
+      value: trend.value,
+      quantity: trend.quantity,
+      codes: trend.codes,
+      low: trend.low,
+      out: trend.out,
       newCodesThisMonth: filteredRows.filter((row: any) => {
-        if (!row.createdAt) return false
-        return monthKey(new Date(row.createdAt)) === monthKey(now)
+        const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
+        const firstTxDate = firstTransactionDateMap.get(itemId)
+        if (!firstTxDate) return false
+        return monthKey(firstTxDate) === monthKey(now)
       }).length,
       newCodesPreviousMonth: filteredRows.filter((row: any) => {
-        if (!row.createdAt) return false
+        const itemId = String(row.materialId ?? row.inventoryItemId ?? row.id)
+        const firstTxDate = firstTransactionDateMap.get(itemId)
+        if (!firstTxDate) return false
         const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-        return monthKey(new Date(row.createdAt)) === monthKey(previousMonth)
+        return monthKey(firstTxDate) === monthKey(previousMonth)
       }).length,
     }
-  }, [transactions, filteredRows])
+  }, [transactions, filteredRows, kpis])
 
   const kpiDeltas = useMemo(() => {
-    const delta = (values: number[]) => formatPercentDelta(values.at(-1) ?? 0, values.at(-2) ?? 0)
-    const newCodeDelta = formatPercentDelta(kpiTrend.newCodesThisMonth, kpiTrend.newCodesPreviousMonth)
+    const percent = (curr: number, prev: number, suffix: string) => {
+      const diff = curr - prev
+      const absDiff = Math.abs(diff)
+      const formattedDiff = suffix === 'đ' ? formatCurrencyVnd(absDiff) : `${formatQuantity(absDiff, 1)} ${suffix}`
+      const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
+      const arrowPrefix = arrow ? `${arrow}${formattedDiff}` : `0 ${suffix}`
+      
+      if (!prev) {
+        if (!curr) return `0 ${suffix} (0%)`
+        return `▲${formattedDiff} (+100%)`
+      }
+      const delta = (diff / Math.abs(prev)) * 100
+      if (delta === 0) return `0 ${suffix} (0%)`
+      const sign = delta > 0 ? '+' : '-'
+      const formattedDelta = (delta % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(1)).replace('.', ',')
+      return `${arrowPrefix} (${sign}${formattedDelta}%)`
+    }
+
+    const count = (curr: number, prev: number, suffix = 'mã') => {
+      const diff = curr - prev
+      if (diff === 0) return `0 ${suffix}`
+      const arrow = diff > 0 ? '▲' : '▼'
+      return `${arrow}${Math.abs(diff)} ${suffix}`
+    }
+
     return {
-      value: delta(kpiTrend.value),
-      quantity: delta(kpiTrend.quantity),
-      codes: `+ ${formatQuantity(kpiTrend.newCodesThisMonth, 0)} mã mới · ${newCodeDelta}`,
-      low: delta(kpiTrend.low),
-      out: delta(kpiTrend.out),
+      value: percent(kpiTrend.value.at(-1) ?? 0, kpiTrend.value.at(-2) ?? 0, 'đ'),
+      quantity: percent(kpiTrend.quantity.at(-1) ?? 0, kpiTrend.quantity.at(-2) ?? 0, 'tấn'),
+      codes: count(kpiTrend.codes.at(-1) ?? 0, kpiTrend.codes.at(-2) ?? 0, 'mã'),
+      low: count(kpiTrend.low.at(-1) ?? 0, kpiTrend.low.at(-2) ?? 0, 'mã'),
+      out: count(kpiTrend.out.at(-1) ?? 0, kpiTrend.out.at(-2) ?? 0, 'mã'),
+    }
+  }, [kpiTrend])
+
+  const kpiNoteColors = useMemo(() => {
+    const getNoteColorClass = (curr: number, prev: number, isAlertMetric: boolean) => {
+      const diff = curr - prev
+      if (diff === 0) return 'text-slate-400'
+      if (isAlertMetric) {
+        return diff < 0 ? 'text-emerald-400' : 'text-red-400'
+      } else {
+        return diff > 0 ? 'text-emerald-400' : 'text-red-400'
+      }
+    }
+    return {
+      value: getNoteColorClass(kpiTrend.value.at(-1) ?? 0, kpiTrend.value.at(-2) ?? 0, false),
+      quantity: getNoteColorClass(kpiTrend.quantity.at(-1) ?? 0, kpiTrend.quantity.at(-2) ?? 0, false),
+      codes: getNoteColorClass(kpiTrend.codes.at(-1) ?? 0, kpiTrend.codes.at(-2) ?? 0, false),
+      low: getNoteColorClass(kpiTrend.low.at(-1) ?? 0, kpiTrend.low.at(-2) ?? 0, true),
+      out: getNoteColorClass(kpiTrend.out.at(-1) ?? 0, kpiTrend.out.at(-2) ?? 0, true),
+    }
+  }, [kpiTrend])
+
+  const quantityDelta = useMemo(() => {
+    const curr = kpiTrend.quantity.at(-1) ?? 0
+    const prev = kpiTrend.quantity.at(-2) ?? 0
+    const diff = curr - prev
+    const absDiff = Math.abs(diff)
+    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
+    if (!prev) {
+      if (!curr) return { text: '0 tấn (0%)', color: 'text-slate-400' }
+      return { text: `▲${formatQuantity(absDiff, 1)} tấn (+100%)`, color: 'text-emerald-400' }
+    }
+    const percent = (diff / Math.abs(prev)) * 100
+    const sign = percent >= 0 ? '+' : '-'
+    return {
+      text: `${arrow}${formatQuantity(absDiff, 1)} tấn (${sign}${Math.abs(percent).toFixed(1)}%)`,
+      color: diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-400',
+    }
+  }, [kpiTrend])
+
+  const alertsDiff = useMemo(() => {
+    const curr = (kpiTrend.low.at(-1) ?? 0) + (kpiTrend.out.at(-1) ?? 0)
+    const prev = (kpiTrend.low.at(-2) ?? 0) + (kpiTrend.out.at(-2) ?? 0)
+    const diff = curr - prev
+    const absDiff = Math.abs(diff)
+    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
+    const text = arrow ? `${arrow}${absDiff} với tháng trước` : `Không thay đổi`
+    return {
+      text,
+      color: diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-slate-400',
     }
   }, [kpiTrend])
 
@@ -693,12 +857,13 @@ export function InventoryMaterialsPage() {
       <InventoryTabWorkspace />
 
       <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 gap-1.5 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <InventoryMetricCard
             title="Tổng giá trị tồn kho"
             value={money(kpis.totalValue)}
             note={kpiDeltas.value}
-            tone="blue"
+            noteClassName={kpiNoteColors.value}
+            tone="emerald"
             icon={<CircleDollarSign size={15} />}
             trend={kpiTrend.value}
           />
@@ -706,6 +871,7 @@ export function InventoryMaterialsPage() {
             title="Tổng khối lượng"
             value={`${formatQuantity(kpis.totalQty, 0)} tấn`}
             note={kpiDeltas.quantity}
+            noteClassName={kpiNoteColors.quantity}
             tone="cyan"
             icon={<RefreshCw size={15} />}
             trend={kpiTrend.quantity}
@@ -714,16 +880,18 @@ export function InventoryMaterialsPage() {
             title="Mã vật tư"
             value={formatQuantity(kpis.totalCodes, 0)}
             note={kpiDeltas.codes}
-            tone="emerald"
+            noteClassName={kpiNoteColors.codes}
+            tone="indigo"
             icon={<PackageCheck size={15} />}
             trend={kpiTrend.codes}
             active={!statusFilter}
             onClick={() => { setStatusFilter(''); setPage(1) }}
           />
           <InventoryMetricCard
-            title="Vật tư sắp hết hàng"
+            title="Sắp hết hàng"
             value={formatQuantity(kpis.low, 0)}
             note={kpiDeltas.low}
+            noteClassName={kpiNoteColors.low}
             tone="amber"
             icon={<TriangleAlert size={15} />}
             trend={kpiTrend.low}
@@ -731,9 +899,10 @@ export function InventoryMaterialsPage() {
             onClick={() => { setStatusFilter('LOW'); setPage(1) }}
           />
           <InventoryMetricCard
-            title="Vật tư hết hàng"
+            title="Hết hàng"
             value={formatQuantity(kpis.out, 0)}
             note={kpiDeltas.out}
+            noteClassName={kpiNoteColors.out}
             tone="red"
             icon={<ShieldX size={15} />}
             trend={kpiTrend.out}
@@ -823,9 +992,8 @@ export function InventoryMaterialsPage() {
                   </button>
                 </div>
               </InventoryPanel>
-
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-                    <InventoryPanel className="xl:col-span-9 p-0 pb-0">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-1 items-start">
+                    <InventoryPanel className="xl:col-span-9">
                       <div className="mb-1 flex items-center justify-between">
                         <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách tồn kho</h3>
                         <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
@@ -891,42 +1059,78 @@ export function InventoryMaterialsPage() {
                       <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
                     </InventoryPanel>
 
-                    <div className="space-y-1 xl:col-span-3">
-                      <ChartCard title="Phân bố tồn kho theo kho" note="Đơn vị: tấn" page={pagedZoneDistribution.page} pageCount={pagedZoneDistribution.pageCount} onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))} onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}>
-                        <CompactDonut
-                          segments={pagedZoneSegments}
-                          centerValue={formatQuantity(kpis.totalQty, 0)}
-                          centerLabel="tấn"
-                        />
-                      </ChartCard>
+                   <div className="space-y-1 xl:col-span-3">
+                    <ChartCard
+                      title="Phân bố tồn kho"
+                      value={`${formatQuantity(kpis.totalQty, 1)} tấn`}
+                      delta={`${warehouseOptions.length} kho hoạt động`}
+                      page={pagedZoneDistribution.page}
+                      pageCount={pagedZoneDistribution.pageCount}
+                      onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))}
+                      onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}
+                      className="h-[220px]"
+                      chartHeightClass="h-[120px] overflow-y-auto scrollbar-none"
+                    >
+                      <CompactDonut
+                        segments={pagedZoneSegments}
+                        centerValue={formatQuantity(kpis.totalQty, 0)}
+                        centerLabel="tấn"
+                      />
+                    </ChartCard>
 
-                      <ChartCard title="Biến động tồn kho" note="Giá trị: tỷ đồng">
+                      <ChartCard
+                        title="Biến động tồn kho"
+                        value={`${formatQuantity(kpis.totalQty, 1)} tấn`}
+                        delta={quantityDelta.text}
+                        deltaColorClass={quantityDelta.color}
+                        className="h-[178px]"
+                        chartHeightClass="h-[82px] overflow-y-auto scrollbar-none"
+                      >
                         <StockTrendChart rows={monthlyTrend} />
                       </ChartCard>
 
-                      <ChartCard title="Cảnh báo tồn kho" action={<button onClick={() => setShowAllAlerts(true)} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>} page={pagedAlerts.page} pageCount={pagedAlerts.pageCount} onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))} onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}>
-                        <div className="h-[154px] space-y-1.5 overflow-hidden text-xs">
+                      <ChartCard
+                        title="Cảnh báo tồn kho"
+                        value={`${alerts.length} cảnh báo`}
+                        delta={alertsDiff.text}
+                        deltaColorClass={alertsDiff.color}
+                        action={<button onClick={() => setShowAllAlerts(true)} className="text-[10px] text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>}
+                        page={pagedAlerts.page}
+                        pageCount={pagedAlerts.pageCount}
+                        onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))}
+                        onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}
+                        className="h-[200px]"
+                        chartHeightClass="h-[82px] overflow-y-auto scrollbar-thin"
+                      >
+                        <div className="space-y-1 text-[11px]">
                           {pagedAlerts.rows.map((row: any) => (
-                            <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
-                              <span className={row.level === 'Hết hàng' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
-                              <span className="text-slate-400">Kho chính: {formatQuantity(row.stock, 3)}</span>
-                              <span className={`rounded px-2 py-0.5 ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
+                            <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-xl border border-white/10 bg-[#08111f]/90 px-2.5 py-1.5 transition hover:bg-slate-900/40">
+                              <span className={row.level === 'Hết hàng' ? 'truncate font-medium text-red-300' : 'truncate font-medium text-amber-300'}>{row.materialName ?? row.materialCode}</span>
+                              <span className="text-slate-400 font-mono text-[10px]">Kho chính: {formatQuantity(row.stock, 1)} t</span>
+                              <span className={`rounded px-1.5 py-0.5 font-semibold text-[9px] ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
                             </div>
                           ))}
-                          {alerts.length === 0 && <div className="rounded border border-white/10 bg-white/[0.04] px-3 py-4 text-center text-slate-500">Không có cảnh báo tồn kho.</div>}
+                          {alerts.length === 0 && <div className="rounded-xl border border-white/10 bg-[#08111f]/90 px-3 py-4 text-center text-slate-500 text-xs">Không có cảnh báo tồn kho.</div>}
                         </div>
                       </ChartCard>
                     </div>
                   </div>
 
-                <section className="rounded-2xl border border-white/10 bg-slate-950/45 p-3 shadow-[0_16px_52px_rgba(0,0,0,0.2)]">
-                  <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-white">Thống kê nhanh</h3>
-                  <div className="grid grid-cols-1 divide-y divide-white/10 md:grid-cols-5 md:divide-x md:divide-y-0">
-                    {quickStats.map((item) => (
-                      <div key={item.title} className="px-3 py-1.5 first:pl-0 last:pr-0">
-                        <div className="text-xs text-slate-400">{item.title}</div>
-                        <div className={`mt-0.5 text-base font-semibold ${item.tone}`}>{item.value}</div>
-                        <div className="text-xs text-slate-500">{item.note}</div>
+                <section className="rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] p-3">
+                  <h3 className="mb-0.15 text-[12px] font-bold uppercase tracking-[0.14em] text-white">Thống kê nhanh</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-5 divide-y sm:divide-y-0 divide-white/10">
+                    {quickStats.map((item, idx) => (
+                      <div
+                        key={item.title}
+                        className={`flex items-center justify-between px-3 py-1.5 ${
+                          idx < quickStats.length - 1 ? 'sm:border-r border-white/10' : ''
+                        }`}
+                      >
+                        <span className="text-xs text-slate-400">{item.title}</span>
+                        <div className="text-right">
+                          <div className={`text-sm font-bold ${item.tone}`}>{item.value}</div>
+                          <div className="text-[10px] text-slate-500">{item.note}</div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1059,11 +1263,27 @@ export function InventoryMaterialsPage() {
                 </table>
               </div>
               <div className="space-y-3">
-                <AlertMiniChart title="Theo mức độ" rows={[
-                  ['Sắp hết', alerts.filter((row: any) => row.level === 'Sắp hết').length],
-                  ['Hết hàng', alerts.filter((row: any) => row.level === 'Hết hàng').length],
-                ]} />
-                <AlertMiniChart title="Top tồn thấp" rows={alerts.slice(0, 6).map((row: any) => [row.materialCode, row.stock])} />
+                <ChartCard
+                  title="Theo mức độ"
+                  value={`${alerts.length} cảnh báo`}
+                  delta="3 mức cảnh báo"
+                >
+                  <AlertMiniChart rows={[
+                    ['Sắp hết', alerts.filter((row: any) => row.level === 'Sắp hết').length],
+                    ['Hết hàng', alerts.filter((row: any) => row.level === 'Hết hàng').length],
+                  ]} />
+                </ChartCard>
+
+                <ChartCard
+                  title="Top tồn thấp"
+                  value={`${alerts.slice(0, 6).length} vật tư gần ngưỡng`}
+                  delta="Dưới định mức"
+                >
+                  <AlertMiniChart rows={alerts.slice(0, 6).map((row: any) => [
+                    `${row.materialCode} (${formatQuantity(row.stock, 1)} tấn)`,
+                    row.stock
+                  ])} />
+                </ChartCard>
               </div>
             </div>
           </div>
@@ -1093,8 +1313,8 @@ function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number 
   }).join(' ')
 
   return (
-    <div className="h-[154px]">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[118px] w-full overflow-visible">
+    <div className="h-[140px] flex flex-col justify-between">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[105px] w-full overflow-visible">
         <defs>
           <linearGradient id="stockTrendFill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#1d7cff" stopOpacity="0.32" />
@@ -1116,24 +1336,29 @@ function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number 
   )
 }
 
-function AlertMiniChart({ title, rows }: { title: string; rows: Array<[string, number]> }) {
+function AlertMiniChart({ rows, colors }: { rows: Array<[string, number]>; colors?: string[] }) {
   const max = Math.max(1, ...rows.map(([, value]) => value))
+  const defaultColors = ['from-amber-500 to-orange-400', 'from-red-500 to-pink-500', 'from-cyan-500 to-blue-400', 'from-emerald-500 to-teal-400']
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-      <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</h4>
-      <div className="mt-3 space-y-2">
-        {rows.map(([label, value]) => (
-          <div key={label}>
+    <div className="space-y-3 py-1">
+      {rows.map(([label, value], index) => {
+        const percent = max > 0 ? (value / max) * 100 : 0
+        const barColor = colors ? colors[index % colors.length] : defaultColors[index % defaultColors.length]
+        return (
+          <div key={label} className="group">
             <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-              <span className="truncate text-slate-300">{label}</span>
-              <span className="text-cyan-300">{formatQuantity(value, 0)}</span>
+              <span className="truncate text-slate-300 font-medium group-hover:text-white transition text-[11px]">{label}</span>
+              <span className="text-cyan-300 font-mono font-semibold text-[11px]">{formatQuantity(value, 0)}</span>
             </div>
-            <div className="h-2 rounded-full bg-slate-900">
-              <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-red-400" style={{ width: `${Math.max(5, (value / max) * 100)}%` }} />
+            <div className="h-2 w-full rounded-full bg-slate-900 ring-1 ring-white/[0.05]">
+              <div
+                className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
+                style={{ width: `${Math.max(4, percent)}%` }}
+              />
             </div>
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
@@ -1160,7 +1385,7 @@ function MaterialsPagination({
   const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
 
   return (
-    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
+    <div className="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3">
       <div>
         Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>

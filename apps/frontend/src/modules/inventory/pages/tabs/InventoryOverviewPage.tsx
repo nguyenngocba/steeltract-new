@@ -35,7 +35,7 @@ import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 const PAGE_SIZE = 13
 const donutColors = ['#1d7cff', '#14c987', '#7c3aed', '#f59e0b', '#ef4444', '#06b6d4']
 const compactInput =
-  'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+  'h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]'
 
 function parseLocaleNumber(v: any) {
   if (typeof v === 'number') return v
@@ -241,7 +241,7 @@ function OverviewMetricCard({
   isLoading,
 }: {
   title: string
-  value: string
+  value: React.ReactNode
   note?: string
   noteClassName?: string
   tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
@@ -265,7 +265,7 @@ function OverviewMetricCard({
 
   if (isLoading) {
     return (
-      <section className="relative h-[108px] overflow-hidden rounded-xl border border-white/10 bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] animate-pulse">
+      <section className="relative h-[108px] overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] animate-pulse">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2 min-w-0 flex-1">
             <div className="h-2 w-16 rounded bg-white/10" />
@@ -283,7 +283,7 @@ function OverviewMetricCard({
   const content = (
     <>
       <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
           <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
           {note ? <div className={`mt-1 truncate text-[10px] font-semibold ${noteClassName ?? item.note}`}>{note}</div> : null}
@@ -295,9 +295,9 @@ function OverviewMetricCard({
       {trend && trend.length > 0 && <KpiSparkline values={trend} line={item.line} fill={item.fill} />}
     </>
   )
-  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
-    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
-  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
+  const className = `relative h-[108px] overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-cyan-400/[0.055] text-left p-3 transition ${
+  active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
+} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`;
   if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
   return <section className={className}>{content}</section>
 }
@@ -677,34 +677,44 @@ export function InventoryOverviewPage() {
       items: flat(summary.totalItems),
     }
 
-    const percent = (curr: number, prev: number) => {
+    const percent = (curr: number, prev: number, suffix: string) => {
+      const diff = curr - prev
+      const absDiff = Math.abs(diff)
+      const formattedDiff = suffix === 'đ' ? formatCurrencyVnd(absDiff) : `${formatQuantity(absDiff)} ${suffix}`
+      
+      const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
+      const arrowPrefix = arrow ? `${arrow}${formattedDiff}` : `0 ${suffix}`
+      
       if (!prev) {
-        if (!curr) return '0% với tháng trước'
-        return '▲100% với tháng trước'
+        if (!curr) return `0 ${suffix} (0%)`
+        return `▲${formattedDiff} (+100%)`
       }
-      const delta = ((curr - prev) / Math.abs(prev)) * 100
-      if (delta === 0) return '0% với tháng trước'
-      const arrow = delta > 0 ? '▲' : '▼'
+      
+      const delta = (diff / Math.abs(prev)) * 100
+      if (delta === 0) return `0 ${suffix} (0%)`
+      
+      const sign = delta > 0 ? '+' : '-'
       const formattedDelta = delta % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(1)
-      return `${arrow}${formattedDelta}% với tháng trước`
+      
+      return `${arrowPrefix} (${sign}${formattedDelta}%)`
     }
 
-    const count = (curr: number, prev: number, suffix: string) => {
+    const count = (curr: number, prev: number) => {
       const diff = curr - prev
-      if (diff === 0) return `0 ${suffix} với tháng trước`
+      if (diff === 0) return '0 mã'
       const arrow = diff > 0 ? '▲' : '▼'
-      return `${arrow} ${Math.abs(diff)} ${suffix} với tháng trước`
+      return `${arrow}${Math.abs(diff)} mã`
     }
 
     const deltas = {
-      value: percent(snapshots[11].totalValue, snapshots[10].totalValue),
-      quantity: percent(snapshots[11].totalQty, snapshots[10].totalQty),
-      low: count(snapshots[11].low, snapshots[10].low, 'mã sắp hết'),
-      out: count(snapshots[11].out, snapshots[10].out, 'mã hết hàng'),
-      primary: percent(snapshots[11].primaryQty, snapshots[10].primaryQty),
-      secondary: percent(snapshots[11].secondaryQty, snapshots[10].secondaryQty),
-      consumable: percent(snapshots[11].consumableQty, snapshots[10].consumableQty),
-      items: count(snapshots[11].totalItems, snapshots[10].totalItems, 'mã vật tư'),
+      value: percent(snapshots[11].totalValue, snapshots[10].totalValue, 'đ'),
+      quantity: percent(snapshots[11].totalQty, snapshots[10].totalQty, 'tấn'),
+      low: count(snapshots[11].low, snapshots[10].low),
+      out: count(snapshots[11].out, snapshots[10].out),
+      primary: percent(snapshots[11].primaryQty, snapshots[10].primaryQty, 'tấn'),
+      secondary: percent(snapshots[11].secondaryQty, snapshots[10].secondaryQty, 'tấn'),
+      consumable: percent(snapshots[11].consumableQty, snapshots[10].consumableQty, 'tấn'),
+      items: count(snapshots[11].totalItems, snapshots[10].totalItems),
     }
 
     const getNoteColorClass = (curr: number, prev: number, isAlertMetric: boolean) => {
@@ -855,7 +865,12 @@ export function InventoryOverviewPage() {
           />
           <OverviewMetricCard
             title="Vật tư chính"
-            value={`${formatQuantity(summary.primaryCount, 0)} (${formatQuantity(summary.primaryQty, 0)} tấn)`}
+            value={
+              <>
+                <span className="text-white font-semibold">{formatQuantity(summary.primaryCount, 0)}</span>{' '}
+                <span className="text-slate-400 font-normal text-[14px]">({formatQuantity(summary.primaryQty)} tấn)</span>
+              </>
+            }
             note={kpiDeltas.primary}
             noteClassName={kpiNoteColors.primary}
             tone="blue"
@@ -865,7 +880,12 @@ export function InventoryOverviewPage() {
           />
           <OverviewMetricCard
             title="Vật tư phụ"
-            value={`${formatQuantity(summary.secondaryCount, 0)} (${formatQuantity(summary.secondaryQty, 0)} tấn)`}
+            value={
+              <>
+                <span className="text-white font-semibold">{formatQuantity(summary.secondaryCount, 0)}</span>{' '}
+                <span className="text-slate-400 font-normal text-[14px]">({formatQuantity(summary.secondaryQty)} tấn)</span>
+              </>
+            }
             note={kpiDeltas.secondary}
             noteClassName={kpiNoteColors.secondary}
             tone="violet"
@@ -875,7 +895,12 @@ export function InventoryOverviewPage() {
           />
           <OverviewMetricCard
             title="Vật tư tiêu hao"
-            value={`${formatQuantity(summary.consumableCount, 0)} (${formatQuantity(summary.consumableQty, 0)} tấn)`}
+            value={
+              <>
+                <span className="text-white font-semibold">{formatQuantity(summary.consumableCount, 0)}</span>{' '}
+                <span className="text-slate-400 font-normal text-[14px]">({formatQuantity(summary.consumableQty)} tấn)</span>
+              </>
+            }
             note={kpiDeltas.consumable}
             noteClassName={kpiNoteColors.consumable}
             tone="orange"

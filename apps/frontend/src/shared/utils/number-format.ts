@@ -6,7 +6,13 @@ function groupThousands(value: string): string {
 }
 
 function trimFraction(value: string): string {
-  return value.replace(/0+$/, '').replace(/\.$/, '')
+  if (!value.includes('.')) {
+    return value
+  }
+
+  return value
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '')
 }
 
 function isGroupedThousands(value: string, separator: string): boolean {
