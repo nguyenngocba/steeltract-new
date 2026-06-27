@@ -9,9 +9,9 @@ import {
   InventoryPanel,
   inventoryTableHead,
   inventoryTableRow,
-  inventoryTableShell,
   inventoryMutedButton,
 } from '../../components/InventoryVisuals'
+import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS } from '../../../../shared/ui/cockpit'
 import { useDeleteMaterial } from '../../hooks/useDeleteMaterial'
 import { useCategories } from '../../hooks/useCategories'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
@@ -186,8 +186,8 @@ function ChartCard({
   onPrev,
   onNext,
   children,
-  className = 'h-[260px]',
-  chartHeightClass = 'h-[150px]',
+  className = COCKPIT_HEIGHTS.CHART_LG,
+  chartHeightClass = COCKPIT_HEIGHTS.CHART_BODY_150,
 }: {
   title: string
   value?: string
@@ -202,31 +202,22 @@ function ChartCard({
   className?: string
   chartHeightClass?: string
 }) {
-  const hasPages = Boolean(page && pageCount && pageCount > 1)
-  const isShorter = className.includes('h-[170px]')
   return (
-    <section className={`overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] text-left flex flex-col justify-between ${isShorter ? 'p-3' : 'p-4'} ${className}`}>
-      <div className="flex items-start justify-between gap-3 shrink-0">
-        <div className="h-[64px] flex flex-col justify-start min-w-0 flex-1">
-          <h3 className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</h3>
-          {value !== undefined && <div className="mt-1 truncate text-2xl font-semibold text-white leading-none">{value}</div>}
-          {delta !== undefined && <div className={`mt-1 truncate text-[10px] ${deltaColorClass}`}>{delta}</div>}
-        </div>
-        {action || hasPages ? (
-          <div className="flex shrink-0 items-center gap-2 mt-1">
-            {action}
-            {hasPages ? (
-              <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono">
-                <button type="button" onClick={onPrev} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-300 hover:bg-white/10 transition">‹</button>
-                <span>{page}/{pageCount}</span>
-                <button type="button" onClick={onNext} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-300 hover:bg-white/10 transition">›</button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      <div className={`overflow-hidden shrink-0 ${chartHeightClass}`}>{children}</div>
-    </section>
+    <CockpitChartCard
+      title={title}
+      value={value}
+      delta={delta}
+      deltaColorClass={deltaColorClass}
+      action={action}
+      page={page}
+      pageCount={pageCount}
+      onPrev={onPrev}
+      onNext={onNext}
+      className={className}
+      chartHeightClass={chartHeightClass}
+    >
+      {children}
+    </CockpitChartCard>
   )
 }
 
@@ -251,64 +242,20 @@ function InventoryMetricCard({
   active?: boolean
   onClick?: () => void
 }) {
-  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
-    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
-    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
-    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
-    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
-    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
-    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
-    indigo: { text: 'text-indigo-300', bg: 'bg-indigo-500/10', line: '#6366f1', fill: 'rgba(99,102,241,0.22)', note: 'text-emerald-400' },
-    violet: { text: 'text-violet-300', bg: 'bg-violet-500/10', line: '#8b5cf6', fill: 'rgba(139,92,246,0.22)', note: 'text-emerald-400' },
-    orange: { text: 'text-orange-300', bg: 'bg-orange-500/10', line: '#f97316', fill: 'rgba(249,115,22,0.22)', note: 'text-red-400' },
-  }
-  const item = color[tone] || color.blue
-  const content = (
-    <>
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[10px] uppercase tracking-[0.12em] text-slate-400">{title}</div>
-          <div className="mt-1 truncate text-2xl font-semibold text-white leading-none">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[10px] font-semibold ${noteClassName ?? item.note}`}>{note}</div> : null}
-        </div>
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
-          {icon}
-        </div>
-      </div>
-      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
-    </>
-  )
-
-  const className = `relative h-[108px] overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-cyan-400/[0.055] text-left p-4 transition ${
-  active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
-} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`;
-
-  if (onClick) {
-    return <button type="button" onClick={onClick} className={className}>{content}</button>
-  }
-
-  return <section className={className}>{content}</section>
-}
-
-function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
-  const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
-  const min = Math.min(...rows)
-  const max = Math.max(...rows)
-  const range = Math.max(1, max - min)
-  const points = rows.map((value, index) => {
-    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
-    const y = 34 - ((value - min) / range) * 24 - 5
-    return `${x},${y}`
-  }).join(' ')
-
   return (
-    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
-      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
-      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <CockpitKpiCard
+      title={title}
+      value={value}
+      note={note}
+      noteClassName={noteClassName}
+      tone={tone}
+      icon={icon}
+      trend={trend}
+      active={active}
+      onClick={onClick}
+    />
   )
 }
-
 
 function CompactDonut({ segments, centerValue, centerLabel }: { segments: Array<{ label: string; value: number; color: string }>; centerValue: string; centerLabel: string }) {
   const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
@@ -787,17 +734,34 @@ export function InventoryMaterialsPage() {
   }, [kpiTrend])
 
   const alertsDiff = useMemo(() => {
-    const curr = (kpiTrend.low.at(-1) ?? 0) + (kpiTrend.out.at(-1) ?? 0)
-    const prev = (kpiTrend.low.at(-2) ?? 0) + (kpiTrend.out.at(-2) ?? 0)
-    const diff = curr - prev
-    const absDiff = Math.abs(diff)
-    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
-    const text = arrow ? `${arrow}${absDiff} với tháng trước` : `Không thay đổi`
-    return {
-      text,
-      color: diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-slate-400',
+    const curr = (kpiTrend.low.at(-1) ?? 0) + (kpiTrend.out.at(-1) ?? 0);
+    const prev = (kpiTrend.low.at(-2) ?? 0) + (kpiTrend.out.at(-2) ?? 0);
+    const diff = curr - prev;
+    const absDiff = Math.abs(diff);
+    let text = '';
+    let color = 'text-slate-400';
+
+    if (diff === 0) {
+      text = 'Không thay đổi';
+    } else if (diff > 0) {
+      text = `▲ ${absDiff} cảnh báo so với tháng trước`;
+      color = 'text-red-400';
+    } else {
+      text = `▼ ${absDiff} cảnh báo so với tháng trước`;
+      color = 'text-emerald-400';
     }
-  }, [kpiTrend])
+
+    // Nếu không có dữ liệu tháng trước, hiển thị fallback
+    if (prev === 0 && curr === 0) {
+      text = 'Chưa có cảnh báo';
+      color = 'text-slate-400';
+    } else if (prev === 0 && curr > 0) {
+      text = `▲ ${curr} cảnh báo mới (tháng này)`;
+      color = 'text-red-400';
+    }
+
+    return { text, color };
+  }, [kpiTrend]);
 
   const quickStats = useMemo(() => {
     const txRows = transactionRows(transactions)
@@ -999,7 +963,7 @@ export function InventoryMaterialsPage() {
                         <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
                       </div>
                       {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
-                      <div className={`${inventoryTableShell} h-[520px] overflow-auto`}>
+                      <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_SM}>
                         <table className="w-full min-w-[1050px] text-sm table-fixed">
                           <colgroup>
                             <col className="w-[140px]" />   {/* Tên vật tư */}
@@ -1013,18 +977,23 @@ export function InventoryMaterialsPage() {
                             <col className="w-[150px]" />   {/* Vị trí */}
                             <col className="w-[100px]" />   {/* Trạng thái */}
                           </colgroup>
-                          <thead className={inventoryTableHead}>
+                          <thead
+                                className={`${inventoryTableHead}
+                                  bg-transparent
+                                  text-slate-300
+                                  border-b border-cyan-400/10`}
+                              >
                             <tr>
-                              <th className="px-1.5 py-0.5 text-left font-medium">Tên vật tư</th>
-                              <th className="px-1.5 py-0.5 text-left font-medium">Quy cách</th>
-                              <th className="px-1.5 py-0.5 text-left font-medium">ĐVT</th>
-                              <th className="px-1.5 py-0.5 text-right font-medium">Kho chính</th>
-                              <th className="px-1.5 py-0.5 text-right font-medium">Kho SX</th>
-                              <th className="px-1.5 py-0.5 text-right font-medium">Tổng tồn</th>
-                              <th className="px-1.5 py-0.5 text-right font-medium">Đơn giá</th>
-                              <th className="px-1.5 py-0.5 text-right font-medium">Giá trị</th>
-                              <th className="px-1.5 py-0.5 text-left font-medium">Vị trí</th>
-                              <th className="px-1.5 py-0.5 text-left font-medium">Trạng thái</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tên vật tư</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Quy cách</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">ĐVT</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Kho chính</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Kho SX</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tổng tồn</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Đơn giá</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Giá trị</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Vị trí</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Trạng thái</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1055,7 +1024,7 @@ export function InventoryMaterialsPage() {
                             ))}
                           </tbody>
                         </table>
-                      </div>
+                      </CockpitTableShell>
                       <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
                     </InventoryPanel>
 
@@ -1063,13 +1032,13 @@ export function InventoryMaterialsPage() {
                     <ChartCard
                       title="Phân bố tồn kho"
                       value={`${formatQuantity(kpis.totalQty, 1)} tấn`}
-                      delta={`${warehouseOptions.length} kho hoạt động`}
+                      delta={`${zoneDistribution.length} kho hoạt động`}
                       page={pagedZoneDistribution.page}
                       pageCount={pagedZoneDistribution.pageCount}
                       onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))}
                       onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}
-                      className="h-[220px]"
-                      chartHeightClass="h-[120px] overflow-y-auto scrollbar-none"
+                      className={COCKPIT_HEIGHTS.CHART_MD}
+                      chartHeightClass={`${COCKPIT_HEIGHTS.CHART_BODY_120} overflow-y-auto scrollbar-none`}
                     >
                       <CompactDonut
                         segments={pagedZoneSegments}
@@ -1083,8 +1052,8 @@ export function InventoryMaterialsPage() {
                         value={`${formatQuantity(kpis.totalQty, 1)} tấn`}
                         delta={quantityDelta.text}
                         deltaColorClass={quantityDelta.color}
-                        className="h-[178px]"
-                        chartHeightClass="h-[82px] overflow-y-auto scrollbar-none"
+                        className={COCKPIT_HEIGHTS.CHART_XXS}
+                        chartHeightClass={`${COCKPIT_HEIGHTS.CHART_BODY_82} overflow-y-auto scrollbar-none`}
                       >
                         <StockTrendChart rows={monthlyTrend} />
                       </ChartCard>
@@ -1099,25 +1068,24 @@ export function InventoryMaterialsPage() {
                         pageCount={pagedAlerts.pageCount}
                         onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))}
                         onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}
-                        className="h-[200px]"
-                        chartHeightClass="h-[82px] overflow-y-auto scrollbar-thin"
+                        className={`${COCKPIT_HEIGHTS.CHART_MD} bg-slate-950/45`}
+                        chartHeightClass={`${COCKPIT_HEIGHTS.CHART_BODY_140} overflow-y-auto [&::-webkit-scrollbar]:hidden scrollbar-width-none`}
                       >
                         <div className="space-y-1 text-[11px]">
                           {pagedAlerts.rows.map((row: any) => (
-                            <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-xl border border-white/10 bg-[#08111f]/90 px-2.5 py-1.5 transition hover:bg-slate-900/40">
+                            <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/45 px-2.5 py-1.5 transition hover:bg-slate-900/40">
                               <span className={row.level === 'Hết hàng' ? 'truncate font-medium text-red-300' : 'truncate font-medium text-amber-300'}>{row.materialName ?? row.materialCode}</span>
                               <span className="text-slate-400 font-mono text-[10px]">Kho chính: {formatQuantity(row.stock, 1)} t</span>
                               <span className={`rounded px-1.5 py-0.5 font-semibold text-[9px] ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
                             </div>
                           ))}
-                          {alerts.length === 0 && <div className="rounded-xl border border-white/10 bg-[#08111f]/90 px-3 py-4 text-center text-slate-500 text-xs">Không có cảnh báo tồn kho.</div>}
+                          {alerts.length === 0 && <div className="rounded-xl border border-slate-800 bg-slate-950/45 px-3 py-4 text-center text-slate-500 text-xs">Không có cảnh báo tồn kho.</div>}
                         </div>
                       </ChartCard>
                     </div>
                   </div>
 
-                <section className="rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] p-3">
-                  <h3 className="mb-0.15 text-[12px] font-bold uppercase tracking-[0.14em] text-white">Thống kê nhanh</h3>
+                <CockpitChartCard title="Thống kê nhanh" className="min-h-0">
                   <div className="grid grid-cols-1 sm:grid-cols-5 divide-y sm:divide-y-0 divide-white/10">
                     {quickStats.map((item, idx) => (
                       <div
@@ -1134,7 +1102,7 @@ export function InventoryMaterialsPage() {
                       </div>
                     ))}
                   </div>
-                </section>
+                </CockpitChartCard>
               </div>
 
               {showAll && (
@@ -1223,50 +1191,61 @@ export function InventoryMaterialsPage() {
 
       {showAllAlerts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
-          <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-xl border border-white/10 bg-[#0b1424]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-xl border border-white/10 bg-[#0b1424]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <div>
                 <h3 className="text-lg font-semibold text-white">Tất cả cảnh báo tồn kho</h3>
                 <p className="mt-1 text-xs text-slate-500">{formatQuantity(alerts.length, 0)} cảnh báo theo bộ lọc hiện tại</p>
               </div>
               <button onClick={() => setShowAllAlerts(false)} className="rounded border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-300 hover:text-white">Đóng</button>
             </div>
-            <div className="grid max-h-[70vh] gap-4 overflow-auto p-4 xl:grid-cols-[1fr_300px]">
+            <div className="grid max-h-[80vh] gap-4 overflow-auto p-6 xl:grid-cols-[1fr_320px]">
               <div className="overflow-hidden rounded-xl border border-white/10">
-                <table className="w-full min-w-[780px] text-sm">
+                <table className="w-full min-w-[1100px] text-sm table-fixed">
+                  <colgroup>
+                    <col className="w-[140px]" />
+                    <col className="w-[180px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[140px]" />
+                    <col className="w-[160px]" />
+                  </colgroup>
                   <thead className="bg-white/[0.055] text-xs uppercase tracking-[0.08em] text-slate-400">
                     <tr>
-                      <th className="px-3 py-2 text-left">Mã vật tư</th>
-                      <th className="px-3 py-2 text-left">Tên vật tư</th>
-                      <th className="px-3 py-2 text-left">Nhóm</th>
-                      <th className="px-3 py-2 text-right">Kho chính</th>
-                      <th className="px-3 py-2 text-right">Tồn tối thiểu</th>
-                      <th className="px-3 py-2 text-left">Mức cảnh báo</th>
-                      <th className="px-3 py-2 text-left">Vị trí</th>
+                      <th className="px-4 py-3 text-left">Mã vật tư</th>
+                      <th className="px-4 py-3 text-left">Tên vật tư</th>
+                      <th className="px-4 py-3 text-left">Nhóm</th>
+                      <th className="px-4 py-3 text-right">Kho chính</th>
+                      <th className="px-4 py-3 text-right">Tồn tối thiểu</th>
+                      <th className="px-4 py-3 text-left">Mức cảnh báo</th>
+                      <th className="px-4 py-3 text-left">Vị trí</th>
                     </tr>
                   </thead>
                   <tbody>
                     {alerts.map((row: any) => (
                       <tr key={row.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.04]">
-                        <td className="px-3 py-2 text-cyan-300">{row.materialCode}</td>
-                        <td className="px-3 py-2">{row.materialName}</td>
-                        <td className="px-3 py-2 text-slate-400">{row.category ?? '-'}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">{formatQuantity(row.stock, 3)}</td>
-                        <td className="px-3 py-2 text-right">{formatQuantity(num(row.minimumStock || 5), 0)}</td>
-                        <td className="px-3 py-2">
-                          <span className={`rounded px-2 py-1 text-xs ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
+                        <td className="truncate px-4 py-2.5 text-cyan-300" title={row.materialCode}>{row.materialCode}</td>
+                        <td className="truncate px-4 py-2.5" title={row.materialName}>{row.materialName}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-400" title={row.category ?? '-'}>{row.category ?? '-'}</td>
+                        <td className="px-4 py-2.5 text-right font-mono tabular-nums">{formatQuantity(row.stock, 3)}</td>
+                        <td className="px-4 py-2.5 text-right">{formatQuantity(num(row.minimumStock || 5), 0)}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`rounded px-2.5 py-1 text-xs font-semibold ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
                         </td>
-                        <td className="px-3 py-2 text-slate-400">{displayLocation(row)}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-400" title={displayLocation(row)}>{displayLocation(row)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <ChartCard
                   title="Theo mức độ"
                   value={`${alerts.length} cảnh báo`}
-                  delta="3 mức cảnh báo"
+                  delta="Phân bố theo mức"
+                  className={`${COCKPIT_HEIGHTS.CHART_ALERT} bg-slate-950/45`}
+                  chartHeightClass={COCKPIT_HEIGHTS.CHART_BODY_140}
                 >
                   <AlertMiniChart rows={[
                     ['Sắp hết', alerts.filter((row: any) => row.level === 'Sắp hết').length],
@@ -1278,6 +1257,8 @@ export function InventoryMaterialsPage() {
                   title="Top tồn thấp"
                   value={`${alerts.slice(0, 6).length} vật tư gần ngưỡng`}
                   delta="Dưới định mức"
+                  className={`${COCKPIT_HEIGHTS.CHART_ALERT} bg-slate-950/45`}
+                  chartHeightClass={COCKPIT_HEIGHTS.CHART_BODY_140}
                 >
                   <AlertMiniChart rows={alerts.slice(0, 6).map((row: any) => [
                     `${row.materialCode} (${formatQuantity(row.stock, 1)} tấn)`,
@@ -1313,8 +1294,8 @@ function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number 
   }).join(' ')
 
   return (
-    <div className="h-[140px] flex flex-col justify-between">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[105px] w-full overflow-visible">
+    <div className={`${COCKPIT_HEIGHTS.CHART_BODY_140} flex flex-col justify-between`}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`${COCKPIT_HEIGHTS.CHART_BODY_105} w-full overflow-visible`}>
         <defs>
           <linearGradient id="stockTrendFill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#1d7cff" stopOpacity="0.32" />

@@ -9,25 +9,17 @@ import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import {
   CompactDonutSummary,
   HorizontalBars,
-  InventoryChartCard,
-  InventoryKpi,
-  InventoryPagination,
   InventoryPanel,
-  inventoryGridGap,
   inventoryInput,
-  inventoryPageStack,
-  inventoryTableHead,
   inventoryTableRow,
-  inventoryTableShell,
-  inventoryMutedButton,
-   inventoryPanel,
 } from '../../components/InventoryVisuals'
+import { CockpitChartCard, CockpitKpiCard, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { activateZone, createZone, deactivateZone, deleteZone, getZoneDetail, updateZone, type WarehouseLocation, type WarehouseLocationDetail } from '../../api/zones.api'
 import { useZones } from '../../hooks/useZones'
 import { useWarehouses } from '../../hooks/useWarehouses'
 import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 5
 const LOCATION_ROWS = ['A', 'B', 'C', 'D', 'E', 'F']
 const LOCATION_COLUMNS = ['01', '02', '03', '04', '05', '06']
 const LOCATION_LEVELS = ['L1', 'L2', 'L3', 'L4']
@@ -127,30 +119,154 @@ function auditZone(zone: WarehouseLocation) {
 function isRealStorageLocation(zone: WarehouseLocation) {
   return auditZone(zone) === 'Real storage location'
 }
-// ================= COMPONENT SPARKLINE =================
-function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
-  const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
-  const min = Math.min(...rows)
-  const max = Math.max(...rows)
-  const range = Math.max(1, max - min)
-  const points = rows.map((value, index) => {
-    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
-    const y = 34 - ((value - min) / range) * 24 - 5
-    return `${x},${y}`
-  }).join(' ')
+// ================= COMPONENT METRIC CARD =================
+function formatShortCurrency(value: number) {
+  if (value >= 1e9) {
+    return `${(value / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ`
+  }
+  if (value >= 1e6) {
+    return `${(value / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} triệu`
+  }
+  return formatCurrency(value)
+}
+
+function VerticalBarChart({
+  data,
+}: {
+  data: Array<{ label: string; value: number; color: string }>
+}) {
+  const max = Math.max(1, ...data.map((d) => d.value))
   return (
-    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
-      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
-      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div className={`flex ${COCKPIT_HEIGHTS.CHART_BODY_115} items-end justify-around gap-2 pt-2 px-1`}>
+      {data.map((item, idx) => {
+        const percent = (item.value / max) * 100
+        return (
+          <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end group">
+            <span className="text-[10px] font-mono text-slate-400 mb-1 font-semibold">{item.value}</span>
+            <div
+              className="w-7 rounded-t transition-all duration-300 hover:brightness-110"
+              style={{
+                height: `${Math.max(6, (item.value / max) * 65)}px`,
+                backgroundColor: item.color,
+                boxShadow: `0 2px 8px ${item.color}25`,
+              }}
+            />
+            <span className="text-[10px] text-slate-400 mt-1.5 truncate max-w-full text-center">{item.label}</span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
-// ================= COMPONENT METRIC CARD =================
-function OverviewMetricCard({
+function CompactPieChart({
+  segments,
+}: {
+  segments: Array<{ label: string; value: number; color: string }>
+}) {
+  const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
+  let cursor = 0
+  const gradient = segments
+    .map((item) => {
+      const start = cursor
+      const end = cursor + (item.value / total) * 100
+      cursor = end
+      return `${item.color} ${start}% ${end}%`
+    })
+    .join(', ')
+
+  return (
+    <div className="grid grid-cols-[100px_1fr] items-center gap-3 pt-1">
+      <div
+        className="relative h-20 w-20 rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.3)] transition-transform hover:scale-105 duration-300 mx-auto"
+        style={{ background: `conic-gradient(${gradient})` }}
+      />
+      <div className="space-y-1 overflow-hidden">
+        {segments.slice(0, 6).map((item, idx) => {
+          const percent = (item.value / total) * 100
+          return (
+            <div key={idx} className="grid grid-cols-[1fr_auto] items-center gap-2 text-[10px]">
+              <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="truncate">{item.label}</span>
+              </span>
+              <span className="whitespace-nowrap text-slate-400 font-mono">
+                {formatQuantity(item.value, 0)} tấn ({percent.toFixed(0)}%)
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function LocationsChartCard({
+  title,
+  subtitle,
+  value,
+  action,
+  children,
+  className = '',
+  heightClass = '',
+}: {
+  title: string
+  subtitle?: string
+  value?: string | number
+  action?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+  heightClass?: string
+}) {
+  return (
+    <CockpitChartCard
+      title={title}
+      value={value}
+      subtitle={subtitle}
+      action={action}
+      className={className}
+      heightClass={heightClass}
+    >
+      {children}
+    </CockpitChartCard>
+  )
+}
+
+function getDeltaNote(current: number, previous: number, unit: string, isCurrency = false) {
+  const diff = current - previous
+  const percent = previous > 0 ? (diff / previous) * 100 : 0
+  const sign = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
+  const colorClass = diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-400'
+  
+  let formattedDiff = ''
+  if (isCurrency) {
+    formattedDiff = formatCurrency(Math.abs(diff))
+  } else {
+    const decimals = (unit === 'tấn' || unit === '%') ? 1 : 0
+    const space = (unit === '%' || unit === '') ? '' : ' '
+    formattedDiff = `${formatQuantity(Math.abs(diff), decimals)}${space}${unit}`
+  }
+  
+  const formattedPercent = percent >= 0 ? `+${percent.toFixed(1)}%` : `${percent.toFixed(1)}%`
+  
+  if (diff === 0) {
+    return {
+      text: `${isCurrency ? '0 đ' : `0${unit === '%' ? '' : ' '}${unit}`} (0.0%)`,
+      colorClass: 'text-slate-400'
+    }
+  }
+
+  return {
+    text: `${sign}${formattedDiff} (${formattedPercent})`,
+    colorClass
+  }
+}
+
+function InventoryMetricCard({
   title,
   value,
   note,
+  noteClassName,
   tone = 'blue',
   icon,
   trend,
@@ -158,169 +274,30 @@ function OverviewMetricCard({
   onClick,
 }: {
   title: string
-  value: string
-  note?: string
-  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple'
+  value: React.ReactNode
+  note?: React.ReactNode
+  noteClassName?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
   icon: React.ReactNode
   trend: number[]
   active?: boolean
   onClick?: () => void
 }) {
-  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
-    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
-    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
-    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
-    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
-    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
-    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
-  }
-  const item = color[tone]
-  const content = (
-    <>
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
-        </div>
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
-          {icon}
-        </div>
-      </div>
-      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
-    </>
-  )
-  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
-    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
-  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
-  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
-  return <section className={className}>{content}</section>
-}
-function LocationsPagination({
-  page,
-  pageCount,
-  total,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  pageSize: number
-  onPageChange: (page: number) => void
-}) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-0 mb-0 text-[10px] text-slate-400">
-      <div className="whitespace-nowrap">
-        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
-      </div>
-      <div className="flex items-center gap-1">
-        {pages[0] > 1 && <span className="px-1">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-5 min-w-5 rounded border px-1 text-[10px] transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-sm'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40'
-            }`}
-          >
-            {pageNo}
-          </button>
-        ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1">...</span>}
-      </div>
-      <div className="flex gap-1">
-        <button
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          className="rounded border border-white/10 bg-white/[0.055] px-1.5 text-[10px] font-medium text-slate-300 transition hover:border-cyan-400/40 disabled:opacity-40"
-        >
-          Trước
-        </button>
-        <button
-          disabled={safePage >= safePageCount}
-          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
-          className="rounded border border-white/10 bg-white/[0.055] px-1.5 text-[10px] font-medium text-slate-300 transition hover:border-cyan-400/40 disabled:opacity-40"
-        >
-          Sau
-        </button>
-      </div>
-    </div>
+    <CockpitKpiCard
+      title={title}
+      value={value}
+      note={note}
+      noteClassName={noteClassName}
+      tone={tone}
+      icon={icon}
+      trend={trend}
+      active={active}
+      onClick={onClick}
+    />
   )
 }
 
-function MaterialsPagination({
-  page,
-  pageCount,
-  total,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  pageSize: number
-  onPageChange: (page: number) => void
-}) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
-  return (
-    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
-      <div>
-        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
-      </div>
-      <div className="flex justify-center gap-2">
-        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
-            }`}
-          >
-            {pageNo}
-          </button>
-        ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
-      </div>
-      <div className="flex justify-start gap-2 md:justify-end">
-        <button
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          className={inventoryMutedButton}
-        >
-          Trước
-        </button>
-        <button
-          disabled={safePage >= safePageCount}
-          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
-          className={inventoryMutedButton}
-        >
-          Sau
-        </button>
-      </div>
-    </div>
-  )
-}
 export function InventoryLocationsPage() {
   const queryClient = useQueryClient()
   const { data: zones = [], isLoading } = useZones()
@@ -334,11 +311,52 @@ export function InventoryLocationsPage() {
   const [form, setForm] = useState<LocationForm | null>(null)
   const [detailId, setDetailId] = useState('')
   const [selectedSlot, setSelectedSlot] = useState<SlotMaterialView | null>(null)
+  const [modalType, setModalType] = useState<'value' | 'maxStock' | 'recentInbound' | 'recentOutbound' | null>(null)
   const { data: detail } = useQuery({
     queryKey: ['inventory-zone-detail', detailId],
     queryFn: () => getZoneDetail(detailId),
     enabled: Boolean(detailId),
   })
+
+  const recentInboundData = useMemo(() => {
+    const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+    return txRows
+      .filter((tx: any) => String(tx.type ?? '').toUpperCase() === 'INBOUND')
+      .sort((a: any, b: any) => {
+        const dateA = a.transactionDate ?? a.createdAt ?? 0
+        const dateB = b.transactionDate ?? b.createdAt ?? 0
+        return new Date(dateB).getTime() - new Date(dateA).getTime()
+      })
+      .map((tx: any) => {
+        const firstItem = tx.items?.[0]
+        return {
+          date: tx.transactionDate ?? tx.createdAt,
+          code: firstItem?.inventoryItem?.code ?? 'N/A',
+          name: firstItem?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
+          quantity: n(firstItem?.quantity),
+        }
+      })
+  }, [transactionsData])
+
+  const recentOutboundData = useMemo(() => {
+    const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+    return txRows
+      .filter((tx: any) => String(tx.type ?? '').toUpperCase() === 'OUTBOUND')
+      .sort((a: any, b: any) => {
+        const dateA = a.transactionDate ?? a.createdAt ?? 0
+        const dateB = b.transactionDate ?? b.createdAt ?? 0
+        return new Date(dateB).getTime() - new Date(dateA).getTime()
+      })
+      .map((tx: any) => {
+        const firstItem = tx.items?.[0]
+        return {
+          date: tx.transactionDate ?? tx.createdAt,
+          code: firstItem?.inventoryItem?.code ?? 'N/A',
+          name: firstItem?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
+          quantity: Math.abs(n(firstItem?.quantity)),
+        }
+      })
+  }, [transactionsData])
 
   const refresh = async () => {
     await Promise.all([
@@ -385,7 +403,6 @@ export function InventoryLocationsPage() {
         return [zone.code, zone.name, zone.row, zone.column, zone.level, zone.description, zone.auditType].join(' ').toLowerCase().includes(q)
       })
   }, [zones, query, status, audit])
-  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const pagedRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const materialCostByCode = useMemo(() => {
@@ -439,10 +456,14 @@ export function InventoryLocationsPage() {
     return map
   }, [slotViews])
 
+  const activeRealZones = useMemo(() => rows.filter((z) => z.active), [rows])
+  const inactiveRealZones = useMemo(() => rows.filter((z) => !z.active), [rows])
+  const totalActiveCapacity = activeRealZones.length * TOTAL_CELL_LEVELS
   const occupiedSlots = slotViews.length
-  const totalSlotCapacity = Math.max(1, rows.length * TOTAL_CELL_LEVELS)
-  const freeSlots = Math.max(0, totalSlotCapacity - occupiedSlots)
-  const occupancyPercent = totalSlotCapacity > 0 ? (occupiedSlots / totalSlotCapacity) * 100 : 0
+  const freeSlots = Math.max(0, totalActiveCapacity - occupiedSlots)
+  const maintenanceSlots = inactiveRealZones.length * TOTAL_CELL_LEVELS
+  const totalCapacitySum = totalActiveCapacity + maintenanceSlots
+  const occupancyPercent = totalCapacitySum > 0 ? (occupiedSlots / totalCapacitySum) * 100 : 0
   const inventoryValue = Array.from(valueByZone.values()).reduce((sum, value) => sum + value, 0)
 
   const stats = useMemo(() => ({
@@ -468,41 +489,379 @@ export function InventoryLocationsPage() {
   const stockByLocation = useMemo(() => rows
     .slice()
     .sort((a, b) => n(b.totalStockQuantity) - n(a.totalStockQuantity))
-    .slice(0, 6)
     .map((zone) => [zone.code, n(zone.totalStockQuantity)] as [string, number]), [rows])
 
   const valueByLocation = useMemo(() => rows
     .map((zone) => ({ code: zone.code, value: valueByZone.get(zone.code) ?? 0 }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6), [rows, valueByZone])
+    .sort((a, b) => b.value - a.value), [rows, valueByZone])
 
-  const topOccupiedSlots = useMemo(() => slotViews
-    .slice()
-    .sort((a, b) => b.value - a.value || b.quantity - a.quantity)
-    .slice(0, 8), [slotViews])
-
-  const movementRoutes = useMemo(() => {
-    const map = new Map<string, { source: string; destination: string; count: number; quantity: number; value: number }>()
-    transactionRows(transactionsData)
-      .filter((tx: any) => String(tx?.type ?? tx?.transactionType ?? '').toUpperCase().includes('TRANSFER'))
-      .forEach((tx: any) => {
-        const sourceLines = transactionItems(tx).filter((line: any) => n(line?.quantity) < 0)
-        const destinationLines = transactionItems(tx).filter((line: any) => n(line?.quantity) > 0)
-        sourceLines.forEach((sourceLine: any) => {
-          destinationLines.forEach((destinationLine: any) => {
-            const source = lineLocationLabel(sourceLine)
-            const destination = lineLocationLabel(destinationLine)
-            const key = `${source}->${destination}`
-            const previous = map.get(key) ?? { source, destination, count: 0, quantity: 0, value: 0 }
-            previous.count += 1
-            previous.quantity += Math.min(Math.abs(n(sourceLine.quantity)), Math.abs(n(destinationLine.quantity)))
-            previous.value += Math.max(lineAmount(sourceLine), lineAmount(destinationLine))
-            map.set(key, previous)
-          })
-        })
+  const topOccupiedSlotsData = useMemo(() => {
+    return slotViews
+      .map((slot) => {
+        const zone = rows.find((z) => z.code === slot.zoneCode)
+        const zoneCapacity = zone ? n(zone.capacity) : 1
+        const percent = zoneCapacity > 0 ? (slot.quantity / zoneCapacity) * 100 : 0
+        return {
+          ...slot,
+          percent: Math.min(100, percent),
+          displayPercent: percent,
+        }
       })
-    return Array.from(map.values()).sort((a, b) => b.value - a.value || b.count - a.count).slice(0, 8)
-  }, [transactionsData])
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 6)
+  }, [slotViews, rows])
+
+  const topMaterialsFromSlots = useMemo(() => {
+    const map = new Map<string, {
+      code: string
+      name: string
+      stock: number
+      value: number
+      locations: string[]
+    }>()
+
+    slotViews.forEach((slot) => {
+      slot.materials.forEach((m) => {
+        let entry = map.get(m.code)
+        if (!entry) {
+          entry = {
+            code: m.code,
+            name: m.name,
+            stock: 0,
+            value: 0,
+            locations: [],
+          }
+          map.set(m.code, entry)
+        }
+        entry.stock += m.quantity
+        entry.value += m.value
+        if (!entry.locations.includes(slot.zoneCode)) {
+          entry.locations.push(slot.zoneCode)
+        }
+      })
+    })
+
+    const list = Array.from(map.values())
+      .sort((a, b) => b.stock - a.stock)
+
+    const maxStock = list[0]?.stock || 1
+
+    return list.map((item) => ({
+      ...item,
+      percent: (item.stock / maxStock) * 100,
+      locationStr: item.locations.slice(0, 3).join(', ') + (item.locations.length > 3 ? '...' : ''),
+    }))
+  }, [slotViews])
+
+  const zoneCapacityDist = useMemo(() => {
+    return rows.map((zone) => {
+      const zoneSlots = slotViews.filter((slot) => slot.zoneCode === zone.code).length
+      const stock = n(zone.totalStockQuantity)
+      const capacity = n(zone.capacity)
+      return {
+        id: zone.id,
+        code: zone.code,
+        name: zone.name,
+        stock,
+        capacity,
+        occupiedSlots: zoneSlots,
+      }
+    })
+    .sort((a, b) => b.stock - a.stock)
+  }, [rows, slotViews])
+
+  const previewValueByLocation = useMemo(() => {
+    return valueByLocation.slice().sort((a, b) => b.value - a.value).slice(0, 5)
+  }, [valueByLocation])
+
+  const previewStockByLocation = useMemo(() => {
+    return stockByLocation.slice().sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [stockByLocation])
+
+  const previewRecentInbound = useMemo(() => {
+    return recentInboundData.slice(0, 5)
+  }, [recentInboundData])
+
+  const previewRecentOutbound = useMemo(() => {
+    return recentOutboundData.slice(0, 5)
+  }, [recentOutboundData])
+
+  const previewTopMaterials = useMemo(() => {
+    return topMaterialsFromSlots.slice().sort((a, b) => b.stock - a.stock).slice(0, 5)
+  }, [topMaterialsFromSlots])
+
+  const previewZoneCapacity = useMemo(() => {
+    return zoneCapacityDist.slice().sort((a, b) => b.capacity - a.capacity).slice(0, 5)
+  }, [zoneCapacityDist])
+
+  const materialUsageByCode = useMemo(() => {
+    const map = new Map<string, string>()
+    ;(auditRows as any[]).forEach((row) => {
+      const code = materialCodeFromAudit(row)
+      if (!code) return
+      map.set(code, String(row.materialUsageType ?? row.usageType ?? 'PRIMARY').toUpperCase())
+    })
+    return map
+  }, [auditRows])
+
+  const materialTypeDistribution = useMemo(() => {
+    let primaryStock = 0
+    let secondaryStock = 0
+    let consumableStock = 0
+
+    slotViews.forEach((slot) => {
+      slot.materials.forEach((m) => {
+        const usage = materialUsageByCode.get(m.code) ?? 'PRIMARY'
+        if (usage === 'PRIMARY') {
+          primaryStock += m.quantity
+        } else if (usage === 'SECONDARY') {
+          secondaryStock += m.quantity
+        } else if (usage === 'CONSUMABLE') {
+          consumableStock += m.quantity
+        }
+      })
+    })
+
+    const total = primaryStock + secondaryStock + consumableStock
+    const percentPrimary = total > 0 ? (primaryStock / total) * 100 : 0
+
+    return {
+      primary: primaryStock,
+      secondary: secondaryStock,
+      consumable: consumableStock,
+      total,
+      percentPrimary,
+    }
+  }, [slotViews, materialUsageByCode])
+
+  const zoneStatusStats = useMemo(() => {
+    let using = 0
+    let empty = 0
+    let maintenance = 0
+
+    rows.forEach((zone) => {
+      if (!zone.active) {
+        maintenance++
+      } else if (n(zone.totalStockQuantity) > 0) {
+        using++
+      } else {
+        empty++
+      }
+    })
+
+    const total = using + empty + maintenance
+    const percentUsing = total > 0 ? (using / total) * 100 : 0
+
+    return {
+      using,
+      empty,
+      maintenance,
+      total,
+      percentUsing,
+    }
+  }, [rows])
+
+  const kpiTrendsAndDeltas = useMemo(() => {
+    const now = new Date()
+    const snapshotDates = Array.from({ length: 6 }).map((_, index) => {
+      const monthsBack = 5 - index
+      const date = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0, 23, 59, 59, 999)
+      return date > now ? now : date
+    })
+
+    // Build current zone material stock map
+    const zoneMaterialStock = new Map<string, Map<string, number>>()
+    slotViews.forEach((slot) => {
+      const zoneCode = slot.zoneCode
+      if (!zoneMaterialStock.has(zoneCode)) {
+        zoneMaterialStock.set(zoneCode, new Map<string, number>())
+      }
+      const matMap = zoneMaterialStock.get(zoneCode)!
+      slot.materials.forEach((m) => {
+        const currentQty = matMap.get(m.code) ?? 0
+        matMap.set(m.code, currentQty + m.quantity)
+      })
+    })
+
+    // Build current slot stock map
+    const slotStockMap = new Map<string, number>()
+    slotViews.forEach((slot) => {
+      slotStockMap.set(slot.label, slot.quantity)
+    })
+
+    const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
+    
+    // Movements for zone material level rollback
+    const movements = txRows.flatMap((tx: any) => {
+      const txDate = tx.transactionDate ?? tx.createdAt
+      if (!txDate) return []
+      const dateObj = new Date(txDate)
+      const items = Array.isArray(tx.items) ? tx.items : []
+      return items.map((line: any) => {
+        const zoneCode = line?.zone?.code ?? line?.zoneCode
+        const materialCode = line?.inventoryItem?.code ?? line?.materialCode
+        return {
+          zoneCode: zoneCode ? String(zoneCode) : null,
+          materialCode: materialCode ? String(materialCode) : null,
+          quantity: n(line.quantity),
+          date: dateObj,
+        }
+      })
+    })
+
+    // Movements for slot level rollback
+    const slotMovements = txRows.flatMap((tx: any) => {
+      const txDate = tx.transactionDate ?? tx.createdAt
+      if (!txDate) return []
+      const dateObj = new Date(txDate)
+      const items = Array.isArray(tx.items) ? tx.items : []
+      return items.map((line: any) => {
+        const zoneCode = line?.zone?.code ?? line?.zoneCode
+        const slotId = line?.slot?.code ?? line?.slotId
+        const level = line?.level
+        const slotLabel = [zoneCode, slotId, level].filter(Boolean).join('/')
+        return {
+          slotLabel,
+          quantity: n(line.quantity),
+          date: dateObj,
+        }
+      })
+    })
+
+    const getHistoricalState = (targetDate: Date) => {
+      // Slot state rollback
+      const slotState = new Map(slotStockMap)
+      slotMovements.forEach((mv) => {
+        if (mv.date > targetDate && mv.slotLabel) {
+          const currentQty = slotState.get(mv.slotLabel) ?? 0
+          slotState.set(mv.slotLabel, currentQty - mv.quantity)
+        }
+      })
+
+      let occupiedSlotsCount = 0
+      slotState.forEach((qty) => {
+        if (qty > 0) {
+          occupiedSlotsCount++
+        }
+      })
+
+      // Zone material state rollback
+      const zoneMaterialState = new Map<string, Map<string, number>>()
+      zoneMaterialStock.forEach((matMap, zoneCode) => {
+        zoneMaterialState.set(zoneCode, new Map(matMap))
+      })
+
+      movements.forEach((mv) => {
+        if (mv.date > targetDate && mv.zoneCode && mv.materialCode) {
+          const matMap = zoneMaterialState.get(mv.zoneCode)
+          if (matMap) {
+            const currentQty = matMap.get(mv.materialCode) ?? 0
+            matMap.set(mv.materialCode, currentQty - mv.quantity)
+          } else {
+            const newMap = new Map<string, number>()
+            newMap.set(mv.materialCode, -mv.quantity)
+            zoneMaterialState.set(mv.zoneCode, newMap)
+          }
+        }
+      })
+
+      let occupiedLocations = 0
+      let emptyLocations = 0
+      let totalStock = 0
+      let totalValue = 0
+
+      rows.forEach((zone) => {
+        const matMap = zoneMaterialState.get(zone.code)
+        let zoneStock = 0
+        let zoneValue = 0
+        if (matMap) {
+          matMap.forEach((qty, matCode) => {
+            const safeQty = Math.max(0, qty)
+            zoneStock += safeQty
+            const cost = materialCostByCode.get(matCode) ?? 0
+            zoneValue += safeQty * cost
+          })
+        }
+
+        if (zone.active) {
+          if (zoneStock > 0) {
+            occupiedLocations++
+          } else {
+            emptyLocations++
+          }
+        }
+        totalStock += zoneStock
+        totalValue += zoneValue
+      })
+
+      const totalCapacity = rows.length * TOTAL_CELL_LEVELS
+      const occupancyPercent = totalCapacity > 0 ? (occupiedSlotsCount / totalCapacity) * 100 : 0
+
+      return {
+        totalLocations: rows.length,
+        occupiedLocations,
+        emptyLocations,
+        occupancyPercent,
+        totalStock,
+        totalValue,
+      }
+    }
+
+    const snapshots = snapshotDates.map((date) => getHistoricalState(date))
+
+    const totalLocationsTrend = snapshots.map((s) => s.totalLocations)
+    const occupiedLocationsTrend = snapshots.map((s) => s.occupiedLocations)
+    const emptyLocationsTrend = snapshots.map((s) => s.emptyLocations)
+    const occupancyPercentTrend = snapshots.map((s) => s.occupancyPercent)
+    const totalStockTrend = snapshots.map((s) => s.totalStock)
+    const totalValueTrend = snapshots.map((s) => s.totalValue)
+
+    return {
+      snapshots,
+      totalLocationsTrend,
+      occupiedLocationsTrend,
+      emptyLocationsTrend,
+      occupancyPercentTrend,
+      totalStockTrend,
+      totalValueTrend,
+    }
+  }, [rows, slotViews, transactionsData, materialCostByCode])
+
+  const locDelta = useMemo(() => {
+    const prev = kpiTrendsAndDeltas.snapshots[4]?.totalLocations ?? 0
+    const curr = kpiTrendsAndDeltas.snapshots[5]?.totalLocations ?? 0
+    return getDeltaNote(curr, prev, 'vị trí')
+  }, [kpiTrendsAndDeltas])
+
+  const occupiedDelta = useMemo(() => {
+    const prev = kpiTrendsAndDeltas.snapshots[4]?.occupiedLocations ?? 0
+    const curr = kpiTrendsAndDeltas.snapshots[5]?.occupiedLocations ?? 0
+    return getDeltaNote(curr, prev, 'vị trí')
+  }, [kpiTrendsAndDeltas])
+
+  const emptyDelta = useMemo(() => {
+    const prev = kpiTrendsAndDeltas.snapshots[4]?.emptyLocations ?? 0
+    const curr = kpiTrendsAndDeltas.snapshots[5]?.emptyLocations ?? 0
+    return getDeltaNote(curr, prev, 'vị trí')
+  }, [kpiTrendsAndDeltas])
+
+  const capacityDelta = useMemo(() => {
+    const prev = kpiTrendsAndDeltas.snapshots[4]?.occupancyPercent ?? 0
+    const curr = kpiTrendsAndDeltas.snapshots[5]?.occupancyPercent ?? 0
+    return getDeltaNote(curr, prev, '%')
+  }, [kpiTrendsAndDeltas])
+
+  const valDelta = useMemo(() => {
+    const prev = kpiTrendsAndDeltas.snapshots[4]?.totalValue ?? 0
+    const curr = kpiTrendsAndDeltas.snapshots[5]?.totalValue ?? 0
+    return getDeltaNote(curr, prev, 'đ', true)
+  }, [kpiTrendsAndDeltas])
+
+  const qtyDelta = useMemo(() => {
+    const prev = kpiTrendsAndDeltas.snapshots[4]?.totalStock ?? 0
+    const curr = kpiTrendsAndDeltas.snapshots[5]?.totalStock ?? 0
+    return getDeltaNote(curr, prev, 'tấn')
+  }, [kpiTrendsAndDeltas])
 
   const warehouseOptions = useMemo(() => {
     const byId = new Map<string, { id: string; code: string; name: string }>()
@@ -552,122 +911,80 @@ export function InventoryLocationsPage() {
     active: zone.active,
     warehouseId: zone.warehouseId ?? '',
   })
-  // Thống kê theo tầng
-const levelStats = useMemo(() => {
-  const map = new Map<string, { count: number; stock: number }>();
-  rows.forEach((zone) => {
-    const level = zone.level || 'Khác';
-    if (!map.has(level)) map.set(level, { count: 0, stock: 0 });
-    const entry = map.get(level)!;
-    entry.count += zone.materialCount || 0;
-    entry.stock += zone.totalStockQuantity || 0;
-  });
-  return Array.from(map.entries())
-    .map(([level, data]) => ({ level, ...data }))
-    .sort((a, b) => b.stock - a.stock);
-}, [rows]);
 
-// Vật tư nhập nhiều nhất (dùng materialCount làm đại diện)
-const inboundZones = useMemo(() => {
-  return rows
-    .map((zone) => ({ code: zone.code, count: zone.materialCount || 0 }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}, [rows]);
-
-// Vật tư xuất nhiều nhất (dùng tồn thấp -> giả định xuất nhiều)
-const outboundZones = useMemo(() => {
-  return rows
-    .map((zone) => ({ code: zone.code, stock: zone.totalStockQuantity || 0 }))
-    .sort((a, b) => a.stock - b.stock)
-    .slice(0, 5);
-}, [rows]);
-// Lấy 10 giao dịch nhập gần nhất
-const recentInbound = useMemo(() => {
-  const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
-  return txRows
-    .filter((tx: any) => String(tx.type ?? '').toUpperCase() === 'INBOUND')
-    .sort((a: any, b: any) => {
-      const dateA = a.transactionDate ?? a.createdAt ?? 0
-      const dateB = b.transactionDate ?? b.createdAt ?? 0
-      return new Date(dateB).getTime() - new Date(dateA).getTime()
-    })
-    .slice(0, 10)
-}, [transactionsData])
-
-// Lấy 10 giao dịch xuất gần nhất
-const recentOutbound = useMemo(() => {
-  const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
-  return txRows
-    .filter((tx: any) => String(tx.type ?? '').toUpperCase() === 'OUTBOUND')
-    .sort((a: any, b: any) => {
-      const dateA = a.transactionDate ?? a.createdAt ?? 0
-      const dateB = b.transactionDate ?? b.createdAt ?? 0
-      return new Date(dateB).getTime() - new Date(dateA).getTime()
-    })
-    .slice(0, 10)
-}, [transactionsData])
-
-const topMaterials = useMemo(() => {
-  return auditRows
-    .filter((item: any) => n(item.currentStock) > 0)
-    .sort((a: any, b: any) => n(b.currentStock) - n(a.currentStock))
-    .slice(0, 5)
-    .map((item: any) => ({
-      code: item.materialCode ?? item.code,
-      stock: n(item.currentStock),
-    }))
-}, [auditRows])
+  const levelStats = useMemo(() => {
+    const map = new Map<string, { count: number; stock: number }>();
+    rows.forEach((zone) => {
+      const level = zone.level || 'Khác';
+      if (!map.has(level)) map.set(level, { count: 0, stock: 0 });
+      const entry = map.get(level)!;
+      entry.count += zone.materialCount || 0;
+      entry.stock += zone.totalStockQuantity || 0;
+    });
+    return Array.from(map.entries())
+      .map(([level, data]) => ({ level, ...data }))
+      .sort((a, b) => b.stock - a.stock);
+  }, [rows]);
 
   return <EnterpriseModulePage>
-    <div className="space-y-1 -mt-2">
+    <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
       <InventoryTabWorkspace />
-      <div className="grid gap-1.5 md:grid-cols-5">
-        <OverviewMetricCard
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
+        <InventoryMetricCard
           title="Tổng vị trí"
-          value={formatQuantity(stats.total, 0)}
-          note={`${stats.active} đang hoạt động`}
+          value={formatQuantity(rows.length, 0)}
+          note={locDelta.text}
+          noteClassName={locDelta.colorClass}
           tone="blue"
           icon={<MapPinned size={15} />}
-          trend={[0,0,0,0,0,0]}
+          trend={kpiTrendsAndDeltas.totalLocationsTrend}
         />
-        <OverviewMetricCard
-          title="Occupancy"
-          value={`${stats.occupancyPercent.toFixed(1)}%`}
-          note={`${formatQuantity(stats.occupiedSlots, 0)} occupied slots`}
+        <InventoryMetricCard
+          title="Đang sử dụng"
+          value={formatQuantity(zoneStatusStats.using, 0)}
+          note={occupiedDelta.text}
+          noteClassName={occupiedDelta.colorClass}
           tone="emerald"
           icon={<Layers3 size={15} />}
-          trend={[0,0,0,0,0,0]}
+          trend={kpiTrendsAndDeltas.occupiedLocationsTrend}
         />
-        <OverviewMetricCard
-          title="Free slots"
-          value={formatQuantity(stats.freeSlots, 0)}
-          note={`${formatQuantity(stats.occupiedSlots, 0)} đã dùng`}
+        <InventoryMetricCard
+          title="Vị trí trống"
+          value={formatQuantity(zoneStatusStats.empty, 0)}
+          note={emptyDelta.text}
+          noteClassName={emptyDelta.colorClass}
           tone="cyan"
           icon={<Package size={15} />}
-          trend={[0,0,0,0,0,0]}
+          trend={kpiTrendsAndDeltas.emptyLocationsTrend}
         />
-        <OverviewMetricCard
-          title="Occupied slots"
-          value={formatQuantity(stats.occupiedSlots, 0)}
-          note={`${formatQuantity(stats.materialCount, 0)} vật tư`}
+        <InventoryMetricCard
+          title="Hiệu suất sức chứa"
+          value={`${stats.occupancyPercent.toFixed(1)}%`}
+          note={capacityDelta.text}
+          noteClassName={capacityDelta.colorClass}
           tone="purple"
           icon={<Warehouse size={15} />}
-          trend={[0,0,0,0,0,0]}
+          trend={kpiTrendsAndDeltas.occupancyPercentTrend}
         />
-        <OverviewMetricCard
+        <InventoryMetricCard
           title="Tổng tồn theo vị trí"
           value={formatCurrency(stats.inventoryValue)}
-          note={`${formatQuantity(stats.stock, 0)} quantity`}
+          note={
+            <span className="flex items-center gap-1.5 truncate">
+              <span className={valDelta.colorClass}>{valDelta.text}</span>
+              <span className="text-slate-500 font-normal">·</span>
+              <span className={qtyDelta.colorClass}>{qtyDelta.text}</span>
+            </span>
+          }
           tone="amber"
           icon={<Warehouse size={15} />}
-          trend={[0,0,0,0,0,0]}
+          trend={kpiTrendsAndDeltas.totalStockTrend}
         />
       </div>
 
       <InventoryPanel>
-        <div className="grid gap-1.5 lg:grid-cols-[1fr_180px_220px_auto]">
-          <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className={inventoryInput} placeholder="Tìm mã, tên, row, column, level..." />
+        <div className="grid gap-1 lg:grid-cols-[1fr_180px_220px_auto]">
+          <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className={inventoryInput} placeholder="Tìm mã, tên, hàng, cột, tầng..." />
           <select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); setPage(1) }} className={inventoryInput}>
             <option value="all">Tất cả trạng thái</option>
             <option value="active">Đang hoạt động</option>
@@ -681,266 +998,477 @@ const topMaterials = useMemo(() => {
         </div>
       </InventoryPanel>
 
-      <div className="grid items-start gap-1.5 xl:grid-cols-[1fr_320px]">
-        {/* Cột trái: bảng + các chart mới */}
-        <div className="flex flex-col gap-1.5">
-          <InventoryPanel title="Danh sách vị trí kho" className="!p-0 pb-0">
-            <div className={`${inventoryTableShell} h-[240px] overflow-auto`}>
-              <table className="w-full min-w-[1160px] text-xs">
-                <thead className={inventoryTableHead}>
-                  <tr>
-                    <th className="px-2 py-2 text-left font-medium">Mã vị trí</th>
-                    <th className="px-2 py-2 text-left font-medium">Tên vị trí</th>
-                    <th className="px-2 py-2 text-left font-medium">Kho cha</th>
-                    <th className="px-2 py-2 text-left font-medium">Row</th>
-                    <th className="px-2 py-2 text-left font-medium">Slot</th>
-                    <th className="px-2 py-2 text-left font-medium">Tầng</th>
-                    <th className="px-2 py-2 text-right font-medium">Sức chứa</th>
-                    <th className="px-2 py-2 text-right font-medium">Ô/tầng</th>
-                    <th className="px-2 py-2 text-right font-medium">Occupancy</th>
-                    <th className="px-2 py-2 text-right font-medium">Vật tư</th>
-                    <th className="px-2 py-2 text-right font-medium">Tồn</th>
-                    <th className="px-2 py-2 text-right font-medium">Giá trị</th>
-                    <th className="px-2 py-2 text-left font-medium">Trạng thái</th>
-                    <th className="px-2 py-2 text-center font-medium">Thao tác</th>
+      {/* Row 1 Grid */}
+      <div className="grid grid-cols-12 gap-1">
+        {/* Vị trí kho */}
+         <LocationsChartCard title="Danh sách vị trí kho" heightClass={COCKPIT_HEIGHTS.CHART_XL} className="col-span-12 2xl:col-span-9">
+          <div className="flex flex-col h-full justify-between">
+            <div className="overflow-auto scrollbar-none flex-1">
+              <table className="w-full text-[14px] text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 text-xs font-semibold">
+                    <th className="py-2 px-1">Kho</th>
+                    <th className="py-2 px-1">Zone</th>
+                    <th className="py-2 px-1 text-center">Slot</th>
+                    <th className="py-2 px-1 text-center">Tầng</th>
+                    <th className="py-2 px-1 text-right">Khối lượng</th>
+                    <th className="py-2 px-1 text-right">Số vật tư</th>
+                    <th className="py-2 px-1 text-center">Trạng thái</th>
+                    <th className="py-2 px-1 text-center">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-white/5">
                   {pagedRows.map((zone) => {
-                    const zoneOccupied = countOccupiedFromOccupancy(zone.cellOccupancy)
-                    const zoneOccupancy = TOTAL_CELL_LEVELS > 0 ? (zoneOccupied / TOTAL_CELL_LEVELS) * 100 : 0
-                    const zoneValue = valueByZone.get(zone.code) ?? 0
+                    const status = !zone.active
+                      ? 'MAINTENANCE'
+                      : n(zone.totalStockQuantity) > 0
+                        ? 'USING'
+                        : 'EMPTY';
+
                     return (
-                    <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
-                      <td className="px-2 py-1.5 font-medium text-cyan-300">{zone.code}</td>
-                      <td className="px-2 py-1.5 text-white">{zone.name}</td>
-                      <td className="px-2 py-1.5 text-slate-300">{zone.warehouse?.name ?? '-'}</td>
-                      <td className="px-2 py-1.5 text-slate-300">{zone.row ?? '-'}</td>
-                      <td className="px-2 py-1.5 text-slate-300">{zone.column ?? '-'}</td>
-                      <td className="px-2 py-1.5 text-slate-300">{zone.level ?? '-'}</td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.capacity), 0)} t</td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(zoneOccupied, 0)} / {formatQuantity(TOTAL_CELL_LEVELS, 0)}</td>
-                      <td className="px-2 py-1.5 text-right text-cyan-300">{zoneOccupancy.toFixed(1)}%</td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.materialCount), 0)}</td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{formatQuantity(n(zone.totalStockQuantity), 0)}</td>
-                      <td className="px-2 py-1.5 text-right text-emerald-300">{formatCurrency(zoneValue)}</td>
-                      <td className="px-2 py-1.5">
-                        <span className={`inline-flex rounded-lg border px-2 py-1 text-xs ${zone.active ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-600 bg-slate-800/50 text-slate-400'}`}>
-                          {zone.active ? 'Hoạt động' : 'Ngưng dùng'}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <div className="flex justify-center gap-1.5">
-                          <IconButton title="Chi tiết" onClick={(event) => { event.stopPropagation(); setDetailId(zone.id) }}><Eye size={14} /></IconButton>
-                          <IconButton title="Sửa" onClick={(event) => { event.stopPropagation(); edit(zone) }}><Edit3 size={14} /></IconButton>
-                          <IconButton title={zone.active ? 'Ngưng dùng' : 'Kích hoạt'} onClick={(event) => { event.stopPropagation(); zone.active ? deactivateMutation.mutate(zone.id) : activateMutation.mutate(zone.id) }}>
-                            {zone.active ? <PowerOff size={14} /> : <Power size={14} />}
-                          </IconButton>
-                          <IconButton title="Xóa (soft delete)" onClick={(event) => { event.stopPropagation(); deleteMutation.mutate(zone.id) }}><Trash2 size={14} /></IconButton>
-                        </div>
-                      </td>
-                    </tr>
-                    )
+                      <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
+                        <td className="py-2.5 px-1 text-slate-300 font-medium">
+                          {zone.warehouse?.code === 'MAIN'
+                            ? 'Kho chính'
+                            : zone.warehouse?.code === 'PRODUCTION'
+                              ? 'Kho sản xuất'
+                              : (zone.warehouse?.code || '-')}
+                        </td>
+                        <td className="py-2.5 px-1 font-semibold text-cyan-300">{zone.code}</td>
+                        <td className="py-2.5 px-1 text-center text-slate-200">{zone.column || '-'}</td>
+                        <td className="py-2.5 px-1 text-center text-slate-200">{zone.level || '-'}</td>
+                        <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
+                          {formatQuantity(n(zone.totalStockQuantity), 1)} tấn
+                        </td>
+                        <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
+                          {formatQuantity(n(zone.materialCount), 0)}
+                        </td>
+                        <td className="py-2.5 px-1 text-center">
+                          {status === 'MAINTENANCE' && (
+                            <span className="border border-amber-400/30 bg-amber-500/10 text-amber-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                              Bảo trì
+                            </span>
+                          )}
+                          {status === 'USING' && (
+                            <span className="border border-cyan-400/30 bg-cyan-500/10 text-cyan-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                              Đang dùng
+                            </span>
+                          )}
+                          {status === 'EMPTY' && (
+                            <span className="border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                              Trống
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-1" onClick={(event) => event.stopPropagation()}>
+                          <div className="flex justify-center gap-1">
+                            <button type="button" title="Chi tiết" onClick={() => setDetailId(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Eye size={12} /></button>
+                            <button type="button" title="Sửa" onClick={() => edit(zone)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Edit3 size={12} /></button>
+                            <button type="button" title={zone.active ? 'Ngưng dùng' : 'Kích hoạt'} onClick={() => zone.active ? deactivateMutation.mutate(zone.id) : activateMutation.mutate(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200">
+                              {zone.active ? <PowerOff size={12} /> : <Power size={12} />}
+                            </button>
+                            <button type="button" title="Xóa" onClick={() => deleteMutation.mutate(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Trash2 size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
                   })}
                 </tbody>
               </table>
             </div>
-            <MaterialsPagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            {isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải vị trí kho...</p> : null}
-          </InventoryPanel>
-
-          
-
-          {/* Hàng chart 2: Top 10 nhập + Top 10 xuất (nằm song song nhau) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
-            <InventoryChartCard title="Top 10 vật tư nhập gần nhất" className="p-2">
-              <div className="space-y-1">
-                {recentInbound.length === 0 ? (
-                  <div className="text-center text-xs text-slate-500 py-4">Chưa có giao dịch nhập</div>
-                ) : (
-                  recentInbound.map((tx: any, index: number) => {
-                    const firstItem = tx.items?.[0]?.inventoryItem
-                    return (
-                      <div key={tx.id} className="flex justify-between text-xs border-b border-white/5 py-1">
-                        <span className="text-slate-300">{index+1}. {firstItem?.code ?? tx.itemCode ?? 'N/A'}</span>
-                        <span className="text-cyan-300">
-                          {firstItem?.name ?? tx.itemName ?? ''}
-                          <span className="ml-2 text-slate-500">
-                            {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('vi-VN') : ''}
-                          </span>
-                        </span>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </InventoryChartCard>
-
-            <InventoryChartCard title="Top 10 vật tư xuất gần nhất" className="p-2">
-              <div className="space-y-1">
-                {recentOutbound.length === 0 ? (
-                  <div className="text-center text-xs text-slate-500 py-4">Chưa có giao dịch xuất</div>
-                ) : (
-                  recentOutbound.map((tx: any, index: number) => {
-                    const firstItem = tx.items?.[0]?.inventoryItem
-                    return (
-                      <div key={tx.id} className="flex justify-between text-xs border-b border-white/5 py-1">
-                        <span className="text-slate-300">{index+1}. {firstItem?.code ?? tx.itemCode ?? 'N/A'}</span>
-                        <span className="text-red-300">
-                          {firstItem?.name ?? tx.itemName ?? ''}
-                          <span className="ml-2 text-slate-500">
-                            {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('vi-VN') : ''}
-                          </span>
-                        </span>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </InventoryChartCard>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
-            <InventoryChartCard title="Top occupied slots" className="p-2">
-              <div className="space-y-2">
-                {topOccupiedSlots.length ? topOccupiedSlots.map((slot, index) => (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    onClick={() => setSelectedSlot(slot)}
-                    className="block w-full rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-semibold text-cyan-300">#{index + 1} {slot.label}</div>
-                        <div className="mt-1 text-xs text-slate-500">{slot.materials.length} vật tư trong slot</div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="font-semibold text-slate-100">{formatQuantity(slot.quantity, 3)}</div>
-                        <div className="mt-1 text-xs text-emerald-300">{formatCurrency(slot.value)}</div>
-                      </div>
-                    </div>
-                  </button>
-                )) : (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
-                    Chưa có slot đang chứa vật tư.
-                  </div>
-                )}
-              </div>
-            </InventoryChartCard>
-
-            <InventoryChartCard title="Luồng điều chuyển theo slot" className="p-2">
-              <div className="space-y-2">
-                {movementRoutes.length ? movementRoutes.map((route) => (
-                  <div key={`${route.source}-${route.destination}`} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-slate-100">{route.source} → {route.destination}</div>
-                        <div className="mt-1 text-xs text-slate-500">{formatQuantity(route.count, 0)} lần · {formatQuantity(route.quantity, 3)} lượng</div>
-                      </div>
-                      <div className="shrink-0 text-right text-emerald-300">{formatCurrency(route.value)}</div>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.035] p-6 text-center text-sm text-slate-500">
-                    Chưa có giao dịch điều chuyển đủ source/destination slot.
-                  </div>
-                )}
-              </div>
-            </InventoryChartCard>
-          </div>
-        </div>
-
-        {/* Cột phải: 3 chart cũ */}
-        <div className="space-y-1.5 self-start">
-          <InventoryChartCard title="Top 5 vị trí có tồn cao nhất" className="p-2">
-            <div className="space-y-2">
-              {stockByLocation.slice(0, 5).map(([code, value], index) => {
-                const percent = value / (stockByLocation[0]?.[1] || 1) * 100;
-                return (
-                  <div key={code}>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-300">#{index+1} {code}</span>
-                      <span className="text-cyan-300">{formatQuantity(value, 0)} tấn</span>
-                    </div>
-                    <div className="mt-1 h-2 rounded-full bg-slate-700">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400"
-                        style={{ width: `${Math.max(2, percent)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="mt-1 shrink-0">
+              <DataTablePagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </div>
-          </InventoryChartCard>
-          <InventoryChartCard title="Giá trị tồn theo vị trí" className="p-2">
-            <HorizontalBars
-              rows={valueByLocation.map((item) => [item.code, item.value])}
-              valueFormatter={(value) => formatCurrency(value)}
+          </div>
+        </LocationsChartCard>
+
+        {/* Right column: Stacked vertical sidebar */}
+         <div className="col-span-12 2xl:col-span-3 flex flex-col gap-1">
+          {/* Hiệu suất sức chứa */}
+          <LocationsChartCard title="Hiệu suất sức chứa" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="pt-1">
+              <CompactDonutSummary
+                segments={[
+                  { label: 'Đang dùng', value: occupiedSlots, color: '#06b6d4' },
+                  { label: 'Trống', value: freeSlots, color: '#10b981' },
+                  { label: 'Bảo trì', value: maintenanceSlots, color: '#f59e0b' },
+                ]}
+                centerValue={`${occupancyPercent.toFixed(0)}%`}
+                centerLabel="Đã sử dụng"
+              />
+            </div>
+          </LocationsChartCard>
+
+          {/* Trạng thái vị trí */}
+          <LocationsChartCard title="Trạng thái vị trí" heightClass={COCKPIT_HEIGHTS.CHART_SM_ALT}>
+            <VerticalBarChart
+              data={[
+                { label: 'Đang dùng', value: zoneStatusStats.using, color: '#06b6d4' },
+                { label: 'Trống', value: zoneStatusStats.empty, color: '#10b981' },
+                { label: 'Bảo trì', value: zoneStatusStats.maintenance, color: '#f59e0b' },
+              ]}
             />
-          </InventoryChartCard>
-          <InventoryChartCard title="Top 5 vật tư tồn cao nhất" className="p-2">
-            <div className="space-y-2">
-              {topMaterials.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-4">Chưa có dữ liệu</div>
-              ) : (
-                topMaterials.map((item, index) => {
-                  const maxStock = topMaterials[0]?.stock || 1;
-                  const percent = (item.stock / maxStock) * 100;
-                  return (
-                    <div key={item.code}>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-300">#{index+1} {item.code}</span>
-                        <span className="text-cyan-300">{formatQuantity(item.stock, 0)} tấn</span>
-                      </div>
-                      <div className="mt-1 h-2 rounded-full bg-slate-700">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-400"
-                          style={{ width: `${Math.max(2, percent)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </InventoryChartCard>
-          {/* Cột phải: 1 chart mới - Hiệu suất sức chứa */}
-          <div className="space-y-1.5 self-start">
-            <InventoryChartCard title="Hiệu suất sức chứa" className="p-2">
-              <div className="space-y-2">
-                {rows.slice(0, 6).map((zone) => {
-                  const used = n(zone.totalStockQuantity);
-                  const capacity = n(zone.capacity);
-                  const percent = capacity > 0 ? (used / capacity) * 100 : 0;
-                  return (
-                    <div key={zone.id}>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-300">{zone.code}</span>
-                        <span className="text-cyan-300">
-                          {formatQuantity(used, 0)} / {formatQuantity(capacity, 0)} tấn
-                          <span className="ml-2 text-slate-500">({percent.toFixed(0)}%)</span>
-                        </span>
-                      </div>
-                      <div className="mt-1 h-2 rounded-full bg-slate-700">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-                          style={{ width: `${Math.min(100, percent)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </InventoryChartCard>
-          </div>
+          </LocationsChartCard>
+
+          {/* Phân bố loại vật tư */}
+          <LocationsChartCard title="Phân bố loại vật tư" heightClass={COCKPIT_HEIGHTS.CHART_SM_ALT}>
+            <CompactPieChart
+              segments={[
+                { label: 'Vật tư chính', value: materialTypeDistribution.primary, color: '#3b82f6' },
+                { label: 'Vật tư phụ', value: materialTypeDistribution.secondary, color: '#a855f7' },
+                { label: 'Vật tư tiêu hao', value: materialTypeDistribution.consumable, color: '#f97316' },
+              ]}
+            />
+          </LocationsChartCard>
         </div>
+      </div>
+
+      {/* Grid of the remaining charts */}
+      <div className="grid grid-cols-12 gap-1">
+        {/* Row 2 */}
+        <LocationsChartCard
+          title="Giá trị tồn theo vị trí"
+          heightClass={COCKPIT_HEIGHTS.PANEL_MD}
+          className="col-span-12 xl:col-span-6"
+          action={
+            <button
+              type="button"
+              onClick={() => setModalType('value')}
+              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+            >
+              Xem tất cả
+            </button>
+          }
+        >
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
+            <table className="w-full text-[11px] text-left">
+              <thead>
+                <tr className="border-b border-white/10 text-slate-400 font-medium">
+                  <th className="py-1 px-2">Kho</th>
+                  <th className="py-1 px-2 text-right">Giá trị</th>
+                  <th className="py-1 px-2 text-right">%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {previewValueByLocation.map((item) => {
+                  const pct = inventoryValue > 0 ? (item.value / inventoryValue) * 100 : 0
+                  return (
+                    <tr key={item.code} className="hover:bg-white/5">
+                      <td className="py-1 px-2 font-medium text-cyan-300">{item.code}</td>
+                      <td className="py-1 px-2 text-right text-slate-200">{formatShortCurrency(item.value)}</td>
+                      <td className="py-1 px-2 text-right text-emerald-400 font-mono">{pct.toFixed(1)}%</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </LocationsChartCard>
+
+        <LocationsChartCard
+          title="Vị trí tồn kho cao nhất"
+          heightClass={COCKPIT_HEIGHTS.PANEL_MD}
+          className="col-span-12 xl:col-span-6"
+          action={
+            <button
+              type="button"
+              onClick={() => setModalType('maxStock')}
+              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+            >
+              Xem tất cả
+            </button>
+          }
+        >
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
+            <table className="w-full text-[11px] text-left">
+              <thead>
+                <tr className="border-b border-white/10 text-slate-400 font-medium">
+                  <th className="py-1 px-2">Vị trí</th>
+                  <th className="py-1 px-2 text-right">Khối lượng</th>
+                  <th className="py-1 px-2 text-right">%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {previewStockByLocation.map(([code, stock]) => {
+                  const pct = stats.stock > 0 ? (stock / stats.stock) * 100 : 0
+                  return (
+                    <tr key={code} className="hover:bg-white/5">
+                      <td className="py-1 px-2 font-medium text-cyan-300">{code}</td>
+                      <td className="py-1 px-2 text-right text-slate-200">{formatQuantity(stock, 1)} tấn</td>
+                      <td className="py-1 px-2 text-right text-emerald-400 font-mono">{pct.toFixed(1)}%</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </LocationsChartCard>
+
+        {/* Row 3 */}
+        <LocationsChartCard
+          title="Vật tư nhập gần nhất"
+          heightClass={COCKPIT_HEIGHTS.PANEL_SM}
+          className="col-span-12 xl:col-span-6"
+          action={
+            <button
+              type="button"
+              onClick={() => setModalType('recentInbound')}
+              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+            >
+              Xem tất cả
+            </button>
+          }
+        >
+          {previewRecentInbound.length === 0 ? (
+            <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
+              <table className="w-full text-[11px] text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 font-medium">
+                    <th className="py-1 px-2">Mã</th>
+                    <th className="py-1 px-2">Vật tư</th>
+                    <th className="py-1 px-2 text-right">Số lượng</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {previewRecentInbound.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-white/5">
+                      <td className="py-1 px-2 font-medium text-cyan-300">{item.code}</td>
+                      <td className="py-1 px-2 text-slate-300 truncate max-w-[120px]" title={item.name}>{item.name}</td>
+                      <td className="py-1 px-2 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </LocationsChartCard>
+
+        <LocationsChartCard
+          title="Vật tư xuất gần nhất"
+          heightClass={COCKPIT_HEIGHTS.PANEL_SM}
+          className="col-span-12 xl:col-span-6"
+          action={
+            <button
+              type="button"
+              onClick={() => setModalType('recentOutbound')}
+              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+            >
+              Xem tất cả
+            </button>
+          }
+        >
+          {previewRecentOutbound.length === 0 ? (
+            <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
+              <table className="w-full text-[11px] text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 font-medium">
+                    <th className="py-1 px-2">Mã</th>
+                    <th className="py-1 px-2">Vật tư</th>
+                    <th className="py-1 px-2 text-right">Số lượng</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {previewRecentOutbound.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-white/5">
+                      <td className="py-1 px-2 font-medium text-cyan-300">{item.code}</td>
+                      <td className="py-1 px-2 text-slate-300 truncate max-w-[120px]" title={item.name}>{item.name}</td>
+                      <td className="py-1 px-2 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </LocationsChartCard>
+
+        {/* Row 4 */}
+        <LocationsChartCard title="Vật tư tồn nhiều nhất" heightClass={COCKPIT_HEIGHTS.CHART_RANK} className="col-span-12 xl:col-span-6">
+          <div className="space-y-1 pt-1">
+            {previewTopMaterials.map((item) => (
+              <div key={item.code}>
+                <div className="flex items-center justify-between text-xs mb-0.5">
+                  <span className="font-semibold text-cyan-300">{item.code} <span className="text-slate-400 font-normal ml-1 truncate max-w-[120px] inline-block align-bottom">{item.name}</span></span>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span className="text-slate-200">{formatQuantity(item.stock, 0)} tấn</span>
+                    <span className="text-slate-500">·</span>
+                    <span className="text-emerald-300">{formatShortCurrency(item.value)}</span>
+                  </div>
+                </div>
+                <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
+                    style={{ width: `${item.percent}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+            {previewTopMaterials.length === 0 && (
+              <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu vật tư tồn kho</div>
+            )}
+          </div>
+        </LocationsChartCard>
+
+        <LocationsChartCard title="Phân bố sức chứa theo kho" heightClass={COCKPIT_HEIGHTS.CHART_RANK} className="col-span-12 xl:col-span-6">
+          <div className="space-y-1 pt-1">
+            {previewZoneCapacity.map((zone) => {
+              const percent = zone.capacity > 0 ? (zone.stock / zone.capacity) * 100 : 0
+              return (
+                <div key={zone.id}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-medium text-cyan-300 truncate max-w-[200px]" title={zone.name}>{zone.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 font-mono">{formatQuantity(zone.stock, 1)} / {formatQuantity(zone.capacity, 0)} tấn</span>
+                      <span className="text-emerald-400 font-semibold font-mono">({percent.toFixed(0)}%)</span>
+                      <span className="text-slate-500 font-mono">{zone.occupiedSlots} ô đang dùng</span>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                      style={{ width: `${Math.min(100, percent)}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+            {previewZoneCapacity.length === 0 && (
+              <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu phân bố sức chứa</div>
+            )}
+          </div>
+        </LocationsChartCard>
       </div>
     </div>
     {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
     {selectedSlot ? <SlotMaterialDrawer slot={selectedSlot} onClose={() => setSelectedSlot(null)} /> : null}
+    {modalType && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
+        <div className="max-h-[70vh] w-full max-w-3xl overflow-auto rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between scrollbar-thin">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 shrink-0">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
+              {modalType === 'value' && 'Giá trị tồn theo vị trí'}
+              {modalType === 'maxStock' && 'Vị trí tồn kho cao nhất'}
+              {modalType === 'recentInbound' && 'Vật tư nhập gần nhất'}
+              {modalType === 'recentOutbound' && 'Vật tư xuất gần nhất'}
+            </h3>
+            <button
+              onClick={() => setModalType(null)}
+              className="rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 hover:text-white transition"
+            >
+              Đóng
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto">
+            {modalType === 'value' && (
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                    <th className="py-2 px-3">Kho</th>
+                    <th className="py-2 px-3 text-right">Giá trị</th>
+                    <th className="py-2 px-3 text-right">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {valueByLocation.map((item) => {
+                    const pct = inventoryValue > 0 ? (item.value / inventoryValue) * 100 : 0
+                    return (
+                      <tr key={item.code} className="hover:bg-white/5">
+                        <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
+                        <td className="py-2 px-3 text-right text-slate-200">{formatShortCurrency(item.value)}</td>
+                        <td className="py-2 px-3 text-right text-emerald-400 font-mono">{pct.toFixed(1)}%</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {modalType === 'maxStock' && (
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                    <th className="py-2 px-3">Vị trí</th>
+                    <th className="py-2 px-3 text-right">Khối lượng</th>
+                    <th className="py-2 px-3 text-right">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {stockByLocation.map(([code, stock]) => {
+                    const pct = stats.stock > 0 ? (stock / stats.stock) * 100 : 0
+                    return (
+                      <tr key={code} className="hover:bg-white/5">
+                        <td className="py-2 px-3 font-medium text-cyan-300">{code}</td>
+                        <td className="py-2 px-3 text-right text-slate-200">{formatQuantity(stock, 1)} tấn</td>
+                        <td className="py-2 px-3 text-right text-emerald-400 font-mono">{pct.toFixed(1)}%</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {modalType === 'recentInbound' && (
+              recentInboundData.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
+              ) : (
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                      <th className="py-2 px-3">Ngày</th>
+                      <th className="py-2 px-3">Mã</th>
+                      <th className="py-2 px-3">Tên</th>
+                      <th className="py-2 px-3 text-right">Số lượng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {recentInboundData.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-white/5">
+                        <td className="py-2 px-3 text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</td>
+                        <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
+                        <td className="py-2 px-3 text-slate-200 max-w-[240px] truncate" title={item.name}>{item.name}</td>
+                        <td className="py-2 px-3 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            )}
+
+            {modalType === 'recentOutbound' && (
+              recentOutboundData.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
+              ) : (
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                      <th className="py-2 px-3">Ngày</th>
+                      <th className="py-2 px-3">Mã</th>
+                      <th className="py-2 px-3">Tên</th>
+                      <th className="py-2 px-3 text-right">Số lượng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {recentOutboundData.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-white/5">
+                        <td className="py-2 px-3 text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</td>
+                        <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
+                        <td className="py-2 px-3 text-slate-200 max-w-[240px] truncate" title={item.name}>{item.name}</td>
+                        <td className="py-2 px-3 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    )}
   </EnterpriseModulePage>
 }
 
@@ -950,7 +1478,7 @@ function SlotMaterialDrawer({ slot, onClose }: { slot: SlotMaterialView; onClose
       <aside className="h-full w-full max-w-3xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#071321]/95 px-6 py-5 backdrop-blur">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Vật tư trong slot</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Vật tư trong ô chứa</p>
             <h2 className="mt-1 text-2xl font-bold">{slot.label}</h2>
             <p className="mt-1 text-sm text-slate-400">{formatQuantity(slot.quantity, 3)} tổng lượng · {formatCurrency(slot.value)}</p>
           </div>
@@ -959,8 +1487,8 @@ function SlotMaterialDrawer({ slot, onClose }: { slot: SlotMaterialView; onClose
 
         <div className="space-y-4 p-6">
           <div className="grid gap-3 md:grid-cols-3">
-            <InfoBox label="Zone" value={slot.zoneCode} />
-            <InfoBox label="Slot" value={slot.slotId} />
+            <InfoBox label="Khu vực" value={slot.zoneCode} />
+            <InfoBox label="Ô chứa" value={slot.slotId} />
             <InfoBox label="Tầng" value={slot.level} />
           </div>
 
@@ -987,7 +1515,7 @@ function SlotMaterialDrawer({ slot, onClose }: { slot: SlotMaterialView; onClose
                 ))}
               </tbody>
             </table>
-            {!slot.materials.length ? <p className="border-t border-slate-800 px-4 py-6 text-center text-sm text-slate-500">Slot này chưa có danh sách vật tư chi tiết từ API.</p> : null}
+            {!slot.materials.length ? <p className="border-t border-slate-800 px-4 py-6 text-center text-sm text-slate-500">Ô này chưa có danh sách vật tư chi tiết từ API.</p> : null}
           </div>
         </div>
       </aside>
@@ -1000,8 +1528,15 @@ function IconButton({ title, onClick, children }: { title: string; onClick: (eve
 }
 
 function AuditChip({ value }: { value: string }) {
+  const labels: Record<string, string> = {
+    'Real storage location': 'Vị trí lưu kho thật',
+    'Demo record': 'Bản ghi demo',
+    'Warehouse-like record': 'Cấu trúc kho',
+    'Needs review': 'Cần kiểm tra',
+  }
+  const displayValue = labels[value] || value
   const tone = value === 'Real storage location' ? 'bg-emerald-950 text-emerald-300' : value === 'Demo record' ? 'bg-red-950 text-red-300' : value === 'Warehouse-like record' ? 'bg-amber-950 text-amber-300' : 'bg-slate-800 text-slate-300'
-  return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{value}</span>
+  return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{displayValue}</span>
 }
 
 function AuditRow({ icon, label, value, note }: { icon: ReactNode; label: string; value: number; note: string }) {
@@ -1031,9 +1566,9 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
         {!warehouses.length ? <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
           Chưa tải được danh sách kho cha. Cần có dữ liệu MAIN/PRODUCTION trong master warehouses.
         </div> : null}
-        <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inventoryInput} placeholder="Row, ví dụ A" />
-        <input value={form.column} onChange={(e) => setForm({ ...form, column: e.target.value })} className={inventoryInput} placeholder="Slot, ví dụ 01" />
-        <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} className={inventoryInput} placeholder="Tầng, ví dụ L1" />
+        <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inventoryInput} placeholder="Hàng (Row), ví dụ A" />
+        <input value={form.column} onChange={(e) => setForm({ ...form, column: e.target.value })} className={inventoryInput} placeholder="Cột (Slot), ví dụ 01" />
+        <input value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} className={inventoryInput} placeholder="Tầng (Level), ví dụ L1" />
         <input value={form.capacity} onFocus={(e) => setForm({ ...form, capacity: formatQuantityInput(e.target.value) })} onBlur={(e) => setForm({ ...form, capacity: formatQuantity(e.target.value) })} onChange={(e) => setForm({ ...form, capacity: formatQuantityInput(e.target.value) })} className={inventoryInput} inputMode="decimal" placeholder="Sức chứa vận hành, ví dụ 100 tấn" />
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inventoryInput} h-24 py-2 md:col-span-2`} placeholder="Ghi chú vị trí" />
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Đang hoạt động</label>
@@ -1068,7 +1603,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Chi tiết vị trí kho</p>
           <h2 className="mt-1 text-2xl font-bold">{detail ? `${detail.code} · ${detail.name}` : 'Đang tải...'}</h2>
-          <p className="mt-1 text-sm text-slate-400">Read-only Phase 1 · chưa hỗ trợ kéo thả hoặc thay đổi tồn kho.</p>
+          <p className="mt-1 text-sm text-slate-400">Chế độ xem (Phase 1) · chưa hỗ trợ kéo thả hoặc thay đổi tồn kho trực tiếp.</p>
         </div>
         <button onClick={onClose} className="rounded-lg border border-slate-700 p-2.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><X size={18} /></button>
       </div>
@@ -1088,8 +1623,8 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
               <InfoBox label="Tên vị trí" value={detail.name} />
               <InfoBox label="Kho cha" value={detail.warehouse?.name ?? '-'} />
               <InfoBox label="Trạng thái" value={detail.active ? 'Hoạt động' : 'Ngưng dùng'} />
-              <InfoBox label="Row" value={detail.row ?? '-'} />
-              <InfoBox label="Slot" value={detail.column ?? '-'} />
+              <InfoBox label="Hàng" value={detail.row ?? '-'} />
+              <InfoBox label="Cột" value={detail.column ?? '-'} />
               <InfoBox label="Tầng" value={detail.level ?? '-'} />
             </div>
             {detail.description ? <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-sm text-slate-400">{detail.description}</p> : null}
@@ -1119,8 +1654,8 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
                   <tr>
                     <th className="px-4 py-3">Mã vật tư</th>
                     <th className="px-4 py-3">Tên vật tư</th>
-                    <th className="px-4 py-3">Slot</th>
-                    <th className="px-4 py-3">Level</th>
+                    <th className="px-4 py-3">Cột</th>
+                    <th className="px-4 py-3">Tầng</th>
                     <th className="px-4 py-3 text-right">Số lượng</th>
                     <th className="px-4 py-3">Đơn vị</th>
                   </tr>
@@ -1162,11 +1697,11 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
             </div>
           </SectionCard>
 
-          <SectionCard title="Nhóm vật tư theo level">
+          <SectionCard title="Nhóm vật tư theo tầng">
             <div className="space-y-1.5 self-start">
               {levelGroups.map((group) => <div key={group.level} className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-100"><Layers3 size={15} className="text-cyan-300" />{group.level}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-100"><Layers3 size={15} className="text-cyan-300" />Tầng {group.level}</span>
                   <span className="text-xs text-slate-400">{group.items.length} vật tư</span>
                 </div>
                 <div className="mt-3 space-y-2">
@@ -1176,7 +1711,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
                   </div>)}
                 </div>
               </div>)}
-              {!levelGroups.length ? <p className="text-sm text-slate-500">Chưa có dữ liệu level để nhóm vật tư.</p> : null}
+              {!levelGroups.length ? <p className="text-sm text-slate-500">Chưa có dữ liệu phân tầng để nhóm vật tư.</p> : null}
             </div>
           </SectionCard>
         </div> : null}
@@ -1185,7 +1720,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
           <LayeredSlotDetail detail={detail} />
         </SectionCard> : null}
 
-        {activeTab === 'map' ? <SectionCard title="2D visual preview">
+        {activeTab === 'map' ? <SectionCard title="Sơ đồ 2D ô chứa">
           <Location2DPreview detail={detail} />
         </SectionCard> : null}
       </div> : <p className="p-6 text-sm text-slate-500">Đang tải chi tiết...</p>}
@@ -1241,7 +1776,7 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
       <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded bg-cyan-400" />Vị trí đang xem</span>
       <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded bg-emerald-500" />Có vật tư</span>
       <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded border border-slate-700 bg-slate-900" />Ô trống</span>
-      <span className="ml-auto text-slate-500">Preview dùng row/column/level hiện có, chưa phải map kéo thả.</span>
+      <span className="ml-auto text-slate-500">Mô phỏng sử dụng hàng/cột/tầng hiện có, chưa hỗ trợ kéo thả.</span>
     </div>
     <div className="grid gap-4 xl:grid-cols-[0.82fr_0.38fr]">
       <div className="overflow-auto rounded-xl border border-slate-800 bg-slate-950/60 p-3">
@@ -1258,7 +1793,7 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
             return <button type="button" onClick={() => setSelectedCell({ row, column })} key={`${row}-${column}`} className={`min-h-[54px] rounded-lg border p-1.5 text-left transition ${isClicked ? 'ring-2 ring-cyan-300/70 border-cyan-300 bg-cyan-400/16 shadow-[0_0_22px_rgba(34,211,238,0.20)]' : isOccupied ? 'border-emerald-500/70 bg-emerald-500/14' : 'border-slate-800 bg-slate-900/45 hover:border-slate-600'}`}>
               <div className="flex h-full flex-col justify-between">
                 <span className={`text-xs font-semibold ${isClicked ? 'text-cyan-200' : 'text-slate-500'}`}>{row}{column}</span>
-                <span className={`text-[10px] uppercase tracking-[0.12em] ${isOccupied ? 'text-emerald-300' : isClicked ? 'text-cyan-300' : 'text-slate-600'}`}>{isOccupied ? `${cellMaterials.length} item` : isClicked ? 'Selected' : 'Empty'}</span>
+                <span className={`text-[10px] uppercase tracking-[0.12em] ${isOccupied ? 'text-emerald-300' : isClicked ? 'text-cyan-300' : 'text-slate-600'}`}>{isOccupied ? `${cellMaterials.length} mã` : isClicked ? 'Đang chọn' : 'Trống'}</span>
               </div>
             </button>
           }),
@@ -1281,7 +1816,7 @@ function Location2DPreview({ detail }: { detail: WarehouseLocationDetail }) {
     <div className="grid gap-3 md:grid-cols-3">
       <InfoBox label="Số tầng mẫu" value={LOCATION_LEVELS.join('-')} />
       <InfoBox label="Ô đang xem" value={selectedCellCode} />
-      <InfoBox label="Trạng thái ô" value={selectedCellMaterials.length ? 'Occupied' : 'Empty'} />
+      <InfoBox label="Trạng thái ô" value={selectedCellMaterials.length ? 'Đã dùng' : 'Trống'} />
     </div>
   </div>
 }
@@ -1344,7 +1879,7 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
             const active = selectedCell === cell
             return <button key={cell} type="button" onClick={() => setSelectedCell(cell)} className={`rounded-lg border px-2 py-2 text-left text-xs transition ${active ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.18)]' : count ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-200' : 'border-slate-800 bg-slate-900/55 text-slate-500 hover:border-slate-600'}`}>
               <div className="font-semibold">{cell}</div>
-              <div className="mt-1 text-[10px]">{count ? `${count} item` : 'Trống'}</div>
+              <div className="mt-1 text-[10px]">{count ? `${count} mã` : 'Trống'}</div>
             </button>
           }))}
         </div>
@@ -1352,7 +1887,7 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
 
       <div className="grid grid-cols-2 gap-3">
         <InfoBox label="Khu vực" value={detail.warehouse?.name ?? '-'} />
-        <InfoBox label="Zone" value={detail.code} />
+        <InfoBox label="Phân khu" value={detail.code} />
         <InfoBox label="Ô (Slot)" value={selectedCell} />
         <InfoBox label="Tầng đang nổi bật" value={selectedLevel} />
         <InfoBox label="Sức chứa tối đa" value={`${formatQuantity(n(detail.capacity), 0)} tấn`} />
@@ -1366,7 +1901,7 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">Mô phỏng phân tầng</p>
           <h4 className="mt-1 text-xl font-bold text-white">Ô {selectedCell}</h4>
         </div>
-        <span className="text-xs text-slate-500">CSS isometric preview</span>
+        <span className="text-xs text-slate-500">Mô phỏng trực quan 2.5D</span>
       </div>
       <div className="grid gap-6 lg:grid-cols-[120px_1fr]">
         <div className="space-y-3 pt-4">
@@ -1380,9 +1915,9 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
             {group.level}
           </button>)}
         </div>
-        <div className="relative min-h-[330px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40">
+        <div className={`relative ${COCKPIT_HEIGHTS.LOCATION_MAP_MIN} overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40`}>
           <div className="absolute inset-x-8 bottom-8 h-8 rounded-[40%] bg-black/35 blur-md" />
-          <div className="absolute left-1/2 top-10 h-[260px] w-[360px] -translate-x-1/2">
+          <div className={`absolute left-1/2 top-10 ${COCKPIT_HEIGHTS.LOCATION_STACK} w-[360px] -translate-x-1/2`}>
             {levelStats.map((group, index) => <button type="button" onClick={() => setSelectedLevel(group.level)} key={group.level} className="absolute left-0 w-full text-left" style={{ top: `${index * 58}px` }}>
               <div className={`relative h-14 skew-x-[-18deg] rounded-lg border transition ${
                 selectedLevel === group.level

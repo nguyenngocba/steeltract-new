@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
+import { Layers3, MapPinned, Package, Warehouse } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleKpiStrip, ModuleLoadingState, ModulePageHeader } from '../../../../shared/ui/modules'
+import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState, ModulePageHeader } from '../../../../shared/ui/modules'
+import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { useProjects } from '../../../inventory/hooks/useProjects'
 import {
-  InventoryChartCard,
-  InventoryKpi,
-  inventoryGridGap,
   inventoryInput,
-  inventoryPageStack,
   inventoryTableHead,
   inventoryTableRow,
 } from '../../../inventory/components/InventoryVisuals'
@@ -34,7 +32,6 @@ import {
   ComponentsDonut,
   ComponentsMiniBars,
   ComponentsSelect,
-  componentsInput,
   componentsMutedButton,
   componentsPrimaryButton,
 } from './ComponentsCockpitShared'
@@ -66,6 +63,7 @@ type ComponentRow = {
   workOrder: string
   dueDate?: string
   productionStatus?: string
+  rawCreatedAt?: string
   createdAt: string
 }
 
@@ -116,6 +114,77 @@ function componentTypeBucket(type: string) {
   return 'Assembly'
 }
 
+function componentStatusBadgeClass(status: string) {
+  const normalized = String(status ?? '').toUpperCase()
+  if (['READY', 'COMPLETED', 'DONE', 'FINISHED', 'INSTALLED'].includes(normalized)) {
+    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+  }
+  if (['CUTTING', 'WELDING', 'PAINTING', 'IN_PROGRESS', 'RUNNING', 'ACTIVE'].includes(normalized)) {
+    return 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+  }
+  if (['SHIPPED', 'DELIVERED'].includes(normalized)) {
+    return 'border-blue-400/30 bg-blue-400/10 text-blue-300'
+  }
+  if (['FAILED', 'REJECTED', 'NCR'].includes(normalized)) {
+    return 'border-red-400/30 bg-red-400/10 text-red-300'
+  }
+  return 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+}
+
+function InventoryMetricCard({
+  title,
+  value,
+  note,
+  noteClassName,
+  tone = 'blue',
+  icon,
+  trend,
+  active,
+  onClick,
+}: {
+  title: string
+  value: React.ReactNode
+  note?: React.ReactNode
+  noteClassName?: string
+  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
+  icon?: React.ReactNode
+  trend?: number[]
+  active?: boolean
+  onClick?: () => void
+}) {
+  return (
+    <CockpitKpiCard
+      title={title}
+      value={value}
+      note={note}
+      noteClassName={noteClassName}
+      tone={tone}
+      icon={icon}
+      trend={trend}
+      active={active}
+      onClick={onClick}
+    />
+  )
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  children,
+  className = '',
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <CockpitChartCard title={title} subtitle={subtitle} className={`${COCKPIT_HEIGHTS.CHART_MD} ${className}`}>
+      {children}
+    </CockpitChartCard>
+  )
+}
+
 export function ComponentsListPage() {
   const routeLocation = useLocation()
   const routeComponentId =
@@ -134,6 +203,11 @@ export function ComponentsListPage() {
   const [type, setType] = useState('')
   const [location, setLocation] = useState('')
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [project, status, type, location, query])
 
   const [createOpen, setCreateOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -230,6 +304,7 @@ export function ComponentsListPage() {
         workOrder: order?.orderNo ?? '-',
         dueDate: order?.plannedEndAt,
         productionStatus: order?.status,
+        rawCreatedAt: record.createdAt,
         createdAt: record.createdAt
           ? new Date(record.createdAt).toLocaleDateString('vi-VN')
           : '-',
@@ -266,6 +341,11 @@ export function ComponentsListPage() {
     })
   }, [rows, project, status, type, location, query])
 
+  const PAGE_SIZE = 10
+  const paginatedRows = useMemo(() => {
+    return filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  }, [filtered, page])
+
   const cockpitKpis = useMemo(() => ({
     total: rows.length,
     running: rows.filter((row) => isRunningStatus(row.rawStatus) || isRunningStatus(row.productionStatus)).length,
@@ -274,6 +354,7 @@ export function ComponentsListPage() {
     delayed: rows.filter((row) => isDelayed(row.dueDate, row.productionStatus ?? row.rawStatus)).length,
     weight: rows.reduce((sum, row) => sum + Number(row.weight ?? 0), 0),
   }), [rows])
+
   const componentAnalytics = useMemo(() => {
     const topWeight = [...rows].sort((a, b) => Number(b.weight ?? 0) - Number(a.weight ?? 0)).slice(0, 5)
     const delayedRows = rows.filter((row) => isDelayed(row.dueDate, row.productionStatus ?? row.rawStatus)).slice(0, 5)
@@ -284,6 +365,24 @@ export function ComponentsListPage() {
       color: { Beam: '#1d7cff', Column: '#14c987', Brace: '#f59e0b', Plate: '#7c3aed', Assembly: '#06b6d4' }[label] ?? '#06b6d4',
     }))
     return { topWeight, delayedRows, materialShortage, structure }
+  }, [rows])
+
+  const newestComponents = useMemo(() => {
+    return rows
+      .slice()
+      .sort((a, b) => {
+        const timeA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0
+        const timeB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0
+        return timeB - timeA
+      })
+      .slice(0, 5)
+  }, [rows])
+
+  const mostUsedComponents = useMemo(() => {
+    return rows
+      .slice()
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5)
   }, [rows])
 
   function openDetail(row: ComponentRow) {
@@ -381,7 +480,7 @@ export function ComponentsListPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className={inventoryPageStack}>
+      <div className="w-full min-w-0 flex-1 space-y-1">
         <ModulePageHeader
           eyebrow="Steel component lifecycle"
           title="Trung tâm điều hành cấu kiện"
@@ -389,14 +488,44 @@ export function ComponentsListPage() {
           action={<button onClick={() => setCreateOpen(true)} className={componentsPrimaryButton}>+ Tạo cấu kiện</button>}
         />
 
-        <ModuleKpiStrip className="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          <InventoryKpi title="Tổng cấu kiện" value={formatQuantity(cockpitKpis.total, 0)} note="Toàn bộ cấu kiện" tone="blue" />
-          <InventoryKpi title="Đang sản xuất" value={formatQuantity(cockpitKpis.running, 0)} note="IN_PROGRESS / RUNNING" tone="cyan" />
-          <InventoryKpi title="Hoàn thành" value={formatQuantity(cockpitKpis.completed, 0)} note="DONE / COMPLETED / READY+" tone="emerald" />
-          <InventoryKpi title="Chờ vật tư" value={formatQuantity(cockpitKpis.waitingMaterial, 0)} note="Issued / Required < 100%" tone="amber" />
-          <InventoryKpi title="Trễ tiến độ" value={formatQuantity(cockpitKpis.delayed, 0)} note="Quá hạn chưa hoàn thành" tone="red" />
-          <InventoryKpi title="Khối lượng cấu kiện" value={`${formatQuantity(cockpitKpis.weight, 3)} kg`} note="Theo BOM hiện có" tone="purple" />
-        </ModuleKpiStrip>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
+          <InventoryMetricCard
+            title="Tổng cấu kiện"
+            value={formatQuantity(cockpitKpis.total, 0)}
+            note="Toàn bộ cấu kiện"
+            tone="blue"
+            icon={<Package size={16} />}
+          />
+          <InventoryMetricCard
+            title="Đang sản xuất"
+            value={formatQuantity(cockpitKpis.running, 0)}
+            note="Lệnh chạy hoạt động"
+            tone="cyan"
+            icon={<Layers3 size={16} />}
+          />
+          <InventoryMetricCard
+            title="Hoàn thành"
+            value={formatQuantity(cockpitKpis.completed, 0)}
+            note="Cấu kiện đã sẵn sàng"
+            tone="emerald"
+            icon={<Warehouse size={16} />}
+          />
+          <InventoryMetricCard
+            title="Chờ vật tư"
+            value={formatQuantity(cockpitKpis.waitingMaterial, 0)}
+            note="Cấp phát chưa đủ"
+            tone="amber"
+            icon={<Warehouse size={16} />}
+          />
+          <InventoryMetricCard
+            title="Trễ tiến độ"
+            value={formatQuantity(cockpitKpis.delayed, 0)}
+            note="Quá hạn kế hoạch"
+            tone="red"
+            icon={<MapPinned size={16} />}
+          />
+        </div>
 
         <ModuleFilterBar>
           <input
@@ -436,7 +565,7 @@ export function ComponentsListPage() {
           </ComponentsSelect>
         </ModuleFilterBar>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1">
           <button onClick={() => openProductionFor()} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500">
             + Tạo lệnh sản xuất
           </button>
@@ -445,121 +574,143 @@ export function ComponentsListPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-9">
-            <InventoryChartCard title={`Danh sách cấu kiện (${filtered.length})`} note="Production cockpit grid">
-              <ModuleDataGrid>
-                <div className="overflow-auto">
-                <table className="w-full min-w-[1320px] text-sm">
-                  <thead className={inventoryTableHead}>
-                    <tr>
-                      {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Work Order', 'Progress', 'Material Ready', 'Vị trí hiện tại', 'Trạng thái', 'Khối lượng', 'Ngày tạo', 'Thao tác'].map((h) => (
-                        <th key={h} className="px-2 py-2 text-left font-medium">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      <tr>
-                        <td colSpan={13} className="px-2 py-6">
-                          <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
-                        </td>
-                      </tr>
-                    ) : filtered.map((row) => (
-                      <tr
-                        key={row.code}
-                        onClick={() => openDetail(row)}
-                        className={`cursor-pointer ${inventoryTableRow}`}
-                      >
-                        <td className="px-2 py-2 text-cyan-300">{row.code}</td>
-                        <td className="px-2 py-2">{row.name}</td>
-                        <td className="px-2 py-2">{row.profile}</td>
-                        <td className="px-2 py-2">{row.type}</td>
-                        <td className="px-2 py-2">{row.project}</td>
-                        <td className="px-2 py-2 text-cyan-300">{row.workOrder}</td>
-                        <td className="px-2 py-2"><ProgressMeter value={row.progress} /></td>
-                        <td className="px-2 py-2"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
-                        <td className="px-2 py-2">{row.location}</td>
-                        <td className="px-2 py-2">{row.status}</td>
-                        <td className="px-2 py-2 font-mono tabular-nums">{formatQuantity(row.weight, 3)} kg</td>
-                        <td className="px-2 py-2">{row.createdAt}</td>
-                        <td className="px-2 py-2">
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void handleDelete(row)
-                            }}
-                            className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
-                          >
-                            Xóa
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              </ModuleDataGrid>
-              {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState title="Không tìm thấy cấu kiện" description="Thử đổi từ khóa hoặc bộ lọc trạng thái/dự án." /></div> : null}
-              <div className="mt-3 text-xs text-slate-400">Hiển thị 1 - {filtered.length} của {filtered.length} kết quả</div>
-            </InventoryChartCard>
-          </div>
+        {/* Row 1: Phân bố cấu kiện & Tình trạng cấu kiện */}
+        <div className="grid grid-cols-12 gap-1">
+          <ChartCard title="Phân bố cấu kiện" subtitle="Beam / Column / Brace / Plate / Assembly" className="col-span-12 xl:col-span-6">
+            <ComponentsDonut
+              centerValue={formatQuantity(rows.length, 0)}
+              centerLabel="cấu kiện"
+              segments={componentAnalytics.structure}
+            />
+          </ChartCard>
+          <ChartCard title="Tình trạng cấu kiện" subtitle="Xu hướng 12 kỳ gần nhất" className="col-span-12 xl:col-span-6">
+            <ComponentsMiniBars values={[18, 24, 16, 31, 28, 35, 42, 38, 44, 49, 46, 52]} />
+          </ChartCard>
+        </div>
 
-          <div className="space-y-4 xl:col-span-3">
-            <InventoryChartCard title="Top cấu kiện theo khối lượng" note="Theo BOM hiện có">
-              <RankList rows={componentAnalytics.topWeight.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.weight, 3)} kg` }))} />
-            </InventoryChartCard>
-            <InventoryChartCard title="Top cấu kiện chậm tiến độ" note="Due date < Today">
-              <RankList rows={componentAnalytics.delayedRows.map((row) => ({ id: row.id, title: row.code, subtitle: row.dueDate ? new Date(row.dueDate).toLocaleDateString('vi-VN') : '-', value: row.workOrder }))} empty="Không có cấu kiện trễ tiến độ" />
-            </InventoryChartCard>
-            <InventoryChartCard title="Cấu kiện thiếu vật tư" note="BOM required - issued">
-              <RankList rows={componentAnalytics.materialShortage.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.materialReady, 0)}%` }))} empty="Chưa phát hiện thiếu vật tư" />
-            </InventoryChartCard>
-            <InventoryChartCard title="Cơ cấu cấu kiện" note="Beam / Column / Brace / Plate / Assembly">
-              <ComponentsDonut
-                centerValue={formatQuantity(rows.length, 0)}
-                centerLabel="cấu kiện"
-                segments={componentAnalytics.structure}
-              />
-            </InventoryChartCard>
-            <InventoryChartCard title="Nhịp tạo cấu kiện" note="Xu hướng 12 kỳ gần nhất">
-              <ComponentsMiniBars values={[18, 24, 16, 31, 28, 35, 42, 38, 44, 49, 46, 52]} />
-            </InventoryChartCard>
+        {/* Row 2: Cấu kiện mới nhất & Cấu kiện sử dụng nhiều nhất */}
+        <div className="grid grid-cols-12 gap-1">
+          <ChartCard title="Cấu kiện mới nhất" subtitle="Theo thời gian tạo gần đây" className="col-span-12 xl:col-span-6">
+            <RankList rows={newestComponents.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: row.createdAt }))} />
+          </ChartCard>
+          <ChartCard title="Cấu kiện sử dụng nhiều nhất" subtitle="Theo số lượng tồn hiện có" className="col-span-12 xl:col-span-6">
+            <RankList rows={mostUsedComponents.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.qty, 0)} kiện` }))} />
+          </ChartCard>
+        </div>
+
+        {/* Row 3: Danh sách cấu kiện (Full Width) */}
+        <div className="w-full min-w-0 flex-1">
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách cấu kiện</h3>
+            <button type="button" className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
           </div>
+          <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_SM}>
+            <table className="w-full min-w-[1050px] text-sm table-fixed">
+              <colgroup>
+                <col className="w-[110px]" />
+                <col className="w-[150px]" />
+                <col className="w-[130px]" />
+                <col className="w-[110px]" />
+                <col className="w-[130px]" />
+                <col className="w-[115px]" />
+                <col className="w-[130px]" />
+                <col className="w-[130px]" />
+                <col className="w-[140px]" />
+                <col className="w-[105px]" />
+                <col className="w-[110px]" />
+                <col className="w-[95px]" />
+                <col className="w-[70px]" />
+              </colgroup>
+              <thead className="bg-transparent text-slate-300 border-b border-cyan-400/10">
+                <tr>
+                  {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Work Order', 'Progress', 'Material Ready', 'Vị trí hiện tại', 'Trạng thái', 'Khối lượng', 'Ngày tạo', 'Thao tác'].map((h, i) => (
+                    <th key={h} className={`px-1.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-300 ${i === 10 ? 'text-right' : 'text-left'}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={13} className="px-1.5 py-6">
+                      <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
+                    </td>
+                  </tr>
+                ) : paginatedRows.map((row) => (
+                  <tr
+                    key={row.code}
+                    onClick={() => openDetail(row)}
+                    className="cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] transition duration-150"
+                  >
+                    <td className="truncate px-1.5 py-1 text-cyan-300" title={row.code}>{row.code}</td>
+                    <td className="truncate px-1.5 py-1 text-white" title={row.name}>{row.name}</td>
+                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.profile}>{row.profile}</td>
+                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.type}>{row.type}</td>
+                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.project}>{row.project}</td>
+                    <td className="truncate px-1.5 py-1 text-cyan-300" title={row.workOrder}>{row.workOrder}</td>
+                    <td className="px-1.5 py-1"><ProgressMeter value={row.progress} /></td>
+                    <td className="px-1.5 py-1"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
+                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.location}>{row.location}</td>
+                    <td className="px-1.5 py-1">
+                      <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.rawStatus)}`}>
+                        {row.status}
+                      </span>
+                    </td>
+                    <td className="truncate px-1.5 py-1 font-mono tabular-nums text-right text-cyan-300" title={`${formatQuantity(row.weight, 3)} kg`}>{formatQuantity(row.weight, 3)} kg</td>
+                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.createdAt}>{row.createdAt}</td>
+                    <td className="px-1.5 py-1" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        onClick={() => void handleDelete(row)}
+                        className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/20"
+                      >
+                        Xóa
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CockpitTableShell>
+          {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState title="Không tìm thấy cấu kiện" description="Thử đổi từ khóa hoặc bộ lọc trạng thái/dự án." /></div> : null}
+          <DataTablePagination
+            page={page}
+            total={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
       </div>
 
       {createOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-[#071323]/95 p-5 shadow-2xl ring-1 ring-white/[0.03] backdrop-blur-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Tạo cấu kiện mới</h3>
-              <button onClick={closeCreateModal} className={componentsMutedButton}>Đóng</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
+          <div className="w-full rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between" style={{ maxWidth: '48rem' }}>
+            <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">Tạo cấu kiện mới</h3>
+              <button onClick={closeCreateModal} className="rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 hover:text-white transition">Đóng</button>
             </div>
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <input value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Tên cấu kiện" className={`${componentsInput} xl:col-span-2`} />
-              <select value={createForm.type} onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))} className={componentsInput}>
+            <div className="grid grid-cols-1 xl:grid-cols-2" style={{ gap: '0.75rem' }}>
+              <input value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Tên cấu kiện" className={`${inventoryInput} xl:col-span-2`} />
+              <select value={createForm.type} onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))} className={inventoryInput}>
                 <option>Dầm (Beam)</option>
                 <option>Cột (Column)</option>
                 <option>Bản mã (Plate)</option>
               </select>
-              <input value={createForm.profile} onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))} placeholder="Profile/Kích thước" className={componentsInput} />
-              <select value={createForm.projectId} onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value }))} className={componentsInput}>
+              <input value={createForm.profile} onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))} placeholder="Profile/Kích thước" className={inventoryInput} />
+              <select value={createForm.projectId} onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value }))} className={inventoryInput}>
                 <option value="">Chọn dự án</option>
                 {projects.map((item: { id: string; code?: string; name: string }) => (
                   <option key={item.id} value={item.id}>{item.code ?? item.name} - {item.name}</option>
                 ))}
               </select>
-              <input value={createForm.qty} onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))} placeholder="Số lượng" className={componentsInput} />
+              <input value={createForm.qty} onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))} placeholder="Số lượng" className={inventoryInput} />
             </div>
-            <div className="mt-4 rounded-xl border border-cyan-900/60 bg-cyan-950/10 p-3 text-xs text-cyan-100">
+            <div className="mt-4 rounded-xl border border-cyan-900/40 bg-cyan-950/20 p-3 text-xs text-cyan-100">
               Vật tư không khai báo tại đây. Sau khi tạo cấu kiện, tạo Production BOM riêng để quản lý định mức và routing sản xuất.
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={closeCreateModal} className={componentsMutedButton}>Hủy</button>
-              <button onClick={submitCreate} className={componentsPrimaryButton}>Lưu cấu kiện</button>
+            <div className="mt-4 flex justify-end gap-2 border-t border-white/10 pt-3">
+              <button onClick={closeCreateModal} className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300 hover:bg-white/5 transition">Hủy</button>
+              <button onClick={submitCreate} className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition">Lưu cấu kiện</button>
             </div>
           </div>
         </div>
@@ -583,7 +734,7 @@ export function ComponentsListPage() {
       >
         {selected ? (
           <>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="grid grid-cols-1 xl:grid-cols-3" style={{ gap: '1rem' }}>
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Trạng thái</div>
                 <div className="mt-1 text-lg font-semibold text-white">{selected.status}</div>
@@ -600,7 +751,7 @@ export function ComponentsListPage() {
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
               <div className="mb-3 text-sm font-semibold text-white">Thông tin cấu kiện</div>
-              <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+              <div className="grid grid-cols-2 xl:grid-cols-6" style={{ gap: '0.75rem' }}>
                 <CostMetric title="Code" value={selected.code} />
                 <CostMetric title="Name" value={selected.name} />
                 <CostMetric title="Type" value={selected.type} />
@@ -615,7 +766,7 @@ export function ComponentsListPage() {
                 <div className="text-sm font-semibold text-white">Vị trí lắp đặt</div>
                 <div className="mt-1 text-xs text-slate-500">Thông tin được ghi khi xác nhận lắp đặt tại công trình.</div>
               </div>
-              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 xl:grid-cols-4" style={{ gap: '0.75rem' }}>
                 <CostMetric title="Khu vực" value={selected.installZone ?? '-'} />
                 <CostMetric title="Trục" value={selected.installAxis ?? '-'} />
                 <CostMetric title="Tầng" value={selected.installLevel ?? '-'} />
@@ -624,7 +775,7 @@ export function ComponentsListPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-3 flex items-center justify-between" style={{ gap: '0.75rem' }} >
                 <div>
                   <div className="text-sm font-semibold text-white">Production BOM liên kết</div>
                   <div className="mt-1 text-xs text-slate-500">Định mức vật tư và routing dùng khi phát hành lệnh sản xuất.</div>
@@ -661,13 +812,13 @@ export function ComponentsListPage() {
               </table>
             </div>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <div className="mt-4 grid xl:grid-cols-2" style={{ gap: '1rem' }}>
               <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
                 <div className="mb-3">
                   <div className="text-sm font-semibold text-white">Vật tư</div>
                   <div className="mt-1 text-xs text-slate-500">Tính theo BOM required và Production Material Issue đã cấp phát.</div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3" style={{ gap: '0.75rem' }}>
                   <CostMetric title="Required" value={quantity(selectedRequiredQty)} />
                   <CostMetric title="Issued" value={quantity(selectedIssuedQty)} tone="text-emerald-300" />
                   <CostMetric title="Remaining" value={quantity(selectedRemainingQty)} tone={selectedRemainingQty > 0 ? 'text-amber-300' : 'text-cyan-300'} />
@@ -712,7 +863,7 @@ export function ComponentsListPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-3 flex items-center justify-between" style={{ gap: '0.75rem' }}>
                 <div>
                   <div className="text-sm font-semibold text-white">Costing cấu kiện</div>
                   <div className="mt-1 text-xs text-slate-500">Chi phí thực tế tính từ production consumption và giá vốn bình quân vật tư.</div>
@@ -730,7 +881,7 @@ export function ComponentsListPage() {
                   Chưa đủ dữ liệu costing. Cấu kiện cần có lệnh sản xuất và consumption records.
                 </div>
               ) : costingView === 'summary' ? (
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <div className="grid grid-cols-2 xl:grid-cols-4" style={{ gap: '0.75rem' }}>
                   <CostMetric title="Estimated Cost" value={money(selectedCosting?.estimatedCost)} />
                   <CostMetric title="Actual Cost" value={money(selectedCosting?.actualCost)} tone="text-emerald-300" />
                   <CostMetric title="Variance" value={money(selectedCosting?.varianceCost)} tone={(selectedCosting?.varianceCost ?? 0) > 0 ? 'text-red-300' : 'text-cyan-300'} />
@@ -745,8 +896,8 @@ export function ComponentsListPage() {
                   Chưa đủ dữ liệu breakdown. Cấu kiện cần có BOM, lệnh sản xuất và dữ liệu consumption.
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="flex flex-col" style={{ gap: '1rem' }}>
+                  <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: '0.75rem' }}>
                     <CostMetric title="Estimated Material Cost" value={money(selectedCostingBreakdown?.summary.estimatedMaterialCost)} />
                     <CostMetric title="Actual Material Cost" value={money(selectedCostingBreakdown?.summary.actualMaterialCost)} tone="text-emerald-300" />
                     <CostMetric title="Variance" value={money(selectedCostingBreakdown?.summary.varianceCost)} tone={(selectedCostingBreakdown?.summary.varianceCost ?? 0) > 0 ? 'text-red-300' : 'text-cyan-300'} />
@@ -811,7 +962,7 @@ function RankList({
   return (
     <div className="space-y-2">
       {rows.map((row) => (
-        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs" style={{ gap: '0.75rem' }}>
           <div className="min-w-0">
             <div className="truncate font-semibold text-cyan-300">{row.title}</div>
             {row.subtitle ? <div className="mt-0.5 truncate text-slate-500">{row.subtitle}</div> : null}

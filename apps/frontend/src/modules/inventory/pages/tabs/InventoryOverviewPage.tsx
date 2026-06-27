@@ -1023,7 +1023,7 @@ export function InventoryOverviewPage() {
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Tồn kho vật tư</h3>
                 <button onClick={() => setOverviewPopup('stock-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
               </div>
-              <div className={`${inventoryTableShell} h-[430px] overflow-auto`}>
+              <div className={`${inventoryTableShell} border-0 ring-0 bg-transparent shadow-none rounded-none h-[430px] overflow-auto scrollbar-none`}>
                 <table className="w-full min-w-[1050px] text-sm table-fixed">
                   <colgroup>
                     <col className="w-[140px]" />
@@ -1037,21 +1037,27 @@ export function InventoryOverviewPage() {
                     <col className="w-[150px]" />
                     <col className="w-[100px]" />
                   </colgroup>
-                  <thead className={inventoryTableHead}>
-                    <tr>
-                      <th className="px-1.5 py-1 text-left font-medium">Tên vật tư</th>
-                      <th className="px-1.5 py-1 text-left font-medium">Quy cách</th>
-                      <th className="px-1.5 py-1 text-left font-medium">ĐVT</th>
-                      <th className="px-1.5 py-1 text-right font-medium">Kho chính</th>
-                      <th className="px-1.5 py-1 text-right font-medium">Kho SX</th>
-                      <th className="px-1.5 py-1 text-right font-medium">Tổng tồn</th>
-                      <th className="px-1.5 py-1 text-right font-medium">Đơn giá</th>
-                      <th className="px-1.5 py-1 text-right font-medium">Giá trị</th>
-                      <th className="px-1.5 py-1 text-left font-medium">Vị trí</th>
-                      <th className="px-1.5 py-1 text-left font-medium">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                          <thead
+                                className={`${inventoryTableHead}
+                                  bg-transparent
+                                  text-slate-300
+                                  border-b border-cyan-400/10`}
+                              >
+                            <tr>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tên vật tư</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Quy cách</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">ĐVT</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Kho chính</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Kho SX</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tổng tồn</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Đơn giá</th>
+                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Giá trị</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Vị trí</th>
+                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+
                     {pagedRows.map((item: any) => {
                       const status = statusOf(item)
                       return (

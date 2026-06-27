@@ -1,5 +1,147 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20C.8 – Components Theme Unification
+
+Completed:
+
+* **Unified Root Layout**: Changed root layout wrapper to `w-full min-w-0 flex-1 space-y-1` and replaced grid/chart gaps with a clean `gap-1` system. Removed light surfaces, center wrappers (`mx-auto`), `max-w-*` restrictions, and hardcoded widths.
+* **WMS KPI Cockpit Cards**: Unified the KPI strip by defining a local `InventoryMetricCard` and `KpiSparkline` matching `InventoryMaterialsPage` exact visuals (h-[108px], rounded-2xl, border-cyan-300/15, industrial gradient, and ring-cyan-400/[0.055]). Configured the grid layout as `grid-cols-1 md:grid-cols-5 gap-1` with 5 metrics:
+  1. *Tổng cấu kiện* (blue, Package)
+  2. *Đang sản xuất* (cyan, Layers3)
+  3. *Hoàn thành* (emerald, Warehouse)
+  4. *Chờ vật tư* (amber, Warehouse)
+  5. *Trễ tiến độ* (red, MapPinned)
+* **Reorganized Analytics Layout**: Configured a fluid 3-row layout structure matching the locations page hierarchy:
+  - *Row 1*: "Phân bố cấu kiện" (donut chart) and "Tình trạng cấu kiện" (mini bars trend) in `col-span-12 xl:col-span-6` grid.
+  - *Row 2*: "Cấu kiện mới nhất" (sorted by raw creation time DESC) and "Cấu kiện sử dụng nhiều nhất" (sorted by quantity DESC) in `col-span-12 xl:col-span-6` grid.
+  - *Row 3*: "Danh sách cấu kiện" table in full width.
+* **Redesigned Analytics Cards**: Configured local `ChartCard` matching the Inventory card shell (height h-[220px], same gradient, same shadow, same ring, rounded-2xl, and title: `text-xs font-bold uppercase tracking-[0.12em] text-white`, subtitle: `text-[11px] text-slate-500`).
+* **Direct Table Parity**: Styled the main table to match the Inventory stock list exactly:
+  - Shell classes: `border-0 ring-0 bg-transparent shadow-none rounded-none overflow-auto scrollbar-none h-[520px]`
+  - Table style: `w-full min-w-[1050px] text-sm table-fixed`
+  - Header cells: `bg-transparent text-slate-300 border-b border-cyan-400/10`
+  - Row lines: `hover:bg-cyan-400/[0.04] border-b border-white/[0.04] cursor-pointer`
+  - Numeric columns (Khối lượng): `font-mono tabular-nums text-right`
+* **Creation Modal Theme**: Refactored the local create modal to use the exact translucent WMS modal container, inputs, and button visual styles of the Inventory transaction forms.
+* **Visual Audit & Pagination**: Performed a visual audit, resolving nested card wrappers, matching all design tokens and height constraints (`h-[108px]`, `h-[220px]`, `gap-1`), adding local frontend pagination for table parity, and replacing all prohibited classes (`gap-3`, `gap-4`, `space-y-4`, `max-w-3xl`) with safe overrides.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-26 Sprint 20I.5F – Inventory Locations KPI Cockpit
+
+Completed:
+
+* **WMS KPI Cockpit Cards**: Replaced the first 5 locations analytics cards with the standard WMS KPI cockpit cards, fully aligned with the unified `InventoryMetricCard` visual design:
+  1. *Tổng vị trí* (blue, MapPinned)
+  2. *Đang sử dụng* (emerald, Layers3)
+  3. *Vị trí trống* (cyan, Package)
+  4. *Hiệu suất sức chứa* (purple, Warehouse)
+  5. *Tổng tồn theo vị trí* (amber, Warehouse)
+* **Visual Parity**: Applied standard styles: height of `h-[108px]`, `rounded-2xl`, `border-cyan-300/15`, cockpit gradient background, and `ring-cyan-400/[0.055]`, featuring the `KpiSparkline` at the bottom.
+* **6-Month Trend Rollback**: Implemented transactional rollback logic over 6 snapshot dates to compute historical location stats:
+  - `totalLocationsTrend`: total locations (constant count of real storage locations)
+  - `occupiedLocationsTrend`: occupied locations (active locations count with stock > 0)
+  - `emptyLocationsTrend`: empty locations (active locations count with stock === 0)
+  - `occupancyPercentTrend`: slot occupancy percentage (occupied slots / total slots capacity)
+  - `totalStockTrend`: total stock quantity (in tons)
+* **Vietnamese Delta Notes**: Configured dynamic delta notes comparing current month with the previous month:
+  - Location count delta: `▲2 vị trí (+18,2%)` / `▼2 vị trí (-18,2%)`
+  - Capacity percentage delta: `▲1,2% (+5,4%)`
+  - Stock value delta: `▲3.790.984.762 đ (+49,2%)`
+  - Stock weight delta: `▲686,5 tấn (+6,4%)`
+* **Card 5 Rich Subtext**: Programmed Card 5 subtext to display both value delta and weight delta inline: `▲3.790.984.762 đ (+49,2%) · ▲686,5 tấn (+6,4%)` with color indicators.
+* **Responsive Layout**: Wrapped the cockpit cards in a fluid `<div className="grid grid-cols-1 gap-1 md:grid-cols-5">` layout.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+* Verified the backend compiles and builds successfully using `pnpm -C apps/backend-api build`.
+
+## 2026-06-26 Sprint 20I.5D – Inventory Locations Responsive Workspace
+
+Completed:
+
+* **Removed Width Constraints**: Removed all fixed width constraints, `max-w-*` limits, `mx-auto` centering wrappers, container classes, and hardcoded widths like `w-[1040px]` or `w-[320px]`.
+* **Root Layout Adjustment**: Updated the root layout wrapper to use `w-full min-w-0 flex-1 space-y-1`.
+* **Main Row 1 Grid**: Structured Row 1 as a 12-column grid (`grid-cols-12 gap-1`) where "Danh sách vị trí kho" takes `col-span-12 2xl:col-span-8` and the stacked right sidebar takes `col-span-12 2xl:col-span-4`.
+* **Analytics Bottom Grid**: Reconfigured Row 2, 3, and 4 cards to use a 12-column grid (`grid-cols-12 gap-1`) with `col-span-12 xl:col-span-6` for each of the four cards (*Giá trị tồn theo vị trí*, *Vị trí tồn kho cao nhất*, *Vật tư nhập gần nhất*, and *Vật tư xuất gần nhất*).
+* **Automatic Scaling**: Ensured the dashboard grows and shrinks dynamically to fit all monitors (laptop to ultrawide) and respects both sidebar states (expanded and collapsed).
+* **Preserved Core Logic**: Left all calculations, hooks, APIs, datasets, and chart logic completely unchanged.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+* Verified the backend compiles and builds successfully using `pnpm -C apps/backend-api build`.
+
+## 2026-06-26 Sprint 20I.5C – Inventory Locations Dashboard Usability Polish
+
+Completed:
+
+* **Enlarged Locations Section**: Made "Danh sách vị trí kho" card larger with a height of `h-[560px]`, text size `text-[12px]`, row cell padding `py-2.5`, and table headers `text-xs font-semibold`.
+* **New Locations Columns**: Added columns `Kho`, `Zone`, `Slot`, `Tầng`, `Khối lượng`, `Số vật tư`, and `Trạng thái`.
+* **Vietnamese Status Badges**: Added rounded-full status badges for locations: `Đang dùng` (cyan), `Trống` (emerald), and `Bảo trì` (amber).
+* **Enlarged Analytics Cards**: Adjusted card heights:
+  * *Giá trị tồn theo vị trí*: `h-[320px]`
+  * *Vị trí tồn kho cao nhất*: `h-[320px]`
+  * *Vật tư nhập gần nhất*: `h-[300px]`
+  * *Vật tư xuất gần nhất*: `h-[300px]`
+* **Xem Tất Cả Action & Modal**: Added a "Xem tất cả" action on the header of the four analytics cards. Clicking the action opens a full table modal dialog with `fixed inset-0 bg-slate-950/75 backdrop-blur-md max-h-[70vh] overflow-auto rounded-2xl` layout and localized columns (including transaction date mapping `Ngày` for imports and exports).
+* **Preserved Calculations**: Left all original query hooks, useMemo metrics, and API logic completely unchanged.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+* Verified the backend compiles and builds successfully using `pnpm -C apps/backend-api build`.
+
+## 2026-06-26 Sprint 20I.5B – Inventory Locations Dashboard Layout Polish
+
+Completed:
+
+* **Primary Dashboard Section**: Made "Danh sách vị trí kho" the main left card with a height of `h-[520px]` and responsive width (approximately 1040px on standard desktop sizes).
+* **Right Sidebar Layout**: Created a stacked right sidebar (`w-[320px]`, `gap-1`) containing:
+  * *Hiệu suất sức chứa*: Compact donut chart using `CompactDonutSummary`.
+  * *Trạng thái vị trí*: Vertical bar chart using `VerticalBarChart`.
+  * *Phân bố loại vật tư*: Pie chart using `CompactPieChart`.
+* **Compact Tables Replacement**: Replaced horizontal bar charts with compact tables (`rounded-xl border border-white/10 bg-[#08111f]/90 text-[11px] py-1 px-2` spacing) displaying the top 5 rows sliced:
+  * *Giá trị tồn theo vị trí* (Columns: Kho | Giá trị | %)
+  * *Vị trí tồn kho cao nhất* (Columns: Vị trí | Khối lượng | %)
+  * *Vật tư nhập gần nhất* (Columns: Mã | Vật tư | Số lượng)
+  * *Vật tư xuất gần nhất* (Columns: Mã | Vật tư | Số lượng)
+* **Reduced Spacing**: Applied `gap-1` and `space-y-1` spacing across the locations cockpit page to create a dense industrial theme.
+* **Fully Localized Vietnamese Labels**: Fully translated all units (such as `t` to `tấn`, table headers, status labels) and removed English chart titles.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+* Verified the backend compiles and builds successfully using `pnpm -C apps/backend-api build`.
+
+## 2026-06-26 Sprint 20I.5A Inventory Location Dashboard Redesign
+
+Completed:
+
+* **MES/WMS Cockpit Theme & Spacing**:
+  * Redesigned the dashboard charts in `InventoryLocationsPage.tsx` to align with the premium dark cockpit theme (gradients, rings, cyan borders, and backdrop-blurs).
+  * Removed all legacy borders/slate-950 background styles, ensuring cards look extremely premium and cohesive.
+  * Standardized card padding to `p-3` and card grid gap to `gap-3` (strictly avoiding `gap-5` or `gap-6` as requested).
+* **Grid Layout & Responsive Heights**:
+  * Structured the dashboard into 5 rows with exact height and column configurations:
+    * **Row 1**: *Top occupied slots* (Left, `h-[220px]`, top 6, horizontal progress bars) & *Hiệu suất sức chứa* (Right, `h-[220px]`, `CompactDonutSummary` showing "X% Đã sử dụng" center value and Legend: Đang dùng, Trống, Bảo trì).
+    * **Row 2**: *Giá trị tồn theo vị trí* (Left, `h-[250px]`, `HorizontalBars` showing Top 8 locations sorted DESC in billions/millions VND short form) & *Top 5 vị trí có tồn cao nhất* (Right, `h-[250px]`, `HorizontalBars` in tons).
+    * **Row 3**: *Top 10 vật tư nhập gần nhất* (Left, `h-[250px]`, `HorizontalBars` showing top 6 material names and quantities) & *Top 10 vật tư xuất gần nhất* (Right, `h-[250px]`, `HorizontalBars` showing top 6 material names and quantities).
+    * **Row 4**: *Top 5 vật tư tồn cao nhất* (Full width, `h-[280px]`, custom detail table showing material Code, Name, Location, Stock, Value, and a percentage progress bar relative to the max stock).
+    * **Row 5**: *Phân bố sức chứa theo kho* (Full width, `h-[250px]`, custom progress bar list showing zone name, tonnage, capacity utilization percentage, and active slot count).
+  * Replaced the old low-value "Luồng điều chuyển theo slot" chart with the new warehouse/zone capacity distribution chart.
+  * Ensured responsive columns: 2 columns on Desktop/Laptop (`lg:grid-cols-2`), 1 column on Tablet/mobile (`grid-cols-1`).
+* **KPI Metric Cards**:
+  * Redesigned the 5 KPI metric cards at the top of the page using the premium cockpit theme and rings to maintain 100% style consistency.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+* Verified the backend compiles and builds successfully using `pnpm -C apps/backend-api build`.
+
 ## 2026-06-26 Sprint 20I.4F Inventory Materials Parity Audit & Visual Rhythm
 
 Completed:
