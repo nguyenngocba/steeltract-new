@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
-import { Layers3, MapPinned, Package, Warehouse } from 'lucide-react'
+import { Package } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState, ModulePageHeader } from '../../../../shared/ui/modules'
+import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { useProjects } from '../../../inventory/hooks/useProjects'
@@ -135,21 +135,15 @@ function InventoryMetricCard({
   title,
   value,
   note,
-  noteClassName,
   tone = 'blue',
-  icon,
   trend,
-  active,
   onClick,
 }: {
   title: string
   value: React.ReactNode
   note?: React.ReactNode
-  noteClassName?: string
   tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
-  icon?: React.ReactNode
   trend?: number[]
-  active?: boolean
   onClick?: () => void
 }) {
   return (
@@ -157,11 +151,9 @@ function InventoryMetricCard({
       title={title}
       value={value}
       note={note}
-      noteClassName={noteClassName}
       tone={tone}
-      icon={icon}
-      trend={trend}
-      active={active}
+      state="normal"
+      trendData={trend}
       onClick={onClick}
     />
   )
@@ -489,12 +481,15 @@ export function ComponentsListPage() {
   return (
     <EnterpriseModulePage>
       <div className="w-full min-w-0 flex-1 space-y-1">
-        <ModulePageHeader
-          eyebrow="Steel component lifecycle"
-          title="Trung tâm điều hành cấu kiện"
-          description="Theo dõi cấu kiện từ BOM, lệnh sản xuất, QC, bãi, giao hàng đến lắp đặt."
-          action={<button onClick={() => setCreateOpen(true)} className={componentsPrimaryButton}>+ Tạo cấu kiện</button>}
-        />
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={() => setCreateOpen(true)} className={`${componentsPrimaryButton} h-9 rounded-xl`}>+ Tạo cấu kiện</button>
+          <button onClick={() => openProductionFor()} className="h-9 rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500">
+            + Tạo lệnh sản xuất
+          </button>
+          <button onClick={() => openBomFor()} className={`${componentsMutedButton} h-9 rounded-xl`}>
+            + Tạo BOM
+          </button>
+        </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
@@ -503,35 +498,30 @@ export function ComponentsListPage() {
             value={formatQuantity(cockpitKpis.total, 0)}
             note="Toàn bộ cấu kiện"
             tone="blue"
-            icon={<Package size={16} />}
           />
           <InventoryMetricCard
             title="Đang sản xuất"
             value={formatQuantity(cockpitKpis.running, 0)}
             note="Lệnh chạy hoạt động"
             tone="cyan"
-            icon={<Layers3 size={16} />}
           />
           <InventoryMetricCard
             title="Hoàn thành"
             value={formatQuantity(cockpitKpis.completed, 0)}
             note="Cấu kiện đã sẵn sàng"
             tone="emerald"
-            icon={<Warehouse size={16} />}
           />
           <InventoryMetricCard
             title="Chờ vật tư"
             value={formatQuantity(cockpitKpis.waitingMaterial, 0)}
             note="Cấp phát chưa đủ"
             tone="amber"
-            icon={<Warehouse size={16} />}
           />
           <InventoryMetricCard
             title="Trễ tiến độ"
             value={formatQuantity(cockpitKpis.delayed, 0)}
             note="Quá hạn kế hoạch"
             tone="red"
-            icon={<MapPinned size={16} />}
           />
         </div>
 
@@ -572,15 +562,6 @@ export function ComponentsListPage() {
             <option value="QC nội bộ">QC nội bộ</option>
           </ComponentsSelect>
         </ModuleFilterBar>
-
-        <div className="flex flex-wrap items-center gap-1">
-          <button onClick={() => openProductionFor()} className="rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500">
-            + Tạo lệnh sản xuất
-          </button>
-          <button onClick={() => openBomFor()} className={componentsMutedButton}>
-            + Tạo Production BOM
-          </button>
-        </div>
 
         <div className="grid grid-cols-12 gap-1">
           <div className="col-span-12 xl:col-span-9">

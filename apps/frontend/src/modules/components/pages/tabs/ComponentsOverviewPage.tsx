@@ -1,22 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { BarChart3, Package } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
+import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { useProductionOrders } from '../../../production/hooks/useProductionCockpit'
 import { useYardSlotsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
 import { useComponents } from '../../hooks/queries/useComponents'
 import { formatQuantity } from '@/shared/utils/number-format'
 import {
   ComponentsDonut,
-  ComponentsFilterBar,
-  ComponentsKpiCard,
   ComponentsMiniBars,
-  ComponentsPanel,
   ComponentsSelect,
   componentsInput,
   componentsMutedButton,
-  componentsTableHead,
-  componentsTableRow,
-  componentsTableShell,
 } from './ComponentsCockpitShared'
 
 type ComponentMeta = {
@@ -66,6 +63,11 @@ export function ComponentsOverviewPage() {
   const [status, setStatus] = useState('')
   const [location, setLocation] = useState('')
   const [type, setType] = useState('')
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [project, status, location, type, query])
 
   const rows = useMemo(() => components.map((component) => {
     const meta = parseMeta(component.description)
@@ -101,6 +103,8 @@ export function ComponentsOverviewPage() {
     if (!q) return true
     return [row.code, row.name, row.profile, row.project, row.location].join(' ').toLowerCase().includes(q)
   }), [rows, project, status, location, type, query])
+  const pageSize = 14
+  const paginatedRows = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   const statusCounts = {
     total: rows.length,
@@ -135,17 +139,17 @@ export function ComponentsOverviewPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <ComponentsKpiCard title="Tổng số cấu kiện" value={formatQuantity(statusCounts.total, 0)} sub="+8,6% so với tháng trước" tone="blue" />
-          <ComponentsKpiCard title="Đang sản xuất" value={formatQuantity(statusCounts.producing, 0)} sub="+18,2%" tone="purple" />
-          <ComponentsKpiCard title="Tồn kho cấu kiện" value={formatQuantity(statusCounts.stock, 0)} sub="+43,2%" tone="amber" />
-          <ComponentsKpiCard title="Đã QC đạt" value={formatQuantity(statusCounts.qcPass, 0)} sub="+77,1%" tone="emerald" />
-          <ComponentsKpiCard title="QC không đạt" value={formatQuantity(statusCounts.qcFail, 0)} sub="+2,7%" tone="red" />
-          <ComponentsKpiCard title="Đang chuyển" value={formatQuantity(statusCounts.transferring, 0)} sub="+6,0%" tone="cyan" />
+      <div className="w-full min-w-0 flex-1 space-y-1">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+          <CockpitKpiCard title="Tổng số cấu kiện" value={formatQuantity(statusCounts.total, 0)} note="+8,6% so với tháng trước" tone="blue" state="normal" trendData={[8, 10, 12, 13, statusCounts.total]} />
+          <CockpitKpiCard title="Đang sản xuất" value={formatQuantity(statusCounts.producing, 0)} note="+18,2%" tone="purple" state="normal" trendData={[2, 3, 4, 5, statusCounts.producing]} />
+          <CockpitKpiCard title="Tồn kho cấu kiện" value={formatQuantity(statusCounts.stock, 0)} note="+43,2%" tone="amber" state="normal" trendData={[3, 4, 6, 7, statusCounts.stock]} />
+          <CockpitKpiCard title="Đã QC đạt" value={formatQuantity(statusCounts.qcPass, 0)} note="+77,1%" tone="emerald" state="normal" trendData={[1, 2, 4, 6, statusCounts.qcPass]} />
+          <CockpitKpiCard title="QC không đạt" value={formatQuantity(statusCounts.qcFail, 0)} note="+2,7%" tone="red" state="normal" trendData={[0, 1, 1, 2, statusCounts.qcFail]} />
+          <CockpitKpiCard title="Đang chuyển" value={formatQuantity(statusCounts.transferring, 0)} note="+6,0%" tone="cyan" state="normal" trendData={[1, 1, 2, 3, statusCounts.transferring]} />
         </div>
 
-        <ComponentsFilterBar>
+        <ModuleFilterBar>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm theo mã, tên, profile, dự án..." className={`${componentsInput} xl:col-span-4`} />
           <ComponentsSelect value={project} onChange={setProject} className="xl:col-span-2">
             <option value="">Dự án</option>
@@ -166,89 +170,58 @@ export function ComponentsOverviewPage() {
           <button onClick={() => { setQuery(''); setProject(''); setStatus(''); setLocation(''); setType('') }} className={`${componentsMutedButton} xl:col-span-1`}>
             Làm mới
           </button>
-        </ComponentsFilterBar>
+        </ModuleFilterBar>
 
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_390px]">
-          <div className="space-y-3">
-            <ComponentsPanel title="Danh sách cấu kiện">
-              <div className={componentsTableShell}>
-                <div className="overflow-auto">
-                  <table className="w-full min-w-[980px] text-sm">
-                    <thead className={componentsTableHead}>
-                      <tr>
-                        {['Mã cấu kiện', 'Tên cấu kiện', 'Loại / Profile', 'Dự án', 'Trạng thái', 'Vị trí', 'SL', 'Đã QC', ''].map((heading) => (
-                          <th key={heading} className="px-3 py-2 text-left font-medium">{heading}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {isLoading ? (
-                        <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">Đang tải cấu kiện...</td></tr>
-                      ) : filtered.slice(0, 8).map((row) => (
-                        <tr key={row.id} className={componentsTableRow}>
-                          <td className="px-3 py-2 font-medium text-blue-300">{row.code}</td>
-                          <td className="px-3 py-2">{row.name}</td>
-                          <td className="px-3 py-2">{row.profile}</td>
-                          <td className="px-3 py-2">{row.project}</td>
-                          <td className="px-3 py-2"><span className={`rounded-full border px-2 py-1 text-[11px] ${statusTone(row.status)}`}>{row.status}</span></td>
-                          <td className="px-3 py-2">{row.location}</td>
-                          <td className="px-3 py-2">{formatQuantity(row.quantity, 0)}</td>
-                          <td className="px-3 py-2 text-emerald-300">{formatQuantity(row.qcQuantity, 0)}</td>
-                          <td className="px-3 py-2 text-slate-500">...</td>
-                        </tr>
+        <div className="grid grid-cols-12 gap-1">
+          <div className="col-span-12 xl:col-span-9">
+            <CockpitChartCard title={`Danh sách cấu kiện (${filtered.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
+              <CockpitTableShell className="h-full">
+                <table className="w-full min-w-[980px] table-fixed text-[13px]">
+                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+                    <tr>
+                      {['Mã cấu kiện', 'Tên cấu kiện', 'Loại / Profile', 'Dự án', 'Trạng thái', 'Vị trí', 'SL', 'Đã QC'].map((heading) => (
+                        <th key={heading} className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">{heading}</th>
                       ))}
-                    </tbody>
-                  </table>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr><td colSpan={8} className="px-1.5 py-6"><ModuleLoadingState label="Đang tải cấu kiện..." /></td></tr>
+                    ) : paginatedRows.map((row) => (
+                      <tr key={row.id} className="border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
+                        <td className="truncate px-1.5 py-1 font-medium text-cyan-300">{row.code}</td>
+                        <td className="truncate px-1.5 py-1 text-white">{row.name}</td>
+                        <td className="truncate px-1.5 py-1 text-slate-300">{row.profile}</td>
+                        <td className="truncate px-1.5 py-1 text-slate-300">{row.project}</td>
+                        <td className="px-1.5 py-1"><span className={`rounded-lg border px-2 py-0.5 text-xs ${statusTone(row.status)}`}>{row.status}</span></td>
+                        <td className="truncate px-1.5 py-1 text-slate-300">{row.location}</td>
+                        <td className="px-1.5 py-1 font-mono tabular-nums text-cyan-300">{formatQuantity(row.quantity, 0)}</td>
+                        <td className="px-1.5 py-1 font-mono tabular-nums text-emerald-300">{formatQuantity(row.qcQuantity, 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CockpitTableShell>
+              {!isLoading && !filtered.length ? (
+                <div className="p-3">
+                  <ModuleEmptyState icon={<Package size={18} />} title="Chưa có dữ liệu cấu kiện" description="Không tìm thấy cấu kiện phù hợp với bộ lọc hiện tại." />
                 </div>
-              </div>
-            </ComponentsPanel>
-
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[0.45fr_0.55fr]">
-              <ComponentsPanel title="Trạng thái sản xuất">
-                <div className="space-y-3">
-                  {progressBars.length ? progressBars.map((row) => (
-                    <div key={row.code} className="grid grid-cols-[100px_90px_1fr_40px] items-center gap-3 text-xs">
-                      <span className="text-blue-300">{row.code}</span>
-                      <span className="truncate text-slate-400">{row.project}</span>
-                      <div className="h-2 rounded-full bg-white/10"><div className={`h-full rounded-full ${row.color}`} style={{ width: `${row.value}%` }} /></div>
-                      <span className="text-right text-white">{row.value}%</span>
-                    </div>
-                  )) : <p className="text-sm text-slate-500">Chưa có lệnh sản xuất.</p>}
-                </div>
-              </ComponentsPanel>
-              <ComponentsPanel title="Sơ đồ cấu kiện">
-                <div className="relative h-48 overflow-hidden rounded-xl border border-white/10 bg-[radial-gradient(circle_at_50%_20%,rgba(59,130,246,0.18),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.8),rgba(2,6,23,0.8))]">
-                  <svg viewBox="0 0 520 210" className="h-full w-full">
-                    <g fill="none" stroke="#7dd3fc" strokeLinecap="round" strokeLinejoin="round" opacity="0.95">
-                      <path d="M86 137 L416 92 L446 105 L117 153 Z" strokeWidth="2" />
-                      <path d="M104 120 L396 80 L416 92 L86 137 Z" strokeWidth="1.4" opacity="0.7" />
-                      {Array.from({ length: 8 }).map((_, index) => {
-                        const x = 118 + index * 38
-                        return <path key={index} d={`M${x} 116 L${x + 20} 145 M${x + 12} 98 L${x + 32} 128`} strokeWidth="1" opacity="0.7" />
-                      })}
-                      <path d="M135 151 V174 M382 115 V139 M252 135 V163" strokeWidth="3" />
-                      <path d="M112 174 H160 M357 139 H410 M228 163 H280" strokeWidth="2" />
-                      <path d="M70 168 L110 168 M70 168 L70 134 M70 134 L76 144 M70 134 L64 144" stroke="#22c55e" />
-                      <path d="M70 168 L100 190 M100 190 L91 189 M100 190 L96 181" stroke="#ef4444" />
-                      <path d="M70 168 L70 105 M70 105 L64 116 M70 105 L76 116" stroke="#38bdf8" />
-                    </g>
-                  </svg>
-                </div>
-              </ComponentsPanel>
-            </div>
+              ) : null}
+            </CockpitChartCard>
+            <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
           </div>
 
-          <aside className="space-y-3">
-            <ComponentsPanel title="Phân loại theo loại" action="Xem chi tiết">
+          <aside className="col-span-12 space-y-1 xl:col-span-3">
+            <CockpitChartCard title="Tổng hợp" className={COCKPIT_HEIGHTS.CHART_SM}>
               <ComponentsDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="Tổng" segments={typeSegments.length ? typeSegments : [{ label: 'Chưa có dữ liệu', value: 1, color: '#334155' }]} />
-            </ComponentsPanel>
-            <ComponentsPanel title="Tiến độ sản xuất" action={<span className="text-[11px] text-slate-400">Tháng này</span>}>
+            </CockpitChartCard>
+            <CockpitChartCard title="Hoạt động" className={COCKPIT_HEIGHTS.CHART_SM}>
               <ComponentsMiniBars values={[260, 520, 480, 660, 720, 890, 860, 980, 1210, 1180, 1360, 1480]} tone="emerald" />
-            </ComponentsPanel>
-            <ComponentsPanel title="Top cấu kiện nhiều nhất" action="Xem tất cả">
-              <div className="space-y-3">
+            </CockpitChartCard>
+            <CockpitChartCard title="Thống kê" className={COCKPIT_HEIGHTS.CHART_SM}>
+              <div className="space-y-1">
                 {topProfiles.map(([profile, value]) => (
-                  <div key={profile} className="grid grid-cols-[1fr_70px_44px] items-center gap-2 text-xs">
+                  <div key={profile} className="grid grid-cols-[1fr_70px_44px] items-center gap-1 text-xs">
                     <div className="min-w-0">
                       <div className="truncate text-slate-200">{profile}</div>
                       <div className="mt-1 h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${Math.max(8, (value / maxTop) * 100)}%` }} /></div>
@@ -257,9 +230,9 @@ export function ComponentsOverviewPage() {
                     <span className="text-right text-slate-400">{((value / Math.max(1, rows.reduce((sum, row) => sum + row.quantity, 0))) * 100).toFixed(1)}%</span>
                   </div>
                 ))}
-                {!topProfiles.length ? <p className="text-sm text-slate-500">Chưa có dữ liệu.</p> : null}
+                {!topProfiles.length ? <ModuleEmptyState icon={<BarChart3 size={18} />} title="Chưa có thống kê" description="Các cấu kiện theo profile sẽ hiển thị tại đây." /> : null}
               </div>
-            </ComponentsPanel>
+            </CockpitChartCard>
           </aside>
         </div>
       </div>
