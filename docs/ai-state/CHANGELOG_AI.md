@@ -1,5 +1,22 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20D.2C – Executive KPI Implementation
+
+Completed:
+
+* **Executive KPI Presentation**: Enhanced the shared `CockpitKpiCard` component (`CockpitKpiCard.tsx`) to support executive presentation layouts when `state` is provided:
+  - Supports `state` value states: `'loading'`, `'empty'`, `'normal'`, and `'alert'`.
+  - Supports `tone`, `trendText`, `trendData`, and `statusText` props.
+  - Implemented the vertical rhythm layout: Top (icon, status badge), Center (large 3xl/4xl value), Bottom (small uppercase title, trend text).
+  - Designed loading skeleton state and empty text (`—`) state with muted opacity.
+  - Styled visual rules: border opacity <= 12%, glow opacity <= 8% (`boxShadow` with custom color alpha), high negative space, and amber warning styling for alert state (critical alert uses red badge only).
+  - Added new `KPI_EXEC` height token (`h-[128px]`) to `cockpit-tokens.ts`.
+* **Dashboard Integration**: Redesigned `DashboardPage.tsx` to render the 5 redesigned executive KPI cards (Inventory Days, Production Active, Component Pipeline, QC Pass Rate, Open Alerts) directly using the enhanced shared `CockpitKpiCard` component.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 20D.1 – Executive Dashboard Implementation
 
 Completed:

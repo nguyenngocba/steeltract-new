@@ -22,6 +22,7 @@ import {
 } from '@/shared/ui/modules'
 import { formatQuantity } from '@/shared/utils/number-format'
 import { getDashboardCockpit, type DashboardCockpit } from '@/services/api/dashboard.api'
+import { CockpitKpiCard } from '@/shared/ui/cockpit'
 
 const fmt = (value = 0, digits = 0) => formatQuantity(value, digits)
 const colors = ['#1d7cff', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#38bdf8']
@@ -63,15 +64,54 @@ export function DashboardPage() {
           action={<button className={moduleMutedButton}>Cập nhật mỗi 10 giây</button>}
         />
 
-        {isLoading ? <ModuleLoadingState variant="kpi" label="Đang tải dashboard..." /> : (
-          <ModuleKpiStrip className="md:grid-cols-2 xl:grid-cols-5">
-            <ExecutiveKpi icon={Warehouse} title="Inventory pressure" value={`${fmt(inventoryForecast.daysOfCover, 1)} ngày`} note={inventoryForecast.assumption} tone={inventoryForecast.daysOfCover < 7 ? 'red' : 'cyan'} />
-            <ExecutiveKpi icon={Factory} title="Production active" value={fmt(kpis?.productionActive)} note={`${fmt(kpis?.productionOrders)} MO tổng`} tone="emerald" />
-            <ExecutiveKpi icon={Boxes} title="Component pipeline" value={fmt(componentPipeline.total)} note={`${fmt(componentPipeline.ready + componentPipeline.shipped)} ready/shipped`} tone="purple" />
-            <ExecutiveKpi icon={Truck} title="Yard occupancy" value={`${fmt(yardAnalytics.occupancyRate, 1)}%`} note={`${fmt(yardAnalytics.occupiedSlots)}/${fmt(yardAnalytics.totalSlots)} slot`} tone={yardAnalytics.occupancyRate >= 85 ? 'red' : 'amber'} />
-            <ExecutiveKpi icon={ShieldCheck} title="QC pass rate" value={`${fmt(qcTrend.passRate, 1)}%`} note={`${fmt(qcTrend.openIssues)} open issues`} tone={qcTrend.passRate < 90 ? 'amber' : 'emerald'} />
-          </ModuleKpiStrip>
-        )}
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-3">
+          <CockpitKpiCard
+            title="Inventory Days"
+            value={isLoading ? '' : `${fmt(inventoryForecast.daysOfCover, 1)}d`}
+            trendText={inventoryForecast.daysOfCover < 7 ? 'CRITICAL' : 'ACTIVE'}
+            trendData={inventoryForecast.trendRows?.map(r => r.value)}
+            statusText="LIVE"
+            tone={inventoryForecast.daysOfCover < 7 ? 'red' : 'cyan'}
+            state={isLoading ? 'loading' : (!inventoryForecast.currentStock ? 'empty' : (inventoryForecast.daysOfCover < 7 ? 'alert' : 'normal'))}
+            icon={<Warehouse className="h-5 w-5" />}
+          />
+          <CockpitKpiCard
+            title="Production Active"
+            value={isLoading ? '' : `${fmt(kpis?.productionActive)} lines`}
+            trendText={`${fmt(kpis?.productionOrders)} MO total`}
+            statusText={kpis?.productionActive ? 'RUNNING' : 'IDLE'}
+            tone="blue"
+            state={isLoading ? 'loading' : (!kpis?.productionOrders ? 'empty' : 'normal')}
+            icon={<Factory className="h-5 w-5" />}
+          />
+          <CockpitKpiCard
+            title="Component Pipeline"
+            value={isLoading ? '' : `${fmt(componentPipeline.total)} pcs`}
+            trendText={`+${fmt(componentPipeline.ready)} rdy`}
+            statusText="PIPELINE"
+            tone="cyan"
+            state={isLoading ? 'loading' : (!componentPipeline.total ? 'empty' : 'normal')}
+            icon={<Boxes className="h-5 w-5" />}
+          />
+          <CockpitKpiCard
+            title="QC Pass Rate"
+            value={isLoading ? '' : `${fmt(qcTrend.passRate, 1)}%`}
+            trendText={`${fmt(qcTrend.openIssues)} open`}
+            statusText={qcTrend.passRate >= 90 ? 'PASSED' : 'REWORK'}
+            tone={qcTrend.passRate < 90 ? 'amber' : 'emerald'}
+            state={isLoading ? 'loading' : (!qcTrend.passRate ? 'empty' : (qcTrend.passRate < 90 ? 'alert' : 'normal'))}
+            icon={<ShieldCheck className="h-5 w-5" />}
+          />
+          <CockpitKpiCard
+            title="Open Alerts"
+            value={isLoading ? '' : `${fmt(executiveAlerts.length)}`}
+            trendText={`${executiveAlerts.filter(a => a.tone === 'red').length} critical`}
+            statusText={executiveAlerts.length > 0 ? 'WARNING' : 'OK'}
+            tone={executiveAlerts.length > 0 ? (executiveAlerts.some(a => a.tone === 'red') ? 'red' : 'amber') : 'cyan'}
+            state={isLoading ? 'loading' : (executiveAlerts.length > 0 ? 'alert' : 'normal')}
+            icon={<AlertTriangle className="h-5 w-5" />}
+          />
+        </div>
 
         <div className="mt-3 grid gap-3 xl:grid-cols-[1.1fr_1.1fr_.8fr]">
           <InventoryForecastPanel forecast={inventoryForecast} />
@@ -110,10 +150,6 @@ export function DashboardPage() {
       </main>
     </OperationalShell>
   )
-}
-
-function ExecutiveKpi({ icon: Icon, title, value, note, tone }: { icon: LucideIcon; title: string; value: string; note: string; tone: ModuleTone }) {
-  return <ModuleKpiCard icon={<Icon size={18} />} title={title} value={value} note={note} tone={tone} className="h-[112px]" />
 }
 
 function InventoryForecastPanel({ forecast }: { forecast: InventoryForecast }) {
