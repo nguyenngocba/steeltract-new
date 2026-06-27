@@ -12,6 +12,7 @@ Completed:
   - *Row 3*: Operational Pulse shift throughput metrics (`col-span-12 xl:col-span-6`) and exception registry categorized by severity (`col-span-12 xl:col-span-6`).
   - *Row 4*: Operational Timeline event flow (`col-span-12 xl:col-span-7`) and factory OEE circular rings (`col-span-12 xl:col-span-5`).
 * **Real-time & Mock view models**: Implemented standard mock view models and structured time strings.
+* **Component Extraction & Refactor**: Extracted sub-components into dedicated files in `modules/inventory/components/dashboard/`: `ExecutiveKpiRow.tsx`, `ForecastAreaChart.tsx`, `PipelineDonut.tsx`, `OperationalPulse.tsx`, `AlertsPanel.tsx`, `ActivityTimeline.tsx`, and `PerformanceGauge.tsx`. Reduced `InventoryOverviewPage.tsx` from ~350 lines to 198 lines total, ensuring modularity while keeping the visual layout, mock data, and business logic identical.
 
 Verification:
 
