@@ -1,5 +1,22 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20D.1 – Executive Dashboard Implementation
+
+Completed:
+
+* **ERP Executive Cockpit**: Completely redesigned the Inventory Overview Page (`InventoryOverviewPage.tsx`) into a Manufacturing ERP Cockpit (Executive Dashboard).
+* **Card Re-use**: Utilized the existing shared cockpit components (`CockpitKpiCard`, `CockpitChartCard`, `COCKPIT_HEIGHTS`, and `COCKPIT_SHELL`) without duplicating tokens or creating new generic card wrapper structures.
+* **Layout Grid**: Implemented the full 4-row grid structure supporting standard and ultrawide viewports:
+  - *Row 1*: 5 Executive KPI Cards (Inventory Days, Production Active, Component Pipeline, QC Pass Rate, Open Alerts) mapping to color-coded cockpit tones.
+  - *Row 2*: Inventory Forecast SVG Area Chart (`col-span-12 xl:col-span-8`) and Component Pipeline SVG Donut Chart (`col-span-12 xl:col-span-4`).
+  - *Row 3*: Operational Pulse shift throughput metrics (`col-span-12 xl:col-span-6`) and exception registry categorized by severity (`col-span-12 xl:col-span-6`).
+  - *Row 4*: Operational Timeline event flow (`col-span-12 xl:col-span-7`) and factory OEE circular rings (`col-span-12 xl:col-span-5`).
+* **Real-time & Mock view models**: Implemented standard mock view models and structured time strings.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 20C.8 – Components Theme Unification
 
 Completed:

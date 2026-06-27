@@ -1,1483 +1,404 @@
-import { useMemo, useState, type ReactNode } from 'react'
-
-import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import { useMemo, useState, useEffect } from 'react'
 import {
-  AdjustmentTransactionModal,
-  InboundTransactionModal,
-  OutboundTransactionModal,
-  StockTakeTransactionModal,
-  TransferTransactionModal,
-} from '../../components/InventoryTransactionModals'
+  CockpitChartCard,
+  CockpitKpiCard,
+  COCKPIT_HEIGHTS,
+} from '@/shared/ui/cockpit'
 import {
-  CompactDonutSummary,
-  CompactTrendChart,
-  InventoryChartCard,
-  InventoryKpi,
-  InventoryPagination,
-  InventoryPanel,
-  inventoryGridGap,
-  inventoryInput,
-  inventoryMutedButton,
-  inventoryPageStack,
-  inventoryTableHead,
-  inventoryTableRow,
-  inventoryTableShell,
-} from '../../components/InventoryVisuals'
-import { useInventoryAudit } from '../../hooks/useInventoryAudit'
-import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
-import { useMaterialDetail } from '../../hooks/useMaterialDetail'
-import { useZones } from '../../hooks/useZones'
-import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
-import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
+  Warehouse,
+  Activity,
+  Layers,
+  ShieldCheck,
+  AlertTriangle,
+  Inbox,
+  Send,
+  GitCompare,
+  SlidersHorizontal,
+  Clock,
+  CircleDot
+} from 'lucide-react'
 
-const PAGE_SIZE = 13
-const donutColors = ['#1d7cff', '#14c987', '#7c3aed', '#f59e0b', '#ef4444', '#06b6d4']
-const compactInput =
-  'h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]'
-
-function parseLocaleNumber(v: any) {
-  if (typeof v === 'number') return v
-  const raw = String(v ?? '').trim()
-  if (!raw) return 0
-  const normalized = raw.replace(/\./g, '').replace(',', '.')
-  const n = Number(normalized)
-  return Number.isFinite(n) ? n : 0
-}
-
-function num(v: any) {
-  return parseLocaleNumber(v)
-}
-
-function money(v: any) {
-  return formatCurrencyVnd(num(v))
-}
-
-function formatQty(v: any) {
-  return formatQuantity(num(v), 3)
-}
-
-function materialUsageLabel(value: string | undefined) {
-  const map: Record<string, string> = {
-    PRIMARY: 'Vật tư chính',
-    SECONDARY: 'Vật tư phụ',
-    CONSUMABLE: 'Vật tư tiêu hao',
+// ----------------------------------------------------
+// Mock Data Model
+// ----------------------------------------------------
+const mockDashboardData = {
+  executiveKpis: [
+    { id: 'inventory_days', title: 'Inventory Days', value: '42d', note: 'Ngày tồn kho trung bình', changePercent: -5.2, trend: [45, 44, 43, 42, 42, 42], tone: 'cyan' as const, icon: <Warehouse className="h-5 w-5" /> },
+    { id: 'production_active', title: 'Production Active', value: '18 lines', note: 'Lò cao & dây chuyền chạy', changePercent: 89, trend: [15, 16, 17, 18, 18, 18], tone: 'cyan' as const, icon: <Activity className="h-5 w-5" /> },
+    { id: 'component_pipeline', title: 'Component Pipeline', value: '256k t', note: 'Cấu kiện trong pipeline', changePercent: 12, trend: [240, 248, 252, 256, 256], tone: 'blue' as const, icon: <Layers className="h-5 w-5" /> },
+    { id: 'qc_pass_rate', title: 'QC Pass Rate', value: '96.8%', note: 'Tỷ lệ đạt kiểm định QC', changePercent: 2, trend: [95.1, 95.8, 96.2, 96.8, 96.8], tone: 'emerald' as const, icon: <ShieldCheck className="h-5 w-5" /> },
+    { id: 'open_alerts', title: 'Open Alerts', value: '7', note: 'Cảnh báo vận hành hoạt động', changePercent: 3, trend: [9, 8, 7, 7, 7], tone: 'orange' as const, icon: <AlertTriangle className="h-5 w-5" /> },
+  ],
+  forecast: {
+    daysOfCover: 42,
+    targetRangeMin: 10,
+    targetRangeMax: 100,
+    series: [
+      { date: '26 Oct', currentStock: 18, dailyMovement: 12, demandForecast: 20 },
+      { date: '28 Oct', currentStock: 16, dailyMovement: 14, demandForecast: 22 },
+      { date: '02 Nov', currentStock: 22, dailyMovement: 15, demandForecast: 24 },
+      { date: '08 Nov', currentStock: 28, dailyMovement: 19, demandForecast: 28 },
+      { date: '14 Nov', currentStock: 32, dailyMovement: 24, demandForecast: 30 },
+    ]
+  },
+  pipeline: {
+    totalComponents: 78450,
+    totalWeightTons: 256,
+    segments: [
+      { stage: 'raw_material', label: 'Nguyên liệu thô', value: 27457, percentage: 35, colorCode: '#06b6d4' },
+      { stage: 'work_in_progress', label: 'Bán thành phẩm', value: 31380, percentage: 40, colorCode: '#3b82f6' },
+      { stage: 'finished_goods', label: 'Thành phẩm', value: 15690, percentage: 20, colorCode: '#10b981' },
+      { stage: 'scrap', label: 'Phế phẩm / Hao hụt', value: 3923, percentage: 5, colorCode: '#ef4444' }
+    ]
+  },
+  operationalPulse: {
+    shiftId: 'SHIFT-A',
+    metrics: [
+      { id: 'inbound', label: 'Today Inbound', count: 15, volume: 140, targetVolume: 200, icon: <Inbox className="h-4 w-4" /> },
+      { id: 'outbound', label: 'Today Outbound', count: 12, volume: 98, targetVolume: 120, icon: <Send className="h-4 w-4" /> },
+      { id: 'transfers', label: 'Transfers', count: 19, volume: 45, targetVolume: 50, icon: <GitCompare className="h-4 w-4" /> },
+      { id: 'adjustments', label: 'Adjustments', count: 3, volume: -2, targetVolume: 5, icon: <SlidersHorizontal className="h-4 w-4" /> }
+    ]
+  },
+  alerts: [
+    { id: 'a1', timestamp: '14:15', severity: 'critical', title: 'Furnace #4 Temperature Exceeded Limit', message: 'Nhiệt độ lò cao vượt quá 1600°C' },
+    { id: 'a2', timestamp: '13:58', severity: 'critical', title: 'Raw Material Scarcity Alert', message: 'Tồn kho quặng sắt dưới ngưỡng tối thiểu' },
+    { id: 'a3', timestamp: '12:44', severity: 'critical', title: 'Machine Breakdown (CRANE #2)', message: 'Cẩu trục chính mất tín hiệu điều khiển' },
+    { id: 'a4', timestamp: '14:22', severity: 'warning', title: 'Logistics Delay: Truck 789', message: 'Xe vận chuyển cấu kiện trễ 45 phút' },
+    { id: 'a5', timestamp: '13:31', severity: 'warning', title: 'Inventory Level Low - Alloy Steel', message: 'Tồn thép hợp kim sắp hết' },
+    { id: 'a6', timestamp: '12:01', severity: 'info', title: 'Upcoming QC Audit (EHS)', message: 'Đoàn kiểm định chất lượng sắp đến' }
+  ],
+  activity: [
+    { id: 'e1', timestamp: '14:28', operatorName: 'Nguyen Van A', module: 'production', description: 'Production Order #P-7740 started' },
+    { id: 'e2', timestamp: '14:19', operatorName: 'Tran Van B', module: 'qc', description: 'QC Check Passed: Heat #H-521 (98.2%)' },
+    { id: 'e3', timestamp: '14:03', operatorName: 'Le Van C', module: 'warehouse', description: 'Inbound Shipment #I-3301 arrived' },
+    { id: 'e4', timestamp: '13:47', operatorName: 'Le Van C', module: 'warehouse', description: 'Inventory Adjustment: Finished Rebar' }
+  ],
+  performance: {
+    oee: 84,
+    scheduleCompliance: 91,
+    availabilityRate: 97,
+    qualityRate: 89
   }
-  return map[String(value ?? 'PRIMARY')] ?? 'Vật tư chính'
 }
 
-function isMainWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
-}
+// ----------------------------------------------------
+// Sub-Components
+// ----------------------------------------------------
 
-function isMainWarehouseLine(line: any) {
-  const warehouse = line?.warehouse ?? line?.zone?.warehouse
-  if (!warehouse) return true
-  const code = String(warehouse.code ?? '').trim().toUpperCase()
-  const name = String(warehouse.name ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
-}
+function AreaForecastChart({ series }: { series: typeof mockDashboardData.forecast.series }) {
+  const points = useMemo(() => {
+    return series.map((s, idx) => {
+      const x = (idx / (series.length - 1)) * 100
+      const y = 90 - (s.currentStock / 40) * 70
+      return `${x},${y}`
+    }).join(' ')
+  }, [series])
 
-function isProductionWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
-}
+  const movementPoints = useMemo(() => {
+    return series.map((s, idx) => {
+      const x = (idx / (series.length - 1)) * 100
+      const y = 90 - (s.dailyMovement / 40) * 70
+      return `${x},${y}`
+    }).join(' ')
+  }, [series])
 
-function allLocationBalances(item: any) {
-  return Array.isArray(item.locationBalances) ? item.locationBalances : []
-}
-
-function mainWarehouseStock(item: any) {
-  return allLocationBalances(item)
-    .filter(isMainWarehouseLocation)
-    .reduce((sum: number, location: any) => sum + num(location.quantity), 0)
-}
-
-function productionWarehouseStock(item: any) {
-  return allLocationBalances(item)
-    .filter(isProductionWarehouseLocation)
-    .reduce((sum: number, location: any) => sum + num(location.quantity), 0)
-}
-
-function totalWarehouseStock(item: any) {
-  const balances = allLocationBalances(item)
-  if (balances.length) {
-    return balances.reduce((sum: number, location: any) => sum + num(location.quantity), 0)
-  }
-  return num(item.currentStock ?? item.quantity)
-}
-
-function statusOf(item: any) {
-  const stock = mainWarehouseStock(item)
-  const min = num(item.minimumStock ?? 5)
-  if (stock <= 0) return 'OUT'
-  if (min > 0 && stock <= min) return 'LOW'
-  return 'NORMAL'
-}
-
-function statusLabel(status: string) {
-  if (status === 'OUT') return 'Hết hàng'
-  if (status === 'LOW') return 'Sắp hết'
-  return 'Bình thường'
-}
-
-function transactionRows(data: any) {
-  return Array.isArray(data) ? data : data?.data ?? []
-}
-
-function transactionDate(tx: any) {
-  const raw = tx.transactionDate ?? tx.createdAt
-  return raw ? new Date(raw) : null
-}
-
-function firstLine(tx: any) {
-  return Array.isArray(tx.items) ? tx.items[0] : undefined
-}
-
-function transactionQuantity(tx: any) {
-  const items = Array.isArray(tx.items) ? tx.items : []
-  if (items.length) {
-    return items.reduce((sum: number, line: any) => sum + Math.abs(num(line.quantity)), 0)
-  }
-  return Math.abs(num(tx.totalQuantity ?? tx.quantity))
-}
-
-function transactionAmount(tx: any) {
-  const items = Array.isArray(tx.items) ? tx.items : []
-  if (items.length) {
-    return items.reduce((sum: number, line: any) => sum + Math.abs(num(line.totalAmount ?? num(line.quantity) * num(line.unitPrice))), 0)
-  }
-  return Math.abs(num(tx.totalAmount))
-}
-function transactionDateKey(tx: any, length: number) {
-  return String(tx.transactionDate ?? tx.createdAt ?? '').slice(0, length)
-}
-
-function locationLabel(location: any) {
-  const zoneName = String(location?.zoneName ?? '').trim()
-  if (zoneName) return zoneName
-  const zoneCode = String(location?.zoneCode ?? '').trim()
-  const warehouseName = String(location?.warehouseName ?? '').trim()
-  if (zoneCode && warehouseName) return `${zoneCode} - ${warehouseName}`
-  return zoneCode || warehouseName || ''
-}
-
-function rowLocations(item: any) {
-  const balances = Array.isArray(item.locationBalances)
-    ? item.locationBalances.filter((location: any) => num(location.quantity) > 0)
-    : []
-  if (balances.length > 0) return balances
-
-  const fallback = item.position ?? item.zone ?? item.zoneName
-  return fallback ? [{ zoneName: fallback, quantity: item.currentStock }] : []
-}
-
-
-function displayLocation(item: any) {
-  const locations = rowLocations(item)
-  if (!locations.length) return '-'
-  const primary = locationLabel(locations[0]) || '-'
-  return locations.length > 1 ? `${primary} ... +${locations.length - 1}` : primary
-}
-
-function rowMatchesWarehouse(item: any, warehouse: string) {
-  if (!warehouse) return true
-  const locations = rowLocations(item)
-  return locations.some((location: any) => {
-    const text = [
-      location.zoneId,
-      location.zoneCode,
-      location.zoneName,
-      location.warehouseId,
-      location.warehouseCode,
-      location.warehouseName,
-    ].filter(Boolean).join(' ').toLowerCase()
-    return text.includes(warehouse.toLowerCase())
-  })
-}
-
-function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-0 block text-[12px] font-medium text-slate-400">{label}</span>
-      {children}
-    </label>
-  )
-}
-// ================= COMPONENT SPARKLINE =================
-function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
-  const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
-  const min = Math.min(...rows)
-  const max = Math.max(...rows)
-  const range = Math.max(1, max - min)
-  const points = rows.map((value, index) => {
-    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
-    const y = 34 - ((value - min) / range) * 24 - 5
-    return `${x},${y}`
-  }).join(' ')
-  return (
-    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-95">
-      <polyline points={`0,34 ${points} 100,34`} fill={fill} stroke="none" />
-      <polyline points={points} fill="none" stroke={line} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div className="relative h-[220px] w-full flex flex-col justify-between">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[180px] w-full overflow-visible">
+        {/* Grid Lines */}
+        <line x1="0" y1="20" x2="100" y2="20" className="stroke-white/5" strokeWidth="0.5" />
+        <line x1="0" y1="50" x2="100" y2="50" className="stroke-white/5" strokeWidth="0.5" />
+        <line x1="0" y1="80" x2="100" y2="80" className="stroke-white/5" strokeWidth="0.5" />
+        
+        {/* Target Safety Zone */}
+        <rect x="0" y="30" width="100" height="40" className="fill-cyan-500/[0.03]" />
+
+        {/* Current Stock Area */}
+        <polyline points={`0,100 ${points} 100,100`} fill="rgba(6,182,212,0.12)" stroke="none" />
+        <polyline points={points} fill="none" stroke="#06b6d4" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+
+        {/* Daily Movement Line */}
+        <polyline points={movementPoints} fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+
+        {/* Highlight Nodes */}
+        {series.map((s, idx) => {
+          const x = (idx / (series.length - 1)) * 100
+          const y = 90 - (s.currentStock / 40) * 70
+          return <circle key={idx} cx={x} cy={y} r="1.5" fill="#22d3ee" />
+        })}
+      </svg>
+      <div className="grid grid-cols-5 gap-2 text-[10px] text-slate-500 mt-2">
+        {series.map((s) => <span key={s.date} className="text-center">{s.date}</span>)}
+      </div>
+    </div>
   )
 }
 
-// ================= COMPONENT METRIC CARD =================
-function OverviewMetricCard({
-  title,
-  value,
-  note,
-  noteClassName,
-  tone = 'blue',
-  icon,
-  trend,
-  active,
-  onClick,
-  isLoading,
-}: {
-  title: string
-  value: React.ReactNode
-  note?: string
-  noteClassName?: string
-  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
-  icon: React.ReactNode
-  trend?: number[]
-  active?: boolean
-  onClick?: () => void
-  isLoading?: boolean
-}) {
-  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
-    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
-    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
-    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
-    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
-    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
-    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
-    indigo: { text: 'text-indigo-300', bg: 'bg-indigo-500/10', line: '#6366f1', fill: 'rgba(99,102,241,0.22)', note: 'text-emerald-400' },
-    violet: { text: 'text-violet-300', bg: 'bg-violet-500/10', line: '#8b5cf6', fill: 'rgba(139,92,246,0.22)', note: 'text-emerald-400' },
-    orange: { text: 'text-orange-300', bg: 'bg-orange-500/10', line: '#f97316', fill: 'rgba(249,115,22,0.22)', note: 'text-red-400' },
-  }
+function DonutPipelineChart({ segments }: { segments: typeof mockDashboardData.pipeline.segments }) {
+  const total = useMemo(() => segments.reduce((sum, s) => sum + s.value, 0), [segments])
+  
+  const paths = useMemo(() => {
+    let cumulativePercent = 0
+    return segments.map((s) => {
+      const startPercent = cumulativePercent
+      const endPercent = cumulativePercent + (s.value / total)
+      cumulativePercent = endPercent
+      return { ...s, startPercent, endPercent }
+    })
+  }, [segments, total])
 
-  if (isLoading) {
-    return (
-      <section className="relative h-[108px] overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] animate-pulse">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2 min-w-0 flex-1">
-            <div className="h-2 w-16 rounded bg-white/10" />
-            <div className="h-5 w-24 rounded bg-white/10" />
-            <div className="h-2 w-20 rounded bg-white/10" />
-          </div>
-          <div className="h-8 w-8 rounded-lg bg-white/10 shrink-0" />
-        </div>
-        <div className="absolute inset-x-3 bottom-1 h-3 rounded bg-white/5" />
-      </section>
-    )
-  }
-
-  const item = color[tone] || color.blue
-  const content = (
-    <>
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[10px] font-semibold ${noteClassName ?? item.note}`}>{note}</div> : null}
-        </div>
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
-          {icon}
+  return (
+    <div className="flex flex-col md:flex-row items-center justify-between gap-4 h-full">
+      <div className="relative h-32 w-32 flex-shrink-0">
+        <svg viewBox="0 0 36 36" className="h-full w-full">
+          {paths.map((p, idx) => {
+            const strokeDasharray = `${p.percentage} ${100 - p.percentage}`
+            const strokeDashoffset = -p.startPercent * 100 + 25 // top start
+            return (
+              <circle
+                key={idx}
+                cx="18"
+                cy="18"
+                r="15.915"
+                fill="none"
+                stroke={p.colorCode}
+                strokeWidth="3.8"
+                strokeDasharray={strokeDasharray}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-500"
+              />
+            )
+          })}
+          <circle cx="18" cy="18" r="12" className="fill-[#08111f]" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div className="text-lg font-bold text-white">78.4k</div>
+          <div className="text-[8px] uppercase tracking-wider text-slate-500">Tấn</div>
         </div>
       </div>
-      {trend && trend.length > 0 && <KpiSparkline values={trend} line={item.line} fill={item.fill} />}
-    </>
+      <div className="flex-1 space-y-2 w-full">
+        {segments.map((s) => (
+          <div key={s.stage} className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.colorCode }} />
+              <span>{s.label}</span>
+            </span>
+            <span className="font-semibold text-white">{s.percentage}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
-  const className = `relative h-[108px] overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-cyan-400/[0.055] text-left p-3 transition ${
-  active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
-} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`;
-  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
-  return <section className={className}>{content}</section>
 }
+
+function PerformanceGauge({ value, label, tone = 'cyan' }: { value: number; label: string; tone?: 'cyan' | 'blue' }) {
+  const radius = 16
+  const strokeWidth = 2.5
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (value / 100) * circumference
+  const strokeColor = tone === 'cyan' ? 'stroke-cyan-400' : 'stroke-blue-500'
+
+  return (
+    <div className="flex flex-col items-center justify-center p-1">
+      <div className="relative h-14 w-14">
+        <svg className="h-full w-full rotate-[-90deg]">
+          <circle cx="18" cy="18" r={radius} className="stroke-white/5" strokeWidth={strokeWidth} fill="none" />
+          <circle 
+            cx="18" 
+            cy="18" 
+            r={radius} 
+            className={`${strokeColor} transition-all duration-500`}
+            strokeWidth={strokeWidth} 
+            strokeDasharray={circumference} 
+            strokeDashoffset={offset} 
+            strokeLinecap="round" 
+            fill="none" 
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white font-mono">{value}%</span>
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 mt-1 text-center truncate w-full">{label}</span>
+    </div>
+  )
+}
+
+// ----------------------------------------------------
+// Main Cockpit Page Component
+// ----------------------------------------------------
 
 export function InventoryOverviewPage() {
-  const { data: auditRows = [], isLoading: isLoadingAudit, refetch: refetchAudit } = useInventoryAudit()
-  const { data: zones = [] } = useZones()
-  const { data: transactionsData = [], isLoading: isLoadingTransactions } = useInventoryTransactions({})
-  const isLoading = isLoadingAudit || isLoadingTransactions
+  const [timeStr, setTimeStr] = useState('')
 
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
-  const [searchDraft, setSearchDraft] = useState('')
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [usageFilter, setUsageFilter] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [page, setPage] = useState(1)
-  const [transactionModal, setTransactionModal] = useState<null | 'inbound' | 'outbound' | 'transfer' | 'stock-take' | 'adjustment'>(null)
-  const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full' | 'alerts-full'>(null)
-
-  const { data: selectedMaterialDetail } = useMaterialDetail(selectedMaterialId || undefined)
-  const rows = useMemo(() => {
-    return (auditRows as any[]).map((item: any) => {
-      const averageCost = num(item.averageCost ?? item.unitPrice)
-      const mainStock = mainWarehouseStock(item)
-      const productionStock = productionWarehouseStock(item)
-      const totalStock = totalWarehouseStock(item)
-      return {
-        ...item,
-        id: item.materialId ?? item.inventoryItemId ?? item.id,
-        code: item.materialCode ?? item.code,
-        name: item.materialName ?? item.name,
-        quantity: totalStock,
-        mainStock,
-        productionStock,
-        totalStock,
-        averageCost,
-        inventoryValue: num(item.inventoryValue ?? totalStock * averageCost),
-      }
-    })
-  }, [auditRows])
-
-  const categoryOptions = useMemo(() => {
-    return Array.from(new Set(rows.map((item: any) => String(item.category ?? '').trim()).filter(Boolean))).sort()
-  }, [rows])
-
-  const warehouseOptions = useMemo(() => {
-    const fromZones = zones
-      .map((z: any) => ({
-        value: String(z.id ?? z.code ?? ''),
-        label: `${String(z.code ?? '').trim()}${z.name ? ` - ${z.name}` : ''}`.trim(),
-      }))
-      .filter((z: any) => z.value && z.label)
-    const fromBalances = Array.from(
-      new Map(
-        rows.flatMap((item: any) => rowLocations(item).map((location: any) => {
-          const value = String(location.zoneId ?? location.zoneCode ?? location.zoneName ?? '')
-          return [value, { value, label: locationLabel(location) || value }]
-        })),
-      ).values(),
-    ).filter((x: any) => x.value && x.label)
-    return [...fromZones, ...fromBalances].filter((item, index, list) => list.findIndex((x) => x.value === item.value) === index)
-  }, [rows, zones])
-
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((item: any) => {
-      if (categoryFilter && String(item.category ?? '') !== categoryFilter) return false
-      if (usageFilter && String(item.materialUsageType ?? 'PRIMARY') !== usageFilter) return false
-      if (warehouseFilter && !rowMatchesWarehouse(item, warehouseFilter)) return false
-      if (statusFilter && statusOf(item) !== statusFilter) return false
-      if (!q) return true
-      return [
-        item.code,
-        item.name,
-        item.materialType,
-        item.specification,
-        item.category,
-        displayLocation(item),
-      ].join(' ').toLowerCase().includes(q)
-    })
-    .sort((a: any, b: any) => {
-      const codeA = a.code ?? '';
-      const codeB = b.code ?? '';
-      return codeA.localeCompare(codeB);
-    });
-  }, [rows, search, categoryFilter, usageFilter, warehouseFilter, statusFilter])
-
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
-  const activePage = Math.min(page, pageCount)
-  const pagedRows = filteredRows.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE)
-
-  const transactions = useMemo(() => {
-    return transactionRows(transactionsData)
-      .slice()
-      .sort((a: any, b: any) => +(transactionDate(b) ?? 0) - +(transactionDate(a) ?? 0))
-  }, [transactionsData])
-
-  const recentInboundRows = useMemo(() => transactions.filter((x: any) => String(x.type ?? '').toUpperCase() === 'INBOUND'), [transactions])
-  const recentOutboundRows = useMemo(() => transactions.filter((x: any) => String(x.type ?? '').toUpperCase() === 'OUTBOUND'), [transactions])
-  const recentTransferRows = useMemo(
-    () =>
-      transactions.filter(
-        (x: any) => String(x.type ?? '').toUpperCase() === 'TRANSFER',
-      ),
-    [transactions],
-  )
-  const summary = useMemo(() => {
-    const totalQty = filteredRows.reduce((sum: number, item: any) => sum + num(item.quantity), 0)
-    const mainQty = filteredRows.reduce((sum: number, item: any) => sum + mainWarehouseStock(item), 0)
-    const productionQty = filteredRows.reduce((sum: number, item: any) => sum + productionWarehouseStock(item), 0)
-    const totalValue = filteredRows.reduce((sum: number, item: any) => sum + num(item.inventoryValue), 0)
-    const low = filteredRows.filter((item: any) => statusOf(item) === 'LOW').length
-    const out = filteredRows.filter((item: any) => statusOf(item) === 'OUT').length
-    const reserved = filteredRows.reduce((sum: number, item: any) => sum + num(item.reservedQuantity ?? item.reservedStock), 0)
-
-    let primaryCount = 0
-    let primaryQty = 0
-    let secondaryCount = 0
-    let secondaryQty = 0
-    let consumableCount = 0
-    let consumableQty = 0
-
-    filteredRows.forEach((item: any) => {
-      const usage = String(item.materialUsageType ?? 'PRIMARY').toUpperCase()
-      const qty = num(item.quantity)
-      if (usage === 'PRIMARY') {
-        primaryCount += 1
-        primaryQty += qty
-      } else if (usage === 'SECONDARY') {
-        secondaryCount += 1
-        secondaryQty += qty
-      } else if (usage === 'CONSUMABLE') {
-        consumableCount += 1
-        consumableQty += qty
-      }
-    })
-
-    return {
-      totalItems: filteredRows.length,
-      totalQty,
-      mainQty,
-      productionQty,
-      totalValue,
-      low,
-      out,
-      reserved,
-      primaryCount,
-      primaryQty,
-      secondaryCount,
-      secondaryQty,
-      consumableCount,
-      consumableQty,
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setTimeStr(now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' - ' + now.toLocaleDateString('vi-VN'))
     }
-  }, [filteredRows])
-
-  const zoneSegments = useMemo(() => {
-    const map = new Map<string, number>()
-    filteredRows.forEach((item: any) => {
-      const locations = rowLocations(item)
-      if (!locations.length) {
-        map.set('Chưa rõ', (map.get('Chưa rõ') ?? 0) + num(item.quantity))
-        return
-      }
-      locations.forEach((location: any) => {
-        const key = locationLabel(location) || 'Chưa rõ'
-        map.set(key, (map.get(key) ?? 0) + num(location.quantity))
-      })
-    })
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([label, value], index) => ({ label, value, color: donutColors[index % donutColors.length] }))
-  }, [filteredRows])
-
-  const categorySegments = useMemo(() => {
-    const map = new Map<string, number>()
-    filteredRows.forEach((item: any) => {
-      const key = String(item.category ?? item.materialType ?? 'Khác')
-      map.set(key, (map.get(key) ?? 0) + num(item.quantity))
-    })
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([label, value], index) => ({ label, value, color: donutColors[index % donutColors.length] }))
-  }, [filteredRows])
-
-  const valueTrend = useMemo(() => {
-    const map = new Map<string, number>()
-    transactions.forEach((tx: any) => {
-      const date = transactionDate(tx)
-      if (!date) return
-      const key = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
-      const sign = String(tx.type ?? '').toUpperCase() === 'OUTBOUND' ? -1 : 1
-      map.set(key, (map.get(key) ?? 0) + sign * transactionAmount(tx))
-    })
-    const latest = Array.from(map.entries()).slice(-6)
-    if (latest.length === 0) {
-      return Array.from({ length: 6 }, (_, index) => ({
-        label: `${String(index + 1).padStart(2, '0')}/06`,
-        value: summary.totalValue * (0.82 + index * 0.035),
-      }))
-    }
-    let running = Math.max(0, summary.totalValue - latest.reduce((sum, [, value]) => sum + value, 0))
-    return latest.map(([label, value]) => {
-      running = Math.max(0, running + value)
-      return { label, value: running }
-    })
-  }, [transactions, summary.totalValue])
-  const dateAgeInfo = useMemo(() => {
-    const dates: Date[] = []
-
-    // 1. Transaction dates
-    const txRows = transactionRows(transactionsData)
-    txRows.forEach((tx: any) => {
-      const d = transactionDate(tx)
-      if (d && !isNaN(d.getTime())) {
-        dates.push(d)
-      }
-    })
-
-    // 2. Material creation dates
-    auditRows.forEach((row: any) => {
-      const d = row.createdAt ? new Date(row.createdAt) : null
-      if (d && !isNaN(d.getTime())) {
-        dates.push(d)
-      }
-    })
-
-    if (dates.length === 0) {
-      return { oldestDate: new Date(), ageInDays: 0 }
-    }
-
-    const oldest = new Date(Math.min(...dates.map(d => d.getTime())))
-    const now = new Date()
-    const ageInMs = now.getTime() - oldest.getTime()
-    const ageInDays = ageInMs / (1000 * 60 * 60 * 24)
-
-    return { oldestDate: oldest, ageInDays }
-  }, [transactionsData, auditRows])
-
-  const { kpiTrend, kpiDeltas, kpiNoteColors } = useMemo(() => {
-    const ageInDays = dateAgeInfo.ageInDays
-
-    const now = new Date()
-    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const prevMonthLabel = `Tháng ${prevMonthDate.getMonth() + 1}/${prevMonthDate.getFullYear()}`
-
-    // 12 snapshot dates: last day of month going back 11 months to current month-end (capped at now)
-    const snapshotDates = Array.from({ length: 12 }).map((_, index) => {
-      const monthsBack = 11 - index
-      const date = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0, 23, 59, 59, 999)
-      return date > now ? now : date
-    })
-
-    const selectedIds = new Set(filteredRows.map((row: any) => String(row.id)))
-    const txRows = transactionRows(transactionsData)
-    const movements = txRows.flatMap((tx: any) => {
-      const txDate = transactionDate(tx)
-      if (!txDate) return []
-      const items = Array.isArray(tx.items) ? tx.items : []
-      return items
-        .map((line: any) => ({
-          inventoryItemId: String(line.inventoryItemId ?? line.inventoryItem?.id ?? ''),
-          quantity: num(line.quantity),
-          transactionDate: txDate,
-          rawLine: line,
-        }))
-        .filter((line: any) => line.inventoryItemId && selectedIds.has(line.inventoryItemId))
-    })
-
-    const firstTxDateMap = new Map<string, Date>()
-    movements.forEach((m: any) => {
-      const itemId = m.inventoryItemId
-      const mDate = m.transactionDate
-      if (mDate) {
-        const currentMin = firstTxDateMap.get(itemId)
-        if (!currentMin || mDate < currentMin) {
-          firstTxDateMap.set(itemId, mDate)
-        }
-      }
-    })
-
-    const getHistoricalSummary = (targetDate: Date) => {
-      let totalQty = 0
-      let totalValue = 0
-      let low = 0
-      let out = 0
-      let primaryCount = 0
-      let primaryQty = 0
-      let secondaryCount = 0
-      let secondaryQty = 0
-      let consumableCount = 0
-      let consumableQty = 0
-      let totalItems = 0
-
-      filteredRows.forEach((row: any) => {
-        const itemId = String(row.id)
-        const firstTxDate = firstTxDateMap.get(itemId)
-        const existed = firstTxDate && firstTxDate <= targetDate
-        if (!existed) return
-
-        totalItems += 1
-
-        const afterEndTotal = movements
-          .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > targetDate)
-          .reduce((sum: number, line: any) => sum + line.quantity, 0)
-        const totalStock = Math.max(0, totalWarehouseStock(row) - afterEndTotal)
-
-        const afterEndMain = movements
-          .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > targetDate && isMainWarehouseLine(line.rawLine))
-          .reduce((sum: number, line: any) => sum + line.quantity, 0)
-        const mainStock = Math.max(0, mainWarehouseStock(row) - afterEndMain)
-
-        const averageCost = num(row.averageCost)
-        totalQty += totalStock
-        totalValue += totalStock * averageCost
-
-        const usage = String(row.materialUsageType ?? 'PRIMARY').toUpperCase()
-        if (usage === 'PRIMARY') {
-          primaryCount += 1
-          primaryQty += totalStock
-        } else if (usage === 'SECONDARY') {
-          secondaryCount += 1
-          secondaryQty += totalStock
-        } else if (usage === 'CONSUMABLE') {
-          consumableCount += 1
-          consumableQty += totalStock
-        }
-
-        const min = num(row.minimumStock ?? 5)
-        if (mainStock <= 0) {
-          out += 1
-        } else if (min > 0 && mainStock <= min) {
-          low += 1
-        }
-      })
-
-      return {
-        totalItems,
-        totalQty,
-        totalValue,
-        low,
-        out,
-        primaryCount,
-        primaryQty,
-        secondaryCount,
-        secondaryQty,
-        consumableCount,
-        consumableQty,
-      }
-    }
-
-    const snapshots = snapshotDates.map(date => getHistoricalSummary(date))
-
-    const realTrend = {
-      value: snapshots.map(s => s.totalValue),
-      quantity: snapshots.map(s => s.totalQty),
-      low: snapshots.map(s => s.low),
-      out: snapshots.map(s => s.out),
-      primary: snapshots.map(s => s.primaryQty),
-      secondary: snapshots.map(s => s.secondaryQty),
-      consumable: snapshots.map(s => s.consumableQty),
-      items: snapshots.map(s => s.totalItems),
-    }
-
-    const flat = (val: number) => Array.from({ length: 12 }, () => val)
-    const trend = ageInDays >= 365 ? realTrend : {
-      value: flat(summary.totalValue),
-      quantity: flat(summary.totalQty),
-      low: flat(summary.low),
-      out: flat(summary.out),
-      primary: flat(summary.primaryQty),
-      secondary: flat(summary.secondaryQty),
-      consumable: flat(summary.consumableQty),
-      items: flat(summary.totalItems),
-    }
-
-    const percent = (curr: number, prev: number, suffix: string) => {
-      const diff = curr - prev
-      const absDiff = Math.abs(diff)
-      const formattedDiff = suffix === 'đ' ? formatCurrencyVnd(absDiff) : `${formatQuantity(absDiff)} ${suffix}`
-      
-      const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
-      const arrowPrefix = arrow ? `${arrow}${formattedDiff}` : `0 ${suffix}`
-      
-      if (!prev) {
-        if (!curr) return `0 ${suffix} (0%)`
-        return `▲${formattedDiff} (+100%)`
-      }
-      
-      const delta = (diff / Math.abs(prev)) * 100
-      if (delta === 0) return `0 ${suffix} (0%)`
-      
-      const sign = delta > 0 ? '+' : '-'
-      const formattedDelta = delta % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(1)
-      
-      return `${arrowPrefix} (${sign}${formattedDelta}%)`
-    }
-
-    const count = (curr: number, prev: number) => {
-      const diff = curr - prev
-      if (diff === 0) return '0 mã'
-      const arrow = diff > 0 ? '▲' : '▼'
-      return `${arrow}${Math.abs(diff)} mã`
-    }
-
-    const deltas = {
-      value: percent(snapshots[11].totalValue, snapshots[10].totalValue, 'đ'),
-      quantity: percent(snapshots[11].totalQty, snapshots[10].totalQty, 'tấn'),
-      low: count(snapshots[11].low, snapshots[10].low),
-      out: count(snapshots[11].out, snapshots[10].out),
-      primary: percent(snapshots[11].primaryQty, snapshots[10].primaryQty, 'tấn'),
-      secondary: percent(snapshots[11].secondaryQty, snapshots[10].secondaryQty, 'tấn'),
-      consumable: percent(snapshots[11].consumableQty, snapshots[10].consumableQty, 'tấn'),
-      items: count(snapshots[11].totalItems, snapshots[10].totalItems),
-    }
-
-    const getNoteColorClass = (curr: number, prev: number, isAlertMetric: boolean) => {
-      const diff = curr - prev
-      if (diff === 0) return 'text-slate-400'
-      if (isAlertMetric) {
-        return diff < 0 ? 'text-emerald-400' : 'text-red-400'
-      } else {
-        return diff > 0 ? 'text-emerald-400' : 'text-red-400'
-      }
-    }
-
-    const noteColors = {
-      value: getNoteColorClass(snapshots[11].totalValue, snapshots[10].totalValue, false),
-      quantity: getNoteColorClass(snapshots[11].totalQty, snapshots[10].totalQty, false),
-      items: getNoteColorClass(snapshots[11].totalItems, snapshots[10].totalItems, false),
-      primary: getNoteColorClass(snapshots[11].primaryQty, snapshots[10].primaryQty, false),
-      secondary: getNoteColorClass(snapshots[11].secondaryQty, snapshots[10].secondaryQty, false),
-      consumable: getNoteColorClass(snapshots[11].consumableQty, snapshots[10].consumableQty, false),
-      low: getNoteColorClass(snapshots[11].low, snapshots[10].low, true),
-      out: getNoteColorClass(snapshots[11].out, snapshots[10].out, true),
-    }
-
-    return { kpiTrend: trend, kpiDeltas: deltas, kpiNoteColors: noteColors }
-  }, [dateAgeInfo, filteredRows, transactionsData, summary])
-
-  const alerts = useMemo(() => {
-    return filteredRows
-      .map((item: any) => ({ ...item, stockStatus: statusOf(item) }))
-      .filter((item: any) => item.stockStatus !== 'NORMAL')
-      .sort((a: any, b: any) => mainWarehouseStock(a) - mainWarehouseStock(b))
-  }, [filteredRows])
-
-  const todayStats = useMemo(() => {
-    const todayKey = new Date().toISOString().slice(0, 10)
-
-    const inboundToday = recentInboundRows.filter(
-      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
-    )
-
-    const outboundToday = recentOutboundRows.filter(
-      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
-    )
-
-    const transferToday = recentTransferRows.filter(
-      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
-    )
-
-    return {
-      inboundDocs: inboundToday.length,
-      inboundQty: inboundToday.reduce(
-        (sum: number, tx: any) => sum + transactionQuantity(tx),
-        0,
-      ),
-
-      outboundDocs: outboundToday.length,
-      outboundQty: outboundToday.reduce(
-        (sum: number, tx: any) => sum + transactionQuantity(tx),
-        0,
-      ),
-
-      transferDocs: transferToday.length,
-      transferQty: transferToday.reduce(
-        (sum: number, tx: any) => sum + transactionQuantity(tx),
-        0,
-      ),
-    }
-  }, [
-    recentInboundRows,
-    recentOutboundRows,
-    recentTransferRows,
-  ])
-
-  const warehouseStatus = useMemo(() => {
-    const bases = warehouseOptions.length ? warehouseOptions : [{ value: '', label: 'Tất cả kho' }]
-    return bases.slice(0, 8).map((warehouse) => {
-      const scopedRows = warehouse.value ? rows.filter((item: any) => rowMatchesWarehouse(item, warehouse.value)) : rows
-      return {
-        ...warehouse,
-        total: scopedRows.length,
-        low: scopedRows.filter((item: any) => statusOf(item) === 'LOW').length,
-        out: scopedRows.filter((item: any) => statusOf(item) === 'OUT').length,
-      }
-    })
-  }, [warehouseOptions, rows])
-
-  const selectedWarehouseStat = useMemo(() => {
-    return warehouseStatus.find((warehouse) => warehouse.value === warehouseFilter) ?? {
-      value: '',
-      label: 'Tất cả kho',
-      total: rows.length,
-      low: rows.filter((item: any) => statusOf(item) === 'LOW').length,
-      out: rows.filter((item: any) => statusOf(item) === 'OUT').length,
-    }
-  }, [warehouseFilter, warehouseStatus, rows])
-
-  function applySearch() {
-    setSearch(searchDraft)
-    setPage(1)
-  }
-
-  function resetFilters() {
-    setSearchDraft('')
-    setSearch('')
-    setCategoryFilter('')
-    setUsageFilter('')
-    setWarehouseFilter('')
-    setStatusFilter('')
-    setPage(1)
-    refetchAudit()
-  }
+    updateTime()
+    const timer = setInterval(updateTime, 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   return (
-    <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-4 2xl:grid-cols-8 gap-1">
-          <OverviewMetricCard
-            title="Tổng giá trị tồn kho"
-            value={formatCurrencyVnd(summary.totalValue)}
-            note={kpiDeltas.value}
-            noteClassName={kpiNoteColors.value}
-            tone="emerald"
-            icon={<CircleDollarSign size={15} />}
-            trend={kpiTrend.value}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Tổng khối lượng"
-            value={`${formatQuantity(summary.totalQty, 0)} tấn`}
-            note={kpiDeltas.quantity}
-            noteClassName={kpiNoteColors.quantity}
-            tone="cyan"
-            icon={<RefreshCw size={15} />}
-            trend={kpiTrend.quantity}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Mã vật tư"
-            value={formatQuantity(summary.totalItems, 0)}
-            note={kpiDeltas.items}
-            noteClassName={kpiNoteColors.items}
-            tone="indigo"
-            icon={<PackageCheck size={15} />}
-            trend={kpiTrend.items}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Vật tư chính"
-            value={
-              <>
-                <span className="text-white font-semibold">{formatQuantity(summary.primaryCount, 0)}</span>{' '}
-                <span className="text-slate-400 font-normal text-[14px]">({formatQuantity(summary.primaryQty)} tấn)</span>
-              </>
-            }
-            note={kpiDeltas.primary}
-            noteClassName={kpiNoteColors.primary}
-            tone="blue"
-            icon={<PackageCheck size={15} />}
-            trend={kpiTrend.primary}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Vật tư phụ"
-            value={
-              <>
-                <span className="text-white font-semibold">{formatQuantity(summary.secondaryCount, 0)}</span>{' '}
-                <span className="text-slate-400 font-normal text-[14px]">({formatQuantity(summary.secondaryQty)} tấn)</span>
-              </>
-            }
-            note={kpiDeltas.secondary}
-            noteClassName={kpiNoteColors.secondary}
-            tone="violet"
-            icon={<Package size={15} />}
-            trend={kpiTrend.secondary}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Vật tư tiêu hao"
-            value={
-              <>
-                <span className="text-white font-semibold">{formatQuantity(summary.consumableCount, 0)}</span>{' '}
-                <span className="text-slate-400 font-normal text-[14px]">({formatQuantity(summary.consumableQty)} tấn)</span>
-              </>
-            }
-            note={kpiDeltas.consumable}
-            noteClassName={kpiNoteColors.consumable}
-            tone="orange"
-            icon={<Package size={15} />}
-            trend={kpiTrend.consumable}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Sắp hết hàng"
-            value={formatQuantity(summary.low, 0)}
-            note={kpiDeltas.low}
-            noteClassName={kpiNoteColors.low}
-            tone="amber"
-            icon={<TriangleAlert size={15} />}
-            trend={kpiTrend.low}
-            isLoading={isLoading}
-          />
-          <OverviewMetricCard
-            title="Hết hàng"
-            value={formatQuantity(summary.out, 0)}
-            note={kpiDeltas.out}
-            noteClassName={kpiNoteColors.out}
-            tone="red"
-            icon={<ShieldX size={15} />}
-            trend={kpiTrend.out}
-            isLoading={isLoading}
-          />
+    <div className="w-full min-w-0 flex-1 space-y-1 bg-[#050b14] text-slate-100 font-sans p-2">
+      {/* Cockpit Header */}
+      <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-white">SteelTrack Executive Cockpit</h2>
+          <span className="inline-flex items-center gap-1 rounded bg-emerald-950 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            VẬN HÀNH TRỰC TUYẾN
+          </span>
         </div>
-
-        <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
-            <LabeledFilter label="">
-              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={compactInput}>
-                <option value="">Tất cả kho</option>
-                {warehouseOptions.map((warehouse) => 
-                <option key={warehouse.value} value={warehouse.value}>
-                  {warehouse.label}
-                </option>)}
-              </select>
-            </LabeledFilter>
-			    <LabeledFilter label="">
-              <select
-                value={usageFilter}
-                onChange={(e) => {
-                  setUsageFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả loại vật tư</option>
-                <option value="PRIMARY">Vật tư chính</option>
-                <option value="SECONDARY">Vật tư phụ</option>
-                <option value="CONSUMABLE">Vật tư tiêu hao</option>
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="">
-              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className={compactInput}>
-                <option value="">Tất cả nhóm vật tư</option>
-                {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value)
-                  setPage(1)
-                }}
-                className={compactInput}
-              >
-                <option value="">Tất cả trạng thái</option>
-                <option value="NORMAL">Bình thường</option>
-                <option value="LOW">Sắp hết</option>
-                <option value="OUT">Hết hàng</option>
-              </select>
-            </LabeledFilter>
-            <LabeledFilter label="">
-              <input
-                value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') applySearch()
-                }}
-                placeholder="Mã, tên, quy cách, nhà cung cấp..."
-                className={compactInput}
-              />
-            </LabeledFilter>
-            <button onClick={applySearch} className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
-              Tìm kiếm
-            </button>
-            <button onClick={resetFilters} className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
-              Làm mới
-            </button>
-          </div>
-        </InventoryPanel>
-
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-          <div className="space-y-1 xl:col-span-9">
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr] gap-1">
-              <InventoryChartCard title="Thao tác nhanh" className="p-1.5">
-                <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
-                  <QuickActionButton label="Nhập kho" tone="blue" onClick={() => setTransactionModal('inbound')} />
-                  <QuickActionButton label="Xuất kho" tone="amber" onClick={() => setTransactionModal('outbound')} />
-                  <QuickActionButton label="Điều chuyển" tone="purple" onClick={() => setTransactionModal('transfer')} />
-                  <QuickActionButton label="Kiểm kê" tone="emerald" onClick={() => setTransactionModal('stock-take')} />
-                </div>
-              </InventoryChartCard>
-              <InventoryChartCard title="Nhập kho hôm nay" className="border-cyan-500/20 bg-cyan-500/5">
-                <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={recentInboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="cyan" />
-              </InventoryChartCard>
-              <InventoryChartCard title="Xuất kho hôm nay" className="border-amber-500/20 bg-amber-500/5">
-                <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={recentOutboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="amber" />
-              </InventoryChartCard>
-              <InventoryChartCard title="Điều chuyển hôm nay" className="border-purple-500/20 bg-purple-500/5 p-1.5">
-                <TransactionSummary title="phiếu" count={todayStats.transferDocs} quantity={todayStats.transferQty} amount={0} tone="purple" />
-              </InventoryChartCard>
-            </div>
-            <InventoryPanel>
-              <div className="mb-1 flex items-center justify-between gap-3">
-                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Tồn kho vật tư</h3>
-                <button onClick={() => setOverviewPopup('stock-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
-              </div>
-              <div className={`${inventoryTableShell} border-0 ring-0 bg-transparent shadow-none rounded-none h-[430px] overflow-auto scrollbar-none`}>
-                <table className="w-full min-w-[1050px] text-sm table-fixed">
-                  <colgroup>
-                    <col className="w-[140px]" />
-                    <col className="w-[140px]" />
-                    <col className="w-[40px]" />
-                    <col className="w-[100px]" />
-                    <col className="w-[100px]" />
-                    <col className="w-[100px]" />
-                    <col className="w-[110px]" />
-                    <col className="w-[130px]" />
-                    <col className="w-[150px]" />
-                    <col className="w-[100px]" />
-                  </colgroup>
-                          <thead
-                                className={`${inventoryTableHead}
-                                  bg-transparent
-                                  text-slate-300
-                                  border-b border-cyan-400/10`}
-                              >
-                            <tr>
-                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tên vật tư</th>
-                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Quy cách</th>
-                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">ĐVT</th>
-                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Kho chính</th>
-                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Kho SX</th>
-                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tổng tồn</th>
-                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Đơn giá</th>
-                              <th className="px-1.5 py-1 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Giá trị</th>
-                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Vị trí</th>
-                              <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Trạng thái</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-
-                    {pagedRows.map((item: any) => {
-                      const status = statusOf(item)
-                      return (
-                        <tr key={item.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setSelectedMaterialId(String(item.id))}>
-                          <td className="truncate px-1.5 py-0.5 text-white" title={item.name}>{item.name}</td>
-                          <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
-                          <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right text-slate-300" title={money(item.averageCost)}>{money(item.averageCost)}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-medium text-cyan-300" title={money(item.inventoryValue)}>{money(item.inventoryValue)}</td>
-                          <td className="truncate px-1.5 py-0.5">
-                            <span
-                              title={rowLocations(item).map(locationLabel).join('\n')}
-                              className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[10px] text-cyan-100"
-                            >
-                              {displayLocation(item)}
-                            </span>
-                          </td>
-                          <td className="px-1.5 py-0.5">
-                            <span
-                              className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${
-                                status === 'OUT'
-                                  ? 'border-red-400/30 bg-red-500/10 text-red-300'
-                                  : status === 'LOW'
-                                  ? 'border-amber-400/30 bg-amber-500/10 text-amber-300'
-                                  : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
-                              }`}
-                            >
-                              {statusLabel(status)}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <OverviewPagination page={activePage} pageCount={pageCount} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            </InventoryPanel>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <RecentTransactionCard title="Nhập kho gần đây" rows={recentInboundRows.slice(0, 5)} tone="cyan" onViewAll={() => setOverviewPopup('recent-inbound')} />
-              <RecentTransactionCard title="Xuất kho gần đây" rows={recentOutboundRows.slice(0, 5)} tone="amber" onViewAll={() => setOverviewPopup('recent-outbound')} />
-            </div>
-          </div>
-
-          <div className="space-y-1 xl:col-span-3">
-            <InventoryChartCard title="Tổng quan tồn kho" note="Theo vị trí thực tế">
-              <CompactDonutSummary segments={zoneSegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
-            </InventoryChartCard>
-            <InventoryChartCard title="Giá trị tồn kho" note={money(summary.totalValue)}>
-              <CompactTrendChart rows={valueTrend} />
-            </InventoryChartCard>
-            <InventoryChartCard
-              title="Cảnh báo tồn kho"
-              action={<button onClick={() => setOverviewPopup('alerts-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
-            >
-              <AlertRows rows={alerts.slice(0, 6)} />
-            </InventoryChartCard>
-            <InventoryChartCard title="Cơ cấu nhóm vật tư" note="Tỷ trọng tồn kho">
-              <CompactDonutSummary segments={categorySegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
-            </InventoryChartCard>
-          </div>
-        </div>
-
-        <InventoryChartCard title="Tình trạng kho">
-          <div className="grid grid-cols-1 items-center gap-4 text-xs md:grid-cols-[220px_1fr_auto_auto_auto]">
-            <label className="block">
-              <span className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-slate-500">Kho chính</span>
-              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-8 rounded-lg text-xs`}>
-                <option value="">Tất cả kho</option>
-                {warehouseOptions.map((warehouse) => <option key={warehouse.value} value={warehouse.value}>{warehouse.label}</option>)}
-              </select>
-            </label>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <StatusMetric label="Tổng mã" value={selectedWarehouseStat.total} tone="cyan" />
-              <StatusMetric label="Sắp hết hàng" value={selectedWarehouseStat.low} tone="amber" />
-              <StatusMetric label="Hết hàng" value={selectedWarehouseStat.out} tone="red" />
-              <StatusMetric label="Cảnh báo khác" value={Math.max(0, alerts.length - selectedWarehouseStat.low - selectedWarehouseStat.out)} tone="amber" />
-            </div>
-            <div className="hidden h-10 border-l border-white/10 md:block" />
-            <div className="text-slate-400">Cập nhật cuối<br /><span className="text-white">{new Date().toLocaleTimeString('vi-VN')}</span></div>
-            <div className="text-emerald-300">An toàn<br /><span className="font-semibold">{selectedWarehouseStat.out > 0 ? 'Theo dõi' : 'Bình thường'}</span></div>
-          </div>
-        </InventoryChartCard>
-      </div>
-
-      <InventoryMaterialDetailModal
-        open={Boolean(selectedMaterialId && selectedMaterialDetail)}
-        detail={selectedMaterialDetail}
-        onClose={() => setSelectedMaterialId('')}
-      />
-
-      {overviewPopup && (
-        <OverviewModal
-          type={overviewPopup}
-          onClose={() => setOverviewPopup(null)}
-          rows={filteredRows}
-          alerts={alerts}
-          inboundRows={recentInboundRows}
-          outboundRows={recentOutboundRows}
-        />
-      )}
-      <InboundTransactionModal open={transactionModal === 'inbound'} onClose={() => setTransactionModal(null)} />
-      <OutboundTransactionModal open={transactionModal === 'outbound'} onClose={() => setTransactionModal(null)} />
-      <TransferTransactionModal open={transactionModal === 'transfer'} onClose={() => setTransactionModal(null)} />
-      <StockTakeTransactionModal open={transactionModal === 'stock-take'} onClose={() => setTransactionModal(null)} />
-      <AdjustmentTransactionModal open={transactionModal === 'adjustment'} onClose={() => setTransactionModal(null)} />
-    </EnterpriseModulePage>
-  )
-}
-
-function QuickActionButton({ label, tone, onClick }: { label: string; tone: 'blue' | 'emerald' | 'amber' | 'purple'; onClick: () => void }) {
-  const toneClass = {
-    blue: 'border-blue-400/25 bg-blue-600/18 text-blue-200 hover:bg-blue-600/28',
-    emerald: 'border-emerald-400/25 bg-emerald-500/14 text-emerald-200 hover:bg-emerald-500/22',
-    amber: 'border-amber-400/25 bg-amber-500/14 text-amber-200 hover:bg-amber-500/22',
-    purple: 'border-purple-400/25 bg-purple-500/16 text-purple-200 hover:bg-purple-500/24',
-  }[tone]
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-10 rounded-lg border px-2 text-[11px] font-semibold transition ${toneClass}`}
-    >
-      {label}
-    </button>
-  )
-}
-
-function StatusMetric({ label, value, tone }: { label: string; value: number; tone: 'cyan' | 'amber' | 'red' }) {
-  const toneClass = {
-    cyan: 'text-cyan-300',
-    amber: 'text-amber-300',
-    red: 'text-red-300',
-  }[tone]
-  return (
-    <div className="text-center md:text-left">
-      <div className={`text-base font-semibold ${toneClass}`}>{formatQuantity(value, 0)}</div>
-      <div className="text-[11px] text-slate-500">{label}</div>
-    </div>
-  )
-}
-
-function TransactionSummary({ title, count, quantity, amount, tone }: { title: string; count: number; quantity: number; amount: number; tone: 'cyan' | 'amber' | 'purple' }) {
-  const toneClass = {
-    cyan: 'text-cyan-300',
-    amber: 'text-amber-300',
-    purple: 'text-purple-300',
-  }[tone]
-  return (
-    <div className="grid grid-cols-[auto_1fr] items-end gap-3">
-      <div>
-        <div className={`text-2xl font-semibold ${toneClass}`}>
-          {count}
-        </div>
-
-        <div className="text-[11px] text-slate-500">
-          {title}
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <Clock className="h-3.5 w-3.5" />
+          <span className="font-mono">{timeStr}</span>
         </div>
       </div>
 
-      <div className="text-right">
-        <div className={`text-base font-semibold ${toneClass}`}>
-          {formatQty(quantity)} tấn
-        </div>
-
-        <div className="text-xs text-slate-400">
-          {money(amount)}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function RecentTransactionCard({ title, rows, tone, onViewAll }: { title: string; rows: any[]; tone: 'cyan' | 'amber'; onViewAll: () => void }) {
-  return (
-    <InventoryChartCard title={title} action={<button onClick={onViewAll} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}>
-      <div className="space-y-0.5">
-        {rows.map((row: any) => {
-          const line = firstLine(row)
-          const date = transactionDate(row)
-          return (
-            <div key={row.id} className="grid grid-cols-[92px_1fr_76px_52px_58px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
-              <div className={`truncate font-medium ${tone === 'cyan' ? 'text-cyan-300' : 'text-blue-300'}`}>{row.transactionNo ?? row.code}</div>
-              <div className="truncate text-slate-300">{line?.inventoryItem?.name ?? row.projectName ?? row.supplierName ?? line?.inventoryItem?.code ?? '-'}</div>
-              <div className="text-slate-400">{date ? date.toLocaleDateString('vi-VN') : '-'}</div>
-              <div className="text-right text-white">{formatQty(transactionQuantity(row))}</div>
-              <div className="text-right text-emerald-300">{tone === 'cyan' ? 'Đã nhập' : 'Đã xuất'}</div>
-            </div>
-          )
-        })}
-        {rows.length === 0 ? <div className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-5 text-center text-sm text-slate-500">Chưa có giao dịch.</div> : null}
-      </div>
-    </InventoryChartCard>
-  )
-}
-
-function AlertRows({ rows }: { rows: any[] }) {
-  return (
-    <div className="h-[150px] space-y-1.5 overflow-hidden text-xs">
-      {rows.map((row: any) => {
-        const status = row.stockStatus ?? statusOf(row)
-        return (
-          <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
-            <span className={status === 'OUT' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.name ?? row.code}</span>
-            <span className="text-slate-400">Kho chính: {formatQty(mainWarehouseStock(row))}</span>
-            <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-0.5 text-red-300' : 'rounded bg-amber-500/10 px-2 py-0.5 text-amber-300'}>{statusLabel(status)}</span>
-          </div>
-        )
-      })}
-      {rows.length === 0 ? <div className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-5 text-center text-sm text-slate-500">Không có cảnh báo tồn kho.</div> : null}
-    </div>
-  )
-}
-function OverviewPagination({
-  page,
-  pageCount,
-  total,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  pageSize: number
-  onPageChange: (page: number) => void
-}) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
-  return (
-    <div className="grid grid-cols-1 items-center gap-1 px-4 py-1 text-xs text-slate-400 md:grid-cols-3">
-      <div>
-        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
-      </div>
-      <div className="flex justify-center gap-2">
-        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
-            }`}
-          >
-            {pageNo}
-          </button>
+      {/* Row 1: Executive KPIs (5 Cards Strip) */}
+      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-5">
+        {mockDashboardData.executiveKpis.map((kpi) => (
+          <CockpitKpiCard
+            key={kpi.id}
+            title={kpi.title}
+            value={kpi.value}
+            subtitle={kpi.note}
+            icon={kpi.icon}
+            trend={kpi.trend}
+            tone={kpi.tone}
+          />
         ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
       </div>
-      <div className="flex justify-start gap-2 md:justify-end">
-        <button disabled={safePage <= 1} onClick={() => onPageChange(Math.max(1, safePage - 1))} className={inventoryMutedButton}>
-          Trước
-        </button>
-        <button disabled={safePage >= safePageCount} onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))} className={inventoryMutedButton}>
-          Sau
-        </button>
+
+      {/* Row 2: Forecasting & Flow */}
+      <div className="grid grid-cols-12 gap-1">
+        <CockpitChartCard 
+          title="Dự báo tồn kho & Sức chứa" 
+          value="42 ngày bảo phủ"
+          subtitle="Tồn kho hiện tại so với định mức nhu cầu"
+          heightClass={COCKPIT_HEIGHTS.CHART_XL}
+          className="col-span-12 xl:col-span-8"
+        >
+          <AreaForecastChart series={mockDashboardData.forecast.series} />
+        </CockpitChartCard>
+        
+        <CockpitChartCard 
+          title="Trạng thái Pipeline cấu kiện" 
+          value="78,450 kiện"
+          subtitle="Cân đối bán thành phẩm sản xuất"
+          heightClass={COCKPIT_HEIGHTS.CHART_XL}
+          className="col-span-12 xl:col-span-4"
+        >
+          <DonutPipelineChart segments={mockDashboardData.pipeline.segments} />
+        </CockpitChartCard>
       </div>
-    </div>
-  )
-}
-function OverviewModal({
-  type,
-  onClose,
-  rows,
-  alerts,
-  inboundRows,
-  outboundRows,
-}: {
-  type: 'recent-inbound' | 'recent-outbound' | 'stock-full' | 'alerts-full'
-  onClose: () => void
-  rows: any[]
-  alerts: any[]
-  inboundRows: any[]
-  outboundRows: any[]
-}) {
-  const title = {
-    'recent-inbound': 'Toàn bộ nhập kho gần đây',
-    'recent-outbound': 'Toàn bộ xuất kho gần đây',
-    'stock-full': 'Toàn bộ danh sách tồn kho',
-    'alerts-full': 'Tất cả cảnh báo tồn kho',
-  }[type]
-  const txRows = type === 'recent-inbound' ? inboundRows : outboundRows
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-      <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">
-            {type === 'stock-full' ? `Toàn bộ danh sách tồn kho (${rows.length} vật tư)` : title}
-          </h3>
-          <button onClick={onClose} className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white">
-            Đóng
-          </button>
-        </div>
-        <div className="max-h-[74vh] overflow-auto">
-          {(type === 'recent-inbound' || type === 'recent-outbound') ? (
-            <div className="overflow-hidden rounded-xl border border-white/10">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead className={inventoryTableHead}>
-                  <tr>
-                    <th className="px-3 py-2 text-left">Thời gian</th>
-                    <th className="px-3 py-2 text-left">Mã giao dịch</th>
-                    <th className="px-3 py-2 text-left">Mã vật tư</th>
-                    <th className="px-3 py-2 text-left">Tên vật tư</th>
-                    <th className="px-3 py-2 text-right">Số lượng</th>
-                    <th className="px-3 py-2 text-right">Giá trị</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {txRows.map((row: any) => {
-                    const line = firstLine(row)
-                    const date = transactionDate(row)
-                    return (
-                      <tr key={row.id} className={inventoryTableRow}>
-                        <td className="px-3 py-2">{date ? formatQuantity(date, 0) : '-'}</td>
-                        <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? row.code}</td>
-                        <td className="px-3 py-2">{line?.inventoryItem?.code ?? row.itemCode ?? '-'}</td>
-                        <td className="px-3 py-2">{line?.inventoryItem?.name ?? '-'}</td>
-                        <td className="px-3 py-2 text-right">{formatQty(transactionQuantity(row))}</td>
-                        <td className="px-3 py-2 text-right text-cyan-300">{money(transactionAmount(row))}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
+      {/* Row 3: Pulse & Exception registry */}
+      <div className="grid grid-cols-12 gap-1">
+        <CockpitChartCard 
+          title="Nhịp độ vận hành" 
+          value={`Ca hiện tại: ${mockDashboardData.operationalPulse.shiftId}`}
+          subtitle="Giao dịch kho và điều chuyển vật tư trong ngày"
+          heightClass={COCKPIT_HEIGHTS.PANEL_MD}
+          className="col-span-12 xl:col-span-6"
+        >
+          <div className="grid grid-cols-2 gap-2 h-full py-1">
+            {mockDashboardData.operationalPulse.metrics.map((m) => {
+              const pct = Math.min(100, Math.round((m.volume / m.targetVolume) * 100))
+              return (
+                <div key={m.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-2.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1.5">
+                      {m.icon}
+                      <span>{m.label}</span>
+                    </span>
+                    <span className="font-mono text-cyan-300">{m.count} lệnh</span>
+                  </div>
+                  <div className="my-2">
+                    <div className="text-xl font-bold text-white font-mono">{m.volume > 0 ? `+${m.volume}` : m.volume}t</div>
+                    <div className="text-[10px] text-slate-500">Mục tiêu ca: {m.targetVolume}t</div>
+                  </div>
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </CockpitChartCard>
 
-          {type === 'stock-full' ? (
-            <div className="overflow-hidden rounded-xl border border-white/10">
-              <table className="w-full min-w-[1400px] text-sm table-fixed">
-                <colgroup>
-                  <col className="w-[120px]" />
-                  <col className="w-[180px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[50px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[140px]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[120px]" />
-                </colgroup>
-                 <thead className="bg-white/[0.06]">
-                  <tr>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Mã vật tư</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Tên vật tư</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Loại vật tư</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Nhóm vật tư</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Quy cách</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">ĐVT</th>
-                    <th className="px-3 py-1.5 text-right text-slate-400">Kho chính</th>
-                    <th className="px-3 py-1.5 text-right text-slate-400">Kho SX</th>
-                    <th className="px-3 py-1.5 text-right text-slate-400">Tổng tồn</th>
-                    <th className="px-3 py-1.5 text-right text-slate-400">Đơn giá</th>
-                    <th className="px-3 py-1.5 text-right text-slate-400">Giá trị</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Vị trí</th>
-                    <th className="px-3 py-1.5 text-left text-slate-400">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((item: any) => {
-                    const status = statusOf(item)
-                    return (
-                      <tr key={item.id} className={inventoryTableRow}>
-                        <td className="truncate px-3 py-1.5 text-cyan-300" title={item.code}>{item.code}</td>
-                        <td className="truncate px-3 py-1.5 text-white" title={item.name}>{item.name}</td>
-                        <td className="truncate px-3 py-2 text-slate-300" title={materialUsageLabel(item.materialUsageType)}>{materialUsageLabel(item.materialUsageType)}</td>
-                        <td className="truncate px-3 py-2 text-slate-300" title={item.category}>{item.category ?? '-'}</td>
-                        <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
-                        <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
-                        <td className="truncate px-3 py-1.5 text-right text-slate-300" title={money(item.averageCost)}>{money(item.averageCost)}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-medium text-cyan-300" title={money(item.inventoryValue)}>{money(item.inventoryValue)}</td>
-                        <td className="truncate px-3 py-1.5">
-                          <span
-                            title={rowLocations(item).map(locationLabel).join('\n')}
-                            className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-100"
-                          >
-                            {displayLocation(item)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <span
-                            className={`inline-flex rounded-lg border px-3 py-0.5 text-xs ${
-                              status === 'OUT'
-                                ? 'border-red-400/30 bg-red-500/10 text-red-300'
-                                : status === 'LOW'
-                                ? 'border-amber-400/30 bg-amber-500/10 text-amber-300'
-                                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
-                            }`}
-                          >
-                            {statusLabel(status)}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
+        <CockpitChartCard 
+          title="Cảnh báo & Ngoại lệ" 
+          value={`${mockDashboardData.alerts.filter(a => a.severity === 'critical').length} Lỗi nghiêm trọng`}
+          subtitle="Vấn đề phát sinh trên chuỗi cung ứng"
+          heightClass={COCKPIT_HEIGHTS.PANEL_MD}
+          className="col-span-12 xl:col-span-6"
+        >
+          <div className="space-y-1.5 max-h-[220px] overflow-auto scrollbar-thin py-1">
+            {mockDashboardData.alerts.map((a) => (
+              <div 
+                key={a.id} 
+                className={`rounded-lg border px-3 py-2 flex items-start gap-2 text-xs transition duration-150 ${
+                  a.severity === 'critical' 
+                    ? 'border-red-950 bg-red-950/20 text-red-200' 
+                    : a.severity === 'warning' 
+                    ? 'border-amber-950 bg-amber-950/20 text-amber-200'
+                    : 'border-blue-950 bg-blue-950/20 text-blue-200'
+                }`}
+              >
+                <CircleDot className={`h-4 w-4 shrink-0 mt-0.5 ${
+                  a.severity === 'critical' ? 'text-red-400' : a.severity === 'warning' ? 'text-amber-400' : 'text-blue-400'
+                }`} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold flex items-center justify-between">
+                    <span className="truncate">{a.title}</span>
+                    <span className="text-[10px] text-slate-500 font-mono shrink-0 ml-2">{a.timestamp}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5 truncate">{a.message}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CockpitChartCard>
+      </div>
 
-        </div>
+      {/* Row 4: Chronology & efficiency */}
+      <div className="grid grid-cols-12 gap-1">
+        <CockpitChartCard 
+          title="Nhật ký vận hành" 
+          subtitle="Các sự kiện nhà máy, QC và điều chuyển kho"
+          heightClass={COCKPIT_HEIGHTS.PANEL_SM}
+          className="col-span-12 xl:col-span-7"
+        >
+          <div className="relative pl-4 border-l border-white/5 space-y-3.5 max-h-[190px] overflow-auto scrollbar-thin py-1">
+            {mockDashboardData.activity.map((act) => (
+              <div key={act.id} className="relative text-xs">
+                <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-[#050b14] bg-cyan-400" />
+                <div className="flex items-center justify-between text-slate-400 font-medium">
+                  <span className="text-cyan-300 font-semibold">{act.operatorName} ({act.module})</span>
+                  <span className="text-[10px] font-mono text-slate-500">{act.timestamp}</span>
+                </div>
+                <div className="text-[11px] text-slate-300 mt-0.5">{act.description}</div>
+              </div>
+            ))}
+          </div>
+        </CockpitChartCard>
+
+        <CockpitChartCard 
+          title="Hiệu suất nhà máy" 
+          subtitle="OEE tổng thể và tỷ lệ tuân thủ lịch sản xuất"
+          heightClass={COCKPIT_HEIGHTS.PANEL_SM}
+          className="col-span-12 xl:col-span-5"
+        >
+          <div className="grid grid-cols-4 gap-1 h-full py-2 items-center justify-center">
+            <PerformanceGauge value={mockDashboardData.performance.oee} label="OEE" tone="cyan" />
+            <PerformanceGauge value={mockDashboardData.performance.scheduleCompliance} label="Tuân thủ" tone="blue" />
+            <PerformanceGauge value={mockDashboardData.performance.availabilityRate} label="Sẵn sàng" tone="cyan" />
+            <PerformanceGauge value={mockDashboardData.performance.qualityRate} label="Chất lượng" tone="blue" />
+          </div>
+        </CockpitChartCard>
       </div>
     </div>
   )
