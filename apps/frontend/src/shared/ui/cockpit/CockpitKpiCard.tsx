@@ -99,7 +99,7 @@ export function CockpitKpiCard({
         <section className={`relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden bg-slate-950/20 border border-white/5 p-4 rounded-2xl flex flex-col justify-between text-left opacity-40 select-none ${className}`}>
           <div className="flex items-center justify-between">
             {icon ? <div className="text-slate-600">{icon}</div> : <div />}
-            <span className="rounded bg-slate-800/40 px-1.5 py-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider border border-white/5">N/A</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-700" />
           </div>
           <div className="text-3xl lg:text-4xl font-extrabold text-slate-600 font-mono">—</div>
           <div className="flex items-center justify-between text-[10px] text-slate-600">
@@ -136,19 +136,17 @@ export function CockpitKpiCard({
           <div className="flex items-center justify-between">
             {icon ? <div className="text-slate-400">{icon}</div> : <div />}
             {statusText ? (
-              <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+              <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${
                 tone === 'red'
-                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                  ? 'bg-red-450 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                   : tone === 'amber' || tone === 'orange'
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
                   : tone === 'blue'
-                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  ? 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
                   : tone === 'emerald'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : 'bg-cyan-500/10 text-cyan-400 border-cyan-400/20'
-              }`}>
-                {statusText}
-              </span>
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                  : 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]'
+              }`} />
             ) : null}
           </div>
 

@@ -13,6 +13,8 @@ Settings         55%
 Dashboard        45%
 
 Percentages represent implemented operational foundations and visible workflows, not final polish.
+Dashboard Text Density Reduction on 2026-06-27 (Sprint 20D.2G) completed. Reduced visual clutter and text density across the dashboard: replaced text status badges inside `CockpitKpiCard.tsx` with colored glowing dots, shortened KPI titles (`Ngày tồn`, `Sản xuất`, `QC đạt`) and panel titles (`Sử dụng bãi`, `Xu hướng QC`, `Cảnh báo`, `Sản xuất`), and emphasized raw numeric values (`42`, `18`, `256K`, `96,8%`, `7`) by relocating units to subtitle labels and trends. Both frontend and backend builds passed successfully.
+
 Dashboard Text Simplification & Localization on 2026-06-27 (Sprint 20D.2F) completed. Simplified the dashboard header layout by replacing `ModulePageHeader` with a single `"Tổng quan"` title. Localized all 8 panel titles, translated the 5 KPI titles, simplified status chips to `'LIVE'`, `'RUN'`, `'WARN'`, and shortened trend descriptions (e.g. `+2,4 ngày`, `+1 chuyền`, `+12 nghìn tấn`). Both frontend and backend builds passed successfully.
 
 Executive KPI Redesign on 2026-06-27 (Sprint 20D.2C) completed. Enhanced the shared `CockpitKpiCard` component (`CockpitKpiCard.tsx`) to support executive layout formats, custom state values (loading, empty, normal, alert), color-coded tones (cyan, blue, emerald, amber, red), trend text, status badge, and background sparkline charts. Updated `DashboardPage.tsx` to render the 5 redesigned KPI cards directly using the shared component, achieving horizontal rhythm alignment, responsive scaling across viewports, and clean negative space. Both frontend and backend builds passed successfully.

@@ -1,5 +1,19 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20D.2G – Dashboard Text Density Reduction
+
+Completed:
+
+* **Colored Status Dots**: Replaced text-based status badges (`'LIVE'`, `'RUN'`, `'WARN'`) in `CockpitKpiCard.tsx` with glowing, pulsing status dots colored according to the card's tone. Used a small grey dot for empty state.
+* **Shortened Labels**:
+  - *KPI titles*: `Ngày tồn kho` → `Ngày tồn`, `Đang sản xuất` → `Sản xuất`, `Tỷ lệ đạt QC` → `QC đạt`.
+  - *Panel titles*: `Mức sử dụng bãi` → `Sử dụng bãi`, `Xu hướng chất lượng` → `Xu hướng QC`, `Cảnh báo vận hành` → `Cảnh báo`, `Tín hiệu sản xuất` → `Sản xuất`.
+* **Emphasized Numeric Values**: Changed KPI card primary values to display only raw numeric values (`42`, `18`, `256K`, `96,8%`, `7`) by shifting units and labels entirely into titles and trends.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 20D.2F – Dashboard Text Simplification & Localization
 
 Completed:

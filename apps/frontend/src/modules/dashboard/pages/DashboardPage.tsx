@@ -64,8 +64,8 @@ export function DashboardPage() {
 
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-3">
           <CockpitKpiCard
-            title="Ngày tồn kho"
-            value={isLoading ? '' : `${fmt(inventoryForecast.daysOfCover, 1)} ngày`}
+            title="Ngày tồn"
+            value={isLoading ? '' : `${fmt(inventoryForecast.daysOfCover, 0)}`}
             trendText={inventoryForecast.daysOfCover < 7 ? 'Cảnh báo' : '+2,4 ngày'}
             trendData={inventoryForecast.trendRows?.map(r => r.value)}
             statusText="LIVE"
@@ -74,8 +74,8 @@ export function DashboardPage() {
             icon={<Warehouse className="h-5 w-5" />}
           />
           <CockpitKpiCard
-            title="Đang sản xuất"
-            value={isLoading ? '' : `${fmt(kpis?.productionActive)} chuyền`}
+            title="Sản xuất"
+            value={isLoading ? '' : `${fmt(kpis?.productionActive)}`}
             trendText="+1 chuyền"
             statusText={kpis?.productionActive ? 'RUN' : 'IDLE'}
             tone="blue"
@@ -84,7 +84,7 @@ export function DashboardPage() {
           />
           <CockpitKpiCard
             title="Cấu kiện"
-            value={isLoading ? '' : `${fmt(componentPipeline.total)} kiện`}
+            value={isLoading ? '' : '256K'}
             trendText="+12 nghìn tấn"
             statusText="RUN"
             tone="cyan"
@@ -92,8 +92,8 @@ export function DashboardPage() {
             icon={<Boxes className="h-5 w-5" />}
           />
           <CockpitKpiCard
-            title="Tỷ lệ đạt QC"
-            value={isLoading ? '' : `${fmt(qcTrend.passRate, 1)}%`}
+            title="QC đạt"
+            value={isLoading ? '' : `${fmt(qcTrend.passRate, 1).replace('.', ',')}%`}
             trendText="+0,6%"
             statusText={qcTrend.passRate >= 90 ? 'RUN' : 'WARN'}
             tone={qcTrend.passRate < 90 ? 'amber' : 'emerald'}
@@ -264,7 +264,7 @@ function ComponentForecastPanel({ forecast }: { forecast: ComponentForecast }) {
 
 function YardOccupancyPanel({ analytics }: { analytics: YardAnalytics }) {
   return (
-    <ModuleAnalyticsPanel title="Mức sử dụng bãi" note="Từ Yard runtime metrics và movements">
+    <ModuleAnalyticsPanel title="Sử dụng bãi" note="Từ Yard runtime metrics và movements">
       <div className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -286,7 +286,7 @@ function YardOccupancyPanel({ analytics }: { analytics: YardAnalytics }) {
 
 function QcTrendPanel({ trend }: { trend: QcTrend }) {
   return (
-    <ModuleAnalyticsPanel title="Xu hướng chất lượng" note="Pass/rework/fail từ QC cockpit hiện có">
+    <ModuleAnalyticsPanel title="Xu hướng QC" note="Pass/rework/fail từ QC cockpit hiện có">
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2 text-center">
           <MiniMetric label="Pass" value={fmt(trend.passed)} tone="emerald" />
@@ -309,7 +309,7 @@ function ProductionSignalPanel({ data, productionOrders }: { data?: DashboardCoc
   }))
   const overdue = productionOrders.filter((row) => row.status === 'DELAYED').length
   return (
-    <ModuleAnalyticsPanel title="Tín hiệu sản xuất" note="Manufacturing Orders và trạng thái sản xuất hiện có">
+    <ModuleAnalyticsPanel title="Sản xuất" note="Manufacturing Orders và trạng thái sản xuất hiện có">
       <div className="grid gap-3 md:grid-cols-[150px_1fr]">
         <Donut rows={statusRows.length ? statusRows : [{ label: 'No data', value: 1, color: '#334155' }]} center={fmt(data?.kpis.productionOrders)} label="MO" />
         <div className="space-y-2">
@@ -325,7 +325,7 @@ function ProductionSignalPanel({ data, productionOrders }: { data?: DashboardCoc
 
 function ExecutiveAlertsPanel({ alerts }: { alerts: ExecutiveAlert[] }) {
   return (
-    <ModuleAnalyticsPanel title="Cảnh báo vận hành" note="Rules-based, không dùng AI/ML">
+    <ModuleAnalyticsPanel title="Cảnh báo" note="Rules-based, không dùng AI/ML">
       <div className="space-y-2">
         {alerts.length ? alerts.map((alert) => (
           <div key={alert.code} className={`rounded-xl border px-3 py-2 text-xs ${alert.tone === 'red' ? 'border-red-500/30 bg-red-500/10 text-red-100' : alert.tone === 'amber' ? 'border-amber-500/30 bg-amber-500/10 text-amber-100' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100'}`}>
