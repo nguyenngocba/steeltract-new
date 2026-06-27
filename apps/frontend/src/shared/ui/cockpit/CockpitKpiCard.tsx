@@ -80,32 +80,20 @@ export function CockpitKpiCard({
   if (state !== undefined) {
     if (state === 'loading') {
       return (
-        <section className={`relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden bg-slate-950/60 border border-white/5 p-4 rounded-2xl flex flex-col justify-between animate-pulse ${className}`}>
-          <div className="flex items-center justify-between">
-            <div className="h-5 w-5 rounded bg-slate-800" />
-            <div className="h-3 w-10 rounded bg-slate-800" />
-          </div>
-          <div className="h-8 w-24 rounded bg-slate-800 my-1" />
-          <div className="flex items-center justify-between">
-            <div className="h-3 w-20 rounded bg-slate-800" />
-            <div className="h-3 w-8 rounded bg-slate-800" />
-          </div>
+        <section className={`relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden bg-slate-950/60 border border-white/5 px-5 py-4 rounded-2xl flex flex-col justify-between gap-y-2 animate-pulse ${className}`}>
+          <div className="h-3.5 w-16 rounded bg-slate-800" />
+          <div className="h-9 w-24 rounded bg-slate-800 my-1" />
+          <div className="h-3.5 w-20 rounded bg-slate-800" />
         </section>
       )
     }
 
     if (state === 'empty') {
       return (
-        <section className={`relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden bg-slate-950/20 border border-white/5 p-4 rounded-2xl flex flex-col justify-between text-left opacity-40 select-none ${className}`}>
-          <div className="flex items-center justify-between">
-            {icon ? <div className="text-slate-600">{icon}</div> : <div />}
-            <span className="h-1.5 w-1.5 rounded-full bg-slate-700" />
-          </div>
-          <div className="text-3xl lg:text-4xl font-extrabold text-slate-600 font-mono">—</div>
-          <div className="flex items-center justify-between text-[10px] text-slate-600">
-            <span className="uppercase tracking-wider truncate">{title}</span>
-            <span>—</span>
-          </div>
+        <section className={`relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden bg-slate-950/20 border border-white/5 px-5 py-4 rounded-2xl flex flex-col justify-between gap-y-2 text-left opacity-40 select-none ${className}`}>
+          <div className="text-[12px] font-medium text-slate-500 truncate">{title}</div>
+          <div className="text-[38px] xl:text-[42px] font-bold text-slate-500 leading-none tracking-tight">—</div>
+          <div className="text-[11px] text-slate-500 font-mono">—</div>
         </section>
       )
     }
@@ -129,53 +117,41 @@ export function CockpitKpiCard({
       boxShadow: `0 0 12px ${glowColor}`,
     }
 
+    const deltaContent = note ?? trendText
+
     const execContent = (
       <>
-        <div className="relative z-10 flex flex-col justify-between h-full w-full">
-          {/* Top Line */}
-          <div className="flex items-center justify-between">
-            {icon ? <div className="text-slate-400">{icon}</div> : <div />}
-            {statusText ? (
-              <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${
-                tone === 'red'
-                  ? 'bg-red-450 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
-                  : tone === 'amber' || tone === 'orange'
-                  ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
-                  : tone === 'blue'
-                  ? 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
-                  : tone === 'emerald'
-                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                  : 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]'
-              }`} />
-            ) : null}
+        <div className="relative z-10 flex flex-col justify-between h-full w-full gap-y-2">
+          {/* Label (Top) */}
+          <div className="text-[12px] font-medium text-slate-400 truncate">
+            {title}
           </div>
 
-          {/* Center Line */}
-          <div className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-none my-1 font-mono">
+          {/* Large Value (Center) */}
+          <div className="text-[38px] xl:text-[42px] font-bold text-white tracking-tight leading-none tabular-nums">
             {value}
           </div>
 
-          {/* Bottom Line */}
-          <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
-            <span className="uppercase tracking-wider truncate mr-2">{title}</span>
-            {trendText ? (
-              <span className={`font-semibold font-mono ${
-                tone === 'red' || tone === 'orange' ? 'text-red-400' : 'text-emerald-400'
-              }`}>
-                {trendText}
+          {/* Delta (Bottom) */}
+          <div className="text-[11px] font-semibold">
+            {deltaContent ? (
+              <span className={tone === 'red' || tone === 'orange' || tone === 'amber' ? 'text-red-400' : 'text-emerald-400'}>
+                {deltaContent}
               </span>
-            ) : null}
+            ) : (
+              <span className="text-slate-600">—</span>
+            )}
           </div>
         </div>
 
-        {/* Subtle background sparkline if trendData is provided */}
+        {/* Subtle background sparkline if trendData is provided (opacity < 5%) */}
         {trendData ? (
-          <KpiSparkline values={trendData} line={item.line} fill={item.fill} opacity="opacity-30 pointer-events-none" />
+          <KpiSparkline values={trendData} line={item.line} fill={item.fill} opacity="opacity-[0.03] pointer-events-none" />
         ) : null}
       </>
     )
 
-    const execShell = `relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden ${COCKPIT_SHELL} p-4 text-left transition select-none ${borderClass} ${
+    const execShell = `relative ${COCKPIT_HEIGHTS.KPI_EXEC} overflow-hidden ${COCKPIT_SHELL} px-5 py-4 text-left transition select-none ${borderClass} ${
       onClick ? 'cursor-pointer hover:border-cyan-400/25 hover:bg-white/[0.04]' : ''
     } ${className}`
 

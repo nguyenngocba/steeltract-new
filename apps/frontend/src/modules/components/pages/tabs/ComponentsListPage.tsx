@@ -179,7 +179,7 @@ function ChartCard({
   className?: string
 }) {
   return (
-    <CockpitChartCard title={title} subtitle={subtitle} className={`${COCKPIT_HEIGHTS.CHART_MD} ${className}`}>
+    <CockpitChartCard title={title} subtitle={subtitle} className={`${COCKPIT_HEIGHTS.CHART_LG} ${className}`}>
       {children}
     </CockpitChartCard>
   )
@@ -341,7 +341,7 @@ export function ComponentsListPage() {
     })
   }, [rows, project, status, type, location, query])
 
-  const PAGE_SIZE = 10
+  const PAGE_SIZE = 14
   const paginatedRows = useMemo(() => {
     return filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   }, [filtered, page])
@@ -378,11 +378,19 @@ export function ComponentsListPage() {
       .slice(0, 5)
   }, [rows])
 
-  const mostUsedComponents = useMemo(() => {
-    return rows
-      .slice()
-      .sort((a, b) => b.qty - a.qty)
+  const projectDistribution = useMemo(() => {
+    const map = new Map<string, number>()
+    rows.forEach((row) => {
+      map.set(row.project, (map.get(row.project) ?? 0) + 1)
+    })
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
+      .map(([projectName, count]) => ({
+        id: projectName,
+        title: projectName,
+        value: `${formatQuantity(count, 0)} cấu kiện`,
+      }))
   }, [rows])
 
   function openDetail(row: ComponentRow) {
@@ -574,111 +582,112 @@ export function ComponentsListPage() {
           </button>
         </div>
 
-        {/* Row 1: Phân bố cấu kiện & Tình trạng cấu kiện */}
         <div className="grid grid-cols-12 gap-1">
-          <ChartCard title="Phân bố cấu kiện" subtitle="Beam / Column / Brace / Plate / Assembly" className="col-span-12 xl:col-span-6">
+          <div className="col-span-12 xl:col-span-9">
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách cấu kiện</h3>
+              <button type="button" className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
+            </div>
+            <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_MD}>
+              <table className="w-full min-w-[1050px] table-fixed text-[13px]">
+                <colgroup>
+                  <col className="w-[110px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[110px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[115px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[140px]" />
+                  <col className="w-[105px]" />
+                  <col className="w-[110px]" />
+                  <col className="w-[95px]" />
+                  <col className="w-[70px]" />
+                </colgroup>
+                <thead className="bg-transparent text-slate-300 border-b border-cyan-400/10">
+                  <tr>
+                    {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Work Order', 'Progress', 'Material Ready', 'Vị trí hiện tại', 'Trạng thái', 'Khối lượng', 'Ngày tạo', 'Thao tác'].map((h, i) => (
+                      <th key={h} className={`px-1.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-300 ${i === 10 ? 'text-right' : 'text-left'}`}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={13} className="px-1.5 py-6">
+                        <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
+                      </td>
+                    </tr>
+                  ) : paginatedRows.map((row) => (
+                    <tr
+                      key={row.code}
+                      onClick={() => openDetail(row)}
+                      className="cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] transition duration-150"
+                    >
+                      <td className="truncate px-1.5 py-1 text-cyan-300" title={row.code}>{row.code}</td>
+                      <td className="truncate px-1.5 py-1 text-white" title={row.name}>{row.name}</td>
+                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.profile}>{row.profile}</td>
+                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.type}>{row.type}</td>
+                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.project}>{row.project}</td>
+                      <td className="truncate px-1.5 py-1 text-cyan-300" title={row.workOrder}>{row.workOrder}</td>
+                      <td className="px-1.5 py-1"><ProgressMeter value={row.progress} /></td>
+                      <td className="px-1.5 py-1"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
+                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.location}>{row.location}</td>
+                      <td className="px-1.5 py-1">
+                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.rawStatus)}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="truncate px-1.5 py-1 font-mono tabular-nums text-right text-cyan-300" title={`${formatQuantity(row.weight, 3)} kg`}>{formatQuantity(row.weight, 3)} kg</td>
+                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.createdAt}>{row.createdAt}</td>
+                      <td className="px-1.5 py-1" onClick={(event) => event.stopPropagation()}>
+                        <button
+                          onClick={() => void handleDelete(row)}
+                          className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/20"
+                        >
+                          Xóa
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CockpitTableShell>
+            {!isLoading && !filtered.length ? (
+              <div className="p-3">
+                <ModuleEmptyState icon={<Package size={18} />} title="Không tìm thấy cấu kiện" description="Thử đổi từ khóa hoặc bộ lọc trạng thái/dự án." />
+              </div>
+            ) : null}
+            <DataTablePagination
+              page={page}
+              total={filtered.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
+
+          <CockpitChartCard title="Phân loại" subtitle="Beam / Column / Brace / Plate / Assembly" className={`${COCKPIT_HEIGHTS.CHART_SM} col-span-12 xl:col-span-3`}>
             <ComponentsDonut
               centerValue={formatQuantity(rows.length, 0)}
               centerLabel="cấu kiện"
               segments={componentAnalytics.structure}
             />
-          </ChartCard>
-          <ChartCard title="Tình trạng cấu kiện" subtitle="Xu hướng 12 kỳ gần nhất" className="col-span-12 xl:col-span-6">
+          </CockpitChartCard>
+        </div>
+
+        <div className="grid grid-cols-12 gap-1">
+          <ChartCard title="Tiến độ sản xuất" subtitle="Xu hướng 12 kỳ gần nhất" className="col-span-12 xl:col-span-4">
             <ComponentsMiniBars values={[18, 24, 16, 31, 28, 35, 42, 38, 44, 49, 46, 52]} />
           </ChartCard>
-        </div>
-
-        {/* Row 2: Cấu kiện mới nhất & Cấu kiện sử dụng nhiều nhất */}
-        <div className="grid grid-cols-12 gap-1">
-          <ChartCard title="Cấu kiện mới nhất" subtitle="Theo thời gian tạo gần đây" className="col-span-12 xl:col-span-6">
-            <RankList rows={newestComponents.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: row.createdAt }))} />
+          <ChartCard title="Theo dự án" subtitle="Top dự án theo số cấu kiện" className="col-span-12 xl:col-span-4">
+            <RankList rows={projectDistribution} emptyTitle="Chưa có dự án" emptyDescription="Chưa có cấu kiện nào được gán vào dự án." />
           </ChartCard>
-          <ChartCard title="Cấu kiện sử dụng nhiều nhất" subtitle="Theo số lượng tồn hiện có" className="col-span-12 xl:col-span-6">
-            <RankList rows={mostUsedComponents.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.qty, 0)} kiện` }))} />
+          <ChartCard title="Cấu kiện gần đây" subtitle="Theo thời gian tạo gần đây" className="col-span-12 xl:col-span-4">
+            <RankList rows={newestComponents.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: row.createdAt }))} emptyTitle="Chưa có cấu kiện" emptyDescription="Các cấu kiện mới tạo sẽ hiển thị tại đây." />
           </ChartCard>
-        </div>
-
-        {/* Row 3: Danh sách cấu kiện (Full Width) */}
-        <div className="w-full min-w-0 flex-1">
-          <div className="mb-1 flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Danh sách cấu kiện</h3>
-            <button type="button" className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
-          </div>
-          <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_SM}>
-            <table className="w-full min-w-[1050px] text-sm table-fixed">
-              <colgroup>
-                <col className="w-[110px]" />
-                <col className="w-[150px]" />
-                <col className="w-[130px]" />
-                <col className="w-[110px]" />
-                <col className="w-[130px]" />
-                <col className="w-[115px]" />
-                <col className="w-[130px]" />
-                <col className="w-[130px]" />
-                <col className="w-[140px]" />
-                <col className="w-[105px]" />
-                <col className="w-[110px]" />
-                <col className="w-[95px]" />
-                <col className="w-[70px]" />
-              </colgroup>
-              <thead className="bg-transparent text-slate-300 border-b border-cyan-400/10">
-                <tr>
-                  {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Work Order', 'Progress', 'Material Ready', 'Vị trí hiện tại', 'Trạng thái', 'Khối lượng', 'Ngày tạo', 'Thao tác'].map((h, i) => (
-                    <th key={h} className={`px-1.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-300 ${i === 10 ? 'text-right' : 'text-left'}`}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={13} className="px-1.5 py-6">
-                      <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
-                    </td>
-                  </tr>
-                ) : paginatedRows.map((row) => (
-                  <tr
-                    key={row.code}
-                    onClick={() => openDetail(row)}
-                    className="cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] transition duration-150"
-                  >
-                    <td className="truncate px-1.5 py-1 text-cyan-300" title={row.code}>{row.code}</td>
-                    <td className="truncate px-1.5 py-1 text-white" title={row.name}>{row.name}</td>
-                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.profile}>{row.profile}</td>
-                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.type}>{row.type}</td>
-                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.project}>{row.project}</td>
-                    <td className="truncate px-1.5 py-1 text-cyan-300" title={row.workOrder}>{row.workOrder}</td>
-                    <td className="px-1.5 py-1"><ProgressMeter value={row.progress} /></td>
-                    <td className="px-1.5 py-1"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
-                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.location}>{row.location}</td>
-                    <td className="px-1.5 py-1">
-                      <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.rawStatus)}`}>
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="truncate px-1.5 py-1 font-mono tabular-nums text-right text-cyan-300" title={`${formatQuantity(row.weight, 3)} kg`}>{formatQuantity(row.weight, 3)} kg</td>
-                    <td className="truncate px-1.5 py-1 text-slate-300" title={row.createdAt}>{row.createdAt}</td>
-                    <td className="px-1.5 py-1" onClick={(event) => event.stopPropagation()}>
-                      <button
-                        onClick={() => void handleDelete(row)}
-                        className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/20"
-                      >
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CockpitTableShell>
-          {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState title="Không tìm thấy cấu kiện" description="Thử đổi từ khóa hoặc bộ lọc trạng thái/dự án." /></div> : null}
-          <DataTablePagination
-            page={page}
-            total={filtered.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
         </div>
       </div>
 
@@ -951,13 +960,15 @@ function ProgressMeter({ value, tone = 'cyan' }: { value: number; tone?: 'cyan' 
 
 function RankList({
   rows,
-  empty = 'Chưa có dữ liệu',
+  emptyTitle = 'Chưa có dữ liệu',
+  emptyDescription = 'Dữ liệu sẽ hiển thị khi có phát sinh trong hệ thống.',
 }: {
   rows: Array<{ id: string; title: string; subtitle?: string; value: string }>
-  empty?: string
+  emptyTitle?: string
+  emptyDescription?: string
 }) {
   if (!rows.length) {
-    return <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-center text-sm text-slate-500">{empty}</div>
+    return <ModuleEmptyState icon={<Package size={18} />} title={emptyTitle} description={emptyDescription} />
   }
   return (
     <div className="space-y-2">

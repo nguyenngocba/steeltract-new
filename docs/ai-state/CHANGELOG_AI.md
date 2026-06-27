@@ -1,5 +1,101 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20D.4B – KPI Typography Polish
+
+Completed:
+
+* **Label Typography Polish**:
+  - Replaced all uppercase and letter-spacing tracking modifiers.
+  - Formatted labels using `text-[12px] font-medium text-slate-400`.
+* **Value Typography Polish**:
+  - Removed monospace representation `font-mono` from values.
+  - Implemented `font-bold tabular-nums text-[38px] xl:text-[42px] leading-none tracking-tight`.
+* **Delta Formatting**:
+  - Synced trend/delta note values to strictly use Inventory KPI formats with appropriate Vietnamese units: `▲ 2,4 ngày (+6,1%)`, `▲ 1 chuyền (+5,9%)`, `▲ 12K kiện (+4,8%)`, `▲ 0,6%`, `▼ 2 cảnh báo (-22%)`.
+* **Spacing & Sparkline**:
+  - Implemented card wrapper padding constraints: `px-5 py-4 flex flex-col gap-y-2 justify-between`.
+  - Confirmed sparkline opacity remains at 3% (`opacity-[0.03]`) for a clean, decorative layout.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-27 Sprint 20D.4A – KPI Layout Unification
+
+Completed:
+
+* **Executive KPI Layout Restructure**:
+  - Restructured the executive KPI card layout to enforce the top-to-bottom hierarchy: Label (Top), Large Value (Center), and Delta (Bottom).
+  - Maintained executive sizing at `h-[128px]` using `COCKPIT_HEIGHTS.KPI_EXEC`.
+  - Upgraded font sizes inside `CockpitKpiCard.tsx`'s executive layout: Label (`text-[11px]`), Value (`text-[38px] xl:text-[42px]`), and Delta (`text-[11px]`).
+* **Visual Density Reduction**:
+  - Removed large icons, status chips, pulse indicators, extra description subtitles, and duplicate labels from the executive KPI cards.
+  - Set the background sparkline opacity to a subtle 3% (`opacity-[0.03]`) to avoid competition with the primary numeric display.
+* **Information & Formatting Unification**:
+  - Updated card value arguments in `DashboardPage.tsx` to include units inline (e.g. `42 ngày`, `18 chuyền`, `256K kiện`, `7 cảnh báo`).
+  - Synced positive trend indicators with a leading `▲` and negative with `▼`.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-27 Sprint 20D.3C – Dashboard Empty States & Density Optimization
+
+Completed:
+
+* **Custom Empty States**:
+  - Implemented explicit empty states inside Forecast, Pipeline, Yard, QC, and Production panels so they never appear as empty black boxes.
+  - Custom empty states render a panel-specific icon, descriptive title (e.g. `"Chưa có dữ liệu QC"`), and detail subtitle.
+* **Density & Spacing Reductions**:
+  - Reduced outer card heights inside `DashboardPage.tsx` to: Forecast (260px), Pipeline (260px), Yard (260px), Replenishment (260px), QC (260px), Activity (220px), and Assumptions (160px).
+  - Scaled internal svg heights in QC trend to `h-[110px]` to guarantee the chart occupies >=70% of the active card body height.
+* **Readability Upgrades**:
+  - Set minimum header labels and item row labels to `text-[13px]`.
+  - Set secondary metrics to `text-[12px]`.
+* **Activity & Spacing Polish**:
+  - Clipped recent activity descriptions to a maximum of 2 lines using `line-clamp-2`.
+  - Reduced table row vertical spacing and padding parameters to maximize the number of rows displayed.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-27 Sprint 20D.3B – Executive Dashboard Final Polish
+
+Completed:
+
+* **KPI Cards Presentation Polish**:
+  - Main values redesigned to use font sizes `text-[44px] xl:text-[48px] leading-none tracking-tight` for stronger visual weight.
+  - Increased negative space by setting wrapper padding to `px-4 py-4`.
+* **Inventory Movement Chart Polish**:
+  - Grouped bar chart card size stretched to `h-[380px]` container height and chart body scaled to `h-[290px]` to visually dominate the viewport.
+* **Alerts Panel Polish**:
+  - Restructured to render header count as `Cảnh báo (N)`.
+  - Staged alert rows to display a leading status icon (`⚠`), alert title (`row.code`), short message (`Tồn X · thiếu Y SET`), and relative time (`2 phút trước`).
+* **Recent Activity Timeline Polish**:
+  - Fully redesigned into a bullet timeline layout using status circles (`🟢`), event action headers, object descriptions, operator names, and relative times.
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
+## 2026-06-27 Sprint 20D.3 – Executive Dashboard UX Redesign
+
+Completed:
+
+* **Header Removal**: Removed the page title `"Tổng quan"`, descriptions, subtitles, and refresh buttons from `DashboardPage.tsx`. The page starts directly with the KPI cards.
+* **Static Status Dot**: Removed the pulsing animation from `CockpitKpiCard.tsx` status dots to make them clean static indicators.
+* **5-Row Reorganization**:
+  - **Row 1**: 5 executive KPI cards (`Ngày tồn`, `Sản xuất`, `Cấu kiện`, `QC đạt`, `Cảnh báo`) with 48px visual weight values and zero units in main numbers.
+  - **Row 2**: Biến động nhập - xuất - tồn kho (grouped bar chart using SVG columns and legend on top) and Cảnh báo (top 4 critical/warning alerts with subtle borders).
+  - **Row 3**: Dự báo tồn kho (days of cover metrics + sparkline), Tiến độ cấu kiện (donut and pipeline progress), and Sử dụng bãi (occupancy progress meter and inbound/outbound/moves statistics).
+  - **Row 4**: Bổ sung vật tư (horizontal bars for top đề xuất + top 5 table) and Xu hướng QC (time-series QC lines + NCR/Pass rate stats).
+  - **Row 5**: Hoạt động gần đây (compact timeline table) and Giả định dự báo (checklist list with 30% reduced height).
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 20D.2G – Dashboard Text Density Reduction
 
 Completed:
