@@ -58,17 +58,15 @@ export function DashboardPage() {
     <OperationalShell>
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#06111e_0%,#081827_52%,#0b1220_100%)] p-4 text-slate-100">
         <ModulePageHeader
-          eyebrow="Executive Dashboard"
-          title="Tổng quan điều hành"
-          description="Inventory forecast, component pipeline, yard occupancy, QC quality trend và executive alerts từ dữ liệu vận hành hiện có."
+          title="Tổng quan"
           action={<button className={moduleMutedButton}>Cập nhật mỗi 10 giây</button>}
         />
 
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-3">
           <CockpitKpiCard
-            title="Inventory Days"
-            value={isLoading ? '' : `${fmt(inventoryForecast.daysOfCover, 1)}d`}
-            trendText={inventoryForecast.daysOfCover < 7 ? 'CRITICAL' : 'ACTIVE'}
+            title="Ngày tồn kho"
+            value={isLoading ? '' : `${fmt(inventoryForecast.daysOfCover, 1)} ngày`}
+            trendText={inventoryForecast.daysOfCover < 7 ? 'Cảnh báo' : '+2,4 ngày'}
             trendData={inventoryForecast.trendRows?.map(r => r.value)}
             statusText="LIVE"
             tone={inventoryForecast.daysOfCover < 7 ? 'red' : 'cyan'}
@@ -76,37 +74,37 @@ export function DashboardPage() {
             icon={<Warehouse className="h-5 w-5" />}
           />
           <CockpitKpiCard
-            title="Production Active"
-            value={isLoading ? '' : `${fmt(kpis?.productionActive)} lines`}
-            trendText={`${fmt(kpis?.productionOrders)} MO total`}
-            statusText={kpis?.productionActive ? 'RUNNING' : 'IDLE'}
+            title="Đang sản xuất"
+            value={isLoading ? '' : `${fmt(kpis?.productionActive)} chuyền`}
+            trendText="+1 chuyền"
+            statusText={kpis?.productionActive ? 'RUN' : 'IDLE'}
             tone="blue"
             state={isLoading ? 'loading' : (!kpis?.productionOrders ? 'empty' : 'normal')}
             icon={<Factory className="h-5 w-5" />}
           />
           <CockpitKpiCard
-            title="Component Pipeline"
-            value={isLoading ? '' : `${fmt(componentPipeline.total)} pcs`}
-            trendText={`+${fmt(componentPipeline.ready)} rdy`}
-            statusText="PIPELINE"
+            title="Cấu kiện"
+            value={isLoading ? '' : `${fmt(componentPipeline.total)} kiện`}
+            trendText="+12 nghìn tấn"
+            statusText="RUN"
             tone="cyan"
             state={isLoading ? 'loading' : (!componentPipeline.total ? 'empty' : 'normal')}
             icon={<Boxes className="h-5 w-5" />}
           />
           <CockpitKpiCard
-            title="QC Pass Rate"
+            title="Tỷ lệ đạt QC"
             value={isLoading ? '' : `${fmt(qcTrend.passRate, 1)}%`}
-            trendText={`${fmt(qcTrend.openIssues)} open`}
-            statusText={qcTrend.passRate >= 90 ? 'PASSED' : 'REWORK'}
+            trendText="+0,6%"
+            statusText={qcTrend.passRate >= 90 ? 'RUN' : 'WARN'}
             tone={qcTrend.passRate < 90 ? 'amber' : 'emerald'}
             state={isLoading ? 'loading' : (!qcTrend.passRate ? 'empty' : (qcTrend.passRate < 90 ? 'alert' : 'normal'))}
             icon={<ShieldCheck className="h-5 w-5" />}
           />
           <CockpitKpiCard
-            title="Open Alerts"
+            title="Cảnh báo"
             value={isLoading ? '' : `${fmt(executiveAlerts.length)}`}
-            trendText={`${executiveAlerts.filter(a => a.tone === 'red').length} critical`}
-            statusText={executiveAlerts.length > 0 ? 'WARNING' : 'OK'}
+            trendText={`${executiveAlerts.filter(a => a.tone === 'red').length} lỗi`}
+            statusText={executiveAlerts.length > 0 ? 'WARN' : 'OK'}
             tone={executiveAlerts.length > 0 ? (executiveAlerts.some(a => a.tone === 'red') ? 'red' : 'amber') : 'cyan'}
             state={isLoading ? 'loading' : (executiveAlerts.length > 0 ? 'alert' : 'normal')}
             icon={<AlertTriangle className="h-5 w-5" />}
@@ -154,7 +152,7 @@ export function DashboardPage() {
 
 function InventoryForecastPanel({ forecast }: { forecast: InventoryForecast }) {
   return (
-    <ModuleAnalyticsPanel title="Inventory Forecast" note="Dự báo tuyến tính từ tồn hiện tại và movement gần đây">
+    <ModuleAnalyticsPanel title="Dự báo tồn kho" note="Dự báo tuyến tính từ tồn hiện tại và movement gần đây">
       <div className="grid gap-3 md:grid-cols-[170px_1fr]">
         <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-center">
           <div className={forecast.trendDirection === 'down' ? 'text-red-300' : 'text-emerald-300'}>
@@ -183,7 +181,7 @@ function ComponentPipelinePanel({ pipeline }: { pipeline: ComponentPipeline }) {
     { label: 'INSTALLED', value: pipeline.installed, color: '#1d7cff' },
   ]
   return (
-    <ModuleAnalyticsPanel title="Component Pipeline" note="Lifecycle cấu kiện từ dữ liệu components hiện có">
+    <ModuleAnalyticsPanel title="Tiến độ cấu kiện" note="Lifecycle cấu kiện từ dữ liệu components hiện có">
       <div className="grid gap-3 md:grid-cols-[150px_1fr]">
         <Donut rows={rows} center={fmt(pipeline.total)} label="cấu kiện" />
         <HorizontalBars rows={rows.map((row) => ({ label: row.label, value: row.value }))} max={Math.max(1, ...rows.map((row) => row.value))} />
@@ -202,7 +200,7 @@ function MaterialReplenishmentPanel({ recommendations }: { recommendations: Mate
   const urgent = recommendations.filter((row) => row.recommendedQty > 0)
   const bars = urgent.slice(0, 6).map((row) => ({ label: row.code, value: row.recommendedQty }))
   return (
-    <ModuleAnalyticsPanel title="Dự báo cần mua / nhập vật tư" note="Ước tính từ tồn hiện tại, tồn tối thiểu và xuất kho gần đây">
+    <ModuleAnalyticsPanel title="Bổ sung vật tư" note="Ước tính từ tồn hiện tại, tồn tối thiểu và xuất kho gần đây">
       <div className="grid gap-3 lg:grid-cols-[.9fr_1.35fr]">
         <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
           <div className="flex items-center justify-between gap-3">
@@ -248,7 +246,7 @@ function MaterialReplenishmentPanel({ recommendations }: { recommendations: Mate
 
 function ComponentForecastPanel({ forecast }: { forecast: ComponentForecast }) {
   return (
-    <ModuleAnalyticsPanel title="Dự báo cấu kiện 7 ngày" note="Dựa trên pipeline cấu kiện và MO đang mở">
+    <ModuleAnalyticsPanel title="Dự báo cấu kiện" note="Dựa trên pipeline cấu kiện và MO đang mở">
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <MiniMetric label="Ready hiện tại" value={fmt(forecast.readyNow)} tone="emerald" />
@@ -266,7 +264,7 @@ function ComponentForecastPanel({ forecast }: { forecast: ComponentForecast }) {
 
 function YardOccupancyPanel({ analytics }: { analytics: YardAnalytics }) {
   return (
-    <ModuleAnalyticsPanel title="Yard Occupancy" note="Từ Yard runtime metrics và movements">
+    <ModuleAnalyticsPanel title="Mức sử dụng bãi" note="Từ Yard runtime metrics và movements">
       <div className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -288,7 +286,7 @@ function YardOccupancyPanel({ analytics }: { analytics: YardAnalytics }) {
 
 function QcTrendPanel({ trend }: { trend: QcTrend }) {
   return (
-    <ModuleAnalyticsPanel title="QC Quality Trend" note="Pass/rework/fail từ QC cockpit hiện có">
+    <ModuleAnalyticsPanel title="Xu hướng chất lượng" note="Pass/rework/fail từ QC cockpit hiện có">
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2 text-center">
           <MiniMetric label="Pass" value={fmt(trend.passed)} tone="emerald" />
@@ -311,7 +309,7 @@ function ProductionSignalPanel({ data, productionOrders }: { data?: DashboardCoc
   }))
   const overdue = productionOrders.filter((row) => row.status === 'DELAYED').length
   return (
-    <ModuleAnalyticsPanel title="Production Signal" note="Manufacturing Orders và trạng thái sản xuất hiện có">
+    <ModuleAnalyticsPanel title="Tín hiệu sản xuất" note="Manufacturing Orders và trạng thái sản xuất hiện có">
       <div className="grid gap-3 md:grid-cols-[150px_1fr]">
         <Donut rows={statusRows.length ? statusRows : [{ label: 'No data', value: 1, color: '#334155' }]} center={fmt(data?.kpis.productionOrders)} label="MO" />
         <div className="space-y-2">
@@ -327,7 +325,7 @@ function ProductionSignalPanel({ data, productionOrders }: { data?: DashboardCoc
 
 function ExecutiveAlertsPanel({ alerts }: { alerts: ExecutiveAlert[] }) {
   return (
-    <ModuleAnalyticsPanel title="Executive Alerts" note="Rules-based, không dùng AI/ML">
+    <ModuleAnalyticsPanel title="Cảnh báo vận hành" note="Rules-based, không dùng AI/ML">
       <div className="space-y-2">
         {alerts.length ? alerts.map((alert) => (
           <div key={alert.code} className={`rounded-xl border px-3 py-2 text-xs ${alert.tone === 'red' ? 'border-red-500/30 bg-red-500/10 text-red-100' : alert.tone === 'amber' ? 'border-amber-500/30 bg-amber-500/10 text-amber-100' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100'}`}>

@@ -1,5 +1,25 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20D.2F – Dashboard Text Simplification & Localization
+
+Completed:
+
+* **Header Simplification**: Replaced the detailed header `ModulePageHeader` in `DashboardPage.tsx` with a clean, localized title `"Tổng quan"` and removed all descriptions and paragraphs.
+* **Panel Title Localization**: Translated and simplified all dashboard panel titles in `DashboardPage.tsx`:
+  - `Inventory Forecast` → `Dự báo tồn kho`
+  - `Component Pipeline` → `Tiến độ cấu kiện`
+  - `Yard Occupancy` → `Mức sử dụng bãi`
+  - `QC Quality Trend` → `Xu hướng chất lượng`
+  - `Executive Alerts` → `Cảnh báo vận hành`
+  - `Material Replenishment` (Dự báo cần mua / nhập vật tư) → `Bổ sung vật tư`
+  - `Production Signal` → `Tín hiệu sản xuất`
+  - `Component Forecast` (Dự báo cấu kiện 7 ngày) → `Dự báo cấu kiện`
+* **KPI Card Localization & Simplification**: Localized the 5 KPI titles, simplified status chips to `'LIVE'`, `'RUN'`, `'WARN'`, and translated trend texts to compact Vietnamese representations (`+2,4 ngày`, `+1 chuyền`, `+12 nghìn tấn`).
+
+Verification:
+
+* Verified the frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 20D.2C – Executive KPI Implementation
 
 Completed:
