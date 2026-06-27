@@ -134,26 +134,26 @@ export function ComponentsStockPage() {
             <CockpitChartCard title={`Danh sách tồn kho cấu kiện (${filtered.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
               <CockpitTableShell className="h-full">
                 <table className="w-full min-w-[980px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-355">
                     <tr>
                       {['Mã cấu kiện', 'Tên', 'Dự án', 'Zone/kho', 'Vị trí', 'Trọng lượng', 'Trạng thái', 'Ngày tạo'].map((heading) => (
-                        <th key={heading} className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">{heading}</th>
+                        <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300 border-b border-cyan-400/10">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={8} className="px-1.5 py-6"><ModuleLoadingState label="Đang tải tồn kho cấu kiện..." /></td></tr>
+                      <tr><td colSpan={8} className="px-4 py-6"><ModuleLoadingState label="Đang tải tồn kho cấu kiện..." /></td></tr>
                     ) : paginatedRows.map((row) => (
                       <tr key={row.id} onClick={() => setSelectedRow(row)} className="cursor-pointer border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
-                        <td className="truncate px-1.5 py-1 text-cyan-300">{row.code}</td>
-                        <td className="truncate px-1.5 py-1 text-white">{row.name}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.project}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.zone}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.slot}</td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
-                        <td className="px-1.5 py-1 text-slate-300">{row.status}</td>
-                        <td className="px-1.5 py-1 text-slate-300">{row.createdAt}</td>
+                        <td className="truncate px-4 py-2.5 text-cyan-300 font-mono">{row.code}</td>
+                        <td className="truncate px-4 py-2.5 text-white">{row.name}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.project}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.zone}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.slot}</td>
+                        <td className="px-4 py-2.5 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
+                        <td className="px-4 py-2.5 text-slate-300">{row.status}</td>
+                        <td className="px-4 py-2.5 text-slate-300">{row.createdAt}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -28,9 +28,9 @@ export const inventoryTableShell = moduleTableShell
 export const inventoryTable =
   'w-full text-sm'
 
-export const inventoryTableHead = moduleTableHead
+export const inventoryTableHead = 'bg-transparent text-slate-350 border-b border-cyan-400/10 text-xs'
 
-export const inventoryTableRow = moduleTableRow
+export const inventoryTableRow = 'cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] text-slate-200 transition duration-150'
 
 export const inventoryMutedButton = moduleMutedButton
 

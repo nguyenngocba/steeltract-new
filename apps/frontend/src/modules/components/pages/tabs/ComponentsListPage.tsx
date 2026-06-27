@@ -586,10 +586,10 @@ export function ComponentsListPage() {
                   <col className="w-[95px]" />
                   <col className="w-[70px]" />
                 </colgroup>
-                <thead className="bg-transparent text-slate-300 border-b border-cyan-400/10">
+                <thead className="bg-transparent text-slate-350 border-b border-cyan-400/10">
                   <tr>
                     {['Mã cấu kiện', 'Tên cấu kiện', 'Profile/Kích thước', 'Loại', 'Dự án', 'Work Order', 'Progress', 'Material Ready', 'Vị trí hiện tại', 'Trạng thái', 'Khối lượng', 'Ngày tạo', 'Thao tác'].map((h, i) => (
-                      <th key={h} className={`px-1.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-300 ${i === 10 ? 'text-right' : 'text-left'}`}>
+                      <th key={h} className={`px-4 py-2.5 text-xs font-semibold text-slate-300 ${i === 10 ? 'text-right' : 'text-left'}`}>
                         {h}
                       </th>
                     ))}
@@ -598,7 +598,7 @@ export function ComponentsListPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={13} className="px-1.5 py-6">
+                      <td colSpan={13} className="px-4 py-6">
                         <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
                       </td>
                     </tr>
@@ -608,23 +608,23 @@ export function ComponentsListPage() {
                       onClick={() => openDetail(row)}
                       className="cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] transition duration-150"
                     >
-                      <td className="truncate px-1.5 py-1 text-cyan-300" title={row.code}>{row.code}</td>
-                      <td className="truncate px-1.5 py-1 text-white" title={row.name}>{row.name}</td>
-                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.profile}>{row.profile}</td>
-                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.type}>{row.type}</td>
-                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.project}>{row.project}</td>
-                      <td className="truncate px-1.5 py-1 text-cyan-300" title={row.workOrder}>{row.workOrder}</td>
-                      <td className="px-1.5 py-1"><ProgressMeter value={row.progress} /></td>
-                      <td className="px-1.5 py-1"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
-                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.location}>{row.location}</td>
-                      <td className="px-1.5 py-1">
+                      <td className="truncate px-4 py-2.5 text-cyan-300 font-mono" title={row.code}>{row.code}</td>
+                      <td className="truncate px-4 py-2.5 text-white" title={row.name}>{row.name}</td>
+                      <td className="truncate px-4 py-2.5 text-slate-300" title={row.profile}>{row.profile}</td>
+                      <td className="truncate px-4 py-2.5 text-slate-300" title={row.type}>{row.type}</td>
+                      <td className="truncate px-4 py-2.5 text-slate-300" title={row.project}>{row.project}</td>
+                      <td className="truncate px-4 py-2.5 text-cyan-300 font-mono" title={row.workOrder}>{row.workOrder}</td>
+                      <td className="px-4 py-2.5"><ProgressMeter value={row.progress} /></td>
+                      <td className="px-4 py-2.5"><ProgressMeter value={row.materialReady} tone={row.materialReady < 100 ? 'amber' : 'emerald'} /></td>
+                      <td className="truncate px-4 py-2.5 text-slate-300" title={row.location}>{row.location}</td>
+                      <td className="px-4 py-2.5">
                         <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.rawStatus)}`}>
                           {row.status}
                         </span>
                       </td>
-                      <td className="truncate px-1.5 py-1 font-mono tabular-nums text-right text-cyan-300" title={`${formatQuantity(row.weight, 3)} kg`}>{formatQuantity(row.weight, 3)} kg</td>
-                      <td className="truncate px-1.5 py-1 text-slate-300" title={row.createdAt}>{row.createdAt}</td>
-                      <td className="px-1.5 py-1" onClick={(event) => event.stopPropagation()}>
+                      <td className="truncate px-4 py-2.5 font-mono tabular-nums text-right text-cyan-300" title={`${formatQuantity(row.weight, 3)} kg`}>{formatQuantity(row.weight, 3)} kg</td>
+                      <td className="truncate px-4 py-2.5 text-slate-300" title={row.createdAt}>{row.createdAt}</td>
+                      <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <button
                           onClick={() => void handleDelete(row)}
                           className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/20"

@@ -2008,13 +2008,13 @@ function ActionCards({ compact = false }: { compact?: boolean }) {
     </div>
   )
 }
-function Info({ k, v }: { k: string; v: string }) { return <div className="flex justify-between gap-3"><span className="text-slate-500">{k}</span><span className="text-right text-slate-200">{v}</span></div> }
+function Info({ k, v }: { k: string; v: string }) { return <div className="flex justify-between gap-2.5 text-xs py-0.5 border-b border-white/[0.02]"><span className="text-slate-500 font-medium">{k}</span><span className="text-right text-slate-200 font-mono">{v}</span></div> }
 
 function InfoCard({ title, value, tone = 'text-white' }: { title: string; value: string; tone?: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/55 p-3">
-      <div className="text-[11px] text-slate-500">{title}</div>
-      <div className={`mt-1 truncate text-sm font-semibold ${tone}`}>{value}</div>
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-2.5">
+      <div className="text-[11px] text-slate-500 font-medium">{title}</div>
+      <div className={`mt-1 truncate text-sm font-semibold font-mono ${tone}`}>{value}</div>
     </div>
   )
 }
@@ -2027,17 +2027,17 @@ function RankList({
   empty?: string
 }) {
   if (!rows.length) {
-    return <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-center text-sm text-slate-500">{empty}</div>
+    return <div className="rounded-xl border border-white/5 bg-white/[0.015] p-5 text-center text-xs text-slate-500">{empty}</div>
   }
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {rows.map((row) => (
-        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-1.5 rounded-xl border border-white/5 bg-white/[0.02] p-2.5 text-xs">
           <div className="min-w-0">
-            <div className="truncate font-semibold text-cyan-300">{row.title}</div>
-            {row.subtitle ? <div className="mt-0.5 truncate text-slate-500">{row.subtitle}</div> : null}
+            <div className="truncate font-semibold text-cyan-300 font-mono">{row.title}</div>
+            {row.subtitle ? <div className="mt-0.5 truncate text-[11px] text-slate-500">{row.subtitle}</div> : null}
           </div>
-          <div className="font-mono tabular-nums text-slate-200">{row.value}</div>
+          <div className="font-mono tabular-nums text-slate-200 text-right">{row.value}</div>
         </div>
       ))}
     </div>

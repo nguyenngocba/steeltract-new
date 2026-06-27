@@ -74,28 +74,28 @@ export function ComponentsProductionPage() {
             <CockpitChartCard title={`Danh sách lệnh sản xuất (${rows.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
               <CockpitTableShell className="h-full">
                 <table className="w-full min-w-[1100px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-350">
                     <tr>
                       {['Mã lệnh SX', 'Tên cấu kiện', 'Xưởng', 'Số lượng', 'Công đoạn', 'Trạng thái', 'Ngày bắt đầu', 'Dự kiến HT', 'Bãi đích', 'Zone / Slot / Tầng'].map((heading) => (
-                        <th key={heading} className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">{heading}</th>
+                        <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300 border-b border-cyan-400/10">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={10} className="px-1.5 py-6"><ModuleLoadingState label="Đang tải lệnh sản xuất..." /></td></tr>
+                      <tr><td colSpan={10} className="px-4 py-6"><ModuleLoadingState label="Đang tải lệnh sản xuất..." /></td></tr>
                     ) : paginatedRows.map((row) => (
                       <tr key={row.id} onClick={() => setSelectedOrder(row)} className="cursor-pointer border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
-                        <td className="truncate px-1.5 py-1 text-cyan-300">{row.orderNo}</td>
-                        <td className="truncate px-1.5 py-1 text-white">{row.title}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.metadata?.workshop ?? '-'}</td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums text-cyan-300">{formatQuantity(row.quantity, 0)}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.currentStageCode ?? 'Chờ phân công'}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{statusLabel[row.status] ?? row.status}</td>
-                        <td className="px-1.5 py-1 text-slate-300">{date(row.plannedStartAt)}</td>
-                        <td className="px-1.5 py-1 text-slate-300">{date(row.plannedEndAt)}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.metadata?.destinationYard ?? '-'}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{[row.metadata?.destinationZone, row.metadata?.destinationSlot, row.metadata?.destinationLevel].filter(Boolean).join(' / ') || '-'}</td>
+                        <td className="truncate px-4 py-2.5 text-cyan-300 font-mono">{row.orderNo}</td>
+                        <td className="truncate px-4 py-2.5 text-white">{row.title}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.metadata?.workshop ?? '-'}</td>
+                        <td className="px-4 py-2.5 font-mono tabular-nums text-cyan-300">{formatQuantity(row.quantity, 0)}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.currentStageCode ?? 'Chờ phân công'}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{statusLabel[row.status] ?? row.status}</td>
+                        <td className="px-4 py-2.5 text-slate-300">{date(row.plannedStartAt)}</td>
+                        <td className="px-4 py-2.5 text-slate-300">{date(row.plannedEndAt)}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.metadata?.destinationYard ?? '-'}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{[row.metadata?.destinationZone, row.metadata?.destinationSlot, row.metadata?.destinationLevel].filter(Boolean).join(' / ') || '-'}</td>
                       </tr>
                     ))}
                   </tbody>

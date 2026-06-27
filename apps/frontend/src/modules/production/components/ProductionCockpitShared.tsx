@@ -1,18 +1,15 @@
 import type { ReactNode } from 'react'
 import { formatQuantity } from '@/shared/utils/number-format'
 import {
-  ModuleAnalyticsPanel,
-  ModuleKpiCard,
   moduleInput,
   moduleMutedButton,
-  modulePanel,
   modulePrimaryButton,
   moduleTableHead,
   moduleTableRow,
-  type ModuleTone,
 } from '@/shared/ui/modules'
+import { CockpitChartCard, CockpitKpiCard, COCKPIT_SHELL } from '@/shared/ui/cockpit'
 
-export const productionPanel = modulePanel
+export const productionPanel = COCKPIT_SHELL
 
 export const productionInput = moduleInput
 
@@ -25,16 +22,30 @@ export const productionTableHead = moduleTableHead
 export const productionTableRow = moduleTableRow
 
 export function ProductionKpi({ label, value, note, tone = 'cyan', active, onClick }: {
-  label: string; value: string; note?: string; tone?: 'cyan' | 'green' | 'amber' | 'red' | 'purple' | 'blue'; active?: boolean; onClick?: () => void
+  label: string; value: string; note?: string; tone?: any; active?: boolean; onClick?: () => void
 }) {
-  const mappedTone: ModuleTone = tone === 'green' ? 'emerald' : tone
-  return <ModuleKpiCard title={label} value={value} note={note} tone={mappedTone} active={active} onClick={onClick} className="min-h-[104px]" />
+  const mappedTone = tone === 'green' ? 'emerald' : tone
+  return (
+    <CockpitKpiCard
+      title={label}
+      value={value}
+      note={note}
+      tone={mappedTone}
+      active={active}
+      onClick={onClick}
+      trend={[8, 12, 10, 15, 14, 18]}
+    />
+  )
 }
 
 export function ProductionPanel({ title, action, children, className = '' }: {
   title: string; action?: ReactNode; children: ReactNode; className?: string
 }) {
-  return <ModuleAnalyticsPanel title={title} action={action} className={className}>{children}</ModuleAnalyticsPanel>
+  return (
+    <CockpitChartCard title={title} action={action} className={className} heightClass="h-[170px]" chartHeightClass="h-[74px]">
+      {children}
+    </CockpitChartCard>
+  )
 }
 
 export function StatusChip({ status }: { status: string }) {
@@ -73,22 +84,22 @@ export function ProductionDonut({
     .join(', ')
 
   return (
-    <div className="grid min-h-[148px] grid-cols-[120px_1fr] items-center gap-3">
-      <div className="relative h-28 w-28 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.2)]" style={{ background: `conic-gradient(${gradient})` }}>
-        <div className="absolute inset-3 rounded-full bg-[#08111f]" />
+    <div className="grid h-[74px] grid-cols-[74px_1fr] items-center gap-2 overflow-hidden">
+      <div className="relative h-[68px] w-[68px] rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.2)]" style={{ background: `conic-gradient(${gradient})` }}>
+        <div className="absolute inset-1.5 rounded-full bg-[#08111f]" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="text-xl font-semibold text-white">{centerValue}</div>
-          <div className="text-[10px] text-slate-500">{centerLabel}</div>
+          <div className="text-xs font-bold text-white">{centerValue}</div>
+          <div className="text-[7px] text-slate-500 scale-90 leading-none">{centerLabel}</div>
         </div>
       </div>
-      <div className="space-y-1.5 overflow-hidden">
-        {segments.map((item) => (
-          <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-2 text-[11px]">
-            <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="truncate">{item.label}</span>
+      <div className="space-y-0.5 overflow-hidden">
+        {segments.slice(0, 3).map((item) => (
+          <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-1.5 text-[10px]">
+            <span className="flex min-w-0 items-center gap-1 text-slate-350">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="truncate font-sans">{item.label}</span>
             </span>
-            <span className="whitespace-nowrap text-slate-300">{formatQuantity(item.value, 0)}</span>
+            <span className="whitespace-nowrap font-mono tabular-nums text-slate-300">{formatQuantity(item.value, 0)}</span>
           </div>
         ))}
       </div>
@@ -100,9 +111,9 @@ export function ProductionMiniBars({ values, tone = 'cyan' }: { values: number[]
   const max = Math.max(1, ...values)
   const color = tone === 'emerald' ? 'from-emerald-500 to-teal-300' : tone === 'amber' ? 'from-amber-500 to-orange-300' : 'from-blue-500 to-cyan-300'
   return (
-    <div className="flex h-32 items-end gap-2">
+    <div className="flex h-[74px] items-end gap-1 px-1">
       {values.map((value, index) => (
-        <div key={index} className={`flex-1 rounded-t-lg bg-gradient-to-t ${color}`} style={{ height: `${Math.max(8, (value / max) * 100)}%` }} />
+        <div key={index} className={`flex-1 rounded-t bg-gradient-to-t ${color}`} style={{ height: `${Math.max(8, (value / max) * 100)}%` }} />
       ))}
     </div>
   )

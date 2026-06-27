@@ -1,5 +1,24 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 20C.9 & 20P.9A – Cockpit Unification Phase 2
+
+Completed:
+
+*   **Shared Cockpit Extraction**: Created four new generic shared components in `@/shared/ui/cockpit`: `CockpitSidebarStats`, `CockpitRecentList`, `CockpitStatusList`, and `CockpitEmptyState`.
+*   **Components Final Unification (Sprint 20C.9)**:
+    *   Refactored `ComponentsCockpitShared.tsx` to use `COCKPIT_SHELL`, `CockpitKpiCard` (`h-[108px]`), `CockpitChartCard` (`h-[170px]`), and scaled down donut/mini bars to `h-[74px]`.
+    *   Unified table cell and header paddings (`px-4 py-2.5`) across all list views (List, Stock, Production, Overview, Transfers) to match WMS tables.
+    *   Created parity report: `docs/ui/components-final-unification-report.md`.
+*   **Production Workspace Unification (Sprint 20P.9A)**:
+    *   Refactored `ProductionCockpitShared.tsx` to map panels to `COCKPIT_SHELL`, KPI cards to `CockpitKpiCard` (`h-[108px]`), panels to `CockpitChartCard` (`h-[170px]`), and scaled down donut/bars to `h-[74px]`.
+    *   Unified table head and row visual class names directly inside `InventoryVisuals.tsx` so all production grids automatically render with borderless shells, hover effects, and border-cyan highlights.
+    *   Updated `InfoCard` and `RankList` component widgets to standard border (`border-white/5`), background (`bg-white/[0.02]`), and padding (`p-2.5`) styles.
+    *   Created parity report: `docs/ui/production-workspace-unification-report.md`.
+
+Verification:
+
+*   Verified frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 30Y.2 – Yard Cockpit Unification
 
 Completed:

@@ -177,26 +177,26 @@ export function ComponentsOverviewPage() {
             <CockpitChartCard title={`Danh sách cấu kiện (${filtered.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
               <CockpitTableShell className="h-full">
                 <table className="w-full min-w-[980px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-350">
                     <tr>
                       {['Mã cấu kiện', 'Tên cấu kiện', 'Loại / Profile', 'Dự án', 'Trạng thái', 'Vị trí', 'SL', 'Đã QC'].map((heading) => (
-                        <th key={heading} className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">{heading}</th>
+                        <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300 border-b border-cyan-400/10">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={8} className="px-1.5 py-6"><ModuleLoadingState label="Đang tải cấu kiện..." /></td></tr>
+                      <tr><td colSpan={8} className="px-4 py-6"><ModuleLoadingState label="Đang tải cấu kiện..." /></td></tr>
                     ) : paginatedRows.map((row) => (
                       <tr key={row.id} className="border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
-                        <td className="truncate px-1.5 py-1 font-medium text-cyan-300">{row.code}</td>
-                        <td className="truncate px-1.5 py-1 text-white">{row.name}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.profile}</td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.project}</td>
-                        <td className="px-1.5 py-1"><span className={`rounded-lg border px-2 py-0.5 text-xs ${statusTone(row.status)}`}>{row.status}</span></td>
-                        <td className="truncate px-1.5 py-1 text-slate-300">{row.location}</td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums text-cyan-300">{formatQuantity(row.quantity, 0)}</td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums text-emerald-300">{formatQuantity(row.qcQuantity, 0)}</td>
+                        <td className="truncate px-4 py-2.5 text-cyan-300 font-mono">{row.code}</td>
+                        <td className="truncate px-4 py-2.5 text-white">{row.name}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.profile}</td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.project}</td>
+                        <td className="px-4 py-2.5"><span className={`rounded-lg border px-2 py-0.5 text-xs ${statusTone(row.status)}`}>{row.status}</span></td>
+                        <td className="truncate px-4 py-2.5 text-slate-300">{row.location}</td>
+                        <td className="px-4 py-2.5 font-mono tabular-nums text-cyan-300">{formatQuantity(row.quantity, 0)}</td>
+                        <td className="px-4 py-2.5 font-mono tabular-nums text-emerald-300">{formatQuantity(row.qcQuantity, 0)}</td>
                       </tr>
                     ))}
                   </tbody>
