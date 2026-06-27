@@ -1,5 +1,21 @@
 # SteelTrack AI Changelog
 
+## 2026-06-27 Sprint 30Y.2 – Yard Cockpit Unification
+
+Completed:
+
+*   **Root Layout Standard**: Enforced fluid `w-full min-w-0 flex-1 space-y-1` layout on the Yard page main section, removing legacy outer container wrappers and widths.
+*   **Grid spacing standard**: Unified all layout and grid spacing to use `gap-1` and `space-y-1` margins.
+*   **KPI Metric Cards unification**: Replaced all 21 metric KPI cards across the Yard module and sub-tabs with standard `<CockpitKpiCard />` elements using `h-[108px]`, industrial cockpit shell gradients, cyan rings, font-mono tabular-nums numbers, and decorative sparklines.
+*   **Analytics cards standard**: Converted all quick analytics cards to use standard `<CockpitChartCard />` components (`h-[170px]` card heights, `h-[74px]` chart bodies). Customized `YardDonut` and `YardMiniTrend` graphics to scale down and fit perfectly in the `h-[74px]` viewport.
+*   **Table and pagination standard**: Configured table shells (`border-0 ring-0 bg-transparent`), headers (`border-b border-cyan-400/10`), hover rows, and integrated `<DataTablePagination />` paging inside MovementTable and QCTab list views.
+*   **Detail drawers standard**: Standardized local detail panels (Chi tiết tầng, Cấu kiện trong vị trí, Thông tin vị trí, Chi tiết cấu kiện, Cầu trục, Hoạt động gần đây) to use unified `COCKPIT_SHELL` styling, `p-3` padding, and `gap-y-1` flex directions.
+*   **Unification Report**: Generated visual parity documentation under `docs/ui/yard-cockpit-unification-report.md`.
+
+Verification:
+
+*   Verified frontend compiles and builds successfully using `pnpm -C apps/frontend build`.
+
 ## 2026-06-27 Sprint 20D.4B – KPI Typography Polish
 
 Completed:

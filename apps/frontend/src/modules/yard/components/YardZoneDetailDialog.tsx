@@ -58,44 +58,44 @@ export function YardZoneDetailDialog({
         <div><p className="text-[10px] uppercase tracking-[0.16em] text-amber-400">Level 2 · chi tiết zone</p><h2 className="mt-1 text-lg font-semibold">{selected?.zone.code} · {selected?.zone.name}</h2></div>
         <button onClick={onClose} className="rounded p-2 text-slate-400 hover:bg-slate-800 hover:text-white"><X size={18}/></button>
       </header>
-      <div className="grid gap-4 p-5 lg:grid-cols-[1.1fr_.9fr]">
-        <div>
-          <div className="mb-3 flex gap-5 text-xs text-slate-400"><span>Vị trí dùng <b className="text-slate-100">{occupied}/{zoneSlots.length}</b></span><span>Occupancy <b className="text-cyan-300">{occupancy}%</b></span></div>
-          <div className="grid grid-cols-3 gap-3 rounded border border-slate-800 bg-[#030b14] p-4 lg:grid-cols-4">{zoneSlots.map((slot) => <button key={slot.id} onClick={() => onSelectSlot(slot.id)} className={`min-h-20 rounded border p-3 text-left transition hover:border-cyan-300 ${tone(slot)} ${selected?.id === slot.id ? 'ring-2 ring-cyan-300' : ''}`}><div className="text-xs font-semibold">{slot.code}</div><div className="mt-4 flex justify-between text-[10px]"><span>{slot.placements.length} CK</span><span>L{slot.currentStackLevel}/{slot.maxStackLevel}</span></div></button>)}</div>
+      <div className="grid gap-1 p-3 lg:grid-cols-[1.1fr_.9fr]">
+        <div className="space-y-1">
+          <div className="mb-1.5 flex gap-4 text-xs text-slate-400"><span>Vị trí dùng <b className="text-slate-100">{occupied}/{zoneSlots.length}</b></span><span>Occupancy <b className="text-cyan-300 font-mono">{occupancy}%</b></span></div>
+          <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/5 bg-[#030b14]/40 p-3 lg:grid-cols-4">{zoneSlots.map((slot) => <button key={slot.id} onClick={() => onSelectSlot(slot.id)} className={`min-h-[74px] rounded-xl border p-2 text-left transition hover:border-cyan-450 ${tone(slot)} ${selected?.id === slot.id ? 'ring-1 ring-cyan-400' : ''}`}><div className="text-xs font-semibold">{slot.code}</div><div className="mt-2 flex justify-between text-[10px]"><span>{slot.placements.length} CK</span><span>L{slot.currentStackLevel}/{slot.maxStackLevel}</span></div></button>)}</div>
         </div>
-        <div className="space-y-4">
-          <div className="rounded border border-slate-800 bg-[#030b14] p-4">
+        <div className="space-y-1">
+          <div className="rounded-2xl border border-white/5 bg-[#030b14]/40 p-3 flex flex-col gap-y-1">
             <p className="text-[10px] uppercase tracking-[0.16em] text-amber-400">Level 3 · mặt cắt ngang</p>
-            <h3 className="mt-1 text-sm font-semibold">Vị trí {selected?.code ?? '--'}</h3>
-            <div className="mt-4 space-y-2">{Array.from({ length: selected?.maxStackLevel ?? 4 }, (_, index) => {
+            <h3 className="text-sm font-semibold text-white">Vị trí {selected?.code ?? '--'}</h3>
+            <div className="mt-1.5 space-y-1">{Array.from({ length: selected?.maxStackLevel ?? 4 }, (_, index) => {
               const level = (selected?.maxStackLevel ?? 4) - index
               const placement = placements.find((item) => item.stackLevel === level)
-              return <div key={level} className={`grid grid-cols-[42px_1fr_90px] items-center gap-2 rounded border p-2 text-xs ${placement ? 'border-cyan-600 bg-cyan-950/35' : 'border-slate-800 bg-slate-950/30'}`}><b className="text-cyan-300">L{level}</b><span className="text-slate-300">{placement?.itemCode ?? 'Còn trống'}</span><span className={placement ? 'text-amber-300' : 'text-emerald-300'}>{placement ? `${fmt(placement.weight)} tấn` : 'Sẵn sàng'}</span></div>
+              return <div key={level} className={`grid grid-cols-[42px_1fr_90px] items-center gap-1 rounded-lg border p-1.5 text-xs ${placement ? 'border-cyan-600 bg-cyan-950/35' : 'border-slate-800 bg-slate-950/30'}`}><b className="text-cyan-300 font-mono">L{level}</b><span className="text-slate-300 font-mono truncate">{placement?.itemCode ?? 'Còn trống'}</span><span className={`font-mono text-right ${placement ? 'text-amber-300' : 'text-emerald-300'}`}>{placement ? `${fmt(placement.weight)} tấn` : 'Sẵn sàng'}</span></div>
             })}</div>
           </div>
-          <div className="rounded border border-slate-800 bg-[#030b14] p-4">
+          <div className="rounded-2xl border border-white/5 bg-[#030b14]/40 p-3 flex flex-col gap-y-1">
             <p className="text-[10px] uppercase tracking-[0.16em] text-amber-400">Level 4 · chi tiết cấu kiện</p>
-            <div className="mt-3 space-y-2">{placements.map((item) => <button key={item.id} onClick={() => setSelectedPlacementId(item.id)} className={`grid w-full grid-cols-[1fr_42px_75px] items-center gap-2 rounded border p-2 text-left text-xs transition hover:border-cyan-300 hover:bg-cyan-950/25 ${selectedPlacement?.id === item.id ? 'border-cyan-400 bg-cyan-950/35' : 'border-slate-800'}`}><span><Boxes size={13} className="mr-2 inline text-cyan-400"/><b className="text-cyan-300">{item.itemCode}</b><small className="mt-1 block pl-5 text-slate-500">{item.itemName}</small></span><span>L{item.stackLevel}</span><span>{fmt(item.weight)} tấn</span></button>)}{!placements.length && <p className="text-xs text-slate-500">Vị trí đang trống, sẵn sàng nhận cấu kiện.</p>}</div>
+            <div className="mt-1.5 space-y-1">{placements.map((item) => <button key={item.id} onClick={() => setSelectedPlacementId(item.id)} className={`grid w-full grid-cols-[1fr_42px_75px] items-center gap-1 rounded-xl border p-2 text-left text-xs transition hover:border-cyan-300 hover:bg-cyan-950/25 ${selectedPlacement?.id === item.id ? 'border-cyan-400 bg-cyan-950/35' : 'border-slate-800'}`}><span><Boxes size={13} className="mr-2 inline text-cyan-400"/><b className="text-cyan-300 font-mono">{item.itemCode}</b><small className="mt-0.5 block pl-5 text-slate-500">{item.itemName}</small></span><span className="font-mono text-center">L{item.stackLevel}</span><span className="font-mono text-right">{fmt(item.weight)} tấn</span></button>)}{!placements.length && <p className="text-xs text-slate-500 py-1">Vị trí đang trống, sẵn sàng nhận cấu kiện.</p>}</div>
             {selectedPlacement ? (
-              <div className="mt-4 rounded border border-cyan-900 bg-cyan-950/20 p-3 text-xs">
-                <div className="flex items-start justify-between gap-3">
+              <div className="mt-2 rounded-xl border border-cyan-900 bg-cyan-950/20 p-2.5 text-xs">
+                <div className="flex items-start justify-between gap-1">
                   <div>
                     <p className="text-[10px] uppercase tracking-[0.16em] text-cyan-300">Popup cấu kiện trong zone</p>
-                    <h4 className="mt-1 text-sm font-semibold text-white">{selectedPlacement.itemCode}</h4>
-                    <p className="mt-1 text-slate-400">{selectedPlacement.itemName ?? 'Chưa có tên cấu kiện'}</p>
+                    <h4 className="mt-0.5 text-sm font-semibold text-white font-mono">{selectedPlacement.itemCode}</h4>
+                    <p className="mt-0.5 text-slate-400">{selectedPlacement.itemName ?? 'Chưa có tên cấu kiện'}</p>
                   </div>
-                  <button disabled={pending} onClick={outboundSelectedPlacement} className="inline-flex items-center gap-2 rounded bg-amber-500 px-3 py-2 font-semibold text-slate-950 disabled:opacity-50">
-                    <Truck size={14} />
+                  <button disabled={pending} onClick={outboundSelectedPlacement} className="inline-flex items-center gap-1.5 rounded bg-amber-500 px-3 py-1.5 font-semibold text-slate-950 disabled:opacity-50 transition hover:bg-amber-600">
+                    <Truck size={13} />
                     {pending ? 'Đang xuất...' : 'Xuất bãi'}
                   </button>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-slate-300">
+                <div className="mt-2 grid grid-cols-2 gap-1 text-slate-350 text-[11px] font-mono">
                   <span>Zone: <b className="text-white">{selectedPlacementSlot?.zone.code ?? selected?.zone.code}</b></span>
                   <span>Vị trí: <b className="text-white">{selectedPlacementSlot?.code ?? selected?.code} / L{selectedPlacement.stackLevel}</b></span>
                   <span>Số lượng: <b className="text-white">{fmt(selectedPlacement.quantity)}</b></span>
                   <span>Khối lượng: <b className="text-white">{fmt(selectedPlacement.weight)} tấn</b></span>
                 </div>
-                {remove.error ? <p className="mt-3 rounded border border-red-900 bg-red-950/30 p-2 text-red-300">{remove.error instanceof Error ? remove.error.message : 'Không thể xuất bãi cấu kiện.'}</p> : null}
+                {remove.error ? <p className="mt-2 rounded border border-red-900 bg-red-950/30 p-2 text-red-300">{remove.error instanceof Error ? remove.error.message : 'Không thể xuất bãi cấu kiện.'}</p> : null}
               </div>
             ) : null}
           </div>
