@@ -186,8 +186,8 @@ function ChartCard({
   onPrev,
   onNext,
   children,
-  className = COCKPIT_HEIGHTS.CHART_LG,
-  chartHeightClass = COCKPIT_HEIGHTS.CHART_BODY_150,
+  className = 'h-[260px]',
+  chartHeightClass = 'h-[150px]',
 }: {
   title: string
   value?: string
@@ -285,7 +285,9 @@ function CompactDonut({ segments, centerValue, centerLabel }: { segments: Array<
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="truncate">{item.label}</span>
               </span>
-              <span className="text-slate-300">{formatQuantity(item.value, 0)} ({percent.toFixed(1)}%)</span>
+              <span className="text-slate-300">
+                {formatQuantity(item.value, 1)} ({percent.toFixed(1)}%)
+              </span>
             </div>
           )
         })}
@@ -396,6 +398,30 @@ export function InventoryMaterialsPage() {
   function openMaterial(item: any) {
     setDetailMaterial(item)
   }
+
+  function AlertRows({ rows }: { rows: any[] }) {
+  return (
+    <div className="h-full space-y-1.5 overflow-y-auto text-xs [&::-webkit-scrollbar]:hidden scrollbar-width-none">
+      {rows.map((row: any) => {
+        const status = row.stockStatus ?? stockStatus(row)
+        return (
+          <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
+            <span className={status === 'OUT' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.materialName ?? row.materialCode}</span>
+            <span className="text-slate-400">Kho chính: {formatQuantity(mainWarehouseStock(row), 3)}</span>
+            <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-0.5 text-red-300' : 'rounded bg-amber-500/10 px-2 py-0.5 text-amber-300'}>
+              {stockStatusLabel(status)}
+            </span>
+          </div>
+        )
+      })}
+      {rows.length === 0 && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-5 text-center text-sm text-slate-500">
+          Không có cảnh báo tồn kho.
+        </div>
+      )}
+    </div>
+  )
+}
 
   function editMaterial(item: any) {
     setSelectedMaterial({
@@ -978,11 +1004,11 @@ export function InventoryMaterialsPage() {
                             <col className="w-[100px]" />   {/* Trạng thái */}
                           </colgroup>
                           <thead
-                                className={`${inventoryTableHead}
-                                  bg-transparent
-                                  text-slate-300
-                                  border-b border-cyan-400/10`}
-                              >
+                            className={`${inventoryTableHead}
+                              text-slate-300
+                              border-b border-cyan-400/10`}
+                            style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                          >
                             <tr>
                               <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tên vật tư</th>
                               <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Quy cách</th>
@@ -1037,12 +1063,12 @@ export function InventoryMaterialsPage() {
                       pageCount={pagedZoneDistribution.pageCount}
                       onPrev={() => setZoneChartPage((p) => Math.max(1, p - 1))}
                       onNext={() => setZoneChartPage((p) => Math.min(pagedZoneDistribution.pageCount, p + 1))}
-                      className={COCKPIT_HEIGHTS.CHART_MD}
-                      chartHeightClass={`${COCKPIT_HEIGHTS.CHART_BODY_120} overflow-y-auto scrollbar-none`}
+                      className="h-[220px]"
+                      chartHeightClass="h-[120px] overflow-y-auto scrollbar-none"
                     >
                       <CompactDonut
                         segments={pagedZoneSegments}
-                        centerValue={formatQuantity(kpis.totalQty, 0)}
+                        centerValue={formatQuantity(kpis.totalQty, 1)}
                         centerLabel="tấn"
                       />
                     </ChartCard>
@@ -1052,8 +1078,8 @@ export function InventoryMaterialsPage() {
                         value={`${formatQuantity(kpis.totalQty, 1)} tấn`}
                         delta={quantityDelta.text}
                         deltaColorClass={quantityDelta.color}
-                        className={COCKPIT_HEIGHTS.CHART_XXS}
-                        chartHeightClass={`${COCKPIT_HEIGHTS.CHART_BODY_82} overflow-y-auto scrollbar-none`}
+                        className="h-[178px]"
+                        chartHeightClass="h-[82px] overflow-y-auto scrollbar-none"
                       >
                         <StockTrendChart rows={monthlyTrend} />
                       </ChartCard>
@@ -1064,23 +1090,10 @@ export function InventoryMaterialsPage() {
                         delta={alertsDiff.text}
                         deltaColorClass={alertsDiff.color}
                         action={<button onClick={() => setShowAllAlerts(true)} className="text-[10px] text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>}
-                        page={pagedAlerts.page}
-                        pageCount={pagedAlerts.pageCount}
-                        onPrev={() => setAlertChartPage((p) => Math.max(1, p - 1))}
-                        onNext={() => setAlertChartPage((p) => Math.min(pagedAlerts.pageCount, p + 1))}
-                        className={`${COCKPIT_HEIGHTS.CHART_MD} bg-slate-950/45`}
-                        chartHeightClass={`${COCKPIT_HEIGHTS.CHART_BODY_140} overflow-y-auto [&::-webkit-scrollbar]:hidden scrollbar-width-none`}
+                        className="h-[200px]"
+                        chartHeightClass="h-[140px] overflow-y-auto [&::-webkit-scrollbar]:hidden scrollbar-width-none"
                       >
-                        <div className="space-y-1 text-[11px]">
-                          {pagedAlerts.rows.map((row: any) => (
-                            <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/45 px-2.5 py-1.5 transition hover:bg-slate-900/40">
-                              <span className={row.level === 'Hết hàng' ? 'truncate font-medium text-red-300' : 'truncate font-medium text-amber-300'}>{row.materialName ?? row.materialCode}</span>
-                              <span className="text-slate-400 font-mono text-[10px]">Kho chính: {formatQuantity(row.stock, 1)} t</span>
-                              <span className={`rounded px-1.5 py-0.5 font-semibold text-[9px] ${row.level === 'Hết hàng' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>{row.level}</span>
-                            </div>
-                          ))}
-                          {alerts.length === 0 && <div className="rounded-xl border border-slate-800 bg-slate-950/45 px-3 py-4 text-center text-slate-500 text-xs">Không có cảnh báo tồn kho.</div>}
-                        </div>
+                        <AlertRows rows={alerts} />
                       </ChartCard>
                     </div>
                   </div>
@@ -1192,14 +1205,13 @@ export function InventoryMaterialsPage() {
       {showAllAlerts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
           <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-xl border border-white/10 bg-[#0b1424]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+            <div className="flex items-center justify-between px-6 py-4">
               <div>
                 <h3 className="text-lg font-semibold text-white">Tất cả cảnh báo tồn kho</h3>
-                <p className="mt-1 text-xs text-slate-500">{formatQuantity(alerts.length, 0)} cảnh báo theo bộ lọc hiện tại</p>
               </div>
               <button onClick={() => setShowAllAlerts(false)} className="rounded border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-300 hover:text-white">Đóng</button>
             </div>
-            <div className="grid max-h-[80vh] gap-4 overflow-auto p-6 xl:grid-cols-[1fr_320px]">
+             <div className="grid max-h-[74vh] gap-4 overflow-auto p-4 xl:grid-cols-[1fr_320px]">
               <div className="overflow-hidden rounded-xl border border-white/10">
                 <table className="w-full min-w-[1100px] text-sm table-fixed">
                   <colgroup>
@@ -1244,8 +1256,8 @@ export function InventoryMaterialsPage() {
                   title="Theo mức độ"
                   value={`${alerts.length} cảnh báo`}
                   delta="Phân bố theo mức"
-                  className={`${COCKPIT_HEIGHTS.CHART_ALERT} bg-slate-950/45`}
-                  chartHeightClass={COCKPIT_HEIGHTS.CHART_BODY_140}
+                  className="h-[300px]"
+                  chartHeightClass="h-[300px]"
                 >
                   <AlertMiniChart rows={[
                     ['Sắp hết', alerts.filter((row: any) => row.level === 'Sắp hết').length],
@@ -1255,10 +1267,10 @@ export function InventoryMaterialsPage() {
 
                 <ChartCard
                   title="Top tồn thấp"
-                  value={`${alerts.slice(0, 6).length} vật tư gần ngưỡng`}
+                  value={`${Math.min(6, alerts.length)} vật tư gần ngưỡng`}
                   delta="Dưới định mức"
-                  className={`${COCKPIT_HEIGHTS.CHART_ALERT} bg-slate-950/45`}
-                  chartHeightClass={COCKPIT_HEIGHTS.CHART_BODY_140}
+                  className="h-[350px]"
+                  chartHeightClass="h-[300px]"
                 >
                   <AlertMiniChart rows={alerts.slice(0, 6).map((row: any) => [
                     `${row.materialCode} (${formatQuantity(row.stock, 1)} tấn)`,
@@ -1294,8 +1306,8 @@ function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number 
   }).join(' ')
 
   return (
-    <div className={`${COCKPIT_HEIGHTS.CHART_BODY_140} flex flex-col justify-between`}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`${COCKPIT_HEIGHTS.CHART_BODY_105} w-full overflow-visible`}>
+    <div className="h-[90px] flex flex-col justify-between">     {/* giảm từ 140 xuống 90 */}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[65px] w-full overflow-visible">  {/* giảm từ 105 xuống 65 */}
         <defs>
           <linearGradient id="stockTrendFill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#1d7cff" stopOpacity="0.32" />

@@ -87,12 +87,16 @@ export interface ReturnRequest {
     name: string
   } | null
   project?: {
+    id?: string
     code: string
     name: string
   } | null
   requestedBy?: string
   remarks?: string
   createdAt: string
+  updatedAt?: string
+  receivedAt?: string | null
+  disposedAt?: string | null
   items: Array<{
     id: string
     requestedQuantity: number
@@ -114,6 +118,16 @@ export interface ReturnRequest {
       code: string
       name: string
     } | null
+    remarks?: string | null
+  }>
+  logs?: Array<{
+    id: string
+    action: string
+    entity: string
+    entityId?: string | null
+    module?: string | null
+    metadata?: Record<string, unknown> | null
+    createdAt: string
   }>
 }
 

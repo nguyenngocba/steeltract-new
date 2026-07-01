@@ -28,12 +28,17 @@ export const navigation = [
 
       {
         title: 'Biểu đồ xu hướng',
-        path: '/dashboard/charts',
+        path: '/?tab=trends',
       },
 
       {
         title: 'Hoạt động gần đây',
-        path: '/dashboard/activity',
+        path: '/?tab=activities',
+      },
+
+      {
+        title: 'Thông báo',
+        path: '/?tab=notifications',
       },
     ],
   },
@@ -46,8 +51,33 @@ export const navigation = [
     children: [
 
       {
-        title: 'Tồn kho vật tư',
+        title: 'Tổng quan',
         path: '/inventory',
+      },
+
+      {
+        title: 'Vật tư',
+        path: '/inventory/master-data',
+      },
+
+      {
+        title: 'Giao dịch',
+        path: '/inventory/transactions',
+      },
+
+      {
+        title: 'Phiếu trả vật tư',
+        path: '/inventory/returns',
+      },
+
+      {
+        title: 'Tồn kho',
+        path: '/inventory/materials',
+      },
+
+      {
+        title: 'Vị trí kho',
+        path: '/inventory/locations',
       },
 
       {
@@ -62,27 +92,17 @@ export const navigation = [
 
       {
         title: 'Điều chuyển nội bộ',
-        path: '/inventory/transfers',
+        path: '/inventory/transfer',
       },
 
       {
         title: 'Kiểm kê',
-        path: '/inventory/audit',
+        path: '/inventory/stock-take',
       },
 
       {
         title: 'Cảnh báo tồn kho',
         path: '/inventory/alerts',
-      },
-
-      {
-        title: 'Lịch sử giao dịch',
-        path: '/inventory/history',
-      },
-
-      {
-        title: 'Danh mục vật tư',
-        path: '/inventory/catalog',
       },
 
       {
@@ -113,8 +133,13 @@ export const navigation = [
       },
 
       {
-        title: 'Sản xuất cấu kiện',
+        title: 'Sản xuất',
         path: '/components/production',
+      },
+
+      {
+        title: 'Vật tư sử dụng',
+        path: '/components/material-stock',
       },
 
       {
@@ -136,6 +161,11 @@ export const navigation = [
         title: 'Lịch sử gia công',
         path: '/components/history',
       },
+
+      {
+        title: 'Báo cáo',
+        path: '/components/reports',
+      },
     ],
   },
 
@@ -147,32 +177,52 @@ export const navigation = [
     children: [
 
       {
-        title: 'Sơ đồ bãi 2D/3D',
+        title: 'Tổng quan',
         path: '/yard',
       },
 
       {
-        title: 'Danh sách cấu kiện',
+        title: 'Bản đồ 2D',
+        path: '/yard/map-2d',
+      },
+
+      {
+        title: 'Bản đồ 3D',
+        path: '/yard/map-3d',
+      },
+
+      {
+        title: 'Vị trí bãi',
+        path: '/yard/locations',
+      },
+
+      {
+        title: 'Cấu kiện',
         path: '/yard/components',
       },
 
       {
-        title: 'Nhập bãi',
-        path: '/yard/inbound',
+        title: 'Điều phối',
+        path: '/yard/dispatch',
       },
 
       {
-        title: 'Di chuyển nội bộ',
-        path: '/yard/movements',
+        title: 'Live Tracking',
+        path: '/yard/tracking',
       },
 
       {
-        title: 'Xuất bãi',
-        path: '/yard/outbound',
+        title: 'Heatmap',
+        path: '/yard/heatmap',
       },
 
       {
-        title: 'Lịch sử xuất nhập',
+        title: 'Timeline',
+        path: '/yard/timeline',
+      },
+
+      {
+        title: 'Lịch sử',
         path: '/yard/history',
       },
     ],
@@ -187,27 +237,46 @@ export const navigation = [
 
       {
         title: 'Danh sách công trình',
-        path: '/projects',
+        path: '/projects/list',
+      },
+      {
+        title: 'Templates',
+        path: '/projects/templates',
       },
 
       {
-        title: 'Kế hoạch lắp dựng',
-        path: '/projects/gantt',
+        title: 'Tiến độ',
+        path: '/projects/progress',
       },
 
       {
-        title: 'Nhu cầu vật tư',
+        title: 'Cấu kiện',
+        path: '/projects/components',
+      },
+
+      {
+        title: 'Vật tư',
         path: '/projects/materials',
       },
 
       {
-        title: 'QC hiện trường',
-        path: '/projects/qc',
+        title: 'Tài liệu',
+        path: '/projects/documents',
       },
 
       {
         title: 'Chi phí công trình',
         path: '/projects/costs',
+      },
+
+      {
+        title: 'Nhật ký',
+        path: '/projects/logs',
+      },
+
+      {
+        title: 'Báo cáo',
+        path: '/projects/reports',
       },
     ],
   },
@@ -221,22 +290,42 @@ export const navigation = [
 
       {
         title: 'Danh sách NCC',
-        path: '/suppliers',
+        path: '/suppliers/list',
       },
 
       {
-        title: 'Hợp đồng & báo giá',
-        path: '/suppliers/contracts',
+        title: 'Báo giá',
+        path: '/suppliers/quotes',
       },
 
       {
-        title: 'Đánh giá NCC',
-        path: '/suppliers/reviews',
+        title: 'Đơn mua',
+        path: '/suppliers/purchase-orders',
       },
 
       {
-        title: 'Lịch sử mua hàng',
-        path: '/suppliers/history',
+        title: 'Giao hàng',
+        path: '/suppliers/deliveries',
+      },
+
+      {
+        title: 'Chất lượng',
+        path: '/suppliers/quality',
+      },
+
+      {
+        title: 'Công nợ',
+        path: '/suppliers/payables',
+      },
+
+      {
+        title: 'Nhật ký',
+        path: '/suppliers/logs',
+      },
+
+      {
+        title: 'Báo cáo',
+        path: '/suppliers/reports',
       },
     ],
   },
@@ -249,8 +338,23 @@ export const navigation = [
     children: [
 
       {
-        title: 'Kế hoạch kiểm tra',
+        title: 'Tổng quan',
         path: '/qc',
+      },
+
+      {
+        title: 'Kiểm tra đầu vào',
+        path: '/qc/inbound',
+      },
+
+      {
+        title: 'Kiểm tra sản xuất',
+        path: '/qc/production',
+      },
+
+      {
+        title: 'Kiểm tra xuất xưởng',
+        path: '/qc/final',
       },
 
       {
@@ -259,8 +363,23 @@ export const navigation = [
       },
 
       {
-        title: 'CO/CQ',
-        path: '/qc/certificates',
+        title: 'CAPA',
+        path: '/qc/capa',
+      },
+
+      {
+        title: 'Nhật ký',
+        path: '/qc/logs',
+      },
+
+      {
+        title: 'Dashboard',
+        path: '/qc/dashboard',
+      },
+
+      {
+        title: 'Báo cáo',
+        path: '/qc/reports',
       },
     ],
   },
@@ -273,18 +392,23 @@ export const navigation = [
     children: [
 
       {
-        title: 'Danh sách xe',
+        title: 'Tổng quan',
         path: '/logistics',
       },
 
       {
-        title: 'Lộ trình giao hàng',
-        path: '/logistics/routes',
+        title: 'Điều xe',
+        path: '/logistics/dispatch',
       },
 
       {
-        title: 'GPS',
-        path: '/logistics/gps',
+        title: 'Đang vận chuyển',
+        path: '/logistics/tracking',
+      },
+
+      {
+        title: 'Lịch sử',
+        path: '/logistics/history',
       },
     ],
   },

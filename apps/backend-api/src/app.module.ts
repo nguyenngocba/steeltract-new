@@ -43,6 +43,7 @@ import { MaterialMovementsModule } from './modules/material-movements/material-m
 import { RuntimeModule } from './modules/runtime/runtime.module'
 import { SystemModule } from './modules/system/system.module'
 import { CostingModule } from './modules/costing/costing.module'
+import { LogisticsModule } from './modules/logistics/logistics.module'
 @Module({
   imports: [
     EventsModule,
@@ -88,6 +89,7 @@ import { CostingModule } from './modules/costing/costing.module'
     RuntimeModule,
     SystemModule,
     CostingModule,
+    LogisticsModule,
   ],
   controllers: [
   AppController,

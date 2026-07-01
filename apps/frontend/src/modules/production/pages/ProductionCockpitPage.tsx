@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import toast from 'react-hot-toast'
 import { Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
@@ -253,13 +253,16 @@ export function ProductionCockpitPage() {
       {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} reservations={reservations} issues={issues} components={components} onOpen={setSelectedOrder} />}
       {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
       {mode === 'orders' && <Orders rows={filteredOrders} onOpen={setSelectedOrder} />}
+      {mode === 'planning' && <Orders rows={filteredOrders.filter((row) => ['PLANNED', 'RELEASED'].includes(row.status))} onOpen={setSelectedOrder} />}
       {mode === 'execution' && <ProductionExecutionBoard orders={orders} issues={issues} reservations={reservations} />}
       {mode === 'reservations' && <Reservations rows={reservations} orders={orders} onOpen={setSelectedOrder} />}
       {mode === 'warehouse' && <ProductionWarehouseCockpit inventoryItems={inventoryItems as InventoryItemLike[]} auditRows={inventoryAudit as InventoryAuditLike[]} orders={orders} reservations={reservations} consumptions={consumptions} />}
       {mode === 'material-ledger' && <MaterialLedger rows={ledger} orders={orders} filters={ledgerFilters} onFiltersChange={setLedgerFilters} />}
       {mode === 'material-issues' && <Issues rows={issues} consumptions={consumptions} orders={orders} />}
       {mode === 'consumptions' && <Consumptions issues={issues} consumptions={consumptions} />}
+      {mode === 'incidents' && <ProductionNavigationPlaceholder title="Sự cố sản xuất" description="Tab đã được đồng bộ route/sidebar. Chưa có workflow sự cố riêng nên chưa hiển thị dữ liệu nghiệp vụ." icon={<Wrench size={18} />} />}
       {mode === 'logs' && <Logs rows={logs} />}
+      {mode === 'reports' && <ProductionNavigationPlaceholder title="Báo cáo sản xuất" description="Tab đã được đồng bộ route/sidebar. Báo cáo quản trị sẽ dùng dữ liệu sản xuất hiện có ở phase sau." icon={<FileStack size={18} />} />}
 
       {selectedOrder && <OrderWorkspace order={selectedOrder} onClose={() => setSelectedOrder(undefined)} />}
       {selectedBom && <BomWorkspace bom={selectedBom} onClose={() => setSelectedBom(undefined)} />}
@@ -268,6 +271,30 @@ export function ProductionCockpitPage() {
       </div>
     </main>
   </OperationalShell>
+}
+
+function ProductionNavigationPlaceholder({
+  title,
+  description,
+  icon,
+}: {
+  title: string
+  description: string
+  icon: ReactNode
+}) {
+  return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_MD}>
+      <ModuleEmptyState title={title} description={description} icon={icon} />
+    </CockpitTableShell>
+    <aside className="space-y-1">
+      <CockpitChartCard title="Trạng thái" className={COCKPIT_HEIGHTS.CHART_SM}>
+        <ModuleEmptyState title="Chưa có dữ liệu" description="Không có dữ liệu riêng cho tab này trong API hiện tại." icon={icon} />
+      </CockpitChartCard>
+      <CockpitChartCard title="Gần đây" className={COCKPIT_HEIGHTS.CHART_SM}>
+        <ModuleEmptyState title="Chưa có hoạt động" description="Hoạt động sẽ hiển thị khi backend bổ sung nguồn dữ liệu tương ứng." icon={icon} />
+      </CockpitChartCard>
+    </aside>
+  </div>
 }
 
 function Overview({

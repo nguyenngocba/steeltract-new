@@ -280,7 +280,9 @@ export function ModuleDetailDrawer({
   actions,
   children,
   onClose,
-  widthClass = 'max-w-5xl',
+  widthClass,
+  size = 'md',
+  placement = 'right',
 }: {
   open: boolean
   title: string
@@ -289,12 +291,30 @@ export function ModuleDetailDrawer({
   children: ReactNode
   onClose: () => void
   widthClass?: string
+  size?: 'sm' | 'md' | 'lg'
+  placement?: 'right' | 'center'
 }) {
   if (!open) return null
 
+  const sizeClass = {
+    sm: 'w-screen md:w-[45vw] md:min-w-[720px] md:max-w-[820px]',
+    md: 'w-screen md:w-[58vw] md:min-w-[900px] md:max-w-[1180px]',
+    lg: 'w-screen md:w-[62vw] md:min-w-[980px] md:max-w-[1280px]',
+  }[size]
+  const resolvedWidthClass = widthClass ?? sizeClass
+
+  const shellClass =
+    placement === 'center'
+      ? 'fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm'
+      : 'fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-sm'
+  const asideClass =
+    placement === 'center'
+      ? `flex max-h-[90vh] w-full ${resolvedWidthClass} flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
+      : `flex h-full ${resolvedWidthClass} flex-col border-l border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-sm">
-      <aside className={`flex h-full w-full ${widthClass} flex-col border-l border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`}>
+    <div className={shellClass}>
+      <aside className={asideClass}>
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-cyan-300/15 px-5 py-4">
           <div className="min-w-0">
             <h3 className="truncate text-xl font-semibold text-white">{title}</h3>

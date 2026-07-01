@@ -1,5 +1,86 @@
 # SteelTrack Changelog
 
+## 2026-06-30 Project Low Data Entry and Template System
+
+Added:
+
+- Project Template Library with persisted `ProjectTemplate` records.
+- Default `Nhà xưởng 5 nhịp` template seed.
+- Template APIs for create/edit/duplicate/publish/deactivate/default/import/export.
+- Projects `Templates` workspace.
+- Template-driven project creation that generates WBS, dependencies, schedule dates, suggested resources, and resolvable allocations.
+- Quick Update panel in Project Progress for field-friendly updates.
+
+Verified:
+
+- Prisma Client generation passed.
+- Frontend build passed.
+- Backend build passed.
+
+## 2026-06-29 Enterprise Architecture Audit
+
+Added:
+
+- `docs/audit/enterprise-architecture-audit.md`
+- `docs/audit/module-maturity-matrix.md`
+- `docs/audit/workflow-readiness-report.md`
+- `docs/audit/costing-readiness-report.md`
+- `docs/audit/import-readiness-report.md`
+- `docs/audit/realtime-readiness-report.md`
+- `docs/audit/performance-readiness-report.md`
+- `docs/audit/technical-debt-report.md`
+- `docs/audit/next-roadmap-recommendations.md`
+
+Recommended next sequence:
+
+- Workflow Engine Binding P0.
+- Inventory Ledger & Historical Import Readiness.
+- Component/Project Cost Traceability.
+
+Verified:
+
+- Frontend build passed.
+- Backend build passed.
+
+## 2026-06-29 Executive Insights & Control Tower
+
+Added:
+
+- Dashboard health score.
+- 7-day executive summary.
+- Suggested actions.
+- Activity grouping by module.
+- Notification Center counters and priority grouping.
+- Backend services:
+  - DashboardInsightService
+  - DashboardRecommendationService
+
+Verified:
+
+- Frontend build passed.
+- Backend build passed.
+
+## 2026-06-29 Executive Cockpit Intelligence Tabs
+
+Added:
+
+- `GET /dashboard/executive-cockpit`
+- Dashboard tabs:
+  - KPI Chính
+  - Biểu đồ xu hướng
+  - Hoạt động gần đây
+  - Thông báo
+- Backend services:
+  - DashboardMetricsService
+  - DashboardActivityService
+  - DashboardNotificationService
+
+Verified:
+
+- Frontend build passed.
+- Backend build passed.
+- Dashboard module no longer contains `Math.random()` or the old hardcoded `dailyRate = 10`.
+
 ## 2026-06-25 Transaction Date-Time Refresh
 
 Fixed:

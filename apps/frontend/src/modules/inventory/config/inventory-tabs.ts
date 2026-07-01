@@ -64,6 +64,13 @@ export const inventoryTabs = [
   },
 
   {
+    key: 'returns',
+    label: 'Return Requests',
+    vi: 'Phiếu trả vật tư',
+    path: '/inventory/returns',
+  },
+
+  {
     key: 'alerts',
     label: 'Alerts',
     vi: 'Cảnh báo tồn kho',

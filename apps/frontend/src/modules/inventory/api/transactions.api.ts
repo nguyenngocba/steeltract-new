@@ -28,9 +28,16 @@ export async function createInventoryTransaction(
   return response.data
 }
 
-export async function getReturnRequests() {
+export async function getReturnRequests(params?: {
+  status?: string
+  flowType?: string
+  search?: string
+}) {
   const response = await api.get<ReturnRequest[]>(
     '/inventory/returns',
+    {
+      params,
+    },
   )
 
   return response.data
@@ -53,7 +60,7 @@ export async function advanceReturnRequest({
   payload,
 }: {
   id: string
-  action: 'approve' | 'receive' | 'inspect' | 'dispose'
+  action: 'approve' | 'receive' | 'inspect' | 'dispose' | 'reject'
   payload: Record<string, unknown>
 }) {
   const response = await api.patch<ReturnRequest>(

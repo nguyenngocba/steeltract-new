@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, Boxes, Construction, MapPinned, Radio, Search, Truck, Warehouse, type LucideIcon } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useComponents } from '@/modules/components/hooks/queries/useComponents'
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
@@ -39,7 +40,6 @@ function YardKpiCard({
       note={note}
       tone={tone as any}
       icon={<Icon size={15} />}
-      trend={[12, 16, 14, 22, 19, 25]}
     />
   )
 }
@@ -87,6 +87,9 @@ function YardDonut({
 }
 
 function YardMiniTrend({ values, tone = 'blue' }: { values: number[]; tone?: 'blue' | 'emerald' | 'amber' }) {
+  if (!values.length) {
+    return <div className="flex h-32 items-center justify-center text-xs text-slate-500">Chưa có movement thật.</div>
+  }
   const max = Math.max(1, ...values)
   const color = tone === 'emerald' ? 'from-emerald-500 to-teal-300' : tone === 'amber' ? 'from-amber-500 to-orange-300' : 'from-blue-500 to-cyan-300'
   return (
@@ -130,7 +133,8 @@ const makeSlotCode = (zone?: YardZoneRuntime, next = 1) => {
 }
 
 export function YardPage() {
-  const [tab, setTab] = useState<YardTab>('overview')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [selectedSlotId, setSelectedSlotId] = useState<string>()
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>()
   const [selectedZoneId, setSelectedZoneId] = useState<string>()
@@ -148,6 +152,7 @@ export function YardPage() {
   const deleteZone = useDeleteYardZone()
   const createZone = useCreateYardZone()
   const createSlot = useCreateYardSlot()
+  const tab = yardTabs.find((item) => item[2] === location.pathname)?.[0] ?? 'overview'
   const selectedSlot = slots.find((item) => item.id === selectedSlotId) ?? slots[0]
   const selectedPlacement = selectedSlot?.placements.find((item) => item.id === selectedPlacementId) ?? selectedSlot?.placements[0]
   const totalWeight = useMemo(() => slots.flatMap((slot) => slot.placements).reduce((sum, item) => sum + (item.weight ?? 0), 0), [slots])
@@ -159,26 +164,14 @@ export function YardPage() {
       const placement = slot.placements.find((item) => item.itemId === focusComponentId)
       if (!placement) continue
 
-      setTab('map-2d')
+      navigate('/yard/map-2d')
       setSelectedZoneId(slot.zone.id)
       setSelectedSlotId(slot.id)
       setSelectedPlacementId(placement.id)
-      window.location.hash = 'map-2d'
       window.sessionStorage.removeItem('yard-focus-component-id')
       break
     }
-  }, [slots])
-  useEffect(() => {
-    const sync = () => setTab((window.location.hash.slice(1) || 'overview') as YardTab)
-    sync()
-    window.addEventListener('hashchange', sync)
-    return () => window.removeEventListener('hashchange', sync)
-  }, [])
-
-  const selectTab = (id: YardTab) => {
-    window.location.hash = id
-    setTab(id)
-  }
+  }, [navigate, slots])
 
   async function editZone(zone: { id: string; code: string; name: string }) {
     const name = window.prompt('Tên zone', zone.name)
@@ -224,8 +217,7 @@ export function YardPage() {
     }) as YardZoneRuntime
     setZoneForm(null)
     setSelectedZoneId(zone.id)
-    setTab('map-2d')
-    window.location.hash = 'map-2d'
+    navigate('/yard/map-2d')
   }
 
   async function submitSlotForm() {
@@ -242,16 +234,19 @@ export function YardPage() {
     })
     setSelectedZoneId(slotForm.zoneId)
     setSlotForm(null)
-    setTab('map-2d')
-    window.location.hash = 'map-2d'
+    navigate('/yard/map-2d')
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+  const movementsToday = movements.filter((item) => String(item.createdAt ?? '').slice(0, 10) === today).length
+  const overloadedZones = (metrics?.zoneUtilization ?? []).filter((zone) => zone.occupancyRate >= 90).length
+  const movementTrend = buildMovementTrend(movements)
   const stat = [
-    [Warehouse, 'Khu vực bãi', metrics?.zones ?? 0, 'zone vận hành', 'blue'],
-    [MapPinned, 'Tổng vị trí', metrics?.totalSlots ?? 0, 'slot cấu hình', 'cyan'],
-    [Boxes, 'Cấu kiện lưu bãi', metrics?.placements ?? 0, 'thành phẩm', 'emerald'],
-    [Activity, 'Tổng trọng lượng', `${fmt(totalWeight)} tấn`, 'realtime', 'purple'],
-    [Radio, 'Occupancy', `${metrics?.occupancyRate ?? 0}%`, 'LIVE 5s', 'amber'],
+    [Warehouse, 'Occupied Slots', metrics?.occupiedSlots ?? 0, `${metrics?.totalSlots ?? 0} slot`, 'blue'],
+    [MapPinned, 'Available Capacity', Math.max(0, (metrics?.totalSlots ?? 0) - (metrics?.occupiedSlots ?? 0)), 'slot trống', 'cyan'],
+    [Boxes, 'Components In Yard', metrics?.placements ?? 0, 'cấu kiện', 'emerald'],
+    [Activity, 'Movements Today', movementsToday, 'yard_movements', 'purple'],
+    [Radio, 'Overloaded Zones', overloadedZones, '>= 90% capacity', overloadedZones ? 'red' : 'amber'],
   ] as const
   const emptySlots = Math.max(0, (metrics?.totalSlots ?? 0) - (metrics?.occupiedSlots ?? 0))
   const movementSegments = [
@@ -285,10 +280,10 @@ export function YardPage() {
         
         <nav className="mb-1 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
           <div className="flex min-w-max gap-1">
-            {yardTabs.map(([id, label]) => (
-              <button
+            {yardTabs.map(([id, label, path]) => (
+              <Link
                 key={id}
-                onClick={() => selectTab(id)}
+                to={path}
                 className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                   tab === id
                     ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/30'
@@ -296,7 +291,7 @@ export function YardPage() {
                 }`}
               >
                 {label}
-              </button>
+              </Link>
             ))}
           </div>
         </nav>
@@ -328,7 +323,7 @@ export function YardPage() {
             <YardDonut centerValue={formatQuantity(movements.length, 0)} centerLabel="giao dịch" segments={movementSegments} />
           </CockpitChartCard>
           <CockpitChartCard title="Biến động bãi" heightClass="h-[170px]" chartHeightClass="h-[74px]" action={<span className="text-[10px] text-slate-500">Tháng này</span>}>
-            <YardMiniTrend values={[12, 18, 15, 26, 24, 31, 28, 35, 42, 38, 45, 52]} tone="emerald" />
+            <YardMiniTrend values={movementTrend} tone="emerald" />
           </CockpitChartCard>
         </section>
 
@@ -505,4 +500,14 @@ export function YardPage() {
       </main>
     </OperationalShell>
   )
+}
+
+function buildMovementTrend(movements: Array<{ createdAt: string }>) {
+  if (!movements.length) return []
+  const map = new Map<string, number>()
+  movements.forEach((movement) => {
+    const day = String(movement.createdAt ?? '').slice(5, 10) || '-'
+    map.set(day, (map.get(day) ?? 0) + 1)
+  })
+  return Array.from(map.values()).slice(-12)
 }

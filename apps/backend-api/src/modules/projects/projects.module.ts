@@ -15,10 +15,14 @@ import { ProjectsRepository }
 import { ComponentsModule }
   from '../components/components.module'
 
+import { RbacModule }
+  from '../rbac/rbac.module'
+
 @Module({
   imports: [
     PrismaModule,
     ComponentsModule,
+    RbacModule,
   ],
 
   controllers: [

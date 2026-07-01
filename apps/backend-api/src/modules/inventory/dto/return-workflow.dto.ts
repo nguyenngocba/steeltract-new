@@ -76,9 +76,15 @@ export const disposeReturnRequestSchema = z.object({
   remarks: z.string().optional(),
 });
 
+export const rejectReturnRequestSchema = z.object({
+  rejectedBy: optionalTextFilter,
+  remarks: z.string().optional(),
+});
+
 export type ListReturnRequestsDto = z.infer<typeof listReturnRequestsSchema>;
 export type CreateReturnRequestDto = z.infer<typeof createReturnRequestSchema>;
 export type ApproveReturnRequestDto = z.infer<typeof approveReturnRequestSchema>;
 export type ReceiveReturnRequestDto = z.infer<typeof receiveReturnRequestSchema>;
 export type InspectReturnRequestDto = z.infer<typeof inspectReturnRequestSchema>;
 export type DisposeReturnRequestDto = z.infer<typeof disposeReturnRequestSchema>;
+export type RejectReturnRequestDto = z.infer<typeof rejectReturnRequestSchema>;

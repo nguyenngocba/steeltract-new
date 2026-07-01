@@ -18,6 +18,7 @@ import {
   inspectReturnRequestSchema,
   listReturnRequestsSchema,
   receiveReturnRequestSchema,
+  rejectReturnRequestSchema,
 } from './dto/return-workflow.dto';
 import type {
   ApproveReturnRequestDto,
@@ -26,6 +27,7 @@ import type {
   InspectReturnRequestDto,
   ListReturnRequestsDto,
   ReceiveReturnRequestDto,
+  RejectReturnRequestDto,
 } from './dto/return-workflow.dto';
 import { ReturnWorkflowService } from './return-workflow.service';
 
@@ -84,5 +86,14 @@ export class ReturnWorkflowController {
     body: DisposeReturnRequestDto,
   ) {
     return this.service.dispose(id, body);
+  }
+
+  @Patch(':id/reject')
+  reject(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(rejectReturnRequestSchema))
+    body: RejectReturnRequestDto,
+  ) {
+    return this.service.reject(id, body);
   }
 }

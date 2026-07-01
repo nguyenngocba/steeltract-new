@@ -263,10 +263,12 @@ export function CompactDonutSummary({
   segments,
   centerValue,
   centerLabel,
+  showPercent = false,
 }: {
   segments: Array<{ label: string; value: number; color: string }>
   centerValue: string
   centerLabel: string
+  showPercent?: boolean
 }) {
   const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
   let cursor = 0
@@ -297,7 +299,10 @@ export function CompactDonutSummary({
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="truncate">{item.label}</span>
               </span>
-              <span className="whitespace-nowrap text-slate-300">{formatQuantity(item.value, 0)}</span>
+              <span className="whitespace-nowrap text-slate-300">
+                {formatQuantity(item.value, 1)}
+                {showPercent && ` (${percent.toFixed(1)}%)`}
+              </span>
             </div>
           )
         })}

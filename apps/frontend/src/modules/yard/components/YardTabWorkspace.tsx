@@ -4,9 +4,19 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import type { YardTab } from '../config/yard-tabs'
 import type { YardOperationMode } from '../dialogs/YardOperationDialog'
 import type { YardCrane, YardMetrics, YardMovement, YardSlotRuntime, YardZoneRuntime } from '../services/api/yard.api'
-import { ModuleLoadingState } from '@/shared/ui/modules'
+import { ModuleEmptyState, ModuleLoadingState } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
-import { CockpitKpiCard, DataTablePagination, COCKPIT_SHELL } from '@/shared/ui/cockpit'
+import {
+  CockpitChartCard,
+  CockpitEmptyState,
+  CockpitKpiCard,
+  CockpitRecentList,
+  CockpitSidebarStats,
+  CockpitStatusList,
+  CockpitTableShell,
+  DataTablePagination,
+  COCKPIT_SHELL,
+} from '@/shared/ui/cockpit'
 
 const YardOperationalMap2D = lazy(() => import('../maps2d/YardOperationalMap2D').then((module) => ({ default: module.YardOperationalMap2D })))
 const YardOperationalMap3D = lazy(() => import('../maps3d/YardOperationalMap3D').then((module) => ({ default: module.YardOperationalMap3D })))
@@ -53,7 +63,7 @@ function MiniStat({
       note={note}
       tone={tone}
       icon={<Icon size={15} />}
-      trend={trend ?? [10, 14, 12, 18, 15, 20]}
+      trend={trend}
     />
   )
 }
@@ -67,7 +77,7 @@ function MovementTable({ movements, title }: { movements: YardMovement[]; title:
   }, [movements, page])
 
   return (
-    <div className={`${panel} border-0 ring-0 bg-transparent shadow-none rounded-none overflow-auto scrollbar-none`}>
+    <CockpitTableShell>
       <div className="flex items-center justify-between border-b border-cyan-400/10 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-250">{title}</h2>
       </div>
@@ -101,7 +111,7 @@ function MovementTable({ movements, title }: { movements: YardMovement[]; title:
       {total > pageSize && (
         <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
       )}
-    </div>
+    </CockpitTableShell>
   )
 }
 
@@ -168,6 +178,228 @@ function RecentActivities({ movements }: { movements: YardMovement[] }) {
         <div className="mt-0.5 text-slate-500 font-mono">{movement.fromSlot?.code ?? 'Xưởng / QC'} → {movement.toSlot?.code ?? 'Rời bãi'}</div>
       </div>)}
     </div>
+  </div>
+}
+
+function YardComponentsTab({ slots }: { slots: YardSlotRuntime[] }) {
+  const placements = slots.flatMap((slot) => slot.placements.map((placement) => ({
+    ...placement,
+    slotCode: slot.code,
+    zoneCode: slot.zone.code,
+    zoneName: slot.zone.name,
+  })))
+
+  return <div className={`${panel} border-0 ring-0 bg-transparent shadow-none rounded-none overflow-auto scrollbar-none`}>
+    <div className="flex items-center justify-between border-b border-cyan-400/10 px-4 py-3">
+      <h2 className="text-sm font-semibold text-slate-250">Cấu kiện trong bãi</h2>
+      <span className="text-xs text-cyan-300 font-mono">{formatQuantity(placements.length, 0)} cấu kiện</span>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[980px] table-fixed text-sm">
+        <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+          <tr>
+            {['Mã cấu kiện', 'Tên cấu kiện', 'Zone', 'Vị trí', 'Tầng', 'Số lượng', 'Khối lượng'].map((heading) => (
+              <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold">{heading}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {placements.map((placement) => (
+            <tr key={placement.id} className="border-b border-white/[0.04] hover:bg-cyan-400/[0.04]">
+              <td className="px-4 py-2.5 text-xs font-mono text-cyan-300">{placement.itemCode}</td>
+              <td className="px-4 py-2.5 text-xs text-slate-200">{placement.itemName ?? placement.itemType ?? '-'}</td>
+              <td className="px-4 py-2.5 text-xs text-slate-300">{placement.zoneCode} · {placement.zoneName}</td>
+              <td className="px-4 py-2.5 text-xs font-mono text-slate-300">{placement.slotCode}</td>
+              <td className="px-4 py-2.5 text-xs font-mono text-slate-300">L{placement.stackLevel}</td>
+              <td className="px-4 py-2.5 text-xs font-mono text-slate-300">{formatQuantity(placement.quantity, 2)}</td>
+              <td className="px-4 py-2.5 text-xs font-mono text-slate-300">{formatQuantity(placement.weight ?? 0, 2)} tấn</td>
+            </tr>
+          ))}
+          {!placements.length ? <tr><td colSpan={7} className="px-4 py-8"><ModuleEmptyState title="Chưa có cấu kiện trong bãi" description="Dữ liệu sẽ xuất hiện khi phát sinh nhập bãi." /></td></tr> : null}
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+function YardTrackingTab({ zones, slots, movements }: { zones: YardZoneRuntime[]; slots: YardSlotRuntime[]; movements: YardMovement[] }) {
+  return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_330px]">
+    <div className={`${panel} p-3`}>
+      <div className="mb-3 flex justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Live Tracking bãi</h2>
+          <p className="mt-1 text-[11px] text-slate-500">Theo dõi vị trí cấu kiện và luồng di chuyển gần nhất từ dữ liệu runtime.</p>
+        </div>
+        <span className="text-xs text-cyan-300 font-mono">{formatQuantity(movements.length, 0)} movement</span>
+      </div>
+      <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ live tracking..." variant="analytics" />}>
+        <YardOperationalMap2D zones={zones} slots={slots} onSelectZone={() => undefined} />
+      </Suspense>
+    </div>
+    <aside className="space-y-1">
+      <RecentActivities movements={movements} />
+      <MovementTable movements={movements.slice(0, 10)} title="Nhật ký live" />
+    </aside>
+  </div>
+}
+
+function getPlacementRows(slots: YardSlotRuntime[]) {
+  return slots.flatMap((slot) => slot.placements.map((placement) => ({
+    ...placement,
+    slotId: slot.id,
+    slotCode: slot.code,
+    zoneCode: slot.zone.code,
+    zoneName: slot.zone.name,
+    currentStackLevel: slot.currentStackLevel,
+    maxStackLevel: slot.maxStackLevel,
+  })))
+}
+
+function groupSlotsByZone(slots: YardSlotRuntime[]) {
+  return slots.reduce<Record<string, { zone: YardSlotRuntime['zone']; slots: YardSlotRuntime[] }>>((acc, slot) => {
+    acc[slot.zone.id] ??= { zone: slot.zone, slots: [] }
+    acc[slot.zone.id].slots.push(slot)
+    return acc
+  }, {})
+}
+
+function slotRate(slot: YardSlotRuntime) {
+  return slot.maxStackLevel ? slot.currentStackLevel / slot.maxStackLevel * 100 : 0
+}
+
+function rateTone(rate: number) {
+  if (rate >= 90) return 'red'
+  if (rate >= 70) return 'amber'
+  if (rate > 0) return 'cyan'
+  return 'emerald'
+}
+
+function YardMap2DTab({
+  zones,
+  slots,
+  selectedZoneId,
+  selectedPlacementId,
+  onSelectZone,
+  onOpenZoneDetail,
+  onEditZone,
+  onDeleteZone,
+  onCreateZone,
+  onCreateSlot,
+}: {
+  zones: YardZoneRuntime[]
+  slots: YardSlotRuntime[]
+  selectedZoneId?: string
+  selectedPlacementId?: string
+  onSelectZone: (id: string) => void
+  onOpenZoneDetail?: (id: string) => void
+  onEditZone?: (zone: { id: string; code: string; name: string }) => void
+  onDeleteZone?: (zone: { id: string; code: string; name: string }) => void
+  onCreateZone?: () => void
+  onCreateSlot?: (zoneId?: string) => void
+}) {
+  return <div className="space-y-1">
+    <div className={`${panel} p-3`}>
+      <div className="mb-3 flex justify-between">
+        <div><h2 className="text-sm font-semibold">Bản đồ 2D vận hành</h2><p className="mt-1 text-[11px] text-slate-500">Zone, slot, màu occupancy và drill-down vị trí từ runtime bãi.</p></div>
+        <span className="text-xs text-cyan-300 font-mono">{formatQuantity(slots.length, 0)} vị trí</span>
+      </div>
+      <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ 2D..." variant="analytics" />}>
+        <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
+      </Suspense>
+    </div>
+  </div>
+}
+
+function YardLocationsTab({ slots, movements, metrics }: { slots: YardSlotRuntime[]; movements: YardMovement[]; metrics?: YardMetrics }) {
+  const topOccupied = [...slots].sort((a, b) => slotRate(b) - slotRate(a)).slice(0, 6)
+  const recentCodes = new Set(movements.flatMap((movement) => [movement.fromSlot?.code, movement.toSlot?.code]).filter(Boolean) as string[])
+  return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_330px]">
+    <CockpitTableShell>
+      <div className="flex items-center justify-between border-b border-cyan-400/10 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-250">Vị trí bãi</h2>
+        <span className="text-xs text-cyan-300 font-mono">{formatQuantity(slots.length, 0)} slot</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] table-fixed text-sm">
+          <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+            <tr>{['Zone', 'Slot', 'Trạng thái', 'Tầng', 'Cấu kiện', 'Occupancy'].map((heading) => <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold">{heading}</th>)}</tr>
+          </thead>
+          <tbody>
+            {slots.map((slot) => (
+              <tr key={slot.id} className="border-b border-white/[0.04] hover:bg-cyan-400/[0.04]">
+                <td className="px-4 py-2.5 text-xs text-slate-300">{slot.zone.code} · {slot.zone.name}</td>
+                <td className="px-4 py-2.5 text-xs font-mono text-cyan-300">{slot.code}</td>
+                <td className="px-4 py-2.5 text-xs text-slate-300">{slot.status}</td>
+                <td className="px-4 py-2.5 text-xs font-mono text-slate-300">L{slot.currentStackLevel}/{slot.maxStackLevel}</td>
+                <td className="px-4 py-2.5 text-xs font-mono text-slate-300">{formatQuantity(slot.placements.length, 0)}</td>
+                <td className="px-4 py-2.5"><ProgressBar value={slotRate(slot)} tone={slotRate(slot) >= 90 ? 'bg-red-500' : slotRate(slot) >= 70 ? 'bg-amber-400' : 'bg-cyan-500'} /></td>
+              </tr>
+            ))}
+            {!slots.length ? <tr><td colSpan={6} className="px-4 py-8"><CockpitEmptyState title="Chưa có vị trí bãi" description="Tạo zone và slot để bắt đầu quản lý bãi." /></td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+    </CockpitTableShell>
+    <aside className="space-y-1">
+      <CockpitChartCard title="Top occupied locations" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitStatusList items={topOccupied.map((slot) => ({ id: slot.id, label: slot.code, value: `${formatQuantity(slotRate(slot), 0)}%`, statusTone: rateTone(slotRate(slot)) }))} /></CockpitChartCard>
+      <CockpitChartCard title="Capacity efficiency" heightClass="h-[170px]" chartHeightClass="h-[74px]"><ZoneUtilization metrics={metrics} /></CockpitChartCard>
+      <CockpitChartCard title="Recently updated" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitRecentList items={slots.filter((slot) => recentCodes.has(slot.code)).slice(0, 5).map((slot) => ({ id: slot.id, title: slot.code, subtitle: `${slot.zone.code} · ${slot.placements.length} cấu kiện`, statusDot: 'bg-cyan-400' }))} emptyMessage="Chưa có vị trí phát sinh movement." /></CockpitChartCard>
+    </aside>
+  </div>
+}
+
+function YardDispatchTab({ slots, movements, metrics }: { slots: YardSlotRuntime[]; movements: YardMovement[]; metrics?: YardMetrics }) {
+  const available = slots.filter((slot) => slot.currentStackLevel < slot.maxStackLevel)
+  const conflicts = (metrics?.zoneUtilization ?? []).filter((zone) => zone.occupancyRate >= 90)
+  return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_330px]">
+    <div className={`${panel} min-h-[420px] p-4`}>
+      <div className="mb-4 flex items-center justify-between">
+        <div><h2 className="text-sm font-semibold text-white">Điều phối bãi</h2><p className="mt-1 text-[11px] text-slate-500">Điều phối hiển thị khả năng tiếp nhận và xung đột từ dữ liệu runtime; chưa có workflow pending move riêng.</p></div>
+      </div>
+      <CockpitEmptyState title="Chưa có lệnh điều phối chờ xử lý" description="Khi backend có pending moves, danh sách sẽ hiển thị tại đây. Vị trí đề xuất bên phải đang lấy từ slot còn dung lượng thật." />
+    </div>
+    <aside className="space-y-1">
+      <CockpitChartCard title="Suggested destinations" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitRecentList items={available.slice(0, 5).map((slot) => ({ id: slot.id, title: slot.code, subtitle: `${slot.zone.code} · còn ${slot.maxStackLevel - slot.currentStackLevel} tầng`, statusDot: 'bg-emerald-400' }))} emptyMessage="Không còn slot trống." /></CockpitChartCard>
+      <CockpitChartCard title="Occupied conflicts" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitStatusList items={conflicts.map((zone) => ({ id: zone.id, label: zone.code, value: `${zone.occupancyRate}%`, statusTone: 'red' }))} emptyMessage="Không có zone quá tải." /></CockpitChartCard>
+      <CockpitChartCard title="Available locations" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitSidebarStats stats={[{ label: 'Slot còn nhận', value: available.length, colorClass: 'text-emerald-300' }, { label: 'Slot đầy', value: slots.length - available.length, colorClass: 'text-amber-300' }]} /></CockpitChartCard>
+    </aside>
+  </div>
+}
+
+function YardHeatmapTab({ slots, metrics }: { slots: YardSlotRuntime[]; metrics?: YardMetrics }) {
+  const groups = Object.values(groupSlotsByZone(slots)).sort((a, b) => a.zone.code.localeCompare(b.zone.code))
+  return <div className="space-y-1">
+    <div className="grid gap-1 md:grid-cols-3">
+      <CockpitChartCard title="Zone utilization" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitStatusList items={(metrics?.zoneUtilization ?? []).slice(0, 5).map((zone) => ({ id: zone.id, label: zone.code, value: `${zone.occupancyRate}%`, statusTone: rateTone(zone.occupancyRate) }))} /></CockpitChartCard>
+      <CockpitChartCard title="Slot utilization" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitSidebarStats stats={[{ label: 'Occupied', value: metrics?.occupiedSlots ?? 0, colorClass: 'text-cyan-300' }, { label: 'Available', value: Math.max(0, (metrics?.totalSlots ?? 0) - (metrics?.occupiedSlots ?? 0)), colorClass: 'text-emerald-300' }]} /></CockpitChartCard>
+      <CockpitChartCard title="Overload indicators" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitStatusList items={(metrics?.zoneUtilization ?? []).filter((zone) => zone.occupancyRate >= 90).map((zone) => ({ id: zone.id, label: zone.code, value: `${zone.occupancyRate}%`, statusTone: 'red' }))} emptyMessage="Không có zone quá tải." /></CockpitChartCard>
+    </div>
+    <div className={`${panel} p-4`}>
+      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+        {groups.map((group) => (
+          <section key={group.zone.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+            <div className="mb-3 flex justify-between text-xs"><span className="font-semibold text-cyan-300">{group.zone.code}</span><span className="text-slate-500">{group.slots.length} slot</span></div>
+            <div className="grid grid-cols-8 gap-1">
+              {group.slots.map((slot) => {
+                const rate = slotRate(slot)
+                return <div key={slot.id} title={`${slot.code}: ${formatQuantity(rate, 0)}%`} className={`h-7 rounded border ${rate >= 90 ? 'border-red-400/30 bg-red-500/40' : rate >= 70 ? 'border-amber-400/30 bg-amber-400/35' : rate > 0 ? 'border-cyan-400/30 bg-cyan-400/30' : 'border-emerald-400/20 bg-emerald-400/12'}`} />
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  </div>
+}
+
+function YardTimelineTab({ movements }: { movements: YardMovement[] }) {
+  return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_330px]">
+    <MovementTable movements={movements} title="Timeline vận hành bãi" />
+    <aside className="space-y-1">
+      <CockpitChartCard title="Inbound" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitRecentList items={movements.filter((item) => item.type === 'PLACE').slice(0, 5).map((item) => ({ id: item.id, title: item.itemCode, subtitle: item.toSlot?.code ?? 'Nhập bãi', time: formatDateTime(item.createdAt), statusDot: 'bg-emerald-400' }))} /></CockpitChartCard>
+      <CockpitChartCard title="Movements" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitRecentList items={movements.filter((item) => item.type === 'MOVE').slice(0, 5).map((item) => ({ id: item.id, title: item.itemCode, subtitle: `${item.fromSlot?.code ?? '-'} → ${item.toSlot?.code ?? '-'}`, time: formatDateTime(item.createdAt), statusDot: 'bg-cyan-400' }))} /></CockpitChartCard>
+      <CockpitChartCard title="Outbound" heightClass="h-[170px]" chartHeightClass="h-[74px]"><CockpitRecentList items={movements.filter((item) => item.type === 'REMOVE').slice(0, 5).map((item) => ({ id: item.id, title: item.itemCode, subtitle: item.fromSlot?.code ?? 'Xuất bãi', time: formatDateTime(item.createdAt), statusDot: 'bg-amber-400' }))} /></CockpitChartCard>
+    </aside>
   </div>
 }
 
@@ -400,6 +632,18 @@ function QCTab({ slots, movements }: { slots: YardSlotRuntime[]; movements: Yard
 }
 
 function HistoryTab({ movements, metrics }: { movements: YardMovement[]; metrics?: YardMetrics }) {
+  const [componentQuery, setComponentQuery] = useState('')
+  const [locationQuery, setLocationQuery] = useState('')
+  const [dateQuery, setDateQuery] = useState('')
+  const [typeQuery, setTypeQuery] = useState('')
+  const filteredMovements = movements.filter((item) => {
+    const componentOk = !componentQuery || item.itemCode.toLowerCase().includes(componentQuery.toLowerCase())
+    const locationText = `${item.fromSlot?.code ?? ''} ${item.toSlot?.code ?? ''} ${item.fromSlot?.zone?.code ?? ''} ${item.toSlot?.zone?.code ?? ''}`.toLowerCase()
+    const locationOk = !locationQuery || locationText.includes(locationQuery.toLowerCase())
+    const dateOk = !dateQuery || String(item.createdAt ?? '').startsWith(dateQuery)
+    const typeOk = !typeQuery || item.type === typeQuery
+    return componentOk && locationOk && dateOk && typeOk
+  })
   const place = movements.filter((item) => item.type === 'PLACE').length
   const move = movements.filter((item) => item.type === 'MOVE').length
   const remove = movements.filter((item) => item.type === 'REMOVE').length
@@ -411,8 +655,19 @@ function HistoryTab({ movements, metrics }: { movements: YardMovement[]; metrics
       <MiniStat icon={MoveRight} label="Di chuyển" value={move} note="MOVE" tone="cyan" />
       <MiniStat icon={Truck} label="Xuất bãi" value={remove} note="REMOVE" tone="amber" />
     </div>
+    <div className={`${panel} grid gap-1 p-2 md:grid-cols-4`}>
+      <input value={componentQuery} onChange={(event) => setComponentQuery(event.target.value)} className="h-9 rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-500" placeholder="Lọc cấu kiện" />
+      <input value={locationQuery} onChange={(event) => setLocationQuery(event.target.value)} className="h-9 rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none placeholder:text-slate-500" placeholder="Lọc vị trí / zone" />
+      <select value={typeQuery} onChange={(event) => setTypeQuery(event.target.value)} className="h-9 rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none">
+        <option value="">Tất cả loại</option>
+        <option value="PLACE">Nhập bãi</option>
+        <option value="MOVE">Di chuyển</option>
+        <option value="REMOVE">Xuất bãi</option>
+      </select>
+      <input value={dateQuery} onChange={(event) => setDateQuery(event.target.value)} type="date" className="h-9 rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none" />
+    </div>
     <div className="grid gap-1 xl:grid-cols-[1fr_320px]">
-      <MovementTable movements={movements} title="Lịch sử bãi" />
+      <MovementTable movements={filteredMovements} title="Lịch sử bãi" />
       <div className="space-y-1">
         <div className={`${panel} p-4`}>
           <h2 className="text-sm font-semibold">Phân bổ sự kiện</h2>
@@ -463,10 +718,6 @@ export function YardTabWorkspace({
   onCreateSlot?: (zoneId?: string) => void
   onOpenOperation: (mode: YardOperationMode) => void
 }) {
-  if (tab === 'inbound' || tab === 'outbound' || tab === 'transfer') {
-    return <OperationTab mode={tab} slots={slots} metrics={metrics} movements={movements} cranes={cranes} onOpenOperation={onOpenOperation} />
-  }
-
   if (tab === 'overview') {
     return <YardOverviewTab
       slots={slots}
@@ -485,46 +736,43 @@ export function YardTabWorkspace({
     />
   }
 
-  if (tab === 'qc') return <QCTab slots={slots} movements={movements} />
-  if (tab === 'history') return <HistoryTab movements={movements} metrics={metrics} />
+  if (tab === 'map-2d') {
+    return <YardMap2DTab
+      zones={zones}
+      slots={slots}
+      selectedZoneId={selectedZoneId}
+      selectedPlacementId={selectedPlacementId}
+      onSelectZone={onSelectZone}
+      onOpenZoneDetail={onOpenZoneDetail}
+      onEditZone={onEditZone}
+      onDeleteZone={onDeleteZone}
+      onCreateZone={onCreateZone}
+      onCreateSlot={onCreateSlot}
+    />
+  }
 
   if (tab === 'map-3d') {
     return <div className={`${panel} p-3`}>
       <div className="mb-3 flex justify-between">
-        <div><h2 className="text-sm font-semibold">Sơ đồ 3D toàn bãi</h2><p className="mt-1 text-[11px] text-slate-500">Phóng to để kiểm tra cấu kiện, cầu trục và tầng xếp.</p></div>
-        <span className="text-xs text-cyan-300 font-mono">{slots.length} vị trí</span>
+        <div>
+          <h2 className="text-sm font-semibold">Bản đồ 3D bãi</h2>
+          <p className="mt-1 text-[11px] text-slate-500">Khôi phục YardOperationalMap3D: zone → slot → stack level → cấu kiện 3D.</p>
+        </div>
+        <span className="text-xs text-cyan-300 font-mono">{formatQuantity(slots.length, 0)} runtime slots</span>
       </div>
-      <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ 3D..." variant="analytics" />}>
+      <Suspense fallback={<ModuleLoadingState label="Đang tải bản đồ 3D..." variant="analytics" />}>
         <YardOperationalMap3D slots={slots} selectedSlotId={selectedSlotId} />
       </Suspense>
     </div>
   }
 
-  return <div className="space-y-1">
-    <div className={`${panel} p-3`}>
-      <div className="mb-3 flex justify-between">
-        <div><h2 className="text-sm font-semibold">Sơ đồ zone vận hành</h2><p className="mt-1 text-[11px] text-slate-500">Cụm zone → ô vị trí → tầng chứa cấu kiện.</p></div>
-        <span className="text-xs text-cyan-300 font-mono">{slots.length} vị trí</span>
-      </div>
-      <Suspense fallback={<ModuleLoadingState label="Đang tải sơ đồ 2D..." variant="analytics" />}>
-        <YardOperationalMap2D zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} onOpenZoneDetail={onOpenZoneDetail} onEditZone={onEditZone} onDeleteZone={onDeleteZone} onCreateZone={onCreateZone} onCreateSlot={onCreateSlot} />
-      </Suspense>
-    </div>
-    <div className="grid gap-1 lg:grid-cols-3">
-      <SelectedZoneInsight slots={slots} zoneId={selectedZoneId} />
-      <ZoneUtilization metrics={metrics} />
-      <RecentActivities movements={movements} />
-      <div className={`${panel} p-3 flex flex-col gap-y-1`}>
-        <h2 className="text-sm font-semibold text-slate-200">Cầu trục / thiết bị</h2>
-        <div className="mt-1 space-y-1">
-          {cranes.slice(0, 5).map((crane) => <div key={crane.id} className="grid grid-cols-[72px_1fr_45px] items-center gap-1 text-xs">
-            <span className="text-cyan-300 font-mono">{crane.code}</span>
-            <ProgressBar value={crane.utilization ?? 0} tone={(crane.utilization ?? 0) > 80 ? 'bg-red-500' : 'bg-blue-500'} />
-            <span className="text-right font-mono tabular-nums">{crane.utilization ?? 0}%</span>
-          </div>)}
-          {!cranes.length && <p className="text-xs text-slate-500 py-1">Chưa cấu hình cầu trục.</p>}
-        </div>
-      </div>
-    </div>
-  </div>
+  if (tab === 'locations') return <YardLocationsTab slots={slots} movements={movements} metrics={metrics} />
+  if (tab === 'components') return <YardComponentsTab slots={slots} />
+  if (tab === 'dispatch') return <YardDispatchTab slots={slots} movements={movements} metrics={metrics} />
+  if (tab === 'tracking') return <YardTrackingTab zones={zones} slots={slots} movements={movements} />
+  if (tab === 'heatmap') return <YardHeatmapTab slots={slots} metrics={metrics} />
+  if (tab === 'timeline') return <YardTimelineTab movements={movements} />
+  if (tab === 'history') return <HistoryTab movements={movements} metrics={metrics} />
+
+  return <YardMap2DTab zones={zones} slots={slots} selectedZoneId={selectedZoneId} selectedPlacementId={selectedPlacementId} onSelectZone={onSelectZone} />
 }

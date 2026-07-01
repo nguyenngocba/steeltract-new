@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CircleDollarSign, RefreshCw, ShieldX, TriangleAlert, ClipboardList, PackageCheck, ArrowRight } from 'lucide-react'
+import { CircleDollarSign, RefreshCw, RotateCcw, ShieldX, TriangleAlert, ClipboardList, PackageCheck, ArrowRight } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
@@ -170,6 +170,57 @@ function num(v: any) {
 }
 function formatCurrency(v: any) {
   return formatCurrencyVnd(num(v))
+}
+
+function transactionMetadata(transaction: any) {
+  if (!transaction?.note || typeof transaction.note !== 'string') return null
+  try {
+    return JSON.parse(transaction.note)
+  } catch {
+    return null
+  }
+}
+
+function isProjectReturnTransaction(transaction: any) {
+  const meta = transactionMetadata(transaction)
+  return (
+    meta?.source === 'PROJECT_RETURN' ||
+    String(transaction?.referenceModule ?? '').toLowerCase() === 'return-workflow'
+  ) && String(transaction?.type ?? '').toUpperCase() === 'RETURN'
+}
+
+function transactionTypeLabel(transaction: any) {
+  if (isProjectReturnTransaction(transaction)) return 'Trả từ công trình'
+  const type = String(transaction?.type ?? '').toUpperCase()
+  if (type === 'IMPORT' || type === 'INBOUND') return 'Nhập kho'
+  if (type === 'EXPORT' || type === 'OUTBOUND') return 'Xuất kho'
+  if (type === 'TRANSFER') return 'Điều chuyển'
+  if (type === 'RETURN') return 'Trả kho'
+  if (type === 'ADJUSTMENT') return 'Điều chỉnh'
+  return type || '-'
+}
+
+function transactionObjectLabel(transaction: any) {
+  const meta = transactionMetadata(transaction)
+  if (isProjectReturnTransaction(transaction)) {
+    const project = meta?.projectCode || meta?.projectName
+      ? `${meta?.projectCode ?? ''}${meta?.projectCode && meta?.projectName ? ' · ' : ''}${meta?.projectName ?? ''}`
+      : transaction?.projectName
+    return [
+      project ? `← Công trình ${project}` : null,
+      meta?.returnNo ? `Phiếu ${meta.returnNo}` : transaction?.referenceId ? `Phiếu ${transaction.referenceId}` : null,
+    ].filter(Boolean).join(' · ') || 'Trả từ công trình'
+  }
+  return transaction?.supplierName ?? transaction?.projectName ?? '-'
+}
+
+function ProjectReturnBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-200">
+      <RotateCcw size={12} />
+      PROJECT RETURN
+    </span>
+  )
 }
 
 export function InventoryTransactionsPage() {
@@ -477,7 +528,12 @@ export function InventoryTransactionsPage() {
                       return (
                         <tr key={x.id} className={inventoryTableRow}>
                           <td className="px-3 py-1.5">{formatDateTime(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-3 py-1.5">{x.type}</td>
+                          <td className="px-3 py-1.5">
+                            <div className="flex flex-col gap-1">
+                              <span>{transactionTypeLabel(x)}</span>
+                              {isProjectReturnTransaction(x) ? <ProjectReturnBadge /> : null}
+                            </div>
+                          </td>
                           <td className="px-3 py-1.5">
                             <button type="button" onClick={() => setSelectedTransactionId(x.id)} className="font-semibold text-cyan-300 hover:text-cyan-100">
                               {x.transactionNo}
@@ -501,10 +557,10 @@ export function InventoryTransactionsPage() {
                           <td className="px-3 py-1.5">{line?.inventoryItem?.code ?? '-'}</td>
                           <td className="px-3 py-1.5">{line?.inventoryItem?.name ?? '-'}</td>
                           <td className="px-3 py-1.5">{line?.zone?.code ?? '-'}</td>
-                          <td className="px-3 py-1.5">{formatQuantity(Math.abs(num(line?.quantity)), 0)}</td>
+                          <td className="px-3 py-1.5">{`${isProjectReturnTransaction(x) ? '+' : ''}${formatQuantity(Math.abs(num(line?.quantity)), 0)}`}</td>
                           <td className="px-3 py-1.5">{formatCurrency(line?.unitPrice)}</td>
                           <td className="px-3 py-1.5">{formatCurrency(Math.abs(num(line?.totalAmount)))}</td>
-                          <td className="px-3 py-1.5">{x.supplierName ?? x.projectName ?? '-'}</td>
+                          <td className="px-3 py-1.5">{transactionObjectLabel(x)}</td>
                           <td className="px-3 py-1.5">{x.createdBy ?? 'Admin'}</td>
                           <td className="px-3 py-1.5">
                             <span className={`rounded border px-2 py-0.5 text-xs ${
@@ -538,7 +594,7 @@ export function InventoryTransactionsPage() {
                     <span className="truncate text-cyan-300">{x.transactionNo}</span>
                     <span className="shrink-0 text-[11px] text-slate-500">📎 {formatQuantity(attachmentCountForTransaction(x.id), 0)}</span>
                   </div>
-                  <div className="text-slate-400">{x.type}</div>
+                  <div className="text-slate-400">{transactionTypeLabel(x)}</div>
                 </div>
               ))}
             </InventoryChartCard>
@@ -569,12 +625,15 @@ function InventoryTransactionDetailDrawer({
   const [activeTab, setActiveTab] = useState<'overview' | 'attachments'>('overview')
   const items = Array.isArray(transaction?.items) ? transaction.items : []
   const attachmentPreview = attachments.slice(0, 3)
+  const meta = transactionMetadata(transaction)
+  const isProjectReturn = isProjectReturnTransaction(transaction)
+  const totalQty = items.reduce((sum: number, line: any) => sum + Math.abs(num(line.quantity)), 0)
 
   return (
     <ModuleDetailDrawer
       open={open}
       title={transaction?.transactionNo ?? 'Chi tiết giao dịch'}
-      subtitle={`${transaction?.type ?? '-'} · ${transaction?.transactionDate ? formatDateTime(transaction.transactionDate) : '-'} · ${formatQuantity(attachments.length, 0)} tài liệu`}
+      subtitle={`${transactionTypeLabel(transaction)} · ${transaction?.transactionDate ? formatDateTime(transaction.transactionDate) : '-'} · ${formatQuantity(attachments.length, 0)} tài liệu`}
       onClose={onClose}
       widthClass="max-w-5xl"
     >
@@ -592,10 +651,20 @@ function InventoryTransactionDetailDrawer({
           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
             <div className="grid gap-2 text-sm md:grid-cols-2">
               <InfoLine label="Số chứng từ" value={transaction?.transactionNo ?? '-'} />
-              <InfoLine label="Loại giao dịch" value={transaction?.type ?? '-'} />
-              <InfoLine label="Đối tượng" value={transaction?.supplierName ?? transaction?.projectName ?? '-'} />
+              <InfoLine label="Loại giao dịch" value={transactionTypeLabel(transaction)} />
+              <InfoLine label="Đối tượng" value={transactionObjectLabel(transaction)} />
               <InfoLine label="Ngày giao dịch" value={transaction?.transactionDate ? formatDateTime(transaction.transactionDate) : '-'} />
             </div>
+            {isProjectReturn ? (
+              <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                <InfoLine label="Nguồn" value={`Công trình ${meta?.projectCode ?? ''}${meta?.projectName ? ` · ${meta.projectName}` : transaction?.projectName ? ` · ${transaction.projectName}` : ''}`.trim()} />
+                <InfoLine label="Phiếu" value={meta?.returnNo ?? transaction?.referenceId ?? '-'} />
+                <InfoLine label="Task" value={meta?.taskName ?? '-'} />
+                <InfoLine label="Người trả" value={transaction?.performedBy ?? '-'} />
+                <InfoLine label="Số lượng" value={`+${formatQuantity(totalQty)}`} />
+                <InfoLine label="Ngày" value={transaction?.transactionDate ? formatDateTime(transaction.transactionDate) : '-'} />
+              </div>
+            ) : null}
             <div className="mt-3 overflow-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-white/[0.06] text-xs uppercase text-slate-400">

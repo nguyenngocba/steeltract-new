@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Edit3, Eye, Layers3, MapPinned, Package, Power, PowerOff, Trash2, Warehouse, X } from 'lucide-react'
@@ -6,18 +6,20 @@ import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
+import { moduleMutedButton } from '@/shared/ui/modules'
 import {
   CompactDonutSummary,
   HorizontalBars,
   InventoryPanel,
   inventoryInput,
   inventoryTableRow,
+  inventoryMutedButton,
 } from '../../components/InventoryVisuals'
 import { CockpitChartCard, CockpitKpiCard, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { activateZone, createZone, deactivateZone, deleteZone, getZoneDetail, updateZone, type WarehouseLocation, type WarehouseLocationDetail } from '../../api/zones.api'
 import { useZones } from '../../hooks/useZones'
 import { useWarehouses } from '../../hooks/useWarehouses'
-import { formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 5
 const LOCATION_ROWS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -129,6 +131,68 @@ function formatShortCurrency(value: number) {
   }
   return formatCurrency(value)
 }
+function LocationsPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const safePageCount = Math.max(1, pageCount)
+  const safePage = Math.min(Math.max(1, page), safePageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  const windowSize = 5
+  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
+  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
+
+  return (
+    <div className="grid grid-cols-1 items-center gap-1 px-4 py-1 text-xs text-slate-400 md:grid-cols-3">
+      <div>
+        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
+      </div>
+      <div className="flex justify-center gap-2">
+        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
+        {pages.map((pageNo) => (
+          <button
+            key={pageNo}
+            onClick={() => onPageChange(pageNo)}
+            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
+              safePage === pageNo
+                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
+            }`}
+          >
+            {pageNo}
+          </button>
+        ))}
+        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
+      </div>
+      <div className="flex justify-start gap-2 md:justify-end">
+        <button
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(Math.max(1, safePage - 1))}
+          className={inventoryMutedButton}
+        >
+          Trước
+        </button>
+        <button
+          disabled={safePage >= safePageCount}
+          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
+          className={inventoryMutedButton}
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function VerticalBarChart({
   data,
@@ -137,7 +201,7 @@ function VerticalBarChart({
 }) {
   const max = Math.max(1, ...data.map((d) => d.value))
   return (
-    <div className={`flex ${COCKPIT_HEIGHTS.CHART_BODY_115} items-end justify-around gap-2 pt-2 px-1`}>
+    <div className={`flex h-[115px] items-end justify-around gap-2 pt-2 px-1`}>
       {data.map((item, idx) => {
         const percent = (item.value / max) * 100
         return (
@@ -311,13 +375,14 @@ export function InventoryLocationsPage() {
   const [form, setForm] = useState<LocationForm | null>(null)
   const [detailId, setDetailId] = useState('')
   const [selectedSlot, setSelectedSlot] = useState<SlotMaterialView | null>(null)
-  const [modalType, setModalType] = useState<'value' | 'maxStock' | 'recentInbound' | 'recentOutbound' | null>(null)
+  const [modalType, setModalType] = useState<'value' | 'maxStock' | 'recentInbound' | 'recentOutbound' | 'topMaterials' | 'zoneCapacity' | null>(null)
   const { data: detail } = useQuery({
     queryKey: ['inventory-zone-detail', detailId],
     queryFn: () => getZoneDetail(detailId),
     enabled: Boolean(detailId),
   })
 
+  // ========== 1. RECENT INBOUND / OUTBOUND DATA ==========
   const recentInboundData = useMemo(() => {
     const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
     return txRows
@@ -334,6 +399,8 @@ export function InventoryLocationsPage() {
           code: firstItem?.inventoryItem?.code ?? 'N/A',
           name: firstItem?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
           quantity: n(firstItem?.quantity),
+          slot: firstItem?.slot?.code ?? firstItem?.slotId ?? '-',
+          level: firstItem?.level ?? '-',
         }
       })
   }, [transactionsData])
@@ -354,6 +421,8 @@ export function InventoryLocationsPage() {
           code: firstItem?.inventoryItem?.code ?? 'N/A',
           name: firstItem?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
           quantity: Math.abs(n(firstItem?.quantity)),
+          slot: firstItem?.slot?.code ?? firstItem?.slotId ?? '-',
+          level: firstItem?.level ?? '-',
         }
       })
   }, [transactionsData])
@@ -541,9 +610,7 @@ export function InventoryLocationsPage() {
       })
     })
 
-    const list = Array.from(map.values())
-      .sort((a, b) => b.stock - a.stock)
-
+    const list = Array.from(map.values()).sort((a, b) => b.stock - a.stock)
     const maxStock = list[0]?.stock || 1
 
     return list.map((item) => ({
@@ -553,8 +620,8 @@ export function InventoryLocationsPage() {
     }))
   }, [slotViews])
 
-  const zoneCapacityDist = useMemo(() => {
-    return rows.map((zone) => {
+  const zoneCapacityDist = useMemo(() => rows
+    .map((zone) => {
       const zoneSlots = slotViews.filter((slot) => slot.zoneCode === zone.code).length
       const stock = n(zone.totalStockQuantity)
       const capacity = n(zone.capacity)
@@ -567,8 +634,29 @@ export function InventoryLocationsPage() {
         occupiedSlots: zoneSlots,
       }
     })
-    .sort((a, b) => b.stock - a.stock)
-  }, [rows, slotViews])
+    .sort((a, b) => b.stock - a.stock), [rows, slotViews])
+
+  const [modalPage, setModalPage] = useState(1)
+  const modalPageSize = 16
+
+  const modalData = useMemo(() => {
+    if (modalType === 'recentInbound') return recentInboundData
+    if (modalType === 'recentOutbound') return recentOutboundData
+    if (modalType === 'topMaterials') return topMaterialsFromSlots
+    if (modalType === 'zoneCapacity') return zoneCapacityDist
+    return []
+  }, [modalType, recentInboundData, recentOutboundData, topMaterialsFromSlots, zoneCapacityDist])
+
+  const pagedModalData = useMemo(() => {
+    const start = (modalPage - 1) * modalPageSize
+    return modalData.slice(start, start + modalPageSize)
+  }, [modalData, modalPage])
+
+  const totalModalPages = Math.max(1, Math.ceil(modalData.length / modalPageSize))
+
+  useEffect(() => {
+    setModalPage(1)
+  }, [modalType, modalData])
 
   const previewValueByLocation = useMemo(() => {
     return valueByLocation.slice().sort((a, b) => b.value - a.value).slice(0, 5)
@@ -998,109 +1086,258 @@ export function InventoryLocationsPage() {
         </div>
       </InventoryPanel>
 
-      {/* Row 1 Grid */}
+            {/* Row 1 Grid */}
       <div className="grid grid-cols-12 gap-1">
-        {/* Vị trí kho */}
-         <LocationsChartCard title="Danh sách vị trí kho" heightClass={COCKPIT_HEIGHTS.CHART_XL} className="col-span-12 2xl:col-span-9">
-          <div className="flex flex-col h-full justify-between">
-            <div className="overflow-auto scrollbar-none flex-1">
-              <table className="w-full text-[14px] text-left">
-                <thead>
-                  <tr className="border-b border-white/10 text-slate-400 text-xs font-semibold">
-                    <th className="py-2 px-1">Kho</th>
-                    <th className="py-2 px-1">Zone</th>
-                    <th className="py-2 px-1 text-center">Slot</th>
-                    <th className="py-2 px-1 text-center">Tầng</th>
-                    <th className="py-2 px-1 text-right">Khối lượng</th>
-                    <th className="py-2 px-1 text-right">Số vật tư</th>
-                    <th className="py-2 px-1 text-center">Trạng thái</th>
-                    <th className="py-2 px-1 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {pagedRows.map((zone) => {
-                    const status = !zone.active
-                      ? 'MAINTENANCE'
-                      : n(zone.totalStockQuantity) > 0
-                        ? 'USING'
-                        : 'EMPTY';
-
-                    return (
-                      <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
-                        <td className="py-2.5 px-1 text-slate-300 font-medium">
-                          {zone.warehouse?.code === 'MAIN'
-                            ? 'Kho chính'
-                            : zone.warehouse?.code === 'PRODUCTION'
-                              ? 'Kho sản xuất'
-                              : (zone.warehouse?.code || '-')}
-                        </td>
-                        <td className="py-2.5 px-1 font-semibold text-cyan-300">{zone.code}</td>
-                        <td className="py-2.5 px-1 text-center text-slate-200">{zone.column || '-'}</td>
-                        <td className="py-2.5 px-1 text-center text-slate-200">{zone.level || '-'}</td>
-                        <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
-                          {formatQuantity(n(zone.totalStockQuantity), 1)} tấn
-                        </td>
-                        <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
-                          {formatQuantity(n(zone.materialCount), 0)}
-                        </td>
-                        <td className="py-2.5 px-1 text-center">
-                          {status === 'MAINTENANCE' && (
-                            <span className="border border-amber-400/30 bg-amber-500/10 text-amber-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                              Bảo trì
-                            </span>
-                          )}
-                          {status === 'USING' && (
-                            <span className="border border-cyan-400/30 bg-cyan-500/10 text-cyan-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                              Đang dùng
-                            </span>
-                          )}
-                          {status === 'EMPTY' && (
-                            <span className="border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                              Trống
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-1" onClick={(event) => event.stopPropagation()}>
-                          <div className="flex justify-center gap-1">
-                            <button type="button" title="Chi tiết" onClick={() => setDetailId(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Eye size={12} /></button>
-                            <button type="button" title="Sửa" onClick={() => edit(zone)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Edit3 size={12} /></button>
-                            <button type="button" title={zone.active ? 'Ngưng dùng' : 'Kích hoạt'} onClick={() => zone.active ? deactivateMutation.mutate(zone.id) : activateMutation.mutate(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200">
-                              {zone.active ? <PowerOff size={12} /> : <Power size={12} />}
-                            </button>
-                            <button type="button" title="Xóa" onClick={() => deleteMutation.mutate(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Trash2 size={12} /></button>
-                          </div>
-                        </td>
+        {/* Cột trái: Danh sách vị trí + 4 card dưới */}
+        <div className="col-span-12 2xl:col-span-9 flex flex-col gap-1">
+          {/* Bảng danh sách vị trí */}
+          <LocationsChartCard title="Danh sách vị trí kho" heightClass="h-[350px]">
+            <div className="flex flex-col h-full justify-between">
+              <div className="overflow-auto scrollbar-none flex-1">
+                <table className="w-full text-[14px] text-left">
+                  <thead className="bg-white/[0.06]">
+                      <tr className="border-b border-white/10 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
+                        <th className="py-2 px-3 text-left">Kho</th>
+                        <th className="py-2 px-3 text-left">Vị trí</th>
+                        <th className="py-2 px-3 text-center">Slot</th>
+                        <th className="py-2 px-3 text-center">Tầng</th>
+                        <th className="py-2 px-3 text-right">Khối lượng</th>
+                        <th className="py-2 px-3 text-right">Số vật tư</th>
+                        <th className="py-2 px-3 text-center">Trạng thái</th>
+                        <th className="py-2 px-3 text-center">Thao tác</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-1 shrink-0">
-              <DataTablePagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            </div>
-          </div>
-        </LocationsChartCard>
+                    </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {pagedRows.map((zone) => {
+                      const status = !zone.active
+                        ? 'MAINTENANCE'
+                        : n(zone.totalStockQuantity) > 0
+                          ? 'USING'
+                          : 'EMPTY';
 
-        {/* Right column: Stacked vertical sidebar */}
-         <div className="col-span-12 2xl:col-span-3 flex flex-col gap-1">
-          {/* Hiệu suất sức chứa */}
-          <LocationsChartCard title="Hiệu suất sức chứa" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-            <div className="pt-1">
-              <CompactDonutSummary
-                segments={[
-                  { label: 'Đang dùng', value: occupiedSlots, color: '#06b6d4' },
-                  { label: 'Trống', value: freeSlots, color: '#10b981' },
-                  { label: 'Bảo trì', value: maintenanceSlots, color: '#f59e0b' },
-                ]}
-                centerValue={`${occupancyPercent.toFixed(0)}%`}
-                centerLabel="Đã sử dụng"
-              />
+                      return (
+                        <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
+                          <td className="py-2.5 px-1 text-slate-300 font-medium">
+                            {zone.warehouse?.code === 'MAIN'
+                              ? 'Kho chính'
+                              : zone.warehouse?.code === 'PRODUCTION'
+                                ? 'Kho sản xuất'
+                                : (zone.warehouse?.code || '-')}
+                          </td>
+                          <td className="py-2.5 px-1 font-semibold text-cyan-300">{zone.code}</td>
+                          <td className="py-2.5 px-1 text-center text-slate-200">{zone.column || '-'}</td>
+                          <td className="py-2.5 px-1 text-center text-slate-200">{zone.level || '-'}</td>
+                          <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
+                            {formatQuantity(n(zone.totalStockQuantity), 1)} tấn
+                          </td>
+                          <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
+                            {formatQuantity(n(zone.materialCount), 0)}
+                          </td>
+                          <td className="py-2.5 px-1 text-center">
+                            {status === 'MAINTENANCE' && (
+                              <span className="border border-amber-400/30 bg-amber-500/10 text-amber-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                Bảo trì
+                              </span>
+                            )}
+                            {status === 'USING' && (
+                              <span className="border border-cyan-400/30 bg-cyan-500/10 text-cyan-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                Đang dùng
+                              </span>
+                            )}
+                            {status === 'EMPTY' && (
+                              <span className="border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                Trống
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-1" onClick={(event) => event.stopPropagation()}>
+                            <div className="flex justify-center gap-1">
+                              <button type="button" title="Chi tiết" onClick={() => setDetailId(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Eye size={12} /></button>
+                              <button type="button" title="Sửa" onClick={() => edit(zone)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Edit3 size={12} /></button>
+                              <button type="button" title={zone.active ? 'Ngưng dùng' : 'Kích hoạt'} onClick={() => zone.active ? deactivateMutation.mutate(zone.id) : activateMutation.mutate(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200">
+                                {zone.active ? <PowerOff size={12} /> : <Power size={12} />}
+                              </button>
+                              <button type="button" title="Xóa" onClick={() => deleteMutation.mutate(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Trash2 size={12} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-1 shrink-0">
+                <LocationsPagination
+                  page={page}
+                  pageCount={Math.ceil(rows.length / PAGE_SIZE)}
+                  total={rows.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPage}
+                />
+              </div>
             </div>
           </LocationsChartCard>
 
-          {/* Trạng thái vị trí */}
-          <LocationsChartCard title="Trạng thái vị trí" heightClass={COCKPIT_HEIGHTS.CHART_SM_ALT}>
+          {/* 4 card dưới: chia 2 cột, 2 hàng */}
+          <div className="grid grid-cols-2 gap-1">
+            {/* Hàng 1: Nhập gần nhất | Xuất gần nhất */}
+            <LocationsChartCard
+              title="Vật tư nhập gần nhất"
+              heightClass="h-[220px]"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setModalType('recentInbound')}
+                  className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                >
+                  Xem tất cả
+                </button>
+              }
+            >
+              {previewRecentInbound.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
+              ) : (
+                <div className="space-y-0.5">
+                  {previewRecentInbound.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[100px_90px_1fr_70px_70px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
+                      <div className="text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</div>
+                      <div className="truncate font-medium text-cyan-300">{item.code}</div>
+                      <div className="truncate text-slate-300" title={item.name}>{item.name}</div>
+                      <div className="text-right text-white">{formatQuantity(item.quantity, 1)} tấn</div>
+                      <div className="text-right text-emerald-300">Đã nhập</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </LocationsChartCard>
+
+            <LocationsChartCard
+              title="Vật tư xuất gần nhất"
+              heightClass="h-[220px]"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setModalType('recentOutbound')}
+                  className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                >
+                  Xem tất cả
+                </button>
+              }
+            >
+              {previewRecentOutbound.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
+              ) : (
+                <div className="space-y-0.5">
+                  {previewRecentOutbound.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[100px_90px_1fr_70px_70px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
+                      <div className="text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</div>
+                      <div className="truncate font-medium text-blue-300">{item.code}</div>
+                      <div className="truncate text-slate-300" title={item.name}>{item.name}</div>
+                      <div className="text-right text-white">{formatQuantity(item.quantity, 1)} tấn</div>
+                      <div className="text-right text-red-400">Đã xuất</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </LocationsChartCard>
+
+            {/* Hàng 2: Tồn nhiều nhất | Phân bố sức chứa */}
+            <LocationsChartCard
+              title="Vật tư tồn nhiều nhất"
+              heightClass="h-[240px]"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setModalType('topMaterials')}
+                  className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                >
+                  Xem tất cả
+                </button>
+              }
+            >
+              <div className="space-y-1 pt-1">
+                {previewTopMaterials.map((item) => (
+                  <div key={item.code}>
+                    <div className="flex items-center justify-between text-xs mb-0.5">
+                      <span className="font-semibold text-cyan-300">{item.code} <span className="text-slate-400 font-normal ml-1 truncate max-w-[120px] inline-block align-bottom">{item.name}</span></span>
+                      <div className="flex items-center gap-1.5 font-mono">
+                        <span className="text-slate-200">{formatQuantity(item.stock, 0)} tấn</span>
+                        <span className="text-slate-500">·</span>
+                        <span className="text-emerald-300">{formatShortCurrency(item.value)}</span>
+                      </div>
+                    </div>
+                    <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
+                        style={{ width: `${item.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {previewTopMaterials.length === 0 && (
+                  <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu vật tư tồn kho</div>
+                )}
+              </div>
+            </LocationsChartCard>
+
+            <LocationsChartCard
+              title="Phân bố sức chứa theo kho"
+              heightClass="h-[240px]"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setModalType('zoneCapacity')}
+                  className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                >
+                  Xem tất cả
+                </button>
+              }
+            >
+              <div className="space-y-1 pt-1">
+                {previewZoneCapacity.map((zone) => {
+                  const percent = zone.capacity > 0 ? (zone.stock / zone.capacity) * 100 : 0
+                  return (
+                    <div key={zone.id}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium text-cyan-300 truncate max-w-[160px]" title={zone.name}>{zone.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 font-mono">{formatQuantity(zone.stock, 1)} / {formatQuantity(zone.capacity, 0)} tấn</span>
+                          <span className="text-emerald-400 font-semibold font-mono">({percent.toFixed(0)}%)</span>
+                          <span className="text-slate-500 font-mono">{zone.occupiedSlots} ô</span>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                          style={{ width: `${Math.min(100, percent)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+                {previewZoneCapacity.length === 0 && (
+                  <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu phân bố sức chứa</div>
+                )}
+              </div>
+            </LocationsChartCard>
+          </div>
+        </div>
+
+        {/* Cột phải: 3 cards nhỏ */}
+        <div className="col-span-12 2xl:col-span-3 flex flex-col gap-1">
+          <LocationsChartCard title="Hiệu suất sức chứa" heightClass="h-[170px]">
+            <CompactDonutSummary
+              segments={[
+                { label: 'Đang dùng', value: occupiedSlots, color: '#06b6d4' },
+                { label: 'Trống', value: freeSlots, color: '#10b981' },
+                { label: 'Bảo trì', value: maintenanceSlots, color: '#f59e0b' },
+              ]}
+              centerValue={`${occupancyPercent.toFixed(0)}%`}
+              centerLabel="Đã sử dụng"
+            />
+          </LocationsChartCard>
+
+          <LocationsChartCard title="Trạng thái vị trí" heightClass="h-[170px]">
             <VerticalBarChart
               data={[
                 { label: 'Đang dùng', value: zoneStatusStats.using, color: '#06b6d4' },
@@ -1110,8 +1347,7 @@ export function InventoryLocationsPage() {
             />
           </LocationsChartCard>
 
-          {/* Phân bố loại vật tư */}
-          <LocationsChartCard title="Phân bố loại vật tư" heightClass={COCKPIT_HEIGHTS.CHART_SM_ALT}>
+          <LocationsChartCard title="Phân bố loại vật tư" heightClass="h-[170px]">
             <CompactPieChart
               segments={[
                 { label: 'Vật tư chính', value: materialTypeDistribution.primary, color: '#3b82f6' },
@@ -1120,240 +1356,69 @@ export function InventoryLocationsPage() {
               ]}
             />
           </LocationsChartCard>
-        </div>
-      </div>
 
-      {/* Grid of the remaining charts */}
-      <div className="grid grid-cols-12 gap-1">
-        {/* Row 2 */}
-        <LocationsChartCard
-          title="Giá trị tồn theo vị trí"
-          heightClass={COCKPIT_HEIGHTS.PANEL_MD}
-          className="col-span-12 xl:col-span-6"
-          action={
-            <button
-              type="button"
-              onClick={() => setModalType('value')}
-              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
-            >
-              Xem tất cả
-            </button>
-          }
-        >
-          <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
-            <table className="w-full text-[11px] text-left">
-              <thead>
-                <tr className="border-b border-white/10 text-slate-400 font-medium">
-                  <th className="py-1 px-2">Kho</th>
-                  <th className="py-1 px-2 text-right">Giá trị</th>
-                  <th className="py-1 px-2 text-right">%</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {previewValueByLocation.map((item) => {
-                  const pct = inventoryValue > 0 ? (item.value / inventoryValue) * 100 : 0
-                  return (
-                    <tr key={item.code} className="hover:bg-white/5">
-                      <td className="py-1 px-2 font-medium text-cyan-300">{item.code}</td>
-                      <td className="py-1 px-2 text-right text-slate-200">{formatShortCurrency(item.value)}</td>
-                      <td className="py-1 px-2 text-right text-emerald-400 font-mono">{pct.toFixed(1)}%</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </LocationsChartCard>
+          {/* ===== CARD THỨ 4: TỔNG HỢP THEO KHO ===== */}
+          <LocationsChartCard title="Tổng hợp theo kho" heightClass="h-[170px]">
+            {(() => {
+              const warehouseSummary = rows.reduce((acc, zone) => {
+                const warehouseCode = zone.warehouse?.code || 'KHÁC'
+                const warehouseName = warehouseCode === 'MAIN' ? 'Kho chính' : warehouseCode === 'PRODUCTION' ? 'Kho sản xuất' : warehouseCode
+                if (!acc[warehouseName]) {
+                  acc[warehouseName] = { count: 0, stock: 0 }
+                }
+                acc[warehouseName].count += 1
+                acc[warehouseName].stock += n(zone.totalStockQuantity)
+                return acc
+              }, {} as Record<string, { count: number; stock: number }>)
 
-        <LocationsChartCard
-          title="Vị trí tồn kho cao nhất"
-          heightClass={COCKPIT_HEIGHTS.PANEL_MD}
-          className="col-span-12 xl:col-span-6"
-          action={
-            <button
-              type="button"
-              onClick={() => setModalType('maxStock')}
-              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
-            >
-              Xem tất cả
-            </button>
-          }
-        >
-          <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
-            <table className="w-full text-[11px] text-left">
-              <thead>
-                <tr className="border-b border-white/10 text-slate-400 font-medium">
-                  <th className="py-1 px-2">Vị trí</th>
-                  <th className="py-1 px-2 text-right">Khối lượng</th>
-                  <th className="py-1 px-2 text-right">%</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {previewStockByLocation.map(([code, stock]) => {
-                  const pct = stats.stock > 0 ? (stock / stats.stock) * 100 : 0
-                  return (
-                    <tr key={code} className="hover:bg-white/5">
-                      <td className="py-1 px-2 font-medium text-cyan-300">{code}</td>
-                      <td className="py-1 px-2 text-right text-slate-200">{formatQuantity(stock, 1)} tấn</td>
-                      <td className="py-1 px-2 text-right text-emerald-400 font-mono">{pct.toFixed(1)}%</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </LocationsChartCard>
+              const entries = Object.entries(warehouseSummary)
+              const maxStock = Math.max(1, ...entries.map(([, data]) => data.stock))
 
-        {/* Row 3 */}
-        <LocationsChartCard
-          title="Vật tư nhập gần nhất"
-          heightClass={COCKPIT_HEIGHTS.PANEL_SM}
-          className="col-span-12 xl:col-span-6"
-          action={
-            <button
-              type="button"
-              onClick={() => setModalType('recentInbound')}
-              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
-            >
-              Xem tất cả
-            </button>
-          }
-        >
-          {previewRecentInbound.length === 0 ? (
-            <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
-              <table className="w-full text-[11px] text-left">
-                <thead>
-                  <tr className="border-b border-white/10 text-slate-400 font-medium">
-                    <th className="py-1 px-2">Mã</th>
-                    <th className="py-1 px-2">Vật tư</th>
-                    <th className="py-1 px-2 text-right">Số lượng</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {previewRecentInbound.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-white/5">
-                      <td className="py-1 px-2 font-medium text-cyan-300">{item.code}</td>
-                      <td className="py-1 px-2 text-slate-300 truncate max-w-[120px]" title={item.name}>{item.name}</td>
-                      <td className="py-1 px-2 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </LocationsChartCard>
-
-        <LocationsChartCard
-          title="Vật tư xuất gần nhất"
-          heightClass={COCKPIT_HEIGHTS.PANEL_SM}
-          className="col-span-12 xl:col-span-6"
-          action={
-            <button
-              type="button"
-              onClick={() => setModalType('recentOutbound')}
-              className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
-            >
-              Xem tất cả
-            </button>
-          }
-        >
-          {previewRecentOutbound.length === 0 ? (
-            <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#08111f]/90 p-2">
-              <table className="w-full text-[11px] text-left">
-                <thead>
-                  <tr className="border-b border-white/10 text-slate-400 font-medium">
-                    <th className="py-1 px-2">Mã</th>
-                    <th className="py-1 px-2">Vật tư</th>
-                    <th className="py-1 px-2 text-right">Số lượng</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {previewRecentOutbound.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-white/5">
-                      <td className="py-1 px-2 font-medium text-cyan-300">{item.code}</td>
-                      <td className="py-1 px-2 text-slate-300 truncate max-w-[120px]" title={item.name}>{item.name}</td>
-                      <td className="py-1 px-2 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </LocationsChartCard>
-
-        {/* Row 4 */}
-        <LocationsChartCard title="Vật tư tồn nhiều nhất" heightClass={COCKPIT_HEIGHTS.CHART_RANK} className="col-span-12 xl:col-span-6">
-          <div className="space-y-1 pt-1">
-            {previewTopMaterials.map((item) => (
-              <div key={item.code}>
-                <div className="flex items-center justify-between text-xs mb-0.5">
-                  <span className="font-semibold text-cyan-300">{item.code} <span className="text-slate-400 font-normal ml-1 truncate max-w-[120px] inline-block align-bottom">{item.name}</span></span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    <span className="text-slate-200">{formatQuantity(item.stock, 0)} tấn</span>
-                    <span className="text-slate-500">·</span>
-                    <span className="text-emerald-300">{formatShortCurrency(item.value)}</span>
-                  </div>
-                </div>
-                <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
-                    style={{ width: `${item.percent}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            {previewTopMaterials.length === 0 && (
-              <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu vật tư tồn kho</div>
-            )}
-          </div>
-        </LocationsChartCard>
-
-        <LocationsChartCard title="Phân bố sức chứa theo kho" heightClass={COCKPIT_HEIGHTS.CHART_RANK} className="col-span-12 xl:col-span-6">
-          <div className="space-y-1 pt-1">
-            {previewZoneCapacity.map((zone) => {
-              const percent = zone.capacity > 0 ? (zone.stock / zone.capacity) * 100 : 0
               return (
-                <div key={zone.id}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-medium text-cyan-300 truncate max-w-[200px]" title={zone.name}>{zone.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-mono">{formatQuantity(zone.stock, 1)} / {formatQuantity(zone.capacity, 0)} tấn</span>
-                      <span className="text-emerald-400 font-semibold font-mono">({percent.toFixed(0)}%)</span>
-                      <span className="text-slate-500 font-mono">{zone.occupiedSlots} ô đang dùng</span>
-                    </div>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-                      style={{ width: `${Math.min(100, percent)}%` }}
-                    />
-                  </div>
+                <div className="space-y-1.5 pt-1">
+                  {entries.map(([name, data]) => {
+                    const percent = (data.stock / maxStock) * 100
+                    return (
+                      <div key={name}>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-300 truncate max-w-[100px]" title={name}>{name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-mono">{data.count} vị trí</span>
+                            <span className="text-cyan-300 font-mono font-semibold">{formatQuantity(data.stock, 1)} tấn</span>
+                          </div>
+                        </div>
+                        <div className="mt-0.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                            style={{ width: `${Math.max(4, percent)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {entries.length === 0 && (
+                    <div className="text-center text-xs text-slate-500 py-4">Chưa có dữ liệu kho</div>
+                  )}
                 </div>
               )
-            })}
-            {previewZoneCapacity.length === 0 && (
-              <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu phân bố sức chứa</div>
-            )}
-          </div>
-        </LocationsChartCard>
+            })()}
+          </LocationsChartCard>
+        </div>
       </div>
-    </div>
     {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
     {selectedSlot ? <SlotMaterialDrawer slot={selectedSlot} onClose={() => setSelectedSlot(null)} /> : null}
     {modalType && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
-        <div className="max-h-[70vh] w-full max-w-3xl overflow-auto rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between scrollbar-thin">
+        <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between scrollbar-thin">
           <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 shrink-0">
             <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
+              {modalType === 'recentInbound' && 'Toàn bộ nhập kho gần đây'}
+              {modalType === 'recentOutbound' && 'Toàn bộ xuất kho gần đây'}
               {modalType === 'value' && 'Giá trị tồn theo vị trí'}
               {modalType === 'maxStock' && 'Vị trí tồn kho cao nhất'}
-              {modalType === 'recentInbound' && 'Vật tư nhập gần nhất'}
-              {modalType === 'recentOutbound' && 'Vật tư xuất gần nhất'}
+              {modalType === 'topMaterials' && 'Vật tư tồn nhiều nhất'}
+              {modalType === 'zoneCapacity' && 'Phân bố sức chứa theo kho'}
             </h3>
             <button
               onClick={() => setModalType(null)}
@@ -1362,8 +1427,8 @@ export function InventoryLocationsPage() {
               Đóng
             </button>
           </div>
-          
           <div className="flex-1 overflow-auto">
+            {/* Giá trị tồn theo vị trí */}
             {modalType === 'value' && (
               <table className="w-full text-xs text-left">
                 <thead>
@@ -1412,63 +1477,193 @@ export function InventoryLocationsPage() {
               </table>
             )}
 
-            {modalType === 'recentInbound' && (
-              recentInboundData.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
-              ) : (
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
-                      <th className="py-2 px-3">Ngày</th>
-                      <th className="py-2 px-3">Mã</th>
-                      <th className="py-2 px-3">Tên</th>
-                      <th className="py-2 px-3 text-right">Số lượng</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {recentInboundData.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-white/5">
-                        <td className="py-2 px-3 text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</td>
-                        <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
-                        <td className="py-2 px-3 text-slate-200 max-w-[240px] truncate" title={item.name}>{item.name}</td>
-                        <td className="py-2 px-3 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
+            {/* Nhập/Xuất gần nhất */}
+            {(modalType === 'recentInbound' || modalType === 'recentOutbound') && (
+              <>
+                {modalData.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch</div>
+                ) : (
+                  <>
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                          <th className="py-2 px-3">Thời gian</th>
+                          <th className="py-2 px-3">Mã</th>
+                          <th className="py-2 px-3">Tên</th>
+                          <th className="py-2 px-3">Slot</th>
+                          <th className="py-2 px-3">Tầng</th>
+                          <th className="py-2 px-3 text-right">Số lượng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {pagedModalData.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-white/5">
+                            <td className="py-2 px-3 text-slate-400">{formatDateTime(item.date)}</td>
+                            <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
+                            <td className="py-2 px-3 text-slate-200 max-w-[240px] truncate" title={item.name}>{item.name}</td>
+                            <td className="py-2 px-3 text-slate-300">{item.slot}</td>
+                            <td className="py-2 px-3 text-slate-300">{item.level}</td>
+                            <td className="py-2 px-3 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {totalModalPages > 1 && (
+                      <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400 border-t border-white/10">
+                        <span>
+                          Hiển thị {(modalData.length > 0) ? ((modalPage - 1) * modalPageSize + 1) : 0}-
+                          {Math.min(modalPage * modalPageSize, modalData.length)}/{modalData.length} kết quả
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setModalPage((p) => Math.max(1, p - 1))}
+                            disabled={modalPage <= 1 || modalData.length === 0}
+                            className={inventoryMutedButton}
+                          >
+                            Trước
+                          </button>
+                          <span className="px-2 py-1 text-slate-300">{modalPage}/{totalModalPages}</span>
+                          <button
+                            onClick={() => setModalPage((p) => Math.min(totalModalPages, p + 1))}
+                            disabled={modalPage >= totalModalPages || modalData.length === 0}
+                            className={inventoryMutedButton}
+                          >
+                            Sau
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
+            {modalType === 'topMaterials' && (
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90">
+              {pagedModalData.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu vật tư tồn kho</div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto p-2">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                          <th className="py-2 px-3">Mã</th>
+                          <th className="py-2 px-3">Tên</th>
+                          <th className="py-2 px-3 text-right">Khối lượng (tấn)</th>
+                          <th className="py-2 px-3 text-right">Giá trị</th>
+                          <th className="py-2 px-3">Vị trí</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {pagedModalData.map((item) => (
+                          <tr key={item.code} className="hover:bg-white/5">
+                            <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
+                            <td className="py-2 px-3 text-slate-200">{item.name}</td>
+                            <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(item.stock, 1)}</td>
+                            <td className="py-2 px-3 text-right font-mono text-emerald-300">{formatShortCurrency(item.value)}</td>
+                            <td className="py-2 px-3 text-slate-400">{item.locationStr}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalModalPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400 border-t border-white/10">
+                      <span>
+                        Hiển thị {(modalData.length > 0) ? ((modalPage - 1) * modalPageSize + 1) : 0}-
+                        {Math.min(modalPage * modalPageSize, modalData.length)}/{modalData.length} kết quả
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalPage((p) => Math.max(1, p - 1))}
+                          disabled={modalPage <= 1 || modalData.length === 0}
+                          className={inventoryMutedButton}
+                        >
+                          Trước
+                        </button>
+                        <span className="px-2 py-1 text-slate-300">{modalPage}/{totalModalPages}</span>
+                        <button
+                          onClick={() => setModalPage((p) => Math.min(totalModalPages, p + 1))}
+                          disabled={modalPage >= totalModalPages || modalData.length === 0}
+                          className={inventoryMutedButton}
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
-            {modalType === 'recentOutbound' && (
-              recentOutboundData.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
+          {modalType === 'zoneCapacity' && (
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90">
+              {pagedModalData.length === 0 ? (
+                <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu phân bố sức chứa</div>
               ) : (
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
-                      <th className="py-2 px-3">Ngày</th>
-                      <th className="py-2 px-3">Mã</th>
-                      <th className="py-2 px-3">Tên</th>
-                      <th className="py-2 px-3 text-right">Số lượng</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {recentOutboundData.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-white/5">
-                        <td className="py-2 px-3 text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</td>
-                        <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
-                        <td className="py-2 px-3 text-slate-200 max-w-[240px] truncate" title={item.name}>{item.name}</td>
-                        <td className="py-2 px-3 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            )}
+                <>
+                  <div className="overflow-x-auto p-2">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                          <th className="py-2 px-3">Kho</th>
+                          <th className="py-2 px-3 text-right">Tồn (tấn)</th>
+                          <th className="py-2 px-3 text-right">Sức chứa (tấn)</th>
+                          <th className="py-2 px-3 text-right">Tỷ lệ</th>
+                          <th className="py-2 px-3 text-right">Ô đang dùng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {pagedModalData.map((zone) => {
+                          const percent = zone.capacity > 0 ? (zone.stock / zone.capacity) * 100 : 0
+                          return (
+                            <tr key={zone.id} className="hover:bg-white/5">
+                              <td className="py-2 px-3 font-medium text-cyan-300">{zone.name}</td>
+                              <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(zone.stock, 1)}</td>
+                              <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(zone.capacity, 1)}</td>
+                              <td className="py-2 px-3 text-right font-mono text-emerald-300">{percent.toFixed(0)}%</td>
+                              <td className="py-2 px-3 text-right text-slate-400">{zone.occupiedSlots}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalModalPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400 border-t border-white/10">
+                      <span>
+                        Hiển thị {(modalData.length > 0) ? ((modalPage - 1) * modalPageSize + 1) : 0}-
+                        {Math.min(modalPage * modalPageSize, modalData.length)}/{modalData.length} kết quả
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalPage((p) => Math.max(1, p - 1))}
+                          disabled={modalPage <= 1 || modalData.length === 0}
+                          className={inventoryMutedButton}
+                        >
+                          Trước
+                        </button>
+                        <span className="px-2 py-1 text-slate-300">{modalPage}/{totalModalPages}</span>
+                        <button
+                          onClick={() => setModalPage((p) => Math.min(totalModalPages, p + 1))}
+                          disabled={modalPage >= totalModalPages || modalData.length === 0}
+                          className={inventoryMutedButton}
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           </div>
         </div>
       </div>
     )}
+    </div>
   </EnterpriseModulePage>
 }
 
@@ -1915,9 +2110,9 @@ function LayeredSlotDetail({ detail }: { detail: WarehouseLocationDetail }) {
             {group.level}
           </button>)}
         </div>
-        <div className={`relative ${COCKPIT_HEIGHTS.LOCATION_MAP_MIN} overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40`}>
+        <div className={`relative min-h-[240px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40`}>
           <div className="absolute inset-x-8 bottom-8 h-8 rounded-[40%] bg-black/35 blur-md" />
-          <div className={`absolute left-1/2 top-10 ${COCKPIT_HEIGHTS.LOCATION_STACK} w-[360px] -translate-x-1/2`}>
+          <div className={`absolute left-1/2 top-10 h-[300px] w-[360px] -translate-x-1/2`}>
             {levelStats.map((group, index) => <button type="button" onClick={() => setSelectedLevel(group.level)} key={group.level} className="absolute left-0 w-full text-left" style={{ top: `${index * 58}px` }}>
               <div className={`relative h-14 skew-x-[-18deg] rounded-lg border transition ${
                 selectedLevel === group.level

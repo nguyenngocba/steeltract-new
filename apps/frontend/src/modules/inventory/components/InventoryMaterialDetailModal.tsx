@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, Building2, Clock, RefreshCw, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react';
+import { BarChart3, Building2, Clock, RefreshCw, RotateCcw, DollarSign, Download, Edit3, FileText, ImageIcon, MapPinned, Maximize2, Package, PackagePlus, Plus, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrencyVnd, formatDateTime, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format';
 import { API_BASE_URL } from '@/lib/api';
@@ -58,6 +58,16 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 
   { key: 'logs', label: 'Lịch sử' },
 ]
+
+function formatCompactCurrency(value: number): string {
+  if (value >= 1e9) {
+    return (value / 1e9).toFixed(1).replace('.', ',') + ' tỷ';
+  }
+  if (value >= 1e6) {
+    return (value / 1e6).toFixed(1).replace('.', ',') + ' triệu';
+  }
+  return formatCurrencyVnd(value);
+}
 
 function num(value: any) {
   const n = parseLocaleNumber(value)
@@ -207,6 +217,15 @@ function AttachmentCountChip({
     </button>
   )
 }
+function parseTransactionSource(source: string): { type: 'INBOUND' | 'OUTBOUND' | 'TRANSFER' | null; transactionNo: string | null } {
+  const inboundMatch = source.match(/^Inbound Transaction\s+(.+)/);
+  if (inboundMatch) return { type: 'INBOUND', transactionNo: inboundMatch[1] };
+  const outboundMatch = source.match(/^Outbound Transaction\s+(.+)/);
+  if (outboundMatch) return { type: 'OUTBOUND', transactionNo: outboundMatch[1] };
+  const transferMatch = source.match(/^Transfer Transaction\s+(.+)/);
+  if (transferMatch) return { type: 'TRANSFER', transactionNo: transferMatch[1] };
+  return { type: null, transactionNo: null };
+}
 
 function MaterialDocumentsPanel({
   rows,
@@ -218,59 +237,89 @@ function MaterialDocumentsPanel({
   return (
     <ModuleAnalyticsPanel title="Tài liệu vật tư" note={`${formatQuantity(rows.length, 0)} tài liệu theo nguồn phát sinh`}>
       {rows.length ? (
-        <ModuleDataGrid>
-          <div className="overflow-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead className={moduleTableHead}>
-                <tr>
-                  {['Tên file', 'Loại', 'Nguồn', 'Ngày tạo', 'Tải xuống'].map((header) => (
-                    <th key={header} className="px-3 py-3 text-left">{header}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const publicUrl = attachmentPublicUrl(row.attachment)
-                  return (
-                    <tr key={row.attachment.id} className={moduleTableRow}>
-                      <td className="max-w-[280px] px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => onOpen({
-                            title: attachmentDisplayName(row.attachment),
-                            subtitle: row.source,
-                            attachments: [row.attachment],
-                          })}
-                          className="flex max-w-full items-center gap-2 text-left font-semibold text-cyan-100 hover:text-cyan-50"
+        <div className="overflow-auto">
+          <table className="w-full min-w-[820px] text-sm table-fixed">
+            <colgroup>
+              <col className="w-[120px]" />
+              <col className="w-[220px]" />
+              <col className="w-[80px]" />
+              <col className="w-[200px]" />
+              <col className="w-[80px]" />
+              <col className="w-[100px]" />
+            </colgroup>
+            <thead className={moduleTableHead}>
+              <tr>
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Ngày tạo</th>
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Tên file</th>
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Loại</th>
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Nguồn</th>
+                <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Dung lượng</th>
+                <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Tải xuống</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const publicUrl = attachmentPublicUrl(row.attachment)
+                const parsed = parseTransactionSource(row.source)
+                return (
+                  <tr key={row.attachment.id} className={moduleTableRow}>
+                    <td className="px-2 py-1.5 text-slate-400">{row.sourceDate ? formatDateTime(row.sourceDate) : '-'}</td>
+                    <td className="px-2 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onOpen({
+                          title: attachmentDisplayName(row.attachment),
+                          subtitle: row.source,
+                          attachments: [row.attachment],
+                        })}
+                        className="flex w-full items-center gap-2 text-left font-semibold text-cyan-100 hover:text-cyan-50 truncate"
+                        title={attachmentDisplayName(row.attachment)}
+                      >
+                        <FileText size={14} className="shrink-0 text-cyan-300" />
+                        <span className="truncate">{attachmentDisplayName(row.attachment)}</span>
+                      </button>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <span className="rounded-lg border border-white/10 bg-white/[0.045] px-2 py-0.5 text-xs font-semibold text-slate-300">
+                        {row.attachment.category}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {parsed.type ? (
+                        <div className="flex items-center gap-2">
+                          <TransactionTypeBadge type={parsed.type} />
+                          <span className="text-sm font-semibold text-slate-200 truncate" title={parsed.transactionNo ?? ''}>
+                            {parsed.transactionNo}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-300">{row.source}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono tabular-nums text-slate-300">
+                      {formatFileSize(row.attachment.fileSize)}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {publicUrl ? (
+                        <a
+                          href={absoluteUploadUrl(publicUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded border border-cyan-400/20 bg-cyan-400/10 p-1.5 text-cyan-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/20 hover:text-cyan-200"
+                          title="Tải xuống"
                         >
-                          <FileText size={14} className="shrink-0 text-cyan-300" />
-                          <span className="truncate">{attachmentDisplayName(row.attachment)}</span>
-                        </button>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="rounded-lg border border-white/10 bg-white/[0.045] px-2 py-1 text-xs font-semibold text-slate-300">
-                          {row.attachment.category}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-slate-300">{row.source}</td>
-                      <td className="px-3 py-2 text-slate-400">{row.sourceDate ? formatDateTime(row.sourceDate) : '-'}</td>
-                      <td className="px-3 py-2">
-                        {publicUrl ? (
-                          <a href={absoluteUploadUrl(publicUrl)} target="_blank" rel="noreferrer" className={moduleMutedButton}>
-                            <Download size={14} />
-                            Tải xuống
-                          </a>
-                        ) : (
-                          <span className="text-xs text-slate-500">Không có URL</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </ModuleDataGrid>
+                          <Download size={14} />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-500">-</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <ModuleEmptyState icon={<FileText size={18} />} title="Chưa có tài liệu vật tư" description="Tài liệu sẽ xuất hiện theo nguồn: Master Material, giao dịch nhập/xuất, công trình hoặc nhà cung cấp." />
       )}
@@ -439,7 +488,7 @@ function InventoryMetricCard({
     <>
       <div className={`relative z-10 flex items-start justify-between gap-2 ${compact ? 'gap-1' : 'gap-3'}`}>
         <div className="min-w-0">
-          <div className={`truncate font-bold uppercase tracking-[0.12em] text-slate-400 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>{title}</div>
+          <div className={`truncate font-bold uppercase tracking-[0.12em] text-slate-400 ${compact ? 'text-[10px]' : 'text-[10px]'}`}>{title}</div>
           <div className={`mt-1 truncate font-semibold tracking-tight text-white ${compact ? 'text-sm' : 'text-xl'}`}>{value}</div>
           {note ? <div className={`mt-0.5 truncate font-semibold ${item.note} ${compact ? 'text-[9px]' : 'text-[11px]'}`}>{note}</div> : null}
         </div>
@@ -450,9 +499,9 @@ function InventoryMetricCard({
       <KpiSparkline values={trend} line={item.line} fill={item.fill} />
     </>
   );
-  const className = `relative overflow-hidden rounded-xl border bg-slate-950/45 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
-    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
-  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''} ${compact ? 'h-[120px] p-3' : 'h-[108px] p-3'}`;
+  const className = `relative overflow-hidden rounded-xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(10,20,40,0.85),rgba(5,10,25,0.75)_55%,rgba(15,25,50,0.65))] text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-cyan-400/[0.055] transition ${
+  active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
+} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''} ${compact ? 'h-[120px] p-3' : 'h-[108px] p-3'}`;
   if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>;
   return <section className={className}>{content}</section>;
 }
@@ -490,7 +539,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const unit = item.unit ?? fallback?.unit ?? fallback?.unitCode ?? ''
   const currentStock = num(detail?.currentStock ?? fallback?.currentStock ?? fallback?.quantity)
   const averageCost = num(detail?.averageCost ?? fallback?.averageCost)
-  const inventoryValue = num(fallback?.inventoryValue ?? detail?.inventoryValue ?? currentStock * averageCost)
+  const inventoryValue = num(detail?.inventoryValue ?? currentStock * averageCost)
   const minimumStock = num(item.minimumStock ?? fallback?.minimumStock)
   const materialUsageType = item.materialUsageType ?? fallback?.materialUsageType ?? 'PRIMARY'
   const inbound = detail?.inboundHistory ?? []
@@ -599,13 +648,17 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
   // BOM Usage (phân bố theo công trình)
   const bomUsage = useMemo(() => {
-    const map = new Map<string, number>()
+    const map = new Map<string, number>();
     projectRows.forEach((row) => {
-      const projectName = row.projectName ?? 'Khác'
-      map.set(projectName, (map.get(projectName) || 0) + num(row.quantity ?? row.issuedQty ?? 0))
-    })
+      const projectName = row.projectName ?? 'Khác';
+      // Sử dụng giá trị tuyệt đối để tránh dữ liệu âm
+      const qty = Math.abs(num(row.quantity ?? row.issuedQty ?? 0));
+      if (qty > 0) {
+        map.set(projectName, (map.get(projectName) || 0) + qty);
+      }
+    });
     if (!map.size) {
-      return [{ label: 'Chưa có dữ liệu', value: 1, color: '#334155' }]
+      return [{ label: 'No data', value: 1, color: '#334155' }];
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -614,8 +667,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
         label,
         value,
         color: ['#1d7cff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5],
-      }))
-  }, [projectRows])
+      }));
+  }, [projectRows]);
 
   // Phân trang cho Project rows
   const pagedProjectRows = useMemo(() => {
@@ -660,11 +713,11 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const inboundTrend = materialAnalytics.inboundTrend.slice(-6).map(d => d.value)
   const outboundTrend = materialAnalytics.outboundTrend.slice(-6).map(d => d.value)
   const valueTrend = materialAnalytics.inventoryTrend.slice(-6).map(d => d.value * averageCost)
-  const costTrend = Array.from({ length: 6 }, () => averageCost)
+  const costTrend = buildCostTrend(inbound, averageCost)
 
   // Tổng nhập/xuất gần đây
-  const totalInbound = transactionRows.filter(tx => tx.type === 'INBOUND').reduce((sum, tx) => sum + tx.quantity, 0)
-  const totalOutbound = transactionRows.filter(tx => tx.type === 'OUTBOUND').reduce((sum, tx) => sum + tx.quantity, 0)
+  const totalInbound = transactionRows.filter(tx => tx.type === 'INBOUND').reduce((sum, tx) => sum + Math.abs(tx.quantity), 0)
+  const totalOutbound = transactionRows.filter(tx => tx.type === 'OUTBOUND').reduce((sum, tx) => sum + Math.abs(tx.quantity), 0)
 
   // ===== 12. EFFECTS & HANDLERS =====
   useEffect(() => {
@@ -724,7 +777,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
         title={`${code} · ${name}`}
         subtitle={`${materialUsageLabel(materialUsageType)} · ${unit || 'Chưa có đơn vị'} · ${locationRows.length} vị trí lưu kho · ${formatQuantity(photoAttachments.length, 0)} ảnh · ${formatQuantity(documentSourceRows.length, 0)} tài liệu`}
         onClose={onClose}
-        widthClass="max-w-7xl"
+        size="lg"
         actions={onEdit ? (
           <button type="button" onClick={onEdit} className={moduleMutedButton}>
             <Edit3 size={14} />
@@ -815,7 +868,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
               {/* Cột phải: Tồn theo kho + Thông tin vật tư */}
               <div className="space-y-1">
                 <ModuleAnalyticsPanel title="Tồn theo kho" note="Phân tách kho chính và kho vật tư sản xuất">
-                  <div className="grid gap-3 md:grid-cols-[160px_1fr]">
+                  <div className="grid gap-3 md:grid-cols-[280px_1fr]">
                     <Donut
                       rows={[
                         { label: 'Kho chính', value: mainQty, color: '#22c55e' },
@@ -857,57 +910,90 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           )}
 
           {activeTab === 'transactions' && (
-            <div className="space-y-1 mt-1">
-              <DetailTable
-                title="Lịch sử giao dịch"
-                headers={['Mã giao dịch', 'Thời gian', 'Loại', 'Đối tượng', 'Số lượng', 'Giá trị', 'Tài liệu']}
-                rows={pagedTransactionRows.map((row) => {
-                  // Xác định màu chữ dựa trên loại giao dịch
-                  const isAdjustment = row.type === 'ADJUSTMENT';
-                  const colorClass = isAdjustment
-                    ? row.quantity >= 0
-                      ? 'text-emerald-400'
-                      : 'text-red-400'
-                    : row.type === 'INBOUND'
-                      ? 'text-emerald-400'
-                      : row.type === 'OUTBOUND'
-                        ? 'text-amber-400'
-                        : row.type === 'TRANSFER'
-                          ? 'text-purple-400'
-                          : 'text-slate-300';
+            <ModuleAnalyticsPanel title="Lịch sử giao dịch" note="Tổng hợp các giao dịch nhập/xuất" className="mt-1">
+              <div className="overflow-auto">
+                <table className="w-full min-w-[900px] text-sm table-fixed">
+                  <colgroup>
+                    <col className="w-[100px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[80px]" />
+                    <col className="w-[150px]" />
+                    <col className="w-[60px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[180px]" />
+                  </colgroup>
+                  <thead className="bg-white/[0.06] text-xs uppercase tracking-[0.08em] text-slate-400">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium">Thời gian</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Mã giao dịch</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Loại</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Đối tượng</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Số lượng</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Giá trị</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Tài liệu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedTransactionRows.map((row) => {
+                      const isAdjustment = row.type === 'ADJUSTMENT';
+                      const isProjectReturn = isProjectReturnReceived(row);
+                      const colorClass = isAdjustment
+                        ? row.quantity >= 0
+                          ? 'text-emerald-400'
+                          : 'text-red-400'
+                        : row.type === 'INBOUND' || isProjectReturn || row.type === 'RETURN'
+                          ? 'text-emerald-400'
+                          : row.type === 'OUTBOUND'
+                            ? 'text-amber-400'
+                            : row.type === 'TRANSFER'
+                              ? 'text-purple-400'
+                              : 'text-slate-300';
 
-                  const displayQty = isAdjustment
-                    ? `${row.quantity > 0 ? '+' : ''}${fmt(row.quantity)}`
-                    : fmt(Math.abs(row.quantity));
-                  return [
-                    row.transactionNo ?? '-',
-                    row.transactionDate ? formatDateTime(row.transactionDate) : '-',
-                    <TransactionTypeBadge
-                      key="type"
-                      type={row.type}
-                      isPositive={row.quantity >= 0}
-                    />,
-                    row.counterparty,
-                    <span className={`font-mono tabular-nums font-semibold ${colorClass}`}>
-                      {`${displayQty} ${unit}`.trim()}
-                    </span>,
-                    <span className={`font-mono tabular-nums font-semibold ${colorClass}`}>
-                      {money(row.totalAmount)}
-                    </span>,
-                    <AttachmentCountChip
-                      key="attachments"
-                      attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
-                      onOpen={() => setAttachmentContext({
-                        title: row.transactionNo ?? 'Tài liệu giao dịch',
-                        subtitle: transactionSourceLabel(row),
-                        attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
-                      })}
-                    />,
-                  ];
-                })}
-              />
+                      const displayQty = isAdjustment
+                        ? `${row.quantity > 0 ? '+' : ''}${fmt(row.quantity)}`
+                        : isProjectReturn || row.type === 'RETURN'
+                          ? `+${fmt(Math.abs(row.quantity))}`
+                          : fmt(Math.abs(row.quantity));
+                      return (
+                        <tr key={row.transactionNo || row.id} className="border-t border-white/10 hover:bg-white/[0.04]">
+                          <td className="truncate px-2 py-1.5 text-slate-300" title={row.transactionDate ? formatDateTime(row.transactionDate) : '-'}>
+                            {row.transactionDate ? formatDateTime(row.transactionDate) : '-'}
+                          </td>
+                          <td className="truncate px-2 py-1.5 text-cyan-300" title={row.transactionNo ?? '-'}>{row.transactionNo ?? '-'}</td>
+                          <td className="px-2 py-1.5"><TransactionTypeBadge row={row} type={row.type} isPositive={row.quantity >= 0} /></td>
+                          <td className="truncate px-2 py-1.5 text-slate-200" title={row.counterparty}>{row.counterparty}</td>
+                          <td className={`px-2 py-1.5 text-right font-mono tabular-nums font-semibold ${colorClass}`}>
+                            {`${displayQty} ${unit}`.trim()}
+                          </td>
+                          <td className={`px-2 py-1.5 text-right font-mono tabular-nums font-semibold ${colorClass}`}>
+                            {money(row.totalAmount)}
+                          </td>
+                          <td className="truncate px-2 py-1.5 text-left">
+                            <AttachmentCountChip
+                              attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
+                              onOpen={() => setAttachmentContext({
+                                title: row.transactionNo ?? 'Tài liệu giao dịch',
+                                subtitle: transactionSourceLabel(row),
+                                attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
+                              })}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!pagedTransactionRows.length && (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                          Chưa có giao dịch nào.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
               {totalTransactionPages > 1 && (
-                <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400">
+                <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
                   <span>
                     Hiển thị {(transactionPage - 1) * transactionPageSize + 1}-
                     {Math.min(transactionPage * transactionPageSize, transactionRows.length)}/{transactionRows.length} giao dịch
@@ -931,7 +1017,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                   </div>
                 </div>
               )}
-            </div>
+            </ModuleAnalyticsPanel>
           )}
 
           {activeTab === 'locations' && (
@@ -981,32 +1067,38 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                   center={fmt(bomUsage.reduce((sum, item) => sum + item.value, 0))}
                   label={unit}
                   compact={false}
+                  vertical={true}
                 />
               </ModuleAnalyticsPanel>
 
               {/* Bảng Top projects */}
               <ModuleAnalyticsPanel title="Danh sách công trình" note="Top 10 công trình sử dụng nhiều nhất" className="min-h-[540px]">
-                <div className="overflow-auto h-[440px]">
+                <div className="overflow-auto h-[470px]">
                   <table className="w-full min-w-[700px] text-sm table-fixed">
                     <colgroup>
+                      <col className="w-[100px]" />
+                      <col className="w-[140px]" />
+                      <col className="w-[60px]" />
+                      <col className="w-[60px]" />
                       <col className="w-[120px]" />
-                      <col className="w-[100px]" />
-                      <col className="w-[100px]" />
-                      <col className="w-[120px]" />
-                      <col className="w-[100px]" />
+                      <col className="w-[160px]" />
                     </colgroup>
                     <thead className={moduleTableHead}>
                       <tr>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Thời gian</th>
                         <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Công trình</th>
                         <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đã xuất</th>
                         <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đã trả</th>
                         <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Giá trị</th>
-                        <th className="px-2 py-1.5 text-center font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Hồ sơ</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Hồ sơ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {pagedProjectRows.map((row: any) => (
                         <tr key={row.projectId ?? row.id ?? Math.random()} className={moduleTableRow}>
+                          <td className="truncate px-3 py-2 text-slate-400" title={row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}>
+                            {row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}
+                          </td>
                           <td className="truncate px-2 py-1.5 text-slate-200" title={row.projectName ?? 'Không rõ'}>
                             {row.projectName ?? 'Không rõ'}
                           </td>
@@ -1019,7 +1111,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                           <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-cyan-300" title={money(row.issuedValue ?? num(row.quantity) * averageCost)}>
                             {money(row.issuedValue ?? num(row.quantity) * averageCost)}
                           </td>
-                          <td className="px-2 py-1.5 text-center">
+                          <td className="px-2 py-1.5 text-left">
                             <AttachmentCountChip
                               attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
                               onOpen={() => setAttachmentContext({
@@ -1105,39 +1197,45 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
               {/* Donut + Bảng */}
               <div className="grid gap-1 xl:grid-cols-[280px_1fr]">
-                {/* Donut phân bổ nhà cung cấp */}
+                 {/* Donut phân bổ nhà cung cấp (vertical) */}
                 <ModuleAnalyticsPanel title="Phân bổ theo nhà cung cấp" note="Theo giá trị nhập" className="min-h-[240px]">
                   <Donut
                     rows={supplierDonutData}
-                    center={money(supplierDonutData.reduce((sum, item) => sum + item.value, 0))}
+                    center={formatCompactCurrency(supplierDonutData.reduce((sum, item) => sum + item.value, 0))}
                     label="VNĐ"
                     compact={false}
+                    vertical={true}
                   />
                 </ModuleAnalyticsPanel>
 
-                {/* Bảng danh sách nhà cung cấp */}
-                <ModuleAnalyticsPanel title="Danh sách nhà cung cấp" note="Top 10 nhà cung cấp chính" className="min-h-[540px]">
-                  <div className="overflow-auto h-[440px]">
+                {/* Bảng danh sách nhà cung cấp tùy chỉnh */}
+                <ModuleAnalyticsPanel title="Danh sách nhà cung cấp" note="Top 10 nhà cung cấp chính" className="min-h-[470px]">
+                  <div className="overflow-auto h-[470px]">
                     <table className="w-full min-w-[700px] text-sm table-fixed">
                       <colgroup>
-                        <col className="w-[160px]" />
                         <col className="w-[100px]" />
-                        <col className="w-[120px]" />
                         <col className="w-[140px]" />
-                        <col className="w-[100px]" />
+                        <col className="w-[80px]" />
+                        <col className="w-[80px]" />
+                        <col className="w-[120px]" />
+                        <col className="w-[160px]" />
                       </colgroup>
                       <thead className={moduleTableHead}>
                         <tr>
+                          <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Thời gian</th>
                           <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Nhà cung cấp</th>
                           <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Số lượng</th>
                           <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đơn giá</th>
                           <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Tổng giá trị</th>
-                          <th className="px-2 py-1.5 text-center font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Chứng từ</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Chứng từ</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pagedSupplierRows.map((row: any) => (
                           <tr key={row.supplierId ?? row.id ?? Math.random()} className={moduleTableRow}>
+                            <td className="truncate px-3 py-2 text-slate-400" title={row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}>
+                              {row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}
+                            </td>
                             <td className="truncate px-2 py-1.5 text-slate-200" title={row.supplierName ?? 'Không rõ'}>
                               {row.supplierName ?? 'Không rõ'}
                             </td>
@@ -1150,7 +1248,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                             <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-cyan-300" title={money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}>
                               {money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}
                             </td>
-                            <td className="px-2 py-1.5 text-center">
+                            <td className="truncate px-2 py-1.5 text-left">
                               <AttachmentCountChip
                                 attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
                                 onOpen={() => setAttachmentContext({
@@ -1175,7 +1273,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
                   {/* Phân trang */}
                   {totalSupplierPages > 1 && (
-                    <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
+                    <div className="flex items-center justify-between gap-3 px-4 py-1.5 text-xs text-slate-400 border-t border-white/10">
                       <span>
                         Hiển thị {(supplierPage - 1) * supplierPageSize + 1}-
                         {Math.min(supplierPage * supplierPageSize, supplierRows.length)}/{supplierRows.length} nhà cung cấp
@@ -1358,7 +1456,7 @@ function LocationBalancePanel({ rows, unit, onFocus }: { rows: any[]; unit: stri
 
   return (
     <div className="grid gap-1 xl:grid-cols-[400px_1fr]">
-      <div className="space-y-3 mt-1">
+      <div className="space-y-1 mt-1">
         <ModuleAnalyticsPanel title="Phân bố tồn theo vị trí" note="Donut biểu thị tỷ lệ" className="min-h-[240px]">
           <Donut rows={distribution} center={fmt(totalQty)} label={unit || 'tồn'} />
         </ModuleAnalyticsPanel>
@@ -1434,11 +1532,20 @@ function LocationGroup({ title, rows, unit, onFocus }: { title: string; rows: an
   );
 }
 
-function TransactionTypeBadge({ type, isPositive }: { type: string; isPositive?: boolean }) {
+function TransactionTypeBadge({ type, isPositive, row }: { type: string; isPositive?: boolean; row?: any }) {
+  if (row && isProjectReturnReceived(row)) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-200">
+        <RotateCcw size={12} />
+        Trả từ công trình
+      </span>
+    )
+  }
   const normalized = normalizeTransactionType(type);
   const config: Record<string, { label: string; className: string }> = {
     INBOUND: { label: 'Nhập kho', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' },
     OUTBOUND: { label: 'Xuất kho', className: 'border-amber-500/30 bg-amber-500/10 text-amber-200' },
+    RETURN: { label: 'Trả kho', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' },
     TRANSFER: { label: 'Điều chuyển', className: 'border-purple-500/30 bg-purple-500/10 text-purple-200' },
     ADJUSTMENT: { 
       label: 'Điều chỉnh', 
@@ -1485,10 +1592,9 @@ function MaterialAnalyticsCockpit({
   return { direction, percent, color };
 };
 
-  // Dữ liệu đã reverse
-  const inboundRows = [...analytics.inboundTrend].reverse();
-  const outboundRows = [...analytics.outboundTrend].reverse();
-  const inventoryRows = [...analytics.inventoryTrend].reverse();
+  const inboundRows = analytics.inboundTrend
+  const outboundRows = analytics.outboundTrend
+  const inventoryRows = analytics.inventoryTrend
 
   // Tính trend cho từng chuỗi
   const inboundTrend = getTrend(inboundRows);
@@ -1496,7 +1602,7 @@ function MaterialAnalyticsCockpit({
   const inventoryTrend = getTrend(inventoryRows);
 
   return (
-    <div className="grid gap-1 xl:grid-cols-2 mt-1">
+    <div className="grid gap-1 xl:grid-cols-1 mt-1">
       <TrendPanel
           title="Xu hướng nhập kho"
           rows={inboundRows}
@@ -1562,7 +1668,7 @@ function MaterialAnalyticsCockpit({
         }
       />
       <ModuleAnalyticsPanel title="Tỷ lệ xuất / tồn bình quân" className="xl:col-span-2">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
           <MetricLine
             label="Xuất trung bình/ngày"
             value={`${fmt(forecast.outboundDaily)} ${unit}`.trim()}
@@ -1629,7 +1735,7 @@ function TrendPanel({
 }
 
 
-function FoundationLineChart({ rows, color, unit }: { rows: Array<{ label: string; value: number }>; color: string; unit: string }) {
+function FoundationLineChart({ rows, color, unit }: { rows: AnalyticsPoint[]; color: string; unit: string }) {
   const width = 720
   const height = 220
   const padding = 28
@@ -1637,15 +1743,13 @@ function FoundationLineChart({ rows, color, unit }: { rows: Array<{ label: strin
   const min = Math.min(0, ...rows.map((row) => row.value))
   const span = Math.max(1, max - min)
 
-  const formatFullDate = (label: string) => {
-    const parts = label.split('-')
-    if (parts.length === 2) {
-      const month = parts[0]
-      const day = parts[1]
-      const year = new Date().getFullYear()
+  const formatFullDate = (row: AnalyticsPoint) => {
+    const dateKey = row.dateKey
+    if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+      const [year, month, day] = dateKey.split('-')
       return `${day}/${month}/${year}`
     }
-    return label
+    return row.label
   }
 
   const point = (row: { value: number }, index: number) => {
@@ -1658,7 +1762,7 @@ function FoundationLineChart({ rows, color, unit }: { rows: Array<{ label: strin
   const area = `${path} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z`
 
   return (
-    <div className="h-[200px] rounded-xl border border-white/10 bg-slate-950/35 p-3">
+    <div className="h-[195px] rounded-xl border border-white/10 bg-slate-950/35 p-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible">
         <defs>
           <linearGradient id={`area-${color.replace('#', '')}`} x1="0" x2="0" y1="0" y2="1">
@@ -1690,7 +1794,7 @@ function FoundationLineChart({ rows, color, unit }: { rows: Array<{ label: strin
               style={{ pointerEvents: 'all', cursor: 'pointer' }}
             >
               {/* Tooltip với ngày đầy đủ và số lượng in đậm */}
-              <title>{`Ngày: ${formatFullDate(rows[index].label)}\nSố lượng: ${fmt(rows[index].value)} ${unit}`}</title>
+              <title>{`Ngày: ${formatFullDate(rows[index])}\nSố lượng: ${fmt(rows[index].value)} ${unit}`}</title>
             </rect>
 
             {/* Điểm tròn nhỏ trang trí */}
@@ -1711,11 +1815,13 @@ function Donut({
   center,
   label,
   compact = false,
+  vertical = false,
 }: {
   rows: Array<{ label: string; value: number; color: string }>;
   center: string;
   label: string;
   compact?: boolean;
+  vertical?: boolean;
 }) {
   const filtered = rows.filter((row) => row.value > 0)
   const chartRows = filtered.length ? filtered : [{ label: 'No data', value: 1, color: '#334155' }]
@@ -1728,18 +1834,69 @@ function Donut({
     return `${row.color} ${start}% ${end}%`
   }).join(', ')
 
-  // Kích thước khi compact
-  const donutSize = compact ? 'h-20 w-20' : 'h-28 w-28'
+  const donutSize = compact ? 'h-20 w-20' : 'h-32 w-32'
   const inset = compact ? 'inset-2' : 'inset-3'
   const centerText = compact ? 'text-base' : 'text-xl'
   const labelText = compact ? 'text-[8px]' : 'text-[10px]'
-  const gridCols = compact ? 'grid-cols-[100px_1fr]' : 'grid-cols-[136px_1fr]'
-  const gap = compact ? 'gap-2' : 'gap-4'
   const spaceY = compact ? 'space-y-1' : 'space-y-1.5'
   const itemText = compact ? 'text-[10px]' : 'text-[11px]'
+  const isNoData = chartRows.length === 1 && chartRows[0].label === 'No data'
 
+  // Hiển thị No data
+  if (isNoData) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2">
+        <div className={`relative ${donutSize} rounded-full`} style={{ background: `conic-gradient(${gradient})` }}>
+          <div className={`absolute ${inset} rounded-full bg-[#08111f]`} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div className={`font-semibold text-white ${centerText}`}>{center}</div>
+            <div className={`text-slate-500 ${labelText}`}>{label}</div>
+          </div>
+        </div>
+        <div className="text-sm text-slate-400">
+          No data <span className="text-white font-semibold">({chartRows[0].value} (100.0%))</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Layout mặc định (grid ngang)
+  if (!vertical) {
+    const gridCols = compact ? 'grid-cols-[100px_1fr]' : 'grid-cols-[136px_1fr]'
+    const gap = compact ? 'gap-2' : 'gap-4'
+    return (
+      <div className={`grid ${gridCols} items-center ${gap}`}>
+        <div className={`relative ${donutSize} rounded-full`} style={{ background: `conic-gradient(${gradient})` }}>
+          <div className={`absolute ${inset} rounded-full bg-[#08111f]`} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div className={`font-semibold text-white ${centerText}`}>{center}</div>
+            <div className={`text-slate-500 ${labelText}`}>{label}</div>
+          </div>
+        </div>
+        <div className={`${spaceY} overflow-hidden ${itemText}`}>
+          {chartRows.slice(0, 7).map((row) => {
+            const percent = ((row.value / total) * 100).toFixed(1)
+            return (
+              <div key={row.label} className="flex justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
+                  <i className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
+                  <span className="truncate">{row.label}</span>
+                </span>
+                <b className="text-slate-100 whitespace-nowrap">
+                  {formatCompactCurrency(row.value)}
+                  <span className="text-slate-500 font-normal"> ({percent}%)</span>
+                </b>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Layout dọc (chart trên, danh sách dưới)
   return (
-    <div className={`grid ${gridCols} items-center ${gap}`}>
+    <div className="flex flex-col items-center gap-4">
       <div className={`relative ${donutSize} rounded-full`} style={{ background: `conic-gradient(${gradient})` }}>
         <div className={`absolute ${inset} rounded-full bg-[#08111f]`} />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -1747,7 +1904,7 @@ function Donut({
           <div className={`text-slate-500 ${labelText}`}>{label}</div>
         </div>
       </div>
-      <div className={`${spaceY} overflow-hidden ${itemText}`}>
+      <div className={`${spaceY} overflow-hidden ${itemText} w-full max-w-[200px]`}>
         {chartRows.slice(0, 7).map((row) => {
           const percent = ((row.value / total) * 100).toFixed(1)
           return (
@@ -1757,7 +1914,7 @@ function Donut({
                 <span className="truncate">{row.label}</span>
               </span>
               <b className="text-slate-100 whitespace-nowrap">
-                {fmt(row.value)} <span className="text-slate-500 font-normal">({percent}%)</span>
+                {formatCompactCurrency(row.value)} <span className="text-slate-500 font-normal">({percent}%)</span>
               </b>
             </div>
           )
@@ -1772,7 +1929,16 @@ function DetailTable({ title, headers, rows }: { title: string; headers: string[
     <ModuleDataGrid>
       <div className="border-b border-white/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</div>
       <div className="overflow-auto">
-        <table className="w-full min-w-[1000px] text-sm table-fixed">
+        <table className="w-full min-w-[850px] text-sm table-fixed">
+          <colgroup>
+            <col className="w-[50px]" />
+            <col className="w-[50px]" />
+            <col className="w-[40px]" />
+            <col className="w-[60px]" />
+            <col className="w-[50px]" />
+            <col className="w-[60px]" />
+            <col className="w-[120px]" />
+          </colgroup>
           <thead className={moduleTableHead}>
             <tr>
               {headers.map((header) => (
@@ -1788,7 +1954,7 @@ function DetailTable({ title, headers, rows }: { title: string; headers: string[
                   return (
                     <td
                       key={cellIndex}
-                      className="px-3 py-2 align-middle truncate"
+                      className="px-3 py-2 align-middle truncate overflow-hidden"
                       title={isString ? cell : undefined}
                     >
                       {cell}
@@ -1829,6 +1995,7 @@ function buildTransactionRows(inbound: any[], outbound: any[]) {
     .map((row: any) => ({
       ...row,
       counterparty:
+        projectReturnCounterparty(row) ??
         row.supplierName ??
         row.projectName ??
         row.targetName ??
@@ -1944,20 +2111,91 @@ function normalizeTransactionType(value: string) {
   const type = String(value ?? '').toUpperCase()
   if (type.includes('IN') || type.includes('IMPORT') || type.includes('RECEIPT')) return 'INBOUND'
   if (type.includes('OUT') || type.includes('EXPORT') || type.includes('ISSUE')) return 'OUTBOUND'
+  if (type.includes('RETURN')) return 'RETURN'
   if (type.includes('TRANSFER')) return 'TRANSFER'
   return 'ADJUSTMENT'
 }
 
+function transactionMetadata(row: any) {
+  if (!row?.note || typeof row.note !== 'string') return null
+  try {
+    return JSON.parse(row.note)
+  } catch {
+    return null
+  }
+}
+
+function isProjectReturnReceived(row: any) {
+  const meta = transactionMetadata(row)
+  return (
+    meta?.source === 'PROJECT_RETURN' ||
+    String(row?.referenceModule ?? '').toLowerCase() === 'return-workflow'
+  ) && normalizeTransactionType(row?.type ?? '') === 'RETURN'
+}
+
+function projectReturnCounterparty(row: any) {
+  if (!isProjectReturnReceived(row)) return null
+  const meta = transactionMetadata(row)
+  const project = meta?.projectCode || meta?.projectName
+    ? `${meta?.projectCode ?? ''}${meta?.projectCode && meta?.projectName ? ' · ' : ''}${meta?.projectName ?? ''}`
+    : row.projectName
+  const returnNo = meta?.returnNo ?? row.referenceId
+  return [
+    project ? `Công trình: ${project}` : null,
+    meta?.taskName ? `Task: ${meta.taskName}` : null,
+    returnNo ? `Phiếu: ${returnNo}` : null,
+  ].filter(Boolean).join(' · ') || 'Trả từ công trình'
+}
+
+type MovementBucket = {
+  dateKey: string
+  label: string
+  inbound: number
+  outbound: number
+}
+
+type AnalyticsPoint = {
+  label: string
+  value: number
+  dateKey?: string
+}
+
 function buildMovementTrend(rows: any[]) {
-  const map = new Map<string, { label: string; inbound: number; outbound: number }>()
+  const map = new Map<string, { dateKey: string; label: string; inbound: number; outbound: number }>()
   rows.forEach((row) => {
-    const label = String(row.transactionDate ?? row.createdAt ?? '').slice(5, 10) || '-'
-    const current = map.get(label) ?? { label, inbound: 0, outbound: 0 }
-    if (row.type === 'INBOUND') current.inbound += num(row.quantity)
-    if (row.type === 'OUTBOUND') current.outbound += num(row.quantity)
-    map.set(label, current)
+    const dateKey = String(row.transactionDate ?? row.createdAt ?? '').slice(0, 10) || '-'
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return
+    const label = dateKey === '-' ? '-' : dateKey.slice(5, 10)
+    const current = map.get(dateKey) ?? { dateKey, label, inbound: 0, outbound: 0 }
+    if (row.type === 'INBOUND') current.inbound += Math.abs(num(row.quantity))
+    if (row.type === 'OUTBOUND') current.outbound += Math.abs(num(row.quantity))
+    map.set(dateKey, current)
   })
-  return Array.from(map.values()).slice(-10)
+
+  const sortedDateKeys = Array.from(map.keys()).sort()
+  if (!sortedDateKeys.length) return []
+
+  return buildDateRange(sortedDateKeys[0], sortedDateKeys[sortedDateKeys.length - 1])
+    .map((dateKey) => map.get(dateKey) ?? {
+      dateKey,
+      label: dateKey.slice(5, 10),
+      inbound: 0,
+      outbound: 0,
+    })
+}
+
+function buildCostTrend(inbound: any[], fallbackCost: number) {
+  const rows = inbound
+    .map((row: any) => ({
+      dateKey: String(row.transactionDate ?? row.createdAt ?? '').slice(0, 10) || '-',
+      cost: num(row.unitPrice ?? (num(row.quantity) ? num(row.totalAmount) / Math.abs(num(row.quantity)) : fallbackCost)),
+    }))
+    .filter((row) => row.cost > 0)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+    .slice(-6)
+    .map((row) => row.cost)
+
+  return rows.length ? rows : Array.from({ length: 6 }, () => fallbackCost)
 }
 
 function buildForecast(currentStock: number, outbound: any[]) {
@@ -1970,6 +2208,21 @@ function buildForecast(currentStock: number, outbound: any[]) {
     projected7d,
     daysOfCover: currentStock / Math.max(0.001, outboundDaily || 1),
   }
+}
+
+function buildDateRange(startKey: string, endKey: string) {
+  const start = new Date(`${startKey}T00:00:00.000Z`)
+  const end = new Date(`${endKey}T00:00:00.000Z`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return []
+  }
+
+  const keys: string[] = []
+  for (let cursor = start; cursor <= end; cursor = new Date(cursor.getTime() + 86_400_000)) {
+    keys.push(cursor.toISOString().slice(0, 10))
+  }
+
+  return keys
 }
 
 function collectMaterialImages(detail: any, fallback: any, attachments: Attachment[]) {
@@ -2044,17 +2297,17 @@ function debugAttachment(attachment: Attachment) {
 }
 
 function buildMaterialAnalytics(
-  movementRows: Array<{ label: string; inbound: number; outbound: number }>,
+  movementRows: MovementBucket[],
   currentStock: number,
   forecast: { outboundDaily: number },
 ) {
-  const inboundTrend = movementRows.map((row) => ({ label: row.label, value: row.inbound }))
-  const outboundTrend = movementRows.map((row) => ({ label: row.label, value: row.outbound }))
+  const inboundTrend = movementRows.map((row) => ({ label: row.label, value: row.inbound, dateKey: row.dateKey }))
+  const outboundTrend = movementRows.map((row) => ({ label: row.label, value: row.outbound, dateKey: row.dateKey }))
   const netMovement = movementRows.reduce((sum, row) => sum + row.inbound - row.outbound, 0)
   let runningStock = Math.max(0, currentStock - netMovement)
   const inventoryTrend = movementRows.map((row) => {
     runningStock = Math.max(0, runningStock + row.inbound - row.outbound)
-    return { label: row.label, value: runningStock }
+    return { label: row.label, value: runningStock, dateKey: row.dateKey }
   })
   const forecastTrend = Array.from({ length: 7 }, (_, index) => ({
     label: `D+${index + 1}`,
@@ -2062,7 +2315,10 @@ function buildMaterialAnalytics(
   }))
   const inboundTotal = inboundTrend.reduce((sum, row) => sum + row.value, 0)
   const outboundTotal = outboundTrend.reduce((sum, row) => sum + row.value, 0)
-  const stockRows = inventoryTrend.length ? inventoryTrend : [{ label: 'Now', value: currentStock }]
+  const stockRows: AnalyticsPoint[] =
+    inventoryTrend.length
+      ? inventoryTrend
+      : [{ label: 'Now', value: currentStock }]
   const averageStock = stockRows.reduce((sum, row) => sum + row.value, 0) / Math.max(1, stockRows.length)
 
   return {

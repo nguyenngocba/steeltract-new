@@ -1,5 +1,358 @@
 # SteelTrack AI Changelog
 
+## 2026-07-01 Sprint INVRET.1 – Inventory Return Workspace UX Unification
+
+Completed:
+
+* Refactored Inventory Return Requests into a cockpit-aligned workspace using `CockpitKpiCard`, `CockpitChartCard`, `CockpitTableShell`, `DataTablePagination`, `CockpitEmptyState`, and `ModuleDetailDrawer`.
+* Added real-data KPI row: Requested, Received Today, Rejected Today, and Pending Quantity.
+* Added real-data analytics row for return status distribution, 30-day trend, top returned materials, and pending/received/rejected quantity distribution.
+* Rebuilt the return request table with Inventory-style density, pagination, aging badges, and click-to-open row behavior.
+* Standardized Return Request detail to `ModuleDetailDrawer size="sm"` with information, materials, timeline, photos, and logs sections.
+* Added Inventory Overview `Pending Returns` KPI card linking to `/inventory/returns`.
+* Reordered Inventory sidebar entries so Phiếu trả vật tư appears as a primary Inventory workspace.
+
+## 2026-07-01 Sprint 50LOG.1 – Logistics & Dispatch MVP Foundation
+
+Completed:
+
+* Added persistent Logistics dispatch domain: `DispatchOrder`, `DispatchItem`, and `DispatchEvent`, with migration SQL under `20260701090000_dispatch_order_domain`.
+* Added backend Logistics APIs for dispatch dashboard, order list/detail, auto suggestion, lifecycle actions, and completion/cancel.
+* Replaced the Logistics mock shipment screen with real API-backed Cockpit workspaces: Tổng quan, Điều xe, Đang vận chuyển, and Lịch sử.
+* Added Dispatch Detail right-side drawer using `ModuleDetailDrawer size="md"` with information, items, loading checklist, timeline, and lifecycle actions.
+* Auto suggestion now reads real `ProjectTaskMaterialAllocation` and `ProjectTaskComponentAllocation` rows to suggest missing materials and assigned components.
+* Dispatch receive now writes `PROJECT_DISPATCH_RECEIVED` activity logs, reconciles Project task allocations, updates component delivery state, and creates an Inventory export transaction for material dispatch lines.
+
+Known limitations:
+
+* Project Detail has the backend/read-model foundation for dispatch state, but a follow-up UI pass is still needed to expose per-line `Đang vận chuyển`, `Đã nhận`, and `Ngày nhận` columns in all Project material/component tables.
+
+## 2026-07-01 Sprint 40PROJ.10B – Drawer UX Standardization
+
+Completed:
+
+* Added reusable `ModuleDetailDrawer` size system: `sm`, `md`, and `lg`.
+* Standardized Inventory Material Detail and Project Detail on `size="lg"`.
+* Standardized Inventory Return Request Detail on `size="sm"` with header badge, project/requester/date subtitle, and sections for info, materials, timeline, photos, and logs.
+* Added Project Pending Return side drawer using real `ProjectsRuntime.returnRequests`; Pending Return quantities now open a small drawer instead of navigating away.
+* Created `docs/ui/drawer-standardization-report.md` and `docs/ui/inventory-return-drawer-polish-report.md`.
+* Frontend and backend builds passed.
+
+## 2026-07-01 Sprint 40PROJ.10A – Project Detail and Return UX Polish
+
+Completed:
+
+* Project Detail now opens as a right-side drawer with Material Detail-style width constraints instead of a centered modal.
+* Inventory Return Requests detail now opens as a narrower right-side drawer with Project/Material context, return summary, material lines, photos empty state, real logs, and receive/reject actions.
+* Project Return receipt transactions now write business-readable `remarks` and structured JSON `note` metadata with `source = PROJECT_RETURN` and `transactionTypeCode = PROJECT_RETURN_RECEIVED`.
+* Inventory transaction grid and detail drawer now render Project material returns as `Trả từ công trình` with `PROJECT RETURN` badge and project/return request context.
+* Material Detail history now recognizes `RETURN` rows and special-cases Project Return rows instead of falling through to adjustment-like presentation.
+* ActivityLog metadata for `PROJECT_MATERIAL_RETURN_RECEIVED` now includes a human-readable receipt message.
+* Created `docs/ui/project-detail-drawer-polish-report.md`, `docs/ui/project-return-drawer-polish-report.md`, and `docs/ui/project-return-transaction-audit-report.md`.
+
+## 2026-07-01 Sprint – Inventory Return Requests Workspace
+
+Completed:
+
+* Added an Inventory `Return Requests` workspace at `/inventory/returns` with Requested, Received, Accepted, and Rejected views.
+* Return Request detail now shows project, task/material context when available, quantity, reason, real activity logs, and a photo empty state until attachments are linked.
+* Added receive and reject actions from the Return Request workspace. Receive uses the existing Inventory return workflow to increase stock and reconcile Project material allocation; reject clears pending return state without increasing stock.
+* Added backend `PATCH /inventory/returns/:id/reject`, using the existing `CANCELLED` status to represent Rejected without changing Prisma schema.
+* Project material Pending Return quantities now link directly to `/inventory/returns?tab=requested&projectId=...&materialId=...` so operators can process the related requests.
+* Inventory navigation now includes `Phiếu trả vật tư`.
+* Backend and frontend builds passed.
+
+## 2026-07-01 Sprint BUG.4 – Project Material Return Inventory and Project Reconciliation
+
+Completed:
+
+* Project material runtime rows now expose `allocatedQuantity`, `usedQuantity`, `pendingReturnQuantity`, `returnedQuantity`, and `availableReturnQuantity`.
+* Open `SITE_RETURN` requests now reduce available return quantity in Projects without increasing Inventory stock.
+* Receiving a project return now creates an Inventory `RETURN` transaction with `transactionTypeCode = PROJECT_RETURN_RECEIVED`.
+* Receiving a project return now reconciles `ProjectTaskMaterialAllocation` by reducing `issuedQty`, increasing `returnedQty`, and reducing remaining quantity safely.
+* `SITE_RETURN` disposition no longer creates a second stock-in transaction, preventing duplicate Inventory increases.
+* ActivityLog now records `PROJECT_MATERIAL_RETURN_RECEIVED` and `PROJECT_MATERIAL_RETURN_ACCEPTED`.
+* Project material tables now show Allocated, Used, Pending Return, Returned, and Available Return.
+* Project material return buttons are disabled when no returnable quantity remains.
+* Created `docs/bugs/project-material-return-reconciliation-report.md`.
+
+## 2026-07-01 HOTFIX – Project Material Return API 404 and Sidebar Settings Key
+
+Completed:
+
+* Fixed `POST /inventory/returns` returning `404 Not Found` by registering `ReturnWorkflowController` in `InventoryModule.controllers`.
+* Kept Projects material return on the existing Inventory Return workflow instead of creating a duplicate endpoint.
+* Added ActivityLog creation for new return requests with `PROJECT_MATERIAL_RETURN_REQUESTED`.
+* Updated Project material return success invalidation to refresh Projects runtime/WBS/detail and Inventory material detail caches.
+* Added explicit `Vượt số lượng có thể trả` validation feedback when return quantity exceeds the returnable amount.
+* Fixed duplicate React key warning for `/settings` by adding stable ids to duplicated sidebar settings entries and using `item.id` as the primary sidebar key.
+* Created `docs/bugs/project-material-return-api-404-report.md`.
+
+## 2026-07-01 Sprint 40PROJ.10 – Project Intelligence and Site Operations
+
+Completed:
+
+* Added template-driven Project Task rules in the existing `ProjectTemplate.structure` JSON contract without adding a migration.
+* Extended Projects backend DTOs and APIs for Auto WBS generation, bulk WBS updates, and Site Mode updates:
+  * `POST /projects/:id/wbs/generate`
+  * `PATCH /projects/:id/wbs/bulk`
+  * `POST /projects/:id/site-update`
+* Project Task `Tự đề xuất` now reads template rules or template task defaults instead of hardcoded frontend suggestions.
+* Added Auto WBS generation UI for span/axis/floor-driven project task creation.
+* Added bulk task selection/update UI for parent/status/date/owner/checklist/resource changes.
+* Added Project Detail `Công trường` tab for simple site updates: installed quantity, used quantity, QC result, issue flag, note, and photo timeline visibility.
+* Site updates now write `PROJECT_SITE_UPDATE` activity-log rows and update task progress/status through the existing ProjectTask runtime path.
+* Project Detail document tab now supports business category filters: Hợp đồng, Bản vẽ, Biện pháp thi công, Nghiệm thu, Biên bản, Hình ảnh, and Khác.
+* Project Command Center now surfaces executive health panels for forecast finish, material shortages, component shortages, and labor/equipment shortages using real runtime data.
+* Created Sprint 40PROJ.10 reports under `docs/ui/` for template rules, Auto WBS, bulk operations, Site Mode, photo timeline, return lifecycle, cost command center, document categories, activity timeline, and executive dashboard.
+
+Verification:
+
+* `pnpm -C apps/backend-api build` passed.
+* `pnpm -C apps/frontend build` passed.
+
+## 2026-07-01 Sprint 40PROJ.9 – Projects Usability Recovery and Real Data Integration
+
+Completed:
+
+* Repaired Projects Templates routing by adding `/projects/templates` to AppRouter and both sidebar navigation configs.
+* Added Project edit support with `PATCH /projects/:id` and a Project Detail `Sửa công trình` dialog for master/setup fields.
+* Refactored Project Detail to use a centered 90vw/1400px `ModuleDetailDrawer` placement with internal scroll instead of a full-screen-like side panel.
+* Added Component Return from Project to backend and UI: returned components clear `projectId`, move back to `READY`, write `ComponentTimeline`, and write `ActivityLog`.
+* Replaced top-level Projects `Chi phí`, `Tài liệu`, and `Nhật ký` placeholders with real runtime workspaces using financial read models, Attachments, and ActivityLog data.
+* Extended `GET /projects/runtime` with `documents` and `logs` arrays.
+* Added Simple/Advanced mode to WBS Task modal. Simple Mode asks only for name, parent task, and duration, and includes date and steel erection suggestions.
+* Created sprint reports under `docs/ui/`: project return workflow, task smart suggestions, detail drawer refactor, project edit, template routing, cost real data, documents real data, and logs real data.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-07-01 HOTFIX – Restore Projects Runtime and Template APIs
+
+Completed:
+
+* Recovered Projects runtime from Prisma `P2021` caused by missing `project_tasks` tables.
+* Repaired the failed `20260630100000_project_task_domain` migration SQL alias issue and deployed both pending Projects migrations.
+* Confirmed ProjectTask domain tables and `project_templates` now exist, including default template `TPL-NX-5N`.
+* Added backend compatibility guards for missing ProjectTask/ProjectTemplate tables so runtime, WBS, and templates degrade safely instead of crashing.
+* Added temporary Projects debug logging for runtime, templates, create project, template build, and WBS paths.
+* Updated Projects frontend queries to avoid infinite retries and show explicit empty/error states.
+* Created reports:
+  * `docs/bugs/projects-runtime-recovery-report.md`
+  * `docs/bugs/projects-template-api-report.md`
+  * `docs/bugs/projects-migration-status-report.md`
+
+Verification:
+
+* `pnpm --dir apps/backend-api exec prisma migrate status` passed: database schema is up to date.
+* `pnpm -C apps/backend-api build` passed.
+* `pnpm -C apps/frontend build` passed.
+* `GET /projects/runtime`, `GET /projects`, and `GET /projects/:id/wbs` returned 200 from the running backend.
+* `pnpm -C apps/backend-api start:dev` compiled successfully but could not bind because port `3000` was already in use.
+
+## 2026-06-30 HOTFIX – Restore NestJS Runtime (PermissionsGuard / RbacService DI)
+
+Completed:
+
+*   Resolved `UnknownDependenciesException: Nest can't resolve dependencies of the PermissionsGuard (Reflector, ?)` where `? = RbacService`.
+*   Imported `RbacModule` in `ProjectsModule` to satisfy the constructor parameters of `PermissionsGuard` applied to `ProjectsController`.
+*   Created hotfix report: `docs/bugs/projects-rbac-di-hotfix-report.md`.
+
+Verification:
+
+*   `pnpm -C apps/backend-api build` passed.
+*   `pnpm -C apps/backend-api start:dev` and `start:prod` booted successfully without runtime DI exceptions.
+
+## 2026-06-30 Sprint 40PROJ.8 – Low Data Entry and Template System
+
+Completed:
+
+* Added persisted Project Template Library with `ProjectTemplate` and `ProjectTemplateStatus`.
+* Added migration `20260630113000_project_template_library` and seeded default `TPL-NX-5N - Nhà xưởng 5 nhịp`.
+* Added backend template APIs for list, create, update, duplicate, publish, deactivate, set default, export, and import.
+* Project creation can now apply a template to generate normalized `ProjectTask` WBS rows, dependencies, scheduled/baseline dates, suggested resources, resolvable material/component allocations, and initial task cost rows.
+* Added Projects `Templates` tab with template KPIs, template table, default template preview, resources preview, and template editor dialog.
+* Refactored Create Project dialog toward low-data-entry creation with customer, location, start date, handover date, contract value, and template selection.
+* Added Quick Update panel in Project Progress for Simple Mode-style field updates: installed components, used materials, QC pass, incident flag, and notes.
+* Created sprint reports: `project-template-library-report.md`, `project-low-data-entry-report.md`, and `project-quick-update-report.md`.
+* Fixed an unrelated `InventoryLocationsPage.tsx` syntax regression that was blocking frontend build verification.
+
+Verification:
+
+* `pnpm --dir apps/backend-api exec prisma generate` passed.
+* `pnpm -C apps/backend-api build` passed.
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+
+## 2026-06-30 Sprint 40PROJ.3 – Project Execution Management Foundation
+
+Completed:
+
+* Extended `GET /projects/runtime` with derived Project Execution read models: `wbs`, `financial`, `health`, and `returnRequests`.
+* Built WBS runtime rows from existing Projects, Components, component-linked Tasks, and project-linked Inventory material transactions without schema changes.
+* Added Project Detail financial KPI cards for contract value, budget, actual cost, profit, and margin.
+* Added Project Health panels with warnings and suggested actions derived from delayed orders, overdue component tasks, component delivery/install state, open return requests, and budget risk.
+* Replaced the previous simple progress section with a WBS tree grid supporting expand/collapse and visible action entry points for future persisted ProjectTask workflows.
+* Activated Project Material Return through the existing Inventory Return workflow using `POST /inventory/returns` with `flowType = SITE_RETURN`.
+* Created sprint reports: `project-execution-workspace-report.md`, `project-wbs-report.md`, `project-financial-dashboard-report.md`, and `project-return-flow-report.md`.
+* No Prisma schema changes, migrations, staging, or commits were made.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-06-30 Sprint 40PROJ.1 – Projects Cockpit and Detail Workspace Refactor
+
+Completed:
+
+* Refactored `ProjectsPage.tsx` into an Inventory-aligned cockpit using shared cockpit primitives.
+* Added Projects KPI strip for total projects, active projects, completed projects, delayed projects, and actual value.
+* Rebuilt Projects analytics around real runtime data: status distribution, progress by project, value by project, soon-to-complete projects, delayed projects, and recent activity.
+* Reworked the Projects table to match the Inventory table shell, density, transparent surface, compact rows, and cockpit pagination.
+* Converted row selection into a Project Detail Workspace drawer with tabs for Tổng quan, Vật tư, Cấu kiện, and Tiến độ.
+* Added project material and component workspace views using existing `GET /projects/runtime` data only.
+* Kept project return actions as explicit UI feedback because formal Project Return APIs are not available yet.
+* Created `docs/ui/projects-cockpit-refactor-report.md` and `docs/ui/project-detail-workspace-report.md`.
+* No backend, API, Prisma schema, migration, staging, or commit changes were made.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-06-29 Sprint AUDIT.1 – Enterprise Architecture Audit
+
+Completed:
+
+* Audited the full SteelTrack architecture before Workflow Engine, Costing Engine, Historical Import, and Realtime Infrastructure work.
+* Created enterprise reports under `docs/audit/` covering module inventory, navigation, data model readiness, dashboard, workflow, costing, import, realtime, performance, design system maturity, technical debt, and roadmap priorities.
+* Produced a 0-100 maturity matrix for Architecture, Navigation, Design System, Inventory, Components, Production, Yard, Projects, Suppliers, QC, Workflow, Costing, Historical Import, Realtime, and Dashboard.
+* Identified the recommended next three sprint sequence: Workflow Engine Binding P0, Inventory Ledger & Historical Import Readiness, and Component/Project Cost Traceability.
+* No business logic, API contract, Prisma schema, migration, staging, or commit changes were made.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-06-29 Sprint 70EXEC.2 – Executive Insights & Control Tower
+
+Completed:
+
+* Extended `GET /dashboard/executive-cockpit` with `health`, `executiveSummary`, and `recommendations`.
+* Added `DashboardInsightService` for health score and 7-day executive summary rules.
+* Added `DashboardRecommendationService` for suggested actions based on Inventory shortage, Production material risk, Yard occupancy, QC/NCR, Projects, and notifications.
+* Added Executive Control Tower section at the top of Dashboard KPI Chính with Health Score, 7-day Summary, Suggested Actions, Activities by Module, and Notification Center.
+* Upgraded Recent Activities tab to show both module-grouped activity and timeline.
+* Kept all calculations rules-based from real data; no Prisma schema, migration, fake data, or workflow changes.
+* Created `docs/ui/executive-insights-report.md`.
+
+Verification:
+
+* `pnpm -C apps/backend-api build` passed.
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+
+## 2026-06-29 Sprint 70EXEC.1 – Executive Cockpit Intelligence Tabs
+
+Completed:
+
+* Added backend Executive Cockpit services: `DashboardMetricsService`, `DashboardActivityService`, and `DashboardNotificationService`.
+* Added `GET /dashboard/executive-cockpit` as a single DTO endpoint for Dashboard trend, activity, and notification tabs.
+* Added URL-driven Dashboard tabs for `KPI Chính`, `Biểu đồ xu hướng`, `Hoạt động gần đây`, and `Thông báo`.
+* Implemented Predictive Trends from real Inventory transaction/location stock data, BOM/material issue data, and rolling average rules.
+* Implemented unified Recent Activities from Inventory transactions, Production logs, Yard movements, QC inspections, Purchase Orders, and Projects.
+* Implemented executive notification rules for Inventory shortages, delayed Production, Yard capacity, QC failures, Project delays, purchase orders, and persisted notifications.
+* Updated Dashboard sidebar entries so the executive tabs are directly reachable through query routes.
+* Removed the legacy hardcoded Dashboard forecast `dailyRate = 10`; the old forecast endpoint now derives rate from completed/installed components in the last 30 days.
+* Created `docs/ui/executive-cockpit-report.md`.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+* Search verification found no `Math.random()` or `dailyRate = 10` in Dashboard frontend/backend modules.
+
+## 2026-06-28 Sprint 80YARD.1R – Restore Existing Yard 3D Workspace
+
+Completed:
+
+* Reconnected `/yard/map-3d` to the existing `YardOperationalMap3D` implementation.
+* Restored the GLB/R3F-based Yard 3D experience with `Canvas`, `OrbitControls`, `crane.glb`, and `cau-kien-3d.glb`.
+* Added runtime-first/demo-fallback behavior inside `YardOperationalMap3D`: runtime Yard slots render when available; otherwise local demo slots render with the badge `Đang hiển thị dữ liệu mẫu`.
+* Removed the active pseudo-3D render branch from `YardTabWorkspace` so the restored implementation is unambiguous.
+* Created `docs/ui/yard-3d-restoration-report.md` documenting discovery, root cause, runtime/demo sources, and restoration chain.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Build output confirms `YardOperationalMap3D-*.js` is bundled again. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-06-27 Sprint 80YARD.1 – Yard Advanced Workspace and 3D Reintegration
+
+Completed:
+
+* Expanded Yard navigation to route-backed tabs for overview, 2D map, pseudo-3D map, locations, components, dispatch, live tracking, heatmap, timeline, and history.
+* Added concrete AppRouter routes and synchronized both sidebar navigation configs.
+* Restored the missing Yard 3D workspace as a CSS pseudo-3D view using real zones, slots, stack levels, and placements only.
+* Removed decorative Yard trend defaults and switched movement trend display to real `yard_movements`.
+* Added table-first Locations, Components, Timeline, and History workspaces using shared cockpit table and pagination components.
+* Added Dispatch and Heatmap workspaces using real available-slot, occupied-slot, overloaded-zone, and utilization calculations; no pending dispatch data is fabricated.
+* Added History filters for component code, location/zone, movement type, and date.
+* Created `docs/ui/yard-advanced-workspace-report.md`.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` warning remains.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-06-27 Sprint 50NAV.2 + 60UI.2 – Yard/Logistics Navigation and Real KPI Dashboard
+
+Completed:
+
+* Fixed Yard navigation by replacing hash-based tabs with route-backed tabs for overview, locations, components, movements, live tracking, and history.
+* Fixed Logistics navigation by adding route-backed tabs for overview, planning, vehicles, dispatch, tracking, logs, and reports.
+* Synchronized `AppRouter`, both sidebar navigation configs, Yard tab config, `YardPage`, `YardTabWorkspace`, and `LogisticsPage`.
+* Rationalized Dashboard KPI Chính so the top KPI strip uses real Inventory Audit data instead of decorative/static values.
+* Added real Production, Projects, and Suppliers dashboard panels using existing frontend API hooks and runtime endpoints.
+* Removed hardcoded Dashboard timestamps from alerts and recent activity; empty module data now renders explicit empty states instead of fake rows.
+* Created `docs/ui/navigation-yard-logistics-fix-report.md` and `docs/ui/dashboard-kpi-rationalization-report.md`.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
+## 2026-06-27 Hotfix – Inotify Watcher Exhaustion
+
+Completed:
+
+* Diagnosed frontend dev server `ENOSPC` as Linux inotify watcher exhaustion, not disk space exhaustion.
+* Recorded current kernel watcher limits and active watcher consumers in `docs/dev/watchers-diagnostics-report.md`.
+* Created sysctl and development-process remediation guidance in `docs/dev/watchers-remediation-plan.md`.
+* Added safe Vite watcher ignores for generated/cache/artifact directories in `apps/frontend/vite.config.ts`.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+
+## 2026-06-27 Sprint 50NAV.1 – Module Navigation Completion
+
+Completed:
+
+* Synchronized AppRouter and sidebar navigation for Components, Production, Projects, Suppliers, and QC.
+* Added real frontend routes for all target sidebar tabs so direct URL access no longer falls through to Dashboard.
+* Converted Projects, Suppliers, and QC module tabs from local state to URL-derived route state.
+* Added Production route tabs for planning, incidents, and reports without changing APIs, schema, or workflows.
+* Updated both active sidebar navigation configs and preserved legacy QC routes for existing bookmarks.
+* Created `docs/ui/navigation-audit-report.md` and `docs/ui/navigation-completion-report.md`.
+
+Verification:
+
+* `pnpm -C apps/frontend build` passed. Existing Vite `NODE_ENV` and large chunk warnings remain.
+* `pnpm -C apps/backend-api build` passed.
+
 ## 2026-06-27 Sprint 20C.9 & 20P.9A – Cockpit Unification Phase 2
 
 Completed:
@@ -2543,6 +2896,35 @@ Notes:
 * Database was reset for a clean end-to-end workflow test. Backup saved at `backups/steeltrack_before_clean_workflow_20260605_132345.dump`; reusable script added at `scripts/reset-clean-workflow.sql`.
 * Operational data is now clean: inventory materials/transactions, returns, projects, components, BOMs, production orders, QC inspections, yard placements/movements, activity logs and outbox events are zeroed. Master dictionaries, suppliers, QC checklists, yard zones and yard slots were preserved; all yard slots are `AVAILABLE`.
 * Frontend and backend builds pass after the Yard zone/slot runtime fix.
+
+## 2026-06-29
+
+* Sprint BUG.2 validated and corrected Inventory Material Detail analytics timeline direction. `MaterialAnalyticsCockpit` no longer reverses chronological movement rows, `buildMovementTrend()` now fills zero-activity calendar buckets between the material's first and last transaction dates, and chart tooltips now use real `yyyy-MM-dd` date keys rendered as `dd/MM/yyyy`.
+* Sprint BUG.1 fixed Material Detail analytics staleness in Inventory. The backend material detail response now includes live `inventoryValue`, and the frontend Material Detail drawer now uses live detail/computed values instead of stale list-row fallback for inventory value. Movement sparklines now sort date buckets chronologically, keep the latest buckets, use absolute outbound quantities, and cost sparklines are based on recent inbound unit prices.
+* Created `docs/bugs/material-detail-analytics-staleness-report.md` with the transaction-to-detail sequence, rejected hypotheses, root cause, and verification steps.
+* Created `docs/bugs/material-analytics-timeline-validation-report.md` documenting the timeline direction root cause, before/after behavior, validation cases, and affected trend/tooltip behavior.
+
+## 2026-06-30
+
+* Sprint 40PROJ.7 replaces the active Projects WBS metadata bridge with normalized persistence. Added Prisma models and migration for `ProjectTask`, task dependencies, material allocations, component allocations, worker/machine resources, inspections, and task costs.
+* Project WBS APIs and `GET /projects/runtime` now read/write `ProjectTask` domain rows while preserving the existing frontend response shape; legacy `Task.description` JSON is migration input only.
+* Added Project event foundation activity logs for task/material/cost/inspection changes and created architecture docs for Project task domain, migration, scheduling, resource, cost, inspection, and realtime foundations.
+* Sprint 40PROJ.4 upgraded the Projects module toward an execution workspace. Project Detail now includes Overview, Materials, Components, Progress, Cost, Documents, and Logs tabs.
+* Added no-migration Project WBS CRUD endpoints backed by existing `Task` records with SteelTrack Project WBS metadata in `Task.description`.
+* Added editable multi-level WBS tree grid, task editor, task detail drawer, resource-link visibility, move parent/up/down controls, and recursive delete behavior.
+* Added Project list dashboard analytics for progress trend, value trend, work status, and risk alerts using runtime data or empty states.
+* Added Project cost control and timeline panels using existing financial, WBS, project progress, and return request read models.
+* Created Project execution reports under `docs/ui/project-execution-workspace-v2-report.md`, `project-wbs-crud-report.md`, `project-task-resource-linking-report.md`, `project-cost-control-report.md`, and `project-timeline-report.md`.
+* Sprint 40PROJ.5 completed the WBS hierarchy blocker by adding a `Công việc cha` tree select, parent path labels, frontend descendant filtering, and backend circular-parent validation.
+* Added Project Detail `Điều hành` command center with execution KPIs, trend panels, dependency warnings, CSS Grid Gantt, upcoming work, and field-photo empty state.
+* Extended the WBS metadata bridge with task dependency, material/component resource allocation, task revenue, labor cost, machine cost, other cost, and task-level profit/cost traceability fields.
+* Added Task Detail dependency, resource allocation, and task financial sections.
+* Created Project reports for command center, hierarchy, dependencies, Gantt, resource allocation, and cost traceability.
+* Sprint 40PROJ.6 adds a no-migration Project Scheduling read model for WBS dependencies. Backend responses now calculate scheduled start/finish, forecast finish, cascade delay, and baseline variance from WBS metadata.
+* Extended WBS task metadata with baseline dates, worker loading, machine loading, and inspection/acceptance status.
+* Refactored Project Detail `Tiến độ` into a three-pane workspace: WBS tree, task scheduling/detail pane, and action/resource/risk pane.
+* Project Command Center now surfaces cascade delay, resource shortages, procurement readiness warnings, and inspection/handover counters from WBS metadata.
+* Created Project scheduling, baseline, resource loading, procurement readiness, inspection/handover, and detail layout refactor reports.
 
 ## 2026-06-02
 

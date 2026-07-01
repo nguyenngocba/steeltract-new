@@ -6,6 +6,8 @@ import { SidebarItem }
   from './SidebarItem'
 
 type Item = {
+  id?: string
+
   title: string
 
   path: string
@@ -81,7 +83,7 @@ export function SidebarGroup({
         <div className="space-y-1 border-l border-white/10 pl-2">
           {items.map((item) => (
             <SidebarItem
-              key={item.path}
+              key={item.id ?? `${item.path}:${item.title}`}
               label={item.title}
               path={item.path}
             />

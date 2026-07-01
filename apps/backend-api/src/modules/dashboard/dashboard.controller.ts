@@ -15,12 +15,48 @@ import {
 import { PrismaService } from '../../core/prisma/prisma.service'
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { DashboardActivityService } from './dashboard-activity.service'
+import { DashboardInsightService } from './dashboard-insight.service'
+import { DashboardMetricsService } from './dashboard-metrics.service'
+import { DashboardNotificationService } from './dashboard-notification.service'
+import { DashboardRecommendationService } from './dashboard-recommendation.service'
 
 @Controller('dashboard')
 export class DashboardController {
   constructor(
     private prisma: PrismaService,
+    private readonly dashboardMetrics: DashboardMetricsService,
+    private readonly dashboardActivity: DashboardActivityService,
+    private readonly dashboardNotifications: DashboardNotificationService,
+    private readonly dashboardInsights: DashboardInsightService,
+    private readonly dashboardRecommendations: DashboardRecommendationService,
   ) {}
+
+ @UseGuards(JwtAuthGuard)
+  @Get('executive-cockpit')
+  async executiveCockpit() {
+    const [
+      trends,
+      activities,
+      notifications,
+    ] = await Promise.all([
+      this.dashboardMetrics.getPredictiveTrends(),
+      this.dashboardActivity.getRecentActivities(),
+      this.dashboardNotifications.getNotifications(),
+    ])
+    const insights = await this.dashboardInsights.getControlTowerInsights(trends, notifications)
+    const recommendations = this.dashboardRecommendations.getRecommendations(trends, insights, notifications)
+
+    return {
+      generatedAt: new Date().toISOString(),
+      health: insights.health,
+      executiveSummary: insights.executiveSummary,
+      recommendations,
+      trends,
+      activities,
+      notifications,
+    }
+  }
 
  @UseGuards(JwtAuthGuard)
   @Get('cockpit')
@@ -395,6 +431,10 @@ export class DashboardController {
   @UseGuards(JwtAuthGuard)
   @Get('forecast')
   async forecast() {
+    const since = new Date()
+    since.setDate(since.getDate() - 30)
+    since.setHours(0, 0, 0, 0)
+
     const installed =
       await this.prisma.component.count({
         where: {
@@ -409,13 +449,26 @@ export class DashboardController {
     const remaining =
       total - installed
 
-    const dailyRate = 10
+    const completedRecently =
+      await this.prisma.component.count({
+        where: {
+          status: 'INSTALLED',
+          installedDate: {
+            gte: since,
+          },
+        },
+      })
+
+    const dailyRate =
+      completedRecently / 30
 
     const estimatedDays =
-      Math.ceil(
-        remaining /
-          dailyRate,
-      )
+      dailyRate > 0
+        ? Math.ceil(
+            remaining /
+              dailyRate,
+          )
+        : null
 
     return {
       installed,

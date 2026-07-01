@@ -13,10 +13,11 @@ export function SidebarItem({
     useLocation()
 
   const currentPath =
-    `${location.pathname}${location.hash}`
+    `${location.pathname}${location.search}${location.hash}`
 
   const active =
-    currentPath === path || (!path.includes('#') && location.pathname === path)
+    currentPath === path ||
+    (!path.includes('?') && !path.includes('#') && location.pathname === path)
 
   return (
     <Link

@@ -10,6 +10,22 @@ export default defineConfig({
     tailwindcss(),
   ],
 
+  server: {
+    watch: {
+      ignored: [
+        '**/.git/**',
+        '**/.turbo/**',
+        '**/.semble-index/**',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/coverage/**',
+        '**/.vite/**',
+        '../../docs/**',
+        '../../backups/**',
+      ],
+    },
+  },
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

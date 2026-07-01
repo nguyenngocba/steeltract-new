@@ -1,11 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import {
+  Activity,
   AlertTriangle,
+  Bell,
   Boxes,
   Factory,
   PackagePlus,
   ShieldCheck,
+  TrendingDown,
+  TrendingUp,
   Warehouse,
   Clock,
   CheckSquare,
@@ -15,37 +20,66 @@ import { useComponents } from '@/modules/components/hooks/queries/useComponents'
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
 import { useInventoryTransactions } from '@/modules/inventory/hooks/useInventoryTransactions'
 import { useProductionOrders } from '@/modules/production/hooks/useProductionCockpit'
+import { getProjectsRuntime } from '@/modules/projects/api/projects.api'
 import { getQcCockpit } from '@/modules/qc/api/qc.api'
+import { useSupplierCockpitSummaryQuery, useSupplierEvaluationCockpitQuery } from '@/modules/suppliers/hooks/useSuppliersQuery'
 import { useYardMetricsRuntime, useYardMovementsRuntime } from '@/modules/yard/hooks/queries/useYardRuntime'
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
 import {
   ModuleEmptyState,
 } from '@/shared/ui/modules'
-import { formatQuantity } from '@/shared/utils/number-format'
-import { getDashboardCockpit, type DashboardCockpit } from '@/services/api/dashboard.api'
+import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
+import {
+  getDashboardCockpit,
+  getDashboardExecutiveCockpit,
+  type DashboardCockpit,
+  type DashboardExecutiveCockpit,
+  type ExecutiveActivityItem,
+} from '@/services/api/dashboard.api'
 import {
   CockpitChartCard,
   CockpitKpiCard,
+  CockpitRecentList,
+  CockpitSidebarStats,
+  CockpitStatusList,
   COCKPIT_HEIGHTS,
 } from '@/shared/ui/cockpit'
 
 const fmt = (value = 0, digits = 0) => formatQuantity(value, digits)
 const colors = ['#1d7cff', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#38bdf8']
+type DashboardTab = 'kpi' | 'trends' | 'activities' | 'notifications'
+const dashboardTabs: Array<{ id: DashboardTab; label: string }> = [
+  { id: 'kpi', label: 'KPI Chính' },
+  { id: 'trends', label: 'Biểu đồ xu hướng' },
+  { id: 'activities', label: 'Hoạt động gần đây' },
+  { id: 'notifications', label: 'Thông báo' },
+]
 
 // ----------------------------------------------------
 // Main Cockpit Page Component
 // ----------------------------------------------------
 
 export function DashboardPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab') as DashboardTab | null
+  const activeTab = dashboardTabs.some((tab) => tab.id === requestedTab) ? requestedTab! : 'kpi'
   const { data, isLoading } = useQuery<DashboardCockpit>({
     queryKey: ['dashboard-cockpit'],
     queryFn: getDashboardCockpit,
+    refetchInterval: 10000,
+  })
+  const { data: executiveCockpit, isLoading: executiveLoading } = useQuery<DashboardExecutiveCockpit>({
+    queryKey: ['dashboard-executive-cockpit'],
+    queryFn: getDashboardExecutiveCockpit,
     refetchInterval: 10000,
   })
   const { data: transactionsRaw = [] } = useInventoryTransactions({})
   const { data: inventoryRows = [] } = useInventoryAudit()
   const { data: components = [] } = useComponents()
   const { data: productionOrders = [] } = useProductionOrders()
+  const { data: projectsRuntime } = useQuery({ queryKey: ['projects-runtime'], queryFn: getProjectsRuntime, refetchInterval: 10000 })
+  const { data: supplierSummary } = useSupplierCockpitSummaryQuery()
+  const { data: supplierEvaluation } = useSupplierEvaluationCockpitQuery()
   const { data: yardMetrics } = useYardMetricsRuntime()
   const { data: yardMovements = [] } = useYardMovementsRuntime()
   const { data: qc } = useQuery({ queryKey: ['qc-cockpit'], queryFn: getQcCockpit, refetchInterval: 10000 })
@@ -55,61 +89,91 @@ export function DashboardPage() {
   const inventoryForecast = useMemo(() => buildInventoryForecast(data, inventoryRows, transactions), [data, inventoryRows, transactions])
   const componentPipeline = useMemo(() => buildComponentPipeline(components, productionOrders), [components, productionOrders])
   const componentForecast = useMemo(() => buildComponentForecast(componentPipeline, productionOrders), [componentPipeline, productionOrders])
+  const productionOverview = useMemo(() => buildProductionOverview(productionOrders), [productionOrders])
+  const projectsOverview = useMemo(() => buildProjectsOverview(projectsRuntime), [projectsRuntime])
+  const suppliersOverview = useMemo(() => buildSuppliersOverview(supplierSummary, supplierEvaluation), [supplierSummary, supplierEvaluation])
   const yardAnalytics = useMemo(() => buildYardAnalytics(yardMetrics, yardMovements), [yardMetrics, yardMovements])
   const qcTrend = useMemo(() => buildQcTrend(qc), [qc])
+  const inventoryKpis = useMemo(() => buildInventoryKpis(inventoryRows), [inventoryRows])
   const executiveAlerts = useMemo(
     () => buildExecutiveAlerts(data, inventoryForecast, componentPipeline, yardAnalytics, qcTrend, materialRecommendations, componentForecast),
     [data, inventoryForecast, componentPipeline, yardAnalytics, qcTrend, materialRecommendations, componentForecast],
   )
-  const kpis = data?.kpis
-
-  // Memoize trend data for Inventory Days to avoid array recreation
-  const inventoryTrendData = useMemo(() => 
-    inventoryForecast.trendRows?.map(r => r.value) ?? [],
-    [inventoryForecast.trendRows]
-  )
+  const inventoryTrendData = useMemo(() => inventoryForecast.trendRows?.map((row) => row.stock) ?? [], [inventoryForecast.trendRows])
 
   return (
     <OperationalShell>
       <main className="min-h-screen bg-[#050b14] p-2.5 text-slate-100 font-sans space-y-1">
+        <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-cyan-300/10 bg-slate-950/40 p-1">
+          {dashboardTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSearchParams(tab.id === 'kpi' ? {} : { tab: tab.id })}
+              className={`h-9 rounded-xl px-3 text-[13px] font-medium transition ${
+                activeTab === tab.id
+                  ? 'border border-cyan-300/25 bg-cyan-500/15 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,0.12)]'
+                  : 'border border-transparent text-slate-400 hover:bg-white/[0.04] hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'trends' && (
+          <PredictiveTrendsTab cockpit={executiveCockpit} isLoading={executiveLoading} />
+        )}
+
+        {activeTab === 'activities' && (
+          <RecentActivitiesTab cockpit={executiveCockpit} isLoading={executiveLoading} />
+        )}
+
+        {activeTab === 'notifications' && (
+          <ExecutiveNotificationsTab cockpit={executiveCockpit} isLoading={executiveLoading} />
+        )}
+
+        {activeTab === 'kpi' && (
+          <>
+        <ExecutiveControlTower cockpit={executiveCockpit} isLoading={executiveLoading} />
         
-        {/* ROW 1: KPI strip (h-128px) */}
+        {/* ROW 1: Inventory KPI strip (KPI Chính) */}
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           <CockpitKpiCard
-            title="Ngày tồn"
-            value={isLoading ? '' : `${fmt(inventoryForecast.daysOfCover, 0)} ngày`}
-            trendText={inventoryForecast.daysOfCover < 7 ? '▲ Cảnh báo' : '▲ 2,4 ngày (+6,1%)'}
+            title="Giá trị tồn kho"
+            value={isLoading ? '' : formatCurrencyVnd(inventoryKpis.inventoryValue)}
+            trendText={inventoryKpis.inventoryValue > 0 ? 'Từ tồn kho hiện tại' : 'Chưa có giá trị'}
             trendData={inventoryTrendData}
-            tone={inventoryForecast.daysOfCover < 7 ? 'red' : 'cyan'}
-            state={isLoading ? 'loading' : (!inventoryForecast.currentStock ? 'empty' : (inventoryForecast.daysOfCover < 7 ? 'alert' : 'normal'))}
-          />
-          <CockpitKpiCard
-            title="Sản xuất"
-            value={isLoading ? '' : `${fmt(kpis?.productionActive)} chuyền`}
-            trendText="▲ 1 chuyền (+5,9%)"
-            tone="blue"
-            state={isLoading ? 'loading' : (!kpis?.productionOrders ? 'empty' : 'normal')}
-          />
-          <CockpitKpiCard
-            title="Cấu kiện"
-            value={isLoading ? '' : '256K kiện'}
-            trendText="▲ 12K kiện (+4,8%)"
             tone="cyan"
-            state={isLoading ? 'loading' : (!componentPipeline.total ? 'empty' : 'normal')}
+            state={isLoading ? 'loading' : (!inventoryKpis.inventoryValue ? 'empty' : 'normal')}
           />
           <CockpitKpiCard
-            title="QC đạt"
-            value={isLoading ? '' : `${fmt(qcTrend.passRate, 1).replace('.', ',')}%`}
-            trendText="▲ 0,6%"
-            tone={qcTrend.passRate < 90 ? 'amber' : 'emerald'}
-            state={isLoading ? 'loading' : (!qcTrend.passRate ? 'empty' : (qcTrend.passRate < 90 ? 'alert' : 'normal'))}
+            title="Khối lượng tồn"
+            value={isLoading ? '' : `${fmt(inventoryKpis.totalStock, 1)} tấn`}
+            trendText="Theo inventory_location_stocks / audit"
+            tone="blue"
+            state={isLoading ? 'loading' : (!inventoryKpis.totalStock ? 'empty' : 'normal')}
           />
           <CockpitKpiCard
-            title="Cảnh báo"
-            value={isLoading ? '' : `${fmt(executiveAlerts.length)} cảnh báo`}
-            trendText="▼ 2 cảnh báo (-22%)"
-            tone={executiveAlerts.length > 0 ? (executiveAlerts.some(a => a.tone === 'red') ? 'red' : 'amber') : 'cyan'}
-            state={isLoading ? 'loading' : (executiveAlerts.length > 0 ? 'alert' : 'normal')}
+            title="Mã vật tư"
+            value={isLoading ? '' : fmt(inventoryKpis.materialCodes)}
+            trendText="Số mã trong Material Master"
+            tone="cyan"
+            state={isLoading ? 'loading' : (!inventoryKpis.materialCodes ? 'empty' : 'normal')}
+          />
+          <CockpitKpiCard
+            title="Sắp hết hàng"
+            value={isLoading ? '' : fmt(inventoryKpis.lowStock)}
+            trendText="Dựa trên tồn tối thiểu"
+            tone={inventoryKpis.lowStock ? 'amber' : 'emerald'}
+            state={isLoading ? 'loading' : (inventoryKpis.lowStock ? 'alert' : 'normal')}
+          />
+          <CockpitKpiCard
+            title="Hết hàng"
+            value={isLoading ? '' : fmt(inventoryKpis.outOfStock)}
+            trendText="Tồn kho <= 0"
+            tone={inventoryKpis.outOfStock ? 'red' : 'emerald'}
+            state={isLoading ? 'loading' : (inventoryKpis.outOfStock ? 'alert' : 'normal')}
           />
         </div>
 
@@ -185,7 +249,37 @@ export function DashboardPage() {
           </CockpitChartCard>
         </div>
 
-        {/* ROW 5: Hoạt động gần đây & Giả định dự báo */}
+        {/* ROW 5: Production, Projects, Suppliers */}
+        <div className="grid grid-cols-12 gap-1">
+          <CockpitChartCard
+            title="Sản xuất"
+            subtitle="KPI lệnh sản xuất từ dữ liệu MO"
+            heightClass="h-[260px]"
+            className="col-span-12 xl:col-span-4"
+          >
+            <ProductionOverviewPanel overview={productionOverview} />
+          </CockpitChartCard>
+
+          <CockpitChartCard
+            title="Công trình"
+            subtitle="Tiến độ và giá trị theo công trình"
+            heightClass="h-[260px]"
+            className="col-span-12 xl:col-span-4"
+          >
+            <ProjectsOverviewPanel overview={projectsOverview} />
+          </CockpitChartCard>
+
+          <CockpitChartCard
+            title="Nhà cung cấp"
+            subtitle="NCC hoạt động và đánh giá thật"
+            heightClass="h-[260px]"
+            className="col-span-12 xl:col-span-4"
+          >
+            <SuppliersOverviewPanel overview={suppliersOverview} />
+          </CockpitChartCard>
+        </div>
+
+        {/* ROW 6: Hoạt động gần đây & Giả định dự báo */}
         <div className="grid grid-cols-12 gap-1">
           <CockpitChartCard 
             title="Hoạt động gần đây"
@@ -205,6 +299,8 @@ export function DashboardPage() {
             <AssumptionsPanel />
           </CockpitChartCard>
         </div>
+          </>
+        )}
       </main>
     </OperationalShell>
   )
@@ -214,7 +310,563 @@ export function DashboardPage() {
 // Local Chart & Layout Sub-Components
 // ----------------------------------------------------
 
-function MovementGroupedBarChart({ series }: { series: Array<{ label: string; value: number }> }) {
+function ExecutiveControlTower({ cockpit, isLoading }: { cockpit?: DashboardExecutiveCockpit; isLoading: boolean }) {
+  const health = cockpit?.health
+  const summary = cockpit?.executiveSummary
+  const recommendations = cockpit?.recommendations
+  const activities = cockpit?.activities.items ?? []
+  const notifications = cockpit?.notifications
+
+  return (
+    <div className="space-y-1">
+      <div className="grid grid-cols-12 gap-1">
+        <CockpitChartCard title="Tình trạng vận hành hôm nay" subtitle="REAL · Inventory / Production / Yard / QC / Suppliers / Projects" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+          {isLoading ? (
+            <ModuleEmptyState title="Đang tải" description="Hệ thống đang tổng hợp tình trạng vận hành." />
+          ) : (
+            <HealthScorePanel health={health} />
+          )}
+        </CockpitChartCard>
+
+        <CockpitChartCard title="7 ngày tới" subtitle="REAL · Moving average và trạng thái vận hành" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+          <ExecutiveSummaryPanel rows={summary?.items ?? []} />
+        </CockpitChartCard>
+
+        <CockpitChartCard title="Khuyến nghị hôm nay" subtitle="REAL · Rules engine từ cảnh báo vận hành" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+          <SuggestedActionsPanel rows={recommendations?.items ?? []} />
+        </CockpitChartCard>
+      </div>
+
+      <div className="grid grid-cols-12 gap-1">
+        <CockpitChartCard title="Hoạt động theo module" subtitle="REAL · Nhóm hoạt động gần đây" className="col-span-12 xl:col-span-7" heightClass="h-[340px]">
+          <ActivityModuleGroups rows={activities} />
+        </CockpitChartCard>
+
+        <CockpitChartCard title="Notification Center" subtitle="REAL · Critical / Warning / Information" className="col-span-12 xl:col-span-5" heightClass="h-[340px]">
+          <NotificationCenterPanel notifications={notifications} />
+        </CockpitChartCard>
+      </div>
+    </div>
+  )
+}
+
+function HealthScorePanel({ health }: { health?: DashboardExecutiveCockpit['health'] }) {
+  if (!health) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." />
+  }
+
+  const scoreTone = health.status === 'critical' ? 'text-red-300' : health.status === 'warning' ? 'text-amber-300' : 'text-emerald-300'
+  const scoreBg = health.status === 'critical' ? 'border-red-400/25 bg-red-950/[0.04]' : health.status === 'warning' ? 'border-amber-400/25 bg-amber-950/[0.04]' : 'border-emerald-400/20 bg-emerald-950/[0.03]'
+
+  return (
+    <div className="grid h-[224px] grid-cols-[140px_1fr] gap-3">
+      <div className={`flex flex-col items-center justify-center rounded-2xl border ${scoreBg}`}>
+        <div className={`text-[42px] font-bold leading-none tabular-nums ${scoreTone}`}>{fmt(health.score)}</div>
+        <div className="mt-1 text-[13px] text-slate-400">/ 100</div>
+        <div className="mt-3 text-center text-[12px] text-slate-500">{health.title}</div>
+      </div>
+      <div className="space-y-1 overflow-y-auto scrollbar-thin">
+        <CockpitStatusList
+          items={health.modules.map((module) => ({
+            id: module.module,
+            label: `${statusIcon(module.status)} ${module.label}: ${module.summary}`,
+            value: module.score,
+            statusTone: module.status === 'critical' ? 'red' : module.status === 'warning' ? 'amber' : 'emerald',
+          }))}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ExecutiveSummaryPanel({ rows }: { rows: DashboardExecutiveCockpit['executiveSummary']['items'] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." />
+  }
+
+  return (
+    <div className="h-[224px] overflow-y-auto scrollbar-thin">
+      <CockpitRecentList
+        items={rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          subtitle: row.description,
+          time: row.unit ? `${fmt(row.value, 1)}${row.unit}` : fmt(row.value),
+          statusDot: row.priority === 'critical' ? 'bg-red-400' : row.priority === 'warning' ? 'bg-amber-400' : 'bg-cyan-400',
+          highlight: row.priority === 'critical',
+        }))}
+        emptyMessage="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ."
+      />
+    </div>
+  )
+}
+
+function SuggestedActionsPanel({ rows }: { rows: DashboardExecutiveCockpit['recommendations']['items'] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có khuyến nghị" description="Hệ thống chưa phát hiện hành động cần ưu tiên." />
+  }
+
+  return (
+    <div className="h-[224px] overflow-y-auto scrollbar-thin">
+      <CockpitRecentList
+        items={rows.map((row, index) => ({
+          id: row.id,
+          title: `${index + 1}. ${row.title}`,
+          subtitle: `${row.actionType} · ${row.suggestedAction}`,
+          time: row.entityCode ?? row.module,
+          statusDot: row.priority === 'critical' ? 'bg-red-400' : row.priority === 'warning' ? 'bg-amber-400' : 'bg-cyan-400',
+          highlight: row.priority === 'critical',
+        }))}
+      />
+    </div>
+  )
+}
+
+function ActivityModuleGroups({ rows }: { rows: ExecutiveActivityItem[] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." />
+  }
+
+  const modules: ExecutiveActivityItem['module'][] = ['Inventory', 'Production', 'Yard', 'QC', 'Projects', 'Purchasing']
+
+  return (
+    <div className="grid h-[264px] grid-cols-1 gap-1 overflow-y-auto scrollbar-thin md:grid-cols-2 xl:grid-cols-3">
+      {modules.map((module) => {
+        const moduleRows = rows.filter((row) => row.module === module).slice(0, 4)
+        return (
+          <div key={module} className="rounded-xl border border-white/5 bg-slate-950/25 p-2">
+            <div className="mb-2 flex items-center justify-between">
+              <span className={`rounded-lg border px-2 py-0.5 text-[11px] ${moduleTone(module)}`}>{moduleLabel(module)}</span>
+              <span className="text-[11px] text-slate-500">{fmt(rows.filter((row) => row.module === module).length)} dòng</span>
+            </div>
+            <CockpitRecentList
+              items={moduleRows.map((row) => ({
+                id: row.id,
+                title: row.title,
+                subtitle: row.description,
+                time: row.relativeTime,
+                statusDot: row.severity === 'critical' ? 'bg-red-400' : row.severity === 'warning' ? 'bg-amber-400' : 'bg-cyan-400',
+              }))}
+              emptyMessage="Chưa có hoạt động."
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function NotificationCenterPanel({ notifications }: { notifications?: DashboardExecutiveCockpit['notifications'] }) {
+  const counts = notifications?.counts ?? { critical: 0, warning: 0, information: 0 }
+  const topRows = notifications?.items.slice(0, 6) ?? []
+
+  return (
+    <div className="grid h-[264px] grid-cols-[160px_1fr] gap-3">
+      <CockpitSidebarStats
+        stats={[
+          { label: 'Critical', value: counts.critical, colorClass: counts.critical ? 'text-red-300' : 'text-slate-400' },
+          { label: 'Warning', value: counts.warning, colorClass: counts.warning ? 'text-amber-300' : 'text-slate-400' },
+          { label: 'Information', value: counts.information, colorClass: 'text-cyan-300' },
+          { label: 'Tổng', value: counts.critical + counts.warning + counts.information, colorClass: 'text-white' },
+        ]}
+      />
+      <div className="overflow-y-auto scrollbar-thin">
+        {topRows.length ? (
+          <CockpitRecentList
+            items={topRows.map((row) => ({
+              id: row.id,
+              title: row.title,
+              subtitle: row.description,
+              time: row.priority,
+              statusDot: row.priority === 'Critical' ? 'bg-red-400' : row.priority === 'Warning' ? 'bg-amber-400' : 'bg-cyan-400',
+              highlight: row.priority === 'Critical',
+            }))}
+          />
+        ) : (
+          <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function statusIcon(status: 'normal' | 'warning' | 'critical') {
+  if (status === 'critical') return '🔴'
+  if (status === 'warning') return '🟡'
+  return '🟢'
+}
+
+function moduleLabel(module: ExecutiveActivityItem['module']) {
+  switch (module) {
+    case 'Inventory':
+      return 'Kho'
+    case 'Production':
+      return 'Sản xuất'
+    case 'Yard':
+      return 'Bãi tập kết'
+    case 'QC':
+      return 'QC'
+    case 'Projects':
+      return 'Projects'
+    case 'Purchasing':
+      return 'Suppliers'
+    default:
+      return module
+  }
+}
+
+function PredictiveTrendsTab({ cockpit, isLoading }: { cockpit?: DashboardExecutiveCockpit; isLoading: boolean }) {
+  const trends = cockpit?.trends
+  const shortageRows = trends?.materialShortageForecast ?? []
+  const risks = trends?.productionStopRisks ?? []
+  const recommendations = trends?.recommendations ?? []
+  const forecast = trends?.inventoryForecast
+
+  if (isLoading) {
+    return <div className="grid grid-cols-12 gap-1"><CockpitChartCard title="Đang tải dữ liệu dự báo" className="col-span-12 h-[520px]"><ModuleEmptyState title="Đang tải" description="Hệ thống đang tổng hợp dữ liệu vận hành." /></CockpitChartCard></div>
+  }
+
+  return (
+    <div className="grid grid-cols-12 gap-1">
+      <CockpitChartCard title="Dự báo thiếu vật tư" subtitle="REAL · Tồn hiện tại / tiêu thụ 30-90 ngày" className="col-span-12 xl:col-span-8" heightClass="h-[360px]">
+        <MaterialShortageForecast rows={shortageRows} />
+      </CockpitChartCard>
+
+      <CockpitChartCard title="Nên nhập" subtitle="REAL · Khuyến nghị theo moving average" className="col-span-12 xl:col-span-4" heightClass="h-[360px]">
+        <RecommendationPanel rows={recommendations} />
+      </CockpitChartCard>
+
+      <CockpitChartCard title="Nguy cơ dừng sản xuất" subtitle="REAL · BOM + issued + tồn khả dụng" className="col-span-12 xl:col-span-5" heightClass="h-[300px]">
+        <ProductionRiskPanel rows={risks} />
+      </CockpitChartCard>
+
+      <CockpitChartCard title="Xu hướng tiêu thụ" subtitle="REAL · 30 ngày gần nhất so với 30 ngày trước" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+        <ConsumptionTrendPanel trends={trends?.consumptionTrends} />
+      </CockpitChartCard>
+
+      <CockpitChartCard title="Dự báo tồn kho" subtitle="REAL · 7 / 30 / 90 ngày từ rolling average" className="col-span-12 xl:col-span-3" heightClass="h-[300px]">
+        <InventoryProjectionPanel forecast={forecast} />
+      </CockpitChartCard>
+    </div>
+  )
+}
+
+function MaterialShortageForecast({ rows }: { rows: DashboardExecutiveCockpit['trends']['materialShortageForecast'] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<PackagePlus className="h-8 w-8" />} />
+  }
+
+  return (
+    <div className="h-[284px] overflow-y-auto scrollbar-thin">
+      <table className="w-full table-fixed text-[13px]">
+        <thead className="border-b border-cyan-400/10 text-slate-400">
+          <tr>
+            <th className="px-2 py-2 text-left font-medium">Vật tư</th>
+            <th className="px-2 py-2 text-right font-medium">Tồn</th>
+            <th className="px-2 py-2 text-right font-medium">TB/ngày</th>
+            <th className="px-2 py-2 text-right font-medium">Hết sau</th>
+            <th className="px-2 py-2 text-right font-medium">Khuyến nghị</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {rows.slice(0, 10).map((row) => (
+            <tr key={row.inventoryItemId} className="hover:bg-cyan-400/[0.04]">
+              <td className="px-2 py-2">
+                <div className="truncate font-semibold text-white">{row.materialCode}</div>
+                <div className="truncate text-[12px] text-slate-500">{row.materialName}</div>
+              </td>
+              <td className="px-2 py-2 text-right font-mono text-slate-200">{fmt(row.currentStock, 2)} {row.unit}</td>
+              <td className="px-2 py-2 text-right font-mono text-cyan-300">{fmt(row.averageDailyUsage, 2)}</td>
+              <td className={`px-2 py-2 text-right font-mono ${row.severity === 'critical' ? 'text-red-400' : row.severity === 'warning' ? 'text-amber-400' : 'text-slate-300'}`}>
+                {row.daysUntilStockout === null ? '—' : `${fmt(row.daysUntilStockout)} ngày`}
+              </td>
+              <td className="px-2 py-2 text-right font-mono text-emerald-300">{fmt(row.recommendedReorderQty, 2)} {row.unit}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function RecommendationPanel({ rows }: { rows: DashboardExecutiveCockpit['trends']['recommendations'] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<PackagePlus className="h-8 w-8" />} />
+  }
+
+  return (
+    <div className="h-[284px] space-y-2 overflow-y-auto scrollbar-thin">
+      {rows.slice(0, 8).map((row) => (
+        <div key={row.materialId} className="rounded-xl border border-cyan-300/10 bg-slate-950/40 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-white">{row.materialCode}</div>
+              <div className="truncate text-[12px] text-slate-500">{row.materialName}</div>
+            </div>
+            <span className={`rounded-lg border px-2 py-0.5 text-[11px] ${row.priority === 'critical' ? 'border-red-400/30 text-red-300' : row.priority === 'warning' ? 'border-amber-400/30 text-amber-300' : 'border-cyan-400/30 text-cyan-300'}`}>
+              {fmt(row.recommendedQty, 2)} {row.unit}
+            </span>
+          </div>
+          <div className="mt-2 text-[12px] text-slate-400">{row.reason}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ProductionRiskPanel({ rows }: { rows: DashboardExecutiveCockpit['trends']['productionStopRisks'] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<Factory className="h-8 w-8" />} />
+  }
+
+  return (
+    <div className="h-[224px] space-y-2 overflow-y-auto scrollbar-thin">
+      {rows.slice(0, 6).map((row) => (
+        <div key={row.productionOrderId} className="rounded-xl border border-red-400/15 bg-red-950/[0.04] p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-white">{row.productionOrderNo}</div>
+              <div className="truncate text-[12px] text-slate-500">{row.componentCode ?? row.title}</div>
+            </div>
+            <span className="rounded-lg border border-red-400/30 px-2 py-0.5 text-[11px] text-red-300">{row.missingMaterials.length} thiếu</span>
+          </div>
+          <div className="mt-2 space-y-1">
+            {row.missingMaterials.slice(0, 3).map((material) => (
+              <div key={material.materialId} className="flex justify-between gap-2 text-[12px] text-slate-300">
+                <span className="truncate">{material.materialCode} · {material.materialName}</span>
+                <span className="shrink-0 font-mono text-red-300">{fmt(material.shortageQty, 2)} {material.unit}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ConsumptionTrendPanel({ trends }: { trends?: DashboardExecutiveCockpit['trends']['consumptionTrends'] }) {
+  const increasing = trends?.increasing ?? []
+  const decreasing = trends?.decreasing ?? []
+  const abnormal = trends?.abnormal ?? []
+
+  if (!increasing.length && !decreasing.length && !abnormal.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<TrendingUp className="h-8 w-8" />} />
+  }
+
+  return (
+    <div className="grid h-[224px] grid-cols-3 gap-2">
+      <TrendMiniList title="Tăng sử dụng" rows={increasing} tone="up" />
+      <TrendMiniList title="Giảm sử dụng" rows={decreasing} tone="down" />
+      <TrendMiniList title="Bất thường" rows={abnormal} tone="alert" />
+    </div>
+  )
+}
+
+function TrendMiniList({ title, rows, tone }: { title: string; rows: DashboardExecutiveCockpit['trends']['consumptionTrends']['increasing']; tone: 'up' | 'down' | 'alert' }) {
+  const toneClass = tone === 'up' ? 'text-emerald-300' : tone === 'down' ? 'text-sky-300' : 'text-amber-300'
+  return (
+    <div className="rounded-xl border border-white/5 bg-slate-950/30 p-2">
+      <div className={`mb-2 flex items-center gap-1 text-[12px] font-semibold ${toneClass}`}>
+        {tone === 'down' ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
+        {title}
+      </div>
+      <div className="space-y-1.5">
+        {rows.slice(0, 4).map((row) => (
+          <div key={row.materialId} className="min-w-0">
+            <div className="truncate text-[12px] text-white">{row.materialCode}</div>
+            <div className="text-[11px] text-slate-500">{fmt(row.changePercent, 1)}%</div>
+          </div>
+        ))}
+        {!rows.length && <div className="text-[12px] text-slate-600">Không có</div>}
+      </div>
+    </div>
+  )
+}
+
+function InventoryProjectionPanel({ forecast }: { forecast?: DashboardExecutiveCockpit['trends']['inventoryForecast'] }) {
+  if (!forecast?.currentStock) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<Warehouse className="h-8 w-8" />} />
+  }
+
+  const rows = [
+    { label: '7 ngày', value: forecast.horizon7d.at(-1)?.projectedStock ?? forecast.currentStock },
+    { label: '30 ngày', value: forecast.horizon30d.at(-1)?.projectedStock ?? forecast.currentStock },
+    { label: '90 ngày', value: forecast.horizon90d.at(-1)?.projectedStock ?? forecast.currentStock },
+  ]
+
+  return (
+    <div className="h-[224px] space-y-3">
+      <div className="rounded-xl border border-white/5 bg-slate-950/30 p-3">
+        <div className="text-[12px] text-slate-500">Xu hướng</div>
+        <div className={`mt-1 text-lg font-bold ${forecast.trend === 'DOWN_STRONG' ? 'text-red-300' : forecast.trend === 'UP' ? 'text-emerald-300' : 'text-cyan-300'}`}>
+          {forecast.trend === 'DOWN_STRONG' ? 'Giảm mạnh' : forecast.trend === 'UP' ? 'Tăng' : 'Ổn định'}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between rounded-lg border border-white/5 bg-slate-950/20 px-3 py-2 text-[13px]">
+            <span className="text-slate-400">{row.label}</span>
+            <span className="font-mono font-semibold text-white">{fmt(row.value, 1)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RecentActivitiesTab({ cockpit, isLoading }: { cockpit?: DashboardExecutiveCockpit; isLoading: boolean }) {
+  const filters = cockpit?.activities.filters ?? []
+  const [activeFilter, setActiveFilter] = useState<ExecutiveActivityItem['module'] | 'ALL'>('ALL')
+  const rows = cockpit?.activities.items ?? []
+  const filtered = activeFilter === 'ALL' ? rows : rows.filter((row) => row.module === activeFilter)
+
+  return (
+    <div className="grid grid-cols-12 gap-1">
+      <CockpitChartCard
+        title="Hoạt động theo module"
+        subtitle="REAL · Kho / Sản xuất / Bãi / QC / Projects / Suppliers"
+        className="col-span-12 xl:col-span-5"
+        heightClass="h-[620px]"
+        action={
+          <div className="flex flex-wrap gap-1">
+            <button type="button" onClick={() => setActiveFilter('ALL')} className={activityFilterClass(activeFilter === 'ALL')}>Tất cả</button>
+            {filters.map((filter) => (
+              <button key={filter} type="button" onClick={() => setActiveFilter(filter)} className={activityFilterClass(activeFilter === filter)}>{filter}</button>
+            ))}
+          </div>
+        }
+      >
+        {isLoading ? (
+          <ModuleEmptyState title="Đang tải" description="Hệ thống đang tổng hợp hoạt động gần đây." icon={<Activity className="h-8 w-8" />} />
+        ) : (
+          <ActivityModuleGroups rows={filtered} />
+        )}
+      </CockpitChartCard>
+
+      <CockpitChartCard
+        title="Timeline hợp nhất toàn hệ thống"
+        subtitle="REAL · Dòng thời gian điều hành"
+        className="col-span-12 xl:col-span-7"
+        heightClass="h-[620px]"
+      >
+        {isLoading ? (
+          <ModuleEmptyState title="Đang tải" description="Hệ thống đang tổng hợp hoạt động gần đây." icon={<Activity className="h-8 w-8" />} />
+        ) : (
+          <ActivityTimeline rows={filtered} />
+        )}
+      </CockpitChartCard>
+    </div>
+  )
+}
+
+function ActivityTimeline({ rows }: { rows: ExecutiveActivityItem[] }) {
+  if (!rows.length) {
+    return <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<Activity className="h-8 w-8" />} />
+  }
+
+  return (
+    <div className="h-[544px] overflow-y-auto pr-1 scrollbar-thin">
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <div key={row.id} className="grid grid-cols-[90px_1fr] gap-3 rounded-xl border border-cyan-300/10 bg-slate-950/30 p-3">
+            <div className="text-right">
+              <div className="text-[12px] font-semibold text-cyan-300">{row.relativeTime}</div>
+              <div className="mt-1 text-[11px] text-slate-600">{new Date(row.occurredAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+            <div className="min-w-0 border-l border-cyan-400/10 pl-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-lg border px-2 py-0.5 text-[11px] ${moduleTone(row.module)}`}>{row.module}</span>
+                <span className="text-[13px] font-semibold text-white">{row.title}</span>
+                {row.entityCode && <span className="text-[12px] text-slate-500">{row.entityCode}</span>}
+              </div>
+              <div className="mt-1 text-[13px] text-slate-300">{row.description}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ExecutiveNotificationsTab({ cockpit, isLoading }: { cockpit?: DashboardExecutiveCockpit; isLoading: boolean }) {
+  const notifications = cockpit?.notifications
+  const rows = notifications?.items ?? []
+
+  if (isLoading) {
+    return <CockpitChartCard title="Thông báo hệ thống" heightClass="h-[520px]"><ModuleEmptyState title="Đang tải" description="Hệ thống đang tổng hợp thông báo." icon={<Bell className="h-8 w-8" />} /></CockpitChartCard>
+  }
+
+  return (
+    <div className="grid grid-cols-12 gap-1">
+      <CockpitKpiCard className="col-span-12 md:col-span-4" title="Critical" value={fmt(notifications?.counts.critical ?? 0)} trendText="Cần xử lý ngay" tone={(notifications?.counts.critical ?? 0) ? 'red' : 'emerald'} state={(notifications?.counts.critical ?? 0) ? 'alert' : 'normal'} />
+      <CockpitKpiCard className="col-span-12 md:col-span-4" title="Warning" value={fmt(notifications?.counts.warning ?? 0)} trendText="Cần theo dõi" tone={(notifications?.counts.warning ?? 0) ? 'amber' : 'emerald'} state={(notifications?.counts.warning ?? 0) ? 'alert' : 'normal'} />
+      <CockpitKpiCard className="col-span-12 md:col-span-4" title="Information" value={fmt(notifications?.counts.information ?? 0)} trendText="Thông tin vận hành" tone="cyan" state={(notifications?.counts.information ?? 0) ? 'normal' : 'empty'} />
+      <div className="col-span-12 grid grid-cols-12 gap-1">
+        <NotificationColumn title="Critical" rows={rows.filter((row) => row.priority === 'Critical')} className="col-span-12 xl:col-span-4" />
+        <NotificationColumn title="Warning" rows={rows.filter((row) => row.priority === 'Warning')} className="col-span-12 xl:col-span-4" />
+        <NotificationColumn title="Information" rows={rows.filter((row) => row.priority === 'Information')} className="col-span-12 xl:col-span-4" />
+      </div>
+    </div>
+  )
+}
+
+function NotificationColumn({ title, rows, className }: { title: string; rows: DashboardExecutiveCockpit['notifications']['items']; className?: string }) {
+  return (
+    <CockpitChartCard title={title} subtitle={`${fmt(rows.length)} thông báo`} className={className} heightClass="h-[520px]">
+      {!rows.length ? (
+        <ModuleEmptyState title="Chưa có dữ liệu" description="Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ." icon={<Bell className="h-8 w-8" />} />
+      ) : (
+        <div className="h-[444px] space-y-2 overflow-y-auto scrollbar-thin">
+          {rows.map((row) => (
+            <div key={row.id} className={`rounded-xl border p-3 ${row.priority === 'Critical' ? 'border-red-400/20 bg-red-950/[0.04]' : row.priority === 'Warning' ? 'border-amber-400/20 bg-amber-950/[0.04]' : 'border-cyan-400/15 bg-cyan-950/[0.03]'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-semibold text-white">{row.title}</div>
+                  <div className="mt-0.5 text-[12px] text-slate-500">{row.module}{row.entityCode ? ` · ${row.entityCode}` : ''}</div>
+                </div>
+                {row.actionLabel && <span className="shrink-0 rounded-lg border border-white/10 px-2 py-0.5 text-[11px] text-slate-300">{row.actionLabel}</span>}
+              </div>
+              <div className="mt-2 text-[13px] text-slate-300">{row.description}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </CockpitChartCard>
+  )
+}
+
+function activityFilterClass(active: boolean) {
+  return `h-7 rounded-lg border px-2 text-[11px] transition ${
+    active
+      ? 'border-cyan-300/30 bg-cyan-500/15 text-cyan-200'
+      : 'border-white/10 text-slate-400 hover:bg-white/[0.04] hover:text-white'
+  }`
+}
+
+function moduleTone(module: ExecutiveActivityItem['module']) {
+  switch (module) {
+    case 'Inventory':
+      return 'border-emerald-400/25 text-emerald-300'
+    case 'Production':
+      return 'border-blue-400/25 text-blue-300'
+    case 'Yard':
+      return 'border-cyan-400/25 text-cyan-300'
+    case 'QC':
+      return 'border-violet-400/25 text-violet-300'
+    case 'Purchasing':
+      return 'border-amber-400/25 text-amber-300'
+    case 'Projects':
+      return 'border-sky-400/25 text-sky-300'
+    default:
+      return 'border-white/10 text-slate-300'
+  }
+}
+
+function MovementGroupedBarChart({ series }: { series: InventoryMovementPoint[] }) {
+  const maxValue = Math.max(1, ...series.flatMap((row) => [row.inbound, row.outbound, row.stock]))
+  const avgInbound = series.reduce((sum, row) => sum + row.inbound, 0) / Math.max(1, series.length)
+  const avgOutbound = series.reduce((sum, row) => sum + row.outbound, 0) / Math.max(1, series.length)
+  const latestStock = series.at(-1)?.stock ?? 0
   return (
     <div className="relative h-[290px] w-full flex flex-col justify-between pt-1">
       {/* Legend on top */}
@@ -233,9 +885,9 @@ function MovementGroupedBarChart({ series }: { series: Array<{ label: string; va
           
           {series.map((s, idx) => {
             const xOffset = 6 + idx * 19
-            const inboundHeight = Math.min(75, Math.max(8, (s.value / 12000) * 80))
-            const outboundHeight = Math.min(75, Math.max(5, (s.value / 15000) * 80))
-            const stockHeight = Math.min(80, Math.max(12, (s.value / 10000) * 80))
+            const inboundHeight = s.inbound > 0 ? Math.max(5, (s.inbound / maxValue) * 80) : 0
+            const outboundHeight = s.outbound > 0 ? Math.max(5, (s.outbound / maxValue) * 80) : 0
+            const stockHeight = s.stock > 0 ? Math.max(5, (s.stock / maxValue) * 80) : 0
 
             return (
               <g key={idx}>
@@ -260,15 +912,15 @@ function MovementGroupedBarChart({ series }: { series: Array<{ label: string; va
       <div className="grid grid-cols-3 gap-2 text-center border-t border-white/5 pt-2 mt-2">
         <div>
           <span className="text-[9px] text-slate-500 block uppercase">Trung bình nhập</span>
-          <span className="text-xs font-semibold text-white font-mono">4.2k t</span>
+          <span className="text-xs font-semibold text-white font-mono">{fmt(avgInbound, 1)} t</span>
         </div>
         <div>
           <span className="text-[9px] text-slate-500 block uppercase">Trung bình xuất</span>
-          <span className="text-xs font-semibold text-white font-mono">3.8k t</span>
+          <span className="text-xs font-semibold text-white font-mono">{fmt(avgOutbound, 1)} t</span>
         </div>
         <div>
-          <span className="text-[9px] text-slate-500 block uppercase">Hiệu suất tồn</span>
-          <span className="text-xs font-semibold text-cyan-300 font-mono">92.4%</span>
+          <span className="text-[9px] text-slate-500 block uppercase">Tồn hiện tại</span>
+          <span className="text-xs font-semibold text-cyan-300 font-mono">{fmt(latestStock, 1)} t</span>
         </div>
       </div>
     </div>
@@ -292,13 +944,98 @@ function AlertsPanel({ alerts }: { alerts: ExecutiveAlert[] }) {
           <div className="min-w-0 flex-1">
             <div className="font-semibold flex items-center justify-between text-white">
               <span className="truncate">{a.title}</span>
-              <span className="text-[9px] text-slate-500 font-mono shrink-0 ml-2">2 phút trước</span>
+              <span className="text-[9px] text-slate-400 font-mono shrink-0 ml-2">{a.value}</span>
             </div>
             <div className="text-[10px] text-slate-405 mt-0.5 truncate">{a.description}</div>
           </div>
         </div>
       ))}
       {!top4.length && <ModuleEmptyState title="Không có cảnh báo" description="Vận hành hiện tại an toàn." />}
+    </div>
+  )
+}
+
+function ProductionOverviewPanel({ overview }: { overview: ProductionOverview }) {
+  if (!overview.totalOrders) {
+    return <div className="flex h-[180px] items-center justify-center"><ModuleEmptyState title="Chưa có dữ liệu sản xuất" description="Dữ liệu sẽ xuất hiện khi phát sinh lệnh sản xuất." /></div>
+  }
+
+  const rows = [
+    { label: 'Đang chạy', value: overview.running, tone: 'text-cyan-300' },
+    { label: 'Hoàn thành hôm nay', value: overview.completedToday, tone: 'text-emerald-400' },
+    { label: 'Chậm tiến độ', value: overview.delayed, tone: overview.delayed ? 'text-red-400' : 'text-slate-300' },
+    { label: 'Chờ vật tư', value: overview.waitingMaterial, tone: overview.waitingMaterial ? 'text-amber-400' : 'text-slate-300' },
+  ]
+
+  return (
+    <div className="space-y-2 py-1 h-[180px] flex flex-col justify-between">
+      <div className="grid grid-cols-2 gap-2">
+        {rows.map((row) => (
+          <div key={row.label} className="rounded-xl border border-white/5 bg-slate-950/20 p-2">
+            <div className={`text-lg font-bold font-mono ${row.tone}`}>{fmt(row.value)}</div>
+            <div className="mt-0.5 text-[12px] text-slate-500">{row.label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-white/5 pt-2">
+        <div className="flex justify-between text-[13px] text-slate-400">
+          <span>Hiệu suất hoàn thành</span>
+          <span className="font-bold text-white font-mono">{fmt(overview.efficiency, 1)}%</span>
+        </div>
+        <Meter value={overview.efficiency} />
+      </div>
+    </div>
+  )
+}
+
+function ProjectsOverviewPanel({ overview }: { overview: ProjectsOverview }) {
+  if (!overview.totalProjects && !overview.contractValue) {
+    return <div className="flex h-[180px] items-center justify-center"><ModuleEmptyState title="Chưa có dữ liệu công trình" description="Dữ liệu sẽ xuất hiện khi phát sinh công trình, cấu kiện hoặc vật tư." /></div>
+  }
+
+  return (
+    <div className="space-y-2 py-1 h-[180px] flex flex-col justify-between">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-white/5 bg-slate-950/20 p-2">
+          <div className="text-lg font-bold text-cyan-300 font-mono">{fmt(overview.activeProjects)}</div>
+          <div className="mt-0.5 text-[12px] text-slate-500">Đang triển khai</div>
+        </div>
+        <div className="rounded-xl border border-white/5 bg-slate-950/20 p-2">
+          <div className={`text-lg font-bold font-mono ${overview.delayedProjects ? 'text-red-400' : 'text-slate-300'}`}>{fmt(overview.delayedProjects)}</div>
+          <div className="mt-0.5 text-[12px] text-slate-500">Trễ tiến độ</div>
+        </div>
+      </div>
+      <div className="space-y-1.5 text-[13px]">
+        <div className="flex justify-between text-slate-400"><span>Giá trị hợp đồng</span><span className="font-mono font-semibold text-white">{formatCurrencyVnd(overview.contractValue)}</span></div>
+        <div className="flex justify-between text-slate-400"><span>Cấu kiện sản xuất</span><span className="font-mono font-semibold text-cyan-300">{fmt(overview.componentsInProduction)}</span></div>
+        <div className="flex justify-between text-slate-400"><span>Vật tư sử dụng</span><span className="font-mono font-semibold text-emerald-400">{formatCurrencyVnd(overview.materialValue)}</span></div>
+      </div>
+    </div>
+  )
+}
+
+function SuppliersOverviewPanel({ overview }: { overview: SuppliersOverview }) {
+  if (!overview.totalSuppliers) {
+    return <div className="flex h-[180px] items-center justify-center"><ModuleEmptyState title="Chưa có dữ liệu nhà cung cấp" description="Dữ liệu sẽ xuất hiện khi có NCC, nhập kho hoặc đánh giá." /></div>
+  }
+
+  return (
+    <div className="space-y-2 py-1 h-[180px] flex flex-col justify-between">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-white/5 bg-slate-950/20 p-2">
+          <div className="text-lg font-bold text-cyan-300 font-mono">{fmt(overview.activeSuppliers)}</div>
+          <div className="mt-0.5 text-[12px] text-slate-500">NCC hoạt động</div>
+        </div>
+        <div className="rounded-xl border border-white/5 bg-slate-950/20 p-2">
+          <div className="text-lg font-bold text-emerald-400 font-mono">{fmt(overview.averageRating, 1)}</div>
+          <div className="mt-0.5 text-[12px] text-slate-500">Điểm đánh giá</div>
+        </div>
+      </div>
+      <div className="space-y-1.5 text-[13px]">
+        <div className="flex justify-between text-slate-400"><span>NCC có giao dịch kho</span><span className="font-mono font-semibold text-white">{fmt(overview.usedInInventory)}</span></div>
+        <div className="flex justify-between text-slate-400"><span>NCC đã đánh giá</span><span className="font-mono font-semibold text-white">{fmt(overview.evaluated)}</span></div>
+        <div className="flex justify-between text-slate-400"><span>Cảnh báo đánh giá</span><span className={`font-mono font-semibold ${overview.warning ? 'text-amber-400' : 'text-slate-300'}`}>{fmt(overview.warning)}</span></div>
+      </div>
     </div>
   )
 }
@@ -573,7 +1310,7 @@ function RecentActivityPanel({ activities }: { activities: any[] }) {
             </div>
             <div className="text-right shrink-0">
               <span className="text-slate-350 block font-medium leading-tight">{act.operatorName}</span>
-              <span className="text-[12px] text-slate-500 block font-mono leading-tight mt-0.5">2 phút trước</span>
+              <span className="text-[12px] text-slate-500 block font-mono leading-tight mt-0.5">{act.timestamp}</span>
             </div>
           </div>
         )
@@ -616,8 +1353,23 @@ type InventoryForecast = {
   projectedStock: number
   daysOfCover: number
   trendDirection: 'up' | 'down'
-  trendRows: Array<{ label: string; value: number }>
+  trendRows: InventoryMovementPoint[]
   assumption: string
+}
+
+type InventoryMovementPoint = {
+  label: string
+  inbound: number
+  outbound: number
+  stock: number
+}
+
+type InventoryKpis = {
+  inventoryValue: number
+  totalStock: number
+  materialCodes: number
+  lowStock: number
+  outOfStock: number
 }
 
 type ComponentPipeline = {
@@ -677,6 +1429,33 @@ type QcTrend = {
   assumption: string
 }
 
+type ProductionOverview = {
+  totalOrders: number
+  running: number
+  completedToday: number
+  delayed: number
+  waitingMaterial: number
+  efficiency: number
+}
+
+type ProjectsOverview = {
+  totalProjects: number
+  activeProjects: number
+  delayedProjects: number
+  contractValue: number
+  componentsInProduction: number
+  materialValue: number
+}
+
+type SuppliersOverview = {
+  totalSuppliers: number
+  activeSuppliers: number
+  usedInInventory: number
+  evaluated: number
+  averageRating: number
+  warning: number
+}
+
 type ExecutiveAlert = {
   code: string
   title: string
@@ -691,16 +1470,36 @@ function normalizeRows(raw: any): any[] {
   return []
 }
 
+function buildInventoryKpis(inventoryRows: any[]): InventoryKpis {
+  return inventoryRows.reduce<InventoryKpis>((acc, row) => {
+    const stock = Number(row.currentStock ?? row.quantity ?? 0)
+    const minimumStock = Number(row.minimumStock ?? row.minStock ?? row.safetyStock ?? 0)
+    const averageCost = Number(row.averageCost ?? row.avgCost ?? row.unitPrice ?? 0)
+    acc.inventoryValue += stock * averageCost
+    acc.totalStock += stock
+    acc.materialCodes += 1
+    if (stock <= 0) acc.outOfStock += 1
+    else if (minimumStock > 0 && stock <= minimumStock) acc.lowStock += 1
+    return acc
+  }, {
+    inventoryValue: 0,
+    totalStock: 0,
+    materialCodes: 0,
+    lowStock: 0,
+    outOfStock: 0,
+  })
+}
+
 function buildInventoryForecast(data: DashboardCockpit | undefined, inventoryRows: any[], transactions: any[]): InventoryForecast {
   const currentStock = inventoryRows.reduce((sum, row) => sum + Number(row.currentStock ?? row.quantity ?? 0), 0)
-  const trendRows = data?.movementTrend?.length ? data.movementTrend.map((row) => ({ label: row.label, value: Number(row.value ?? 0) })) : lastSevenRows(transactions)
+  const trendRows = buildInventoryMovementRows(transactions, currentStock, data?.movementTrend)
   const recent = transactions.slice(0, 80)
   const inbound = recent.filter((tx) => isInbound(tx)).reduce((sum, tx) => sum + transactionQuantity(tx), 0)
   const outbound = recent.filter((tx) => isOutbound(tx)).reduce((sum, tx) => sum + transactionQuantity(tx), 0)
   const days = Math.max(1, Math.min(14, trendRows.length || 7))
   const inboundDaily = inbound / days
   const outboundDaily = outbound / days
-  const fallbackNet = trendRows.length >= 2 ? (trendRows.at(-1)!.value - trendRows[0].value) / Math.max(1, trendRows.length - 1) : 0
+  const fallbackNet = trendRows.length >= 2 ? (trendRows.at(-1)!.stock - trendRows[0].stock) / Math.max(1, trendRows.length - 1) : 0
   const netDailyMovement = recent.length ? inboundDaily - outboundDaily : fallbackNet
   const projectedStock = Math.max(0, currentStock + netDailyMovement * 7)
   const consumptionRate = Math.max(0.1, outboundDaily || Math.abs(netDailyMovement) || 1)
@@ -713,9 +1512,50 @@ function buildInventoryForecast(data: DashboardCockpit | undefined, inventoryRow
     projectedStock,
     daysOfCover,
     trendDirection: netDailyMovement < 0 ? 'down' : 'up',
-    trendRows: trendRows.length ? trendRows : [{ label: 'No data', value: 0 }],
+    trendRows: trendRows.length ? trendRows : [{ label: 'No data', inbound: 0, outbound: 0, stock: 0 }],
     assumption: recent.length ? 'Forecast = current stock + 7 ngày net movement gần nhất.' : 'Thiếu transaction chi tiết; dùng movementTrend.',
   }
+}
+
+function buildInventoryMovementRows(
+  transactions: any[],
+  currentStock: number,
+  fallback?: Array<{ label: string; value: number }>,
+): InventoryMovementPoint[] {
+  if (!transactions.length) {
+    return (fallback ?? []).map((row) => ({
+      label: row.label,
+      inbound: 0,
+      outbound: 0,
+      stock: Number(row.value ?? 0),
+    }))
+  }
+
+  const sorted = [...transactions].sort((a, b) =>
+    String(a.transactionDate ?? a.createdAt ?? '').localeCompare(String(b.transactionDate ?? b.createdAt ?? '')),
+  )
+  const map = new Map<string, { inbound: number; outbound: number }>()
+  sorted.forEach((tx) => {
+    const label = String(tx.transactionDate ?? tx.createdAt ?? '').slice(5, 10) || '-'
+    const row = map.get(label) ?? { inbound: 0, outbound: 0 }
+    const quantity = transactionQuantity(tx)
+    if (isInbound(tx)) row.inbound += quantity
+    if (isOutbound(tx)) row.outbound += quantity
+    map.set(label, row)
+  })
+
+  const rows = Array.from(map.entries()).slice(-7)
+  const netTotal = rows.reduce((sum, [, row]) => sum + row.inbound - row.outbound, 0)
+  let runningStock = Math.max(0, currentStock - netTotal)
+  return rows.map(([label, row]) => {
+    runningStock = Math.max(0, runningStock + row.inbound - row.outbound)
+    return {
+      label,
+      inbound: row.inbound,
+      outbound: row.outbound,
+      stock: runningStock,
+    }
+  })
 }
 
 function buildComponentPipeline(components: any[], productionOrders: any[]): ComponentPipeline {
@@ -803,6 +1643,54 @@ function buildComponentForecast(pipeline: ComponentPipeline, productionOrders: a
   }
 }
 
+function buildProductionOverview(productionOrders: any[]): ProductionOverview {
+  const today = new Date().toISOString().slice(0, 10)
+  const normalized = productionOrders.map((row) => ({ ...row, statusText: String(row.status ?? '').toUpperCase() }))
+  const completed = normalized.filter((row) => ['COMPLETED', 'DONE', 'FINISHED'].includes(row.statusText))
+  const running = normalized.filter((row) => ['IN_PROGRESS', 'RUNNING', 'ACTIVE', 'PROCESSING', 'RELEASED'].includes(row.statusText)).length
+  const completedToday = completed.filter((row) => String(row.completedAt ?? row.updatedAt ?? row.finishedAt ?? '').slice(0, 10) === today).length
+  const delayed = normalized.filter((row) => {
+    const due = String(row.dueDate ?? row.plannedEndAt ?? row.endDate ?? '').slice(0, 10)
+    return due && due < today && !['COMPLETED', 'DONE', 'FINISHED', 'CANCELLED'].includes(row.statusText)
+  }).length
+  const waitingMaterial = normalized.filter((row) => ['WAITING_MATERIAL', 'MATERIAL_SHORTAGE', 'BLOCKED'].includes(row.statusText)).length
+  return {
+    totalOrders: normalized.length,
+    running,
+    completedToday,
+    delayed,
+    waitingMaterial,
+    efficiency: normalized.length ? completed.length / normalized.length * 100 : 0,
+  }
+}
+
+function buildProjectsOverview(runtime: any): ProjectsOverview {
+  const metrics = runtime?.metrics ?? {}
+  const projects = Array.isArray(runtime?.projects) ? runtime.projects : []
+  const materials = Array.isArray(runtime?.materials) ? runtime.materials : []
+  const delayedProjects = projects.filter((row: any) => Number(row.delayedOrders ?? 0) > 0).length
+  const materialValue = materials.reduce((sum: number, row: any) => sum + Number(row.totalAmount ?? 0), 0)
+  return {
+    totalProjects: Number(metrics.totalProjects ?? projects.length ?? 0),
+    activeProjects: Number(metrics.activeProjects ?? projects.filter((row: any) => row.status === 'ACTIVE').length ?? 0),
+    delayedProjects,
+    contractValue: Number(metrics.contractValue ?? 0),
+    componentsInProduction: Number(metrics.readyComponents ?? 0) + Number(metrics.shippedComponents ?? 0) + Number(metrics.deliveredComponents ?? 0),
+    materialValue,
+  }
+}
+
+function buildSuppliersOverview(summary: any, evaluation: any): SuppliersOverview {
+  return {
+    totalSuppliers: Number(summary?.total ?? evaluation?.metrics?.total ?? 0),
+    activeSuppliers: Number(summary?.active ?? 0),
+    usedInInventory: Number(summary?.usedInInventory ?? 0),
+    evaluated: Number(evaluation?.metrics?.evaluated ?? 0),
+    averageRating: Number(evaluation?.metrics?.averageOverall ?? 0),
+    warning: Number(evaluation?.metrics?.warning ?? 0),
+  }
+}
+
 function buildYardAnalytics(metrics: any, movements: any[]): YardAnalytics {
   return {
     occupancyRate: Number(metrics?.occupancyRate ?? 0),
@@ -860,11 +1748,19 @@ function buildExecutiveAlerts(data: DashboardCockpit | undefined, inventory: Inv
 function buildRecentActivities(transactions: any[]): any[] {
   return transactions.slice(0, 6).map((tx, idx) => ({
     id: tx.id ?? String(idx),
-    timestamp: String(tx.transactionDate ?? tx.createdAt ?? '').slice(11, 16) || '14:28',
+    timestamp: formatActivityTime(tx.transactionDate ?? tx.createdAt),
     operatorName: tx.operatorName ?? 'Operator',
     module: tx.type === 'PRODUCTION' ? 'production' : tx.type === 'QC' ? 'qc' : 'warehouse',
     description: tx.description ?? tx.note ?? `Giao dịch ${tx.transactionNo ?? tx.code ?? ''}`
   }))
+}
+
+function formatActivityTime(value: unknown) {
+  const raw = String(value ?? '')
+  if (!raw) return '-'
+  const date = raw.slice(0, 10)
+  const time = raw.slice(11, 16)
+  return time ? `${date} ${time}` : date || '-'
 }
 
 function isInbound(tx: any) {
@@ -906,28 +1802,6 @@ function transactionItemKey(item: any) {
   ).trim()
 }
 
-function lastSevenRows(transactions: any[]) {
-  const map = new Map<string, number>()
-  transactions.forEach((tx) => {
-    const label = String(tx.transactionDate ?? tx.createdAt ?? '').slice(5, 10) || '-'
-    map.set(label, (map.get(label) ?? 0) + transactionQuantity(tx))
-  })
-  return Array.from(map.entries()).slice(-7).map(([label, value]) => ({ label, value }))
-}
-
-function productionLabel(value: string) {
-  const labels: Record<string, string> = {
-    DRAFT: 'Nháp',
-    PLANNED: 'Đã lên kế hoạch',
-    RELEASED: 'Đã phát hành',
-    IN_PROGRESS: 'Đang sản xuất',
-    DELAYED: 'Trễ tiến độ',
-    COMPLETED: 'Hoàn thành',
-    CANCELLED: 'Đã hủy',
-  }
-  return labels[value] ?? value
-}
-
 // ----------------------------------------------------
 // UI Element Components
 // ----------------------------------------------------
@@ -937,13 +1811,14 @@ function Meter({ value }: { value: number }) {
   return <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(4, value))}%` }} /></div>
 }
 
-function Sparkline({ rows, heightClass = 'h-28' }: { rows: Array<{ label: string; value: number }>; heightClass?: string }) {
-  const max = Math.max(1, ...rows.map((row) => row.value))
+function Sparkline({ rows, heightClass = 'h-28' }: { rows: Array<{ label: string; value?: number; stock?: number }>; heightClass?: string }) {
+  const values = rows.map((row) => Number(row.value ?? row.stock ?? 0))
+  const max = Math.max(1, ...values)
   return (
     <div className={`flex ${heightClass} items-end gap-1.5 rounded-xl border border-white/5 bg-slate-950/20 px-2 pb-2`}>
-      {rows.map((row) => (
+      {rows.map((row, index) => (
         <div key={row.label} className="flex flex-1 flex-col items-center justify-end h-full">
-          <div className="w-full rounded-t bg-gradient-to-t from-blue-700 to-cyan-400" style={{ height: `${Math.max(8, (row.value / max) * 100)}%` }} />
+          <div className="w-full rounded-t bg-gradient-to-t from-blue-700 to-cyan-400" style={{ height: `${Math.max(8, (values[index] / max) * 100)}%` }} />
         </div>
       ))}
     </div>

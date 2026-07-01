@@ -1,4 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
@@ -24,14 +26,82 @@ import {
   inventoryTableHead,
   inventoryTableRow,
   inventoryTableShell,
+  HorizontalBars,
 } from '../../components/InventoryVisuals'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
-import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
-import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
+import { CircleDollarSign, Clock, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
+import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
+import { getReturnRequests } from '../../api/transactions.api'
+// ================= CHART CARD COMPONENT =================
+function ChartCard({
+  title,
+  value,
+  delta,
+  deltaColorClass = 'text-slate-400',
+  action,
+  children,
+  className = 'h-[260px]',
+  chartHeightClass = 'h-[150px]',
+}: {
+  title: string
+  value?: string
+  delta?: string
+  deltaColorClass?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+  chartHeightClass?: string
+}) {
+  return (
+    <section className={`overflow-hidden rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] text-left flex flex-col justify-between p-4 ${className}`}>
+      <div className="flex items-start justify-between gap-3 shrink-0">
+        <div className="flex flex-col justify-start min-h-[40px]">
+          <h3 className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</h3>
+          {value && <div className="mt-1 truncate text-2xl font-semibold text-white leading-none">{value}</div>}
+          {delta && <div className={`mt-1 truncate text-[10px] ${deltaColorClass}`}>{delta}</div>}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      <div className={`overflow-hidden shrink-0 ${chartHeightClass}`}>{children}</div>
+    </section>
+  )
+}
 
+// ================= STOCK TREND CHART =================
+function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number }> }) {
+  const max = Math.max(1, ...rows.map((row) => row.value))
+  const points = rows.map((row, index) => {
+    const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+    const y = 100 - (row.value / max) * 78 - 10
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <div className="h-[90px] flex flex-col justify-between">     {/* giảm từ 140 xuống 90 */}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[65px] w-full overflow-visible">  {/* giảm từ 105 xuống 65 */}
+        <defs>
+          <linearGradient id="stockTrendFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#1d7cff" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#1d7cff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polyline points={`0,100 ${points} 100,100`} fill="url(#stockTrendFill)" stroke="none" />
+        <polyline points={points} fill="none" stroke="#1d7cff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+        {rows.map((row, index) => {
+          const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
+          const y = 100 - (row.value / max) * 78 - 10
+          return <circle key={row.label} cx={x} cy={y} r="1.6" fill="#38bdf8" />
+        })}
+      </svg>
+      <div className="grid grid-cols-6 gap-2 text-[10px] text-slate-500">
+        {rows.map((row) => <span key={row.label}>{row.label}</span>)}
+      </div>
+    </div>
+  )
+}
 const PAGE_SIZE = 13
 const donutColors = ['#1d7cff', '#14c987', '#7c3aed', '#f59e0b', '#ef4444', '#06b6d4']
 const compactInput =
@@ -303,9 +373,14 @@ function OverviewMetricCard({
 }
 
 export function InventoryOverviewPage() {
+  const navigate = useNavigate()
   const { data: auditRows = [], isLoading: isLoadingAudit, refetch: refetchAudit } = useInventoryAudit()
   const { data: zones = [] } = useZones()
   const { data: transactionsData = [], isLoading: isLoadingTransactions } = useInventoryTransactions({})
+  const { data: returnRequests = [], isLoading: isLoadingReturns } = useQuery({
+    queryKey: ['inventory-return-requests-overview'],
+    queryFn: () => getReturnRequests({ flowType: 'SITE_RETURN' }),
+  })
   const isLoading = isLoadingAudit || isLoadingTransactions
 
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
@@ -454,6 +529,21 @@ export function InventoryOverviewPage() {
       consumableQty,
     }
   }, [filteredRows])
+  const pendingReturns = useMemo(() => {
+    const rows = returnRequests.filter((request: any) => ['REQUESTED', 'APPROVED'].includes(request.status))
+    const quantity = rows.reduce((sum: number, request: any) => {
+      const items = Array.isArray(request.items) ? request.items : []
+      return sum + items.reduce((lineSum: number, item: any) => lineSum + num(item.requestedQuantity), 0)
+    }, 0)
+    return {
+      count: rows.length,
+      quantity,
+      trend: rows.slice(0, 6).map((request: any) => {
+        const items = Array.isArray(request.items) ? request.items : []
+        return items.reduce((lineSum: number, item: any) => lineSum + num(item.requestedQuantity), 0)
+      }),
+    }
+  }, [returnRequests])
 
   const zoneSegments = useMemo(() => {
     const map = new Map<string, number>()
@@ -747,6 +837,45 @@ export function InventoryOverviewPage() {
       .filter((item: any) => item.stockStatus !== 'NORMAL')
       .sort((a: any, b: any) => mainWarehouseStock(a) - mainWarehouseStock(b))
   }, [filteredRows])
+    const alertsDelta = useMemo(() => {
+    // Giả sử bạn có dữ liệu lịch sử, nếu không thì hiển thị "0 cảnh báo mới"
+    const current = alerts.length;
+    // Nếu không có dữ liệu tháng trước, coi là 0
+    const previous = 0; // bạn có thể thay bằng dữ liệu thực tế nếu có
+    const diff = current - previous;
+      if (diff === 0) return { text: '0 cảnh báo mới (tháng này)', color: 'text-slate-400' };
+      if (diff > 0) return { text: `▲ ${diff} cảnh báo mới (tháng này)`, color: 'text-red-400' };
+      return { text: `▼ ${Math.abs(diff)} cảnh báo (tháng này)`, color: 'text-red-400' };
+    }, [alerts]);
+
+    const quantityDelta = useMemo(() => {
+    const trend = kpiTrend.quantity; // mảng 6 giá trị: [tháng 5, tháng 4, ..., hiện tại]
+    if (!trend || trend.length < 2) {
+      return { text: '0 tấn (0.0%)', color: 'text-slate-400' };
+    }
+    const current = trend[trend.length - 1];     // tháng hiện tại
+    const previous = trend[trend.length - 2];    // tháng trước
+    const diff = current - previous;
+    const percent = previous > 0 ? (diff / previous) * 100 : 0;
+    if (diff === 0) return { text: '0 tấn (0.0%)', color: 'text-slate-400' };
+    const formattedDiff = formatQty(Math.abs(diff));
+    if (diff > 0) {
+      return { text: `▲ ${formattedDiff} tấn (+${percent.toFixed(1)}%)`, color: 'text-emerald-400' };
+    }
+    return { text: `▼ ${formattedDiff} tấn (${percent.toFixed(1)}%)`, color: 'text-red-400' };
+  }, [kpiTrend.quantity]);
+
+  const topMaterials = useMemo(() => {
+    return filteredRows
+      .map((item: any) => ({
+        name: item.name,
+        code: item.code,
+        quantity: totalWarehouseStock(item),
+        value: item.inventoryValue ?? totalWarehouseStock(item) * item.averageCost,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [filteredRows]);
 
   const todayStats = useMemo(() => {
     const todayKey = new Date().toISOString().slice(0, 10)
@@ -832,7 +961,7 @@ export function InventoryOverviewPage() {
       <InventoryTabWorkspace />
 
       <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-4 2xl:grid-cols-8 gap-1">
+        <div className="grid grid-cols-1 md:grid-cols-4 2xl:grid-cols-9 gap-1">
           <OverviewMetricCard
             title="Tổng giá trị tồn kho"
             value={formatCurrencyVnd(summary.totalValue)}
@@ -927,6 +1056,17 @@ export function InventoryOverviewPage() {
             icon={<ShieldX size={15} />}
             trend={kpiTrend.out}
             isLoading={isLoading}
+          />
+          <OverviewMetricCard
+            title="Pending Returns"
+            value={formatQuantity(pendingReturns.count, 0)}
+            note={`${formatQuantity(pendingReturns.quantity)} chờ nhận`}
+            noteClassName="text-amber-300"
+            tone="amber"
+            icon={<Clock size={15} />}
+            trend={pendingReturns.trend}
+            isLoading={isLoadingReturns}
+            onClick={() => navigate('/inventory/returns')}
           />
         </div>
 
@@ -1038,11 +1178,11 @@ export function InventoryOverviewPage() {
                     <col className="w-[100px]" />
                   </colgroup>
                           <thead
-                                className={`${inventoryTableHead}
-                                  bg-transparent
-                                  text-slate-300
-                                  border-b border-cyan-400/10`}
-                              >
+                            className={`${inventoryTableHead}
+                              text-slate-300
+                              border-b border-cyan-400/10`}
+                            style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                          >
                             <tr>
                               <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Tên vật tư</th>
                               <th className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300">Quy cách</th>
@@ -1100,49 +1240,114 @@ export function InventoryOverviewPage() {
               <OverviewPagination page={activePage} pageCount={pageCount} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </InventoryPanel>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
               <RecentTransactionCard title="Nhập kho gần đây" rows={recentInboundRows.slice(0, 5)} tone="cyan" onViewAll={() => setOverviewPopup('recent-inbound')} />
               <RecentTransactionCard title="Xuất kho gần đây" rows={recentOutboundRows.slice(0, 5)} tone="amber" onViewAll={() => setOverviewPopup('recent-outbound')} />
             </div>
           </div>
 
           <div className="space-y-1 xl:col-span-3">
-            <InventoryChartCard title="Tổng quan tồn kho" note="Theo vị trí thực tế">
-              <CompactDonutSummary segments={zoneSegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
-            </InventoryChartCard>
-            <InventoryChartCard title="Giá trị tồn kho" note={money(summary.totalValue)}>
-              <CompactTrendChart rows={valueTrend} />
-            </InventoryChartCard>
-            <InventoryChartCard
-              title="Cảnh báo tồn kho"
-              action={<button onClick={() => setOverviewPopup('alerts-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
+            {/* 1. Phân bố tồn kho */}
+            <ChartCard
+              title="Phân bố tồn kho"
+              value={`${formatQty(summary.totalQty)} tấn`}
+              delta={`${zoneSegments.length} kho hoạt động`}
+              className="h-[220px]"
+              chartHeightClass="h-[120px] overflow-y-auto scrollbar-none"
             >
-              <AlertRows rows={alerts.slice(0, 6)} />
-            </InventoryChartCard>
-            <InventoryChartCard title="Cơ cấu nhóm vật tư" note="Tỷ trọng tồn kho">
-              <CompactDonutSummary segments={categorySegments} centerValue={formatQty(summary.totalQty)} centerLabel="tấn" />
+              <CompactDonutSummary
+                segments={zoneSegments}
+                centerValue={formatQuantity(summary.totalQty, 1)}   // 1 chữ số thập phân
+                centerLabel="tấn"
+                showPercent={true}
+              />
+            </ChartCard>
+
+            {/* 2. Biến động tồn kho */}
+            <ChartCard
+              title="Biến động tồn kho"
+              value={`${formatQty(summary.totalQty)} tấn`}
+              delta={quantityDelta.text}
+              deltaColorClass={quantityDelta.color}
+              className="h-[178px]"
+              chartHeightClass="h-[90px] overflow-y-auto scrollbar-none"
+            >
+              <StockTrendChart rows={valueTrend} />
+            </ChartCard>
+
+            {/* 3. Cảnh báo tồn kho */}
+            <ChartCard
+              title="Cảnh báo tồn kho"
+              value={`${alerts.length} cảnh báo`}
+              delta={alertsDelta.text}
+              deltaColorClass={alertsDelta.color}
+              action={<button onClick={() => setOverviewPopup('alerts-full')} className="text-[10px] text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>}
+              className="h-[200px]"
+              chartHeightClass="h-[140px]"   // bỏ overflow-y-auto
+            >
+              <AlertRows rows={alerts} />   // truyền toàn bộ alerts
+            </ChartCard>
+
+            {/* 4. Top vật tư tồn kho (mới) */}
+            <InventoryChartCard
+              title="Top vật tư tồn kho"
+              note="Theo giá trị tồn kho"
+              className="h-[207px]"
+            >
+              <div className="h-[160px] overflow-y-auto [&::-webkit-scrollbar]:hidden scrollbar-width-none pr-1">
+                {topMaterials.length > 0 ? (
+                  <HorizontalBars
+                    rows={topMaterials.map((item) => [item.name, item.value])}
+                    valueFormatter={(v) => formatCurrencyVnd(v)}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                    Không có dữ liệu tồn kho
+                  </div>
+                )}
+              </div>
             </InventoryChartCard>
           </div>
         </div>
 
         <InventoryChartCard title="Tình trạng kho">
-          <div className="grid grid-cols-1 items-center gap-4 text-xs md:grid-cols-[220px_1fr_auto_auto_auto]">
+          <div className="grid grid-cols-1 items-center gap-10 text-xs md:grid-cols-[220px_1fr_auto_auto_auto]">
             <label className="block">
               <span className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-slate-500">Kho chính</span>
-              <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={`${inventoryInput} h-8 rounded-lg text-xs`}>
+              <select
+                value={warehouseFilter}
+                onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }}
+                className="h-7 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 py-0.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65"
+              >
                 <option value="">Tất cả kho</option>
-                {warehouseOptions.map((warehouse) => <option key={warehouse.value} value={warehouse.value}>{warehouse.label}</option>)}
+                {warehouseOptions.map((warehouse) => (
+                  <option key={warehouse.value} value={warehouse.value}>
+                    {warehouse.label}
+                  </option>
+                ))}
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+
+            <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
               <StatusMetric label="Tổng mã" value={selectedWarehouseStat.total} tone="cyan" />
-              <StatusMetric label="Sắp hết hàng" value={selectedWarehouseStat.low} tone="amber" />
+              <StatusMetric label="Sắp hết" value={selectedWarehouseStat.low} tone="amber" />
               <StatusMetric label="Hết hàng" value={selectedWarehouseStat.out} tone="red" />
               <StatusMetric label="Cảnh báo khác" value={Math.max(0, alerts.length - selectedWarehouseStat.low - selectedWarehouseStat.out)} tone="amber" />
             </div>
-            <div className="hidden h-10 border-l border-white/10 md:block" />
-            <div className="text-slate-400">Cập nhật cuối<br /><span className="text-white">{new Date().toLocaleTimeString('vi-VN')}</span></div>
-            <div className="text-emerald-300">An toàn<br /><span className="font-semibold">{selectedWarehouseStat.out > 0 ? 'Theo dõi' : 'Bình thường'}</span></div>
+
+            <div className="hidden h-8 border-l border-white/10 md:block" />
+
+            <div className="text-center text-[10px] text-slate-400">
+              Cập nhật
+              <br />
+              <span className="text-xs text-white">{new Date().toLocaleTimeString('vi-VN')}</span>
+            </div>
+
+            <div className="text-center text-[10px] text-emerald-300">
+              An toàn
+              <br />
+              <span className="text-xs font-semibold">{selectedWarehouseStat.out > 0 ? 'Theo dõi' : 'Bình thường'}</span>
+            </div>
           </div>
         </InventoryChartCard>
       </div>
@@ -1199,7 +1404,7 @@ function StatusMetric({ label, value, tone }: { label: string; value: number; to
   return (
     <div className="text-center md:text-left">
       <div className={`text-base font-semibold ${toneClass}`}>{formatQuantity(value, 0)}</div>
-      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="text-[14px] text-slate-500">{label}</div>
     </div>
   )
 }
@@ -1243,11 +1448,20 @@ function RecentTransactionCard({ title, rows, tone, onViewAll }: { title: string
           const line = firstLine(row)
           const date = transactionDate(row)
           return (
-            <div key={row.id} className="grid grid-cols-[92px_1fr_76px_52px_58px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
-              <div className={`truncate font-medium ${tone === 'cyan' ? 'text-cyan-300' : 'text-blue-300'}`}>{row.transactionNo ?? row.code}</div>
-              <div className="truncate text-slate-300">{line?.inventoryItem?.name ?? row.projectName ?? row.supplierName ?? line?.inventoryItem?.code ?? '-'}</div>
+            <div key={row.id} className="grid grid-cols-[80px_180px_1fr_80px_80px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
+              {/* Thời gian */}
               <div className="text-slate-400">{date ? date.toLocaleDateString('vi-VN') : '-'}</div>
+              {/* Mã giao dịch */}
+              <div className={`truncate font-medium ${tone === 'cyan' ? 'text-cyan-300' : 'text-blue-300'}`}>
+                {row.transactionNo ?? row.code}
+              </div>
+              {/* Tên vật tư */}
+              <div className="truncate text-slate-300" title={line?.inventoryItem?.name ?? row.projectName ?? row.supplierName ?? line?.inventoryItem?.code ?? '-'}>
+                {line?.inventoryItem?.name ?? row.projectName ?? row.supplierName ?? line?.inventoryItem?.code ?? '-'}
+              </div>
+              {/* Số lượng */}
               <div className="text-right text-white">{formatQty(transactionQuantity(row))}</div>
+              {/* Trạng thái */}
               <div className="text-right text-emerald-300">{tone === 'cyan' ? 'Đã nhập' : 'Đã xuất'}</div>
             </div>
           )
@@ -1260,18 +1474,24 @@ function RecentTransactionCard({ title, rows, tone, onViewAll }: { title: string
 
 function AlertRows({ rows }: { rows: any[] }) {
   return (
-    <div className="h-[150px] space-y-1.5 overflow-hidden text-xs">
+    <div className="h-full space-y-1.5 overflow-y-auto text-xs [&::-webkit-scrollbar]:hidden scrollbar-width-none">
       {rows.map((row: any) => {
         const status = row.stockStatus ?? statusOf(row)
         return (
           <div key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
             <span className={status === 'OUT' ? 'truncate text-red-300' : 'truncate text-amber-300'}>{row.name ?? row.code}</span>
             <span className="text-slate-400">Kho chính: {formatQty(mainWarehouseStock(row))}</span>
-            <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-0.5 text-red-300' : 'rounded bg-amber-500/10 px-2 py-0.5 text-amber-300'}>{statusLabel(status)}</span>
+            <span className={status === 'OUT' ? 'rounded bg-red-500/10 px-2 py-0.5 text-red-300' : 'rounded bg-amber-500/10 px-2 py-0.5 text-amber-300'}>
+              {statusLabel(status)}
+            </span>
           </div>
         )
       })}
-      {rows.length === 0 ? <div className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-5 text-center text-sm text-slate-500">Không có cảnh báo tồn kho.</div> : null}
+      {rows.length === 0 && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-5 text-center text-sm text-slate-500">
+          Không có cảnh báo tồn kho.
+        </div>
+      )}
     </div>
   )
 }
@@ -1329,6 +1549,32 @@ function OverviewPagination({
     </div>
   )
 }
+function AlertMiniChart({ rows, colors }: { rows: Array<[string, number]>; colors?: string[] }) {
+  const max = Math.max(1, ...rows.map(([, value]) => value))
+  const defaultColors = ['from-amber-500 to-orange-400', 'from-red-500 to-pink-500', 'from-cyan-500 to-blue-400', 'from-emerald-500 to-teal-400']
+  return (
+    <div className="space-y-3 py-1">  {/* tăng space-y từ 2 lên 3 */}
+      {rows.map(([label, value], index) => {
+        const percent = max > 0 ? (value / max) * 100 : 0
+        const barColor = colors ? colors[index % colors.length] : defaultColors[index % defaultColors.length]
+        return (
+          <div key={label} className="group">
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs">  {/* text-[11px] → text-xs */}
+              <span className="truncate text-slate-300 font-medium group-hover:text-white transition">{label}</span>
+              <span className="text-cyan-300 font-mono font-semibold text-xs">{formatQuantity(value, 0)}</span> {/* thêm text-xs */}
+            </div>
+            <div className="h-2.5 w-full rounded-full bg-slate-900 ring-1 ring-white/[0.05]">  {/* h-2 → h-2.5 */}
+              <div
+                className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
+                style={{ width: `${Math.max(4, percent)}%` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 function OverviewModal({
   type,
   onClose,
@@ -1352,6 +1598,22 @@ function OverviewModal({
   }[type]
   const txRows = type === 'recent-inbound' ? inboundRows : outboundRows
 
+  // Phân trang cho recent-inbound / recent-outbound
+  const [page, setPage] = useState(1)
+  const pageSize = 16
+  const pagedTxRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return txRows.slice(start, start + pageSize)
+  }, [txRows, page])
+  const totalPages = Math.max(1, Math.ceil(txRows.length / pageSize))
+
+  // Reset về trang 1 khi dữ liệu thay đổi
+  useEffect(() => {
+  if (page > totalPages) {
+    setPage(totalPages)
+  }
+}, [txRows, totalPages, page])
+
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
       <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
@@ -1363,9 +1625,10 @@ function OverviewModal({
             Đóng
           </button>
         </div>
-        <div className="max-h-[74vh] overflow-auto">
+        <div className="max-h-[74vh] overflow-auto min-h-[300px]">
           {(type === 'recent-inbound' || type === 'recent-outbound') ? (
-            <div className="overflow-hidden rounded-xl border border-white/10">
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            <div className="min-h-[220px]">
               <table className="w-full min-w-[820px] text-sm">
                 <thead className={inventoryTableHead}>
                   <tr>
@@ -1378,24 +1641,58 @@ function OverviewModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {txRows.map((row: any) => {
-                    const line = firstLine(row)
-                    const date = transactionDate(row)
-                    return (
-                      <tr key={row.id} className={inventoryTableRow}>
-                        <td className="px-3 py-2">{date ? formatQuantity(date, 0) : '-'}</td>
-                        <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? row.code}</td>
-                        <td className="px-3 py-2">{line?.inventoryItem?.code ?? row.itemCode ?? '-'}</td>
-                        <td className="px-3 py-2">{line?.inventoryItem?.name ?? '-'}</td>
-                        <td className="px-3 py-2 text-right">{formatQty(transactionQuantity(row))}</td>
-                        <td className="px-3 py-2 text-right text-cyan-300">{money(transactionAmount(row))}</td>
-                      </tr>
-                    )
-                  })}
+                  {pagedTxRows.length > 0 ? (
+                    pagedTxRows.map((row: any) => {
+                      const line = firstLine(row)
+                      const date = transactionDate(row)
+                      return (
+                        <tr key={row.id} className={inventoryTableRow}>
+                          <td className="px-3 py-2">{date ? formatDateTime(date) : '-'}</td>
+                          <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? row.code}</td>
+                          <td className="px-3 py-2">{line?.inventoryItem?.code ?? row.itemCode ?? '-'}</td>
+                          <td className="px-3 py-2">{line?.inventoryItem?.name ?? '-'}</td>
+                          <td className="px-3 py-2 text-right">{formatQty(transactionQuantity(row))}</td>
+                          <td className="px-3 py-2 text-right text-cyan-300">{money(transactionAmount(row))}</td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
+                        Không có giao dịch.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          ) : null}
+
+            {/* Phân trang luôn hiển thị */}
+            <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400 border-t border-white/10">
+              <span>
+                Hiển thị {(txRows.length > 0) ? ((page - 1) * pageSize + 1) : 0}-
+                {Math.min(page * pageSize, txRows.length)}/{txRows.length} kết quả
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || txRows.length === 0}
+                  className={inventoryMutedButton}
+                >
+                  Trước
+                </button>
+                <span className="px-2 py-1 text-slate-300">{page}/{totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || txRows.length === 0}
+                  className={inventoryMutedButton}
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
           {type === 'stock-full' ? (
             <div className="overflow-hidden rounded-xl border border-white/10">
@@ -1474,6 +1771,93 @@ function OverviewModal({
                   })}
                 </tbody>
               </table>
+            </div>
+          ) : null}
+
+          {type === 'alerts-full' ? (
+            <div className="grid max-h-[74vh] gap-4 overflow-auto xl:grid-cols-[1fr_320px]">
+              {/* Bảng bên trái */}
+              <div className="overflow-hidden rounded-xl border border-white/10">
+                <table className="w-full min-w-[1100px] text-sm table-fixed">
+                  <colgroup>
+                    <col className="w-[140px]" />
+                    <col className="w-[180px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[140px]" />
+                    <col className="w-[160px]" />
+                  </colgroup>
+                  <thead className="bg-white/[0.055] text-xs uppercase tracking-[0.08em] text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Mã vật tư</th>
+                      <th className="px-4 py-3 text-left">Tên vật tư</th>
+                      <th className="px-4 py-3 text-left">Nhóm</th>
+                      <th className="px-4 py-3 text-right">Kho chính</th>
+                      <th className="px-4 py-3 text-right">Tồn tối thiểu</th>
+                      <th className="px-4 py-3 text-left">Mức cảnh báo</th>
+                      <th className="px-4 py-3 text-left">Vị trí</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {alerts.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                          Không có cảnh báo tồn kho.
+                        </td>
+                      </tr>
+                    ) : (
+                      alerts.map((item: any) => {
+                        const status = item.stockStatus ?? statusOf(item)
+                        return (
+                          <tr key={item.id} className="border-t border-white/10 text-slate-200 hover:bg-white/[0.04]">
+                            <td className="truncate px-4 py-2.5 text-cyan-300" title={item.code}>{item.code}</td>
+                            <td className="truncate px-4 py-2.5" title={item.name}>{item.name}</td>
+                            <td className="truncate px-4 py-2.5 text-slate-400" title={item.category ?? '-'}>{item.category ?? '-'}</td>
+                            <td className="px-4 py-2.5 text-right font-mono tabular-nums">{formatQty(mainWarehouseStock(item))}</td>
+                            <td className="px-4 py-2.5 text-right">{formatQty(item.minimumStock ?? 5)}</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`rounded px-2.5 py-1 text-xs font-semibold ${status === 'OUT' ? 'bg-red-500/10 text-red-300' : 'bg-amber-500/10 text-amber-300'}`}>
+                                {statusLabel(status)}
+                              </span>
+                            </td>
+                            <td className="truncate px-4 py-2.5 text-slate-400" title={displayLocation(item)}>{displayLocation(item)}</td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Sidebar bên phải: 2 chart nhỏ */}
+              <div className="space-y-4">
+                <ChartCard
+                  title="Theo mức độ"
+                  value={`${alerts.length} cảnh báo`}
+                  delta="Phân bố theo mức"
+                  className="h-[300px]"
+                  chartHeightClass="h-[300px]"
+                >
+                  <AlertMiniChart rows={[
+                    ['Sắp hết', alerts.filter((item: any) => (item.stockStatus ?? statusOf(item)) === 'LOW').length],
+                    ['Hết hàng', alerts.filter((item: any) => (item.stockStatus ?? statusOf(item)) === 'OUT').length],
+                  ]} />
+                </ChartCard>
+
+                <ChartCard
+                  title="Top tồn thấp"
+                  value={`${Math.min(6, alerts.length)} vật tư gần ngưỡng`}
+                  delta="Dưới định mức"
+                  className="h-[350px]"
+                  chartHeightClass="h-[300px]"
+                >
+                  <AlertMiniChart rows={alerts.slice(0, 6).map((item: any) => [
+                    `${item.code} (${formatQty(item.stock ?? mainWarehouseStock(item))} tấn)`,
+                    item.stock ?? mainWarehouseStock(item)
+                  ])} />
+                </ChartCard>
+              </div>
             </div>
           ) : null}
 

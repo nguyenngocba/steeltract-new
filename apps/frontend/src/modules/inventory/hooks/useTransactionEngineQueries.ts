@@ -38,7 +38,7 @@ export function useCreateInventoryTransactionMutation() {
 export function useReturnRequestsQuery() {
   return useQuery({
     queryKey: queryKeys.inventory.returns(),
-    queryFn: getReturnRequests,
+    queryFn: () => getReturnRequests(),
   })
 }
 

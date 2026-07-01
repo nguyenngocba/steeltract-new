@@ -23,6 +23,7 @@ const InventoryOverviewPage = lazyNamed(() => import('@/modules/inventory/pages/
 const InventoryMaterialsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryMaterialsPage'), 'InventoryMaterialsPage')
 const InventoryLocationsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryLocationsPage'), 'InventoryLocationsPage')
 const InventoryTransactionsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryTransactionsPage'), 'InventoryTransactionsPage')
+const InventoryReturnRequestsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryReturnRequestsPage'), 'InventoryReturnRequestsPage')
 const MaterialDetailPage = lazyNamed(() => import('@/modules/inventory/pages/MaterialDetailPage'), 'MaterialDetailPage')
 const ProductionPage = lazyNamed(() => import('@/modules/production/pages/ProductionPage'), 'ProductionPage')
 const QcPage = lazyNamed(() => import('@/modules/qc/pages/QcPage'), 'QcPage')
@@ -153,6 +154,13 @@ export function AppRouter() {
       />
 
       <Route
+        path="/inventory/returns"
+        element={
+          <InventoryReturnRequestsPage />
+        }
+      />
+
+      <Route
         path="/inventory/outbound"
         element={
           <InventoryOutboundPage />
@@ -211,20 +219,43 @@ export function AppRouter() {
       <Route path="/production/execution" element={<ProductionPage />} />
       <Route path="/production/reservations" element={<ProductionPage />} />
       <Route path="/production/warehouse" element={<ProductionPage />} />
+      <Route path="/production/planning" element={<ProductionPage />} />
       <Route path="/production/material-ledger" element={<ProductionPage />} />
       <Route path="/production/material-issues" element={<ProductionPage />} />
       <Route path="/production/consumptions" element={<ProductionPage />} />
+      <Route path="/production/incidents" element={<ProductionPage />} />
       <Route path="/production/logs" element={<ProductionPage />} />
+      <Route path="/production/reports" element={<ProductionPage />} />
 
       <Route
         path="/qc"
         element={<QcPage />}
       />
+      <Route path="/qc/inbound" element={<QcPage />} />
+      <Route path="/qc/production" element={<QcPage />} />
+      <Route path="/qc/final" element={<QcPage />} />
+      <Route path="/qc/plan" element={<QcPage />} />
+      <Route path="/qc/standards" element={<QcPage />} />
+      <Route path="/qc/ncr" element={<QcPage />} />
+      <Route path="/qc/capa" element={<QcPage />} />
+      <Route path="/qc/calibration" element={<QcPage />} />
+      <Route path="/qc/logs" element={<QcPage />} />
+      <Route path="/qc/dashboard" element={<QcPage />} />
+      <Route path="/qc/reports" element={<QcPage />} />
 
       <Route
         path="/projects"
         element={<ProjectsPage />}
       />
+      <Route path="/projects/list" element={<ProjectsPage />} />
+      <Route path="/projects/templates" element={<ProjectsPage />} />
+      <Route path="/projects/progress" element={<ProjectsPage />} />
+      <Route path="/projects/components" element={<ProjectsPage />} />
+      <Route path="/projects/materials" element={<ProjectsPage />} />
+      <Route path="/projects/costs" element={<ProjectsPage />} />
+      <Route path="/projects/documents" element={<ProjectsPage />} />
+      <Route path="/projects/logs" element={<ProjectsPage />} />
+      <Route path="/projects/reports" element={<ProjectsPage />} />
 
       <Route
         path="/procurement"
@@ -235,19 +266,41 @@ export function AppRouter() {
         path="/yard"
         element={<YardPage />}
       />
+      <Route path="/yard/map-2d" element={<YardPage />} />
+      <Route path="/yard/map-3d" element={<YardPage />} />
+      <Route path="/yard/locations" element={<YardPage />} />
+      <Route path="/yard/components" element={<YardPage />} />
+      <Route path="/yard/dispatch" element={<YardPage />} />
+      <Route path="/yard/tracking" element={<YardPage />} />
+      <Route path="/yard/heatmap" element={<YardPage />} />
+      <Route path="/yard/timeline" element={<YardPage />} />
+      <Route path="/yard/history" element={<YardPage />} />
 
       <Route
         path="/logistics"
         element={<LogisticsPage />}
       />
 
-      <Route path="/logistics/routes" element={<LogisticsPage />} />
-      <Route path="/logistics/gps" element={<LogisticsPage />} />
+      <Route path="/logistics/planning" element={<LogisticsPage />} />
+      <Route path="/logistics/vehicles" element={<LogisticsPage />} />
+      <Route path="/logistics/dispatch" element={<LogisticsPage />} />
+      <Route path="/logistics/tracking" element={<LogisticsPage />} />
+      <Route path="/logistics/history" element={<LogisticsPage />} />
+      <Route path="/logistics/logs" element={<LogisticsPage />} />
+      <Route path="/logistics/reports" element={<LogisticsPage />} />
 
       <Route
         path="/suppliers"
         element={<SuppliersPage />}
       />
+      <Route path="/suppliers/list" element={<SuppliersPage />} />
+      <Route path="/suppliers/quotes" element={<SuppliersPage />} />
+      <Route path="/suppliers/purchase-orders" element={<SuppliersPage />} />
+      <Route path="/suppliers/deliveries" element={<SuppliersPage />} />
+      <Route path="/suppliers/quality" element={<SuppliersPage />} />
+      <Route path="/suppliers/payables" element={<SuppliersPage />} />
+      <Route path="/suppliers/logs" element={<SuppliersPage />} />
+      <Route path="/suppliers/reports" element={<SuppliersPage />} />
 
       <Route
         path="/components"
@@ -286,6 +339,11 @@ export function AppRouter() {
 
       <Route
         path="/components/history"
+        element={<ComponentsHistoryPage />}
+      />
+
+      <Route
+        path="/components/reports"
         element={<ComponentsHistoryPage />}
       />
 

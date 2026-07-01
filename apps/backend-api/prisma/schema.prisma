@@ -57,6 +57,78 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum ProjectTaskStatus {
+  DRAFT
+  PLANNED
+  READY
+  IN_PROGRESS
+  BLOCKED
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectTaskDependencyType {
+  FS
+  SS
+  FF
+}
+
+enum ProjectTaskResourceType {
+  WORKER
+  MACHINE
+  OTHER
+}
+
+enum ProjectTaskInspectionStatus {
+  PENDING_INSPECTION
+  INSPECTION_FAILED
+  INSPECTION_PASSED
+  ACCEPTED
+  HANDED_OVER
+}
+
+enum ProjectTaskComponentStatus {
+  NOT_STARTED
+  IN_PRODUCTION
+  IN_TRANSIT
+  INSTALLING
+  HANDED_OVER
+  RETURNED
+}
+
+enum DispatchOrderStatus {
+  DRAFT
+  PLANNED
+  LOADING
+  IN_TRANSIT
+  ARRIVED
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum DispatchItemType {
+  MATERIAL
+  COMPONENT
+}
+
+enum DispatchEventType {
+  CREATED
+  LOADING
+  DEPARTED
+  ARRIVED
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectTemplateStatus {
+  DRAFT
+  PUBLISHED
+  INACTIVE
+}
+
 enum ComponentStatus {
   STOCK
   CUTTING
@@ -786,6 +858,8 @@ model InventoryItem {
   productionMaterialReservationLines ProductionMaterialReservationLine[]
   productionMaterialLedgers          ProductionMaterialLedger[]
   productionMaterialConsumptions     ProductionMaterialConsumption[]
+  projectTaskMaterialAllocations     ProjectTaskMaterialAllocation[]
+  dispatchItems                      DispatchItem[]
 
   @@index([code])
   @@index([name])
@@ -996,9 +1070,41 @@ model Project {
   components            Component[]
   inventoryTransactions InventoryTransaction[]
   returnRequests        ReturnRequest[]
+  tasks                 ProjectTask[]
+  dispatchOrders        DispatchOrder[]
 
   @@index([status])
   @@map("projects")
+}
+
+model ProjectTemplate {
+  id String @id @default(cuid())
+
+  code String @unique
+
+  name String
+
+  description String?
+
+  status ProjectTemplateStatus @default(DRAFT)
+
+  isDefault Boolean @default(false)
+
+  structure Json @default("{}")
+
+  createdBy String?
+
+  updatedBy String?
+
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([isDefault])
+  @@map("project_templates")
 }
 
 model Component {
@@ -1056,9 +1162,226 @@ model Component {
 
   costing ComponentCosting?
 
+  projectTaskComponentAllocations ProjectTaskComponentAllocation[]
+  dispatchItems                   DispatchItem[]
+
   @@index([status])
   @@index([projectId])
   @@map("components")
+}
+
+model ProjectTask {
+  id String @id @default(cuid())
+
+  projectId String
+
+  parentTaskId String?
+
+  name String
+
+  description String?
+
+  status ProjectTaskStatus @default(PLANNED)
+
+  progress Float @default(0)
+
+  plannedStartAt DateTime?
+
+  plannedFinishAt DateTime?
+
+  actualStartAt DateTime?
+
+  actualFinishAt DateTime?
+
+  scheduledStartAt DateTime?
+
+  scheduledFinishAt DateTime?
+
+  forecastFinishAt DateTime?
+
+  baselineStartAt DateTime?
+
+  baselineFinishAt DateTime?
+
+  cascadeDelayDays Int @default(0)
+
+  baselineVarianceDays Int @default(0)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  parentTask ProjectTask? @relation("ProjectTaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
+
+  childTasks ProjectTask[] @relation("ProjectTaskHierarchy")
+
+  dependencies ProjectTaskDependency[] @relation("ProjectTaskDependencies")
+
+  dependentTasks ProjectTaskDependency[] @relation("ProjectTaskDependents")
+
+  materialAllocations ProjectTaskMaterialAllocation[]
+
+  componentAllocations ProjectTaskComponentAllocation[]
+
+  resources ProjectTaskResource[]
+
+  inspection ProjectTaskInspection?
+
+  cost ProjectTaskCost?
+  dispatchOrders DispatchOrder[]
+
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([projectId, sortOrder])
+  @@map("project_tasks")
+}
+
+model ProjectTaskDependency {
+  id String @id @default(cuid())
+
+  projectTaskId String
+
+  dependsOnTaskId String
+
+  type ProjectTaskDependencyType @default(FS)
+
+  lagDays Int @default(0)
+
+  projectTask ProjectTask @relation("ProjectTaskDependencies", fields: [projectTaskId], references: [id], onDelete: Cascade)
+
+  dependsOnTask ProjectTask @relation("ProjectTaskDependents", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([projectTaskId, dependsOnTaskId, type])
+  @@index([projectTaskId])
+  @@index([dependsOnTaskId])
+  @@map("project_task_dependencies")
+}
+
+model ProjectTaskMaterialAllocation {
+  id String @id @default(cuid())
+
+  projectTaskId String
+
+  inventoryItemId String
+
+  plannedQty Float @default(0)
+
+  issuedQty Float @default(0)
+
+  usedQty Float @default(0)
+
+  returnedQty Float @default(0)
+
+  remainingQty Float @default(0)
+
+  unitCost Float @default(0)
+
+  totalCost Float @default(0)
+
+  projectTask ProjectTask @relation(fields: [projectTaskId], references: [id], onDelete: Cascade)
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([projectTaskId])
+  @@index([inventoryItemId])
+  @@map("project_task_material_allocations")
+}
+
+model ProjectTaskComponentAllocation {
+  id String @id @default(cuid())
+
+  projectTaskId String
+
+  componentId String
+
+  assignedAt DateTime?
+
+  installedAt DateTime?
+
+  returnedAt DateTime?
+
+  status ProjectTaskComponentStatus @default(NOT_STARTED)
+
+  cost Float @default(0)
+
+  projectTask ProjectTask @relation(fields: [projectTaskId], references: [id], onDelete: Cascade)
+
+  component Component @relation(fields: [componentId], references: [id])
+
+  @@index([projectTaskId])
+  @@index([componentId])
+  @@map("project_task_component_allocations")
+}
+
+model ProjectTaskResource {
+  id String @id @default(cuid())
+
+  projectTaskId String
+
+  type ProjectTaskResourceType
+
+  name String?
+
+  quantity Float @default(0)
+
+  allocatedQuantity Float @default(0)
+
+  cost Float @default(0)
+
+  projectTask ProjectTask @relation(fields: [projectTaskId], references: [id], onDelete: Cascade)
+
+  @@index([projectTaskId])
+  @@index([type])
+  @@map("project_task_resources")
+}
+
+model ProjectTaskInspection {
+  id String @id @default(cuid())
+
+  projectTaskId String @unique
+
+  status ProjectTaskInspectionStatus @default(PENDING_INSPECTION)
+
+  inspectionDate DateTime?
+
+  acceptedDate DateTime?
+
+  handoverDate DateTime?
+
+  remarks String?
+
+  projectTask ProjectTask @relation(fields: [projectTaskId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("project_task_inspections")
+}
+
+model ProjectTaskCost {
+  id String @id @default(cuid())
+
+  projectTaskId String @unique
+
+  materialCost Float @default(0)
+
+  laborCost Float @default(0)
+
+  machineCost Float @default(0)
+
+  otherCost Float @default(0)
+
+  budgetCost Float @default(0)
+
+  actualCost Float @default(0)
+
+  forecastCost Float @default(0)
+
+  projectTask ProjectTask @relation(fields: [projectTaskId], references: [id], onDelete: Cascade)
+
+  @@map("project_task_costs")
 }
 
 model ComponentCosting {
@@ -1200,6 +1523,100 @@ model Vehicle {
 
   @@index([status])
   @@map("vehicles")
+}
+
+model DispatchOrder {
+  id String @id @default(cuid())
+
+  code String @unique
+
+  projectId String
+
+  projectTaskId String?
+
+  status DispatchOrderStatus @default(DRAFT)
+
+  plannedAt DateTime?
+
+  departedAt DateTime?
+
+  arrivedAt DateTime?
+
+  receivedAt DateTime?
+
+  vehicle String?
+
+  driver String?
+
+  notes String?
+
+  loadingChecklist Json?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  projectTask ProjectTask? @relation(fields: [projectTaskId], references: [id])
+
+  items DispatchItem[]
+
+  events DispatchEvent[]
+
+  @@index([projectId])
+  @@index([projectTaskId])
+  @@index([status])
+  @@index([plannedAt])
+  @@map("dispatch_orders")
+}
+
+model DispatchItem {
+  id String @id @default(cuid())
+
+  dispatchOrderId String
+
+  type DispatchItemType
+
+  inventoryItemId String?
+
+  componentId String?
+
+  quantity Float @default(0)
+
+  createdAt DateTime @default(now())
+
+  dispatchOrder DispatchOrder @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  component Component? @relation(fields: [componentId], references: [id])
+
+  @@index([dispatchOrderId])
+  @@index([inventoryItemId])
+  @@index([componentId])
+  @@map("dispatch_items")
+}
+
+model DispatchEvent {
+  id String @id @default(cuid())
+
+  dispatchOrderId String
+
+  type DispatchEventType
+
+  message String?
+
+  createdBy String?
+
+  createdAt DateTime @default(now())
+
+  dispatchOrder DispatchOrder @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+
+  @@index([dispatchOrderId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("dispatch_events")
 }
 
 //

@@ -191,6 +191,10 @@ export class InventoryService {
           type: this.toBusinessType(tx.type),
           transactionNo:
             tx.transactionNo ?? tx.code,
+          referenceModule: tx.referenceModule,
+          referenceId: tx.referenceId,
+          note: tx.note,
+          remarks: tx.remarks,
           transactionDate: tx.transactionDate,
           quantity: Number(line.quantity),
           unitPrice:
@@ -212,6 +216,9 @@ export class InventoryService {
             ? supplierMap.get(tx.supplierId)?.name ??
               tx.supplierId
             : null,
+          projectId: tx.projectId,
+          projectName: tx.project?.name ?? null,
+          projectCode: tx.project?.code ?? null,
           zoneId:
             line.zoneId ?? tx.zoneId ?? item.zoneId ?? null,
           zoneCode:
@@ -233,7 +240,6 @@ export class InventoryService {
             item.zone?.name ??
             null,
           attachmentName: null,
-          remarks: tx.remarks,
         })),
     )
 
@@ -245,6 +251,10 @@ export class InventoryService {
           type: this.toBusinessType(tx.type),
           transactionNo:
             tx.transactionNo ?? tx.code,
+          referenceModule: tx.referenceModule,
+          referenceId: tx.referenceId,
+          note: tx.note,
+          remarks: tx.remarks,
           transactionDate: tx.transactionDate,
           quantity: Number(line.quantity),
           signedQuantity: Number(line.quantity),
@@ -263,6 +273,7 @@ export class InventoryService {
             'PCS',
           projectId: tx.projectId,
           projectName: tx.project?.name ?? null,
+          projectCode: tx.project?.code ?? null,
           zoneId:
             line.zoneId ?? tx.zoneId ?? item.zoneId ?? null,
           zoneCode:
@@ -284,7 +295,6 @@ export class InventoryService {
             item.zone?.name ??
             null,
           attachmentName: null,
-          remarks: tx.remarks,
         })),
     )
 
@@ -332,6 +342,8 @@ export class InventoryService {
       inboundQuantity > 0
         ? inboundCost / inboundQuantity
         : 0
+    const inventoryValue =
+      currentStock * averageCost
 
     return {
       item: {
@@ -357,6 +369,7 @@ export class InventoryService {
 
       currentStock,
       averageCost,
+      inventoryValue,
 
       inboundHistory: inboundLines,
       outboundHistory: outboundLines,

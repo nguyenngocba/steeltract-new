@@ -157,7 +157,7 @@ export function EnterpriseSidebar() {
 
                       <NavLink
 
-                        key={item.path}
+                        key={`${item.path}:${item.title}`}
 
                         to={item.path}
                         onMouseDown={(event) => {

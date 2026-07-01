@@ -5,6 +5,80 @@ import { Canvas, useThree } from '@react-three/fiber'
 
 import type { YardSlotRuntime } from '../services/api/yard.api'
 
+const demoZoneA = { id: 'demo-zone-a', code: 'DEMO-A', name: 'Demo Zone A' }
+const demoZoneB = { id: 'demo-zone-b', code: 'DEMO-B', name: 'Demo Zone B' }
+
+const demoYardSlots: YardSlotRuntime[] = [
+  {
+    id: 'demo-slot-a01',
+    code: 'A01',
+    status: 'OCCUPIED',
+    currentStackLevel: 3,
+    maxStackLevel: 4,
+    zone: demoZoneA,
+    placements: [
+      { id: 'demo-placement-a01-1', itemType: 'COMPONENT', itemId: 'demo-cpl-001', itemCode: 'DEMO-CPL-001', itemName: 'Demo Beam H200', quantity: 1, stackLevel: 1, weight: 2.4 },
+      { id: 'demo-placement-a01-2', itemType: 'COMPONENT', itemId: 'demo-cpl-002', itemCode: 'DEMO-CPL-002', itemName: 'Demo Column C300', quantity: 1, stackLevel: 2, weight: 3.1 },
+      { id: 'demo-placement-a01-3', itemType: 'COMPONENT', itemId: 'demo-cpl-003', itemCode: 'DEMO-CPL-003', itemName: 'Demo Brace B120', quantity: 1, stackLevel: 3, weight: 1.2 },
+    ],
+  },
+  {
+    id: 'demo-slot-a02',
+    code: 'A02',
+    status: 'OCCUPIED',
+    currentStackLevel: 2,
+    maxStackLevel: 4,
+    zone: demoZoneA,
+    placements: [
+      { id: 'demo-placement-a02-1', itemType: 'COMPONENT', itemId: 'demo-cpl-004', itemCode: 'DEMO-CPL-004', itemName: 'Demo Truss T01', quantity: 1, stackLevel: 1, weight: 4.8 },
+      { id: 'demo-placement-a02-2', itemType: 'COMPONENT', itemId: 'demo-cpl-005', itemCode: 'DEMO-CPL-005', itemName: 'Demo Plate P12', quantity: 1, stackLevel: 2, weight: 0.9 },
+    ],
+  },
+  {
+    id: 'demo-slot-a03',
+    code: 'A03',
+    status: 'AVAILABLE',
+    currentStackLevel: 0,
+    maxStackLevel: 4,
+    zone: demoZoneA,
+    placements: [],
+  },
+  {
+    id: 'demo-slot-b01',
+    code: 'B01',
+    status: 'OCCUPIED',
+    currentStackLevel: 4,
+    maxStackLevel: 4,
+    zone: demoZoneB,
+    placements: [
+      { id: 'demo-placement-b01-1', itemType: 'COMPONENT', itemId: 'demo-cpl-006', itemCode: 'DEMO-CPL-006', itemName: 'Demo Frame F01', quantity: 1, stackLevel: 1, weight: 5.5 },
+      { id: 'demo-placement-b01-2', itemType: 'COMPONENT', itemId: 'demo-cpl-007', itemCode: 'DEMO-CPL-007', itemName: 'Demo Frame F02', quantity: 1, stackLevel: 2, weight: 5.2 },
+      { id: 'demo-placement-b01-3', itemType: 'COMPONENT', itemId: 'demo-cpl-008', itemCode: 'DEMO-CPL-008', itemName: 'Demo Beam H300', quantity: 1, stackLevel: 3, weight: 3.7 },
+      { id: 'demo-placement-b01-4', itemType: 'COMPONENT', itemId: 'demo-cpl-009', itemCode: 'DEMO-CPL-009', itemName: 'Demo Stair S01', quantity: 1, stackLevel: 4, weight: 2.8 },
+    ],
+  },
+  {
+    id: 'demo-slot-b02',
+    code: 'B02',
+    status: 'OCCUPIED',
+    currentStackLevel: 1,
+    maxStackLevel: 4,
+    zone: demoZoneB,
+    placements: [
+      { id: 'demo-placement-b02-1', itemType: 'COMPONENT', itemId: 'demo-cpl-010', itemCode: 'DEMO-CPL-010', itemName: 'Demo Handrail HR01', quantity: 1, stackLevel: 1, weight: 0.6 },
+    ],
+  },
+  {
+    id: 'demo-slot-b03',
+    code: 'B03',
+    status: 'AVAILABLE',
+    currentStackLevel: 0,
+    maxStackLevel: 4,
+    zone: demoZoneB,
+    placements: [],
+  },
+]
+
 function Asset({ src, position, scale = 1 }: { src: string; position: [number, number, number]; scale?: number }) {
   const { scene } = useGLTF(src)
   const copy = useMemo(() => scene.clone(true), [scene])
@@ -25,7 +99,9 @@ function CameraZoomRig({ zoom }: { zoom: number }) {
 
 export function YardOperationalMap3D({ slots, selectedSlotId }: { slots: YardSlotRuntime[]; selectedSlotId?: string }) {
   const [zoom, setZoom] = useState(1)
-  const visibleSlots = slots.slice(0, 72)
+  const isDemoMode = !slots.length
+  const sourceSlots = isDemoMode ? demoYardSlots : slots
+  const visibleSlots = sourceSlots.slice(0, 72)
   const columns = Math.max(1, Math.ceil(Math.sqrt(visibleSlots.length)))
   const slotWidth = 2.05
   const slotDepth = 2.35
@@ -50,6 +126,11 @@ export function YardOperationalMap3D({ slots, selectedSlotId }: { slots: YardSlo
   })))
 
   return <div className="relative h-[700px] overflow-hidden rounded border border-cyan-900 bg-[#030b14]">
+    {isDemoMode ? (
+      <div className="absolute left-3 top-3 z-10 rounded border border-amber-400/25 bg-amber-950/70 px-3 py-2 text-[11px] font-semibold text-amber-200 shadow-xl backdrop-blur">
+        Đang hiển thị dữ liệu mẫu
+      </div>
+    ) : null}
     <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded border border-slate-700 bg-[#06101b]/90 p-1 shadow-xl backdrop-blur">
       <button type="button" onClick={() => setZoom((value) => Math.min(2.2, Number((value + .2).toFixed(1))))} className="rounded bg-slate-800 p-2 text-cyan-200 hover:bg-cyan-900" title="Phóng to">
         <Plus size={15} />
@@ -63,7 +144,7 @@ export function YardOperationalMap3D({ slots, selectedSlotId }: { slots: YardSlo
       <span className="px-2 text-[10px] font-semibold text-cyan-300">{Math.round(zoom * 100)}%</span>
     </div>
     <div className="absolute bottom-3 left-3 z-10 rounded border border-slate-700 bg-[#06101b]/85 px-3 py-2 text-[11px] text-slate-300 backdrop-blur">
-      Scale bãi: {columns} x {rows} slot · lăn chuột để zoom, kéo để xoay.
+      Scale bãi: {columns} x {rows} slot · {isDemoMode ? 'demo mode' : 'runtime mode'} · lăn chuột để zoom, kéo để xoay.
     </div>
     <Canvas camera={{ position: [13, 12, 17], fov: 40 }}>
       <CameraZoomRig zoom={zoom} />

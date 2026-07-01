@@ -26,7 +26,7 @@ export const componentsTabs = [
   {
     key: 'material-stock',
     label: 'MATERIAL WIP',
-    vi: 'Kho vật tư SX',
+    vi: 'Vật tư sử dụng',
     path: '/components/material-stock',
   },
   {
@@ -46,5 +46,11 @@ export const componentsTabs = [
     label: 'HISTORY',
     vi: 'Lịch sử gia công',
     path: '/components/history',
+  },
+  {
+    key: 'reports',
+    label: 'REPORTS',
+    vi: 'Báo cáo',
+    path: '/components/reports',
   },
 ]

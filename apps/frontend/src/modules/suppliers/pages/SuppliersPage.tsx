@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { BarChart3, FileText, PackageSearch, Pencil, Search, Star, Truck, X, type LucideIcon } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
 import { SectionHeader } from '@/shared/ui/enterprise'
@@ -31,10 +32,22 @@ const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-
 const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
 
 type DetailTab = 'overview' | 'materials' | 'inbound' | 'ratings' | 'files'
-type SupplierModuleTab = 'list' | 'ratings'
+type SupplierModuleTab = 'overview' | 'list' | 'quotes' | 'purchase-orders' | 'deliveries' | 'quality' | 'payables' | 'logs' | 'reports'
+
+const supplierTabs: Array<{ id: SupplierModuleTab; label: string; path: string }> = [
+  { id: 'overview', label: 'Tổng quan', path: '/suppliers' },
+  { id: 'list', label: 'Danh sách NCC', path: '/suppliers/list' },
+  { id: 'quotes', label: 'Báo giá', path: '/suppliers/quotes' },
+  { id: 'purchase-orders', label: 'Đơn mua', path: '/suppliers/purchase-orders' },
+  { id: 'deliveries', label: 'Giao hàng', path: '/suppliers/deliveries' },
+  { id: 'quality', label: 'Chất lượng', path: '/suppliers/quality' },
+  { id: 'payables', label: 'Công nợ', path: '/suppliers/payables' },
+  { id: 'logs', label: 'Nhật ký', path: '/suppliers/logs' },
+  { id: 'reports', label: 'Báo cáo', path: '/suppliers/reports' },
+]
 
 export function SuppliersPage() {
-  const [moduleTab, setModuleTab] = useState<SupplierModuleTab>('list')
+  const location = useLocation()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [evaluationFilter, setEvaluationFilter] = useState('all')
@@ -47,6 +60,9 @@ export function SuppliersPage() {
   const { data: evaluations } = useSupplierEvaluationCockpitQuery()
   const createMutation = useCreateSupplierMutation()
   const updateMutation = useUpdateSupplierMutation()
+  const moduleTab = supplierTabs.find((tab) => tab.path === location.pathname)?.id ?? 'overview'
+  const isSupplierListView = moduleTab === 'overview' || moduleTab === 'list'
+  const isSupplierQualityView = moduleTab === 'quality'
 
   const rows = useMemo(() => suppliers.filter((supplier) => {
     if (status === 'inactive') return false
@@ -85,18 +101,15 @@ export function SuppliersPage() {
     <EnterpriseModulePage>
       <SectionHeader
         title="Nhà cung cấp"
-        description={moduleTab === 'list' ? 'Danh sách nhà cung cấp liên kết Inventory inbound và supplier master.' : 'Đánh giá nhà cung cấp liên kết SupplierScore, Supplier Master và dữ liệu sử dụng trong Inventory.'}
+        description={isSupplierListView ? 'Danh sách nhà cung cấp liên kết Inventory inbound và supplier master.' : 'Không gian nghiệp vụ nhà cung cấp được đồng bộ với sidebar và URL.'}
       />
 
       <div className="space-y-4">
         <nav className={`${panel} flex flex-wrap gap-1 p-1`}>
-          {[
-            ['list', 'Danh sách nhà cung cấp'],
-            ['ratings', 'Đánh giá nhà cung cấp'],
-          ].map(([id, label]) => <button key={id} onClick={() => setModuleTab(id as SupplierModuleTab)} className={`rounded-lg px-4 py-2 text-xs transition ${moduleTab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}
+          {supplierTabs.map((tab) => <Link key={tab.id} to={tab.path} className={`rounded-lg px-4 py-2 text-xs transition ${moduleTab === tab.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{tab.label}</Link>)}
         </nav>
 
-        {moduleTab === 'list' ? <>
+        {isSupplierListView ? <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard title="Total Suppliers" value={summary?.total ?? suppliers.length} note="Master records" />
           <KpiCard title="Active Suppliers" value={summary?.active ?? suppliers.length} note="Schema hiện chưa có status" tone="emerald" />
@@ -187,15 +200,15 @@ export function SuppliersPage() {
             </div>
           </aside>
           </div>
-        </> : <SupplierEvaluationTab
+        </> : isSupplierQualityView ? <SupplierEvaluationTab
           data={evaluations}
           rows={evaluationRows}
           suppliers={suppliers}
           filter={evaluationFilter}
           onFilterChange={setEvaluationFilter}
           onOpenSupplier={setSelectedSupplier}
-          onCreateScore={() => setModuleTab('ratings')}
-        />}
+          onCreateScore={() => undefined}
+        /> : <SupplierNavigationPlaceholder tab={moduleTab} />}
       </div>
 
       <SupplierDetailWorkspace
@@ -222,6 +235,30 @@ function KpiCard({ title, value, note, tone = 'cyan' }: { title: string; value: 
     <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div>
     <div className="mt-3 text-3xl font-semibold text-white">{fmt(value)}</div>
     <div className="mt-1 text-xs text-slate-500">{note}</div>
+  </div>
+}
+
+function SupplierNavigationPlaceholder({ tab }: { tab: SupplierModuleTab }) {
+  const labels: Record<SupplierModuleTab, string> = {
+    overview: 'Tổng quan',
+    list: 'Danh sách NCC',
+    quotes: 'Báo giá',
+    'purchase-orders': 'Đơn mua',
+    deliveries: 'Giao hàng',
+    quality: 'Chất lượng',
+    payables: 'Công nợ',
+    logs: 'Nhật ký',
+    reports: 'Báo cáo',
+  }
+
+  return <div className={`${panel} p-6`}>
+    <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+      <FileText size={18} />
+    </div>
+    <div className="mt-3 text-center text-sm font-semibold text-slate-100">{labels[tab]}</div>
+    <p className="mx-auto mt-1 max-w-xl text-center text-xs text-slate-500">
+      Route và sidebar đã được đồng bộ. Dữ liệu nghiệp vụ riêng cho tab này sẽ được nối khi Supplier/Purchasing phase tương ứng có API.
+    </p>
   </div>
 }
 

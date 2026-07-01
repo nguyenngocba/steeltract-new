@@ -1,21 +1,24 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
 import { approveInspection, completeInspection, createInspection, getQcCockpit, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
-type QcTab = 'overview' | 'inspections' | 'plan' | 'standards' | 'ncr' | 'calibration' | 'reports'
+type QcTab = 'overview' | 'inbound' | 'production' | 'final' | 'plan' | 'standards' | 'ncr' | 'capa' | 'calibration' | 'logs' | 'dashboard' | 'reports'
 
-const tabs: Array<[QcTab, string]> = [
-  ['overview', 'Tổng quan'],
-  ['inspections', 'Phiếu kiểm tra'],
-  ['plan', 'Kế hoạch QC'],
-  ['standards', 'Tiêu chuẩn'],
-  ['ncr', 'Không phù hợp (NCR)'],
-  ['calibration', 'Hiệu chuẩn thiết bị'],
-  ['reports', 'Báo cáo'],
+const tabs: Array<{ id: QcTab; label: string; path: string }> = [
+  { id: 'overview', label: 'Tổng quan', path: '/qc' },
+  { id: 'inbound', label: 'Kiểm tra đầu vào', path: '/qc/inbound' },
+  { id: 'production', label: 'Kiểm tra sản xuất', path: '/qc/production' },
+  { id: 'final', label: 'Kiểm tra xuất xưởng', path: '/qc/final' },
+  { id: 'ncr', label: 'NCR', path: '/qc/ncr' },
+  { id: 'capa', label: 'CAPA', path: '/qc/capa' },
+  { id: 'logs', label: 'Nhật ký', path: '/qc/logs' },
+  { id: 'dashboard', label: 'Dashboard', path: '/qc/dashboard' },
+  { id: 'reports', label: 'Báo cáo', path: '/qc/reports' },
 ]
 const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
 const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
@@ -27,7 +30,8 @@ const fmt = (value = 0) => formatQuantity(value, 1)
 const date = (value?: string | null) => value ? formatDateTime(value) : '-'
 
 export function QcPage() {
-  const [tab, setTab] = useState<QcTab>('overview')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [selectedInspection, setSelectedInspection] = useState<QcInspectionRow | null>(null)
@@ -38,6 +42,9 @@ export function QcPage() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['qc-cockpit'], queryFn: getQcCockpit, refetchInterval: 5000 })
   const runtime = data ?? emptyRuntime()
+  const segment = location.pathname.split('/').at(-1)
+  const legacyTab = ['plan', 'standards', 'calibration'].includes(segment ?? '') ? segment as QcTab : undefined
+  const tab = legacyTab ?? tabs.find((item) => item.path === location.pathname)?.id ?? 'overview'
   const filteredInspections = useMemo(() => runtime.inspections.filter((row) => {
     if (status !== 'all' && row.status !== status) return false
     return `${row.inspectionNo} ${row.projectName} ${row.componentCode} ${row.productionOrderNo}`.toLowerCase().includes(query.toLowerCase())
@@ -60,7 +67,7 @@ export function QcPage() {
       setError('')
       setNotice(`Đã tạo phiếu QC cho ${row.orderNo}.`)
       setCreateDialogOpen(false)
-      setTab('inspections')
+      navigate('/qc/production')
       await invalidate()
     },
     onError: (err) => {
@@ -138,17 +145,19 @@ export function QcPage() {
         <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Chất lượng (QC)</p><h1 className="mt-1 text-2xl font-semibold">Chất lượng (QC)</h1><p className="mt-1 text-xs text-slate-500">QC móc nối sản xuất và cấu kiện. Thành phẩm chỉ được chuyển bãi khi QC đạt hoặc đã duyệt.</p></div>
         <div className="flex gap-2"><button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button><button className={mutedButton}>Xuất Excel</button><button className={mutedButton}>Báo cáo</button></div>
       </header>
-      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs transition ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}</nav>
+      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>{tabs.map((item) => <Link key={item.id} to={item.path} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs transition ${tab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{item.label}</Link>)}</nav>
       <FilterBar query={query} status={status} onQuery={setQuery} onStatus={setStatus} />
       {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
       {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
       {isLoading ? <div className={`${panel} mt-3 p-6 text-center text-sm text-slate-500`}>Đang tải QC cockpit...</div> : null}
-      {tab === 'overview' && <Overview runtime={runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
-      {tab === 'inspections' && <Inspections rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
+      {(tab === 'overview' || tab === 'dashboard') && <Overview runtime={runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
+      {['inbound', 'production', 'final'].includes(tab) && <Inspections rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
       {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'standards' && <Standards runtime={runtime} />}
       {tab === 'ncr' && <Ncr runtime={runtime} />}
+      {tab === 'capa' && <Ncr runtime={runtime} />}
       {tab === 'calibration' && <Calibration />}
+      {tab === 'logs' && <Reports runtime={runtime} />}
       {tab === 'reports' && <Reports runtime={runtime} />}
       <InspectionDetail inspection={selectedInspection} onClose={() => setSelectedInspection(null)} onStart={(id) => startMutation.mutate(id)} onPass={(id) => passMutation.mutate(id)} onFail={(id) => failMutation.mutate(id)} />
       <QueueDetail row={selectedQueue} onClose={() => setSelectedQueue(null)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />

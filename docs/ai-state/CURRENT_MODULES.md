@@ -38,6 +38,8 @@
 
 - Users, Roles & Permissions, and System Logs now use richer real runtime data from System APIs instead of thin table-only views.
 - Dashboard/Tổng quan now uses `GET /dashboard/cockpit` and aggregates real Projects, Production, Components, Inventory, Yard, QC, Activity Logs, and Notifications data.
+- Sprint 70EXEC.1 adds `GET /dashboard/executive-cockpit` plus backend metrics/activity/notification services for URL-driven Executive tabs: Predictive Trends, Recent Activities, and System Notifications.
+- Sprint 70EXEC.2 extends `GET /dashboard/executive-cockpit` with Control Tower health score, 7-day summary, suggested actions, activity grouping, and notification center through backend insight/recommendation services.
 - Notifications/Thông báo now reads persisted `notifications` records from `/system/notifications` and is registered in the active router.
 - System mutation workflows are still not implemented: user create/edit/lock/delete, role permission mutation, notification mark-read, audit export, and backup execution remain Phase S2.
 
@@ -52,6 +54,8 @@
 - Component Costing Sprint 5 now has `ComponentCosting`, component costing APIs, material actual cost from production consumption and Inventory average cost, and a Component detail Costing section.
 - Delivery/Installation Sprint 6 now has component `SHIPPED -> DELIVERED -> INSTALLED` APIs, timeline rows, Project Components actions, and runtime delivered/installed counters.
 - Installation Mapping Sprint 7 now stores component install Zone/Axis/Level/Position, requires those fields in the install modal/API, returns them through Projects runtime, and shows them in Project Components and Component Detail.
+- Projects Sprint 40PROJ.3 now exposes WBS, financial, health, and return request read models through Projects runtime; Project Detail renders a WBS tree grid and can create material return requests through the existing Inventory `SITE_RETURN` workflow.
+- Projects Sprint 40PROJ.8 now adds persisted Project Template Library, default `Nhà xưởng 5 nhịp` template seed, template-backed project creation into normalized ProjectTask rows, and Quick Update Simple Mode foundation for field progress updates.
 - System Audit & Hardening Sprint 8 added read-only Runtime Integrity KPI APIs and documented current Inventory, Production, Component, Costing, and Project integrity findings.
 - Material Return Reconciliation Sprint 10A now validates returnable quantity after consumed/scrap quantities, returns unused issued material to Main Warehouse, writes Inventory `RETURN` plus Production Material Ledger `RETURN`, and prompts for partial returns in the Production Cockpit.
 - Automatic Component Costing Sprint 10B now recalculates ComponentCosting during production completion/component READY workflows without requiring a manual Recalculate button.

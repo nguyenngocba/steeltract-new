@@ -1,12 +1,15 @@
 export const productionTabs = [
   { label: 'Tổng quan', path: '/production' },
-  { label: 'Production BOM', path: '/production/boms' },
   { label: 'Lệnh sản xuất', path: '/production/orders' },
-  { label: 'Execution Board', path: '/production/execution' },
-  { label: 'Giữ chỗ vật tư', path: '/production/reservations' },
+  { label: 'Kế hoạch', path: '/production/planning' },
+  { label: 'Production BOM', path: '/production/boms' },
   { label: 'Kho vật tư SX', path: '/production/warehouse' },
+  { label: 'Theo dõi thực hiện', path: '/production/execution' },
+  { label: 'Giữ chỗ vật tư', path: '/production/reservations' },
   { label: 'Sổ vật tư SX', path: '/production/material-ledger' },
   { label: 'Cấp phát vật tư', path: '/production/material-issues' },
   { label: 'Tiêu hao vật tư', path: '/production/consumptions' },
+  { label: 'Sự cố', path: '/production/incidents' },
   { label: 'Nhật ký sản xuất', path: '/production/logs' },
+  { label: 'Báo cáo', path: '/production/reports' },
 ]

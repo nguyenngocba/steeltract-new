@@ -4,6 +4,7 @@ import { PrismaModule } from '../../core/prisma/prisma.module'
 import { InventoryGateway } from './inventory.gateway'
 import { InventoryController } from './inventory.controller'
 import { InventoryService } from './inventory.service'
+import { ReturnWorkflowController } from './return-workflow.controller'
 import { ReturnWorkflowService } from './return-workflow.service'
 import { CreateTransactionHandler } from './commands/create-transaction.handler'
 import { RuntimeWsModule } from '../../core/ws/runtime-ws.module'
@@ -25,6 +26,7 @@ imports: [
 ],
 controllers: [
   InventoryController,
+  ReturnWorkflowController,
 
   ZonesController,
 
