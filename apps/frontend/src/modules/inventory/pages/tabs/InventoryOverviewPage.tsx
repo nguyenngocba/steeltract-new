@@ -1163,7 +1163,7 @@ export function InventoryOverviewPage() {
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Tồn kho vật tư</h3>
                 <button onClick={() => setOverviewPopup('stock-full')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
               </div>
-              <div className={`${inventoryTableShell} border-0 ring-0 bg-transparent shadow-none rounded-none h-[430px] overflow-auto scrollbar-none`}>
+              <div className={`${inventoryTableShell} border border-white/10 ring-0 bg-transparent shadow-none rounded-lg h-[430px] overflow-auto scrollbar-none`}>
                 <table className="w-full min-w-[1050px] text-sm table-fixed">
                   <colgroup>
                     <col className="w-[140px]" />

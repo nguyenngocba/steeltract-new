@@ -46,7 +46,6 @@ const YardPage = lazyNamed(() => import('@/modules/yard/pages/YardPage'), 'YardP
 const SuppliersPage = lazyNamed(() => import('@/modules/suppliers/pages/SuppliersPage'), 'SuppliersPage')
 const InventoryInboundPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryInboundPage'), 'InventoryInboundPage')
 const InventoryOutboundPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryOutboundPage'), 'InventoryOutboundPage')
-const InventoryMasterDataPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryMasterDataPage'), 'InventoryMasterDataPage')
 const InventoryAuditPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryAuditPage'), 'InventoryAuditPage')
 const InventoryTransferPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryTransferPage'), 'InventoryTransferPage')
 const InventoryStockTakePage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryStockTakePage'), 'InventoryStockTakePage')
@@ -198,7 +197,7 @@ export function AppRouter() {
       <Route
         path="/inventory/master-data"
         element={
-          <InventoryMasterDataPage />
+          <Navigate to="/inventory/materials" replace />
         }
       />
 

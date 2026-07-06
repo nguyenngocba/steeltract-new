@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { Prisma, TransactionType } from '@prisma/client'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
@@ -378,6 +378,167 @@ export class InventoryService {
       projectConsumptionHistory: outboundLines,
 
       locationBalances,
+    }
+  }
+
+  async getInboundSuggestions(id: string) {
+    const item = await this.prisma.inventoryItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+      },
+    })
+
+    if (!item) {
+      throw new Error('Material not found')
+    }
+
+    const lastLine =
+      await this.prisma.inventoryTransactionItem.findFirst({
+        where: {
+          inventoryItemId: id,
+          quantity: {
+            gt: 0,
+          },
+          transaction: {
+            type: TransactionType.IMPORT,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          transaction: true,
+          warehouse: true,
+          zone: {
+            include: {
+              warehouse: true,
+            },
+          },
+        },
+      })
+
+    const since = new Date()
+    since.setDate(since.getDate() - 30)
+
+    const recentLines =
+      await this.prisma.inventoryTransactionItem.findMany({
+        where: {
+          inventoryItemId: id,
+          quantity: {
+            gt: 0,
+          },
+          transaction: {
+            type: TransactionType.IMPORT,
+            transactionDate: {
+              gte: since,
+            },
+          },
+        },
+      })
+
+    const weightedTotal = recentLines.reduce(
+      (sum, line) => {
+        const quantity = Math.abs(Number(line.quantity ?? 0))
+        const unitPrice =
+          Number(line.unitPrice ?? 0) ||
+          (quantity > 0
+            ? Number(line.totalAmount ?? 0) / quantity
+            : 0)
+        return sum + quantity * unitPrice
+      },
+      0,
+    )
+    const weightedQuantity = recentLines.reduce(
+      (sum, line) => sum + Math.abs(Number(line.quantity ?? 0)),
+      0,
+    )
+
+    const supplier = lastLine?.transaction.supplierId
+      ? await this.prisma.supplier.findUnique({
+          where: {
+            id: lastLine.transaction.supplierId,
+          },
+        })
+      : null
+
+    const lastQuantity = Math.abs(
+      Number(lastLine?.quantity ?? 0),
+    )
+    const lastUnitPrice =
+      Number(lastLine?.unitPrice ?? 0) ||
+      (lastQuantity > 0
+        ? Number(lastLine?.totalAmount ?? 0) / lastQuantity
+        : 0)
+
+    const locationOccupancy =
+      lastLine?.zoneId && lastLine?.slotId && lastLine?.level
+        ? await this.prisma.inventoryLocationStock.aggregate({
+            where: {
+              zoneId: lastLine.zoneId,
+              slotId: lastLine.slotId,
+              level: lastLine.level,
+              quantity: {
+                gt: 0,
+              },
+            },
+            _sum: {
+              quantity: true,
+            },
+          })
+        : null
+    const capacity = Number(lastLine?.zone?.capacity ?? 0)
+    const occupied = Number(
+      locationOccupancy?._sum.quantity ?? 0,
+    )
+    const freePercent =
+      capacity > 0
+        ? Math.max(
+            0,
+            Math.min(100, 100 - (occupied / capacity) * 100),
+          )
+        : null
+
+    return {
+      materialId: item.id,
+      materialCode: item.code,
+      materialName: item.name,
+      lastLocation:
+        lastLine?.zoneId && lastLine?.slotId && lastLine?.level
+          ? {
+              warehouseId:
+                lastLine.warehouseId ??
+                lastLine.zone?.warehouseId ??
+                null,
+              warehouseName:
+                lastLine.warehouse?.name ??
+                lastLine.zone?.warehouse?.name ??
+                null,
+              zoneId: lastLine.zoneId,
+              zoneCode: lastLine.zone?.code ?? null,
+              zoneName: lastLine.zone?.name ?? null,
+              slotId: lastLine.slotId,
+              level: lastLine.level,
+              freePercent,
+            }
+          : null,
+      lastPrice:
+        lastUnitPrice > 0
+          ? {
+              unitPrice: lastUnitPrice,
+              transactionDate:
+                lastLine?.transaction.transactionDate ?? null,
+              supplierName: supplier?.name ?? null,
+              transactionNo:
+                lastLine?.transaction.transactionNo ??
+                lastLine?.transaction.code ??
+                null,
+            }
+          : null,
+      averagePrice30Days:
+        weightedQuantity > 0 ? weightedTotal / weightedQuantity : null,
     }
   }
 
@@ -944,6 +1105,7 @@ export class InventoryService {
         'Transaction requires at least one item',
       )
     }
+    this.assertInboundStorageLocations(baseItems, type)
 
     const maxAttempts = 3
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -1317,11 +1479,30 @@ export class InventoryService {
         slotId:
           item.slotId ?? payload.slotId ?? undefined,
         level:
-          item.level ?? payload.level ?? undefined,  
+          item.level ?? payload.level ?? undefined,
         unitPrice: safeUnitPrice,
         totalAmount,
       }
     })
+  }
+
+  private assertInboundStorageLocations(
+    lines: NormalizedInventoryLine[],
+    type: TransactionType,
+  ) {
+    if (type !== TransactionType.IMPORT) return
+
+    const hasMissingLocation = lines.some(
+      (line) =>
+        Number(line.quantity ?? 0) > 0 &&
+        (!line.zoneId || !line.slotId || !line.level),
+    )
+
+    if (hasMissingLocation) {
+      throw new BadRequestException(
+        'Vui lòng chọn vị trí lưu kho cho tất cả vật tư nhập.',
+      )
+    }
   }
 
   private async resolveLineWarehouses(

@@ -129,10 +129,15 @@ Current focus:
 Status:
 
 - Completed module navigation synchronization pass for Components, Production, Projects, Suppliers, QC, Yard, and Logistics.
+- Dynamic workspace header hotfix completed on 2026-07-02.
+- Sprint UX.1 compact header and mini-sidebar pass completed on 2026-07-02.
 
 Current architecture:
 
 - Inventory remains the reference for path-based module navigation.
+- The topbar header derives from route metadata and renders exactly two context lines: module title and workspace title. Static `SteelTrack ERP` and Inventory breadcrumb output were removed from active Inventory pages.
+- The topbar is compacted to a 50px shell with smaller module/workspace typography so dashboards regain vertical space.
+- Collapsed sidebar mode is now a 64px mini icon rail instead of a nearly-empty hidden panel. Module icons remain visible, hoverable, clickable, and open fixed-position flyout menus using the existing route tree.
 - Components and Production use dedicated frontend routes for each operational tab.
 - Projects, Suppliers, and QC now derive active tab state from `location.pathname` instead of local tab state.
 - Yard now derives active tabs from real routes instead of hash fragments.
@@ -609,22 +614,49 @@ Current focus:
 Status:
 
 - Active and visually aligned with the Inventory Cockpit.
+- Sprint INV.NAV.2 restored advanced Inventory operational pages into the sidebar under `Nghiệp vụ nâng cao`.
 
 Current architecture:
 
 - Return Requests use `GET /inventory/returns?flowType=SITE_RETURN`.
+- Return Requests render inside the same `EnterpriseModulePage` + `InventoryTabWorkspace` shell as Overview, Transactions, Materials/Stock, and Locations.
 - Workspace metrics and analytics are computed from real return request rows.
 - Receive/reject actions continue to use the existing return workflow APIs.
 - Detail view uses the shared small right-side drawer standard.
+- Inventory navigation now exposes primary workspaces plus a nested advanced operations group. Primary workspaces are Tổng quan kho, Giao dịch, Phiếu trả vật tư, Vật tư & Tồn kho, and Vị trí kho. Advanced operations expose Nhập kho, Xuất kho, Điều chuyển, Kiểm kê, Điều chỉnh, Cảnh báo, and Audit through their existing routes. Legacy `/inventory/master-data` redirects to `/inventory/materials`.
+- The advanced operations group is collapsed by default, remembers expansion per session, and auto-opens when an advanced child route is active.
 
 Known limitations:
 
 - Photo display remains an empty state until return request attachments are linked to this workspace.
 - Timeline uses status timestamps and activity logs; a dedicated immutable return-event table does not exist.
+- Sidebar Audit visibility is marked `adminOnly` and uses existing user role/permission fields for frontend visibility. Backend/API permissions remain the authority.
 
 Current focus:
 
 - Validate the Return Requests cockpit with Inventory operators and confirm aging thresholds match operational urgency.
+- Validate the advanced Inventory sidebar in expanded/collapsed sidebars and confirm all restored operational routes remain reachable without duplicate route behavior.
+
+## Inventory Inbound Location Validation
+
+Status:
+
+- Active. Inbound stock creation now requires an exact storage bucket.
+
+Current architecture:
+
+- Backend `InventoryService.createTransaction()` validates every `IMPORT` transaction line before persisting stock. Lines with positive quantity must include `zoneId`, `slotId`, and `level`.
+- Frontend `InboundTransactionModal` disables confirmation and highlights location fields when the selected inbound line has quantity but no complete Zone/Slot/Level.
+- The modal reads smart suggestions from `GET /inventory/items/:id/inbound-suggestions`, which derives last used location, last inbound price, and 30-day average price from existing Inventory transaction history.
+
+Known limitations:
+
+- Suggested free capacity is only shown when the last used zone exposes usable capacity data. Otherwise the UI shows the real last location without a free-percent claim.
+- The legacy inbound wizard now requires a location but remains visually older than the main Inventory transaction modal.
+
+Current focus:
+
+- Validate real inbound receipts with operators and confirm the suggested last price/location reduce data entry without encouraging incorrect location reuse.
 
 ## NestJS Dependency Injection Hotfix
 

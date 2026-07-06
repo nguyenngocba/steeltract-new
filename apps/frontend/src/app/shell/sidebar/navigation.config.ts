@@ -50,56 +50,34 @@ export const navigation = [
         title: 'Tổng quan kho',
         path: '/inventory',
       },
-
-      {
-        title: 'Vật tư',
-        path: '/inventory/master-data',
-      },
-
       {
         title: 'Giao dịch',
         path: '/inventory/transactions',
       },
-
       {
         title: 'Phiếu trả vật tư',
         path: '/inventory/returns',
       },
-
       {
-        title: 'Tồn kho',
+        title: 'Vật tư & Tồn kho',
         path: '/inventory/materials',
       },
-
       {
         title: 'Vị trí kho',
         path: '/inventory/locations',
       },
-
       {
-        title: 'Nhập kho',
-        path: '/inventory/inbound',
-      },
-
-      {
-        title: 'Xuất kho',
-        path: '/inventory/outbound',
-      },
-      {
-        title: 'Điều chuyển',
-        path: '/inventory/transfer',
-      },
-      {
-        title: 'Kiểm kê',
-        path: '/inventory/stock-take',
-      },
-      {
-        title: 'Điều chỉnh tồn kho',
-        path: '/inventory/adjustments',
-      },
-      {
-        title: 'Cảnh báo tồn kho',
-        path: '/inventory/alerts',
+        id: 'inventory-advanced-operations',
+        title: 'Nghiệp vụ nâng cao',
+        children: [
+          { id: 'inventory-inbound', title: 'Nhập kho', path: '/inventory/inbound' },
+          { id: 'inventory-outbound', title: 'Xuất kho', path: '/inventory/outbound' },
+          { id: 'inventory-transfer', title: 'Điều chuyển', path: '/inventory/transfer' },
+          { id: 'inventory-stock-take', title: 'Kiểm kê', path: '/inventory/stock-take' },
+          { id: 'inventory-adjustments', title: 'Điều chỉnh', path: '/inventory/adjustments' },
+          { id: 'inventory-alerts', title: 'Cảnh báo', path: '/inventory/alerts' },
+          { id: 'inventory-audit', title: 'Audit', path: '/inventory/audit', adminOnly: true },
+        ],
       },
     ],
   },

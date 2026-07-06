@@ -989,6 +989,7 @@ export function InventoryMaterialsPage() {
                         <button onClick={() => setShowAll(true)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>
                       </div>
                       {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
+                      <div className="rounded-lg border border-white/10 overflow-hidden">
                       <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_SM}>
                         <table className="w-full min-w-[1050px] text-sm table-fixed">
                           <colgroup>
@@ -1033,7 +1034,7 @@ export function InventoryMaterialsPage() {
                                 <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
                                 <td className="truncate px-1.5 py-0.5 text-right text-slate-300" title={money(Number(item.averageCost ?? 0))}>{money(Number(item.averageCost ?? 0))}</td>
                                 <td className="truncate px-1.5 py-0.5 text-right font-medium text-cyan-300" title={money(Number(item.inventoryValue ?? 0))}>{money(Number(item.inventoryValue ?? 0))}</td>
-                                <td className="truncate px-1.5 py-0.5">
+                                <td className="truncate px-1.5 py-0.5 align-middle">
                                   <span
                                     title={rowLocations(item).map(locationLabel).join('\n')}
                                     className="inline-block w-full truncate rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[10px] text-cyan-100"
@@ -1051,6 +1052,7 @@ export function InventoryMaterialsPage() {
                           </tbody>
                         </table>
                       </CockpitTableShell>
+                      </div>
                       <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
                     </InventoryPanel>
 

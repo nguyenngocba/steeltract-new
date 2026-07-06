@@ -22,3 +22,14 @@ export async function getInventoryItems() {
 
   return data
 }
+
+export async function getInboundSuggestions(
+  id: string,
+) {
+  const { data } =
+    await inventoryApi.get(
+      `/inventory/items/${id}/inbound-suggestions`,
+    )
+
+  return data
+}

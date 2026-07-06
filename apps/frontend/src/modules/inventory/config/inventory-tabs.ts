@@ -10,7 +10,7 @@ export const inventoryTabs = [
   {
     key: 'stock',
     label: 'Stock',
-    vi: 'Tồn kho',
+    vi: 'Vật tư & Tồn kho',
     path: '/inventory/materials',
   },
 

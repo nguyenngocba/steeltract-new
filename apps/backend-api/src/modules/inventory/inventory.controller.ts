@@ -36,6 +36,13 @@ export class InventoryController {
     return this.inventoryService.getItemDetail(id)
   }
 
+  @Get('items/:id/inbound-suggestions')
+  async getInboundSuggestions(
+    @Param('id') id: string,
+  ) {
+    return this.inventoryService.getInboundSuggestions(id)
+  }
+
   @Get('audit')
   async getInventoryAudit() {
     return this.inventoryService.getInventoryAudit()

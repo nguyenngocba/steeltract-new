@@ -7,6 +7,7 @@ import {
 import {
 
   NavLink,
+  useLocation,
 
 } from 'react-router-dom'
 
@@ -24,6 +25,15 @@ import {
   navigation,
 
 } from '../../config/navigation.config'
+import { useAuthStore } from '../../../store/auth.store'
+
+type NavigationItem = {
+  id?: string
+  title: string
+  path?: string
+  children?: NavigationItem[]
+  adminOnly?: boolean
+}
 
 export function EnterpriseSidebar() {
   const navRef = useRef<HTMLDivElement>(null)
@@ -154,38 +164,16 @@ export function EnterpriseSidebar() {
                   <div className="mt-2 space-y-1 border-l border-zinc-800 pl-5">
 
                     {group.children.map((item) => (
-
-                      <NavLink
-
-                        key={`${item.path}:${item.title}`}
-
-                        to={item.path}
-                        onMouseDown={(event) => {
-                          event.currentTarget.blur()
-                        }}
-                        onFocus={(event) => {
-                          event.currentTarget.blur()
-                        }}
-                        onClick={() => {
+                      <EnterpriseSidebarItem
+                        key={item.id ?? `${item.path ?? item.title}:${item.title}`}
+                        item={item}
+                        onNavigate={() => {
                           const element = navRef.current
                           if (element) {
                             window.sessionStorage.setItem('steeltrack-sidebar-scroll', String(element.scrollTop))
                           }
                         }}
-
-                        className={({ isActive }) => `block rounded-xl px-4 py-3 text-sm transition ${
-                          isActive
-
-                            ? 'bg-cyan-500/10 text-cyan-300'
-
-                            : 'text-zinc-500 hover:bg-zinc-900 hover:text-white'
-                        }`}
-                      >
-
-                        {item.title}
-
-                      </NavLink>
-
+                      />
                     ))}
 
                   </div>
@@ -202,5 +190,125 @@ export function EnterpriseSidebar() {
       </div>
 
     </div>
+  )
+}
+
+function EnterpriseSidebarItem({
+  item,
+  onNavigate,
+}: {
+  item: NavigationItem
+  onNavigate: () => void
+}) {
+  const user = useAuthStore((state) => state.user)
+  if (!canAccessNavigationItem(item, user)) return null
+
+  if (item.children?.length) {
+    return (
+      <EnterpriseSidebarNestedGroup
+        item={item}
+        onNavigate={onNavigate}
+      />
+    )
+  }
+
+  if (!item.path) return null
+
+  return (
+    <NavLink
+      to={item.path}
+      onMouseDown={(event) => {
+        event.currentTarget.blur()
+      }}
+      onFocus={(event) => {
+        event.currentTarget.blur()
+      }}
+      onClick={onNavigate}
+      className={({ isActive }) => `block rounded-xl px-4 py-3 text-sm transition ${
+        isActive
+          ? 'bg-cyan-500/10 text-cyan-300'
+          : 'text-zinc-500 hover:bg-zinc-900 hover:text-white'
+      }`}
+    >
+      {item.title}
+    </NavLink>
+  )
+}
+
+function EnterpriseSidebarNestedGroup({
+  item,
+  onNavigate,
+}: {
+  item: NavigationItem
+  onNavigate: () => void
+}) {
+  const location = useLocation()
+  const user = useAuthStore((state) => state.user)
+  const children = item.children?.filter((child) => canAccessNavigationItem(child, user)) ?? []
+  const activeChild = children.some((child) => child.path === location.pathname)
+  const storageKey = `steeltrack-sidebar-nested:${item.id ?? item.title}`
+
+  const [open, setOpen] = useState(() => {
+    try {
+      const saved = window.sessionStorage.getItem(storageKey)
+      if (saved !== null) return saved === 'true'
+    } catch {
+      // Ignore unavailable storage and derive from the active route.
+    }
+    return activeChild
+  })
+
+  useEffect(() => {
+    if (activeChild) setOpen(true)
+  }, [activeChild])
+
+  useEffect(() => {
+    window.sessionStorage.setItem(storageKey, String(open))
+  }, [open, storageKey])
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
+      >
+        <span>{item.title}</span>
+        <ChevronDown
+          size={15}
+          className={`text-zinc-500 transition ${open ? 'rotate-180 text-cyan-300' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-1 space-y-1 border-l border-cyan-400/15 pl-3">
+          {children.map((child) => (
+            <EnterpriseSidebarItem
+              key={child.id ?? `${child.path ?? child.title}:${child.title}`}
+              item={child}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function canAccessNavigationItem(
+  item: NavigationItem,
+  user: ReturnType<typeof useAuthStore.getState>['user'],
+) {
+  if (!item.adminOnly) return true
+  if (!user) return false
+
+  const roles = user.roles?.map((role) => role.toLowerCase()) ?? []
+  const permissions = user.permissions ?? []
+
+  return (
+    roles.some((role) => role.includes('admin') || role.includes('quản trị')) ||
+    permissions.includes('*') ||
+    permissions.includes('admin.read') ||
+    permissions.includes('admin.write')
   )
 }

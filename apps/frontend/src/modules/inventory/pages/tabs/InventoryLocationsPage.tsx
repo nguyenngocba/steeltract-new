@@ -153,7 +153,7 @@ function LocationsPagination({
   const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
 
   return (
-    <div className="grid grid-cols-1 items-center gap-1 px-4 py-1 text-xs text-slate-400 md:grid-cols-3">
+    <div className="grid grid-cols-1 items-center gap-1 px-4 py-0.5 text-xs text-slate-400 md:grid-cols-3">
       <div>
         Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>
@@ -370,7 +370,7 @@ export function InventoryLocationsPage() {
   const { data: auditRows = [] } = useInventoryAudit()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all')
-  const [audit, setAudit] = useState<'all' | 'Demo record' | 'Warehouse-like record' | 'Real storage location' | 'Needs review'>('all')
+  const [warehouseFilter, setWarehouseFilter] = useState('')
   const [page, setPage] = useState(1)
   const [form, setForm] = useState<LocationForm | null>(null)
   const [detailId, setDetailId] = useState('')
@@ -381,6 +381,25 @@ export function InventoryLocationsPage() {
     queryFn: () => getZoneDetail(detailId),
     enabled: Boolean(detailId),
   })
+  // State cho ô tìm kiếm (chỉ áp dụng khi nhấn nút/Enter)
+  const [searchDraft, setSearchDraft] = useState('')
+
+  // Hàm áp dụng tìm kiếm
+  const applySearch = () => {
+    setQuery(searchDraft)  // cập nhật query thật
+    setPage(1)             // về trang 1
+    refresh()              // tải lại dữ liệu
+  }
+
+  // Hàm làm mới (reset tất cả filter)
+  const resetFilters = () => {
+    setSearchDraft('')
+    setQuery('')
+    setStatus('all')
+    setWarehouseFilter('')
+    setPage(1)
+    refresh()
+  }
 
   // ========== 1. RECENT INBOUND / OUTBOUND DATA ==========
   const recentInboundData = useMemo(() => {
@@ -433,6 +452,15 @@ export function InventoryLocationsPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-zone-detail'] }),
     ])
   }
+  const handleSearch = () => {
+    setPage(1)
+    refresh()
+  }
+
+  const handleRefresh = () => {
+    setPage(1)
+    refresh()
+  }
 
   const saveMutation = useMutation({
     mutationFn: async (payload: LocationForm) => {
@@ -460,18 +488,22 @@ export function InventoryLocationsPage() {
   const deleteMutation = useMutation({ mutationFn: deleteZone, onSuccess: refresh })
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return (zones as WarehouseLocation[])
-      .filter(isRealStorageLocation)
-      .map((zone) => ({ ...zone, auditType: auditZone(zone) }))
-      .filter((zone) => {
-        if (status === 'active' && !zone.active) return false
-        if (status === 'inactive' && zone.active) return false
-        if (audit !== 'all' && zone.auditType !== audit) return false
-        if (!q) return true
-        return [zone.code, zone.name, zone.row, zone.column, zone.level, zone.description, zone.auditType].join(' ').toLowerCase().includes(q)
-      })
-  }, [zones, query, status, audit])
+  const q = query.trim().toLowerCase()
+  return (zones as WarehouseLocation[])
+    .filter(isRealStorageLocation)
+    .map((zone) => ({ ...zone, auditType: auditZone(zone) }))
+    .filter((zone) => {
+      if (status === 'active' && !zone.active) return false
+      if (status === 'inactive' && zone.active) return false
+      // Lọc theo kho
+      if (warehouseFilter && zone.warehouseId !== warehouseFilter) return false
+      if (!q) return true
+      return [zone.code, zone.name, zone.row, zone.column, zone.level, zone.description, zone.auditType]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+}, [zones, query, status, warehouseFilter])
   const pagedRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const materialCostByCode = useMemo(() => {
@@ -693,34 +725,32 @@ export function InventoryLocationsPage() {
   }, [auditRows])
 
   const materialTypeDistribution = useMemo(() => {
-    let primaryStock = 0
-    let secondaryStock = 0
-    let consumableStock = 0
+  let primaryStock = 0
+  let secondaryStock = 0
+  let consumableStock = 0
 
-    slotViews.forEach((slot) => {
-      slot.materials.forEach((m) => {
-        const usage = materialUsageByCode.get(m.code) ?? 'PRIMARY'
-        if (usage === 'PRIMARY') {
-          primaryStock += m.quantity
-        } else if (usage === 'SECONDARY') {
-          secondaryStock += m.quantity
-        } else if (usage === 'CONSUMABLE') {
-          consumableStock += m.quantity
-        }
-      })
+  slotViews.forEach((slot) => {
+    slot.materials.forEach((m) => {
+      const usage = materialUsageByCode.get(m.code) ?? 'PRIMARY'
+      if (usage === 'PRIMARY') {
+        primaryStock += m.quantity
+      } else if (usage === 'SECONDARY') {
+        secondaryStock += m.quantity
+      } else if (usage === 'CONSUMABLE') {
+        consumableStock += m.quantity
+      }
     })
+  })
 
-    const total = primaryStock + secondaryStock + consumableStock
-    const percentPrimary = total > 0 ? (primaryStock / total) * 100 : 0
+  const total = primaryStock + secondaryStock + consumableStock
 
-    return {
-      primary: primaryStock,
-      secondary: secondaryStock,
-      consumable: consumableStock,
-      total,
-      percentPrimary,
-    }
-  }, [slotViews, materialUsageByCode])
+  return {
+    primary: primaryStock,
+    secondary: secondaryStock,
+    consumable: consumableStock,
+    total,
+  }
+}, [slotViews, materialUsageByCode])
 
   const zoneStatusStats = useMemo(() => {
     let using = 0
@@ -1070,19 +1100,73 @@ export function InventoryLocationsPage() {
         />
       </div>
 
-      <InventoryPanel>
-        <div className="grid gap-1 lg:grid-cols-[1fr_180px_220px_auto]">
-          <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className={inventoryInput} placeholder="Tìm mã, tên, hàng, cột, tầng..." />
-          <select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); setPage(1) }} className={inventoryInput}>
+      <InventoryPanel className="rounded-xl">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_minmax(260px,1fr)_120px_120px_auto]">
+          {/* Dropdown trạng thái */}
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as typeof status)
+              setPage(1)
+            }}
+            className={`${inventoryInput} h-9 self-end`}
+          >
             <option value="all">Tất cả trạng thái</option>
             <option value="active">Đang hoạt động</option>
             <option value="inactive">Ngưng dùng</option>
           </select>
-          <select value={audit} onChange={(event) => { setAudit(event.target.value as typeof audit); setPage(1) }} className={inventoryInput}>
-            <option value="all">Tất cả phân loại</option>
-            <option value="Real storage location">Vị trí lưu kho thật</option>
+
+          {/* Dropdown chọn kho (thay cho phân loại) */}
+          <select
+            value={warehouseFilter}
+            onChange={(e) => {
+              setWarehouseFilter(e.target.value)
+              setPage(1)
+            }}
+            className={`${inventoryInput} h-9 self-end`}
+          >
+            <option value="">Tất cả kho</option>
+            {warehouseOptions.map((wh) => (
+              <option key={wh.id} value={wh.id}>
+                {wh.name}
+              </option>
+            ))}
           </select>
-          <button onClick={() => setForm(emptyForm)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">+ Thêm vị trí</button>
+
+          {/* Ô tìm kiếm */}
+          <input
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applySearch()
+            }}
+            placeholder="Mã, tên, hàng, cột, tầng..."
+            className={`${inventoryInput} h-9 self-end`}
+          />
+
+          {/* Nút Tìm kiếm */}
+          <button
+            onClick={applySearch}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+
+          {/* Nút Làm mới */}
+          <button
+            onClick={resetFilters}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+
+          {/* Nút + Thêm vị trí */}
+          <button
+            onClick={() => setForm(emptyForm)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            + Thêm vị trí
+          </button>
         </div>
       </InventoryPanel>
 
@@ -1093,10 +1177,11 @@ export function InventoryLocationsPage() {
           {/* Bảng danh sách vị trí */}
           <LocationsChartCard title="Danh sách vị trí kho" heightClass="h-[350px]">
             <div className="flex flex-col h-full justify-between">
-              <div className="overflow-auto scrollbar-none flex-1">
+              {/* Phần bảng cuộn - được bọc viền */}
+              <div className="overflow-auto scrollbar-none flex-1 rounded-lg border border-white/10">
                 <table className="w-full text-[14px] text-left">
-                  <thead className="bg-white/[0.06]">
-                      <tr className="border-b border-white/10 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
+                  <thead className="bg-white/[0.06] sticky top-0 z-10">
+                    <tr className="border-b border-white/10 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
                         <th className="py-2 px-3 text-left">Kho</th>
                         <th className="py-2 px-3 text-left">Vị trí</th>
                         <th className="py-2 px-3 text-center">Slot</th>
@@ -1166,7 +1251,7 @@ export function InventoryLocationsPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-1 shrink-0">
+              <div className="mt-0.5 shrink-0">
                 <LocationsPagination
                   page={page}
                   pageCount={Math.ceil(rows.length / PAGE_SIZE)}
@@ -1179,72 +1264,72 @@ export function InventoryLocationsPage() {
           </LocationsChartCard>
 
           {/* 4 card dưới: chia 2 cột, 2 hàng */}
-          <div className="grid grid-cols-2 gap-1">
-            {/* Hàng 1: Nhập gần nhất | Xuất gần nhất */}
-            <LocationsChartCard
-              title="Vật tư nhập gần nhất"
-              heightClass="h-[220px]"
-              action={
-                <button
-                  type="button"
-                  onClick={() => setModalType('recentInbound')}
-                  className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
-                >
-                  Xem tất cả
-                </button>
-              }
-            >
-              {previewRecentInbound.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
-              ) : (
-                <div className="space-y-0.5">
-                  {previewRecentInbound.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-[100px_90px_1fr_70px_70px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
-                      <div className="text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</div>
-                      <div className="truncate font-medium text-cyan-300">{item.code}</div>
-                      <div className="truncate text-slate-300" title={item.name}>{item.name}</div>
-                      <div className="text-right text-white">{formatQuantity(item.quantity, 1)} tấn</div>
-                      <div className="text-right text-emerald-300">Đã nhập</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </LocationsChartCard>
+            <div className="grid grid-cols-2 gap-1">
+              {/* Hàng 1: Nhập gần nhất | Xuất gần nhất */}
+              <LocationsChartCard
+                title="Vật tư nhập gần nhất"
+                heightClass="h-[185px]"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setModalType('recentInbound')}
+                    className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                  >
+                    Xem tất cả
+                  </button>
+                }
+              >
+                {previewRecentInbound.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch nhập</div>
+                ) : (
+                  <div className="space-y-0">
+                    {previewRecentInbound.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-[100px_90px_1fr_70px_70px] items-center gap-2 border-b border-white/8 px-1.5 py-1 text-xs last:border-b-0 last:pb-0">
+                        <div className="text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</div>
+                        <div className="truncate font-medium text-cyan-300">{item.code}</div>
+                        <div className="truncate text-slate-300" title={item.name}>{item.name}</div>
+                        <div className="text-right text-white">{formatQuantity(item.quantity, 1)} tấn</div>
+                        <div className="text-right text-emerald-300">Đã nhập</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </LocationsChartCard>
 
-            <LocationsChartCard
-              title="Vật tư xuất gần nhất"
-              heightClass="h-[220px]"
-              action={
-                <button
-                  type="button"
-                  onClick={() => setModalType('recentOutbound')}
-                  className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
-                >
-                  Xem tất cả
-                </button>
-              }
-            >
-              {previewRecentOutbound.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
-              ) : (
-                <div className="space-y-0.5">
-                  {previewRecentOutbound.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-[100px_90px_1fr_70px_70px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
-                      <div className="text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</div>
-                      <div className="truncate font-medium text-blue-300">{item.code}</div>
-                      <div className="truncate text-slate-300" title={item.name}>{item.name}</div>
-                      <div className="text-right text-white">{formatQuantity(item.quantity, 1)} tấn</div>
-                      <div className="text-right text-red-400">Đã xuất</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </LocationsChartCard>
+              <LocationsChartCard
+                title="Vật tư xuất gần nhất"
+                heightClass="h-[185px]"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setModalType('recentOutbound')}
+                    className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                  >
+                    Xem tất cả
+                  </button>
+                }
+              >
+                {previewRecentOutbound.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch xuất</div>
+                ) : (
+                  <div className="space-y-0">
+                    {previewRecentOutbound.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-[100px_90px_1fr_70px_70px] items-center gap-2 border-b border-white/8 px-1.5 py-1 text-xs last:border-b-0 last:pb-0">
+                        <div className="text-slate-400">{new Date(item.date).toLocaleDateString('vi-VN')}</div>
+                        <div className="truncate font-medium text-blue-300">{item.code}</div>
+                        <div className="truncate text-slate-300" title={item.name}>{item.name}</div>
+                        <div className="text-right text-white">{formatQuantity(item.quantity, 1)} tấn</div>
+                        <div className="text-right text-red-400">Đã xuất</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </LocationsChartCard>
 
             {/* Hàng 2: Tồn nhiều nhất | Phân bố sức chứa */}
             <LocationsChartCard
               title="Vật tư tồn nhiều nhất"
-              heightClass="h-[240px]"
+              heightClass="h-[195px]"
               action={
                 <button
                   type="button"
@@ -1282,7 +1367,7 @@ export function InventoryLocationsPage() {
 
             <LocationsChartCard
               title="Phân bố sức chứa theo kho"
-              heightClass="h-[240px]"
+              heightClass="h-[195px]"
               action={
                 <button
                   type="button"
@@ -1298,7 +1383,7 @@ export function InventoryLocationsPage() {
                   const percent = zone.capacity > 0 ? (zone.stock / zone.capacity) * 100 : 0
                   return (
                     <div key={zone.id}>
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex items-center justify-between text-xs mb-0.5">
                         <span className="font-medium text-cyan-300 truncate max-w-[160px]" title={zone.name}>{zone.name}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-slate-400 font-mono">{formatQuantity(zone.stock, 1)} / {formatQuantity(zone.capacity, 0)} tấn</span>
@@ -1306,7 +1391,7 @@ export function InventoryLocationsPage() {
                           <span className="text-slate-500 font-mono">{zone.occupiedSlots} ô</span>
                         </div>
                       </div>
-                      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-1 rounded-full bg-white/10 overflow-hidden">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
                           style={{ width: `${Math.min(100, percent)}%` }}
@@ -1348,12 +1433,14 @@ export function InventoryLocationsPage() {
           </LocationsChartCard>
 
           <LocationsChartCard title="Phân bố loại vật tư" heightClass="h-[170px]">
-            <CompactPieChart
+            <CompactDonutSummary
               segments={[
                 { label: 'Vật tư chính', value: materialTypeDistribution.primary, color: '#3b82f6' },
                 { label: 'Vật tư phụ', value: materialTypeDistribution.secondary, color: '#a855f7' },
                 { label: 'Vật tư tiêu hao', value: materialTypeDistribution.consumable, color: '#f97316' },
               ]}
+              centerValue={formatQuantity(materialTypeDistribution.total, 1)}
+              centerLabel="tấn"
             />
           </LocationsChartCard>
 
@@ -1411,7 +1498,7 @@ export function InventoryLocationsPage() {
     {modalType && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
         <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between scrollbar-thin">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 shrink-0">
+          <div className="flex items-center justify-between pb-3 mb-4 shrink-0">
             <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
               {modalType === 'recentInbound' && 'Toàn bộ nhập kho gần đây'}
               {modalType === 'recentOutbound' && 'Toàn bộ xuất kho gần đây'}
@@ -1483,7 +1570,7 @@ export function InventoryLocationsPage() {
                 {modalData.length === 0 ? (
                   <div className="text-center text-xs text-slate-500 py-8">Chưa có giao dịch</div>
                 ) : (
-                  <>
+                  <div className="border border-white/10 rounded-lg overflow-hidden">
                     <table className="w-full text-xs text-left">
                       <thead>
                         <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
@@ -1533,69 +1620,69 @@ export function InventoryLocationsPage() {
                         </div>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </>
             )}
             {modalType === 'topMaterials' && (
-            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90">
-              {pagedModalData.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu vật tư tồn kho</div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto p-2">
-                    <table className="w-full text-xs text-left">
-                      <thead>
-                        <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
-                          <th className="py-2 px-3">Mã</th>
-                          <th className="py-2 px-3">Tên</th>
-                          <th className="py-2 px-3 text-right">Khối lượng (tấn)</th>
-                          <th className="py-2 px-3 text-right">Giá trị</th>
-                          <th className="py-2 px-3">Vị trí</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {pagedModalData.map((item) => (
-                          <tr key={item.code} className="hover:bg-white/5">
-                            <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
-                            <td className="py-2 px-3 text-slate-200">{item.name}</td>
-                            <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(item.stock, 1)}</td>
-                            <td className="py-2 px-3 text-right font-mono text-emerald-300">{formatShortCurrency(item.value)}</td>
-                            <td className="py-2 px-3 text-slate-400">{item.locationStr}</td>
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90">
+                {pagedModalData.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu vật tư tồn kho</div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">
+                            <th className="py-2 px-3">Mã</th>
+                            <th className="py-2 px-3">Tên</th>
+                            <th className="py-2 px-3 text-right">Khối lượng (tấn)</th>
+                            <th className="py-2 px-3 text-right">Giá trị</th>
+                            <th className="py-2 px-3">Vị trí</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {totalModalPages > 1 && (
-                    <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400 border-t border-white/10">
-                      <span>
-                        Hiển thị {(modalData.length > 0) ? ((modalPage - 1) * modalPageSize + 1) : 0}-
-                        {Math.min(modalPage * modalPageSize, modalData.length)}/{modalData.length} kết quả
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setModalPage((p) => Math.max(1, p - 1))}
-                          disabled={modalPage <= 1 || modalData.length === 0}
-                          className={inventoryMutedButton}
-                        >
-                          Trước
-                        </button>
-                        <span className="px-2 py-1 text-slate-300">{modalPage}/{totalModalPages}</span>
-                        <button
-                          onClick={() => setModalPage((p) => Math.min(totalModalPages, p + 1))}
-                          disabled={modalPage >= totalModalPages || modalData.length === 0}
-                          className={inventoryMutedButton}
-                        >
-                          Sau
-                        </button>
-                      </div>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {pagedModalData.map((item) => (
+                            <tr key={item.code} className="hover:bg-white/5">
+                              <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
+                              <td className="py-2 px-3 text-slate-200">{item.name}</td>
+                              <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(item.stock, 1)}</td>
+                              <td className="py-2 px-3 text-right font-mono text-emerald-300">{formatShortCurrency(item.value)}</td>
+                              <td className="py-2 px-3 text-slate-400">{item.locationStr}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                    {totalModalPages > 1 && (
+                      <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs text-slate-400 border-t border-white/10">
+                        <span>
+                          Hiển thị {(modalData.length > 0) ? ((modalPage - 1) * modalPageSize + 1) : 0}-
+                          {Math.min(modalPage * modalPageSize, modalData.length)}/{modalData.length} kết quả
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setModalPage((p) => Math.max(1, p - 1))}
+                            disabled={modalPage <= 1 || modalData.length === 0}
+                            className={inventoryMutedButton}
+                          >
+                            Trước
+                          </button>
+                          <span className="px-2 py-1 text-slate-300">{modalPage}/{totalModalPages}</span>
+                          <button
+                            onClick={() => setModalPage((p) => Math.min(totalModalPages, p + 1))}
+                            disabled={modalPage >= totalModalPages || modalData.length === 0}
+                            className={inventoryMutedButton}
+                          >
+                            Sau
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
           {modalType === 'zoneCapacity' && (
             <div className="overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90">
@@ -1603,7 +1690,7 @@ export function InventoryLocationsPage() {
                 <div className="text-center text-xs text-slate-500 py-8">Chưa có dữ liệu phân bố sức chứa</div>
               ) : (
                 <>
-                  <div className="overflow-x-auto p-2">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead>
                         <tr className="border-b border-white/10 text-slate-400 font-semibold bg-white/[0.02]">

@@ -27,7 +27,9 @@ import {
   modulePrimaryButton,
 } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
+import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { advanceReturnRequest, getReturnRequests } from '../../api/transactions.api'
+import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import type { ReturnRequest } from '../../types/transaction-engine.types'
 
 type ReturnTab = 'requested' | 'received' | 'accepted' | 'rejected'
@@ -146,7 +148,9 @@ export function InventoryReturnRequestsPage() {
   }
 
   return (
-    <div className="w-full min-w-0 flex-1 space-y-1">
+    <EnterpriseModulePage>
+      <InventoryTabWorkspace />
+      <div className="w-full min-w-0 flex-1 space-y-1">
       <section className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitKpiCard title="Requested" value={formatQuantity(metrics.requestedCount, 0)} note="Phiếu đang chờ" icon={<FileClock size={18} />} tone="amber" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
         <CockpitKpiCard title="Received Today" value={formatQuantity(metrics.receivedToday, 0)} note="Đã nhận hôm nay" icon={<CheckCircle2 size={18} />} tone="emerald" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
@@ -247,7 +251,8 @@ export function InventoryReturnRequestsPage() {
         onReceive={(request) => receiveMutation.mutate(request)}
         onReject={(request) => rejectMutation.mutate(request)}
       />
-    </div>
+      </div>
+    </EnterpriseModulePage>
   )
 }
 

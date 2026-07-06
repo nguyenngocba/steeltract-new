@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CircleDollarSign, PackageCheck, RefreshCw, Target, TriangleAlert } from 'lucide-react'
-
+import { CockpitKpiCard, COCKPIT_HEIGHTS } from '../../../../shared/ui/cockpit'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
@@ -88,7 +88,7 @@ function OverviewMetricCard({
       <KpiSparkline values={trend} line={item.line} fill={item.fill} />
     </>
   )
-  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
+  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-[#0b1424] p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.3)] ring-1 ring-white/[0.04] transition ${
     active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
   } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
   if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
@@ -417,7 +417,7 @@ export function InventoryOutboundPage() {
   const { data: projects = [] } = useProjects()
   const { data: zones = [] } = useZones()
   const { data: tx = [], isLoading } = useInventoryTransactions({ type: 'OUTBOUND' })
-
+  const [showAll, setShowAll] = useState(false);
   const [date, setDate] = useState('')
   const [projectId, setProjectId] = useState('')
   const [zoneId, setZoneId] = useState('')
@@ -493,6 +493,38 @@ export function InventoryOutboundPage() {
       yearAmount,
       docs: inMonth.length,
       pending,
+    }
+  }, [rows])
+
+  // ===== TREND DỮ LIỆU THỰC TẾ =====
+  const kpiTrend = useMemo(() => {
+    const now = new Date()
+    // Lấy 6 tháng gần nhất (tính từ tháng hiện tại lùi về 5 tháng)
+    const months = Array.from({ length: 6 }).map((_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      return { date, key }
+    })
+
+    // Nhóm dữ liệu theo tháng
+    const monthData = months.map(({ key }) => {
+      const inMonth = rows.filter((x: any) => 
+        String(x.transactionDate ?? x.createdAt).slice(0, 7) === key
+      )
+      return {
+        qty: sumTransactionQuantity(inMonth),
+        amount: sumTransactionAmount(inMonth),
+        docs: inMonth.length,
+        pending: inMonth.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING').length,
+      }
+    })
+
+    return {
+      monthlyQty: monthData.map((d) => d.qty),
+      monthlyAmount: monthData.map((d) => d.amount),
+      todayAmount: monthData.map((d) => d.amount), // tạm thời dùng monthly amount, hoặc bạn có thể tính theo ngày
+      docs: monthData.map((d) => d.docs),
+      pending: monthData.map((d) => d.pending),
     }
   }, [rows])
 
@@ -660,9 +692,8 @@ export function InventoryOutboundPage() {
     return alerts.sort((a, b) => b.value - a.value).slice(0, 5)
   }, [rows])
 
-    const filterInput =
-      'h-9 w-full rounded-md border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
-  
+    const compactInput =
+      'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'  
     const paged = useMemo(() => {
     const start = (page - 1) * pageSize
     return rows.slice(start, start + pageSize)
@@ -674,61 +705,61 @@ export function InventoryOutboundPage() {
       <InventoryTabWorkspace />
 
       <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-1.5">
-          <OverviewMetricCard
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-1">
+          <CockpitKpiCard
             title="Tổng xuất trong tháng"
             value={`${formatQuantity(kpis.monthlyQty, 0)} tấn`}
             note="Theo phiếu xuất"
             tone="blue"
             icon={<RefreshCw size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.monthlyQty}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Giá trị xuất trong tháng"
             value={formatCurrency(kpis.monthlyAmount)}
             note="Giá trị đã xuất"
             tone="emerald"
             icon={<CircleDollarSign size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.monthlyAmount}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Giá trị xuất hôm nay"
             value={formatCurrency(kpis.todayAmount)}
             note="Theo ngày hiện tại"
             tone="purple"
             icon={<CircleDollarSign size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.todayAmount}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Số phiếu xuất"
             value={formatQuantity(kpis.docs, 0)}
             note="Trong tháng hiện tại"
             tone="cyan"
             icon={<PackageCheck size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.docs}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Chờ duyệt"
             value={formatQuantity(kpis.pending, 0)}
             note="Cần xử lý"
             tone="amber"
             icon={<TriangleAlert size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.pending}
           />
         </div>
 
-        <InventoryPanel className="rounded-xl p-0.5">
+        <InventoryPanel className="rounded-xl">
           <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_minmax(260px,1fr)_130px_120px]">
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={filterInput}
+              className={compactInput}
             />
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className={filterInput}
+              className={compactInput}
             >
               <option value="">Đơn vị nhận</option>
               {projects.map((p: any) => (
@@ -738,7 +769,7 @@ export function InventoryOutboundPage() {
             <select
               value={zoneId}
               onChange={(e) => setZoneId(e.target.value)}
-              className={filterInput}
+              className={compactInput}
             >
               <option value="">Kho xuất</option>
               {zones.map((z: any) => (
@@ -752,17 +783,17 @@ export function InventoryOutboundPage() {
                 if (e.key === 'Enter') applySearch()
               }}
               placeholder="Tìm mã phiếu, vật tư, đơn vị nhận..."
-              className={filterInput}
+              className={compactInput}
             />
             <button
               onClick={applySearch}
-              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
             >
               Tìm kiếm
             </button>
             <button
               onClick={resetFilters}
-              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
             >
               Làm mới
             </button>
@@ -770,13 +801,46 @@ export function InventoryOutboundPage() {
         </InventoryPanel>
 
         <div className={`grid grid-cols-1 xl:grid-cols-12 gap-1.5`}>
-          <InventoryPanel title="Danh sách phiếu xuất" className="xl:col-span-9 p-0">
-            <div className={`${inventoryTableShell} overflow-auto`}>
-              <table className="w-full min-w-[1100px] text-sm">
-                <thead className={inventoryTableHead}>
+          <InventoryPanel
+            title={
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                  Danh sách phiếu xuất
+                </h3>
+
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+                >
+                  Xem tất cả
+                </button>
+              </div>
+            }
+            className="xl:col-span-9 p-0"
+          >
+            <div className="rounded-lg border border-white/10 overflow-hidden">
+              <table className="w-full min-w-[1300px] text-sm table-fixed">
+                <colgroup>
+                  <col className="w-[90px]" /> {/* Mã phiếu */}
+                  <col className="w-[140px]" /> {/* Ngày */}
+                  <col className="w-[80px]" /> {/* Loại */}
+                  <col className="w-[150px]" /> {/* Đơn vị nhận */}
+                  <col className="w-[60px]" /> {/* Kho xuất */}
+                  <col className="w-[60px]" /> {/* Tổng SL */}
+                  <col className="w-[140px]" /> {/* Giá trị */}
+                  <col className="w-[60px]" /> {/* Hồ sơ */}
+                  <col className="w-[80px]" /> {/* Trạng thái */}
+                  <col className="w-[160px]" /> {/* Người tạo */}
+                </colgroup>
+                <thead
+                  className={`${inventoryTableHead}
+                    text-slate-300
+                    border-b border-cyan-400/10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
                   <tr>
-                    {['Mã phiếu xuất', 'Ngày xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Tổng khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left font-medium">
+                    {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Tổng khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-medium">
                         {h}
                       </th>
                     ))}
@@ -792,24 +856,24 @@ export function InventoryOutboundPage() {
                           className={`${inventoryTableRow} cursor-pointer`}
                           onClick={() => setSelectedTransaction(x)}
                         >
-                          <td className="px-3 py-1.5 text-cyan-300">{x.transactionNo}</td>
-                          <td className="px-3 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-3 py-1.5">{x.referenceType ?? 'Xuất kho'}</td>
-                          <td className="px-3 py-1.5">{transactionProjectName(x)}</td>
-                          <td className="px-3 py-1.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
-                          <td className="px-3 py-1.5">{formatQuantity(transactionQuantity(x), 0)}</td>
-                          <td className="px-3 py-1.5">{formatCurrency(transactionAmount(x))}</td>
-                          <td className="px-3 py-1.5" onClick={(event) => event.stopPropagation()}>
+                          <td className="px-2 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-2 py-1.5 text-cyan-300">{x.transactionNo}</td>
+                          <td className="px-2 py-1.5">{x.referenceType ?? 'Xuất kho'}</td>
+                          <td className="px-2 py-1.5">{transactionProjectName(x)}</td>
+                          <td className="px-2 py-1.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
+                          <td className="px-2 py-1.5">{formatQuantity(transactionQuantity(x), 0)}</td>
+                          <td className="px-2 py-1.5">{formatCurrency(transactionAmount(x))}</td>
+                          <td className="px-2 py-1.5" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-3 py-1.5">
+                          <td className="px-2 py-1.5">
                             <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">{String(x.status ?? 'COMPLETED')}</span>
                           </td>
-                          <td className="px-3 py-1.5">{x.createdBy ?? 'Admin'}</td>
+                          <td className="px-2 py-1.5">{x.createdBy ?? 'Admin'}</td>
                         </tr>
                       )
                     })}

@@ -11,6 +11,10 @@ type InboundPayload = {
   unitPrice?: number
   supplierId?: string
   invoiceNo?: string
+  warehouseId?: string
+  zoneId?: string
+  slotId?: string
+  level?: string
 }
 
 export function useCreateInbound() {
@@ -38,6 +42,14 @@ export function useCreateInbound() {
               payload.quantity,
             unitPrice:
               payload.unitPrice,
+            warehouseId:
+              payload.warehouseId,
+            zoneId:
+              payload.zoneId,
+            slotId:
+              payload.slotId,
+            level:
+              payload.level,
           },
         ],
       }),

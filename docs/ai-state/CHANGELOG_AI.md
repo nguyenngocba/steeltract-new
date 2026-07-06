@@ -1,5 +1,53 @@
 # SteelTrack AI Changelog
 
+## 2026-07-02 Hotfix – Mini Sidebar Flyout Clickability
+
+Completed:
+
+* Fixed collapsed mini-sidebar module icons so clicks reliably open flyout menus.
+* Moved mini-sidebar flyouts from sidebar-contained absolute positioning to viewport-fixed positioning at `left: 64px` with high z-index.
+* Added click-outside handling and route-change cleanup so flyouts close predictably.
+
+## 2026-07-02 Sprint UX.1 – Compact Header and Mini Sidebar
+
+Completed:
+
+* Reduced the dynamic topbar height from 64px to 50px with compact module/workspace typography.
+* Scaled topbar controls, search, status, icons, and user chip to preserve the 44-50px header target.
+* Replaced the collapsed sidebar placeholder with a 64px mini sidebar that keeps module icons visible and clickable.
+* Added collapsed-sidebar flyout menus using the existing navigation tree, including nested Inventory `Nghiệp vụ nâng cao` actions.
+* Added hover tooltips for collapsed module icons and kept route highlighting in collapsed mode.
+
+## 2026-07-02 Hotfix – Dynamic Workspace Header
+
+Completed:
+
+* Replaced the static topbar label `SteelTrack ERP` with route-derived module titles.
+* Added route metadata helpers `getModuleTitle()` and `getWorkspaceTitle()` for current and future module workspaces.
+* Removed the Inventory breadcrumb line from `InventoryTabWorkspace`, leaving the topbar as the single source for module/workspace context.
+* Inventory pages now render two header lines only, e.g. `VẬT TƯ KHO` and `Tổng quan kho`.
+
+## 2026-07-02 Sprint INV.NAV.2 – Inventory Advanced Operations Sidebar
+
+Completed:
+
+* Restored hidden Inventory operational pages into the sidebar under a nested `Nghiệp vụ nâng cao` group without changing routes.
+* Reused existing routes for `/inventory/inbound`, `/inventory/outbound`, `/inventory/transfer`, `/inventory/stock-take`, `/inventory/adjustments`, `/inventory/alerts`, and `/inventory/audit`.
+* Added nested sidebar rendering with per-session expand/collapse memory and active-route auto-open behavior.
+* Added route context for advanced Inventory routes; this was later moved into the dynamic workspace header by the 2026-07-02 header hotfix.
+* Marked Inventory Audit as an admin-only sidebar item using existing user role/permission fields.
+* Created `docs/ui/inventory-advanced-operations-sidebar-report.md` and `docs/audit/inventory-workspace-recovery-report.md`.
+
+## 2026-07-01 Hotfix – Inventory Returns Workspace Shell and Materials Navigation
+
+Completed:
+
+* Wrapped `InventoryReturnRequestsPage` with the same `EnterpriseModulePage` and `InventoryTabWorkspace` used by other Inventory workspaces, so `/inventory/returns` keeps the Inventory shell/header/sidebar context.
+* Removed the redundant Inventory sidebar workspace `Vật tư`.
+* Renamed the stock workspace to `Vật tư & Tồn kho`.
+* Reduced Inventory navigation to the requested primary workspaces: Tổng quan kho, Giao dịch, Phiếu trả vật tư, Vật tư & Tồn kho, and Vị trí kho.
+* Redirected legacy `/inventory/master-data` access to `/inventory/materials` to avoid a dead route while removing the standalone Materials workspace from navigation.
+
 ## 2026-07-01 Sprint INVRET.1 – Inventory Return Workspace UX Unification
 
 Completed:
@@ -2925,6 +2973,12 @@ Notes:
 * Refactored Project Detail `Tiến độ` into a three-pane workspace: WBS tree, task scheduling/detail pane, and action/resource/risk pane.
 * Project Command Center now surfaces cascade delay, resource shortages, procurement readiness warnings, and inspection/handover counters from WBS metadata.
 * Created Project scheduling, baseline, resource loading, procurement readiness, inspection/handover, and detail layout refactor reports.
+
+## 2026-07-02
+
+* Sprint INV.BUG.5 hardened inbound inventory creation. Backend `POST /inventory/transactions` now rejects `IMPORT`/`INBOUND` lines with positive quantity unless `zoneId`, `slotId`, and `level` are supplied, returning the Vietnamese validation message required by warehouse operations.
+* Sprint INV.UGX.1 added inbound smart suggestions from real transaction history. The Inventory inbound modal now requests last inbound location, last inbound price, and 30-day weighted average price; it auto-fills the last price when available, allows override, and warns when the new price differs by more than 30%.
+* The active inbound modal and legacy inbound wizard now block submit when a storage location is missing. The inbound modal highlights location fields and shows the missing-location summary before submission.
 
 ## 2026-06-02
 

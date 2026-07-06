@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getInboundSuggestions } from '../api/inventory.api'
 import { useCreateTransaction } from '../hooks/useCreateTransaction'
 import { useInventoryItems } from '../hooks/useInventoryItems'
 import { useMaterialDetail } from '../hooks/useMaterialDetail'
@@ -52,6 +53,21 @@ function num(v: any) {
 
 function formatCurrency(v: any) {
   return formatCurrencyVnd(v)
+}
+
+function formatShortDate(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+function formatPercent(value?: number | null) {
+  if (value == null || !Number.isFinite(Number(value))) return null
+  return `${Math.round(Number(value))}%`
 }
 
 function isMainWarehouseZone(zone: any) {
@@ -234,8 +250,14 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     remark: '',
   })
   const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
+  const [unitPriceEdited, setUnitPriceEdited] = useState(false)
 
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
+  const { data: inboundSuggestion } = useQuery({
+    queryKey: ['inventory-inbound-suggestions', form.inventoryItemId],
+    queryFn: () => getInboundSuggestions(form.inventoryItemId),
+    enabled: open && Boolean(form.inventoryItemId),
+  })
   const currentStock = num(selectedMaterial?.quantity)
   const quantity = num(form.quantity)
   const unitPrice = num(form.unitPrice)
@@ -254,6 +276,36 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const selectedInboundZoneFull = isZoneFull(selectedInboundZone)
   const selectedInboundCellOccupied = isCellOccupied(selectedInboundZone, form.slotId, form.level)
   const inboundEmptyCell = findEmptyCell(selectedInboundZone)
+  const validInboundLocations = useMemo(() => {
+    return mainZones.flatMap((zone: any) =>
+      INTERNAL_CELLS.flatMap((cell) =>
+        INTERNAL_LEVELS
+          .filter((level) => !isCellOccupied(zone, cell, level))
+          .map((level) => ({
+            zone,
+            cell,
+            level,
+          })),
+      ),
+    )
+  }, [mainZones])
+  const missingInboundLocation =
+    quantity > 0 && (!form.zoneId || !form.slotId || !form.level)
+  const missingInboundLocationCount = missingInboundLocation ? 1 : 0
+  const priceDeltaPercent =
+    inboundSuggestion?.lastPrice?.unitPrice && unitPrice > 0
+      ? Math.abs(unitPrice - Number(inboundSuggestion.lastPrice.unitPrice)) /
+        Number(inboundSuggestion.lastPrice.unitPrice)
+      : 0
+  const hasLargePriceDelta = priceDeltaPercent > 0.3
+  const canSubmitInbound =
+    Boolean(form.inventoryItemId) &&
+    quantity > 0 &&
+    unitPrice > 0 &&
+    !missingInboundLocation &&
+    !selectedInboundZoneFull &&
+    !selectedInboundCellOccupied &&
+    !createTransaction.isPending
 
   useEffect(() => {
     if (!open) return
@@ -263,6 +315,50 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       transactionDate: formatLocalDateTimeInput(),
     }))
   }, [open])
+
+  useEffect(() => {
+    if (!form.inventoryItemId || unitPriceEdited) return
+    const suggestedPrice = Number(
+      inboundSuggestion?.lastPrice?.unitPrice ?? 0,
+    )
+    if (suggestedPrice <= 0 || form.unitPrice) return
+
+    setForm((prev) => ({
+      ...prev,
+      unitPrice: formatCurrencyInput(String(suggestedPrice)),
+    }))
+  }, [
+    form.inventoryItemId,
+    form.unitPrice,
+    inboundSuggestion?.lastPrice?.unitPrice,
+    unitPriceEdited,
+  ])
+
+  useEffect(() => {
+    if (
+      !form.inventoryItemId ||
+      form.zoneId ||
+      form.slotId ||
+      form.level ||
+      validInboundLocations.length !== 1
+    ) {
+      return
+    }
+
+    const [onlyLocation] = validInboundLocations
+    setForm((prev) => ({
+      ...prev,
+      zoneId: onlyLocation.zone.id,
+      slotId: onlyLocation.cell,
+      level: onlyLocation.level,
+    }))
+  }, [
+    form.inventoryItemId,
+    form.zoneId,
+    form.slotId,
+    form.level,
+    validInboundLocations,
+  ])
   
   useEffect(() => {
     if (!form.inventoryItemId) return
@@ -303,6 +399,10 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
 
   async function submit() {
     if (!form.inventoryItemId || quantity <= 0 || unitPrice <= 0) return
+    if (missingInboundLocation) {
+      toast.error('Vui lòng chọn vị trí lưu kho.')
+      return
+    }
     if (selectedInboundZoneFull) return
     if (selectedInboundCellOccupied) return
     const no = generateTransactionNo('NK')
@@ -348,6 +448,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       remark: '',
     })
     setAttachmentFiles([])
+    setUnitPriceEdited(false)
     onClose()
   }
 
@@ -365,7 +466,10 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
             </option>
           ))}
         </select>
-        <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value }))} className={fieldClass}>
+        <select value={form.inventoryItemId} onChange={(e) => {
+          setUnitPriceEdited(false)
+          setForm((f) => ({ ...f, inventoryItemId: e.target.value }))
+        }} className={fieldClass}>
           <option value="">Vật tư</option>
           {materials.map((m: any) => (
             <option key={m.id} value={m.id}>
@@ -374,11 +478,14 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           ))}
         </select>
         <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
-        <input value={form.unitPrice} onChange={(e) => setForm((f) => ({ ...f, unitPrice: formatCurrencyInput(e.target.value) }))} inputMode="numeric" placeholder="Đơn giá nhập" className={fieldClass} />
+        <input value={form.unitPrice} onChange={(e) => {
+          setUnitPriceEdited(true)
+          setForm((f) => ({ ...f, unitPrice: formatCurrencyInput(e.target.value) }))
+        }} inputMode="numeric" placeholder="Đơn giá nhập" className={fieldClass} />
         <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
           Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
         </div>
-        <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={fieldClass}>
+        <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
           <option value="">Vị trí nhận thuộc Kho chính</option>
           {mainZones.map((z: any) => (
             <option disabled={isZoneFull(z)} key={z.id} value={z.id}>
@@ -386,14 +493,14 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
             </option>
           ))}
         </select>
-        <select value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={fieldClass}>
+        <select value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
           <option value="">Chọn ô trong vị trí</option>
           {INTERNAL_CELLS.map((cell) => {
             const occupiedOnAnyLevel = selectedInboundZone && INTERNAL_LEVELS.every((item) => isCellOccupied(selectedInboundZone, cell, item))
             return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
           })}
         </select>
-        <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={fieldClass}>
+        <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
           <option value="">Chọn tầng nhận</option>
           {INTERNAL_LEVELS.map((level) => {
             const occupied = selectedInboundZone && form.slotId && isCellOccupied(selectedInboundZone, form.slotId, level)
@@ -411,6 +518,10 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       {selectedInboundZoneFull ? <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
         Slot/tầng này đã đầy. Vui lòng chọn vị trí hoặc tầng khác trước khi xác nhận nhập kho.
       </div> : null}
+      {missingInboundLocation ? <div className="mt-3 rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">
+        <div className="font-semibold">Vui lòng chọn vị trí lưu kho.</div>
+        <div className="mt-1 text-red-100/90">{missingInboundLocationCount} vật tư chưa chọn vị trí lưu kho.</div>
+      </div> : null}
       {form.zoneId ? <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-sm md:flex-row md:items-center md:justify-between ${
         selectedInboundCellOccupied
           ? 'border-red-400/40 bg-red-500/10 text-red-200'
@@ -427,6 +538,91 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           Gợi ý ô trống
         </button>
       </div> : null}
+      {form.inventoryItemId ? <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-500/10 p-3 text-sm text-slate-200">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Vị trí gợi ý</div>
+            {inboundSuggestion?.lastLocation ? (
+              <div className="mt-1 text-white">
+                {[
+                  inboundSuggestion.lastLocation.zoneCode,
+                  inboundSuggestion.lastLocation.slotId,
+                  inboundSuggestion.lastLocation.level,
+                ].filter(Boolean).join('-')}
+                {formatPercent(inboundSuggestion.lastLocation.freePercent) ? (
+                  <span className="ml-2 text-cyan-200">
+                    (còn trống {formatPercent(inboundSuggestion.lastLocation.freePercent)})
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-1 text-slate-400">Chưa có lịch sử vị trí cho vật tư này.</div>
+            )}
+          </div>
+          {inboundSuggestion?.lastLocation ? (
+            <button
+              type="button"
+              onClick={() => setForm((prev) => ({
+                ...prev,
+                zoneId: inboundSuggestion.lastLocation.zoneId ?? prev.zoneId,
+                slotId: inboundSuggestion.lastLocation.slotId ?? prev.slotId,
+                level: inboundSuggestion.lastLocation.level ?? prev.level,
+              }))}
+              className="rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
+            >
+              Dùng vị trí gợi ý
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-3 border-t border-cyan-300/10 pt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Đơn giá gần nhất</div>
+          {inboundSuggestion?.lastPrice ? (
+            <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-white">
+                  {formatCurrency(inboundSuggestion.lastPrice.unitPrice)}
+                  {selectedMaterial?.unit ? <span className="text-slate-400">/{selectedMaterial.unit}</span> : null}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {[
+                    formatShortDate(inboundSuggestion.lastPrice.transactionDate),
+                    inboundSuggestion.lastPrice.supplierName,
+                    inboundSuggestion.lastPrice.transactionNo,
+                  ].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUnitPriceEdited(true)
+                  setForm((prev) => ({
+                    ...prev,
+                    unitPrice: formatCurrencyInput(String(inboundSuggestion.lastPrice.unitPrice)),
+                  }))
+                }}
+                className="rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20"
+              >
+                Dùng đơn giá gần nhất
+              </button>
+            </div>
+          ) : (
+            <div className="mt-1 text-slate-400">Chưa có lịch sử đơn giá nhập.</div>
+          )}
+          <div className="mt-2 text-xs text-slate-300">
+            Giá trung bình 30 ngày:{' '}
+            <span className="font-semibold text-cyan-200">
+              {inboundSuggestion?.averagePrice30Days
+                ? formatCurrency(inboundSuggestion.averagePrice30Days)
+                : 'Chưa có dữ liệu'}
+            </span>
+          </div>
+          {hasLargePriceDelta ? (
+            <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              Đơn giá chênh lệch lớn so với lịch sử.
+            </div>
+          ) : null}
+        </div>
+      </div> : null}
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
         <div className="text-slate-300">Thành tiền trước VAT: <span className="font-semibold text-cyan-300">{formatCurrency(subTotal)}</span></div>
         <div className="mt-1 text-slate-300">Tiền VAT: <span className="font-semibold text-cyan-300">{formatCurrency(vatAmount)}</span></div>
@@ -438,7 +634,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className={`${textareaClass} mt-3 w-full`} />
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className={secondaryButtonClass}>Hủy</button>
-        <button disabled={selectedInboundZoneFull || selectedInboundCellOccupied} onClick={submit} className={primaryButtonClass}>
+        <button disabled={!canSubmitInbound} onClick={submit} className={primaryButtonClass}>
           Xác nhận nhập kho
         </button>
       </div>

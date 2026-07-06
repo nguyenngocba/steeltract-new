@@ -12,6 +12,12 @@ Logistics         0%
 Settings         55%
 Dashboard        60%
 
+Sprint UX.1 on 2026-07-02 did not change module percentages. It compacted the route-derived topbar to a 50px shell and replaced collapsed sidebar mode with a 64px icon rail plus flyout menus backed by the existing navigation tree.
+
+Dynamic Workspace Header hotfix on 2026-07-02 did not change module percentages. The topbar now derives module and workspace titles from route metadata, removes the static `SteelTrack ERP` label, and removes Inventory breadcrumb output so Inventory pages show only two header lines.
+
+Sprint INV.NAV.2 on 2026-07-02 did not change module percentages. It restored Inventory operational pages into the sidebar under `Nghiệp vụ nâng cao` while reusing existing routes for inbound, outbound, transfer, stock take, adjustments, alerts, and audit. The nested group is collapsed by default, remembers expansion per session, and auto-opens for active child routes.
+
 Inventory Return Requests workspace on 2026-07-01 completed. Inventory now has `/inventory/returns` with Requested/Received/Accepted/Rejected views, return request KPIs, detail drawer, receive action, and reject action. Project Pending Return quantities link directly into this workspace with project/material filters. Reject uses existing `CANCELLED` status to avoid schema changes; receive continues to use the existing Inventory return workflow and reconciles Project material allocation. Backend and frontend builds passed.
 
 Sprint 40PROJ.10 on 2026-07-01 increased Projects to 86%. It adds template-driven task rules, Auto WBS generation, bulk task operations, a Project Detail `Công trường` Site Mode tab, Site Mode ActivityLog writes, document category filters, and executive shortage/forecast panels in the Project Command Center. New backend endpoints are `POST /projects/:id/wbs/generate`, `PATCH /projects/:id/wbs/bulk`, and `POST /projects/:id/site-update`. Backend and frontend builds passed.
@@ -206,3 +212,5 @@ Sprint 40PROJ.6 on 2026-06-30 hardens Projects scheduling and execution without 
 Sprint 40PROJ.7 on 2026-06-30 converts Projects scheduling/resource/inspection/cost persistence from the temporary WBS metadata bridge to normalized domain tables. The active WBS APIs and `GET /projects/runtime` now use `ProjectTask` and related allocation/dependency/cost/inspection tables, while migration SQL preserves legacy metadata rows into the new model. Remaining Projects work is now workflow hardening on top of the domain model, not persistence normalization.
 
 Sprint 50LOG.1 on 2026-07-01 adds the Logistics Dispatch MVP foundation. Logistics now has persistent DispatchOrder/DispatchItem/DispatchEvent models, real dispatch dashboard APIs, lifecycle endpoints, an API-backed Logistics cockpit, auto suggestion from ProjectTask allocations, and dispatch receive reconciliation into Project task allocations plus Inventory export transactions. Logistics remains partial until exact yard/loading source locations, attachment-backed loading proof, and Project Detail per-line dispatch summary columns are completed.
+
+Sprint INV.BUG.5 / INV.UGX.1 on 2026-07-02 does not change module percentages. It hardens Inventory inbound stock creation by requiring Zone/Slot/Level on every positive inbound line and adds real-history inbound suggestions for last used location, last inbound price, and 30-day weighted average price. Backend and frontend builds passed with no schema or migration changes.

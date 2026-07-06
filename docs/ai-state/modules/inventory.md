@@ -25,7 +25,16 @@ Route:
 Navigation:
 
 - Sidebar Inventory submenu includes `Vị trí kho`.
-- Inventory no longer renders the horizontal in-page tab strip; users switch Inventory tabs from the sidebar.
+- Inventory no longer renders the horizontal in-page tab strip; users switch Inventory workspaces from the sidebar.
+- Sprint INV.NAV.2 restores advanced operational pages under the nested `Nghiệp vụ nâng cao` sidebar group:
+  - `/inventory/inbound`
+  - `/inventory/outbound`
+  - `/inventory/transfer`
+  - `/inventory/stock-take`
+  - `/inventory/adjustments`
+  - `/inventory/alerts`
+  - `/inventory/audit`
+- The advanced group is collapsed by default, remembers expansion per session, and auto-opens when an advanced child route is active.
 - Inventory actions `Nhập kho`, `Xuất kho`, and `Khác` are shown in the topbar on Inventory routes.
 
 Database:
@@ -531,6 +540,25 @@ Capacity semantics:
 - The current 2D storage structure is fixed at 36 cells x 4 levels = 144 cell-level positions per real storage location.
 - UI must display capacity and occupied cell-level count as separate values.
 - Full-location validation should use empty cell-level availability, not `materialCount >= capacity`.
+
+### Inbound Location & Price Suggestions
+
+Current status:
+
+- Positive-quantity inbound lines must include `zoneId`, `slotId`, and `level`.
+- Backend validation is enforced centrally in `InventoryService.createTransaction()` for all `IMPORT` / `INBOUND` transaction creation paths.
+- The main inbound modal highlights missing location fields, disables confirmation, and shows `Vui lòng chọn vị trí lưu kho.` plus the count of incomplete inbound lines.
+- `GET /inventory/items/:id/inbound-suggestions` derives suggestions from real transaction history:
+  - last used inbound location;
+  - last inbound unit price;
+  - 30-day weighted average inbound unit price.
+- The inbound modal auto-fills the last unit price once when a material is selected, keeps the value editable, and warns if the edited price differs by more than 30% from the last inbound price.
+
+Boundary:
+
+- No schema or migration was introduced.
+- Free-capacity text is only shown when zone capacity data exists; otherwise the UI does not invent utilization.
+- Outbound, transfer, return, and adjustment flows were not changed by this validation rule.
 
 ## Boundaries Preserved
 
