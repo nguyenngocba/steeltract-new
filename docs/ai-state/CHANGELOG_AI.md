@@ -1,5 +1,420 @@
 # SteelTrack AI Changelog
 
+## 2026-07-08 EPIC116 – Project Detail Snapshot Completion & Architecture Freeze
+
+Completed:
+
+* Added persisted `ProjectDetailSnapshot` storage for Project Detail tab payloads with tab-level uniqueness and freshness metadata.
+* Switched `GET /projects/:id/detail/:tab` to snapshot-first reads with repository-backed read-model fallback and no API/UI contract changes.
+* Extended Background Snapshot Writer to rebuild Project Detail snapshots outside request transactions, including tab-scoped incremental updates such as `ProjectDetailSnapshot:materials`.
+* Added Project Detail snapshot runtime metrics for hits, fallback, tab group hits, age, and lag.
+* Added Project Detail snapshot parity validation and Operations Center Project Detail snapshot health.
+* Applied migration `20260708143000_project_detail_snapshots` successfully.
+
+Reports:
+
+* `docs/runtime/project-detail-snapshot-report.md`
+* `docs/runtime/project-detail-cutover-report.md`
+* `docs/runtime/project-detail-parity-report.md`
+* `docs/runtime/project-architecture-freeze-v1.md`
+
+## 2026-07-08 Thiết kế Tài liệu Quy chuẩn Đặt tên, Hợp đồng API và Ranh giới Domain (EPIC210)
+
+Completed:
+
+* Viết chi tiết tài liệu quy chuẩn đặt tên [enterprise-naming-conventions.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-naming-conventions.md) bao gồm Database, Repositories, Events, Snapshots và Phân bản (Versioning).
+* Viết chi tiết tài liệu chuẩn thiết kế API REST [enterprise-api-contracts.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-api-contracts.md) bao gồm phân trang, bộ lọc, sắp xếp, payload mẫu và định dạng lỗi Zod.
+* Viết chi tiết tài liệu ranh giới domain [enterprise-domain-boundaries.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-domain-boundaries.md) bao gồm ma trận quyền gọi giữa các module và đặc tả chi tiết 8 phân hệ cốt lõi.
+* Cập nhật các tài liệu trạng thái hệ thống (`CHANGELOG_AI.md`, `CURRENT_STATE.md`, `PROJECT_STATUS.md`, và `NEXT_TASKS.md`).
+* Không sửa đổi code thực thi hay tạo database migration nào, tuân thủ nghiêm ngặt quy định đóng băng kiến trúc.
+
+## 2026-07-08 Thiết kế tài liệu Kiến trúc Core Platform (Enterprise Performance, Versioning & Dependency Map)
+
+Completed:
+
+* Thiết kế tài liệu SLA Hiệu năng Hệ thống ([enterprise-performance-sla.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-performance-sla.md)) quy định chi tiết ngưỡng phản hồi API, luồng xử lý tác vụ nền (retry, backoff, heartbeat) và các ngưỡng cảnh báo kỹ thuật của Operations Center.
+* Thiết kế tài liệu Chính sách Quản lý Phiên bản ([enterprise-versioning-policy.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-versioning-policy.md)) quy định quy chuẩn SemVer, API versioning, cơ sở dữ liệu (mô hình Expand-Contract), Event versioning, Snapshot/Read Model schema versioning và quy trình Rollback khẩn cấp khi triển khai lỗi.
+* Thiết kế tài liệu Bản đồ Phụ thuộc Module ([enterprise-module-dependency-map.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-module-dependency-map.md)) thể hiện ma trận tương tác giữa các module bằng biểu đồ Mermaid kèm ràng buộc chi tiết (Allowed, Forbidden, Event-only, Snapshot-only).
+* Cập nhật các tài liệu trạng thái hệ thống (`CHANGELOG_AI.md`, `CURRENT_STATE.md`, `PROJECT_STATUS.md`, và `NEXT_TASKS.md`).
+* Không sửa đổi code thực thi hay tạo database migration nào, tuân thủ nghiêm ngặt quy định đóng băng kiến trúc.
+
+Reports:
+
+* [enterprise-performance-sla.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-performance-sla.md)
+* [enterprise-versioning-policy.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-versioning-policy.md)
+* [enterprise-module-dependency-map.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-module-dependency-map.md)
+
+## 2026-07-08 EPIC211 – Thiết kế hệ thống quản trị kiến trúc (Enterprise Architecture Governance)
+
+Completed:
+
+* Created the Enterprise Code Review Checklist ([enterprise-code-review-checklist.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-code-review-checklist.md)) detailing the 9 mandatory review criteria for PR approval (Repository, Snapshot, Runtime Metrics, Operations Center, Read Model, Feature Flag, Background Job, Transactional Outbox, Performance Gate).
+* Created the Enterprise Release Policy ([enterprise-release-policy.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-release-policy.md)) outlining the criteria for product release, zero-downtime database migration constraints, step-by-step smoke test protocol, and feature flag dynamic rollback and degradation manual runbook.
+* Updated the system state files (`CHANGELOG_AI.md`, `CURRENT_STATE.md`, `PROJECT_STATUS.md`, and `NEXT_TASKS.md`) to record the completion of EPIC211.
+* No source code modifications or database migrations were made, adhering to freeze rules.
+
+Reports:
+
+* [enterprise-code-review-checklist.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-code-review-checklist.md)
+* [enterprise-release-policy.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-release-policy.md)
+
+## 2026-07-08 Enterprise Architecture Governance & ADRs
+
+Completed:
+
+* Created the Enterprise Architecture Governance guide ([enterprise-governance.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-governance.md)) covering quality management processes, the role of the Architecture Guardian in AI/Humans co-development, and the Architecture Review Board (ARB) review cycle.
+* Created the Enterprise Architecture Decision Records repository ([enterprise-architecture-decision-records.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-architecture-decision-records.md)) containing 10 detailed Architectural Decision Records (ADR001 to ADR010) covering Repository Pattern, Snapshot First Read, Background Engine, Operations Center Integration, Runtime Metrics, Read Model Separated Query, Feature Flags, Query Budget, Outbox Pattern, and Module Boundaries.
+* No source code modifications or migrations were made, adhering to freeze rules.
+
+Reports:
+
+* [enterprise-governance.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-governance.md)
+* [enterprise-architecture-decision-records.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-architecture-decision-records.md)
+
+## 2026-07-08 EPIC202 & EPIC203 – QC & Logistics Blueprints
+
+Completed:
+
+* Designed the Quality Control (QC) Master Blueprint ([qc-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/qc-blueprint.md)) covering Incoming QC, In-process QC, Final QC, Non-Conformance Reports (NCR), Corrective and Preventive Actions (CAPA), Rework, Quality Ledger, and Traceability graph structures.
+* Designed the Logistics Master Blueprint ([logistics-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/logistics-blueprint.md)) covering Dispatch, Shipment, Vehicle, Driver, Route, Proof of Delivery (POD), GPS tracking, and Dispatch Cockpit interface layouts.
+* Created module documentation for Logistics ([logistics.md](file:///opt/projects/steeltrack/docs/ai-state/modules/logistics.md)) and linked QC documentation ([qc.md](file:///opt/projects/steeltrack/docs/ai-state/modules/qc.md)) to the new blueprint.
+* No source code modifications or migrations were made, adhering to freeze rules.
+
+Reports:
+
+* [qc-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/qc-blueprint.md)
+* [logistics-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/logistics-blueprint.md)
+
+## 2026-07-08 EPIC210 – Enterprise Standards & Guidelines Design
+
+Completed:
+
+* Created the complete Enterprise Standards (EPIC210) matching the current SteelTrack core platform architecture.
+* Created the Enterprise Domain Map and Bounded Context Boundaries ([enterprise-domain-map.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-domain-map.md)).
+* Documented the Enterprise System Events and Outbox Payloads catalog ([enterprise-event-catalog.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-event-catalog.md)).
+* Formulated the Enterprise Read Models and Caching strategy ([enterprise-read-model-catalog.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-read-model-catalog.md)).
+* Designed the Enterprise Snapshot database tables and payload schemas ([enterprise-snapshot-catalog.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-snapshot-catalog.md)).
+* Detailed the Repository layer development guidelines with a full Work Order creation code pattern ([enterprise-repository-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-repository-guidelines.md)).
+* Defined the Runtime Metrics and Performance Telemetry guidelines with SLO targets ([enterprise-runtime-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-runtime-guidelines.md)).
+* Detailed the Background Processing Engine and Retry policy guidelines ([enterprise-background-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-background-guidelines.md)).
+* Formulated the Operations Center integration, health probes, and alert thresholds ([enterprise-operations-center-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-operations-center-guidelines.md)).
+* Standardized the minimal industrial Cockpit theme, KPI cards, table pagination, and detail drawers ([enterprise-ui-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-ui-guidelines.md)).
+* Standardized the AI assistant, nesting optimizer, and work center queue advisor integration ([enterprise-ai-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-ai-guidelines.md)).
+* Created the Core Software Development Standards, naming conventions, and Git safety rules ([enterprise-development-standards.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-development-standards.md)).
+* No source code modifications or migrations were made, adhering to architecture freeze rules.
+
+Reports:
+
+* [enterprise-domain-map.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-domain-map.md)
+* [enterprise-event-catalog.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-event-catalog.md)
+* [enterprise-read-model-catalog.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-read-model-catalog.md)
+* [enterprise-snapshot-catalog.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-snapshot-catalog.md)
+* [enterprise-repository-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-repository-guidelines.md)
+* [enterprise-runtime-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-runtime-guidelines.md)
+* [enterprise-background-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-background-guidelines.md)
+* [enterprise-operations-center-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-operations-center-guidelines.md)
+* [enterprise-ui-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-ui-guidelines.md)
+* [enterprise-ai-guidelines.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-ai-guidelines.md)
+* [enterprise-development-standards.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-development-standards.md)
+
+## 2026-07-08 EPIC201 – Projects (PMS) Blueprint Design
+
+Completed:
+
+* Designed the complete Projects (PMS) Blueprint matching the current SteelTrack core platform architecture.
+* Created the Projects overview architectural layers and integration map ([projects-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/projects-blueprint.md)).
+* Created the Projects domain model specification for WBS tasks, allocations, dependencies, costs, and repository signatures ([projects-domain.md](file:///opt/projects/steeltrack/docs/architecture/projects-domain.md)).
+* Documented the event-driven outbox architecture and event schemas for Projects task and allocation updates ([projects-event-flow.md](file:///opt/projects/steeltrack/docs/architecture/projects-event-flow.md)).
+* Formulated the read-model caching strategy and tab-gated API boundaries ([projects-read-model.md](file:///opt/projects/steeltrack/docs/architecture/projects-read-model.md)).
+* Outlined the persisted snapshot schemas, rebuild jobs, and idempotency key patterns ([projects-snapshot.md](file:///opt/projects/steeltrack/docs/architecture/projects-snapshot.md)).
+* Designed WMS/Inventory-compliant Gantt chart UI, WBS tree grid, and Site Mode mobile designs ([projects-dashboard.md](file:///opt/projects/steeltrack/docs/architecture/projects-dashboard.md)).
+* Detailed site workflows for Erection, inspection QC, handover, and material returns lifecycle ([projects-workflow.md](file:///opt/projects/steeltrack/docs/architecture/projects-workflow.md)).
+* Formulated the 4-sprint implementation roadmap for PMS Phase.
+* No source code modifications or migrations were made, adhering to architecture freeze rules.
+
+Reports:
+
+* [projects-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/projects-blueprint.md)
+* [projects-domain.md](file:///opt/projects/steeltrack/docs/architecture/projects-domain.md)
+* [projects-event-flow.md](file:///opt/projects/steeltrack/docs/architecture/projects-event-flow.md)
+* [projects-read-model.md](file:///opt/projects/steeltrack/docs/architecture/projects-read-model.md)
+* [projects-snapshot.md](file:///opt/projects/steeltrack/docs/architecture/projects-snapshot.md)
+* [projects-dashboard.md](file:///opt/projects/steeltrack/docs/architecture/projects-dashboard.md)
+* [projects-workflow.md](file:///opt/projects/steeltrack/docs/architecture/projects-workflow.md)
+
+## 2026-07-08 EPIC206 & EPIC207 – Finance & HR Blueprints Design
+
+
+Completed:
+
+* Designed the complete Finance Blueprint (EPIC206) covering Inventory Valuation (FIFO/WAC), WIP calculation, Actual Costing, Cost Centers, Budget Control, Cashflow forecasting, dashboards, and AI integrations ([finance-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/finance-blueprint.md)).
+* Designed the complete HR Blueprint (EPIC207) covering Employee Profiles, Skill Matrix, Shifts, Attendance reconciliation, Training & Certifications, Payroll integration, dashboards, and AI integrations ([hr-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/hr-blueprint.md)).
+
+Reports:
+
+* `docs/architecture/finance-blueprint.md`
+* `docs/architecture/hr-blueprint.md`
+
+## 2026-07-08 EPIC208 & EPIC209 – AI & Integration Blueprints
+
+Completed:
+
+* Designed the complete AI Enterprise Blueprint (`docs/architecture/ai-blueprint.md`) covering the 8 AI modules: AI Assistant, AI Planner, AI Scheduler, AI Inventory, AI Production, AI QC, AI Logistics, and AI Operations Center.
+* Designed the complete Enterprise Integration Blueprint (`docs/architecture/integration-blueprint.md`) covering system-wide data flows, cross-chain domain events, synchronized read models, background job dependencies, visual lineage control tower, and integration monitoring.
+* No source code modifications or migrations were made, adhering to freeze rules.
+
+Reports:
+
+* [ai-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/ai-blueprint.md)
+* [integration-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/integration-blueprint.md)
+
+## 2026-07-08 EPIC204 & EPIC205 – Yard (YMS) & Purchasing Blueprints Design
+
+Completed:
+
+* Designed the complete Yard Management System (YMS) Blueprint matching the current SteelTrack core platform architecture.
+* Created the detailed Yard Blueprint (`docs/architecture/yard-blueprint.md`) covering Yard Map 2D/3D, Yard Zones, Slots, Stacks, Cranes, Reservations, Movements, Loading/Unloading tasks, capacity rules, Yard Cockpit specs, Operations Center metrics, AI Smart Stacking Optimizer, technical risks, and phased sprints.
+* Designed the complete Purchasing & Procurement Blueprint matching the current SteelTrack core platform architecture.
+* Created the detailed Purchasing Blueprint (`docs/architecture/purchasing-blueprint.md`) covering Purchase Requisitions (PR), Requests for Quotation (RFQ), Supplier Quotations, Purchase Orders (PO), Goods Receipts (GR), Supplier Performance metrics, Approval Workflows, Budgets, Purchasing Cockpit specs, Operations Center metrics, AI Smart Quotation Scorer, technical risks, and phased sprints.
+* Updated related module documentation for `docs/ai-state/modules/yard.md` and `docs/ai-state/modules/suppliers.md` to reflect these blueprints.
+
+Reports:
+
+* `docs/architecture/yard-blueprint.md`
+* `docs/architecture/purchasing-blueprint.md`
+
+## 2026-07-08 EPIC114 – Production (MES) Blueprint Design
+
+Completed:
+
+* Designed the complete Production (MES) Blueprint matching the current SteelTrack core platform architecture.
+* Created the production domain specification covering WorkOrder, Shifts, capacity, downtime, OEE, Rework, and Scrap models (`docs/architecture/production-domain.md`).
+* Documented the event-driven outbox architecture and event consumer contracts for production transitions (`docs/architecture/production-event-flow.md`).
+* Formulated the read-model caching strategy and tab-gated API endpoint boundaries (`docs/architecture/production-read-model.md`).
+* Outlined the persisted snapshot schemas, rebuild jobs, and idempotency key patterns (`docs/architecture/production-snapshot.md`).
+* Designed WMS/Inventory-compliant manager and operator dashboards, KPIs, and real-time WebSocket updates (`docs/architecture/production-dashboard.md`).
+* Detailed Standard Operating Procedures (SOPs) for material issue, routing completion, QC gating, returns, and machine downtime/scrap handling (`docs/architecture/production-workflow.md`).
+* Formulated the multi-sprint implementation roadmap from Sprint 1 to Sprint 8.
+
+Reports:
+
+* `docs/architecture/production-blueprint.md`
+* `docs/architecture/production-domain.md`
+* `docs/architecture/production-event-flow.md`
+* `docs/architecture/production-read-model.md`
+* `docs/architecture/production-snapshot.md`
+* `docs/architecture/production-dashboard.md`
+* `docs/architecture/production-workflow.md`
+
+## 2026-07-08 EPIC112 – INV.CORE.2 Inventory Snapshot Completion
+
+Completed:
+
+* Added persisted domain snapshot models for Inventory Material and Inventory Location.
+* Applied migration `20260708103000_inventory_domain_snapshots`.
+* Extended the Inventory snapshot writer to persist dashboard, material, and location snapshots through the Background Engine.
+* Material Detail now reads `InventoryMaterialSnapshot` first and falls back to the repository-backed read model when missing or stale.
+* Inventory Locations now read `InventoryLocationSnapshot` first and fall back to repository-backed live composition when missing or stale.
+* Inventory lifecycle events now schedule background snapshot update jobs after publishing persistent Outbox events.
+* Runtime metrics now distinguish material snapshot hit/miss and location snapshot hit/miss while preserving global snapshot counters.
+* Operations Center Inventory health now exposes material snapshot health, location snapshot health, freshness, hit ratio, lag, and rebuild status.
+* Inventory is now an Architecture Freeze v1.0 candidate and should be treated as the reference architecture for future modules.
+
+Reports:
+
+* `docs/runtime/inventory-material-snapshot-report.md`
+* `docs/runtime/inventory-location-snapshot-report.md`
+* `docs/runtime/inventory-snapshot-cutover-report.md`
+* `docs/runtime/inventory-architecture-freeze-report.md`
+
+## 2026-07-07 EPIC 106 – Enterprise Background Engine Implementation
+
+Completed:
+
+* Implemented `BackgroundJobManager` as a small scheduling facade over the existing `JobSchedulerService`.
+* Implemented `SnapshotUpdateDispatcher` for idempotent `snapshot.<module>.update` and `snapshot.<module>.rebuild` background jobs.
+* Implemented `SnapshotRebuilder` acceptance path for snapshot jobs. It safely returns `skipped` while persisted snapshot tables are not enabled.
+* Replaced the active `OutboxService` stub with Prisma-backed persistent outbox create, claim, dispatch, retry, and dead-letter behavior.
+* Added `EventPublisherService` for normal and persistent domain event publishing.
+* Added `EventConsumerService` to map snapshot-relevant Inventory, Project, and Logistics events into snapshot update jobs.
+* Added `JobRetryPolicyService` and wired `JobWorkerService` to use it for retry/dead-letter decisions.
+* Wired snapshot job handling into the existing background worker without adding standalone cron jobs.
+
+Reports:
+
+* `docs/runtime/background-engine-implementation-report.md`
+
+Known limitations:
+
+* No persisted snapshot tables exist yet.
+* Snapshot jobs are accepted and executed, but write no snapshot payloads until the snapshot schema is introduced.
+* Existing Dashboard/runtime APIs still read current sources; no API contract or behavior changed.
+
+## 2026-07-07 EPIC 105 – Enterprise Background Engine
+
+Completed:
+
+* Designed the Background Engine architecture for moving SteelTrack from runtime aggregate reads toward background-maintained snapshots.
+* Standardized the Snapshot Update Engine contract for Inventory, Projects, Logistics, and Dashboard snapshots.
+* Designed Snapshot Rebuilder behavior, rebuild modes, idempotency, staleness policy, and rebuild metrics.
+* Documented Event Bus Foundation for snapshot update routing using existing `EventBusService`, `JobSchedulerService`, `JobWorkerService`, and future persistent Outbox hardening.
+* Documented the current limitation that `OutboxService` is present but stubbed in the active codebase, so production event-driven snapshots require outbox persistence hardening before multi-instance deployment.
+
+Reports:
+
+* `docs/architecture/background-engine.md`
+* `docs/architecture/snapshot-update-engine.md`
+* `docs/architecture/event-bus-foundation.md`
+* `docs/runtime/snapshot-rebuild-report.md`
+
+Known limitations:
+
+* No snapshot tables were created.
+* No background snapshot jobs were implemented.
+* Current API behavior remains runtime/fallback based.
+* Persistent Outbox must be hardened before snapshot events become production-critical.
+
+## 2026-07-07 EPIC 104 – Enterprise Data Engine
+
+Completed:
+
+* Added the first real Enterprise Data Engine index foundation migration.
+* Added 11 composite indexes for high-value Inventory transaction, Inventory item history, exact location stock bucket, ProjectTask hierarchy/schedule, ReturnRequest queues, and ActivityLog timelines.
+* Captured `EXPLAIN ANALYZE` before and after the migration.
+* Verified all new indexes exist in PostgreSQL.
+* Added forced planner checks to prove index usability on the currently small dataset where PostgreSQL often correctly prefers sequential scans.
+* Designed the persisted snapshot architecture for Inventory, Projects, Logistics, and Executive Dashboard without creating snapshot tables yet.
+
+Reports:
+
+* `docs/runtime/data-engine-index-foundation-report.md`
+* `docs/runtime/de1/`
+* `docs/architecture/persisted-snapshot-architecture.md`
+
+Known limitations:
+
+* Current data volume is too small for reliable timing improvement claims. Several normal planner runs still choose sequential scans because the active tables contain only tens or hundreds of rows.
+* Dispatch indexes remain a follow-up because the before/after baseline was captured before dispatch tables were available in the active database.
+* Persisted snapshots are designed only; no snapshot schema or workflow migration was introduced.
+
+## 2026-07-07 EPIC 103 – Runtime Analytics Foundation
+
+Completed:
+
+* Added in-memory runtime analytics aggregation over existing RT.1 request/query metrics.
+* Added sliding windows for 5 minutes, 1 hour, and 24 hours.
+* Added endpoint rankings by average latency, p95 latency, and request count.
+* Added query rankings by execution count, average duration, and max duration.
+* Added rule-based runtime recommendations for high SQL count, latency spikes, duplicate lookups, and low read-model effectiveness.
+* Added read-model effectiveness calculation using cache hits, read-model hits, fallback query signals, and snapshot miss signals.
+* Added performance score and architecture score by module from observed runtime metrics.
+* Added explicit 7/30/90-day trend placeholders that report persisted runtime metrics are required instead of fabricating long-range trends from process memory.
+
+Reports:
+
+* `docs/runtime/runtime-analytics-report.md`
+* `docs/runtime/performance-score-report.md`
+* `docs/runtime/runtime-recommendation-report.md`
+* `docs/runtime/read-model-effectiveness-report.md`
+* `docs/runtime/architecture-score-report.md`
+
+Known limitations:
+
+* Runtime analytics are process-local and retain at most 24 hours.
+* 7/30/90-day trends require a future persisted metrics store.
+* Repository coverage and index coverage remain static-documentation inputs, not runtime-measured signals yet.
+
+## 2026-07-07 EPIC 102 – Runtime Instrumentation & Observability
+
+Completed:
+
+* Added a global NestJS runtime metrics interceptor for request duration, status code, Prisma query count, SQL total/longest duration, heap memory delta/peak, response size when available, timestamp, and budget class.
+* Added Prisma query event profiling through `PrismaService` without logging raw SQL or parameters.
+* Added query budget configuration for Dashboard, Detail, Lookup, Search, Report, and Default endpoint classes.
+* Added slow query detection for SQL duration over 200 ms with sanitized runtime logging to `docs/runtime/slow-query.log` when slow queries occur.
+* Added `RuntimeHealthService` and extended existing `/performance/health` and `/performance/metrics` outputs with runtime request/query/cache/read-model/memory signals.
+* Added runtime duplicate-query heuristic to flag potential N+1 patterns without changing request behavior.
+
+Reports:
+
+* `docs/runtime/runtime-metrics-report.md`
+* `docs/runtime/query-profiler-report.md`
+* `docs/runtime/runtime-health-report.md`
+* `docs/runtime/performance-baseline.md`
+* `docs/runtime/slow-query-report.md`
+
+Known limitations:
+
+* Metrics are process-local and reset on restart.
+* Prisma model/action is inferred from sanitized SQL shape because Prisma query events do not expose model/action directly.
+* Runtime instrumentation measures live traffic only; no controlled load test was run in this sprint.
+
+## 2026-07-07 EPIC 101 – Enterprise Scalability Foundation
+
+Completed:
+
+* Defined SteelTrack performance gates and query budgets for Dashboard/Cockpit, Detail, Lookup, and Search/List endpoints.
+* Audited enterprise query risks across Dashboard, Inventory, Projects, Logistics, Production, Costing, and runtime controllers.
+* Documented N+1/query-in-loop, over-fetching, duplicate aggregation, deep include, and unbounded read risks without changing business behavior.
+* Audited existing index coverage and proposed future composite/covering index candidates for high-volume transaction, task, return, activity, dispatch, and dashboard paths.
+* Created a 5-year data growth plan covering partitioning, archive policy, persisted read models, and id-based event contracts.
+
+Reports:
+
+* `docs/audit/enterprise-performance-gate.md`
+* `docs/audit/enterprise-query-audit.md`
+* `docs/audit/enterprise-index-audit.md`
+* `docs/architecture/data-growth-5-year-plan.md`
+* `docs/audit/enterprise-scalability-foundation-report.md`
+
+Known limitations:
+
+* EPIC 101 is documentation/audit only. No indexes, migrations, persisted snapshots, or instrumentation were added.
+* Runtime performance budgets are target gates, not measured production SLOs yet.
+
+## 2026-07-07 EPIC 100 – Core Foundation
+
+Completed:
+
+* Audited Inventory, Projects, and Logistics repository boundaries for enterprise-scale query ownership.
+* Extended `InventoryRepository` with Material Detail and Dashboard read-model source queries.
+* Refactored `InventoryService.getItemDetail()` and `DashboardInventoryReadModelService` to use Inventory repository methods for aggregate reads.
+* Added `LogisticsRepository` and moved DispatchOrder aggregate, dispatch suggestion, allocation reconciliation, component update, and activity log persistence behind repository methods.
+* Extended `ProjectsRepository` with runtime source queries and tab-specific Project Detail source queries.
+* Refactored `ProjectsService.detailTab()` so Project Detail tabs no longer call `runtimeDashboard()` and slice full runtime arrays.
+* Added persisted read-model migration path documentation for Inventory, Projects, and Logistics.
+* Added query segmentation and query budget audit reports.
+
+Reports:
+
+* `docs/audit/epic-100-repository-layer-audit.md`
+* `docs/architecture/persisted-read-model-foundation.md`
+* `docs/audit/query-segmentation-report.md`
+* `docs/audit/query-budget-audit.md`
+
+Known limitations:
+
+* Inventory return workflow, Project template CRUD, and ProjectTask command mutation paths still use direct Prisma calls intentionally; they need separate regression-backed repository hardening.
+* No persisted snapshot tables were created in this sprint.
+
+## 2026-07-07 Epic PERF Foundation
+
+Completed:
+
+* Audited Dashboard API endpoints and documented direct transaction-table hotspots in `docs/audit/dashboard-api-performance-audit.md`.
+* Added `DashboardInventoryReadModelService` as an internal cached Inventory dashboard read model for stock, low-stock, recent movement, procurement, anomaly, and forecast inputs.
+* Refactored Dashboard Inventory-heavy paths to use the read model while keeping existing routes and frontend DTO compatibility.
+* Added tab-scoped Project Detail API `GET /projects/:id/detail/:tab` and React Query cache key `['project-detail-tab', projectId, tab]`.
+* Added Logistics dispatch detail lazy query using `GET /logistics/dispatch-orders/:id`.
+* Reduced Inventory Material Detail attachment queries so attachment-heavy data loads only for tabs that need it.
+* Created `docs/audit/perf-foundation-report.md`.
+
+Known limitations:
+
+* The Inventory dashboard read model is an in-memory cached read model, not a persisted snapshot table.
+* Project Detail tab API currently creates a frontend/cache boundary but still slices `runtimeDashboard()` internally; native tab-specific backend queries remain future work.
+* Inventory Material Detail lazy loading currently focuses on attachment-heavy tab data; a full tab-specific material detail API remains future work.
+
 ## 2026-07-02 Hotfix – Mini Sidebar Flyout Clickability
 
 Completed:
@@ -2979,6 +3394,44 @@ Notes:
 * Sprint INV.BUG.5 hardened inbound inventory creation. Backend `POST /inventory/transactions` now rejects `IMPORT`/`INBOUND` lines with positive quantity unless `zoneId`, `slotId`, and `level` are supplied, returning the Vietnamese validation message required by warehouse operations.
 * Sprint INV.UGX.1 added inbound smart suggestions from real transaction history. The Inventory inbound modal now requests last inbound location, last inbound price, and 30-day weighted average price; it auto-fills the last price when available, allows override, and warns when the new price differs by more than 30%.
 * The active inbound modal and legacy inbound wizard now block submit when a storage location is missing. The inbound modal highlights location fields and shows the missing-location summary before submission.
+
+## 2026-07-07
+
+* EPIC107 SNAP.1 added persisted snapshot tables for Inventory, Projects, and Logistics dispatch dashboards.
+* Added snapshot repositories, writer, reader, validator, and rebuilder integration under the backend runtime foundation.
+* Background snapshot rebuild jobs now write real persisted snapshots instead of returning `skipped`.
+* Runtime metrics now track snapshot hit, miss, rebuild, and lag counters.
+* Verified the background path writes real Inventory and Project snapshot rows. Dispatch snapshot rows remain empty in the current validation database because no dispatch orders exist.
+* `prisma migrate deploy` / `migrate status` are clean for the SNAP.1 migration. `migrate dev` remains blocked by pre-existing migration drift in `20260630100000_project_task_domain` and the unmanaged `inventory_location_stocks_backup` table; no destructive reset was run.
+
+## 2026-07-08
+
+* EPIC115 completed Project Core Compliance hardening without UI, route, workflow, business-logic, or public API contract changes.
+* `ProjectsService` no longer injects or calls `PrismaService` directly; Project template, WBS, component return, table readiness, and ProjectTask relation persistence now route through `ProjectsRepository`.
+* Project mutations now publish persistent `project.*` outbox events and request Background Engine snapshot updates instead of relying only on activity-log rows.
+* Runtime Metrics now expose Project-specific snapshot/read-model counters: `projectSnapshotHit`, `projectSnapshotMiss`, `projectReadModelHit`, and `projectFallbackCount`.
+* Operations Center overview now includes an additive `projects` platform-health section covering repository, read model, snapshot, event/outbox, background job, runtime, and Project counts.
+* Project is now a Core Platform Architecture Freeze Candidate at approximately 95% compliance. Final freeze remains blocked until Project Detail tab payloads have persisted snapshot coverage.
+* EPIC107 SNAP.2 added a backend `DashboardReaderService` strategy layer with `SnapshotReaderStrategy`, `RuntimeAggregateStrategy`, and module feature flags.
+* Inventory cockpit dashboard reads now prefer persisted `InventoryDashboardSnapshot` rows and transparently fall back to runtime aggregate when disabled, missing, stale, or mismatched.
+* Projects runtime dashboard reads now prefer persisted `ProjectDashboardSnapshot` rows for project progress/delay values with runtime fallback and parity warnings.
+* Logistics dispatch dashboard reads now prefer persisted `DispatchDashboardSnapshot` rows when dispatch snapshots exist; the current dataset has no dispatch orders, so fallback is expected.
+* Runtime metrics now track snapshot fallback, stale count, snapshot age, and snapshot confidence in addition to hit/miss/rebuild/lag.
+* EPIC108 added backend-only enterprise validation services for snapshot parity, benchmark execution, background recovery inspection, and controlled stress harnesses. No public API, UI, workflow, or business logic behavior changed.
+* EPIC109 OPS.1 added the first read-only Operations Center at `/operations-center`.
+* Added `GET /operations-center/overview` to aggregate runtime metrics, background jobs, outbox events, snapshot freshness, cache/read-model effectiveness, database size, storage usage, API ranking, query ranking, performance score, architecture score, and rule-based system alerts.
+* Operations Center uses existing cockpit UI primitives and does not change business workflows, existing API contracts, Prisma schema, or runtime behavior.
+* EPIC111 completed a read-only Core Platform Compliance Audit for Inventory and Production.
+* Created Inventory and Production compliance reports, module scorecard, technical debt priority list, and separate refactor roadmaps under `docs/audit/`.
+* Audit conclusion: Inventory is approximately 72% Core Platform compliant and ready for targeted repository/event/read-model cleanup; Production is approximately 52% compliant and should not receive major MES expansion before domain, repository, event, and snapshot foundations are hardened.
+* EPIC112 INV.CORE.1 completed Inventory Core Compliance hardening without changing UI, workflow, Prisma schema, or public API contracts.
+* Inventory active services/controllers now route persistence through `InventoryRepository`; direct Prisma usage in `apps/backend-api/src/modules/inventory` is confined to the repository.
+* Added `InventoryReadModelService` for Material Detail and inbound suggestion composition, plus `InventoryEventService` for persistent outbox-backed Inventory lifecycle events.
+* Operations Center overview now includes an additive `inventory` platform-health section for repository, read model, snapshot, event/outbox, jobs, cache, and Inventory operational counts.
+* EPIC116.1 completed Projects Architecture Freeze v1.0 hardening and backend startup repair.
+* Project Detail snapshots are now limited to reusable execution summary tabs (`overview`, `materials`, `components`, `progress`, `command`, `site`, `costs`); `documents` and `logs` remain repository read-model fallback paths to avoid per-screen snapshot sprawl.
+* Backend startup root cause was fixed in `apps/backend-api/tsconfig.build.json`: production builds now compile only `src/**/*.ts` with `rootDir: ./src` and emit `dist/main.js`, matching `node dist/main`.
+* Verified `pnpm -C apps/backend-api start`, `start:dev`, and `start:prod` all reach `Nest application successfully started`; test runs were timeout-terminated because the server commands are long-running.
 
 ## 2026-06-02
 

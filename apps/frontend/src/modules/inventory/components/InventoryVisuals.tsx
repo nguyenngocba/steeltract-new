@@ -53,12 +53,21 @@ export function InventoryPanel({
   children,
   className = '',
 }: {
-  title?: string
+  title?: ReactNode
   children: ReactNode
   className?: string
 }) {
+  if (typeof title !== 'string' && title) {
+    return (
+      <section className={`${modulePanel} overflow-hidden ${className}`}>
+        <div className="px-4 pt-3">{title}</div>
+        <div className="p-3">{children}</div>
+      </section>
+    )
+  }
+
   return (
-    <ModuleAnalyticsPanel title={title} className={className}>
+    <ModuleAnalyticsPanel title={typeof title === 'string' ? title : undefined} className={className}>
       {children}
     </ModuleAnalyticsPanel>
   )

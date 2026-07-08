@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { Prisma, TransactionType } from '@prisma/client'
 
-import { PrismaService } from '../../core/prisma/prisma.service'
 import { RuntimeGateway } from '../../core/ws/runtime.gateway'
 import { EventStoreService } from '../../core/events/event-store.service'
 import { TelemetryService } from '../../core/telemetry/telemetry.service'
-import { nextOperationalCode } from '../../common/utils/code-generator'
 import { InventoryRepository } from './inventory.repository'
+import { InventoryEventService } from './inventory-event.service'
+import { InventoryReadModelService } from './inventory-read-model.service'
 
 type NormalizedInventoryLine = {
   inventoryItemId: string
@@ -23,10 +23,12 @@ type NormalizedInventoryLine = {
 @Injectable()
 export class InventoryService {
   constructor(
-    private readonly prisma: PrismaService,
-
     private readonly inventoryRepository:
       InventoryRepository,
+    private readonly readModel:
+      InventoryReadModelService,
+    private readonly inventoryEvents:
+      InventoryEventService,
 
     private readonly gateway:
       RuntimeGateway,
@@ -88,458 +90,11 @@ export class InventoryService {
   }
 
   async getItemDetail(id: string) {
-    const item =
-      await this.inventoryRepository.findItemById(
-        id,
-      )
-    if (!item) {
-      throw new Error('Material not found')
-    }
-    const locationStocks =
-      await this.prisma.inventoryLocationStock.findMany({
-        where: {
-          inventoryItemId: id,
-          quantity: {
-            gt: 0,
-          },
-        },
-        include: {
-          zone: {
-            include: {
-              warehouse: true,
-            },
-          },
-        },
-      })
-
-    const transactions =
-      await this.prisma.inventoryTransaction.findMany({
-        where: {
-          items: {
-            some: {
-              inventoryItemId: id,
-            },
-          },
-        },
-        orderBy: {
-          transactionDate: 'desc',
-        },
-        include: {
-          project: true,
-          zone: {
-            include: {
-              warehouse: true,
-            },
-          },
-          items: {
-            where: {
-              inventoryItemId: id,
-            },
-            include: {
-              unit: true,
-              warehouse: true,
-              zone: {
-                include: {
-                  warehouse: true,
-                },
-              },
-            },
-          },
-        },
-      })
-
-    const supplierIds = Array.from(
-      new Set(
-        transactions
-          .map((tx) => tx.supplierId)
-          .filter(Boolean),
-      ),
-    ) as string[]
-
-    const suppliers = supplierIds.length
-      ? await this.prisma.supplier.findMany({
-          where: {
-            id: {
-              in: supplierIds,
-            },
-          },
-        })
-      : []
-    const supplierMap = new Map(
-      suppliers.map((supplier) => [
-        supplier.id,
-        supplier,
-      ]),
-    )
-
-    const currentStock = transactions.reduce(
-      (acc, tx) =>
-        acc +
-        tx.items.reduce(
-          (lineAcc, line) =>
-            lineAcc + Number(line.quantity ?? 0),
-          0,
-        ),
-      0,
-    )
-
-    const inboundLines = transactions.flatMap((tx) =>
-      tx.items
-        .filter((line) => Number(line.quantity) > 0)
-        .map((line) => ({
-          transactionId: tx.id,
-          type: this.toBusinessType(tx.type),
-          transactionNo:
-            tx.transactionNo ?? tx.code,
-          referenceModule: tx.referenceModule,
-          referenceId: tx.referenceId,
-          note: tx.note,
-          remarks: tx.remarks,
-          transactionDate: tx.transactionDate,
-          quantity: Number(line.quantity),
-          unitPrice:
-            line.unitPrice != null
-              ? Number(line.unitPrice)
-              : null,
-          totalAmount:
-            line.totalAmount != null
-              ? Number(line.totalAmount)
-              : null,
-          signedQuantity: Number(line.quantity),
-          unit:
-            line.unit?.code ??
-            item.unit ??
-            item.unitMaster?.code ??
-            'PCS',
-          supplierId: tx.supplierId,
-          supplierName: tx.supplierId
-            ? supplierMap.get(tx.supplierId)?.name ??
-              tx.supplierId
-            : null,
-          projectId: tx.projectId,
-          projectName: tx.project?.name ?? null,
-          projectCode: tx.project?.code ?? null,
-          zoneId:
-            line.zoneId ?? tx.zoneId ?? item.zoneId ?? null,
-          zoneCode:
-            line.zone?.code ??
-            tx.zone?.code ??
-            item.zone?.code ??
-            null,
-          zoneName:
-            line.zone
-              ? `${line.zone.code} - ${line.zone.name}`
-              : tx.zone
-                ? `${tx.zone.code} - ${tx.zone.name}`
-                : item.zone
-                  ? `${item.zone.code} - ${item.zone.name}`
-                  : null,
-          zoneRawName:
-            line.zone?.name ??
-            tx.zone?.name ??
-            item.zone?.name ??
-            null,
-          attachmentName: null,
-        })),
-    )
-
-    const outboundLines = transactions.flatMap((tx) =>
-      tx.items
-        .filter((line) => Number(line.quantity) < 0)
-        .map((line) => ({
-          transactionId: tx.id,
-          type: this.toBusinessType(tx.type),
-          transactionNo:
-            tx.transactionNo ?? tx.code,
-          referenceModule: tx.referenceModule,
-          referenceId: tx.referenceId,
-          note: tx.note,
-          remarks: tx.remarks,
-          transactionDate: tx.transactionDate,
-          quantity: Number(line.quantity),
-          signedQuantity: Number(line.quantity),
-          unitPrice:
-            line.unitPrice != null
-              ? Number(line.unitPrice)
-              : null,
-          totalAmount:
-            line.totalAmount != null
-              ? Number(line.totalAmount)
-              : null,
-          unit:
-            line.unit?.code ??
-            item.unit ??
-            item.unitMaster?.code ??
-            'PCS',
-          projectId: tx.projectId,
-          projectName: tx.project?.name ?? null,
-          projectCode: tx.project?.code ?? null,
-          zoneId:
-            line.zoneId ?? tx.zoneId ?? item.zoneId ?? null,
-          zoneCode:
-            line.zone?.code ??
-            tx.zone?.code ??
-            item.zone?.code ??
-            null,
-          zoneName:
-            line.zone
-              ? `${line.zone.code} - ${line.zone.name}`
-              : tx.zone
-                ? `${tx.zone.code} - ${tx.zone.name}`
-                : item.zone
-                  ? `${item.zone.code} - ${item.zone.name}`
-                  : null,
-          zoneRawName:
-            line.zone?.name ??
-            tx.zone?.name ??
-            item.zone?.name ??
-            null,
-          attachmentName: null,
-        })),
-    )
-
-    const locationBalances = locationStocks.map(
-      (row) => ({
-        zoneId: row.zoneId,
-        zoneCode: row.zone?.code ?? null,
-        zoneName: row.zone
-          ? `${row.zone.code} - ${row.zone.name}`
-          : null,
-
-        slotId: row.slotId,
-        level: row.level,
-
-        row: row.zone?.row ?? null,
-        column: row.zone?.column ?? null,
-
-        warehouseName:
-          row.zone?.warehouse?.name ?? null,
-
-        warehouseCode:
-          row.zone?.warehouse?.code ?? null,
-
-        quantity: Number(row.quantity),
-      }),
-    )
-      .sort((a, b) => b.quantity - a.quantity)
-
-    const inboundQuantity = inboundLines.reduce(
-      (acc, line) => acc + line.quantity,
-      0,
-    )
-    const inboundCost = inboundLines.reduce(
-      (acc, line) =>
-        acc +
-        Number(
-          line.totalAmount ??
-            (line.unitPrice != null
-              ? line.unitPrice * line.quantity
-              : 0),
-        ),
-      0,
-    )
-    const averageCost =
-      inboundQuantity > 0
-        ? inboundCost / inboundQuantity
-        : 0
-    const inventoryValue =
-      currentStock * averageCost
-
-    return {
-      item: {
-        id: item.id,
-        code: item.code,
-        name: item.name,
-        description: item.description,
-        category: item.category?.name ?? '',
-        categoryId: item.categoryId,
-        materialTypeId: item.materialTypeId,
-        materialType: item.materialType?.name ?? '',
-        materialUsageType: item.materialUsageType,
-        zoneId: item.zoneId,
-        slotId: item.slotId,
-        level: item.level,
-        zoneCode: item.zone?.code ?? '',
-        zoneName: item.zone
-          ? `${item.zone.code} - ${item.zone.name}`
-          : '',
-        minimumStock: item.minimumStock ?? 0,
-        unit: item.unit ?? item.unitMaster?.code ?? 'PCS',
-      },
-
-      currentStock,
-      averageCost,
-      inventoryValue,
-
-      inboundHistory: inboundLines,
-      outboundHistory: outboundLines,
-
-      supplierHistory: inboundLines,
-      projectConsumptionHistory: outboundLines,
-
-      locationBalances,
-    }
+    return this.readModel.materialDetail(id)
   }
 
   async getInboundSuggestions(id: string) {
-    const item = await this.prisma.inventoryItem.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-      },
-    })
-
-    if (!item) {
-      throw new Error('Material not found')
-    }
-
-    const lastLine =
-      await this.prisma.inventoryTransactionItem.findFirst({
-        where: {
-          inventoryItemId: id,
-          quantity: {
-            gt: 0,
-          },
-          transaction: {
-            type: TransactionType.IMPORT,
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        include: {
-          transaction: true,
-          warehouse: true,
-          zone: {
-            include: {
-              warehouse: true,
-            },
-          },
-        },
-      })
-
-    const since = new Date()
-    since.setDate(since.getDate() - 30)
-
-    const recentLines =
-      await this.prisma.inventoryTransactionItem.findMany({
-        where: {
-          inventoryItemId: id,
-          quantity: {
-            gt: 0,
-          },
-          transaction: {
-            type: TransactionType.IMPORT,
-            transactionDate: {
-              gte: since,
-            },
-          },
-        },
-      })
-
-    const weightedTotal = recentLines.reduce(
-      (sum, line) => {
-        const quantity = Math.abs(Number(line.quantity ?? 0))
-        const unitPrice =
-          Number(line.unitPrice ?? 0) ||
-          (quantity > 0
-            ? Number(line.totalAmount ?? 0) / quantity
-            : 0)
-        return sum + quantity * unitPrice
-      },
-      0,
-    )
-    const weightedQuantity = recentLines.reduce(
-      (sum, line) => sum + Math.abs(Number(line.quantity ?? 0)),
-      0,
-    )
-
-    const supplier = lastLine?.transaction.supplierId
-      ? await this.prisma.supplier.findUnique({
-          where: {
-            id: lastLine.transaction.supplierId,
-          },
-        })
-      : null
-
-    const lastQuantity = Math.abs(
-      Number(lastLine?.quantity ?? 0),
-    )
-    const lastUnitPrice =
-      Number(lastLine?.unitPrice ?? 0) ||
-      (lastQuantity > 0
-        ? Number(lastLine?.totalAmount ?? 0) / lastQuantity
-        : 0)
-
-    const locationOccupancy =
-      lastLine?.zoneId && lastLine?.slotId && lastLine?.level
-        ? await this.prisma.inventoryLocationStock.aggregate({
-            where: {
-              zoneId: lastLine.zoneId,
-              slotId: lastLine.slotId,
-              level: lastLine.level,
-              quantity: {
-                gt: 0,
-              },
-            },
-            _sum: {
-              quantity: true,
-            },
-          })
-        : null
-    const capacity = Number(lastLine?.zone?.capacity ?? 0)
-    const occupied = Number(
-      locationOccupancy?._sum.quantity ?? 0,
-    )
-    const freePercent =
-      capacity > 0
-        ? Math.max(
-            0,
-            Math.min(100, 100 - (occupied / capacity) * 100),
-          )
-        : null
-
-    return {
-      materialId: item.id,
-      materialCode: item.code,
-      materialName: item.name,
-      lastLocation:
-        lastLine?.zoneId && lastLine?.slotId && lastLine?.level
-          ? {
-              warehouseId:
-                lastLine.warehouseId ??
-                lastLine.zone?.warehouseId ??
-                null,
-              warehouseName:
-                lastLine.warehouse?.name ??
-                lastLine.zone?.warehouse?.name ??
-                null,
-              zoneId: lastLine.zoneId,
-              zoneCode: lastLine.zone?.code ?? null,
-              zoneName: lastLine.zone?.name ?? null,
-              slotId: lastLine.slotId,
-              level: lastLine.level,
-              freePercent,
-            }
-          : null,
-      lastPrice:
-        lastUnitPrice > 0
-          ? {
-              unitPrice: lastUnitPrice,
-              transactionDate:
-                lastLine?.transaction.transactionDate ?? null,
-              supplierName: supplier?.name ?? null,
-              transactionNo:
-                lastLine?.transaction.transactionNo ??
-                lastLine?.transaction.code ??
-                null,
-            }
-          : null,
-      averagePrice30Days:
-        weightedQuantity > 0 ? weightedTotal / weightedQuantity : null,
-    }
+    return this.readModel.inboundSuggestions(id)
   }
 
   async getInventoryAudit() {
@@ -554,53 +109,7 @@ export class InventoryService {
     const itemIds = items.map((item) => item.id)
 
     const transactionLines =
-      await this.prisma.inventoryTransactionItem.findMany({
-        where: {
-          inventoryItemId: {
-            in: itemIds,
-          },
-        },
-        include: {
-          transaction: {
-            select: {
-              transactionDate: true,
-              zoneId: true,
-              zone: {
-                select: {
-                  id: true,
-                  code: true,
-                  name: true,
-                  row: true,
-                  column: true,
-                  level: true,
-                  warehouse: {
-                    select: {
-                      code: true,
-                      name: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          zone: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              row: true,
-              column: true,
-              level: true,
-              warehouse: {
-                select: {
-                  code: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      })
+      await this.inventoryRepository.findInventoryAuditTransactionLines(itemIds)
 
     const metricsByItem = new Map<
       string,
@@ -787,11 +296,7 @@ export class InventoryService {
 
   async createItem(payload: any) {
     const defaultCategory =
-      await this.prisma.inventoryCategory.findFirst({
-        orderBy: {
-          createdAt: 'asc',
-        },
-      })
+      await this.inventoryRepository.findDefaultCategory()
 
     if (!defaultCategory) {
       throw new Error(
@@ -799,7 +304,7 @@ export class InventoryService {
       )
     }
 
-    return this.inventoryRepository.createItem({
+    const item = await this.inventoryRepository.createItem({
       code: payload.code,
       name: payload.name,
       description: payload.description,
@@ -833,6 +338,12 @@ export class InventoryService {
         },
       }),
     })
+    await this.inventoryEvents.materialUpdated({
+      id: item.id,
+      inventoryItemId: item.id,
+      type: 'created',
+    })
+    return item
   }
   async updateItem(
     id: string,
@@ -897,16 +408,28 @@ export class InventoryService {
       data.level = payload.level ?? null
     }
 
-    return this.inventoryRepository.updateItemInfo(
+    const item = await this.inventoryRepository.updateItemInfo(
       id,
       data,
     )
+    await this.inventoryEvents.materialUpdated({
+      id,
+      inventoryItemId: id,
+      type: 'updated',
+    })
+    return item
   }
 
   async deleteItem(id: string) {
-    return this.inventoryRepository.deleteItem(
+    const item = await this.inventoryRepository.deleteItem(
       id,
     )
+    await this.inventoryEvents.materialUpdated({
+      id,
+      inventoryItemId: id,
+      type: 'deleted',
+    })
+    return item
   }
 
   async listTransactions(filters?: {
@@ -949,13 +472,7 @@ export class InventoryService {
       ),
     ) as string[]
     const suppliers = supplierIds.length
-      ? await this.prisma.supplier.findMany({
-          where: {
-            id: {
-              in: supplierIds,
-            },
-          },
-        })
+      ? await this.inventoryRepository.findSuppliersByIds(supplierIds)
       : []
     const supplierMap = new Map(
       suppliers.map((supplier) => [
@@ -1007,32 +524,14 @@ export class InventoryService {
 
   async getTransactionDetail(id: string) {
     const transaction =
-      await this.prisma.inventoryTransaction.findUnique({
-        where: { id },
-        include: {
-          transactionType: true,
-          project: true,
-          warehouse: true,
-          zone: true,
-          items: {
-            include: {
-              inventoryItem: true,
-              unit: true,
-              warehouse: true,
-              zone: true,
-            },
-          },
-        },
-      })
+      await this.inventoryRepository.findTransactionById(id)
 
     if (!transaction) {
       throw new Error('Transaction not found')
     }
 
     const supplier = transaction.supplierId
-      ? await this.prisma.supplier.findUnique({
-          where: { id: transaction.supplierId },
-        })
+      ? await this.inventoryRepository.findSupplierById(transaction.supplierId)
       : null
 
     const businessType =
@@ -1157,8 +656,7 @@ export class InventoryService {
           }
         }
 
-        const generatedNo = await nextOperationalCode(
-          this.prisma,
+        const generatedNo = await this.inventoryRepository.nextOperationalCode(
           'inventoryTransaction',
           'transactionNo',
           inventoryCodePrefix(type),
@@ -1328,6 +826,51 @@ export class InventoryService {
           'inventory.transactions',
           1,
         )
+
+        await this.inventoryEvents.transactionCreated({
+          id: transaction.id,
+          transactionNo: transaction.transactionNo ?? transaction.code,
+          type: transaction.type,
+          itemCount: transaction.items.length,
+          projectId: transaction.projectId,
+          referenceId: transaction.referenceId,
+        })
+        for (const line of baseItems) {
+          await this.inventoryEvents.stockBucketUpdated({
+            id: `${transaction.id}:${line.inventoryItemId}:${line.zoneId ?? 'no-zone'}:${line.slotId ?? 'no-slot'}:${line.level ?? 'no-level'}`,
+            inventoryItemId: line.inventoryItemId,
+            warehouseId: line.warehouseId ?? payload.warehouseId ?? null,
+            transactionNo: transaction.transactionNo ?? transaction.code,
+            type: transaction.type,
+            referenceId: transaction.id,
+          })
+        }
+        if (type === TransactionType.ADJUSTMENT) {
+          await this.inventoryEvents.adjustmentPosted({
+            id: transaction.id,
+            transactionNo: transaction.transactionNo ?? transaction.code,
+            type: transaction.type,
+          })
+        }
+        if (
+          String(payload.transactionTypeCode ?? payload.type ?? '')
+            .toUpperCase()
+            .includes('STOCK')
+        ) {
+          await this.inventoryEvents.stocktakeCompleted({
+            id: transaction.id,
+            transactionNo: transaction.transactionNo ?? transaction.code,
+            type: transaction.type,
+          })
+        }
+        if (type === TransactionType.RETURN) {
+          await this.inventoryEvents.returnReceived({
+            id: transaction.id,
+            transactionNo: transaction.transactionNo ?? transaction.code,
+            type: transaction.type,
+            referenceId: transaction.referenceId,
+          })
+        }
 
         return transaction
           },
@@ -1520,17 +1063,7 @@ export class InventoryService {
       return lines
     }
 
-    const zones = await this.prisma.warehouseZone.findMany({
-      where: {
-        id: {
-          in: zoneIds,
-        },
-      },
-      select: {
-        id: true,
-        warehouseId: true,
-      },
-    })
+    const zones = await this.inventoryRepository.findWarehouseZonesByIds(zoneIds)
     const warehouseByZoneId = new Map(
       zones.map((zone) => [zone.id, zone.warehouseId]),
     )
@@ -1637,34 +1170,7 @@ export class InventoryService {
     if (!ids.length) return costs
 
     const inboundLines =
-      await this.prisma.inventoryTransactionItem.findMany({
-        where: {
-          inventoryItemId: {
-            in: ids,
-          },
-          quantity: {
-            gt: 0,
-          },
-          OR: [
-            {
-              unitPrice: {
-                gt: 0,
-              },
-            },
-            {
-              totalAmount: {
-                gt: 0,
-              },
-            },
-          ],
-        },
-        select: {
-          inventoryItemId: true,
-          quantity: true,
-          unitPrice: true,
-          totalAmount: true,
-        },
-      })
+      await this.inventoryRepository.findInboundCostLines(ids)
 
     const totals = new Map<
       string,
@@ -1711,13 +1217,13 @@ export class InventoryService {
 
   private async getCurrentStock(
     inventoryItemId: string,
-    tx: any = this.prisma,
+    tx?: any,
   ) {
     const aggregate =
-      await tx.inventoryTransactionItem.aggregate({
-        where: { inventoryItemId },
-        _sum: { quantity: true },
-      })
+      await this.inventoryRepository.aggregateTransactionItemQuantity(
+        inventoryItemId,
+        tx,
+      )
 
     if (aggregate._sum.quantity != null) {
       return Number(aggregate._sum.quantity)
@@ -1739,7 +1245,7 @@ export class InventoryService {
       slotId?: string | null
       level?: string | null
     },
-    tx: any = this.prisma,
+    tx?: any,
   ) {
     const where = {
       inventoryItemId: line.inventoryItemId,
@@ -1748,9 +1254,7 @@ export class InventoryService {
       slotId: line.slotId ?? null,
       level: line.level ?? null,
     }
-    const stock = await tx.inventoryLocationStock.findFirst({
-      where,
-    })
+    const stock = await this.inventoryRepository.findLocationStockBucket(where, tx)
 
     return {
       where,
@@ -1765,17 +1269,7 @@ export class InventoryService {
     }
 
     const grouped =
-      await this.prisma.inventoryTransactionItem.groupBy({
-        by: ['inventoryItemId'],
-        where: {
-          inventoryItemId: {
-            in: itemIds,
-          },
-        },
-        _sum: {
-          quantity: true,
-        },
-      })
+      await this.inventoryRepository.groupTransactionItemStockByItems(itemIds)
 
     return grouped.reduce<Record<string, number>>(
       (acc, row) => {

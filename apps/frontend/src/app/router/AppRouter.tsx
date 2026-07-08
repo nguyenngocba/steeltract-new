@@ -65,6 +65,7 @@ const RolesPage = lazyNamed(() => import('@/modules/roles/pages/RolesPage'), 'Ro
 const SystemLogsWorkspace = lazyNamed(() => import('@/modules/system-logs/workspaces/SystemLogsWorkspace'), 'SystemLogsWorkspace')
 const LogisticsPage = lazyNamed(() => import('@/modules/logistics/pages/LogisticsPage'), 'LogisticsPage')
 const NotificationsPage = lazyNamed(() => import('@/modules/notifications/pages/NotificationsPage'), 'NotificationsPage')
+const OperationsCenterPage = lazyNamed(() => import('@/modules/operations-center/pages/OperationsCenterPage'), 'OperationsCenterPage')
 
 export function AppRouter() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -117,6 +118,11 @@ export function AppRouter() {
       <Route
         path="/notifications"
         element={<NotificationsPage />}
+      />
+
+      <Route
+        path="/operations-center"
+        element={<OperationsCenterPage />}
       />
 
       <Route

@@ -366,6 +366,7 @@ function itemHasActiveRoute(item: NavigationItem, activePath: string): boolean {
 }
 
 function isRouteActive(path: string, activePath: string) {
-  if (path === '/') return activePath === '/'
-  return activePath === path || activePath.startsWith(`${path}/`)
+  const normalizedPath = path.split('?')[0].split('#')[0]
+  if (normalizedPath === '/') return activePath === '/'
+  return activePath === normalizedPath || activePath.startsWith(`${normalizedPath}/`)
 }

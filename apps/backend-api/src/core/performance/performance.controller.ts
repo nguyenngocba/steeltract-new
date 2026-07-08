@@ -2,25 +2,28 @@ import { Controller, Get } from '@nestjs/common';
 
 import { CacheService } from './cache.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
+import { RuntimeHealthService } from './runtime-health.service';
 
 @Controller('performance')
 export class PerformanceController {
   constructor(
     private readonly cache: CacheService,
     private readonly metrics: PerformanceMetricsService,
+    private readonly runtimeHealth: RuntimeHealthService,
   ) {}
 
   @Get('health')
-  health() {
+  health(): Record<string, unknown> {
     return {
       status: 'ok',
       uptimeSeconds: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),
+      runtime: this.runtimeHealth.snapshot(),
     };
   }
 
   @Get('metrics')
-  getMetrics() {
+  getMetrics(): Record<string, unknown> {
     return {
       ...this.metrics.snapshot(),
       cache: this.cache.stats(),

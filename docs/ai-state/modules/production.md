@@ -80,6 +80,17 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * `ProductionMaterialLedger`
 * `ProductionMaterialConsumption`
 * `ComponentCosting`
+* `WorkOrder`
+* `Shift`
+* `ProductionCapacity`
+* `ComponentAssembly`
+* `ProductionRework`
+* `ProductionScrap`
+* `MachineDowntime`
+* `MachineOee`
+* `ProductionDashboardSnapshot`
+* `ProductionOrderSnapshot`
+* `WorkCenterSnapshot`
 
 ## API Endpoints
 
@@ -134,20 +145,11 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 
 ## Remaining Tasks
 
-* Add richer manual material issue editing and approval UI.
-* Add issue/return document headers if approval workflow requires multi-line documents.
-* Review and reconcile historical production issue transaction rows that were created before slot/level was preserved.
-* Review historical issue/consume/return rows from validation data before any automated backfill.
-* Review and clean the historical invalid reservation bucket reported by Runtime Integrity after Sprint 10C.
-* Extend Production Material Ledger writes for adjust events.
-* Add richer production costing inputs for labor, machine, overhead, QC rework, and Yard handling cost.
-* Add richer production scheduling, work-center capacity, machine assignment, and operator workflow.
-* Consider replacing `Float` with decimal-safe database types only if future financial/weight precision requirements exceed current operational tolerance.
-* Continue Sprint 18 UI review with operators and extract repeated Production transaction/detail table helpers if the new cockpit patterns are approved.
-* Consider exposing unit material cost on Work Order material readiness/value APIs if operators need true value-based WO ranking instead of required-quantity proxy analytics.
-* Consider exposing unit material cost or total line value on Material Issue APIs if operators need true issue-value KPIs and value-based material issue analytics.
-* Consider a persisted production warehouse receipt/balance ledger if operators need auditable production-stock history independent from current Inventory location balances and reservation rows.
-* Consider exposing canonical shopfloor stage/status data if operators need the Execution Board to reflect real machine/work-center queues rather than UI fallback mapping.
-* Review Sprint 20A Costing Engine with both the Sprint 20A.5 demo dataset and more real Production Orders, then decide whether issue/return costs should move from read model to persisted costing snapshots.
-* Prioritize 20B Component Cost Analysis and 20C Project Cost Control before deeper Shopfloor dashboard expansion.
-* Add immutable stage transition history, actual runtime/downtime capture, production-line queues, and labor/machine rate data before treating Shopfloor analytics as authoritative MES data.
+* **Sprint 1 (WorkOrder & Core Domain Setup)**: Implement `WorkOrder` entity, repositories, and DTOs. Migration of work order tables.
+* **Sprint 2 (Shopfloor Runtime & Downtime)**: Implement `Shift`, `MachineDowntime`, and downtime tracking APIs.
+* **Sprint 3 (Scrap & Rework Workflows)**: Implement `ProductionScrap`, `ProductionRework` tables, validations, and NCR connection.
+* **Sprint 4 (Outbox Events & Event Consumer)**: Implement persistent outbox events for production transitions and event listener routing.
+* **Sprint 5 (Persisted Snapshots)**: Create `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and rebuilder background jobs.
+* **Sprint 6 (WMS & Costing Integration)**: Hardening material issue/return balance equations and average-cost ledger reconciliations.
+* **Sprint 7 (Shopfloor Dashboard & Cockpits)**: Build dynamic manager and operator interfaces, including OEE and downtime gauges.
+* **Sprint 8 (Operations Center & AI Optimizer)**: Integrate production alerts into the Operations Center and add AI-driven queue scheduling optimization.

@@ -1,0 +1,44 @@
+Q5B inventory_location_stocks exact bucket full key
+                                                                                                                                                   QUERY PLAN                                                                                                                                                   
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Join  (cost=0.05..2.53 rows=1 width=110) (actual time=0.062..0.084 rows=1 loops=1)
+   Hash Cond: ((s."inventoryItemId" = inventory_location_stocks."inventoryItemId") AND (s."warehouseId" = inventory_location_stocks."warehouseId") AND (s."zoneId" = inventory_location_stocks."zoneId") AND (s."slotId" = inventory_location_stocks."slotId") AND (s.level = inventory_location_stocks.level))
+   Buffers: shared hit=2
+   ->  Seq Scan on inventory_location_stocks s  (cost=0.00..1.51 rows=51 width=110) (actual time=0.009..0.013 rows=51 loops=1)
+         Buffers: shared hit=1
+   ->  Hash  (cost=0.03..0.03 rows=1 width=76) (actual time=0.017..0.018 rows=1 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 9kB
+         Buffers: shared hit=1
+         ->  Limit  (cost=0.00..0.03 rows=1 width=76) (actual time=0.007..0.007 rows=1 loops=1)
+               Buffers: shared hit=1
+               ->  Seq Scan on inventory_location_stocks  (cost=0.00..1.51 rows=51 width=76) (actual time=0.006..0.006 rows=1 loops=1)
+                     Filter: (("warehouseId" IS NOT NULL) AND ("zoneId" IS NOT NULL) AND ("slotId" IS NOT NULL) AND (level IS NOT NULL))
+                     Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=275
+ Planning Time: 1.214 ms
+ Execution Time: 0.152 ms
+(17 rows)
+
+Q5B forced index
+SET
+                                                                                                                                                 QUERY PLAN                                                                                                                                                  
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=0.28..8.58 rows=1 width=110) (actual time=0.029..0.031 rows=1 loops=1)
+   Buffers: shared hit=4
+   ->  Limit  (cost=0.14..0.40 rows=1 width=76) (actual time=0.018..0.019 rows=1 loops=1)
+         Buffers: shared hit=2
+         ->  Index Scan using "inventory_location_stocks_zoneId_slotId_level_idx" on inventory_location_stocks  (cost=0.14..13.29 rows=51 width=76) (actual time=0.018..0.018 rows=1 loops=1)
+               Index Cond: (("zoneId" IS NOT NULL) AND ("slotId" IS NOT NULL) AND (level IS NOT NULL))
+               Filter: ("warehouseId" IS NOT NULL)
+               Buffers: shared hit=2
+   ->  Index Scan using inventory_location_stocks_item_bucket_idx on inventory_location_stocks s  (cost=0.14..8.17 rows=1 width=110) (actual time=0.008..0.009 rows=1 loops=1)
+         Index Cond: (("inventoryItemId" = inventory_location_stocks."inventoryItemId") AND ("warehouseId" = inventory_location_stocks."warehouseId") AND ("zoneId" = inventory_location_stocks."zoneId") AND ("slotId" = inventory_location_stocks."slotId") AND (level = inventory_location_stocks.level))
+         Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=4
+ Planning Time: 0.298 ms
+ Execution Time: 0.055 ms
+(15 rows)
+
+RESET

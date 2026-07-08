@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import {
   ComponentStatus,
@@ -12,7 +12,11 @@ import {
 } from '@prisma/client';
 
 import { ComponentsService } from '../../components/services/components.service';
-import { PrismaService } from '../../../core/prisma/prisma.service';
+import { EventPublisherService } from '../../../core/events/event-publisher.service';
+import { SnapshotUpdateDispatcher } from '../../../core/jobs/snapshot-update-dispatcher.service';
+import { PerformanceMetricsService } from '../../../core/performance/performance-metrics.service';
+import { DashboardReaderService } from '../../../core/snapshots/dashboard-reader.service';
+import { SnapshotReaderService } from '../../../core/snapshots/snapshot-reader.service';
 import {
   CreateProjectDto,
   CreateProjectTemplateDto,
@@ -53,14 +57,32 @@ type ProjectTaskDomain = Prisma.ProjectTaskGetPayload<{
   include: typeof projectTaskInclude;
 }>;
 
+const PROJECT_DETAIL_SNAPSHOT_MAX_AGE_SECONDS = Number(
+  process.env.PROJECT_DETAIL_SNAPSHOT_MAX_AGE_SECONDS ??
+    process.env.USE_PROJECT_SNAPSHOT_MAX_AGE_SECONDS ??
+    process.env.SNAPSHOT_MAX_AGE_SECONDS ??
+    900,
+);
+
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
   constructor(
+    @Inject(ProjectsRepository)
     private readonly repository: ProjectsRepository,
+    @Inject(ComponentsService)
     private readonly componentsService: ComponentsService,
-    private readonly prisma: PrismaService,
+    @Inject(DashboardReaderService)
+    private readonly dashboardReader: DashboardReaderService,
+    @Inject(SnapshotReaderService)
+    private readonly snapshotReader: SnapshotReaderService,
+    @Inject(EventPublisherService)
+    private readonly events: EventPublisherService,
+    @Inject(SnapshotUpdateDispatcher)
+    private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
+    @Inject(PerformanceMetricsService)
+    private readonly metrics: PerformanceMetricsService,
   ) {}
 
   async findAll(query: ListProjectsDto) {
@@ -142,26 +164,18 @@ export class ProjectsService {
       this.logger.warn('project_templates table is missing; returning empty template list');
       return [];
     }
-    return this.prisma.projectTemplate.findMany({
-      orderBy: [
-        { isDefault: 'desc' },
-        { createdAt: 'desc' },
-      ],
-    });
+    return this.repository.findProjectTemplates();
   }
 
   async createTemplate(dto: CreateProjectTemplateDto) {
     this.logger.debug(`createTemplate code=${dto.code}`);
     await this.assertProjectTemplateTableReady();
-    return this.prisma.$transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       if (dto.isDefault) {
-        await tx.projectTemplate.updateMany({
-          where: { isDefault: true },
-          data: { isDefault: false },
-        });
+        await this.repository.clearDefaultProjectTemplates(undefined, tx);
       }
-      const template = await tx.projectTemplate.create({
-        data: {
+      const template = await this.repository.createProjectTemplate(
+        {
           code: dto.code,
           name: dto.name,
           description: dto.description,
@@ -170,7 +184,8 @@ export class ProjectsService {
           structure: dto.structure as Prisma.InputJsonValue,
           publishedAt: dto.status === ProjectTemplateStatus.PUBLISHED ? new Date() : null,
         },
-      });
+        tx,
+      );
       await this.emitProjectEvent('project.template.created', template.id, { code: template.code, name: template.name }, tx);
       return template;
     });
@@ -178,17 +193,14 @@ export class ProjectsService {
 
   async updateTemplate(id: string, dto: UpdateProjectTemplateDto) {
     await this.assertProjectTemplateTableReady();
-    return this.prisma.$transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       await this.assertProjectTemplate(id, tx);
       if (dto.isDefault) {
-        await tx.projectTemplate.updateMany({
-          where: { isDefault: true, id: { not: id } },
-          data: { isDefault: false },
-        });
+        await this.repository.clearDefaultProjectTemplates(id, tx);
       }
-      const template = await tx.projectTemplate.update({
-        where: { id },
-        data: {
+      const template = await this.repository.updateProjectTemplate(
+        id,
+        {
           code: dto.code,
           name: dto.name,
           description: dto.description,
@@ -197,7 +209,8 @@ export class ProjectsService {
           structure: dto.structure as Prisma.InputJsonValue | undefined,
           publishedAt: dto.status === ProjectTemplateStatus.PUBLISHED ? new Date() : undefined,
         },
-      });
+        tx,
+      );
       await this.emitProjectEvent('project.template.updated', id, { code: template.code, name: template.name }, tx);
       return template;
     });
@@ -205,10 +218,10 @@ export class ProjectsService {
 
   async duplicateTemplate(id: string) {
     await this.assertProjectTemplateTableReady();
-    return this.prisma.$transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       const source = await this.assertProjectTemplate(id, tx);
-      const template = await tx.projectTemplate.create({
-        data: {
+      const template = await this.repository.createProjectTemplate(
+        {
           code: `${source.code}-COPY-${Date.now().toString().slice(-4)}`,
           name: `${source.name} - Copy`,
           description: source.description,
@@ -216,7 +229,8 @@ export class ProjectsService {
           isDefault: false,
           structure: source.structure as Prisma.InputJsonValue,
         },
-      });
+        tx,
+      );
       await this.emitProjectEvent('project.template.duplicated', template.id, { sourceId: id, code: template.code }, tx);
       return template;
     });
@@ -244,7 +258,7 @@ export class ProjectsService {
 
   async exportTemplate(id: string) {
     await this.assertProjectTemplateTableReady();
-    const template = await this.assertProjectTemplate(id, this.prisma);
+    const template = await this.assertProjectTemplate(id);
     return {
       exportedAt: new Date(),
       template,
@@ -253,12 +267,12 @@ export class ProjectsService {
 
   async importTemplates(dto: ImportProjectTemplateDto) {
     await this.assertProjectTemplateTableReady();
-    return this.prisma.$transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       const rows = [];
       for (const template of dto.templates) {
-        const row = await tx.projectTemplate.upsert({
-          where: { code: template.code },
-          create: {
+        const row = await this.repository.upsertProjectTemplateByCode(
+          template.code,
+          {
             code: template.code,
             name: template.name,
             description: template.description,
@@ -267,14 +281,15 @@ export class ProjectsService {
             structure: template.structure as Prisma.InputJsonValue,
             publishedAt: template.status === ProjectTemplateStatus.PUBLISHED ? new Date() : null,
           },
-          update: {
+          {
             name: template.name,
             description: template.description,
             status: template.status,
             structure: template.structure as Prisma.InputJsonValue,
             updatedAt: new Date(),
           },
-        });
+          tx,
+        );
         rows.push(row);
       }
       await this.emitProjectEvent('project.template.imported', 'project-template-import', { count: rows.length }, tx);
@@ -321,38 +336,26 @@ export class ProjectsService {
     dto: ReturnProjectComponentDto,
   ) {
     await this.assertProjectExists(projectId);
-    return this.prisma.$transaction(async (tx) => {
-      const component = await tx.component.findUnique({
-        where: { id: componentId },
-      });
-      if (!component || component.projectId !== projectId) {
+    return this.repository.transaction(async (tx) => {
+      const component = await this.repository.findProjectComponent(projectId, componentId, tx);
+      if (!component) {
         throw new NotFoundException('Project component not found');
       }
       if (!['SHIPPED', 'DELIVERED', 'INSTALLED'].includes(component.status)) {
         throw new BadRequestException('Only shipped, delivered, or installed project components can be returned.');
       }
 
-      const updated = await tx.component.update({
-        where: { id: componentId },
-        data: {
-          projectId: null,
-          status: ComponentStatus.READY,
-          installedDate: null,
-          installZone: null,
-          installAxis: null,
-          installLevel: null,
-          installPosition: null,
-        },
-      });
-      await tx.componentTimeline.create({
-        data: {
+      const updated = await this.repository.updateProjectComponentReturned(componentId, tx);
+      await this.repository.createComponentTimeline(
+        {
           componentId,
           action: 'RETURNED_TO_YARD',
           note: dto.reason ?? 'Trả cấu kiện từ công trình về bãi',
         },
-      });
-      await tx.activityLog.create({
-        data: {
+        tx,
+      );
+      await this.repository.createActivityLog(
+        {
           action: 'PROJECT_COMPONENT_RETURNED',
           entity: 'Component',
           entityId: componentId,
@@ -366,7 +369,8 @@ export class ProjectsService {
             reason: dto.reason,
           },
         },
-      });
+        tx,
+      );
       await this.emitProjectEvent('project.component.changed', componentId, {
         projectId,
         status: updated.status,
@@ -420,9 +424,9 @@ export class ProjectsService {
       await this.assertProjectWbsTask(projectId, dto.parentId);
     }
     const sortOrder = dto.sortOrder ?? Date.now();
-    const task = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.projectTask.create({
-        data: {
+    const task = await this.repository.transaction(async (tx) => {
+      const created = await this.repository.createProjectTask(
+        {
           projectId,
           parentTaskId: dto.parentId ?? null,
           name: dto.name,
@@ -440,13 +444,11 @@ export class ProjectsService {
           forecastFinishAt: dto.actualFinishAt ?? dto.plannedFinishAt,
           sortOrder,
         },
-      });
+        tx,
+      );
       await this.replaceProjectTaskRelations(projectId, created.id, dto, tx);
       await this.emitProjectEvent('project.task.created', created.id, { projectId, name: dto.name }, tx);
-      return tx.projectTask.findUniqueOrThrow({
-        where: { id: created.id },
-        include: projectTaskInclude,
-      });
+      return this.repository.findProjectTaskOrThrow(created.id, tx);
     });
     return this.toProjectWbsRuntimeFromDomain(task);
   }
@@ -459,9 +461,9 @@ export class ProjectsService {
     }
     const startDate = dto.startDate ?? new Date();
     const createdIds: string[] = [];
-    await this.prisma.$transaction(async (tx) => {
-      const root = await tx.projectTask.create({
-        data: {
+    await this.repository.transaction(async (tx) => {
+      const root = await this.repository.createProjectTask(
+        {
           projectId,
           parentTaskId: dto.parentId ?? null,
           name: dto.rootName,
@@ -476,12 +478,13 @@ export class ProjectsService {
           baselineFinishAt: this.addDays(startDate, dto.spans * dto.axes * dto.taskDurationDays),
           sortOrder: Date.now(),
         },
-      });
+        tx,
+      );
       createdIds.push(root.id);
 
       for (let span = 1; span <= dto.spans; span += 1) {
-        const spanTask = await tx.projectTask.create({
-          data: {
+        const spanTask = await this.repository.createProjectTask(
+          {
             projectId,
             parentTaskId: root.id,
             name: `Nhịp ${span}`,
@@ -489,13 +492,14 @@ export class ProjectsService {
             progress: 0,
             sortOrder: Date.now() + span,
           },
-        });
+          tx,
+        );
         createdIds.push(spanTask.id);
 
         for (let floor = 1; floor <= dto.floors; floor += 1) {
           const floorParent = dto.floors > 1
-            ? await tx.projectTask.create({
-              data: {
+            ? await this.repository.createProjectTask(
+              {
                 projectId,
                 parentTaskId: spanTask.id,
                 name: `Tầng ${floor}`,
@@ -503,15 +507,16 @@ export class ProjectsService {
                 progress: 0,
                 sortOrder: Date.now() + span * 1_000 + floor,
               },
-            })
+              tx,
+            )
             : spanTask;
           if (dto.floors > 1) createdIds.push(floorParent.id);
 
           for (let axis = 1; axis <= dto.axes; axis += 1) {
             const axisStart = this.addDays(startDate, ((span - 1) * dto.axes + (axis - 1)) * dto.taskDurationDays);
             const axisFinish = this.addDays(axisStart, dto.taskDurationDays - 1);
-            const axisTask = await tx.projectTask.create({
-              data: {
+            const axisTask = await this.repository.createProjectTask(
+              {
                 projectId,
                 parentTaskId: floorParent.id,
                 name: `Trục ${axis}`,
@@ -526,7 +531,8 @@ export class ProjectsService {
                 baselineFinishAt: axisFinish,
                 sortOrder: Date.now() + span * 10_000 + floor * 1_000 + axis,
               },
-            });
+              tx,
+            );
             createdIds.push(axisTask.id);
           }
         }
@@ -547,7 +553,7 @@ export class ProjectsService {
       await this.assertProjectWbsTask(projectId, dto.parentId);
     }
     const updatedIds: string[] = [];
-    await this.prisma.$transaction(async (tx) => {
+    await this.repository.transaction(async (tx) => {
       for (const taskId of dto.taskIds) {
         const task = await this.assertProjectWbsTask(projectId, taskId);
         if (dto.parentId && dto.parentId !== taskId) {
@@ -558,9 +564,9 @@ export class ProjectsService {
           dto.owner ? `Bulk owner: ${dto.owner}` : '',
           dto.checklist?.length ? `Checklist: ${dto.checklist.join(', ')}` : '',
         ].filter(Boolean).join('\n');
-        await tx.projectTask.update({
-          where: { id: taskId },
-          data: {
+        await this.repository.updateProjectTask(
+          taskId,
+          {
             parentTaskId: Object.prototype.hasOwnProperty.call(dto, 'parentId') ? dto.parentId ?? null : task.parentTaskId,
             description: notes,
             status: dto.status ? this.toProjectTaskStatus(dto.status) : task.status,
@@ -570,10 +576,11 @@ export class ProjectsService {
             scheduledFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt') ? dto.plannedFinishAt : task.scheduledFinishAt,
             forecastFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt') ? dto.plannedFinishAt : task.forecastFinishAt,
           },
-        });
+          tx,
+        );
         for (const resource of dto.resources ?? []) {
-          await tx.projectTaskResource.create({
-            data: {
+          await this.repository.createProjectTaskResource(
+            {
               projectTaskId: taskId,
               type: resource.type,
               name: resource.name,
@@ -581,7 +588,8 @@ export class ProjectsService {
               allocatedQuantity: 0,
               cost: Number(resource.cost ?? 0),
             },
-          });
+            tx,
+          );
         }
         updatedIds.push(taskId);
       }
@@ -629,8 +637,7 @@ export class ProjectsService {
       workers: task.resources.filter((item) => item.type === ProjectTaskResourceType.WORKER).map((item) => ({ role: item.name, required: Number(item.quantity ?? 0), allocated: Number(item.allocatedQuantity ?? 0) })),
       machines: task.resources.filter((item) => item.type === ProjectTaskResourceType.MACHINE).map((item) => ({ type: item.name, required: Number(item.quantity ?? 0), allocated: Number(item.allocatedQuantity ?? 0) })),
     });
-    await this.prisma.activityLog.create({
-      data: {
+    await this.repository.createActivityLog({
         action: 'PROJECT_SITE_UPDATE',
         entity: 'ProjectTask',
         entityId: dto.taskId,
@@ -644,8 +651,7 @@ export class ProjectsService {
           note: dto.note,
           photoAttachmentIds: dto.photoAttachmentIds ?? [],
         },
-      },
-    });
+      });
     return updated;
   }
 
@@ -662,10 +668,10 @@ export class ProjectsService {
       await this.assertProjectWbsTask(projectId, nextParentId);
       await this.assertNoCircularWbsParent(projectId, taskId, nextParentId);
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.projectTask.update({
-        where: { id: taskId },
-        data: {
+    const updated = await this.repository.transaction(async (tx) => {
+      await this.repository.updateProjectTask(
+        taskId,
+        {
           parentTaskId: nextParentId,
           name: dto.name ?? existing.name,
           description: dto.description ?? existing.description,
@@ -700,15 +706,13 @@ export class ProjectsService {
             : existing.forecastFinishAt,
           sortOrder: dto.sortOrder ?? existing.sortOrder,
         },
-      });
+        tx,
+      );
       if (this.shouldReplaceProjectTaskRelations(dto)) {
         await this.replaceProjectTaskRelations(projectId, taskId, dto, tx);
       }
       await this.emitProjectEvent('project.task.updated', taskId, { projectId, name: dto.name ?? existing.name }, tx);
-      return tx.projectTask.findUniqueOrThrow({
-        where: { id: taskId },
-        include: projectTaskInclude,
-      });
+      return this.repository.findProjectTaskOrThrow(taskId, tx);
     });
     return this.toProjectWbsRuntimeFromDomain(updated);
   }
@@ -735,14 +739,8 @@ export class ProjectsService {
         }
       }
     }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.projectTask.deleteMany({
-        where: {
-          id: {
-            in: Array.from(deleteIds),
-          },
-        },
-      });
+    await this.repository.transaction(async (tx) => {
+      await this.repository.deleteProjectTasks(Array.from(deleteIds), tx);
       await this.emitProjectEvent('project.task.deleted', taskId, { projectId, deletedIds: Array.from(deleteIds) }, tx);
     });
     return {
@@ -752,6 +750,53 @@ export class ProjectsService {
   }
 
   async runtimeDashboard() {
+    const result = await this.dashboardReader.read({
+      module: 'projects',
+      snapshotType: 'ProjectDashboardSnapshot',
+      loadSnapshot: async () => {
+        const rows = await this.snapshotReader.projectsDashboard();
+        if (rows.length === 0) {
+          return null;
+        }
+        return {
+          data: rows,
+          updatedAt: rows.reduce((oldest, row) =>
+            row.updatedAt.getTime() < oldest.getTime() ? row.updatedAt : oldest,
+          rows[0].updatedAt),
+          rowCount: rows.length,
+        };
+      },
+      readSnapshot: async (rows) =>
+        this.applyProjectDashboardSnapshots(
+          await this.runtimeDashboardRuntime(),
+          rows,
+        ),
+      readRuntime: () => this.runtimeDashboardRuntime(),
+      compare: (snapshot, runtime) =>
+        this.compareRuntimeNumbers(snapshot.metrics, runtime.metrics, [
+          'totalProjects',
+          'averageProgress',
+        ]),
+    });
+
+    if (result.source === 'snapshot') {
+      this.metrics.recordProjectReadModelHit();
+    } else {
+      this.metrics.recordProjectFallback();
+      void this.snapshotDispatcher.requestUpdate({
+        scope: {
+          module: 'projects',
+          snapshotType: 'ProjectRuntimeSnapshot',
+        },
+        reason: 'fallback-miss',
+        priority: 60,
+      });
+    }
+
+    return result.data;
+  }
+
+  private async runtimeDashboardRuntime() {
     this.logger.debug('runtimeDashboard');
     const hasProjectTaskDomain = await this.hasProjectTaskTable();
     if (!hasProjectTaskDomain) {
@@ -770,119 +815,7 @@ export class ProjectsService {
       documents,
       activityLogs,
     ] =
-      await Promise.all([
-        this.prisma.project.findMany({
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-        this.prisma.component.findMany({
-          include: {
-            project: true,
-          },
-        }),
-        this.prisma.inventoryTransaction.findMany({
-          include: {
-            items: {
-              include: {
-                inventoryItem: true,
-                unit: true,
-              },
-            },
-          },
-          orderBy: {
-            transactionDate: 'desc',
-          },
-          take: 500,
-        }),
-        this.prisma.productionOrder.findMany({
-          include: {
-            stages: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-        this.prisma.task.findMany({
-          where: {
-            component: {
-              is: {
-                projectId: {
-                  not: null,
-                },
-              },
-            },
-          },
-          include: {
-            component: true,
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        }),
-        this.prisma.projectTask.findMany({
-          include: projectTaskInclude,
-          orderBy: {
-            createdAt: 'asc',
-          },
-        }),
-        this.prisma.returnRequest.findMany({
-          where: {
-            projectId: {
-              not: null,
-            },
-          },
-          include: {
-            project: true,
-            warehouse: true,
-            items: {
-              include: {
-                inventoryItem: true,
-                unit: true,
-                zone: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 300,
-        }),
-        this.prisma.attachment.findMany({
-          where: {
-            deletedAt: null,
-            OR: [
-              { module: { in: ['projects', 'project'] } },
-              { entityType: { in: ['project', 'Project'] } },
-            ],
-          },
-          include: {
-            versions: {
-              orderBy: {
-                version: 'desc',
-              },
-              take: 1,
-            },
-            links: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 300,
-        }),
-        this.prisma.activityLog.findMany({
-          where: {
-            OR: [
-              { module: { in: ['projects', 'project'] } },
-              { entity: { in: ['Project', 'ProjectTask', 'ReturnRequest'] } },
-            ],
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 300,
-        }),
-      ]);
+      await this.repository.findRuntimeSources();
 
     const projectRows = projects.map((project) => {
       const projectComponents = components.filter(
@@ -1277,6 +1210,523 @@ export class ProjectsService {
     };
   }
 
+  private applyProjectDashboardSnapshots(runtime: any, snapshots: any[]) {
+    const byProject = new Map(
+      snapshots.map((snapshot) => [snapshot.projectId, snapshot]),
+    );
+    const projects = runtime.projects.map((project) => {
+      const snapshot = byProject.get(project.id);
+      if (!snapshot) {
+        return project;
+      }
+      return {
+        ...project,
+        progress: Math.round(Number(snapshot.progress ?? project.progress ?? 0)),
+        delayedOrders: Number(snapshot.delayedTaskCount ?? project.delayedOrders ?? 0),
+      };
+    });
+    const progress = runtime.progress.map((project) => {
+      const snapshot = byProject.get(project.id);
+      if (!snapshot) {
+        return project;
+      }
+      return {
+        ...project,
+        progress: Math.round(Number(snapshot.progress ?? project.progress ?? 0)),
+        delayedOrders: Number(snapshot.delayedTaskCount ?? project.delayedOrders ?? 0),
+      };
+    });
+    const averageProgress = projects.length
+      ? projects.reduce((sum, project) => sum + Number(project.progress ?? 0), 0) /
+        projects.length
+      : 0;
+
+    return {
+      ...runtime,
+      metrics: {
+        ...runtime.metrics,
+        totalProjects: projects.length,
+        activeProjects: Number(runtime.metrics.activeProjects ?? 0),
+        completedProjects: Number(runtime.metrics.completedProjects ?? 0),
+        averageProgress,
+      },
+      projects,
+      progress,
+    };
+  }
+
+  private compareRuntimeNumbers(
+    snapshot: Record<string, unknown>,
+    runtime: Record<string, unknown>,
+    fields: string[],
+  ) {
+    return fields.flatMap((field) => {
+      const snapshotValue = Number(snapshot[field] ?? 0);
+      const runtimeValue = Number(runtime[field] ?? 0);
+      if (Math.abs(snapshotValue - runtimeValue) <= 0.0001) {
+        return [];
+      }
+      return [{
+        field,
+        snapshotValue,
+        runtimeValue,
+        reason: 'VALUE_MISMATCH' as const,
+      }];
+    });
+  }
+
+  async detailTab(projectId: string, tab: string) {
+    const normalizedTab = this.normalizeProjectDetailTab(tab);
+    if (this.supportsProjectDetailSnapshot(normalizedTab)) {
+      const snapshot = await this.snapshotReader.projectDetail(
+        projectId,
+        normalizedTab,
+      );
+      if (snapshot && this.isFreshProjectDetailSnapshot(snapshot.updatedAt, snapshot.stale)) {
+        return snapshot.payload;
+      }
+
+      this.metrics.recordProjectDetailFallback();
+      void this.snapshotDispatcher.requestUpdate({
+        scope: {
+          module: 'projects',
+          snapshotType: `ProjectDetailSnapshot:${normalizedTab}`,
+          scopeId: projectId,
+          projectId,
+        },
+        reason: snapshot ? 'stale-snapshot' : 'fallback-miss',
+        priority: 60,
+      });
+    } else {
+      this.metrics.recordProjectDetailFallback();
+    }
+
+    this.metrics.recordProjectReadModelHit();
+    const hasProjectTaskDomain = await this.hasProjectTaskTable();
+    if (!hasProjectTaskDomain) {
+      this.logger.warn(`ProjectTask domain tables are missing; returning empty detail for project ${projectId}`);
+      return {
+        project: null,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const sources = await this.repository.findProjectDetailSources(projectId, tab);
+    const project = sources.project;
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const components = this.buildProjectComponentRows(sources.components);
+    const materials = this.buildProjectMaterialRows(
+      project,
+      sources.inventoryTransactions,
+      sources.projectTasks,
+      sources.returnRequests,
+    );
+    const projectRow = this.buildProjectRuntimeRow(
+      project,
+      sources.components,
+      sources.inventoryTransactions,
+      sources.productionOrders,
+    );
+    const wbs = this.buildProjectWbsFromDomain(project.id, sources.projectTasks) ??
+      this.buildProjectWbs(
+        projectRow,
+        components,
+        materials,
+        sources.componentTasks,
+      );
+    const financial = this.buildProjectFinancial(projectRow, components, materials);
+    const health = this.buildProjectHealth(
+      projectRow,
+      components,
+      materials,
+      sources.componentTasks,
+      sources.returnRequests,
+    );
+    const returnRequests = this.mapProjectReturnRequests(sources.returnRequests);
+    const documents = this.mapProjectDocuments(sources.documents);
+    const logs = this.mapProjectLogs(sources.activityLogs);
+
+    const base = {
+      project: projectRow,
+      generatedAt: new Date().toISOString(),
+    };
+
+    switch (normalizedTab) {
+      case 'materials':
+        return { ...base, materials, returnRequests };
+      case 'components':
+        return { ...base, components };
+      case 'progress':
+      case 'command':
+      case 'site':
+        return { ...base, wbs, health, documents, logs };
+      case 'costs':
+        return { ...base, financial, wbs };
+      case 'documents':
+        return { ...base, documents };
+      case 'logs':
+        return { ...base, logs, wbs, returnRequests };
+      case 'overview':
+      default:
+        return {
+          ...base,
+          materials,
+          components,
+          wbs,
+          financial,
+          health,
+          returnRequests,
+          documents,
+          logs,
+        };
+    }
+  }
+
+  private normalizeProjectDetailTab(tab: string) {
+    const value = String(tab || 'overview').toLowerCase();
+    if (['overview', 'materials', 'components', 'progress', 'command', 'site', 'costs', 'documents', 'logs'].includes(value)) {
+      return value;
+    }
+
+    return 'overview';
+  }
+
+  private supportsProjectDetailSnapshot(tab: string) {
+    return [
+      'overview',
+      'materials',
+      'components',
+      'progress',
+      'command',
+      'site',
+      'costs',
+    ].includes(tab);
+  }
+
+  private isFreshProjectDetailSnapshot(updatedAt: Date, stale: boolean) {
+    if (stale) {
+      this.metrics.recordSnapshotStale();
+      return false;
+    }
+
+    const maxAgeSeconds =
+      Number.isFinite(PROJECT_DETAIL_SNAPSHOT_MAX_AGE_SECONDS) &&
+      PROJECT_DETAIL_SNAPSHOT_MAX_AGE_SECONDS > 0
+        ? PROJECT_DETAIL_SNAPSHOT_MAX_AGE_SECONDS
+        : 900;
+    const ageSeconds = Math.round((Date.now() - updatedAt.getTime()) / 1000);
+    if (ageSeconds > maxAgeSeconds) {
+      this.metrics.recordSnapshotStale();
+      return false;
+    }
+
+    return true;
+  }
+
+  private buildProjectRuntimeRow(
+    project: any,
+    components: any[],
+    inventoryTransactions: any[],
+    productionOrders: any[],
+  ) {
+    const completedComponents = components.filter((component) =>
+      component.status === 'INSTALLED',
+    );
+    const readyComponents = components.filter(
+      (component) => component.status === 'READY',
+    ).length;
+    const shippedComponents = components.filter(
+      (component) => component.status === 'SHIPPED',
+    ).length;
+    const deliveredComponents = components.filter((component) =>
+      ['DELIVERED', 'INSTALLED'].includes(component.status),
+    ).length;
+    const componentProgress = components.length
+      ? (completedComponents.length / components.length) * 100
+      : project.status === 'COMPLETED'
+        ? 100
+        : project.status === 'ACTIVE'
+          ? 60
+          : 0;
+    const orderProgress = productionOrders.length
+      ? (productionOrders.filter((order) => order.status === 'COMPLETED').length /
+          productionOrders.length) *
+        100
+      : componentProgress;
+    const contractValue =
+      components.reduce(
+        (sum, component) => sum + Number(component.estimatedCost ?? 0),
+        0,
+      ) ||
+      inventoryTransactions.reduce(
+        (sum, transaction) =>
+          sum +
+          transaction.items.reduce(
+            (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+            0,
+          ),
+        0,
+      );
+    const actualValue =
+      components.reduce(
+        (sum, component) => sum + Number(component.actualCost ?? 0),
+        0,
+      ) ||
+      inventoryTransactions.reduce(
+        (sum, transaction) =>
+          sum +
+          transaction.items.reduce(
+            (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+            0,
+          ),
+        0,
+      );
+
+    return {
+      ...project,
+      progress: Math.round((componentProgress + orderProgress) / 2),
+      type: this.projectType(project.name, project.description),
+      location: this.projectLocation(project.description),
+      owner: this.projectOwner(project.description),
+      contractValue,
+      actualValue,
+      tonnage:
+        productionOrders.reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) ||
+        components.length,
+      readyComponents,
+      shippedComponents,
+      delivered: deliveredComponents,
+      deliveredComponents,
+      installedComponents: completedComponents.length,
+      pending: Math.max(0, components.length - deliveredComponents),
+      delayedOrders: productionOrders.filter((order) => order.status === 'DELAYED').length,
+      componentCount: components.length,
+      orderCount: productionOrders.length,
+      materialTransactions: inventoryTransactions.length,
+      startedAt: project.createdAt,
+      plannedEndAt: project.updatedAt,
+    };
+  }
+
+  private buildProjectComponentRows(components: any[]) {
+    return components
+      .filter((component) => component.projectId)
+      .map((component) => ({
+        id: component.id,
+        projectId: component.projectId,
+        projectCode: component.project?.code ?? '-',
+        projectName: component.project?.name ?? '-',
+        code: component.code,
+        name: component.name,
+        status: component.status,
+        plannedDate: component.plannedDate,
+        installedDate: component.installedDate,
+        installZone: component.installZone,
+        installAxis: component.installAxis,
+        installLevel: component.installLevel,
+        installPosition: component.installPosition,
+        estimatedCost: Number(component.estimatedCost ?? 0),
+        actualCost: Number(component.actualCost ?? 0),
+      }));
+  }
+
+  private buildProjectMaterialRows(
+    project: any,
+    inventoryTransactions: any[],
+    projectTasks: ProjectTaskDomain[],
+    returnRequests: any[],
+  ) {
+    const allocationMetrics = new Map<string, {
+      allocatedQuantity: number;
+      usedQuantity: number;
+      returnedQuantity: number;
+    }>();
+    for (const task of projectTasks) {
+      for (const allocation of task.materialAllocations) {
+        const key = `${task.projectId}:${allocation.inventoryItemId}`;
+        const current = allocationMetrics.get(key) ?? {
+          allocatedQuantity: 0,
+          usedQuantity: 0,
+          returnedQuantity: 0,
+        };
+        current.allocatedQuantity += Number(allocation.issuedQty ?? 0);
+        current.usedQuantity += Number(allocation.usedQty ?? 0);
+        current.returnedQuantity += Number(allocation.returnedQty ?? 0);
+        allocationMetrics.set(key, current);
+      }
+    }
+
+    const returnMetrics = new Map<string, {
+      pendingReturnQuantity: number;
+      returnedQuantity: number;
+    }>();
+    for (const request of returnRequests) {
+      if (!request.projectId || request.flowType !== 'SITE_RETURN') continue;
+      const status = String(request.status);
+      const isPending = ['REQUESTED', 'APPROVED'].includes(status);
+      const isReturned = ['RECEIVED', 'INSPECTED', 'DISPOSED'].includes(status);
+      if (!isPending && !isReturned) continue;
+      for (const item of request.items) {
+        const key = `${request.projectId}:${item.inventoryItemId}`;
+        const current = returnMetrics.get(key) ?? {
+          pendingReturnQuantity: 0,
+          returnedQuantity: 0,
+        };
+        if (isPending) {
+          current.pendingReturnQuantity += Number(item.requestedQuantity ?? 0);
+        }
+        if (isReturned) {
+          current.returnedQuantity += Number(
+            item.receivedQuantity ??
+              item.inspectedQuantity ??
+              item.requestedQuantity ??
+              0,
+          );
+        }
+        returnMetrics.set(key, current);
+      }
+    }
+
+    return inventoryTransactions.flatMap((transaction) =>
+      transaction.items.map((item) => {
+        const key = `${transaction.projectId ?? ''}:${item.inventoryItemId}`;
+        const allocation = allocationMetrics.get(key);
+        const returns = returnMetrics.get(key);
+        const fallbackAllocated =
+          transaction.type === 'EXPORT' ? Math.abs(Number(item.quantity ?? 0)) : 0;
+        const allocatedQuantity =
+          allocation?.allocatedQuantity && allocation.allocatedQuantity > 0
+            ? allocation.allocatedQuantity
+            : fallbackAllocated;
+        const usedQuantity = allocation?.usedQuantity ?? 0;
+        const pendingReturnQuantity = returns?.pendingReturnQuantity ?? 0;
+        const returnedQuantity = Math.max(
+          allocation?.returnedQuantity ?? 0,
+          returns?.returnedQuantity ?? 0,
+        );
+
+        return {
+          id: item.id,
+          projectId: transaction.projectId,
+          projectCode: project.code ?? '-',
+          projectName: project.name ?? '-',
+          materialCode: item.inventoryItem.code,
+          materialName: item.inventoryItem.name,
+          unit: item.unit?.symbol ?? item.inventoryItem.unit,
+          inventoryItemId: item.inventoryItemId,
+          unitId: item.unitId,
+          zoneId: item.zoneId,
+          quantity: Number(item.quantity ?? 0),
+          allocatedQuantity,
+          usedQuantity,
+          pendingReturnQuantity,
+          returnedQuantity,
+          availableReturnQuantity: Math.max(
+            0,
+            allocatedQuantity - usedQuantity - pendingReturnQuantity,
+          ),
+          unitPrice: Number(item.unitPrice ?? 0),
+          totalAmount: Number(item.totalAmount ?? 0),
+          type: transaction.type,
+          date: transaction.transactionDate,
+        };
+      }),
+    );
+  }
+
+  private mapProjectReturnRequests(returnRequests: any[]) {
+    return returnRequests.map((request) => ({
+      id: request.id,
+      returnNo: request.returnNo,
+      flowType: request.flowType,
+      status: request.status,
+      projectId: request.projectId,
+      projectCode: request.project?.code ?? '-',
+      projectName: request.project?.name ?? '-',
+      warehouseCode: request.warehouse?.code ?? '-',
+      warehouseName: request.warehouse?.name ?? '-',
+      requestedBy: request.requestedBy,
+      remarks: request.remarks,
+      createdAt: request.createdAt,
+      items: request.items.map((item) => ({
+        id: item.id,
+        inventoryItemId: item.inventoryItemId,
+        materialCode: item.inventoryItem.code,
+        materialName: item.inventoryItem.name,
+        requestedQuantity: Number(item.requestedQuantity ?? 0),
+        receivedQuantity: Number(item.receivedQuantity ?? 0),
+        inspectedQuantity: Number(item.inspectedQuantity ?? 0),
+        disposition: item.disposition,
+        unit: item.unit?.symbol ?? item.inventoryItem.unit,
+        zoneCode: item.zone?.code ?? '-',
+        zoneName: item.zone?.name ?? '-',
+      })),
+    }));
+  }
+
+  private mapProjectDocuments(documents: any[]) {
+    return documents.map((document) => {
+      const version = document.versions[0];
+      const projectLink = document.links.find((link) => ['projects', 'project'].includes(link.module));
+      const projectId = document.entityType?.toLowerCase() === 'project'
+        ? document.entityId
+        : projectLink?.entityId ?? null;
+      const source = document.entityType?.toLowerCase() === 'project'
+        ? 'Project'
+        : document.entityType
+          ? `${document.module ?? 'Attachment'} · ${document.entityType}`
+          : document.module ?? 'Attachment';
+      return {
+        id: document.id,
+        title: document.title,
+        originalName: document.originalName ?? version?.originalName ?? document.title,
+        category: document.category,
+        mimeType: document.mimeType,
+        fileSize: document.fileSize,
+        module: document.module,
+        entityType: document.entityType,
+        entityId: document.entityId,
+        projectId,
+        source,
+        publicUrl: version?.publicUrl ?? document.thumbnailUrl ?? null,
+        createdAt: document.createdAt,
+      };
+    });
+  }
+
+  private mapProjectLogs(activityLogs: any[]) {
+    return activityLogs.map((log) => {
+      const metadata = log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
+        ? log.metadata as Record<string, unknown>
+        : {};
+      const projectId = typeof metadata.projectId === 'string'
+        ? metadata.projectId
+        : log.entity === 'Project'
+          ? log.entityId
+          : null;
+      const detail = [
+        typeof metadata.projectCode === 'string' ? metadata.projectCode : null,
+        typeof metadata.componentCode === 'string' ? metadata.componentCode : null,
+        typeof metadata.returnNo === 'string' ? metadata.returnNo : null,
+      ].filter(Boolean).join(' · ');
+      return {
+        id: log.id,
+        action: log.action,
+        entity: log.entity,
+        entityId: log.entityId,
+        module: log.module,
+        userId: log.userId,
+        projectId,
+        title: this.projectLogTitle(log.action),
+        detail: detail || null,
+        createdAt: log.createdAt,
+      };
+    });
+  }
+
   private buildProjectWbs(
     project: {
       id: string;
@@ -1500,10 +1950,7 @@ export class ProjectsService {
   }
 
   private async assertProjectExists(projectId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true },
-    });
+    const project = await this.repository.findOne(projectId);
     if (!project) {
       throw new NotFoundException('Project not found');
     }
@@ -1514,22 +1961,11 @@ export class ProjectsService {
       this.logger.warn(`ProjectTask domain tables are missing; returning empty WBS for project ${projectId}`);
       return [];
     }
-    return this.prisma.projectTask.findMany({
-      where: {
-        projectId,
-      },
-      include: projectTaskInclude,
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+    return this.repository.findProjectTasks(projectId);
   }
 
   private async assertProjectWbsTask(projectId: string, taskId: string) {
-    const task = await this.prisma.projectTask.findUnique({
-      where: { id: taskId },
-      include: projectTaskInclude,
-    });
+    const task = await this.repository.findProjectTask(taskId);
     if (!task || task.projectId !== projectId) {
       throw new NotFoundException('Project WBS task not found');
     }
@@ -1656,17 +2092,7 @@ export class ProjectsService {
     dto: Partial<CreateProjectWbsTaskDto>,
     tx: Prisma.TransactionClient,
   ) {
-    await tx.projectTaskDependency.deleteMany({
-      where: {
-        OR: [
-          { projectTaskId: taskId },
-          { dependsOnTaskId: taskId },
-        ],
-      },
-    });
-    await tx.projectTaskMaterialAllocation.deleteMany({ where: { projectTaskId: taskId } });
-    await tx.projectTaskComponentAllocation.deleteMany({ where: { projectTaskId: taskId } });
-    await tx.projectTaskResource.deleteMany({ where: { projectTaskId: taskId } });
+    await this.repository.clearProjectTaskRelations(taskId, tx);
 
     const dependencyInputs = [
       ...(dto.predecessors ?? []).map((dependency) => ({
@@ -1684,13 +2110,14 @@ export class ProjectsService {
       if (dependency.projectTaskId === dependency.dependsOnTaskId) continue;
       await this.assertProjectWbsTask(projectId, dependency.projectTaskId);
       await this.assertProjectWbsTask(projectId, dependency.dependsOnTaskId);
-      await tx.projectTaskDependency.create({
-        data: {
+      await this.repository.createProjectTaskDependency(
+        {
           projectTaskId: dependency.projectTaskId,
           dependsOnTaskId: dependency.dependsOnTaskId,
           type: dependency.type,
         },
-      });
+        tx,
+      );
     }
 
     for (const material of dto.materials ?? []) {
@@ -1698,8 +2125,8 @@ export class ProjectsService {
       if (!inventoryItemId) continue;
       const plannedQty = Number(material.planned ?? 0);
       const totalCost = Number(material.cost ?? 0);
-      await tx.projectTaskMaterialAllocation.create({
-        data: {
+      await this.repository.createProjectTaskMaterialAllocation(
+        {
           projectTaskId: taskId,
           inventoryItemId,
           plannedQty,
@@ -1712,14 +2139,15 @@ export class ProjectsService {
           unitCost: plannedQty > 0 ? totalCost / plannedQty : 0,
           totalCost,
         },
-      });
+        tx,
+      );
     }
 
     for (const component of dto.components ?? []) {
       const componentId = await this.resolveComponentId(component.id || component.code, tx);
       if (!componentId) continue;
-      await tx.projectTaskComponentAllocation.create({
-        data: {
+      await this.repository.createProjectTaskComponentAllocation(
+        {
           projectTaskId: taskId,
           componentId,
           assignedAt: Number(component.assigned ?? 0) > 0 ? new Date() : null,
@@ -1728,44 +2156,42 @@ export class ProjectsService {
           status: this.toProjectTaskComponentStatus(component.status),
           cost: Number(component.cost ?? 0),
         },
-      });
+        tx,
+      );
     }
 
     for (const worker of dto.workers ?? []) {
-      await tx.projectTaskResource.create({
-        data: {
+      await this.repository.createProjectTaskResource(
+        {
           projectTaskId: taskId,
           type: ProjectTaskResourceType.WORKER,
           name: worker.role,
           quantity: Number(worker.required ?? 0),
           allocatedQuantity: Number(worker.allocated ?? 0),
         },
-      });
+        tx,
+      );
     }
 
     for (const machine of dto.machines ?? []) {
-      await tx.projectTaskResource.create({
-        data: {
+      await this.repository.createProjectTaskResource(
+        {
           projectTaskId: taskId,
           type: ProjectTaskResourceType.MACHINE,
           name: machine.type,
           quantity: Number(machine.required ?? 0),
           allocatedQuantity: Number(machine.allocated ?? 0),
         },
-      });
+        tx,
+      );
     }
 
     if (dto.inspectionStatus) {
-      await tx.projectTaskInspection.upsert({
-        where: { projectTaskId: taskId },
-        create: {
-          projectTaskId: taskId,
-          status: this.toProjectTaskInspectionStatus(dto.inspectionStatus),
-        },
-        update: {
-          status: this.toProjectTaskInspectionStatus(dto.inspectionStatus),
-        },
-      });
+      await this.repository.upsertProjectTaskInspection(
+        taskId,
+        this.toProjectTaskInspectionStatus(dto.inspectionStatus),
+        tx,
+      );
     }
 
     const materialCost = this.sum((dto.materials ?? []).map((item) => Number(item.cost ?? 0)));
@@ -1774,10 +2200,9 @@ export class ProjectsService {
     const machineCost = Number(dto.machineCost ?? 0);
     const otherCost = Number(dto.otherCost ?? 0);
     const actualCost = materialCost + componentCost + laborCost + machineCost + otherCost;
-    await tx.projectTaskCost.upsert({
-      where: { projectTaskId: taskId },
-      create: {
-        projectTaskId: taskId,
+    await this.repository.upsertProjectTaskCost(
+      taskId,
+      {
         materialCost: materialCost + componentCost,
         laborCost,
         machineCost,
@@ -1786,16 +2211,8 @@ export class ProjectsService {
         actualCost,
         forecastCost: actualCost,
       },
-      update: {
-        materialCost: materialCost + componentCost,
-        laborCost,
-        machineCost,
-        otherCost,
-        budgetCost: Number(dto.revenue ?? 0),
-        actualCost,
-        forecastCost: actualCost,
-      },
-    });
+      tx,
+    );
     await this.emitProjectEvent('project.material.changed', taskId, { projectId }, tx);
     await this.emitProjectEvent('project.cost.changed', taskId, { projectId, actualCost }, tx);
     if (dto.inspectionStatus) {
@@ -1822,43 +2239,20 @@ export class ProjectsService {
   private async resolveInventoryItemId(value: unknown, tx: Prisma.TransactionClient) {
     const key = String(value ?? '').trim();
     if (!key) return null;
-    const item = await tx.inventoryItem.findFirst({
-      where: {
-        OR: [
-          { id: key },
-          { code: key },
-        ],
-      },
-      select: { id: true },
-    });
+    const item = await this.repository.findInventoryItemByIdOrCode(key, tx);
     return item?.id ?? null;
   }
 
   private async resolveComponentId(value: unknown, tx: Prisma.TransactionClient) {
     const key = String(value ?? '').trim();
     if (!key) return null;
-    const component = await tx.component.findFirst({
-      where: {
-        OR: [
-          { id: key },
-          { code: key },
-        ],
-      },
-      select: { id: true },
-    });
+    const component = await this.repository.findComponentByIdOrCode(key, tx);
     return component?.id ?? null;
   }
 
   private async hasTable(tableName: string) {
     try {
-      const rows = await this.prisma.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.tables
-          WHERE table_schema = current_schema()
-            AND table_name = ${tableName}
-        ) AS "exists"
-      `;
+      const rows = await this.repository.tableExists(tableName);
       return Boolean(rows[0]?.exists);
     } catch (error) {
       this.logger.warn(`Unable to check table ${tableName}: ${error instanceof Error ? error.message : String(error)}`);
@@ -1958,14 +2352,7 @@ export class ProjectsService {
     tx: Prisma.TransactionClient,
   ) {
     this.logger.debug(`buildProjectFromTemplate projectId=${projectId} templateId=${templateId}`);
-    const template = await tx.projectTemplate.findFirst({
-      where: {
-        id: templateId,
-        status: {
-          not: ProjectTemplateStatus.INACTIVE,
-        },
-      },
-    });
+    const template = await this.repository.findActiveProjectTemplate(templateId, tx);
     if (!template) {
       throw new NotFoundException('Project template not found');
     }
@@ -1977,8 +2364,8 @@ export class ProjectsService {
       const parentId = task.parentKey ? idByKey.get(task.parentKey) ?? null : null;
       const startAt = this.templateTaskStart(task, structure.tasks, options.startDate);
       const finishAt = this.addDays(startAt, Math.max(1, task.durationDays ?? 1) - 1);
-      const created = await tx.projectTask.create({
-        data: {
+      const created = await this.repository.createProjectTask(
+        {
           projectId,
           parentTaskId: parentId,
           name: task.name,
@@ -1998,13 +2385,14 @@ export class ProjectsService {
           baselineFinishAt: finishAt,
           sortOrder: Date.now() + idByKey.size,
         },
-      });
+        tx,
+      );
       idByKey.set(task.key, created.id);
       createdTasks.set(task.key, created);
 
       for (const resource of task.resources ?? []) {
-        await tx.projectTaskResource.create({
-          data: {
+        await this.repository.createProjectTaskResource(
+          {
             projectTaskId: created.id,
             type: resource.type,
             name: resource.name,
@@ -2012,14 +2400,15 @@ export class ProjectsService {
             allocatedQuantity: 0,
             cost: Number(resource.cost ?? 0),
           },
-        });
+          tx,
+        );
       }
 
       for (const materialName of task.suggestedMaterials ?? []) {
         const inventoryItemId = await this.resolveInventoryItemId(materialName, tx);
         if (!inventoryItemId) continue;
-        await tx.projectTaskMaterialAllocation.create({
-          data: {
+        await this.repository.createProjectTaskMaterialAllocation(
+          {
             projectTaskId: created.id,
             inventoryItemId,
             plannedQty: 0,
@@ -2030,27 +2419,30 @@ export class ProjectsService {
             unitCost: 0,
             totalCost: 0,
           },
-        });
+          tx,
+        );
       }
 
       for (const componentName of task.suggestedComponents ?? []) {
         const componentId = await this.resolveComponentId(componentName, tx);
         if (!componentId) continue;
-        await tx.projectTaskComponentAllocation.create({
-          data: {
+        await this.repository.createProjectTaskComponentAllocation(
+          {
             projectTaskId: created.id,
             componentId,
             status: ProjectTaskComponentStatus.NOT_STARTED,
           },
-        });
+          tx,
+        );
       }
 
-      await tx.projectTaskCost.create({
-        data: {
-          projectTaskId: created.id,
+      await this.repository.upsertProjectTaskCost(
+        created.id,
+        {
           budgetCost: task.key === structure.tasks[0]?.key ? Number(options.contractValue ?? 0) : 0,
         },
-      });
+        tx,
+      );
     }
 
     for (const task of structure.tasks) {
@@ -2059,14 +2451,15 @@ export class ProjectsService {
       for (const dependency of task.dependsOn ?? []) {
         const dependsOnTaskId = idByKey.get(dependency.key);
         if (!dependsOnTaskId || dependsOnTaskId === projectTaskId) continue;
-        await tx.projectTaskDependency.create({
-          data: {
+        await this.repository.createProjectTaskDependency(
+          {
             projectTaskId,
             dependsOnTaskId,
             type: this.toProjectTaskDependencyType(dependency.type),
             lagDays: Number(dependency.lagDays ?? 0),
           },
-        });
+          tx,
+        );
       }
     }
 
@@ -2074,15 +2467,16 @@ export class ProjectsService {
       const lastTask = structure.tasks[structure.tasks.length - 1];
       const lastId = idByKey.get(lastTask.key);
       if (lastId) {
-        await tx.projectTask.update({
-          where: { id: lastId },
-          data: {
+        await this.repository.updateProjectTask(
+          lastId,
+          {
             plannedFinishAt: options.handoverDate,
             scheduledFinishAt: options.handoverDate,
             forecastFinishAt: options.handoverDate,
             baselineFinishAt: options.handoverDate,
           },
-        });
+          tx,
+        );
       }
     }
 
@@ -2175,11 +2569,9 @@ export class ProjectsService {
 
   private async assertProjectTemplate(
     id: string,
-    tx: Prisma.TransactionClient | PrismaService,
+    tx?: Prisma.TransactionClient,
   ) {
-    const template = await tx.projectTemplate.findUnique({
-      where: { id },
-    });
+    const template = await this.repository.findProjectTemplate(id, tx);
     if (!template) {
       throw new NotFoundException('Project template not found');
     }
@@ -2214,12 +2606,44 @@ export class ProjectsService {
     return ProjectTaskComponentStatus.NOT_STARTED;
   }
 
-  private emitProjectEvent(
+  private async emitProjectEvent(
     action: string,
     entityId: string,
     metadata: Record<string, unknown>,
     tx: Prisma.TransactionClient,
   ) {
+    const projectId =
+      typeof metadata.projectId === 'string'
+        ? metadata.projectId
+        : undefined;
+
+    await this.events.publishPersistent(
+      action,
+      {
+        aggregateId: entityId,
+        projectId,
+        sourceVersion: new Date().toISOString(),
+        ...metadata,
+      },
+      {
+        module: 'projects',
+        idempotencyKey: `projects:${action}:${entityId}:${Date.now()}`,
+      },
+    );
+
+    await this.snapshotDispatcher.requestUpdate({
+      scope: {
+        module: 'projects',
+        snapshotType: action.includes('schedule')
+          ? 'ProjectTaskHealthSnapshot'
+          : 'ProjectRuntimeSnapshot',
+        scopeId: entityId,
+        projectId,
+      },
+      reason: 'domain-event',
+      priority: 70,
+    });
+
     return this.repository.createActivityLog(
       {
         action,
@@ -2496,15 +2920,50 @@ export class ProjectsService {
     return project;
   }
 
-  private log(
+  private async log(
     action: string,
     entityId: string,
     project: {
       code: string;
       name: string;
     },
-    tx: Prisma.TransactionClient | PrismaService,
+    tx: Prisma.TransactionClient,
   ) {
+    const eventName =
+      action === 'CREATE'
+        ? 'project.created'
+        : action === 'UPDATE'
+          ? 'project.updated'
+          : action === 'DELETE'
+            ? 'project.deleted'
+            : `project.${action.toLowerCase()}`;
+
+    await this.events.publishPersistent(
+      eventName,
+      {
+        aggregateId: entityId,
+        projectId: entityId,
+        code: project.code,
+        name: project.name,
+        sourceVersion: new Date().toISOString(),
+      },
+      {
+        module: 'projects',
+        idempotencyKey: `projects:${eventName}:${entityId}:${Date.now()}`,
+      },
+    );
+
+    await this.snapshotDispatcher.requestUpdate({
+      scope: {
+        module: 'projects',
+        snapshotType: 'ProjectRuntimeSnapshot',
+        scopeId: entityId,
+        projectId: entityId,
+      },
+      reason: 'domain-event',
+      priority: 70,
+    });
+
     return this.repository.createActivityLog(
       {
         action,

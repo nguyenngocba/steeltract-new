@@ -8,33 +8,20 @@ import {
   Put,
 } from '@nestjs/common'
 
-import { PrismaService }
-  from '../../core/prisma/prisma.service'
+import { InventoryRepository } from './inventory.repository'
 
 @Controller('inventory/material-types')
 export class MaterialTypesController {
 
   constructor(
-    private readonly prisma:
-      PrismaService,
+    private readonly inventoryRepository:
+      InventoryRepository,
   ) {}
 
   @Get()
   async getMaterialTypes() {
 
-    return this.prisma.materialType.findMany({
-      where: {
-        active: true,
-      },
-
-      include: {
-        category: true,
-      },
-
-      orderBy: {
-        name: 'asc',
-      },
-    })
+    return this.inventoryRepository.listMaterialTypes()
   }
 
   @Post()
@@ -42,10 +29,7 @@ export class MaterialTypesController {
     @Body() body: any,
   ) {
 
-    return this.prisma.materialType.create({
-
-      data: {
-
+    return this.inventoryRepository.createMaterialType({
         code:
           body.code,
 
@@ -64,7 +48,6 @@ export class MaterialTypesController {
         color:
           body.color ??
           null,
-      },
     })
   }
 
@@ -74,14 +57,7 @@ export class MaterialTypesController {
     @Body() body: any,
   ) {
 
-    return this.prisma.materialType.update({
-
-      where: {
-        id,
-      },
-
-      data: {
-
+    return this.inventoryRepository.updateMaterialType(id, {
         code:
           body.code,
 
@@ -103,7 +79,6 @@ export class MaterialTypesController {
         color:
           body.color ??
           null,
-      },
     })
   }
 
@@ -112,14 +87,8 @@ export class MaterialTypesController {
     @Param('id') id: string,
   ) {
 
-    return this.prisma.materialType.update({
-
-      where: {
-        id,
-      },
-      data: {
+    return this.inventoryRepository.updateMaterialType(id, {
         active: false,
-      },
     })
   }
 }

@@ -19,6 +19,7 @@ import {
   advanceDispatchOrder,
   createDispatchOrder,
   getDispatchDashboard,
+  getDispatchOrder,
   getDispatchOrders,
   suggestDispatchItems,
   type CreateDispatchOrderPayload,
@@ -323,25 +324,32 @@ function DispatchTable({ orders, onSelect, loading }: { orders: DispatchOrder[];
 }
 
 function DispatchDetailDrawer({ order, onClose, onAction, pending }: { order: DispatchOrder | null; onClose: () => void; onAction: (action: 'loading' | 'depart' | 'arrive' | 'receive' | 'complete' | 'cancel') => void; pending: boolean }) {
+  const { data: freshOrder } = useQuery({
+    queryKey: ['logistics-dispatch-detail', order?.id],
+    queryFn: () => getDispatchOrder(order!.id),
+    enabled: Boolean(order?.id),
+    staleTime: 15_000,
+  })
   if (!order) return null
+  const detailOrder = freshOrder ?? order
 
-  const action = nextAction(order.status)
+  const action = nextAction(detailOrder.status)
 
   return (
-    <ModuleDetailDrawer open={Boolean(order)} onClose={onClose} title={`Điều xe ${order.code}`} subtitle={`${order.project?.name ?? 'Chưa rõ công trình'} · ${statusLabel[order.status]}`} size="md">
+    <ModuleDetailDrawer open={Boolean(order)} onClose={onClose} title={`Điều xe ${detailOrder.code}`} subtitle={`${detailOrder.project?.name ?? 'Chưa rõ công trình'} · ${statusLabel[detailOrder.status]}`} size="md">
       <div className="space-y-3 text-sm text-slate-300">
         <section className="grid gap-2 md:grid-cols-2">
-          <Info label="Công trình" value={order.project?.name} />
-          <Info label="Task" value={order.projectTask?.name} />
-          <Info label="Xe" value={order.vehicle} />
-          <Info label="Tài xế" value={order.driver} />
-          <Info label="Ngày kế hoạch" value={formatDateTime(order.plannedAt)} />
-          <Info label="Trạng thái" value={statusLabel[order.status]} />
+          <Info label="Công trình" value={detailOrder.project?.name} />
+          <Info label="Task" value={detailOrder.projectTask?.name} />
+          <Info label="Xe" value={detailOrder.vehicle} />
+          <Info label="Tài xế" value={detailOrder.driver} />
+          <Info label="Ngày kế hoạch" value={formatDateTime(detailOrder.plannedAt)} />
+          <Info label="Trạng thái" value={statusLabel[detailOrder.status]} />
         </section>
 
         <Section title="Hàng hóa">
           <div className="space-y-2">
-            {order.items.map((item) => <DispatchItemRow key={item.id} item={item} />)}
+            {detailOrder.items.map((item) => <DispatchItemRow key={item.id} item={item} />)}
           </div>
         </Section>
 
@@ -357,7 +365,7 @@ function DispatchDetailDrawer({ order, onClose, onAction, pending }: { order: Di
 
         <Section title="Timeline / Logs">
           <div className="space-y-2">
-            {order.events.map((event) => (
+            {detailOrder.events.map((event) => (
               <div key={event.id} className="rounded-lg border border-cyan-300/10 bg-cyan-400/[0.035] px-3 py-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-cyan-200">{event.type}</span>
@@ -370,7 +378,7 @@ function DispatchDetailDrawer({ order, onClose, onAction, pending }: { order: Di
         </Section>
 
         <footer className="sticky bottom-0 -mx-1 flex flex-wrap justify-end gap-2 border-t border-cyan-300/10 bg-[#07111f]/95 px-1 py-3 backdrop-blur">
-          {order.status !== 'COMPLETED' && order.status !== 'CANCELLED' ? <button className={moduleMutedButton} onClick={() => onAction('cancel')} disabled={pending} type="button"><X size={14} /> Hủy</button> : null}
+          {detailOrder.status !== 'COMPLETED' && detailOrder.status !== 'CANCELLED' ? <button className={moduleMutedButton} onClick={() => onAction('cancel')} disabled={pending} type="button"><X size={14} /> Hủy</button> : null}
           {action ? <button className={modulePrimaryButton} onClick={() => onAction(action.id)} disabled={pending} type="button">{action.label}</button> : null}
         </footer>
       </div>

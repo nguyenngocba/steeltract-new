@@ -146,6 +146,14 @@ export async function getDispatchOrders() {
   return response.data
 }
 
+export async function getDispatchOrder(id: string) {
+  const response = await api.get<DispatchOrder>(
+    `/logistics/dispatch-orders/${id}`,
+  )
+
+  return response.data
+}
+
 export async function createDispatchOrder(
   payload: CreateDispatchOrderPayload,
 ) {

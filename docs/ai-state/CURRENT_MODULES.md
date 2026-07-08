@@ -4,6 +4,8 @@
 
 ✅ Inventory
 
+- EPIC112 INV.CORE.2 marks Inventory as the Architecture Freeze v1.0 candidate: repository boundary, persistent Outbox events, background snapshot writer, Material/Location persisted snapshots, snapshot-first readers with fallback, runtime metrics, and Operations Center health are now the reference pattern for future modules.
+
 ## In Progress
 
 🚧 Dashboard
@@ -16,6 +18,9 @@
 🚧 QC
 🚧 Logistics
 🚧 Users / Roles / System Logs
+🚧 Operations Center
+
+- Projects is now a Core Platform Architecture Freeze Candidate after EPIC115: Project service persistence routes through `ProjectsRepository`, dashboard/runtime reads are snapshot-first with fallback, mutations publish persistent `project.*` events, and Operations Center exposes Project Platform Health. Final freeze remains pending persisted Project Detail tab snapshots.
 
 ## Not Started
 
@@ -42,6 +47,7 @@
 - Sprint 70EXEC.2 extends `GET /dashboard/executive-cockpit` with Control Tower health score, 7-day summary, suggested actions, activity grouping, and notification center through backend insight/recommendation services.
 - Notifications/Thông báo now reads persisted `notifications` records from `/system/notifications` and is registered in the active router.
 - System mutation workflows are still not implemented: user create/edit/lock/delete, role permission mutation, notification mark-read, audit export, and backup execution remain Phase S2.
+- Operations Center OPS.1 adds `/operations-center` as a read-only system cockpit for runtime health, jobs, snapshots, cache, database, storage, API rankings, events, performance score, and alerts. It is separate from the business Dashboard.
 
 ## 2026-06-07 Production Material Notes
 
@@ -73,7 +79,19 @@
 - Sprint 20A material cost uses actual production issue Inventory transaction valuation first, then falls back to weighted average Inventory cost.
 - Approval-oriented issue/return documents, adjust ledger writers, richer consumption entry UX, labor/machine/overhead costing inputs, and costing approvals remain backlog work.
 
+## 2026-07-08 Projects Blueprint Notes
+
+- Completed the comprehensive system design and architecture blueprint for Projects Management System (PMS) (EPIC201).
+- Designed the layered architecture, integration map, technical risk analysis, Operations Center KPIs, and 4-sprint roadmap in `projects-blueprint.md`.
+- Formulated the domain models (`Project`, `ProjectTask`, `ProjectTaskDependency`, allocations, resources, inspections, cost tables) and exact `ProjectsRepository` signatures in `projects-domain.md`.
+- Modeled the outbox event flow, schemas, consumer routing, and idempotency handling in `projects-event-flow.md`.
+- Defined tab-gated API boundaries (`GET /projects/:id/detail/:tab`), composite database indexes, and cache TTL in `projects-read-model.md`.
+- Outlined persisted snapshot tables, JSON structures, background rebuilder, and idempotency keys in `projects-snapshot.md`.
+- Designed WBS tree grid, interactive Gantt chart, Mobile Site Mode, and UI load budgets in `projects-dashboard.md`.
+- Formulated the site erection, inspection QC, handover, and WMS return integration workflows in `projects-workflow.md`.
+
 ## 2026-06-11 Documentation Notes
+
 
 - `docs/ai-state` is now the primary documentation source for current state, workflow, module status, decisions, design guidance, and audits.
 - Legacy MERGE documentation has been folded into ai-state documents:

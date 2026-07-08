@@ -18,7 +18,7 @@ export function AppTopbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const moduleTitle = getModuleTitle(location.pathname)
-  const workspaceTitle = getWorkspaceTitle(location.pathname)
+  const workspaceTitle = getWorkspaceTitle(location.pathname, location.search)
   const isInventoryRoute = location.pathname.startsWith('/inventory')
 
   function handleLogout() {
@@ -125,6 +125,7 @@ export function getModuleTitle(pathname: string) {
   if (pathname.startsWith('/analytics')) return 'PHÂN TÍCH'
   if (pathname.startsWith('/reports') || pathname.startsWith('/reporting')) return 'BÁO CÁO'
   if (pathname.startsWith('/notifications')) return 'THÔNG BÁO'
+  if (pathname.startsWith('/operations-center')) return 'OPERATIONS CENTER'
   if (pathname.startsWith('/master-data')) return 'DANH MỤC HỆ THỐNG'
   if (pathname.startsWith('/ai') || pathname.startsWith('/copilot')) return 'AI ASSISTANT'
   if (pathname.startsWith('/settings')) return 'CÀI ĐẶT HỆ THỐNG'
@@ -135,8 +136,25 @@ export function getModuleTitle(pathname: string) {
   return 'STEELTRACK'
 }
 
-export function getWorkspaceTitle(pathname: string) {
+export function getWorkspaceTitle(pathname: string, search = '') {
   if (pathname === '/' || pathname.startsWith('/dashboard')) return 'Bảng KPI chính'
+  if (pathname.startsWith('/operations-center')) {
+    const tab = new URLSearchParams(search).get('tab') ?? 'overview'
+    const titles: Record<string, string> = {
+      overview: 'Tổng quan',
+      runtime: 'Runtime',
+      database: 'Database',
+      jobs: 'Background Jobs',
+      snapshot: 'Snapshot',
+      cache: 'Cache',
+      storage: 'Storage',
+      api: 'API',
+      events: 'Events',
+      performance: 'Performance',
+      alerts: 'Alerts',
+    }
+    return titles[tab] ?? 'Tổng quan'
+  }
 
   if (pathname === '/inventory') return 'Tổng quan kho'
   if (pathname.startsWith('/inventory/materials/')) return 'Chi tiết vật tư'

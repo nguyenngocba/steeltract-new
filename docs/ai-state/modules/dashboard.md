@@ -32,10 +32,18 @@ In Progress.
 * Health Score covers Inventory, Production, Yard, QC, Suppliers, and Projects using real operational counts and rule weights.
 * Suggested Actions recommend operational follow-up only; they do not create workflow records.
 * Notifications route is registered separately and reads persisted notification rows through System APIs.
+* Epic PERF Foundation adds `DashboardInventoryReadModelService`, an internal cached Inventory dashboard read model used by Inventory-heavy dashboard endpoints and executive services without changing route contracts.
+* EPIC 100 moves Dashboard Inventory read-model source queries through `InventoryRepository`, preparing the current process-local cache for a future persisted snapshot implementation.
+* EPIC 101 defines enterprise performance gates for Dashboard/Cockpit endpoints and recommends persisted `DashboardExecutiveSnapshot` and module snapshots before scaling dashboard workloads to high-volume operational data.
+* EPIC104 adds the first Data Engine index migration for transaction, return, task, and activity sources used by Dashboard and Executive Cockpit rollups. Persisted snapshot architecture is documented in `docs/architecture/persisted-snapshot-architecture.md`; no snapshot table exists yet.
+* EPIC107 SNAP.1 adds persisted snapshot tables and services for Inventory, Project, and Dispatch dashboard data. Dashboard endpoints are not switched yet, but `SnapshotReaderService` and the repositories are ready for a follow-up read-path migration.
+* EPIC107 SNAP.2 adds `DashboardReaderService`, `SnapshotReaderStrategy`, and `RuntimeAggregateStrategy`. Inventory, Projects, and Logistics dashboard reads now prefer persisted snapshots and fall back to runtime aggregate without changing response contracts.
+* EPIC108 adds validation services to compare snapshot output against runtime/source recalculation and benchmark runtime vs snapshot dashboard read paths before further cutover expansion.
+* EPIC109 OPS.1 consumes Dashboard/runtime foundation signals in Operations Center, but keeps the business Dashboard separate from system administration.
 
 ## Database Models
 
-Dashboard aggregates existing module data rather than owning a dedicated schema.
+Dashboard currently aggregates existing module data through services/read models, while the persisted snapshot schema is now available for future read-path migration.
 
 Key sources:
 
@@ -48,12 +56,20 @@ Key sources:
 * Activity Logs.
 * Notifications.
 * Purchase Orders.
+* `inventory_dashboard_snapshots`.
+* `project_dashboard_snapshots`.
+* `dispatch_dashboard_snapshots`.
 
 ## API Endpoints
 
 * `GET /dashboard/cockpit`
 * `GET /dashboard/executive-cockpit`
 * `GET /system/notifications`
+
+Internal read-model services:
+
+* `DashboardInventoryReadModelService`
+* `DashboardReaderService`
 
 ## Routes
 
@@ -73,3 +89,8 @@ Key sources:
 * Add richer time-series APIs later if executive forecast accuracy needs more than current movement/history aggregates.
 * Add formal procurement links once Purchasing exists so material replenishment recommendations can create purchase requests.
 * Validate Sprint 70EXEC.1/70EXEC.2 prediction, notification, health score, and recommendation thresholds with live operator data.
+* Validate snapshot parity warnings and hit/fallback rates with real traffic.
+* Run EPIC108 benchmark cases for Dashboard runtime vs snapshot reads before expanding snapshot schemas or disabling parity checks.
+* Expand snapshot schemas if chart-level dashboard payloads need to stop using runtime compatibility data.
+* Apply `docs/audit/enterprise-performance-gate.md` before adding new Dashboard widgets or trends.
+* Move executive health, recommendations, activities, and notification counts toward persisted read models after live KPI rules are validated.

@@ -44,6 +44,7 @@ import { RuntimeModule } from './modules/runtime/runtime.module'
 import { SystemModule } from './modules/system/system.module'
 import { CostingModule } from './modules/costing/costing.module'
 import { LogisticsModule } from './modules/logistics/logistics.module'
+import { OperationsCenterModule } from './modules/operations-center/operations-center.module'
 @Module({
   imports: [
     EventsModule,
@@ -90,6 +91,7 @@ import { LogisticsModule } from './modules/logistics/logistics.module'
     SystemModule,
     CostingModule,
     LogisticsModule,
+    OperationsCenterModule,
   ],
   controllers: [
   AppController,

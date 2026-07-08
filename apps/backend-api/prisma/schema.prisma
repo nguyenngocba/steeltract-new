@@ -660,6 +660,9 @@ model MasterWarehouse {
   returnRequests                     ReturnRequest[]
   productionMaterialReservationLines ProductionMaterialReservationLine[]
   productionMaterialLedgers          ProductionMaterialLedger[]
+  inventoryDashboardSnapshots        InventoryDashboardSnapshot[]
+  inventoryMaterialSnapshots         InventoryMaterialSnapshot[]
+  inventoryLocationSnapshots         InventoryLocationSnapshot[]
 
   @@index([active])
   @@map("master_warehouses")
@@ -860,6 +863,7 @@ model InventoryItem {
   productionMaterialConsumptions     ProductionMaterialConsumption[]
   projectTaskMaterialAllocations     ProjectTaskMaterialAllocation[]
   dispatchItems                      DispatchItem[]
+  materialSnapshots                  InventoryMaterialSnapshot[]
 
   @@index([code])
   @@index([name])
@@ -934,6 +938,8 @@ model InventoryTransaction {
   @@index([zoneId])
   @@index([projectId])
   @@index([transactionDate])
+  @@index([type, transactionDate(sort: Desc)], map: "inventory_transactions_type_transactionDate_idx")
+  @@index([projectId, transactionDate(sort: Desc)], map: "inventory_transactions_projectId_transactionDate_idx")
   @@map("inventory_transactions")
 }
 
@@ -972,6 +978,8 @@ model InventoryTransactionItem {
 
   zone WarehouseZone? @relation(fields: [zoneId], references: [id])
 
+  @@index([inventoryItemId, createdAt(sort: Desc)], map: "inventory_transaction_items_inventoryItemId_createdAt_idx")
+  @@index([transactionId, inventoryItemId], map: "inventory_transaction_items_transactionId_inventoryItemId_idx")
   @@map("inventory_transaction_items")
 }
 
@@ -988,6 +996,7 @@ model InventoryLocationStock {
 
   @@index([inventoryItemId])
   @@index([zoneId, slotId, level])
+  @@index([inventoryItemId, warehouseId, zoneId, slotId, level], map: "inventory_location_stocks_item_bucket_idx")
   @@map("inventory_location_stocks")
 }
 
@@ -1020,6 +1029,8 @@ model ReturnRequest {
   @@index([status])
   @@index([projectId])
   @@index([warehouseId])
+  @@index([projectId, status, createdAt(sort: Desc)], map: "return_requests_projectId_status_createdAt_idx")
+  @@index([flowType, status, createdAt(sort: Desc)], map: "return_requests_flowType_status_createdAt_idx")
   @@map("return_requests")
 }
 
@@ -1067,11 +1078,14 @@ model Project {
 
   updatedAt DateTime @updatedAt
 
-  components            Component[]
-  inventoryTransactions InventoryTransaction[]
-  returnRequests        ReturnRequest[]
-  tasks                 ProjectTask[]
-  dispatchOrders        DispatchOrder[]
+  components                 Component[]
+  inventoryTransactions      InventoryTransaction[]
+  returnRequests             ReturnRequest[]
+  dashboardSnapshot          ProjectDashboardSnapshot?
+  detailSnapshots            ProjectDetailSnapshot[]
+  tasks                      ProjectTask[]
+  dispatchOrders             DispatchOrder[]
+  dispatchDashboardSnapshots DispatchDashboardSnapshot[]
 
   @@index([status])
   @@map("projects")
@@ -1231,12 +1245,14 @@ model ProjectTask {
 
   inspection ProjectTaskInspection?
 
-  cost ProjectTaskCost?
+  cost           ProjectTaskCost?
   dispatchOrders DispatchOrder[]
 
   @@index([projectId])
   @@index([parentTaskId])
   @@index([projectId, sortOrder])
+  @@index([projectId, parentTaskId, sortOrder], map: "project_tasks_projectId_parentTaskId_sortOrder_idx")
+  @@index([projectId, status, scheduledFinishAt], map: "project_tasks_projectId_status_scheduledFinishAt_idx")
   @@map("project_tasks")
 }
 
@@ -1560,6 +1576,8 @@ model DispatchOrder {
 
   projectTask ProjectTask? @relation(fields: [projectTaskId], references: [id])
 
+  dashboardSnapshot DispatchDashboardSnapshot?
+
   items DispatchItem[]
 
   events DispatchEvent[]
@@ -1617,6 +1635,159 @@ model DispatchEvent {
   @@index([type])
   @@index([createdAt])
   @@map("dispatch_events")
+}
+
+model InventoryDashboardSnapshot {
+  id             String   @id @default(cuid())
+  warehouseId    String?
+  warehouseCode  String?
+  snapshotDate   DateTime @db.Date
+  totalMaterials Int      @default(0)
+  totalStock     Float    @default(0)
+  availableStock Float    @default(0)
+  reservedStock  Float    @default(0)
+  lowStockCount  Int      @default(0)
+  movementToday  Float    @default(0)
+  movementMonth  Float    @default(0)
+  inventoryValue Float    @default(0)
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+
+  @@unique([warehouseId, snapshotDate])
+  @@index([snapshotDate])
+  @@index([warehouseCode])
+  @@map("inventory_dashboard_snapshots")
+}
+
+model InventoryMaterialSnapshot {
+  id                  String   @id @default(cuid())
+  materialId          String
+  warehouseId         String?
+  warehouseCode       String?
+  scopeKey            String
+  currentStock        Float    @default(0)
+  availableStock      Float    @default(0)
+  reservedStock       Float    @default(0)
+  allocatedToProjects Float    @default(0)
+  pendingReturn       Float    @default(0)
+  returnedQuantity    Float    @default(0)
+  inboundQuantity     Float    @default(0)
+  outboundQuantity    Float    @default(0)
+  inventoryValue      Float    @default(0)
+  attachmentCount     Int      @default(0)
+  locationCount       Int      @default(0)
+  lastInboundAt       DateTime?
+  lastOutboundAt      DateTime?
+  detailPayload       Json?
+  locationPayload     Json?
+  transactionPayload  Json?
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+
+  material  InventoryItem    @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+
+  @@unique([materialId, scopeKey])
+  @@index([materialId])
+  @@index([warehouseId])
+  @@index([warehouseCode])
+  @@index([updatedAt])
+  @@map("inventory_material_snapshots")
+}
+
+model InventoryLocationSnapshot {
+  id            String   @id @default(cuid())
+  locationKey   String   @unique
+  warehouseId   String?
+  warehouseCode String?
+  warehouseName String?
+  zoneId        String?
+  zoneCode      String?
+  zoneName      String?
+  slotId        String?
+  level         String?
+  quantity      Float    @default(0)
+  occupied      Boolean  @default(false)
+  materialCount Int      @default(0)
+  materialPayload Json?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
+  zone      WarehouseZone?   @relation(fields: [zoneId], references: [id])
+
+  @@index([warehouseId])
+  @@index([warehouseCode])
+  @@index([zoneId, slotId, level])
+  @@index([occupied])
+  @@index([updatedAt])
+  @@map("inventory_location_snapshots")
+}
+
+model ProjectDashboardSnapshot {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  progress           Float    @default(0)
+  delayedTaskCount   Int      @default(0)
+  completedTaskCount Int      @default(0)
+  activeTaskCount    Int      @default(0)
+  materialProgress   Float    @default(0)
+  componentProgress  Float    @default(0)
+  logisticsProgress  Float    @default(0)
+  costProgress       Float    @default(0)
+  healthScore        Float    @default(100)
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+  @@map("project_dashboard_snapshots")
+}
+
+model ProjectDetailSnapshot {
+  id              String   @id @default(cuid())
+  projectId       String
+  tab             String
+  payload         Json
+  sourceWatermark String?
+  parityStatus    String   @default("UNKNOWN")
+  warningCount    Int      @default(0)
+  stale           Boolean  @default(false)
+  refreshReason   String?
+  generatedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, tab])
+  @@index([projectId])
+  @@index([tab])
+  @@index([stale])
+  @@index([updatedAt])
+  @@map("project_detail_snapshots")
+}
+
+model DispatchDashboardSnapshot {
+  id              String   @id @default(cuid())
+  dispatchOrderId String   @unique
+  projectId       String?
+  loadingCount    Int      @default(0)
+  inTransitCount  Int      @default(0)
+  arrivedCount    Int      @default(0)
+  completedCount  Int      @default(0)
+  delayCount      Int      @default(0)
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  dispatchOrder DispatchOrder @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+  project       Project?      @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([updatedAt])
+  @@map("dispatch_dashboard_snapshots")
 }
 
 //
@@ -1817,6 +1988,7 @@ model WarehouseZone {
   returnItems                        ReturnRequestItem[]
   productionMaterialReservationLines ProductionMaterialReservationLine[]
   productionMaterialLedgers          ProductionMaterialLedger[]
+  inventoryLocationSnapshots         InventoryLocationSnapshot[]
 
   @@index([warehouseId])
   @@index([active])
@@ -2921,6 +3093,8 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([module, createdAt(sort: Desc)], map: "activity_logs_module_createdAt_idx")
+  @@index([entity, entityId, createdAt(sort: Desc)], map: "activity_logs_entity_entityId_createdAt_idx")
   @@map("activity_logs")
 }
 

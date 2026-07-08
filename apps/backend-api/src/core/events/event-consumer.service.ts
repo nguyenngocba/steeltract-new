@@ -1,0 +1,156 @@
+import {
+  Inject,
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+
+import {
+  SnapshotUpdateDispatcher,
+  SnapshotModule,
+} from '../jobs/snapshot-update-dispatcher.service';
+import { DomainEvent } from './domain-event.interface';
+import { EventBusService } from './event-bus.service';
+
+interface SnapshotEventPayload {
+  aggregateId?: string;
+  projectId?: string;
+  inventoryItemId?: string;
+  warehouseId?: string;
+  dispatchOrderId?: string;
+  sourceVersion?: string;
+}
+
+const snapshotEventMap: Record<
+  string,
+  {
+    module: SnapshotModule;
+    snapshotType: string;
+  }
+> = {
+  'inventory.transaction.created': {
+    module: 'inventory',
+    snapshotType: 'InventoryDashboardSnapshot',
+  },
+  'inventory.stock.changed': {
+    module: 'inventory',
+    snapshotType: 'MaterialLocationBalanceSnapshot',
+  },
+  'inventory.return.received': {
+    module: 'inventory',
+    snapshotType: 'InventoryDashboardSnapshot',
+  },
+  'project.task.created': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot',
+  },
+  'project.task.updated': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot',
+  },
+  'project.task.deleted': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot',
+  },
+  'project.created': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.updated': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.deleted': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.component.changed': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.wbs.generated': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.tasks.bulk_updated': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.template.applied': {
+    module: 'projects',
+    snapshotType: 'ProjectRuntimeSnapshot',
+  },
+  'project.schedule.changed': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot:progress',
+  },
+  'project.material.changed': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot:materials',
+  },
+  'project.cost.changed': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot:costs',
+  },
+  'project.inspection.changed': {
+    module: 'projects',
+    snapshotType: 'ProjectDetailSnapshot:progress',
+  },
+  'logistics.dispatch.changed': {
+    module: 'logistics',
+    snapshotType: 'LogisticsDispatchSnapshot',
+  },
+};
+
+@Injectable()
+export class EventConsumerService implements OnModuleInit, OnModuleDestroy {
+  private readonly unsubscribers: Array<() => void> = [];
+
+  constructor(
+    @Inject(EventBusService)
+    private readonly eventBus: EventBusService,
+    @Inject(SnapshotUpdateDispatcher)
+    private readonly dispatcher: SnapshotUpdateDispatcher,
+  ) {}
+
+  onModuleInit() {
+    Object.keys(snapshotEventMap).forEach((eventName) => {
+      this.unsubscribers.push(
+        this.eventBus.subscribe<SnapshotEventPayload>(
+          eventName,
+          (event) => this.handleSnapshotEvent(event),
+        ),
+      );
+    });
+  }
+
+  onModuleDestroy() {
+    this.unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }
+
+  private async handleSnapshotEvent(
+    event: DomainEvent<string, SnapshotEventPayload>,
+  ) {
+    const mapping = snapshotEventMap[event.name];
+
+    if (!mapping) {
+      return;
+    }
+
+    await this.dispatcher.requestUpdate({
+      scope: {
+        module: mapping.module,
+        snapshotType: mapping.snapshotType,
+        scopeId: event.payload.aggregateId,
+        projectId: event.payload.projectId,
+        inventoryItemId: event.payload.inventoryItemId,
+        warehouseId: event.payload.warehouseId,
+        dispatchOrderId: event.payload.dispatchOrderId,
+      },
+      reason: 'domain-event',
+      sourceEventId: event.metadata?.eventId,
+      sourceWatermark: event.payload.sourceVersion,
+      priority: 70,
+    });
+  }
+}

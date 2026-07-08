@@ -2,6 +2,10 @@ import { Module } from '@nestjs/common'
 
 import { PrismaModule }
   from '../../core/prisma/prisma.module'
+import { SnapshotsModule }
+  from '../../core/snapshots/snapshots.module'
+import { EventsModule }
+  from '../../core/events/events.module'
 
 import { ProjectsController }
   from './projects.controller'
@@ -23,6 +27,8 @@ import { RbacModule }
     PrismaModule,
     ComponentsModule,
     RbacModule,
+    SnapshotsModule,
+    EventsModule,
   ],
 
   controllers: [

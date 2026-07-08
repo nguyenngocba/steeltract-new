@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 
 import { BackgroundJobStatus, Prisma } from '@prisma/client';
 
@@ -17,7 +20,10 @@ export interface ScheduleJobInput {
 
 @Injectable()
 export class JobSchedulerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+  ) {}
 
   schedule(input: ScheduleJobInput) {
     const data: Prisma.BackgroundJobCreateInput = {

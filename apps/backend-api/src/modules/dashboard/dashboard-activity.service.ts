@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
 
 type ActivityModule = 'Inventory' | 'Production' | 'Yard' | 'QC' | 'Purchasing' | 'Projects'
 
@@ -29,7 +30,10 @@ function relativeTime(value: Date) {
 
 @Injectable()
 export class DashboardActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventoryReadModel: DashboardInventoryReadModelService,
+  ) {}
 
   async getRecentActivities(): Promise<{
     filters: ActivityModule[]
@@ -43,15 +47,7 @@ export class DashboardActivityService {
       purchaseOrders,
       projects,
     ] = await Promise.all([
-      this.prisma.inventoryTransaction.findMany({
-        take: 20,
-        include: {
-          items: {
-            include: { inventoryItem: true },
-          },
-        },
-        orderBy: { transactionDate: 'desc' },
-      }),
+      this.inventoryReadModel.getRecentTransactions(20),
       this.prisma.productionLog.findMany({
         take: 20,
         include: { productionOrder: true },

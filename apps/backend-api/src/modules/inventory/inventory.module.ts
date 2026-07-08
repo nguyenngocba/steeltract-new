@@ -9,9 +9,12 @@ import { ReturnWorkflowService } from './return-workflow.service'
 import { CreateTransactionHandler } from './commands/create-transaction.handler'
 import { RuntimeWsModule } from '../../core/ws/runtime-ws.module'
 import { EventsModule } from '../../core/events/events.module'
+import { SnapshotsModule } from '../../core/snapshots/snapshots.module'
 import { TelemetryModule } from '../../core/telemetry/telemetry.module'
 import { ListTransactionsHandler } from './queries/list-transactions.handler'
 import { InventoryRepository } from './inventory.repository'
+import { InventoryEventService } from './inventory-event.service'
+import { InventoryReadModelService } from './inventory-read-model.service'
 
 import { ZonesController } from './zones.controller'
 import { InventoryCategoriesController } from './inventory-categories.controller'
@@ -22,6 +25,7 @@ imports: [
   PrismaModule,
   RuntimeWsModule,
   EventsModule,
+  SnapshotsModule,
   TelemetryModule,
 ],
 controllers: [
@@ -40,6 +44,8 @@ controllers: [
   providers: [
     InventoryService,
     InventoryRepository,
+    InventoryEventService,
+    InventoryReadModelService,
     ReturnWorkflowService,
     InventoryGateway,
     CreateTransactionHandler,
@@ -48,6 +54,9 @@ controllers: [
 
   exports: [
     InventoryService,
+    InventoryRepository,
+    InventoryEventService,
+    InventoryReadModelService,
   ],
 })
 export class InventoryModule {}

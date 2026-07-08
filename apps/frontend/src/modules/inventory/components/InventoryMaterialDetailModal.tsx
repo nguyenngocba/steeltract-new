@@ -562,7 +562,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
   const { data: attachmentResult = [] } = useQuery({
     queryKey: attachmentQueryKey,
     queryFn: () => getAttachments({ module: 'inventory', entityType: 'material', entityId: materialId }),
-    enabled: Boolean(materialId),
+    enabled: Boolean(materialId) && ['overview', 'images', 'documents'].includes(activeTab),
   })
   const attachments = normalizeAttachmentList(attachmentResult)
   const photoAttachments = attachments.filter((attachment) => attachment.category === 'PHOTO' || attachment.mimeType.startsWith('image/'))
@@ -593,9 +593,9 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
   // ===== 6. TRANSACTION ATTACHMENTS =====
   const { data: transactionAttachmentResult = [] } = useQuery({
-    queryKey: ['attachments', 'inventory', 'transaction', 'material-detail', materialId],
+    queryKey: ['attachments', 'inventory', 'transaction', 'material-detail', materialId, activeTab],
     queryFn: () => getAttachments({ module: 'inventory', entityType: 'transaction' }),
-    enabled: Boolean(materialId),
+    enabled: Boolean(materialId) && ['transactions', 'documents', 'logs', 'projects', 'suppliers'].includes(activeTab),
     staleTime: 10_000,
   })
   const allTransactionAttachments = normalizeAttachmentList(transactionAttachmentResult)

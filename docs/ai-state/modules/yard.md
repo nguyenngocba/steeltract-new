@@ -2,11 +2,12 @@
 
 ## Scope
 
-Yard covers finished component staging, yard placement, yard movement visibility, outbound/removal workflow, and future shipment staging.
+Yard covers finished component staging, yard placement, yard movement visibility, outbound/removal workflow, crane tracking, loading/unloading tasks, and yard capacity management.
 
 ## Current Status
 
-In Progress.
+* **Design**: 100% Completed (Approved Master Blueprint at [yard-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/yard-blueprint.md)).
+* **Implementation**: 72% (Cockpit UI and basic integration complete; advanced placement, reservations, crane task queues, and AI optimization remain as next implementation sprints).
 
 ## Implemented Features
 
@@ -20,29 +21,33 @@ In Progress.
 
 ## Database Models
 
-Known operational tables include:
+The blueprint defines the following data models to be added:
 
-* `YardItemPlacement`
-* `YardMovement`
-* Yard slots/zones from the Yard schema area.
+* `YardZone`: Physical partition of the finished component yard.
+* `YardSlot`: Specific coordinate coordinate slot in a zone.
+* `YardItemPlacement`: Component physical placement details.
+* `YardCrane`: Heavy cranes and equipment tracker.
+* `YardReservation`: Booking coordinates for components prior to entry/dispatch.
+* `YardMovement`: Immutable movement logs of components on the yard.
+* `YardLoadUnloadTask`: Detailed crane tasks for loading, unloading, or shifting.
 
 ## API Endpoints
 
-Currently documented through existing runtime/workflow integrations:
+Designed endpoints in the blueprint include:
 
-* `POST /production/:id/stage-to-yard`
-* `GET /runtime/operational-workflow`
-* `GET /dashboard/cockpit`
+* `POST /yard/reservations` - Create slot reservations
+* `POST /yard/placements` - Confirm physical component placements
+* `POST /yard/movements` - Move components internally
+* `GET /yard/layout-state` - Read layout state (snapshot-first)
 
 ## Routes
 
 * Yard cockpit routes are active in the app navigation.
 
-## Remaining Tasks
+## Remaining Tasks (Phased Sprints)
 
-* Add formal Yard outbound/shipment documents beyond the current Yard movement + Component timeline record.
-* Add shipment staging workflow.
-* Add richer crane telemetry.
-* Add realtime movement animation.
-* Add full yard zone/slot CRUD screens.
-* Add formal project-return Yard placement workflow.
+* **Sprint 1**: Set up Prisma models and `YardRepository`.
+* **Sprint 2**: Implement APIs for Placements and Reservations with occupancy gates.
+* **Sprint 3**: Implement internal movements and Crane task queue dispatch.
+* **Sprint 4**: Build `snapshot.yard.rebuild` background job and register metrics.
+* **Sprint 5**: Integrate 2D/3D visual map on the frontend and wire AI smart stacking suggestions.

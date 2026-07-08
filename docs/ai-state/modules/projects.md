@@ -6,7 +6,7 @@ Projects covers project master data, project status visibility, material outboun
 
 ## Current Status
 
-In Progress.
+Architecture Freeze v1.0 approved.
 
 ## Implemented Features
 
@@ -75,6 +75,22 @@ In Progress.
 * Project Command Center includes executive health panels for forecast finish, material shortages, component shortages, and labor/equipment shortages from real runtime data.
 * Project material rows expose allocation reconciliation fields: allocated, used, pending return, returned, and available return.
 * Project material Pending Return quantities link to the Inventory Return Requests workspace with project/material filters so operators can process requested returns without hunting through Inventory.
+* Epic PERF Foundation adds `GET /projects/:id/detail/:tab` and tab-scoped React Query caching for Project Detail workspace payloads while keeping `GET /projects/runtime` compatible.
+* EPIC 100 refactors Project Detail tab data so `GET /projects/:id/detail/:tab` uses tab-specific repository source queries instead of calling full `runtimeDashboard()` and slicing arrays.
+* EPIC 101 identifies Project runtime, ProjectTask hierarchy/schedule, ProjectTask health, return requests, and ActivityLog reads as enterprise-scale snapshot/index candidates. See `docs/audit/enterprise-query-audit.md`, `docs/audit/enterprise-index-audit.md`, and `docs/architecture/data-growth-5-year-plan.md`.
+* EPIC104 adds composite indexes for ProjectTask hierarchy traversal, ProjectTask status/schedule reads, project return request queues, and ActivityLog entity timelines. The migration is `20260707120000_enterprise_index_foundation`.
+* EPIC115 completes Project Core Compliance hardening to Architecture Freeze Candidate level.
+* `ProjectsService` no longer injects `PrismaService`; persistence for templates, WBS commands, ProjectTask relations, and component returns routes through `ProjectsRepository`.
+* Project mutations publish persistent `project.*` outbox events and request Background Engine snapshot updates.
+* Runtime Metrics expose Project-specific snapshot/read-model counters, and Operations Center exposes additive Project Platform Health.
+* EPIC116 adds persisted `ProjectDetailSnapshot` rows for Project Detail tab payloads.
+* `GET /projects/:id/detail/:tab` now reads Project Detail snapshots first and falls back to repository-backed tab read models when snapshots are missing or stale.
+* EPIC116.1 narrows persisted Project Detail snapshots to reusable summary tabs: `overview`, `materials`, `components`, `progress`, `command`, `site`, and `costs`.
+* `documents` and `logs` are intentionally repository read-model fallback paths and should not become Project-screen-specific snapshots unless a shared attachment/activity snapshot model is designed.
+* Project Detail snapshot updates run through Background Engine jobs and support tab-scoped incremental rebuild requests such as `ProjectDetailSnapshot:materials`.
+* Project Detail snapshot parity is available through `SnapshotValidatorService.validateProjectDetails()`.
+* Operations Center exposes Project Detail snapshot health, including freshness, stale count, parity warnings, hits, fallback count, age, and lag.
+* Projects Architecture Freeze v1.0 is approved after EPIC116.1. New Project work should preserve the frozen pattern: Repository boundary, persistent outbox, background snapshot updates, snapshot-first reads, repository fallback, runtime metrics, and Operations Center health.
 
 ## Database Models
 
@@ -89,6 +105,8 @@ Known operational tables:
 * `ProjectTaskInspection`
 * `ProjectTaskCost`
 * `ProjectTemplate`
+* `ProjectDashboardSnapshot`
+* `ProjectDetailSnapshot`
 
 Project also participates through related Inventory, Production, Components, QC, and Yard records.
 
@@ -98,6 +116,7 @@ Currently documented through active integrations:
 
 * Project APIs used by the frontend project and Inventory outbound workflows.
 * `GET /projects/runtime` includes project-linked components, installation location fields, and ready/shipped/delivered/installed counters.
+* `GET /projects/:id/detail/:tab`
 * `GET /projects/:id/cost`
 * `PATCH /projects/:id`
 * `POST /projects/:id/components/:componentId/return`
@@ -158,3 +177,6 @@ Currently documented through active integrations:
 * Add first-class persisted pending return quantity if Project material return reconciliation needs historical snapshots instead of runtime derivation from ReturnRequest rows.
 * Promote project customer/start/handover/contract values from serialized description into first-class Project fields.
 * Expose Logistics dispatch summaries in Project Detail material/component rows: `Đang vận chuyển`, `Đã nhận`, and `Ngày nhận`.
+* Validate EPIC116 Project Detail snapshots with real operator activity. Confirm summary tabs read snapshot on fresh hits, fall back safely on stale/missing snapshots, and queue background refresh without changing frontend response shape.
+* Monitor Operations Center Project Detail snapshot parity warnings after task/material/component/cost/document/log changes.
+* Keep `documents` and `logs` repository-backed unless a shared attachment/activity snapshot model is introduced.

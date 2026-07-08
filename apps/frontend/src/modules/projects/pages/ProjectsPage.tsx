@@ -41,6 +41,7 @@ import {
   generateProjectWbs,
   createProject,
   deliverProjectComponent,
+  getProjectDetailTab,
   getProjectTemplates,
   getProjectsRuntime,
   installProjectComponent,
@@ -57,6 +58,7 @@ import {
   type GenerateProjectWbsPayload,
   type InstallProjectComponentPayload,
   type ProjectTemplate,
+  type ProjectDetailTab,
   type ProjectTemplateTaskRule,
   type ProjectComponentRuntime,
   type ProjectComponentStatus,
@@ -1017,20 +1019,36 @@ function ProjectDetailWorkspace({
 }) {
   const [tab, setTab] = useState<DetailTab>('overview')
   useEffect(() => setTab('overview'), [project?.id])
-  const componentCount = components.length
-  const materialCount = new Set(materials.map((row) => row.materialCode)).size
+  const detailTabQuery = useQuery({
+    queryKey: ['project-detail-tab', project?.id, tab],
+    queryFn: () => getProjectDetailTab(project!.id, tab as ProjectDetailTab),
+    enabled: Boolean(project?.id),
+    staleTime: 30_000,
+  })
+  const tabData = detailTabQuery.data as any
+  const tabProject = tabData?.project ?? project
+  const tabMaterials = tabData?.materials ?? materials
+  const tabComponents = tabData?.components ?? components
+  const tabWbsRows = tabData?.wbs ?? wbsRows
+  const tabFinancial = tabData?.financial ?? financial
+  const tabHealth = tabData?.health ?? health
+  const tabReturnRequests = tabData?.returnRequests ?? returnRequests
+  const tabDocuments = tabData?.documents ?? documents
+  const tabLogs = tabData?.logs ?? logs
+  const componentCount = tabComponents.length
+  const materialCount = new Set(tabMaterials.map((row: ProjectMaterialRuntime) => row.materialCode)).size
 
   return (
     <ModuleDetailDrawer
       open={Boolean(project)}
-      title={project?.name ?? ''}
-      subtitle={project ? `${project.code} · ${project.owner} · ${project.location}` : undefined}
+      title={tabProject?.name ?? ''}
+      subtitle={tabProject ? `${tabProject.code} · ${tabProject.owner} · ${tabProject.location}` : undefined}
       actions={project ? <button type="button" onClick={() => onEditProject(project)} className={moduleMutedButton}>Sửa công trình</button> : undefined}
       onClose={onClose}
       size="lg"
       placement="right"
     >
-      {project ? (
+      {tabProject ? (
         <div className="space-y-1 p-3">
           <div className="flex flex-wrap gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1">
             {[
@@ -1050,45 +1068,45 @@ function ProjectDetailWorkspace({
           {tab === 'overview' && (
             <div className="space-y-1">
               <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
-                <CockpitKpiCard title="Tiến độ" value={`${fmt(project.progress)}%`} note="Hoàn thành" tone="cyan" />
-                <CockpitKpiCard title="Giá trị" value={formatCurrencyVnd(project.actualValue)} note="Đã thực hiện" tone="blue" />
+                <CockpitKpiCard title="Tiến độ" value={`${fmt(tabProject.progress)}%`} note="Hoàn thành" tone="cyan" />
+                <CockpitKpiCard title="Giá trị" value={formatCurrencyVnd(tabProject.actualValue)} note="Đã thực hiện" tone="blue" />
                 <CockpitKpiCard title="Cấu kiện" value={fmt(componentCount, 0)} note="Theo projectId" tone="purple" />
                 <CockpitKpiCard title="Vật tư đã cấp" value={fmt(materialCount, 0)} note="Mã vật tư" tone="amber" />
               </div>
-              <ProjectFinancialSummary project={project} financial={financial} />
-              <ProjectHealthPanel health={health} returnRequests={returnRequests} />
-              <ProjectOverviewExecution rows={wbsRows} project={project} />
+              <ProjectFinancialSummary project={tabProject} financial={tabFinancial} />
+              <ProjectHealthPanel health={tabHealth} returnRequests={tabReturnRequests} />
+              <ProjectOverviewExecution rows={tabWbsRows} project={tabProject} />
               <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_1fr]">
                 <CockpitChartCard title="Thông tin công trình" heightClass="h-[300px]">
                   <div className="grid gap-1 text-xs">
-                    <Info k="Mã công trình" v={project.code} />
-                    <Info k="Khách hàng" v={project.owner} />
-                    <Info k="Địa điểm" v={project.location} />
-                    <Info k="Ngày bắt đầu" v={date(project.startedAt)} />
-                    <Info k="Ngày kết thúc" v={date(project.plannedEndAt)} />
-                    <Info k="Trạng thái" v={statusLabel(project.status)} />
-                    <Info k="Tiến độ" v={`${fmt(project.progress)}%`} />
-                    <Info k="Giá trị" v={formatCurrencyVnd(project.actualValue)} />
+                    <Info k="Mã công trình" v={tabProject.code} />
+                    <Info k="Khách hàng" v={tabProject.owner} />
+                    <Info k="Địa điểm" v={tabProject.location} />
+                    <Info k="Ngày bắt đầu" v={date(tabProject.startedAt)} />
+                    <Info k="Ngày kết thúc" v={date(tabProject.plannedEndAt)} />
+                    <Info k="Trạng thái" v={statusLabel(tabProject.status)} />
+                    <Info k="Tiến độ" v={`${fmt(tabProject.progress)}%`} />
+                    <Info k="Giá trị" v={formatCurrencyVnd(tabProject.actualValue)} />
                   </div>
                 </CockpitChartCard>
                 <CockpitChartCard title="Timeline gần đây" heightClass="h-[300px]">
                   <CockpitRecentList items={[
-                    { id: `${project.id}-created`, title: 'Tạo công trình', subtitle: project.code, time: shortDate(project.createdAt), statusDot: 'bg-cyan-400' },
-                    { id: `${project.id}-updated`, title: 'Cập nhật gần nhất', subtitle: project.name, time: shortDate(project.updatedAt), statusDot: project.status === 'COMPLETED' ? 'bg-emerald-400' : 'bg-amber-400' },
-                    ...components.slice(0, 4).map((component) => ({ id: component.id, title: component.code, subtitle: component.status, time: date(component.plannedDate), statusDot: 'bg-purple-400' })),
+                    { id: `${tabProject.id}-created`, title: 'Tạo công trình', subtitle: tabProject.code, time: shortDate(tabProject.createdAt), statusDot: 'bg-cyan-400' },
+                    { id: `${tabProject.id}-updated`, title: 'Cập nhật gần nhất', subtitle: tabProject.name, time: shortDate(tabProject.updatedAt), statusDot: tabProject.status === 'COMPLETED' ? 'bg-emerald-400' : 'bg-amber-400' },
+                    ...tabComponents.slice(0, 4).map((component: ProjectComponentRuntime) => ({ id: component.id, title: component.code, subtitle: component.status, time: date(component.plannedDate), statusDot: 'bg-purple-400' })),
                   ]} />
                 </CockpitChartCard>
               </div>
             </div>
           )}
-          {tab === 'command' && <ProjectCommandCenter project={project} rows={wbsRows} financial={financial ?? fallbackFinancial(project)} health={health} />}
-          {tab === 'site' && <ProjectSiteMode project={project} rows={wbsRows} documents={documents} logs={logs} saving={savingSite} onSubmit={onSiteUpdate} />}
-          {tab === 'materials' && <ProjectDetailMaterials rows={materials} onReturn={onReturnMaterial} onOpenPendingReturn={onOpenPendingReturn} />}
-          {tab === 'components' && <ProjectDetailComponents rows={components} onReturn={onReturnComponent} />}
-          {tab === 'progress' && <ProjectDetailProgress project={project} rows={wbsRows} health={health} templates={templates} saving={savingWbs} onCreate={onCreateWbs} onUpdate={onUpdateWbs} onMove={onMoveWbs} onDelete={onDeleteWbs} onGenerate={onGenerateWbs} onBulk={onBulkWbs} />}
-          {tab === 'costs' && <ProjectCostControl financial={financial ?? fallbackFinancial(project)} rows={wbsRows} />}
-          {tab === 'documents' && <ProjectDocumentsGallery documents={documents} compact />}
-          {tab === 'logs' && <ProjectTimeline project={project} rows={wbsRows} returnRequests={returnRequests} logs={logs} />}
+          {tab === 'command' && <ProjectCommandCenter project={tabProject} rows={tabWbsRows} financial={tabFinancial ?? fallbackFinancial(tabProject)} health={tabHealth} />}
+          {tab === 'site' && <ProjectSiteMode project={tabProject} rows={tabWbsRows} documents={tabDocuments} logs={tabLogs} saving={savingSite} onSubmit={onSiteUpdate} />}
+          {tab === 'materials' && <ProjectDetailMaterials rows={tabMaterials} onReturn={onReturnMaterial} onOpenPendingReturn={onOpenPendingReturn} />}
+          {tab === 'components' && <ProjectDetailComponents rows={tabComponents} onReturn={onReturnComponent} />}
+          {tab === 'progress' && <ProjectDetailProgress project={tabProject} rows={tabWbsRows} health={tabHealth} templates={templates} saving={savingWbs} onCreate={onCreateWbs} onUpdate={onUpdateWbs} onMove={onMoveWbs} onDelete={onDeleteWbs} onGenerate={onGenerateWbs} onBulk={onBulkWbs} />}
+          {tab === 'costs' && <ProjectCostControl financial={tabFinancial ?? fallbackFinancial(tabProject)} rows={tabWbsRows} />}
+          {tab === 'documents' && <ProjectDocumentsGallery documents={tabDocuments} compact />}
+          {tab === 'logs' && <ProjectTimeline project={tabProject} rows={tabWbsRows} returnRequests={tabReturnRequests} logs={tabLogs} />}
         </div>
       ) : null}
     </ModuleDetailDrawer>

@@ -1,5 +1,9 @@
 # QC Module
 
+## Architecture Design
+
+Thiết kế chi tiết cho phân hệ QC được đặc tả tại [qc-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/qc-blueprint.md).
+
 ## Scope
 
 QC Phase S1 implements an operational quality cockpit connected to Production and Components.

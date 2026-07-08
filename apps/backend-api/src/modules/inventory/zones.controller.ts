@@ -10,7 +10,8 @@ import {
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { InventoryRepository } from './inventory.repository'
+import { InventoryReadModelService } from './inventory-read-model.service'
 
 type ZonePayload = {
   code?: string
@@ -107,209 +108,45 @@ const buildCellOccupancy = (items: OccupancyItem[], includeMaterials = false) =>
 
 @Controller('inventory/zones')
 export class ZonesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly inventoryRepository: InventoryRepository,
+    private readonly readModel: InventoryReadModelService,
+  ) {}
 
   @Get()
   async getZones() {
-    const zones = await this.prisma.warehouseZone.findMany({
-      orderBy: [
-        { active: 'desc' },
-        { code: 'asc' },
-      ],
-      include: {
-        warehouse: true,
-
-        inventoryItems: {
-          where: {
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            quantity: true,
-            unit: true,
-            slotId: true,
-            level: true,
-            unitMaster: {
-              select: {
-                symbol: true,
-                code: true,
-              },
-            },
-          },
-        },
-
-        locationStocks: {
-          where: {
-            quantity: {
-              gt: 0,
-            },
-          },
-          include: {
-            inventoryItem: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                unit: true,
-              },
-            },
-          },
-        },
-      },
-    })
-
-    return zones.map((zone) => {
-      const totalStockQuantity =
-        zone.locationStocks
-          .filter((row) => Number(row.quantity) > 0)
-          .reduce(
-            (sum, row) =>
-              sum + Number(row.quantity ?? 0),
-            0,
-          )
-
-      return {
-        ...zone,
-        materialCount: zone.inventoryItems.length,
-        totalStockQuantity,
-
-        cellOccupancy: buildCellOccupancy(
-          zone.locationStocks
-            .filter((row) => Number(row.quantity) > 0)
-            .map((row) => ({
-            id: row.inventoryItem.id,
-            code: row.inventoryItem.code,
-            name: row.inventoryItem.name,
-            quantity: row.quantity,
-            unit: row.inventoryItem.unit,
-            slotId: row.slotId,
-            level: row.level,
-          })),
-          true,
-        ),
-      }
-    })
+    return this.readModel.locations()
   }
   
   @Get(':id')
   async getZone(@Param('id') id: string) {
-    const zone = await this.prisma.warehouseZone.findUnique({
-      where: { id },
-      include: {
-        warehouse: true,
-        inventoryItems: {
-          where: {
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            quantity: true,
-            unit: true,
-            slotId: true,
-            level: true,
-          },
-        },
-
-        locationStocks: {
-          where: {
-            quantity: {
-              gt: 0,
-            },
-          },
-          include: {
-            inventoryItem: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                unit: true,
-              },
-            },
-          },
-        },
-      }
-    })
-
-    if (!zone) return null
-
-    const totalStockQuantity =
-      zone.locationStocks
-        .filter((row) => Number(row.quantity) > 0)
-        .reduce(
-          (sum, row) =>
-            sum + Number(row.quantity ?? 0),
-          0,
-        )
-
-    return {
-      ...zone,
-      materialCount: zone.inventoryItems.length,
-      totalStockQuantity,
-
-      cellOccupancy: buildCellOccupancy(
-        zone.locationStocks
-          .filter((row) => Number(row.quantity) > 0)
-          .map((row) => ({
-          id: row.inventoryItem.id,
-          code: row.inventoryItem.code,
-          name: row.inventoryItem.name,
-          quantity: row.quantity,
-          unit: row.inventoryItem.unit,
-          slotId: row.slotId,
-          level: row.level,
-        })),
-        true,
-      ),
-    }
+    const zones = await this.readModel.locations()
+    return zones.find((zone) => zone.id === id) ?? null
   }
 
   @Post()
   async createZone(@Body() body: ZonePayload) {
-    return this.prisma.warehouseZone.create({
-      data: this.toCreateZoneData(body),
-    })
+    return this.inventoryRepository.createZone(this.toCreateZoneData(body))
   }
 
   @Put(':id')
   async updateZone(@Param('id') id: string, @Body() body: ZonePayload) {
-    return this.prisma.warehouseZone.update({
-      where: { id },
-      data: this.toUpdateZoneData(body),
-    })
+    return this.inventoryRepository.updateZone(id, this.toUpdateZoneData(body))
   }
 
   @Patch(':id/activate')
   async activateZone(@Param('id') id: string) {
-    return this.prisma.warehouseZone.update({
-      where: { id },
-      data: {
-        active: true,
-      },
-    })
+    return this.inventoryRepository.updateZone(id, { active: true })
   }
 
   @Patch(':id/deactivate')
   async deactivateZone(@Param('id') id: string) {
-    return this.prisma.warehouseZone.update({
-      where: { id },
-      data: {
-        active: false,
-      },
-    })
+    return this.inventoryRepository.updateZone(id, { active: false })
   }
 
   @Delete(':id')
   async deleteZone(@Param('id') id: string) {
-    return this.prisma.warehouseZone.update({
-      where: { id },
-      data: {
-        active: false,
-      },
-    })
+    return this.inventoryRepository.updateZone(id, { active: false })
   }
 
   private toCreateZoneData(body: ZonePayload): Prisma.WarehouseZoneUncheckedCreateInput {

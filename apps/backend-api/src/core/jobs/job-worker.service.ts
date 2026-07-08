@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
@@ -16,7 +17,10 @@ import { DomainEvent } from '../events/domain-event.interface';
 import { EventBusService } from '../events/event-bus.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { JobRetryPolicyService } from './job-retry-policy.service';
 import { JobSchedulerService } from './job-scheduler.service';
+import { SnapshotRebuilder } from './snapshot-rebuilder.service';
+import { SnapshotUpdateRequest } from './snapshot-update-dispatcher.service';
 
 interface WorkflowEventPayload {
   id: string;
@@ -37,10 +41,18 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
   private interval?: NodeJS.Timeout;
 
   constructor(
+    @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(EventBusService)
     private readonly eventBus: EventBusService,
+    @Inject(OutboxService)
     private readonly outboxService: OutboxService,
+    @Inject(JobRetryPolicyService)
+    private readonly retryPolicy: JobRetryPolicyService,
+    @Inject(JobSchedulerService)
     private readonly scheduler: JobSchedulerService,
+    @Inject(SnapshotRebuilder)
+    private readonly snapshotRebuilder: SnapshotRebuilder,
   ) {}
 
   onModuleInit() {
@@ -298,6 +310,17 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
       });
       return;
     }
+
+    if (job.name.startsWith('snapshot.')) {
+      const result = await this.snapshotRebuilder.rebuild(
+        job.payload as unknown as SnapshotUpdateRequest,
+      );
+
+      await this.eventBus.emit('snapshot.rebuild.completed', result, {
+        module: 'snapshots',
+      });
+      return;
+    }
   }
 
   private async failJob(
@@ -307,7 +330,10 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
     startedAt: number,
   ) {
     const retryCount = job.retryCount + 1;
-    const deadLetter = retryCount >= job.maxRetries;
+    const deadLetter = this.retryPolicy.isDeadLetter(
+      retryCount,
+      job.maxRetries,
+    );
 
     await this.prisma.$transaction([
       this.prisma.backgroundJob.update({
@@ -319,7 +345,7 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
             ? BackgroundJobStatus.DEAD_LETTER
             : BackgroundJobStatus.RETRYING,
           retryCount,
-          runAt: this.backoffDate(retryCount),
+          runAt: this.retryPolicy.nextRetryAt(retryCount),
           lockedAt: null,
           lockedBy: null,
           heartbeatAt: null,
@@ -378,12 +404,6 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
 
       await this.outboxService.markFailed(event.id, error);
     }
-  }
-
-  private backoffDate(retryCount: number) {
-    const seconds = Math.min(300, 2 ** retryCount * 5);
-
-    return new Date(Date.now() + seconds * 1000);
   }
 
   private jobPayload(job: BackgroundJob) {

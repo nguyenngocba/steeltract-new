@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -12,7 +13,10 @@ import {
 
 import { nextOperationalCode } from '../../common/utils/code-generator'
 import { PrismaService } from '../../core/prisma/prisma.service'
+import { DashboardReaderService } from '../../core/snapshots/dashboard-reader.service'
+import { SnapshotReaderService } from '../../core/snapshots/snapshot-reader.service'
 import { InventoryService } from '../inventory/inventory.service'
+import { dispatchInclude, LogisticsRepository } from './logistics.repository'
 
 const activeDispatchStatuses: DispatchOrderStatus[] = [
   'DRAFT',
@@ -23,46 +27,27 @@ const activeDispatchStatuses: DispatchOrderStatus[] = [
   'RECEIVED',
 ]
 
-const dispatchInclude = {
-  project: true,
-  projectTask: true,
-  items: {
-    include: {
-      inventoryItem: true,
-      component: true,
-    },
-  },
-  events: {
-    orderBy: {
-      createdAt: 'asc',
-    },
-  },
-} satisfies Prisma.DispatchOrderInclude
-
 @Injectable()
 export class LogisticsService {
   constructor(
+    @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(LogisticsRepository)
+    private readonly logisticsRepository: LogisticsRepository,
+    @Inject(InventoryService)
     private readonly inventoryService: InventoryService,
+    @Inject(DashboardReaderService)
+    private readonly dashboardReader: DashboardReaderService,
+    @Inject(SnapshotReaderService)
+    private readonly snapshotReader: SnapshotReaderService,
   ) {}
 
   async listDispatchOrders() {
-    return this.prisma.dispatchOrder.findMany({
-      include: dispatchInclude,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 200,
-    })
+    return this.logisticsRepository.findDispatchOrders()
   }
 
   async getDispatchOrder(id: string) {
-    const order = await this.prisma.dispatchOrder.findUnique({
-      where: {
-        id,
-      },
-      include: dispatchInclude,
-    })
+    const order = await this.logisticsRepository.findDispatchOrder(id)
 
     if (!order) {
       throw new NotFoundException('Dispatch order not found')
@@ -72,6 +57,40 @@ export class LogisticsService {
   }
 
   async dashboard() {
+    const result = await this.dashboardReader.read({
+      module: 'logistics',
+      snapshotType: 'DispatchDashboardSnapshot',
+      loadSnapshot: async () => {
+        const rows = await this.snapshotReader.dispatchDashboard()
+        if (rows.length === 0) {
+          return null
+        }
+        return {
+          data: rows,
+          updatedAt: rows.reduce((oldest, row) =>
+            row.updatedAt.getTime() < oldest.getTime() ? row.updatedAt : oldest,
+          rows[0].updatedAt),
+          rowCount: rows.length,
+        }
+      },
+      readSnapshot: async (rows) =>
+        this.applyDispatchDashboardSnapshots(
+          await this.dashboardRuntime(),
+          rows,
+        ),
+      readRuntime: () => this.dashboardRuntime(),
+      compare: (snapshot, runtime) =>
+        this.compareRuntimeNumbers(snapshot.kpis, runtime.kpis, [
+          'inTransit',
+          'delivered',
+          'completed',
+        ]),
+    })
+
+    return result.data
+  }
+
+  private async dashboardRuntime() {
     const orders = await this.listDispatchOrders()
     const todayKey = this.dateKey(new Date())
     const statusCounts = orders.reduce<Record<string, number>>((acc, order) => {
@@ -132,49 +151,80 @@ export class LogisticsService {
     }
   }
 
+  private applyDispatchDashboardSnapshots(runtime: any, snapshots: any[]) {
+    const snapshotTotals = snapshots.reduce(
+      (totals, row) => {
+        totals.inTransit += Number(row.inTransitCount ?? 0)
+        totals.delivered += Number(row.arrivedCount ?? 0)
+        totals.completed += Number(row.completedCount ?? 0)
+        totals.delayed += Number(row.delayCount ?? 0)
+        return totals
+      },
+      {
+        inTransit: 0,
+        delivered: 0,
+        completed: 0,
+        delayed: 0,
+      },
+    )
+
+    return {
+      ...runtime,
+      kpis: {
+        ...runtime.kpis,
+        inTransit: snapshotTotals.inTransit,
+        delivered: snapshotTotals.delivered,
+        completed: snapshotTotals.completed,
+      },
+      statusCounts: {
+        ...runtime.statusCounts,
+        IN_TRANSIT: snapshotTotals.inTransit,
+        ARRIVED: snapshotTotals.delivered,
+        COMPLETED: snapshotTotals.completed,
+      },
+    }
+  }
+
+  private compareRuntimeNumbers(
+    snapshot: Record<string, unknown>,
+    runtime: Record<string, unknown>,
+    fields: string[],
+  ) {
+    return fields.flatMap((field) => {
+      const snapshotValue = Number(snapshot[field] ?? 0)
+      const runtimeValue = Number(runtime[field] ?? 0)
+      if (Math.abs(snapshotValue - runtimeValue) <= 0.0001) {
+        return []
+      }
+      return [{
+        field,
+        snapshotValue,
+        runtimeValue,
+        reason: 'VALUE_MISMATCH' as const,
+      }]
+    })
+  }
+
   async suggestDispatchItems(body: any) {
     const projectId = String(body?.projectId ?? '')
     if (!projectId) {
       throw new BadRequestException('projectId is required')
     }
 
-    const taskWhere: Prisma.ProjectTaskWhereInput = {
+    const taskWhere: {
+      projectId: string
+      projectTaskId?: string
+    } = {
       projectId,
-      progress: {
-        lt: 100,
-      },
     }
     if (body?.projectTaskId) {
-      taskWhere.id = String(body.projectTaskId)
+      taskWhere.projectTaskId = String(body.projectTaskId)
     }
 
-    const tasks = await this.prisma.projectTask.findMany({
-      where: taskWhere,
-      include: {
-        materialAllocations: {
-          include: {
-            inventoryItem: true,
-          },
-        },
-        componentAllocations: {
-          include: {
-            component: true,
-          },
-        },
-      },
-      orderBy: [
-        {
-          scheduledStartAt: 'asc',
-        },
-        {
-          plannedStartAt: 'asc',
-        },
-        {
-          sortOrder: 'asc',
-        },
-      ],
-      take: body?.projectTaskId ? 1 : 5,
-    })
+    const tasks =
+      await this.logisticsRepository.findProjectTasksForDispatchSuggestion(
+        taskWhere,
+      )
 
     const items = tasks.flatMap((task) => {
       const materialItems = task.materialAllocations
@@ -250,8 +300,7 @@ export class LogisticsService {
       'DX',
     )
 
-    const order = await this.prisma.dispatchOrder.create({
-      data: {
+    const order = await this.logisticsRepository.createDispatchOrder({
         code,
         project: {
           connect: {
@@ -280,9 +329,7 @@ export class LogisticsService {
             createdBy: body?.createdBy ?? null,
           },
         },
-      },
-      include: dispatchInclude,
-    })
+      })
 
     await this.logActivity('PROJECT_DISPATCH_CREATED', 'DispatchOrder', order.id, {
       dispatchCode: order.code,
@@ -476,22 +523,10 @@ export class LogisticsService {
       return
     }
 
-    const activeItem = await this.prisma.dispatchItem.findFirst({
-      where: {
-        componentId: {
-          in: componentIds,
-        },
-        dispatchOrder: {
-          status: {
-            in: activeDispatchStatuses,
-          },
-        },
-      },
-      include: {
-        dispatchOrder: true,
-        component: true,
-      },
-    })
+    const activeItem = await this.logisticsRepository.findActiveComponentDispatch(
+      componentIds,
+      activeDispatchStatuses,
+    )
 
     if (activeItem) {
       throw new BadRequestException(
@@ -509,86 +544,71 @@ export class LogisticsService {
 
     for (const item of order.items) {
       if (item.type === 'MATERIAL' && item.inventoryItemId) {
-        const allocation = await this.prisma.projectTaskMaterialAllocation.findFirst({
-          where: {
-            projectTaskId: order.projectTaskId,
-            inventoryItemId: item.inventoryItemId,
-          },
-        })
+        const allocation =
+          await this.logisticsRepository.findProjectTaskMaterialAllocation(
+            order.projectTaskId,
+            item.inventoryItemId,
+          )
         const quantity = Number(item.quantity ?? 0)
         if (allocation) {
           const issuedQty = Number(allocation.issuedQty ?? 0) + quantity
-          await this.prisma.projectTaskMaterialAllocation.update({
-            where: {
-              id: allocation.id,
-            },
-            data: {
+          await this.logisticsRepository.updateProjectTaskMaterialAllocation(
+            allocation.id,
+            {
               issuedQty,
               remainingQty: Math.max(0, Number(allocation.plannedQty ?? 0) - issuedQty),
               totalCost: issuedQty * Number(allocation.unitCost ?? 0),
             },
-          })
+          )
         } else {
-          await this.prisma.projectTaskMaterialAllocation.create({
-            data: {
-              projectTaskId: order.projectTaskId,
-              inventoryItemId: item.inventoryItemId,
+          await this.logisticsRepository.createProjectTaskMaterialAllocation({
+              projectTask: { connect: { id: order.projectTaskId } },
+              inventoryItem: { connect: { id: item.inventoryItemId } },
               plannedQty: quantity,
               issuedQty: quantity,
               remainingQty: 0,
-            },
           })
         }
       }
 
       if (item.type === 'COMPONENT' && item.componentId) {
-        const allocation = await this.prisma.projectTaskComponentAllocation.findFirst({
-          where: {
-            projectTaskId: order.projectTaskId,
-            componentId: item.componentId,
-          },
-        })
+        const allocation =
+          await this.logisticsRepository.findProjectTaskComponentAllocation(
+            order.projectTaskId,
+            item.componentId,
+          )
         if (allocation) {
-          await this.prisma.projectTaskComponentAllocation.update({
-            where: {
-              id: allocation.id,
-            },
-            data: {
+          await this.logisticsRepository.updateProjectTaskComponentAllocation(
+            allocation.id,
+            {
               status: 'HANDED_OVER',
             },
-          })
+          )
         } else {
-          await this.prisma.projectTaskComponentAllocation.create({
-            data: {
-              projectTaskId: order.projectTaskId,
-              componentId: item.componentId,
+          await this.logisticsRepository.createProjectTaskComponentAllocation({
+              projectTask: { connect: { id: order.projectTaskId } },
+              component: { connect: { id: item.componentId } },
               assignedAt: new Date(),
               status: 'HANDED_OVER',
-            },
           })
         }
-        await this.prisma.component.update({
-          where: {
-            id: item.componentId,
-          },
-          data: {
-            projectId: order.projectId,
+        await this.logisticsRepository.updateComponent(
+          item.componentId,
+          {
+            project: {
+              connect: {
+                id: order.projectId,
+              },
+            },
             status: 'DELIVERED',
           },
-        })
+        )
       }
     }
   }
 
   private async assertStatus(id: string, statuses: DispatchOrderStatus[]) {
-    const order = await this.prisma.dispatchOrder.findUnique({
-      where: {
-        id,
-      },
-      select: {
-        status: true,
-      },
-    })
+    const order = await this.logisticsRepository.findDispatchOrderStatus(id)
 
     if (!order) {
       throw new NotFoundException('Dispatch order not found')
@@ -607,11 +627,7 @@ export class LogisticsService {
     data: Prisma.DispatchOrderUpdateInput,
     createdBy?: string,
   ) {
-    return this.prisma.dispatchOrder.update({
-      where: {
-        id,
-      },
-      data: {
+    return this.logisticsRepository.updateDispatchOrder(id, {
         ...data,
         status,
         events: {
@@ -621,8 +637,6 @@ export class LogisticsService {
             createdBy: createdBy ?? null,
           },
         },
-      },
-      include: dispatchInclude,
     })
   }
 
@@ -632,14 +646,12 @@ export class LogisticsService {
     entityId: string,
     metadata: Prisma.InputJsonValue,
   ) {
-    return this.prisma.activityLog.create({
-      data: {
+    return this.logisticsRepository.createActivityLog({
         action,
         entity,
         entityId,
         module: 'logistics',
         metadata,
-      },
     })
   }
 

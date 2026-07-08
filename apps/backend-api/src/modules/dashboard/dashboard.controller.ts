@@ -9,7 +9,6 @@ import {
   ProductionOrderStatus,
   ProjectStatus,
   QcInspectionStatus,
-  TransactionType,
 } from '@prisma/client'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
@@ -17,6 +16,7 @@ import { PrismaService } from '../../core/prisma/prisma.service'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { DashboardActivityService } from './dashboard-activity.service'
 import { DashboardInsightService } from './dashboard-insight.service'
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
 import { DashboardMetricsService } from './dashboard-metrics.service'
 import { DashboardNotificationService } from './dashboard-notification.service'
 import { DashboardRecommendationService } from './dashboard-recommendation.service'
@@ -26,6 +26,7 @@ export class DashboardController {
   constructor(
     private prisma: PrismaService,
     private readonly dashboardMetrics: DashboardMetricsService,
+    private readonly inventoryReadModel: DashboardInventoryReadModelService,
     private readonly dashboardActivity: DashboardActivityService,
     private readonly dashboardNotifications: DashboardNotificationService,
     private readonly dashboardInsights: DashboardInsightService,
@@ -58,13 +59,9 @@ export class DashboardController {
     }
   }
 
- @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('cockpit')
   async cockpit() {
-    const since = new Date()
-    since.setDate(since.getDate() - 6)
-    since.setHours(0, 0, 0, 0)
-
     const [
       projects,
       activeProjects,
@@ -73,10 +70,7 @@ export class DashboardController {
       productionCompleted,
       components,
       completedComponents,
-      inventoryItems,
-      inventoryTransactions,
-      inboundTransactions,
-      outboundTransactions,
+      inventory,
       logisticsActive,
       qcOpen,
       yardActive,
@@ -115,20 +109,7 @@ export class DashboardController {
           },
         },
       }),
-      this.prisma.inventoryItem.findMany({
-        include: { category: true },
-      }),
-      this.prisma.inventoryTransaction.findMany({
-        where: { transactionDate: { gte: since } },
-        include: { items: true },
-        orderBy: { transactionDate: 'asc' },
-      }),
-      this.prisma.inventoryTransaction.count({
-        where: { type: TransactionType.IMPORT },
-      }),
-      this.prisma.inventoryTransaction.count({
-        where: { type: TransactionType.EXPORT },
-      }),
+      this.inventoryReadModel.getCockpitInventory(),
       this.prisma.yardMovement.count({
         where: { type: { in: ['PLACE', 'MOVE'] } },
       }),
@@ -159,13 +140,6 @@ export class DashboardController {
       }),
     ])
 
-    const inventoryTotal = inventoryItems.reduce((sum, item) => sum + item.quantity, 0)
-    const inventoryByCategory = new Map<string, number>()
-    for (const item of inventoryItems) {
-      const label = item.category?.name ?? 'Khác'
-      inventoryByCategory.set(label, (inventoryByCategory.get(label) ?? 0) + item.quantity)
-    }
-
     const productionStatus = await this.prisma.productionOrder.groupBy({
       by: ['status'],
       _count: { _all: true },
@@ -181,18 +155,6 @@ export class DashboardController {
       ComponentStatus.DELIVERED,
       ComponentStatus.INSTALLED,
     ]
-    const trend = new Map<string, number>()
-    for (let index = 0; index < 7; index += 1) {
-      const day = new Date(since)
-      day.setDate(since.getDate() + index)
-      trend.set(day.toISOString().slice(5, 10), 0)
-    }
-    for (const transaction of inventoryTransactions) {
-      const key = transaction.transactionDate.toISOString().slice(5, 10)
-      const volume = transaction.items.reduce((sum, item) => sum + Math.abs(item.quantity), 0)
-      trend.set(key, (trend.get(key) ?? 0) + volume)
-    }
-
     return {
       generatedAt: new Date().toISOString(),
       kpis: {
@@ -204,9 +166,9 @@ export class DashboardController {
         completedComponents,
         componentCompletionRate: components > 0 ? Math.round((completedComponents / components) * 100) : 0,
         logisticsActive,
-        inventoryTotal,
-        inboundTransactions,
-        outboundTransactions,
+        inventoryTotal: inventory.inventoryTotal,
+        inboundTransactions: inventory.inboundTransactions,
+        outboundTransactions: inventory.outboundTransactions,
         qcOpen,
         yardActive,
       },
@@ -214,14 +176,8 @@ export class DashboardController {
         status: row.status,
         count: row._count._all,
       })),
-      inventoryDistribution: Array.from(inventoryByCategory.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([label, value]) => ({ label, value })),
-      movementTrend: Array.from(trend.entries()).map(([label, value]) => ({
-        label,
-        value,
-      })),
+      inventoryDistribution: inventory.distribution,
+      movementTrend: inventory.movementTrend,
       projects: projectRows.map((project) => {
         const total = project.components.length
         const done = project.components.filter((component) =>
@@ -245,7 +201,7 @@ export class DashboardController {
         {
           code: 'LOW_STOCK',
           title: 'Vật tư dưới tồn tối thiểu',
-          count: inventoryItems.filter((item) => item.quantity <= item.minimumStock).length,
+          count: inventory.lowStockCount,
         },
         {
           code: 'PRODUCTION_DELAYED',
@@ -267,74 +223,34 @@ export class DashboardController {
   @Get('stats')
   async stats() {
     const [
-      inventoryCount,
       projectCount,
       componentCount,
-      transactionCount,
-
-      lowStockItems,
+      inventoryStats,
     ] = await Promise.all([
-      this.prisma.inventoryItem.count(),
-
       this.prisma.project.count(),
 
       this.prisma.component.count(),
 
-      this.prisma.inventoryTransaction.count(),
-
-      this.prisma.inventoryItem.findMany(),
+      this.inventoryReadModel.getStats(),
     ])
 
-    const lowStockCount =
-      lowStockItems.filter(
-        (item) =>
-          item.quantity <=
-          item.minimumStock,
-      ).length
-
     return {
-      inventoryCount,
+      inventoryCount: inventoryStats.inventoryCount,
       projectCount,
       componentCount,
-      transactionCount,
-
-      lowStockCount,
+      transactionCount: inventoryStats.transactionCount,
+      lowStockCount: inventoryStats.lowStockCount,
     }
   }
   @UseGuards(JwtAuthGuard)
   @Get('recent-transactions')
   async recentTransactions() {
-    return this.prisma.inventoryTransaction.findMany({
-      take: 5,
-
-      include: {
-        items: {
-          include: {
-            inventoryItem: true,
-          },
-        },
-      },
-
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    return this.inventoryReadModel.getRecentTransactions(5)
   }
   @UseGuards(JwtAuthGuard)
   @Get('low-stock')
   async lowStock() {
-    const items =
-      await this.prisma.inventoryItem.findMany({
-        include: {
-          category: true,
-        },
-      })
-
-    return items.filter(
-      (item) =>
-        item.quantity <=
-        item.minimumStock,
-    )
+    return this.inventoryReadModel.getLowStockItems()
   }
   @UseGuards(JwtAuthGuard)
   @Get('construction-progress')
@@ -524,54 +440,13 @@ export class DashboardController {
   @UseGuards(JwtAuthGuard)
   @Get('procurement')
   async procurement() {
-    const items =
-      await this.prisma.inventoryItem.findMany()
-
-    const suggestions =
-      items
-        .filter(
-          (item) =>
-            item.quantity <=
-            item.minimumStock,
-        )
-        .map((item) => ({
-          id: item.id,
-
-          code: item.code,
-
-          name: item.name,
-
-          quantity:
-            item.quantity,
-
-          minimumStock:
-            item.minimumStock,
-
-          suggestedOrder:
-            (
-              item.minimumStock *
-              2
-            ) -
-            item.quantity,
-        }))
-
-    return suggestions
+    return this.inventoryReadModel.getProcurementSuggestions()
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('anomalies')
   async anomalies() {
-    const items =
-      await this.prisma.inventoryItem.findMany()
-
-    const anomalies =
-      items.filter(
-        (item) =>
-          item.quantity <
-          item.minimumStock / 2,
-      )
-
-    return anomalies
+    return this.inventoryReadModel.getAnomalies()
   }
   
   @UseGuards(JwtAuthGuard)

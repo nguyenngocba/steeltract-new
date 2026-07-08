@@ -1,0 +1,313 @@
+import {
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+
+import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
+import { InventorySnapshotRepository } from './inventory-snapshot.repository';
+import { ProjectSnapshotRepository } from './project-snapshot.repository';
+
+type SnapshotValidationWarning = {
+  key: string;
+  field?: string;
+  expected?: number | string | null;
+  actual?: number | string | null;
+  reason: 'MISSING_SNAPSHOT' | 'VALUE_MISMATCH';
+};
+
+@Injectable()
+export class SnapshotValidatorService {
+  private readonly logger = new Logger(SnapshotValidatorService.name);
+
+  constructor(
+    @Inject(InventorySnapshotRepository)
+    private readonly inventorySnapshots: InventorySnapshotRepository,
+    @Inject(ProjectSnapshotRepository)
+    private readonly projectSnapshots: ProjectSnapshotRepository,
+    @Inject(DispatchSnapshotRepository)
+    private readonly dispatchSnapshots: DispatchSnapshotRepository,
+  ) {}
+
+  async validateInventory(snapshotDate = new Date()) {
+    const rows = await this.inventorySnapshots.calculate(snapshotDate);
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of rows) {
+      const persisted = await this.inventorySnapshots.findLatest(
+        row.warehouseId,
+        row.snapshotDate,
+      );
+
+      if (!persisted) {
+        warnings.push({
+          key: row.warehouseId,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.warehouseId, 'totalStock', row.totalStock, persisted.totalStock);
+      this.compareNumber(warnings, row.warehouseId, 'availableStock', row.availableStock, persisted.availableStock);
+      this.compareNumber(warnings, row.warehouseId, 'reservedStock', row.reservedStock, persisted.reservedStock);
+      this.compareNumber(warnings, row.warehouseId, 'movementToday', row.movementToday, persisted.movementToday);
+      this.compareNumber(warnings, row.warehouseId, 'movementMonth', row.movementMonth, persisted.movementMonth);
+      this.compareNumber(warnings, row.warehouseId, 'inventoryValue', row.inventoryValue, persisted.inventoryValue);
+      this.compareNumber(warnings, row.warehouseId, 'totalMaterials', row.totalMaterials, persisted.totalMaterials);
+      this.compareNumber(warnings, row.warehouseId, 'lowStockCount', row.lowStockCount, persisted.lowStockCount);
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Inventory snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'inventory',
+      checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  async validateInventoryMaterial(materialId?: string) {
+    const rows = await this.inventorySnapshots.calculateMaterialSnapshots(
+      materialId,
+    );
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of rows) {
+      const persisted = await this.inventorySnapshots.findMaterialDetailSnapshot(
+        row.materialId,
+      );
+
+      if (!persisted) {
+        warnings.push({
+          key: row.materialId,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.materialId, 'currentStock', row.currentStock, persisted.currentStock);
+      this.compareNumber(warnings, row.materialId, 'availableStock', row.availableStock, persisted.availableStock);
+      this.compareNumber(warnings, row.materialId, 'reservedStock', row.reservedStock, persisted.reservedStock);
+      this.compareNumber(warnings, row.materialId, 'pendingReturn', row.pendingReturn, persisted.pendingReturn);
+      this.compareNumber(warnings, row.materialId, 'inventoryValue', row.inventoryValue, persisted.inventoryValue);
+      this.compareNumber(warnings, row.materialId, 'attachmentCount', row.attachmentCount, persisted.attachmentCount);
+      this.compareNumber(warnings, row.materialId, 'locationCount', row.locationCount, persisted.locationCount);
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Inventory material snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'inventory',
+      snapshotType: 'material',
+      checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  async validateInventoryLocation() {
+    const rows = await this.inventorySnapshots.calculateLocationSnapshots();
+    const persistedRows = await this.inventorySnapshots.findLocationSnapshots();
+    const persisted = new Map(
+      persistedRows.map((row) => [row.locationKey, row]),
+    );
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of rows) {
+      const persistedRow = persisted.get(row.locationKey);
+
+      if (!persistedRow) {
+        warnings.push({
+          key: row.locationKey,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.locationKey, 'quantity', row.quantity, persistedRow.quantity);
+      this.compareNumber(warnings, row.locationKey, 'materialCount', row.materialCount, persistedRow.materialCount);
+      if (row.occupied !== persistedRow.occupied) {
+        warnings.push({
+          key: row.locationKey,
+          field: 'occupied',
+          expected: row.occupied ? 'true' : 'false',
+          actual: persistedRow.occupied ? 'true' : 'false',
+          reason: 'VALUE_MISMATCH',
+        });
+      }
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Inventory location snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'inventory',
+      snapshotType: 'location',
+      checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  async validateProject(projectId?: string) {
+    const rows = await this.projectSnapshots.calculate(projectId);
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of rows) {
+      const persisted = await this.projectSnapshots.findLatest(row.projectId);
+
+      if (!persisted) {
+        warnings.push({
+          key: row.projectId,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.projectId, 'progress', row.progress, persisted.progress);
+      this.compareNumber(warnings, row.projectId, 'delayedTaskCount', row.delayedTaskCount, persisted.delayedTaskCount);
+      this.compareNumber(warnings, row.projectId, 'completedTaskCount', row.completedTaskCount, persisted.completedTaskCount);
+      this.compareNumber(warnings, row.projectId, 'activeTaskCount', row.activeTaskCount, persisted.activeTaskCount);
+      this.compareNumber(warnings, row.projectId, 'materialProgress', row.materialProgress, persisted.materialProgress);
+      this.compareNumber(warnings, row.projectId, 'componentProgress', row.componentProgress, persisted.componentProgress);
+      this.compareNumber(warnings, row.projectId, 'logisticsProgress', row.logisticsProgress, persisted.logisticsProgress);
+      this.compareNumber(warnings, row.projectId, 'costProgress', row.costProgress, persisted.costProgress);
+      this.compareNumber(warnings, row.projectId, 'healthScore', row.healthScore, persisted.healthScore);
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Project snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'projects',
+      checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  async validateProjectDetails(projectId?: string, tab?: string) {
+    const rows = await this.projectSnapshots.calculateDetailSnapshots(
+      projectId,
+      tab,
+    );
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of rows) {
+      const persisted = await this.projectSnapshots.findDetail(
+        row.projectId,
+        row.tab,
+      );
+      const key = `${row.projectId}:${row.tab}`;
+
+      if (!persisted) {
+        warnings.push({
+          key,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      const expected = this.stableJson(row.payload);
+      const actual = this.stableJson(persisted.payload);
+
+      if (expected !== actual) {
+        warnings.push({
+          key,
+          field: 'payload',
+          expected: 'repository-read-model',
+          actual: 'persisted-snapshot',
+          reason: 'VALUE_MISMATCH',
+        });
+      }
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Project detail snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'projects',
+      snapshotType: 'detail',
+      checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  async validateDispatch(dispatchOrderId?: string) {
+    const rows = await this.dispatchSnapshots.calculate(dispatchOrderId);
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of rows) {
+      const persisted = await this.dispatchSnapshots.findLatest(
+        row.dispatchOrderId,
+      );
+
+      if (!persisted) {
+        warnings.push({
+          key: row.dispatchOrderId,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.dispatchOrderId, 'loadingCount', row.loadingCount, persisted.loadingCount);
+      this.compareNumber(warnings, row.dispatchOrderId, 'inTransitCount', row.inTransitCount, persisted.inTransitCount);
+      this.compareNumber(warnings, row.dispatchOrderId, 'arrivedCount', row.arrivedCount, persisted.arrivedCount);
+      this.compareNumber(warnings, row.dispatchOrderId, 'completedCount', row.completedCount, persisted.completedCount);
+      this.compareNumber(warnings, row.dispatchOrderId, 'delayCount', row.delayCount, persisted.delayCount);
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Dispatch snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'logistics',
+      checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  private compareNumber(
+    warnings: SnapshotValidationWarning[],
+    key: string,
+    field: string,
+    expected: number,
+    actual: number,
+  ) {
+    const expectedValue = Number(expected ?? 0);
+    const actualValue = Number(actual ?? 0);
+
+    if (Math.abs(expectedValue - actualValue) <= 0.0001) {
+      return;
+    }
+
+    warnings.push({
+      key,
+      field,
+      expected: expectedValue,
+      actual: actualValue,
+      reason: 'VALUE_MISMATCH',
+    });
+  }
+
+  private stableJson(value: unknown) {
+    return JSON.stringify(value ?? null);
+  }
+}

@@ -11,8 +11,6 @@ import {
 } from '@prisma/client';
 
 import { EventBusService } from '../../core/events/event-bus.service';
-import { PrismaService } from '../../core/prisma/prisma.service';
-import { nextOperationalCode } from '../../common/utils/code-generator';
 import type {
   ApproveReturnRequestDto,
   CreateReturnRequestDto,
@@ -23,58 +21,30 @@ import type {
   RejectReturnRequestDto,
 } from './dto/return-workflow.dto';
 import { InventoryService } from './inventory.service';
+import { InventoryRepository } from './inventory.repository';
+import { InventoryEventService } from './inventory-event.service';
 
 @Injectable()
 export class ReturnWorkflowService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly inventoryRepository: InventoryRepository,
     private readonly inventoryService: InventoryService,
+    private readonly inventoryEvents: InventoryEventService,
     private readonly eventBus: EventBusService,
   ) {}
 
   async findAll(query: ListReturnRequestsDto) {
     const search = query.search || query.q;
 
-    const requests = await this.prisma.returnRequest.findMany({
-      where: {
-        status: query.status as ReturnRequestStatus | undefined,
-        flowType: query.flowType,
-        OR: search
-          ? [
-              {
-                returnNo: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
-              },
-              {
-                remarks: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
-              },
-            ]
-          : undefined,
-      },
-      include: this.include(),
-      orderBy: {
-        createdAt: 'desc',
-      },
+    const requests = await this.inventoryRepository.listReturnRequests({
+      status: query.status as ReturnRequestStatus | undefined,
+      flowType: query.flowType,
+      search,
     });
 
     const ids = requests.map((request) => request.id);
     const logs = ids.length
-      ? await this.prisma.activityLog.findMany({
-          where: {
-            entity: 'ReturnRequest',
-            entityId: {
-              in: ids,
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        })
+      ? await this.inventoryRepository.findActivityLogsByEntity('ReturnRequest', ids)
       : [];
     const logsByRequest = logs.reduce((map, log) => {
       const list = map.get(log.entityId ?? '') ?? [];
@@ -94,8 +64,7 @@ export class ReturnWorkflowService {
       await this.validateSiteReturnAvailability(dto);
     }
 
-    const request = await this.prisma.returnRequest.create({
-      data: {
+    const request = await this.inventoryRepository.createReturnRequest({
         returnNo: dto.returnNo ?? await this.generateReturnNo(dto.flowType),
         flowType: dto.flowType,
         projectId: dto.projectId,
@@ -112,13 +81,10 @@ export class ReturnWorkflowService {
             remarks: item.remarks,
           })),
         },
-      },
-      include: this.include(),
     });
 
     await this.emit('requested', request.id, request.returnNo);
-    await this.prisma.activityLog.create({
-      data: {
+    await this.inventoryRepository.createActivityLog({
         action: 'PROJECT_MATERIAL_RETURN_REQUESTED',
         entity: 'ReturnRequest',
         entityId: request.id,
@@ -130,7 +96,13 @@ export class ReturnWorkflowService {
           itemCount: request.items.length,
           remarks: request.remarks,
         },
-      },
+    });
+    await this.inventoryEvents.returnRequested({
+      id: request.id,
+      returnNo: request.returnNo,
+      status: request.status,
+      itemCount: request.items.length,
+      projectId: request.projectId,
     });
 
     return request;
@@ -143,15 +115,11 @@ export class ReturnWorkflowService {
       throw new BadRequestException('Only requested returns can be approved.');
     }
 
-    const updated = await this.prisma.returnRequest.update({
-      where: { id },
-      data: {
+    const updated = await this.inventoryRepository.updateReturnRequest(id, {
         status: ReturnRequestStatus.APPROVED,
         approvedBy: dto.approvedBy,
         approvedAt: new Date(),
         remarks: dto.remarks ?? request.remarks,
-      },
-      include: this.include(),
     });
 
     await this.emit('approved', updated.id, updated.returnNo);
@@ -172,24 +140,19 @@ export class ReturnWorkflowService {
     }
 
     for (const item of dto.items) {
-      await this.prisma.returnRequestItem.update({
-        where: { id: item.id },
-        data: {
+      await this.inventoryRepository.updateReturnRequestItem(item.id, {
           receivedQuantity: item.receivedQuantity,
           zone: item.zoneId
             ? {
                 connect: {
                   id: item.zoneId,
                 },
-              }
+            }
             : undefined,
-        },
       });
     }
 
-    const updated = await this.prisma.returnRequest.update({
-      where: { id },
-      data: {
+    const updated = await this.inventoryRepository.updateReturnRequest(id, {
         status: ReturnRequestStatus.RECEIVED,
         warehouse: dto.warehouseId
           ? {
@@ -201,8 +164,6 @@ export class ReturnWorkflowService {
         receivedBy: dto.receivedBy,
         receivedAt: new Date(),
         remarks: dto.remarks ?? request.remarks,
-      },
-      include: this.include(),
     });
 
     if (updated.flowType === ReturnFlowType.SITE_RETURN) {
@@ -252,8 +213,7 @@ export class ReturnWorkflowService {
         })),
       });
       await this.applyProjectReturnReceived(updated);
-      await this.prisma.activityLog.create({
-        data: {
+      await this.inventoryRepository.createActivityLog({
           action: 'PROJECT_MATERIAL_RETURN_RECEIVED',
           entity: 'ReturnRequest',
           entityId: updated.id,
@@ -270,11 +230,17 @@ export class ReturnWorkflowService {
             message: `Kho đã nhận lại ${receivedQuantity} ${firstMaterialName} từ công trình ${updated.project?.code ?? updated.projectId ?? ''}.`,
             remarks: updated.remarks,
           },
-        },
       });
     }
 
     await this.emit('received', updated.id, updated.returnNo);
+    await this.inventoryEvents.returnReceived({
+      id: updated.id,
+      returnNo: updated.returnNo,
+      status: updated.status,
+      itemCount: updated.items.length,
+      projectId: updated.projectId,
+    });
 
     return updated;
   }
@@ -287,25 +253,18 @@ export class ReturnWorkflowService {
     }
 
     for (const item of dto.items) {
-      await this.prisma.returnRequestItem.update({
-        where: { id: item.id },
-        data: {
+      await this.inventoryRepository.updateReturnRequestItem(item.id, {
           inspectedQuantity: item.inspectedQuantity,
           disposition: item.disposition,
           remarks: item.remarks,
-        },
       });
     }
 
-    const updated = await this.prisma.returnRequest.update({
-      where: { id },
-      data: {
+    const updated = await this.inventoryRepository.updateReturnRequest(id, {
         status: ReturnRequestStatus.INSPECTED,
         inspectedBy: dto.inspectedBy,
         inspectedAt: new Date(),
         remarks: dto.remarks ?? request.remarks,
-      },
-      include: this.include(),
     });
 
     await this.emit('inspected', updated.id, updated.returnNo);
@@ -365,19 +324,14 @@ export class ReturnWorkflowService {
       });
     }
 
-    const updated = await this.prisma.returnRequest.update({
-      where: { id },
-      data: {
+    const updated = await this.inventoryRepository.updateReturnRequest(id, {
         status: ReturnRequestStatus.DISPOSED,
         disposedAt: new Date(),
         remarks: dto.remarks ?? request.remarks,
-      },
-      include: this.include(),
     });
 
     if (updated.flowType === ReturnFlowType.SITE_RETURN) {
-      await this.prisma.activityLog.create({
-        data: {
+      await this.inventoryRepository.createActivityLog({
           action: 'PROJECT_MATERIAL_RETURN_ACCEPTED',
           entity: 'ReturnRequest',
           entityId: updated.id,
@@ -393,11 +347,17 @@ export class ReturnWorkflowService {
                 quantity: item.inspectedQuantity ?? item.receivedQuantity ?? item.requestedQuantity,
               })),
           },
-        },
       });
     }
 
     await this.emit('disposed', updated.id, updated.returnNo);
+    await this.inventoryEvents.returnAccepted({
+      id: updated.id,
+      returnNo: updated.returnNo,
+      status: updated.status,
+      itemCount: updated.items.length,
+      projectId: updated.projectId,
+    });
 
     return updated;
   }
@@ -414,19 +374,12 @@ export class ReturnWorkflowService {
       throw new BadRequestException('Only requested returns can be rejected.');
     }
 
-    const updated = await this.prisma.returnRequest.update({
-      where: {
-        id,
-      },
-      data: {
+    const updated = await this.inventoryRepository.updateReturnRequest(id, {
         status: ReturnRequestStatus.CANCELLED,
         remarks: dto.remarks ?? request.remarks,
-      },
-      include: this.include(),
     });
 
-    await this.prisma.activityLog.create({
-      data: {
+    await this.inventoryRepository.createActivityLog({
         action: 'PROJECT_MATERIAL_RETURN_REJECTED',
         entity: 'ReturnRequest',
         entityId: updated.id,
@@ -438,9 +391,15 @@ export class ReturnWorkflowService {
           rejectedBy: dto.rejectedBy,
           remarks: updated.remarks,
         },
-      },
     });
     await this.emit('rejected', updated.id, updated.returnNo);
+    await this.inventoryEvents.returnRejected({
+      id: updated.id,
+      returnNo: updated.returnNo,
+      status: updated.status,
+      itemCount: updated.items.length,
+      projectId: updated.projectId,
+    });
 
     return updated;
   }
@@ -465,42 +424,19 @@ export class ReturnWorkflowService {
     projectId: string,
     inventoryItemId: string,
   ) {
-    const [allocations, transactions, openReturns] = await Promise.all([
-      this.prisma.projectTaskMaterialAllocation.findMany({
-        where: {
-          inventoryItemId,
-          projectTask: {
-            projectId,
-          },
-        },
-      }),
-      this.prisma.inventoryTransaction.findMany({
-        where: {
-          projectId,
-        },
-        include: {
-          items: true,
-        },
-      }),
-      this.prisma.returnRequest.findMany({
-        where: {
-          projectId,
-          flowType: ReturnFlowType.SITE_RETURN,
-          status: {
-            in: [
-              ReturnRequestStatus.REQUESTED,
-              ReturnRequestStatus.APPROVED,
-              ReturnRequestStatus.RECEIVED,
-              ReturnRequestStatus.INSPECTED,
-              ReturnRequestStatus.DISPOSED,
-            ],
-          },
-        },
-        include: {
-          items: true,
-        },
-      }),
-    ]);
+    const [allocations, transactions, openReturns] =
+      await this.inventoryRepository.findSiteReturnAvailabilitySources({
+        projectId,
+        inventoryItemId,
+        flowType: ReturnFlowType.SITE_RETURN,
+        statuses: [
+          ReturnRequestStatus.REQUESTED,
+          ReturnRequestStatus.APPROVED,
+          ReturnRequestStatus.RECEIVED,
+          ReturnRequestStatus.INSPECTED,
+          ReturnRequestStatus.DISPOSED,
+        ],
+      });
 
     const allocatedFromTasks = allocations.reduce(
       (sum, row) => sum + Number(row.issuedQty ?? 0),
@@ -569,16 +505,9 @@ export class ReturnWorkflowService {
       if (remaining <= 0) continue;
 
       const allocations =
-        await this.prisma.projectTaskMaterialAllocation.findMany({
-          where: {
-            inventoryItemId: item.inventoryItemId,
-            projectTask: {
-              projectId: request.projectId,
-            },
-          },
-          orderBy: {
-            id: 'asc',
-          },
+        await this.inventoryRepository.findProjectTaskMaterialAllocationsForReturn({
+          inventoryItemId: item.inventoryItemId,
+          projectId: request.projectId,
         });
 
       for (const allocation of allocations) {
@@ -589,26 +518,21 @@ export class ReturnWorkflowService {
         const applied = Math.min(remaining, currentlyReturnable);
         if (applied <= 0) continue;
 
-        await this.prisma.projectTaskMaterialAllocation.update({
-          where: {
-            id: allocation.id,
-          },
-          data: {
+        await this.inventoryRepository.updateProjectTaskMaterialAllocation(
+          allocation.id,
+          {
             issuedQty: Math.max(0, allocatedQty - applied),
             returnedQty: Number(allocation.returnedQty ?? 0) + applied,
             remainingQty: Math.max(0, Number(allocation.remainingQty ?? 0) - applied),
           },
-        });
+        );
         remaining -= applied;
       }
     }
   }
 
   private async requireRequest(id: string) {
-    const request = await this.prisma.returnRequest.findUnique({
-      where: { id },
-      include: this.include(),
-    });
+    const request = await this.inventoryRepository.findReturnRequestById(id);
 
     if (!request) {
       throw new NotFoundException('Return request not found');
@@ -617,23 +541,9 @@ export class ReturnWorkflowService {
     return request;
   }
 
-  private include() {
-    return {
-      project: true,
-      warehouse: true,
-      items: {
-        include: {
-          inventoryItem: true,
-          unit: true,
-          zone: true,
-        },
-      },
-    };
-  }
-
   private generateReturnNo(flowType: string) {
     const prefix = flowType === 'PRODUCTION_RETURN' ? 'HT-SX' : flowType === 'SUPPLIER_RETURN' ? 'HT-NCC' : 'HT-CT';
-    return nextOperationalCode(this.prisma, 'returnRequest', 'returnNo', prefix);
+    return this.inventoryRepository.nextOperationalCode('returnRequest', 'returnNo', prefix);
   }
 
   private emit(action: string, id: string, returnNo: string) {

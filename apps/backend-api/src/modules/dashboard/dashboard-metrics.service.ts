@@ -1,20 +1,12 @@
 import { Injectable } from '@nestjs/common'
 
-import {
-  ProductionOrderStatus,
-  TransactionType,
-} from '@prisma/client'
+import { ProductionOrderStatus } from '@prisma/client'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
 
 type ForecastSeverity = 'critical' | 'warning' | 'information'
 type InventoryTrend = 'UP' | 'STABLE' | 'DOWN_STRONG'
-
-type MaterialUsageWindow = {
-  current30d: number
-  previous30d: number
-  total90d: number
-}
 
 const dayMs = 24 * 60 * 60 * 1000
 
@@ -42,7 +34,10 @@ function severityFor(daysUntilStockout: number | null, currentStock: number, min
 
 @Injectable()
 export class DashboardMetricsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventoryReadModel: DashboardInventoryReadModelService,
+  ) {}
 
   async getPredictiveTrends() {
     const [forecast, productionStopRisks] = await Promise.all([
@@ -61,71 +56,14 @@ export class DashboardMetricsService {
 
   private async getMaterialForecast() {
     const now = new Date()
-    const since30 = daysAgo(30)
-    const since60 = daysAgo(60)
-    const since90 = daysAgo(90)
-
-    const [items, locationStocks, transactions] = await Promise.all([
-      this.prisma.inventoryItem.findMany({
-        where: { deletedAt: null },
-        include: { category: true, unitMaster: true },
-        take: 1000,
-      }),
-      this.prisma.inventoryLocationStock.findMany({
-        where: { quantity: { gt: 0 } },
-      }),
-      this.prisma.inventoryTransaction.findMany({
-        where: { transactionDate: { gte: since90 } },
-        include: {
-          items: {
-            include: {
-              inventoryItem: true,
-            },
-          },
-        },
-        orderBy: { transactionDate: 'asc' },
-      }),
-    ])
-
-    const stockByItem = new Map<string, number>()
-    for (const stock of locationStocks) {
-      stockByItem.set(
-        stock.inventoryItemId,
-        (stockByItem.get(stock.inventoryItemId) ?? 0) + toNumber(stock.quantity),
-      )
-    }
-
-    const usageByItem = new Map<string, MaterialUsageWindow>()
-    let inbound30 = 0
-    let outbound30 = 0
-    let outbound90 = 0
-
-    for (const transaction of transactions) {
-      const isCurrent30 = transaction.transactionDate >= since30
-      const isPrevious30 = transaction.transactionDate >= since60 && transaction.transactionDate < since30
-      const isOutbound = transaction.type === TransactionType.EXPORT
-      const isInbound = transaction.type === TransactionType.IMPORT || transaction.type === TransactionType.RETURN
-
-      for (const line of transaction.items) {
-        const qty = Math.abs(toNumber(line.quantity))
-        if (isCurrent30 && isInbound) inbound30 += qty
-        if (isCurrent30 && isOutbound) outbound30 += qty
-        if (isOutbound) outbound90 += qty
-
-        if (!isOutbound) continue
-
-        const current = usageByItem.get(line.inventoryItemId) ?? {
-          current30d: 0,
-          previous30d: 0,
-          total90d: 0,
-        }
-
-        if (isCurrent30) current.current30d += qty
-        if (isPrevious30) current.previous30d += qty
-        current.total90d += qty
-        usageByItem.set(line.inventoryItemId, current)
-      }
-    }
+    const {
+      items,
+      stockByItem,
+      usageByItem,
+      inbound30,
+      outbound30,
+      outbound90,
+    } = await this.inventoryReadModel.getForecastReadModel()
 
     const materialShortageForecast = items
       .map((item) => {
@@ -145,8 +83,8 @@ export class DashboardMetricsService {
           inventoryItemId: item.id,
           materialCode: item.code,
           materialName: item.name,
-          unit: item.unit ?? item.unitMaster?.symbol ?? '',
-          categoryName: item.category?.name ?? 'Khác',
+          unit: item.unit,
+          categoryName: item.categoryName,
           currentStock,
           minimumStock: toNumber(item.minimumStock),
           consumption30d: usage.current30d,
@@ -177,7 +115,7 @@ export class DashboardMetricsService {
         materialId: item.id,
         materialCode: item.code,
         materialName: item.name,
-        unit: item.unit ?? item.unitMaster?.symbol ?? '',
+        unit: item.unit,
         current30d: usage.current30d,
         previous30d: usage.previous30d,
         changeQty,
@@ -273,20 +211,8 @@ export class DashboardMetricsService {
       orderBy: { updatedAt: 'desc' },
     })
 
-    const materialIds = Array.from(new Set(activeOrders.flatMap((order) => order.bom?.items.map((item) => item.materialId) ?? [])))
-    const locationStocks = materialIds.length
-      ? await this.prisma.inventoryLocationStock.findMany({
-        where: {
-          inventoryItemId: { in: materialIds },
-          quantity: { gt: 0 },
-        },
-      })
-      : []
-
-    const stockByItem = new Map<string, number>()
-    for (const stock of locationStocks) {
-      stockByItem.set(stock.inventoryItemId, (stockByItem.get(stock.inventoryItemId) ?? 0) + toNumber(stock.quantity))
-    }
+    const { stockByItem } =
+      await this.inventoryReadModel.getSnapshot()
 
     return activeOrders
       .map((order) => {

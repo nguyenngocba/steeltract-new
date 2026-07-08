@@ -379,6 +379,25 @@ export async function getProjectsRuntime() {
   return response.data as ProjectsRuntime
 }
 
+export type ProjectDetailTab =
+  | 'overview'
+  | 'command'
+  | 'site'
+  | 'materials'
+  | 'components'
+  | 'progress'
+  | 'costs'
+  | 'documents'
+  | 'logs'
+
+export async function getProjectDetailTab(
+  projectId: string,
+  tab: ProjectDetailTab,
+) {
+  const response = await api.get(`/projects/${projectId}/detail/${tab}`)
+  return response.data
+}
+
 export type CreateProjectPayload = {
   code: string
   name: string

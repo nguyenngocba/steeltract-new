@@ -1,4 +1,7 @@
-import { OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  OnModuleInit,
+} from '@nestjs/common';
 
 import {
   MessageBody,
@@ -30,10 +33,15 @@ export class EventsGateway implements OnModuleInit {
   server: Server;
 
   constructor(
+    @Inject(EventBusService)
     private readonly eventBus: EventBusService,
+    @Inject(WebsocketEventMapper)
     private readonly mapper: WebsocketEventMapper,
+    @Inject(EventThrottleService)
     private readonly throttle: EventThrottleService,
+    @Inject(PerformanceMetricsService)
     private readonly metrics: PerformanceMetricsService,
+    @Inject(WebsocketRoomService)
     private readonly rooms: WebsocketRoomService,
   ) {}
 

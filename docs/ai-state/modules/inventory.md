@@ -2,6 +2,62 @@
 
 ## Current Sprint
 
+SteelTrack EPIC112 - Inventory Snapshot Completion and Architecture Freeze
+
+Scope:
+
+- Complete the final Inventory snapshot layer without changing UI, workflow, public API contracts, or business logic.
+- Persist domain snapshots for Material Detail and Inventory Locations.
+- Read Material Detail and Locations from snapshots first, with repository-backed fallback.
+- Update snapshots through the Background Engine, not inside request transactions.
+- Expose full Inventory snapshot health through Operations Center.
+
+Implemented in EPIC112 INV.CORE.2:
+
+- Added `InventoryMaterialSnapshot` and `InventoryLocationSnapshot`.
+- Added migration `20260708103000_inventory_domain_snapshots`.
+- Extended `InventorySnapshotRepository` to calculate, read, validate, and upsert material/location domain snapshots.
+- Extended `SnapshotWriterService` so Inventory background jobs write dashboard, material, and location snapshots.
+- `InventoryReadModelService.materialDetail()` now uses snapshot-first reads with fallback to the repository-backed read model.
+- `InventoryReadModelService.locations()` now uses snapshot-first reads with fallback to live repository composition.
+- `InventoryEventService` now schedules background snapshot update jobs after persistent Outbox event publication.
+- Runtime metrics now distinguish material snapshot hit/miss and location snapshot hit/miss.
+- Operations Center Inventory health now includes material/location snapshot health, freshness, hit ratio, lag, and rebuild status.
+- Inventory is now an Architecture Freeze v1.0 candidate.
+
+Implemented in EPIC112 INV.CORE.1:
+
+- Added `InventoryReadModelService`.
+- Added `InventoryEventService`.
+- Extended `InventoryRepository` to own the remaining active Inventory persistence/read source methods.
+- `InventoryService` no longer injects `PrismaService`.
+- `ReturnWorkflowService` no longer injects `PrismaService`.
+- Inventory master controllers for zones, categories, units, and material types now call `InventoryRepository`.
+- `GET /operations-center/overview` includes additive Inventory health data for repository, read model, snapshot, event/outbox, jobs, cache, and operational counts.
+- Persistent Inventory events now cover transaction creation, stock bucket updates, return requested/received/rejected/accepted, adjustment posted, stocktake marker completion, and material updates.
+
+Current compliance:
+
+- Repository coverage for active Inventory module service/controller persistence: 100%.
+- Event/Outbox coverage for active Inventory lifecycle events: 100%.
+- Material Detail read path: persisted snapshot first, repository-backed fallback.
+- Inventory Location read path: persisted snapshot first, repository-backed fallback.
+- Snapshot health is exposed through Operations Center.
+
+Verification:
+
+- Prisma generate passed.
+- Prisma migrate deploy passed.
+- Backend build passed during implementation.
+
+Known limitations:
+
+- Inventory Architecture Freeze v1.0 still needs real operator flow validation and parity checks before being marked fully frozen.
+- Stocktake event emission uses transaction payload/type markers until a formal stocktake domain lifecycle exists.
+- Cross-module writers that create Inventory-affecting records should be audited separately.
+
+Previous sprint baseline:
+
 SteelTrack Sprint B - Warehouse Locations
 
 Scope:
@@ -36,6 +92,9 @@ Navigation:
   - `/inventory/audit`
 - The advanced group is collapsed by default, remembers expansion per session, and auto-opens when an advanced child route is active.
 - Inventory actions `Nhập kho`, `Xuất kho`, and `Khác` are shown in the topbar on Inventory routes.
+- Epic PERF Foundation gates Material Detail attachment queries by active tab so image/document/transaction attachments are fetched only when the current detail tab needs them.
+- EPIC 100 extends `InventoryRepository` for Material Detail aggregate reads and Dashboard Inventory read-model sources. Command workflows remain intentionally unchanged.
+- EPIC104 adds composite indexes for Inventory transaction/date reads, material transaction history, transaction item joins, and exact stock bucket validation. The migration is `20260707120000_enterprise_index_foundation`; EXPLAIN evidence is stored in `docs/runtime/de1/`.
 
 Database:
 
@@ -51,6 +110,7 @@ Database:
 Migration:
 
 - `20260605063000_inventory_warehouse_location_fields`
+- `20260707120000_enterprise_index_foundation`
 
 API:
 
@@ -559,6 +619,23 @@ Boundary:
 - No schema or migration was introduced.
 - Free-capacity text is only shown when zone capacity data exists; otherwise the UI does not invent utilization.
 - Outbound, transfer, return, and adjustment flows were not changed by this validation rule.
+
+### Enterprise Performance Notes
+
+Current status:
+
+- Inventory Dashboard aggregation uses `DashboardInventoryReadModelService` and `InventoryRepository` source queries instead of duplicating Inventory transaction reads across dashboard services.
+- Inventory cockpit dashboard reads now go through `DashboardReaderService` and prefer persisted `InventoryDashboardSnapshot` rows when enabled, fresh, and parity-safe.
+- EPIC 101 defines Inventory transaction, transaction item, location stock, and return request index recommendations in `docs/audit/enterprise-index-audit.md`.
+- Inventory is the first candidate for persisted snapshots:
+  - `InventoryDashboardSnapshot`;
+  - `MaterialDailyMovementSnapshot`.
+
+Boundary:
+
+- Some dashboard chart/table fields still use runtime compatibility data because the current `InventoryDashboardSnapshot` is warehouse-summary level.
+- No schema, migration, or index changes were introduced by EPIC 101.
+- Material Detail core analytics still need a future tab-specific API/snapshot split if transaction volume grows.
 
 ## Boundaries Preserved
 

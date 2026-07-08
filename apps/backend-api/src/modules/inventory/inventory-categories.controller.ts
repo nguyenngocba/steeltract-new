@@ -8,29 +8,20 @@ import {
   Put,
 } from '@nestjs/common'
 
-import { PrismaService }
-  from '../../core/prisma/prisma.service'
+import { InventoryRepository } from './inventory.repository'
 
 @Controller('inventory/categories')
 export class InventoryCategoriesController {
 
   constructor(
-    private readonly prisma:
-      PrismaService,
+    private readonly inventoryRepository:
+      InventoryRepository,
   ) {}
 
   @Get()
   async getCategories() {
 
-    return this.prisma.inventoryCategory.findMany({
-      where: {
-        active: true,
-      },
-
-      orderBy: {
-        name: 'asc',
-      },
-    })
+    return this.inventoryRepository.listCategories()
   }
 
   @Post()
@@ -38,10 +29,7 @@ export class InventoryCategoriesController {
     @Body() body: any,
   ) {
 
-    return this.prisma.inventoryCategory.create({
-
-      data: {
-
+    return this.inventoryRepository.createCategory({
         code:
           body.code,
 
@@ -54,7 +42,6 @@ export class InventoryCategoriesController {
         color:
           body.color ??
           null,
-      },
     })
   }
 
@@ -64,14 +51,7 @@ export class InventoryCategoriesController {
     @Body() body: any,
   ) {
 
-    return this.prisma.inventoryCategory.update({
-
-      where: {
-        id,
-      },
-
-      data: {
-
+    return this.inventoryRepository.updateCategory(id, {
         code:
           body.code,
 
@@ -87,7 +67,6 @@ export class InventoryCategoriesController {
         color:
           body.color ??
           null,
-      },
     })
   }
 
@@ -96,14 +75,8 @@ export class InventoryCategoriesController {
     @Param('id') id: string,
   ) {
 
-    return this.prisma.inventoryCategory.update({
-
-      where: {
-        id,
-      },
-      data: {
+    return this.inventoryRepository.updateCategory(id, {
         active: false,
-      },
     })
   }
 }

@@ -7,6 +7,7 @@ import {
 } from '@prisma/client'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
 
 type HealthStatus = 'normal' | 'warning' | 'critical'
 
@@ -45,7 +46,10 @@ function statusFromScore(score: number): HealthStatus {
 
 @Injectable()
 export class DashboardInsightService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventoryReadModel: DashboardInventoryReadModelService,
+  ) {}
 
   async getControlTowerInsights(trends: any, notifications: any) {
     const [health, executiveSummary] = await Promise.all([
@@ -93,25 +97,11 @@ export class DashboardInsightService {
   }
 
   private async inventoryHealth(): Promise<HealthModule> {
-    const [items, locationStocks] = await Promise.all([
-      this.prisma.inventoryItem.findMany({
-        where: { deletedAt: null },
-        take: 1000,
-      }),
-      this.prisma.inventoryLocationStock.findMany({
-        where: { quantity: { gt: 0 } },
-      }),
-    ])
-
-    const stockByItem = new Map<string, number>()
-    for (const stock of locationStocks) {
-      stockByItem.set(stock.inventoryItemId, (stockByItem.get(stock.inventoryItemId) ?? 0) + toNumber(stock.quantity))
-    }
-
+    const snapshot = await this.inventoryReadModel.getSnapshot()
     let outOfStock = 0
     let lowStock = 0
-    for (const item of items) {
-      const stock = stockByItem.has(item.id) ? stockByItem.get(item.id)! : toNumber(item.quantity)
+    for (const item of snapshot.items) {
+      const stock = item.stock
       if (stock <= 0) outOfStock += 1
       else if (stock <= toNumber(item.minimumStock)) lowStock += 1
     }

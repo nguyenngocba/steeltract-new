@@ -1,5 +1,97 @@
 # Next Tasks
+- **EPIC116 Projects Architecture Freeze validation**: Use `docs/runtime/project-architecture-freeze-v1.md` as the Projects architecture gate. Validate Project Detail snapshot parity with real operator activity across `overview`, `materials`, `components`, `progress`, `command`, `site`, `costs`, `documents`, and `logs`; then review Operations Center Project Detail snapshot hit/fallback/lag.
+- **Architecture inheritance rule**: Treat Inventory and Projects as Architecture Freeze v1.0 reference modules. Future Production, Purchasing, QC, Maintenance, Yard, and Logistics implementation should inherit repository boundaries, snapshot-first reads, read-model fallback, outbox events, background snapshot writers, runtime metrics, and Operations Center health signals.
+- **Architecture Audit - Performance, Versioning & Dependencies**: Verify that new business modules (Production, QC, Yard, Logistics, Finance) strictly adhere to response time SLAs, double-write migration protocols, and allowed/forbidden dependency paths as defined in [enterprise-performance-sla.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-performance-sla.md), [enterprise-versioning-policy.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-versioning-policy.md), and [enterprise-module-dependency-map.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-module-dependency-map.md).
 
+- **Architecture Audit & Review**: Schedule the first regular Architecture Review Board (ARB) session as outlined in [enterprise-governance.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-governance.md) to audit codebases against the 10 core ADRs.
+
+- **Sprint AI.1 (AI Engine Foundation)**: Establish database schema for AI execution context (`AiAgentContext`, `AiRecommendationAction`), and implement async inference dispatchers using Outbox events.
+- **Sprint AI.2 (Shopfloor Assistant)**: Connect WebSockets with voice STT/TTS services for crane operators, welding operators, and QC inspectors.
+- **Sprint AI.3 (Nesting Optimizer)**: Implement genetic algorithms for plate/profile nesting on CNC cutting machines to optimize scrap rate.
+- **Sprint AI.4 (Demand Forecasting)**: Deploy time-series models for material demand and isolation forest models for anomaly detection during stock consumption.
+- **Sprint AI.5 (Predictive Maintenance)**: Process IoT telemetry (temperature, vibrations) from machines and generate preventative maintenance tasks.
+- **Sprint AI.6 (Computer Vision QC)**: Train and deploy image analysis pipelines for welding/coating defect detection at QC inspection stations.
+- **Sprint AI.7 (3D Loading & Routing)**: Build 3D bin packing models for truck loading plans and routing optimizations for dispatch orders.
+- **Sprint AI.8 (Operations Center AI)**: Bind model metrics (accuracy, drift, latency) and offline fallback triggers into the Operations Center.
+- **Sprint INT.1 (Integration Framework & Outbox)**: Optimize outbox tables, indexes, and implement saga orchestrator for multi-module transaction consistency.
+- **Sprint INT.2 (Inventory -> Production)**: Synchronize material issues, reservations, and consumption with WMS and MES ledgers.
+- **Sprint INT.3 (Production -> QC)**: Connect production step completion to auto-generation of QC inspection sheets.
+- **Sprint INT.4 (QC -> Yard)**: Automate Yard placement assignments when components pass QC.
+- **Sprint INT.5 (Yard -> Logistics)**: Bind Yard loading tasks and QR scanning validation with Logistics dispatch schedules.
+- **Sprint INT.6 (Logistics -> Projects)**: Synchronize delivery ETAs and receipt confirmations with PMS WBS tasks.
+- **Sprint INT.7 (Projects -> Finance)**: Trigger project cost and ledger calculations on component install/acceptance.
+- **Sprint INT.8 (End-to-End Stress Test)**: Connect integration health monitoring metrics to the Operations Center overview and test under load.
+- **Sprint QC.1 (Domain & Validation Gates)**: Create `CapaAction` and `QualityLedgerEntry` in `schema.prisma`, write repository gates for CO/CQ and NCR status checks, and expose QC/NCR endpoints.
+- **Sprint QC.2 (Events & Snapshots)**: Implement Outbox event handlers for `qc.inspection.completed`, schedule background jobs for Graph Traceability generation, and create `QcDashboardSnapshot` with cached reads.
+- **Sprint QC.3 (Control Tower & AI)**: Build QC Control Tower, interactive Traceability 2D viewer, and integrate AI Root-Cause/CAPA and Scrap anomaly detection.
+- **Sprint LOG.1 (Vehicles & Drivers)**: Create `Driver` and `Route` models, build dispatch planning, and implement `Max Payload Gate` validation.
+- **Sprint LOG.2 (GPS & Driver Mobile)**: Build Driver Mobile Web View with loading checklist and geofencing background engine workers for GPS tracking.
+- **Sprint LOG.3 (Dispatch Cockpit & POD)**: Build Dispatch Cockpit interactive map, integrate Proof of Delivery signature/photo uploads, and connect AI ETA predictor.
+- **Sprint 1 (WorkOrder & Core Domain Setup)**: Implement `WorkOrder` model in `schema.prisma`, create `WorkOrderRepository`, write API endpoints `POST /production/work-orders` and `GET /production/work-orders`, and generate migrations.
+- **Sprint 2 (Shopfloor Runtime & Downtime)**: Create `Shift` and `MachineDowntime` models in Prisma, write downtime logging services, integrate real-time Status Gateways, and implement OEE calculation background scheduler.
+- **Sprint 3 (Scrap & Rework Workflows)**: Create `ProductionScrap` and `ProductionRework` models, wire validation gates for issued vs scrap quantities, and link NCR events from QC inspections to auto-generate Rework Orders.
+- **Sprint 4 (Outbox Events & Event Consumer)**: Wire `production.*` domain events to write transactional `OutboxEvent` rows, harden the event dispatching loop, and implement event routing hooks to trigger rebuild jobs.
+- **Sprint 5 (Persisted Snapshots)**: Create database tables for `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and `WorkCenterSnapshot`, write rebuilder jobs with idempotency keys, and connect read endpoints to read snapshots first.
+- **Sprint 6 (WMS & Costing Integration)**: Implement validation for issue and return quantities (`issued = consumed + scrap + returned + remaining`), and update ComponentCosting engine to recalculate real actual cost from consumption.
+- **Sprint 7 (Shopfloor Dashboard & Cockpits)**: Build manager and operator screens using `<CockpitKpiCard />` and `<CockpitChartCard />`, add fluid 12-column grid layouts, and implement WebSocket listeners for live OEE gauges and status lights.
+- **Sprint 8 (Operations Center & AI Optimizer)**: Connect production snapshot freshness and OEE job telemetry to the Operations Center overview, and implement an AI nesting optimizer and queue advisor.
+- **EPIC201 - PMS Sprint 1 (Domain Setup & Outbox)**: Create `ProjectsRepository` extends, write `createTask`, `updateTask`, `deleteTask` transactions with transactional outbox events `projects.task.created`/`updated`/`deleted`, event schemas, and consumer routing setup.
+- **EPIC201 - PMS Sprint 2 (Dynamic Scheduling & Allocations)**: Implement dynamic WBS scheduling (FS/SS/FF cascade recalculation, lag days), predecessor validation, and material/component allocation controls.
+- **EPIC201 - PMS Sprint 3 (Persisted Snapshots & Read Model)**: Deploy database table `ProjectRuntimeSnapshot` (json payload), implement rebuilder background job with idempotency keys, and build tab-gated API boundary `GET /projects/:id/detail/:tab` with cache TTL and snapshot-first reading.
+- **EPIC201 - PMS Sprint 4 (WBS Gantt & Site Mode UI)**: Build interactive WBS tree grid with keyboard shortcuts, SVG/Canvas Gantt chart with drag-drop connection lines, responsive Mobile Site Mode for progress slide updates, and geotagged verification photo uploads.
+- **EPIC201 - PMS Sprint 5 (QC Inspection & Material Return)**: Connect `ProjectTaskInspection` QC check, handover documents, and link project pending returns with WMS `/inventory/returns` workspace.
+- **EPIC204 - Yard Sprint 1 (Domain Setup)**: Add `YardZone`, `YardSlot`, `YardItemPlacement`, `YardCrane`, `YardReservation`, `YardMovement`, and `YardLoadUnloadTask` to `schema.prisma` and implement `YardRepository`.
+- **EPIC204 - Yard Sprint 2 (Placements & Reservations)**: Write API endpoints for placements and reservations, with logic for slot occupancy check and reservation expiry.
+- **EPIC204 - Yard Sprint 3 (Movements & Crane Telemetry)**: Implement internal movements and loading/unloading tasks for crane operators.
+- **EPIC204 - Yard Sprint 4 (Snapshots & Operations Center)**: Implement background job `snapshot.yard.rebuild` and register telemetry metrics to Operations Center.
+- **EPIC204 - Yard Sprint 5 (Cockpit UI & AI Optimizer)**: Build Yard Cockpit using standard `<CockpitKpiCard />` and `<CockpitChartCard />`, 2D/3D map, and connect AI smart stacking suggestions.
+- **EPIC205 - Purchasing Sprint 1 (Budget & PR)**: Add `PurchaseRequest`, `PurchaseRequestItem`, `PurchaseBudget`, and `ApprovalStep` to `schema.prisma` and implement `PurchaseBudgetService`.
+- **EPIC205 - Purchasing Sprint 2 (RFQ & quotations)**: Implement RFQ creation and supplier quotation submissions.
+- **EPIC205 - Purchasing Sprint 3 (PO & Approvals)**: Build PO creation and multi-level approval workflows with real-time budget checking.
+- **EPIC205 - Purchasing Sprint 4 (Goods Receipt & QC)**: Integrate Goods Receipt with WMS inbound and trigger Supplier Performance scoring.
+- **EPIC205 - Purchasing Sprint 5 (Cockpit UI & AI Scorer)**: Build Purchasing Cockpit, implement background `snapshot.purchasing.rebuild`, and connect AI quotation anomaly detection.
+- **EPIC206 - Finance Sprint 1 (Domain & Valuation Lots)**: Add `InventoryValuationLot`, `InventoryValuationLedger`, and `CostCenter` to `schema.prisma` and implement `ValuationLotRepository`.
+- **EPIC206 - Finance Sprint 2 (Valuation Engine)**: Implement core FIFO and WAC valuation engines with asynchronous Outbox trigger.
+- **EPIC206 - Finance Sprint 3 (WIP & Actual Cost)**: Integrate WIP accumulation and Actual Cost calculation from MES consumption/HR payroll.
+- **EPIC206 - Finance Sprint 4 (Budget & Cost Center)**: Implement budget control checks and overhead allocation rules.
+- **EPIC206 - Finance Sprint 5 (Financial Cockpit & AI)**: Build Financial Dashboard UI, implement background snapshot update, and integrate AI cashflow forecast.
+- **EPIC207 - HR Sprint 1 (Personnel & Skill Matrix)**: Add `Employee`, `Skill`, `EmployeeSkill`, and `EmployeeCertification` to `schema.prisma` and implement `EmployeeRepository`.
+- **EPIC207 - HR Sprint 2 (Attendance & Shift)**: Build shift scheduling and attendance reconciliation engine with hardware scanner buffer.
+- **EPIC207 - HR Sprint 3 (Payroll & Piece Rate)**: Implement piece-rate calculations linked with QC-passed production components.
+- **EPIC207 - HR Sprint 4 (HR Dashboard & AI)**: Build Skill Matrix Grid, HR Dashboard, and integrate AI smart shift/assignment suggestions.
+- Validate EPIC112 INV.CORE.2 Inventory Architecture Freeze candidate with real operator flows: create inbound, outbound, transfer, adjustment, stocktake-style adjustment, Project return request/receive/reject, then run the background worker and confirm Material/Location snapshots refresh.
+- Validate EPIC115 Project Architecture Freeze candidate with real operator flows: create project from template, create/update/move/delete WBS tasks, return a project component, submit Site Mode update, run `POST /jobs/worker/tick`, confirm `project_dashboard_snapshots` updates, confirm `outbox_events` contains `project.*` events, and confirm `/operations-center/overview` includes healthy `projects` status.
+- Plan the final Project freeze sprint only if needed: add persisted Project detail-tab snapshots behind `GET /projects/:id/detail/:tab`, then validate parity against repository read models for overview, materials, components, progress, costs, documents, and logs.
+- Compare Material Detail snapshot payload with repository fallback for at least 5 materials, including materials with multiple locations, attachments, returns, and project allocations.
+- Compare Inventory Location snapshot rows with `inventory_location_stocks` for MAIN and PRODUCTION warehouses; confirm empty locations are marked `occupied=false` rather than deleted.
+- Validate persistent Outbox with an integration scenario: publish a persistent event, run `POST /jobs/worker/tick`, confirm `outbox_events.status` becomes `DISPATCHED`, and confirm duplicate `idempotencyKey` does not create duplicate events.
+- Implement the first background snapshot sprint only after reviewing `docs/architecture/background-engine.md`, `docs/architecture/snapshot-update-engine.md`, and `docs/runtime/snapshot-rebuild-report.md`.
+- Validate persistent Outbox locking/retry/idempotency under concurrent workers before relying on event-driven snapshot updates in multi-instance deployments.
+- Start background snapshot implementation with `snapshot.inventory.rebuild`, dry-run parity comparison, and runtime metrics for snapshot hit/miss/fallback before switching any Dashboard endpoint to snapshot-first behavior.
+- Re-run EPIC104 DE.1 EXPLAIN plans after realistic data growth. Current plans are documented in `docs/runtime/de1/`; the active dataset is too small for reliable timing-improvement claims.
+- Use `docs/runtime/data-engine-index-foundation-report.md` before adding any new composite index. Avoid indexes that do not map to a measured query path or runtime hot endpoint.
+- Use `docs/runtime/inventory-architecture-freeze-report.md` as the architecture gate before starting Production/Purchasing/QC foundation work.
+- Add dispatch composite indexes only after capturing before/after EXPLAIN baselines against populated dispatch tables.
+- Capture EPIC103 runtime analytics after realistic operator traffic: compare `analytics.windows['24h'].endpointRanking`, `queryRanking`, `performanceScore`, `architectureScore`, and `recommendations` against the current reports.
+- Plan persisted runtime metrics before claiming 7/30/90-day trend quality; current EPIC103 long-range trend fields intentionally report unavailable because memory-only data is insufficient.
+- Review modules with low runtime architecture score and cross-check them against EPIC100 repository coverage, EPIC101 query/index audits, and RT.1 slow-query logs before choosing optimizations.
+- Capture RT.1 runtime baselines by exercising `/dashboard/cockpit`, `/dashboard/executive-cockpit`, Inventory list/detail, `/projects/runtime`, Project Detail tabs, Logistics list/detail, then saving observed averages/peaks from `/performance/metrics` into `docs/runtime/performance-baseline.md`.
+- Review `docs/runtime/slow-query.log` after realistic operator flows and compare repeated slow rows with `docs/audit/enterprise-index-audit.md` before adding indexes.
+- Follow up RT.1 by exporting process-local runtime metrics to a central telemetry sink before multi-instance deployment; current metrics reset on restart.
+- Investigate any `queries.nPlusOneWarnings` from `/performance/metrics` with Semble/static query audit before batching code paths.
+- Apply EPIC 101 performance gate (`docs/audit/enterprise-performance-gate.md`) to every new Dashboard, Runtime, Detail, Lookup, and Search/List endpoint before implementation.
+- Plan a schema-enabled index sprint from `docs/audit/enterprise-index-audit.md`, prioritizing Inventory transaction/material/date indexes, ProjectTask hierarchy/status/date indexes, ReturnRequest status/date indexes, ActivityLog module/entity/date indexes, and Dispatch event/date indexes.
+- Use `docs/architecture/data-growth-5-year-plan.md` before historical import, realtime eventing, or persisted read-model work so partition/archive/snapshot decisions stay compatible with 100M+ record growth.
+- Convert the next non-Inventory runtime performance sprint from process-local/live aggregation to persisted snapshots behind existing API contracts; use Inventory Material/Location snapshot design as the pattern.
+- Add endpoint timing/query diagnostics before enforcing strict production SLOs; current EPIC 101 budgets are target gates, not measured production latency baselines.
+- Validate EPIC 100 repository/query pass by comparing Project Detail tabs (`overview`, `materials`, `components`, `progress`, `costs`, `documents`, `logs`) before/after the tab-specific backend source queries.
+- Follow up EPIC 100 by adding regression tests before moving Inventory Return Workflow, Project Template CRUD, and ProjectTask command mutations behind repository methods.
+- Use `docs/architecture/persisted-read-model-foundation.md` to plan the first schema-backed snapshot migration only after operators confirm current cached read-model parity.
+- Review `docs/audit/query-budget-audit.md` before adding new runtime/cockpit endpoints; any endpoint loading transaction/task/log tables should declare a budget and pagination/snapshot plan.
+- Validate Epic PERF Foundation with real dashboard traffic: compare `/dashboard/cockpit`, `/dashboard/stats`, `/dashboard/low-stock`, `/dashboard/procurement`, and `/dashboard/executive-cockpit` responses before/after the Inventory read model, then monitor latency as Inventory transaction volume grows.
+- Follow up PERF.2 by deciding whether Dashboard Inventory aggregation needs a persisted snapshot table once operators have enough transaction volume for meaningful benchmarks.
+- Follow up PERF.3 by replacing the current `GET /projects/:id/detail/:tab` runtime-slicing implementation with native tab-specific backend queries if Project Detail remains heavy with real data.
+- Follow up Inventory Detail performance by monitoring material snapshot hit ratio and snapshot age in Operations Center before considering tab-specific API splitting.
 - Validate mini-sidebar flyout hotfix in browser: collapse the sidebar, click Inventory/Projects/Logistics/Yard/Settings icons, confirm each flyout opens, click outside closes it, and selecting a menu item navigates then closes the flyout.
 - Validate Sprint UX.1 in browser: header should be around 50px tall, dashboard KPI/chart area should gain vertical space, collapsed sidebar should remain 64px wide with clickable module icons, hover tooltips, and flyout menus including Inventory advanced operations.
 - Validate Dynamic Workspace Header in browser: Inventory routes should show only two topbar lines (`VẬT TƯ KHO` plus the active workspace) and should no longer show `SteelTrack ERP` or `Inventory > ...`.
@@ -118,3 +210,25 @@ Backlog after the locked order:
     - Add exact yard/warehouse source location selection and loading photo/signature attachments before treating Logistics as complete.
 22. Move remaining non-inventory frontend-suggested document numbers fully backend-side. Sprint 17E made Inventory transaction numbering backend-owned with `PREFIX-YYMMDD-00001`, max-suffix generation, and `P2002` retry; the follow-up is a formal backend sequence/locking API for other modules and review of historical Inventory `code <> transactionNo` rows.
 23. Clean up legacy frontend auth/router files after confirming no imports remain, so future auth work only uses the active shared auth store and guarded router.
+24. EPIC107 follow-up: validate SNAP.2 snapshot cutover under real traffic. Confirm Inventory/Projects snapshot hit rates, Logistics fallback until dispatch data exists, and parity-warning counts before disabling `SNAPSHOT_PARITY_CHECK`.
+25. Resolve historical Prisma migration drift before relying on `prisma migrate dev` as a hard gate. Current drift is from modified migration `20260630100000_project_task_domain` and unmanaged table `inventory_location_stocks_backup`; do not reset production-like data.
+26. Validate OPS.1 in browser with an Admin session: open `/operations-center`, switch every tab, verify sidebar/topbar titles, confirm `GET /operations-center/overview` returns real metrics, and confirm empty/missing storage or snapshot states do not show fake data.
+27. OPS.2 Database Center: expand Operations Center database visibility with table growth trends, index health, bloat/scan risk, migration drift status, partition/archive readiness, and database backup health.
+28. OPS.3 Runtime Explorer: add request/query drill-down over Runtime Metrics, endpoint budgets, slow query observations, duplicate query/N+1 warnings, and response-size/memory outliers.
+29. OPS.4 Event Explorer: add read-only Outbox/Event Pipeline inspection, dead-letter grouping, replay readiness checks, and retry/idempotency diagnostics before enabling replay actions.
+30. OPS.5 Backup Center: add backup job status, retention, storage capacity, restore-readiness checks, and runbook links.
+31. Use EPIC108 validation services before and after major performance changes: run snapshot parity, benchmark runtime vs snapshot readers, inspect background recovery state, and execute controlled read-only stress harnesses on staging data.
+32. Validate EPIC112 INV.CORE.2 with real operator flows: confirm Inventory outbox events persist, background snapshot jobs are queued, `POST /jobs/worker/tick` rebuilds material/location snapshots, Material Detail opens from snapshot on the second read, and `/operations-center/overview` reports material/location snapshot health.
+33. After validation, mark Inventory Architecture Freeze v1.0 formally and use it as the required architecture template for Production, Purchasing, QC, Maintenance, and future enterprise modules.
+34. Use EPIC111 audit reports before starting new Production work. Production next priority is ProductionOrder/WorkOrder domain clarification, repository coverage, canonical production events, Production snapshot foundations, and missing MES domain design for Shift, Operation, Production Line, Downtime, and OEE.
+35. Apply and validate EPIC210 Enterprise Standards and Guidelines during implementation of the Production, Yard, QC, Logistics, and Purchasing modules.
+36. Validate Projects Architecture Freeze v1.0 under real operator activity:
+    - Confirm `GET /projects/:id/detail/:tab` records snapshot hits for `overview`, `materials`, `components`, `progress`, `command`, `site`, and `costs`.
+    - Confirm `documents` and `logs` use repository fallback intentionally and do not queue unnecessary Project Detail snapshots.
+    - Monitor Operations Center Project Detail snapshot parity, age, lag, hit ratio, and fallback counts.
+37. Keep backend startup verification in release checklists:
+    - `pnpm -C apps/backend-api build`
+    - `pnpm -C apps/backend-api start`
+    - `pnpm -C apps/backend-api start:dev`
+    - `pnpm -C apps/backend-api start:prod`
+    - Confirm the production build output contains `dist/main.js` and not `dist/src/main.js`.

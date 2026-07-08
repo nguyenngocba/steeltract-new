@@ -7,6 +7,7 @@ import {
 } from '@prisma/client'
 
 import { PrismaService } from '../../core/prisma/prisma.service'
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
 
 type NotificationPriority = 'Critical' | 'Warning' | 'Information'
 
@@ -31,7 +32,10 @@ function toNumber(value: number | null | undefined) {
 
 @Injectable()
 export class DashboardNotificationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventoryReadModel: DashboardInventoryReadModelService,
+  ) {}
 
   async getNotifications() {
     const [
@@ -73,24 +77,10 @@ export class DashboardNotificationService {
   }
 
   private async inventoryRules(): Promise<ExecutiveNotification[]> {
-    const [items, locationStocks] = await Promise.all([
-      this.prisma.inventoryItem.findMany({
-        where: { deletedAt: null },
-        take: 1000,
-      }),
-      this.prisma.inventoryLocationStock.findMany({
-        where: { quantity: { gt: 0 } },
-      }),
-    ])
-
-    const stockByItem = new Map<string, number>()
-    for (const stock of locationStocks) {
-      stockByItem.set(stock.inventoryItemId, (stockByItem.get(stock.inventoryItemId) ?? 0) + toNumber(stock.quantity))
-    }
-
-    return items
+    const snapshot = await this.inventoryReadModel.getSnapshot()
+    return snapshot.items
       .map((item): ExecutiveNotification | null => {
-        const stock = stockByItem.has(item.id) ? stockByItem.get(item.id)! : toNumber(item.quantity)
+        const stock = item.stock
         if (stock <= 0) {
           return {
             id: `inventory-out-${item.id}`,

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { PerformanceMetricsService } from './performance-metrics.service';
+
 interface CacheEntry<T> {
   value: T;
   expiresAt: number;
@@ -8,6 +10,10 @@ interface CacheEntry<T> {
 @Injectable()
 export class CacheService {
   private readonly store = new Map<string, CacheEntry<unknown>>();
+
+  constructor(
+    private readonly metrics: PerformanceMetricsService,
+  ) {}
 
   get<T>(key: string): T | undefined {
     const entry = this.store.get(key);
@@ -21,6 +27,8 @@ export class CacheService {
 
       return undefined;
     }
+
+    this.metrics.recordCacheHit();
 
     return entry.value as T;
   }

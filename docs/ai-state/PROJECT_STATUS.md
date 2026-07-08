@@ -2,15 +2,58 @@
 
 Inventory       100%
 Components       90%
-Production       80%
+Production       85%
 Yard             72%
-Projects         82%
+Projects        100%
 Suppliers        55%
 Organizations     0%
 QC               55%
 Logistics         0%
 Settings         55%
 Dashboard        60%
+Operations Center 20%
+Core Platform Architecture documents (Naming Conventions, API Contracts, Domain Boundaries, Performance SLA, Versioning Policy, Module Dependency Map) completed on 2026-07-08. It defines the system naming conventions (DB, repos, events, snapshots, versioning), REST API design standards (pagination, filtering, Zod error formats), detailed module boundaries and caller permission matrices, performance targets (Dashboard < 150ms, Lookup < 80ms, Search < 300ms, Detail < 120ms, Report < 1000ms), background worker exponential backoff math, DLQ rules, snapshot freshness/lag limits, semantic versioning and double-write schema migrations, and deployment rollback protocols.
+
+Enterprise Architecture Governance & ADRs (ADR001-ADR010) completed on 2026-07-08. It establishes the Software Architecture Quality Management process, the Architecture Guardian role guidelines, the periodic Architecture Review Board (ARB) processes, and 10 core Architectural Decision Records (ADRs) detailing design patterns (Repository, Snapshot First, Background Engine, Outbox, and more) aligning with the SteelTrack Core Platform architecture.
+
+EPIC210 on 2026-07-08 completes the Enterprise Standards and Guidelines. It establishes the detailed architecture standards for SteelTrack, including Bounded Context maps, outbox events catalog and schemas, read-model caching strategies, persisted snapshot DB structures, repository-layer design patterns, runtime telemetry and SLO targets, background engine and DLQ queues, Operations Center health probes, and standard UI cockpit/dashboard conventions.
+
+EPIC202 & EPIC203 on 2026-07-08 completes the Quality Control (QC) Blueprint and Logistics Master Blueprint detailed system design. The blueprints specify domain schemas (Prisma notation), aggregates, consistency rules, outbox event flows, read models, persisted snapshots, background scheduler jobs, cockpit dashboard layouts, Operations Center integration, AI integrations (checklist generator, route/load optimizer), technical risks, and phased implementation roadmaps.
+
+EPIC201 on 2026-07-08 completes the Projects Blueprint (PMS) detailed system design. The blueprints specify hierarchical WBS tree structures, dynamic scheduling (Gantt chart), material and component allocations, outbox event flows, tab-gated read models, persisted dashboard and runtime snapshots, mobile-responsive Site Mode, inspection workflows, material returns lifecycle, technical risks, performance budgets, Operations Center telemetry, and a phased implementation roadmap.
+
+EPIC208 & EPIC209 on 2026-07-08 completes the AI Enterprise Blueprint (AI Ecosystem) and Enterprise Integration Blueprint (Cross-Module Data Flow) detailed system design. The blueprints specify domain schemas (Prisma notation, domain models, aggregates), cross-chain domain event flows, read models, persisted snapshots, background engine jobs, Dark Cockpit UI widgets, Operations Center integrations, technical risks, and phased implementation roadmaps.
+
+
+EPIC206 & EPIC207 on 2026-07-08 completes the Finance Blueprint (EPIC206) and HR Blueprint (EPIC207) detailed system designs. The blueprints specify domain schemas, aggregates, outbox event flows, read models, persisted snapshots, background scheduler jobs, financial & HR dashboard layouts, Operations Center integration, AI forecast and optimization models, technical risks, and phased implementation roadmaps.
+
+EPIC204 & EPIC205 on 2026-07-08 completes the Yard Blueprint (YMS) and Purchasing Blueprint (Procurement) detailed system design. The blueprints specify domain schemas (Prisma notation), aggregates, consistency rules, outbox event flows, read models, persisted snapshots, background scheduler jobs, manufacturing-cockpit dashboard layouts, Operations Center integration, AI optimizers (smart stacking and bidding anomaly detection), technical risks, and phased implementation roadmaps.
+
+EPIC114 on 2026-07-08 completes the Production (MES) Blueprint and System Design. It details the domain spec (WorkOrder, Shifts, Downtime, OEE, Rework, Scrap), asynchronous outbox event flow, cached read models, persisted snapshot strategy (rebuilder, keys, payloads), manager/operator cockpit dashboards, and operational SOP workflows. It provides a structured 8-sprint implementation roadmap to move Production to 100% completion using the Core Platform patterns (Outbox, Background Engine, snapshots, and Operations Center).
+
+EPIC112 INV.CORE.2 on 2026-07-08 completes the Inventory Snapshot Completion and Architecture Freeze candidate pass. It adds persisted `InventoryMaterialSnapshot` and `InventoryLocationSnapshot` domain models, applies migration `20260708103000_inventory_domain_snapshots`, connects Inventory lifecycle events to Background Engine snapshot update jobs, switches Material Detail and Inventory Locations to snapshot-first readers with repository fallback, and extends Operations Center with material/location snapshot health, freshness, hit ratio, lag, and rebuild status. Inventory is now the architecture reference for future modules; Production, Purchasing, QC, Maintenance, and other modules should inherit this pattern instead of creating separate runtime/read-model/snapshot stacks.
+
+EPIC115 on 2026-07-08 raises Projects to 95% Core Platform Compliance. It removes direct `PrismaService` usage from `ProjectsService`, routes template/WBS/component-return persistence through `ProjectsRepository`, adds persistent `project.*` outbox events and Background Engine snapshot update requests for Project mutations, exposes Project-specific runtime metrics, and adds Project Platform Health to Operations Center. Projects is now an Architecture Freeze Candidate; final freeze requires persisted Project Detail tab snapshots.
+
+EPIC116 on 2026-07-08 completes Project Detail Snapshot Completion and marks Projects Architecture Freeze v1.0 APPROVED. It adds persisted `ProjectDetailSnapshot` rows per project/tab, applies migration `20260708143000_project_detail_snapshots`, switches `GET /projects/:id/detail/:tab` to snapshot-first reads with repository-backed fallback, adds Project Detail snapshot writer/parity/runtime metrics, and extends Operations Center with Project Detail snapshot health. Projects now follows the frozen Core Platform pattern: Repository, Snapshot, Read Model fallback, Event/Outbox, Background Engine, Runtime Metrics, Operations Center, and Snapshot Parity.
+
+EPIC109 OPS.1 on 2026-07-08 introduced the first read-only Operations Center module. It added `/operations-center`, `GET /operations-center/overview`, system health cards, runtime/API/job/snapshot/cache/database/storage/event/performance/alert workspaces, and documentation. It does not change business workflows, existing API contracts, Prisma schema, or UI patterns outside the new system cockpit.
+
+EPIC 106 Enterprise Background Engine Implementation on 2026-07-07 did not change module percentages. It implemented backend-only background engine plumbing: BackgroundJobManager, SnapshotUpdateDispatcher, SnapshotRebuilder acceptance path, persistent Outbox, Event Publisher, Event Consumer, Retry Policy, and idempotent snapshot job scheduling. No UI, workflow, API contract, schema, or business logic changes were introduced.
+
+EPIC 105 Enterprise Background Engine on 2026-07-07 did not change module percentages. It designed the background snapshot architecture, snapshot update contracts, snapshot rebuilder behavior, and event bus foundation for Inventory, Projects, Logistics, and Dashboard. No UI, workflow, API contract, schema, background worker behavior, or business logic changes were introduced.
+
+EPIC 104 Enterprise Data Engine on 2026-07-07 did not change module percentages. It added a schema-backed composite index migration for enterprise-scale Inventory, Projects, ReturnRequest, and ActivityLog query paths; captured before/after EXPLAIN plans; and documented persisted snapshot architecture. No UI, workflow, API contract, or business logic changes were introduced.
+
+EPIC 103 Runtime Analytics Foundation on 2026-07-07 did not change module percentages. It added backend-only in-memory runtime analytics over RT.1 metrics: endpoint/query rankings, read-model effectiveness, rule-based recommendations, 5m/1h/24h windows, performance score, and architecture score. No UI, workflow, API contract, schema, or business logic changes were introduced.
+
+EPIC 102 Runtime Instrumentation & Observability on 2026-07-07 did not change module percentages. It added backend-only runtime request metrics, Prisma query profiling, query budget warnings, slow query detection, runtime health snapshots, read-model/cache hit counters, and documentation under `docs/runtime/`. No UI, workflow, API contract, schema, or business logic changes were introduced.
+
+EPIC 101 Enterprise Scalability Foundation on 2026-07-07 did not change module percentages. It added documentation-only performance gates, enterprise query audit, index audit, and 5-year data growth planning for partitioning, archives, persisted read models, and event contracts. No schema, UI, workflow, or API contract changes were introduced.
+
+EPIC 100 Core Foundation on 2026-07-07 did not change module percentages. It added repository-layer boundaries for Inventory aggregate reads, Project runtime/detail source queries, and Logistics dispatch aggregates; documented persisted read-model migration paths; segmented Project Detail tab queries; and created query budget/audit reports. No schema, UI, workflow, or public API contract changes were introduced.
+
+Epic PERF Foundation on 2026-07-07 did not change module percentages. It audited Dashboard API transaction hotspots, introduced an internal cached Inventory dashboard read model, preserved existing Dashboard API compatibility, and added tab-scoped lazy detail loading boundaries for Projects, Inventory Material Detail attachments, and Logistics dispatch detail. Backend and frontend builds passed.
 
 Sprint UX.1 on 2026-07-02 did not change module percentages. It compacted the route-derived topbar to a 50px shell and replaced collapsed sidebar mode with a 64px icon rail plus flyout menus backed by the existing navigation tree.
 
@@ -214,3 +257,15 @@ Sprint 40PROJ.7 on 2026-06-30 converts Projects scheduling/resource/inspection/c
 Sprint 50LOG.1 on 2026-07-01 adds the Logistics Dispatch MVP foundation. Logistics now has persistent DispatchOrder/DispatchItem/DispatchEvent models, real dispatch dashboard APIs, lifecycle endpoints, an API-backed Logistics cockpit, auto suggestion from ProjectTask allocations, and dispatch receive reconciliation into Project task allocations plus Inventory export transactions. Logistics remains partial until exact yard/loading source locations, attachment-backed loading proof, and Project Detail per-line dispatch summary columns are completed.
 
 Sprint INV.BUG.5 / INV.UGX.1 on 2026-07-02 does not change module percentages. It hardens Inventory inbound stock creation by requiring Zone/Slot/Level on every positive inbound line and adds real-history inbound suggestions for last used location, last inbound price, and 30-day weighted average price. Backend and frontend builds passed with no schema or migration changes.
+
+EPIC107 SNAP.1 on 2026-07-07 advances the Enterprise Data/Runtime foundation. It adds persisted Inventory, Project, and Dispatch dashboard snapshot models, applies a real Prisma migration, implements snapshot repositories/writer/reader/validator, and connects snapshot rebuild jobs to real database writes. Dashboard UI/API contracts are unchanged; the next step is to switch selected dashboard reads to `SnapshotReaderService` with fallback. `prisma migrate status` is clean, while `migrate dev` is still blocked by pre-existing migration drift outside this sprint.
+
+EPIC107 SNAP.2 on 2026-07-08 completes the first snapshot read cutover without changing module percentages. Inventory dashboard, Projects runtime, and Logistics dispatch dashboard reads now go through `DashboardReaderService`, which chooses persisted snapshot or runtime aggregate based on feature flags, freshness, confidence, and parity checks. Runtime metrics now expose snapshot fallback/stale/age/confidence. No UI, workflow, API contract, schema, or migration changes were introduced.
+
+EPIC108 Enterprise Validation on 2026-07-08 does not change module percentages. It adds backend-only validation foundations for snapshot parity, performance benchmarking, background recovery inspection, and controlled stress harness execution. Current smoke validation reports 0 parity warnings across 3 checked snapshot rows, 6 completed snapshot rebuild jobs, and healthy idempotency evidence. No UI, public API, workflow, schema, or business logic changes were introduced.
+
+EPIC111 Core Platform Compliance Audit on 2026-07-08 does not change module percentages. It created read-only audit reports for Inventory and Production. The audit scores Inventory at approximately 72% Core Platform compliance and Production at approximately 52%. Inventory is ready for targeted repository/event/read-model cleanup; Production should first resolve domain ambiguity, repository coverage, event contracts, and Production snapshot foundations before major MES expansion.
+
+EPIC112 INV.CORE.1 on 2026-07-08 does not change user-facing module percentages. It completes the first Inventory Core Compliance implementation pass: active Inventory services/controllers now route persistence through `InventoryRepository`, Material Detail and inbound suggestions move into `InventoryReadModelService`, Inventory lifecycle events publish through persistent outbox-backed `InventoryEventService`, and Operations Center overview exposes an additive Inventory platform-health section. UI, workflow, public API contracts, Prisma schema, and migrations were not changed.
+
+EPIC116.1 on 2026-07-08 approves Projects Architecture Freeze v1.0 and fixes backend startup hardening. Project Detail snapshot reads are snapshot-first for summary tabs and repository-fallback for unsupported or stale tabs, while `documents` and `logs` remain read-model paths to avoid one snapshot per screen. Backend startup root cause was a TypeScript build layout mismatch caused by inherited `prisma/**/*.ts` build inputs; `tsconfig.build.json` now emits `dist/main.js`, and `start`, `start:dev`, and `start:prod` all bootstrap successfully.

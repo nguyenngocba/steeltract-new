@@ -10,6 +10,9 @@ import { EventStoreService }
 import { EventBusService }
   from './event-bus.service'
 
+import { EventPublisherService }
+  from './event-publisher.service'
+
 import { EventsController }
   from './events.controller'
 
@@ -25,11 +28,13 @@ import { EventsController }
   providers: [
     EventStoreService,
     EventBusService,
+    EventPublisherService,
   ],
 
   exports: [
     EventStoreService,
     EventBusService,
+    EventPublisherService,
   ],
 })
 export class EventsModule {}

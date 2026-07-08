@@ -10,6 +10,7 @@ import {
   Settings,
   Factory,
   Bell,
+  MonitorCog,
 } from 'lucide-react'
 
 export const navigation = [
@@ -37,6 +38,26 @@ export const navigation = [
         title: 'Thông báo',
         path: '/?tab=notifications',
       },
+    ],
+  },
+
+  {
+    title: 'OPERATIONS CENTER',
+
+    icon: MonitorCog,
+
+    children: [
+      { title: 'Tổng quan', path: '/operations-center' },
+      { title: 'Runtime', path: '/operations-center?tab=runtime' },
+      { title: 'Database', path: '/operations-center?tab=database' },
+      { title: 'Background Jobs', path: '/operations-center?tab=jobs' },
+      { title: 'Snapshot', path: '/operations-center?tab=snapshot' },
+      { title: 'Cache', path: '/operations-center?tab=cache' },
+      { title: 'Storage', path: '/operations-center?tab=storage' },
+      { title: 'API', path: '/operations-center?tab=api' },
+      { title: 'Events', path: '/operations-center?tab=events' },
+      { title: 'Performance', path: '/operations-center?tab=performance' },
+      { title: 'Alerts', path: '/operations-center?tab=alerts' },
     ],
   },
 

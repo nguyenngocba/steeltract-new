@@ -180,6 +180,15 @@ export class ProjectsController {
       .returnProjectComponent(id, componentId, body)
   }
 
+  @Get(':id/detail/:tab')
+  detailTab(
+    @Param('id') id: string,
+    @Param('tab') tab: string,
+  ) {
+    return this.projectsService
+      .detailTab(id, tab)
+  }
+
   @Get(':id/wbs')
   wbs(@Param('id') id: string) {
     return this.projectsService
