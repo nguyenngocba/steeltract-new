@@ -9,6 +9,16 @@ import {
 } from '@nestjs/common'
 
 import { InventoryRepository } from './inventory.repository'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
+import {
+  createMaterialTypeSchema,
+  updateMaterialTypeSchema,
+} from './dto/inventory.dto'
+
+import type {
+  CreateMaterialTypeDto,
+  UpdateMaterialTypeDto,
+} from './dto/inventory.dto'
 
 @Controller('inventory/material-types')
 export class MaterialTypesController {
@@ -26,7 +36,8 @@ export class MaterialTypesController {
 
   @Post()
   async createMaterialType(
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createMaterialTypeSchema))
+    body: CreateMaterialTypeDto,
   ) {
 
     return this.inventoryRepository.createMaterialType({
@@ -54,7 +65,8 @@ export class MaterialTypesController {
   @Put(':id')
   async updateMaterialType(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateMaterialTypeSchema))
+    body: UpdateMaterialTypeDto,
   ) {
 
     return this.inventoryRepository.updateMaterialType(id, {

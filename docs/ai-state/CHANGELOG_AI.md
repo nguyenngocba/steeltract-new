@@ -1,5 +1,109 @@
 # SteelTrack AI Changelog
 
+## 2026-07-09 EPIC119 Inventory Inbound & Outbound UI/UX Audit
+
+Completed:
+
+* Conducted a comprehensive read-only UI/UX, workflow, and data binding audit of the Inbound and Outbound inventory tabs.
+* Traced actual inbound and outbound transaction creation steps from React code to Zod DTO schema and repository DB transaction checks.
+* Compiled a UI/UX consistency matrix showing layout, selector, pagination, and KPI card gaps between tabs.
+* Formulated layout proposals (Drawer-based split layouts) and reusable component mapping for WMS operations.
+* Authored 6 detailed audit reports and design specifications under `docs/audit/` and `docs/design/`.
+* Updated the system state to schedule the implementation of the inbound/outbound workspace.
+
+## 2026-07-09 EPIC118.2 Inventory Historical Chart Data Audit
+
+Completed:
+
+* Conducted a comprehensive read-only audit of all inventory historical charts and widgets in the Inventory Overview page.
+* Identified UI binding early-returns and database schema/repository gaps that cause cards to display "Chưa có dữ liệu lịch sử".
+* Traced the full data lineage from React components down to the PostgreSQL tables.
+* Verified that the database business data cleanup on 2026-06-24 correctly accounts for the initial blank state.
+* Confirmed the integrity of EPIC118.1 remediation work with zero synthetic data and parity preserved.
+* Added documentation for the audit report, data lineage flow, and historical chart remediation plan.
+
+## 2026-07-09 EPIC118.1 Inventory UI Data Binding Remediation
+
+Completed:
+
+* Replaced Inventory Overview and Materials diagnostic `/inventory/audit` reads
+  with additive snapshot/read-model endpoints.
+* Added server-side material search, filters, sorting, pagination, aggregate
+  summary, and facets.
+* Added backward-compatible paginated material transaction history.
+* Removed fabricated trend data and corrected today movement/adjustment/alert
+  metric bindings without redesigning the Inventory UI.
+* Verified 23/23 material, location-stock, and material-snapshot parity.
+
+## 2026-07-09 EPIC118 Inventory UI/Data Binding Audit
+
+Completed:
+
+* Audited Inventory Overview, Materials, and Material Detail without modifying
+  application code.
+* Verified real-data parity for 23 active materials across item quantity, location
+  stock, and material snapshots.
+* Classified UI/data binding as `BLOCKED` because of noncanonical audit reads,
+  incorrect metric bindings, silent query caps, and a fabricated trend fallback.
+* Added the five required EPIC118 audit and remediation reports under `docs/audit`.
+
+## 2026-07-08 Hoàn thành Thiết kế Kho tri thức Doanh nghiệp (Enterprise Knowledge Base - EPIC212)
+
+Completed:
+
+* Hoàn thành thiết kế phân vùng kho tri thức doanh nghiệp và xây dựng cấu trúc thư mục tài liệu đồng bộ tại [docs/](file:///opt/projects/steeltrack/docs).
+* Thiết kế chiến lược nạp ngữ cảnh tối ưu cho AI (Context Budgeting & Inheritance Hierarchy) nhằm ngăn ngừa tràn cửa sổ ngữ cảnh và tăng hiệu suất làm việc của AI Agents.
+* Tạo mới tài liệu giới thiệu tổng quan kho tri thức [README.md](file:///opt/projects/steeltrack/docs/README.md) làm điểm bắt đầu (Entry Point) cho Human và AI.
+* Tạo mới mục lục tối cao [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md) kết nối toàn bộ hệ thống tài liệu theo các nhóm logic.
+* Tạo mới sơ đồ cây thư mục chi tiết [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md) mô tả chức năng của từng phân vùng tài liệu.
+* Tạo mới cẩm nang hướng dẫn quản trị và cập nhật tài liệu [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md) cho con người để tránh hiện tượng trôi lệch tài liệu (Documentation Drift).
+* Tạo mới tài liệu hướng dẫn nạp ngữ cảnh [AI_LOADING_GUIDE.md](file:///opt/projects/steeltrack/docs/AI_LOADING_GUIDE.md) đặc tả quy trình nạp tài liệu theo 5 lớp cho AI Subagents.
+* Tạo mới báo cáo kiểm toán toàn bộ tài liệu [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md) phân loại, đánh giá trạng thái và lên phương án lưu trữ tài liệu lịch sử.
+* Cập nhật các tài liệu trạng thái phát triển hệ thống (`CHANGELOG_AI.md`, `CURRENT_STATE.md`, `PROJECT_STATUS.md`, và `NEXT_TASKS.md`) để đồng bộ hoàn thành EPIC212.
+* Không tạo mới hoặc sửa đổi code thực thi hay database migrations/prisma schema, tuân thủ nghiêm ngặt quy định đóng băng kiến trúc.
+
+Reports:
+
+* [README.md](file:///opt/projects/steeltrack/docs/README.md)
+* [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md)
+* [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md)
+* [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md)
+* [AI_LOADING_GUIDE.md](file:///opt/projects/steeltrack/docs/AI_LOADING_GUIDE.md)
+* [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md)
+
+
+## 2026-07-08 Biên soạn Tài liệu Cẩm nang tri thức và Chiến lược nạp ngữ cảnh AI
+
+Completed:
+
+* Soạn thảo tài liệu cẩm nang Enterprise Knowledge Base [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md) hướng dẫn nguyên tắc đóng băng tài liệu, quy trình cập nhật tài liệu khi kiến trúc thay đổi, chính sách lưu trữ tài liệu cũ và kế hoạch lưu trữ các tài liệu runtime/audit báo cáo cũ.
+* Soạn thảo tài liệu chiến lược nạp ngữ cảnh [AI_LOADING_GUIDE.md](file:///opt/projects/steeltrack/docs/AI_LOADING_GUIDE.md) hướng dẫn AI Agents nạp thông tin tối ưu theo phân hệ (Inventory, Projects, Production, QC, Yard, Logistics, Purchasing, Finance, HR, và AI integrations) nhằm tránh tràn cửa sổ ngữ cảnh.
+* Thực hiện kiểm toán toàn bộ thư mục docs/ hiện hành trong [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md), phân loại chi tiết hơn 200 tập tin markdown vào các nhóm chức năng và xác định các file cũ cần lưu trữ.
+* Cập nhật các tài liệu trạng thái kỹ thuật của hệ thống trong thư mục ai-state để đồng bộ hóa kho tri thức.
+* Không thay đổi bất kỳ mã nguồn thực thi hoặc file database migrations/prisma schema nào, bảo đảm tuyệt đối quy tắc đóng băng kiến trúc.
+
+Reports:
+
+* [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md)
+* [AI_LOADING_GUIDE.md](file:///opt/projects/steeltrack/docs/AI_LOADING_GUIDE.md)
+* [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md)
+
+## 2026-07-08 Chuẩn Hóa Tài Liệu Kiến Thức Dự Án (README, Master Index, Doc Map)
+
+Completed:
+
+* Tạo tệp tài liệu tổng quan [README.md](file:///opt/projects/steeltrack/docs/README.md) giới thiệu kho tri thức, vai trò hệ thống tài liệu, các nguyên tắc tổ chức thư mục docs/ và cách sử dụng cho con người/AI Agents.
+* Tạo tệp mục lục tối cao [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md) phân loại toàn bộ tài liệu dự án thành các nhóm logic (Source of Truth, Core Architecture & Blueprints, Governance & Standards, Runtime/Audit/Archive) với các liên kết tuyệt đối clickable dạng file:// không chứa dấu backticks quanh link text.
+* Tạo tệp bản đồ cấu trúc thư mục [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md) biểu diễn cây thư mục docs/ bằng ký tự phân cấp ASCII, giải thích chi tiết chức năng từng thư mục và chỉ dẫn các phương pháp tìm kiếm tài liệu nhanh (Semble, Ripgrep, Master Index).
+* Cập nhật các tài liệu trạng thái kỹ thuật của hệ thống trong thư mục ai-state để đồng bộ hóa kho tri thức.
+* Không thay đổi bất kỳ mã nguồn thực thi hoặc file database migrations/prisma schema nào, bảo đảm tuyệt đối quy tắc đóng băng kiến trúc.
+
+Reports:
+
+* [README.md](file:///opt/projects/steeltrack/docs/README.md)
+* [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md)
+* [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md)
+
 ## 2026-07-08 EPIC116 – Project Detail Snapshot Completion & Architecture Freeze
 
 Completed:
@@ -3432,6 +3536,15 @@ Notes:
 * Project Detail snapshots are now limited to reusable execution summary tabs (`overview`, `materials`, `components`, `progress`, `command`, `site`, `costs`); `documents` and `logs` remain repository read-model fallback paths to avoid per-screen snapshot sprawl.
 * Backend startup root cause was fixed in `apps/backend-api/tsconfig.build.json`: production builds now compile only `src/**/*.ts` with `rootDir: ./src` and emit `dist/main.js`, matching `node dist/main`.
 * Verified `pnpm -C apps/backend-api start`, `start:dev`, and `start:prod` all reach `Nest application successfully started`; test runs were timeout-terminated because the server commands are long-running.
+* EPIC117 completed a read-only Inventory Business Completion audit without changing UI, API contracts, Core Platform, Repository, Snapshot, Event, or Background Engine code.
+* Inventory ledger/location/item snapshot data is internally consistent in the current database: 0 item quantity mismatches, 0 location bucket mismatches, 0 negative location stocks, and 0 missing/zero transaction valuations.
+* Inventory Business Freeze is BLOCKED because 3 `InventoryMaterialSnapshot` rows differ from live location stock, controller-level transaction DTO validation is not yet formalized, and Stock Take still needs a final first-class lifecycle decision.
+* EPIC117.1 completed Inventory Business P0 remediation and approved Inventory Business Freeze v1.0.
+* Corrected `InventoryMaterialSnapshot.currentStock` to use canonical live location balances instead of incomplete historical transaction reconstruction.
+* Reconciled the three reported material snapshots through persistent outbox events and Background Engine jobs; 23/23 active materials now match live stock.
+* Added typed Zod validation for Inventory transaction/item, material master, category, unit, and material-type write endpoints; no `@Body() any` remains in the Inventory module.
+* Completed transaction-line validation for warehouse, zone, slot, level, unit price, and total amount while retaining legacy request compatibility.
+* Retained adjustment-backed Stock Take for v1.0 and documented a first-class session/approval architecture for Phase 2.
 
 ## 2026-06-02
 

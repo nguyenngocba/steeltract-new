@@ -12,6 +12,24 @@ Logistics         0%
 Settings         55%
 Dashboard        60%
 Operations Center 20%
+Documentation   100%
+
+EPIC118.1 on 2026-07-09 remediated Inventory UI data binding without redesigning
+the Overview or Materials workspaces. Snapshot-backed overview/material read
+contracts, server-side query state, paginated material history, real movement
+metrics, and lazy transaction attachments are active. Inventory UI/Data Binding
+v1.0 is APPROVED WITH LIMITATIONS; Inventory Architecture and Business Freeze
+remain approved.
+
+EPIC212 hoàn thành vào ngày 2026-07-08 thiết lập Kho Tri thức Doanh nghiệp (Enterprise Knowledge Base) của SteelTrack. EPIC này chuẩn hóa và tạo mới 6 tài liệu cốt lõi giúp đồng bộ hóa thông tin và quản lý ngữ cảnh:
+* Entry Point chính thức cho Human và AI: [README.md](file:///opt/projects/steeltrack/docs/README.md) giới thiệu kho tri thức và kiến trúc hệ thống.
+* Kết nối toàn bộ corpus tài liệu: [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md) làm mục lục tối cao kết nối các tệp tin theo nhóm logic.
+* Định hình sơ đồ cây thư mục: [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md) ánh xạ cấu trúc và vai trò của từng phân khu tài nguyên.
+* Cẩm nang quản lý tri thức cho con người: [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md) quy định vòng đời tài liệu (DRAFT, PROPOSED, ACTIVE, FROZEN) và tiêu chí đóng băng kiến trúc để ngăn chặn hiện tượng trôi lệch tài liệu (Documentation Drift).
+* Chiến lược nạp ngữ cảnh tối ưu cho AI: [AI_LOADING_GUIDE.md](file:///opt/projects/steeltrack/docs/AI_LOADING_GUIDE.md) thiết lập ngân sách token (10k-15k tokens) và 5 lớp kế thừa ngữ cảnh cho AI Subagents theo từng phân hệ.
+* Báo cáo kiểm toán chất lượng tài liệu: [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md) rà soát, phân loại 200+ tệp markdown và lập kế hoạch dọn dẹp các báo cáo tĩnh, báo cáo polish UI cũ sang thư mục lưu trữ.
+
+
 Core Platform Architecture documents (Naming Conventions, API Contracts, Domain Boundaries, Performance SLA, Versioning Policy, Module Dependency Map) completed on 2026-07-08. It defines the system naming conventions (DB, repos, events, snapshots, versioning), REST API design standards (pagination, filtering, Zod error formats), detailed module boundaries and caller permission matrices, performance targets (Dashboard < 150ms, Lookup < 80ms, Search < 300ms, Detail < 120ms, Report < 1000ms), background worker exponential backoff math, DLQ rules, snapshot freshness/lag limits, semantic versioning and double-write schema migrations, and deployment rollback protocols.
 
 Enterprise Architecture Governance & ADRs (ADR001-ADR010) completed on 2026-07-08. It establishes the Software Architecture Quality Management process, the Architecture Guardian role guidelines, the periodic Architecture Review Board (ARB) processes, and 10 core Architectural Decision Records (ADRs) detailing design patterns (Repository, Snapshot First, Background Engine, Outbox, and more) aligning with the SteelTrack Core Platform architecture.
@@ -194,6 +212,10 @@ Sprint 11A.2 / 13B.3 on 2026-06-17 did not change module percentages. It consoli
 
 Sprint 14A on 2026-06-17 did not change module percentages. It added the shared attachment metadata/filesystem foundation, moved upload storage to `STORAGE_ROOT` or `/data/steeltrack-storage`, added checksum dedupe, and connected Inventory Material Detail image upload/document display to the Attachments backend.
 
+EPIC117.1 on 2026-07-09 approved **Inventory Business Freeze v1.0**. Repository,
+event/outbox, background snapshot, runtime metrics, Operations Center, and data
+consistency gates pass; material snapshot parity is 100% for the active dataset.
+
 Sprint 14B on 2026-06-18 did not change module percentages. It reused the shared Attachments foundation for Inventory transaction documents, added transaction document categories, transaction storage routing, create-form attachment upload, and a transaction detail attachment tab.
 
 Sprint 14B.4 on 2026-06-18 did not change module percentages. It improved Inventory attachment UX discoverability with transaction/material attachment badges and overview quick panels, without backend, API, storage, database, or workflow changes.
@@ -269,3 +291,5 @@ EPIC111 Core Platform Compliance Audit on 2026-07-08 does not change module perc
 EPIC112 INV.CORE.1 on 2026-07-08 does not change user-facing module percentages. It completes the first Inventory Core Compliance implementation pass: active Inventory services/controllers now route persistence through `InventoryRepository`, Material Detail and inbound suggestions move into `InventoryReadModelService`, Inventory lifecycle events publish through persistent outbox-backed `InventoryEventService`, and Operations Center overview exposes an additive Inventory platform-health section. UI, workflow, public API contracts, Prisma schema, and migrations were not changed.
 
 EPIC116.1 on 2026-07-08 approves Projects Architecture Freeze v1.0 and fixes backend startup hardening. Project Detail snapshot reads are snapshot-first for summary tabs and repository-fallback for unsupported or stale tabs, while `documents` and `logs` remain read-model paths to avoid one snapshot per screen. Backend startup root cause was a TypeScript build layout mismatch caused by inherited `prisma/**/*.ts` build inputs; `tsconfig.build.json` now emits `dist/main.js`, and `start`, `start:dev`, and `start:prod` all bootstrap successfully.
+
+EPIC117 on 2026-07-08 does not change module percentages or user-facing behavior. It completes Inventory Business Freeze Phase 1 audit. Ledger/location/item compatibility data is clean in the current database, but Inventory Business Freeze is BLOCKED by 3 material snapshot parity mismatches, non-formal controller-level transaction DTO validation, and an unresolved Stock Take lifecycle decision. No UI, API contract, Core Platform, Repository, Snapshot, Event, or Background Engine code was changed.

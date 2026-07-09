@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
@@ -14,10 +14,9 @@ import {
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS } from '../../../../shared/ui/cockpit'
 import { useDeleteMaterial } from '../../hooks/useDeleteMaterial'
 import { useCategories } from '../../hooks/useCategories'
-import { useInventoryAudit } from '../../hooks/useInventoryAudit'
-import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
+import { useInventoryMaterials, useInventoryOverview } from '../../hooks/useInventoryReadModels'
 import { formatCurrencyVnd, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format'
 
 const PAGE_SIZE = 16
@@ -297,12 +296,6 @@ function CompactDonut({ segments, centerValue, centerLabel }: { segments: Array<
 }
 
 export function InventoryMaterialsPage() {
-  const { data: rows = [], refetch: refetchAudit } = useInventoryAudit()
-  const { data: zones = [] } = useZones()
-  const { data: categories = [] } = useCategories()
-  const { data: transactions = [] } = useInventoryTransactions({})
-  const deleteMaterialMutation = useDeleteMaterial()
-
   const [open, setOpen] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null)
   const [detailMaterial, setDetailMaterial] = useState<any | null>(null)
@@ -322,67 +315,51 @@ export function InventoryMaterialsPage() {
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((item: any) => {
-      if (q) {
-        const match = [
-          item.materialCode,
-          item.materialName,
-          item.materialType,
-          item.category,
-          item.zone,
-          item.position,
-          displayLocation(item),
-        ].join(' ').toLowerCase().includes(q)
-        if (!match) return false
-      }
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchDraft)
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchDraft])
 
-      if (categoryFilter && String(item.categoryId ?? '') !== categoryFilter) return false
-      if (usageFilter && String(item.materialUsageType ?? 'PRIMARY') !== usageFilter) return false
+  const query = {
+    page,
+    pageSize: PAGE_SIZE,
+    search: search || undefined,
+    categoryId: categoryFilter || undefined,
+    materialUsageType: usageFilter || undefined,
+    warehouse: zoneFilter || undefined,
+    stockStatus: statusFilter || undefined,
+    sortBy: 'code' as const,
+    sortOrder: 'asc' as const,
+  }
+  const overviewQuery = {
+    search: search || undefined,
+    categoryId: categoryFilter || undefined,
+    materialUsageType: usageFilter || undefined,
+    warehouse: zoneFilter || undefined,
+    stockStatus: statusFilter || undefined,
+  }
+  const { data: materialsData, refetch: refetchMaterials } = useInventoryMaterials(query)
+  const { data: overviewData, refetch: refetchOverview } = useInventoryOverview(overviewQuery)
+  const { data: zones = [] } = useZones()
+  const { data: categories = [] } = useCategories()
+  const deleteMaterialMutation = useDeleteMaterial()
+  const rows = materialsData?.items ?? []
+  const transactions: any[] = []
 
-      if (zoneFilter) {
-        const zoneText = rowLocations(item)
-          .map((location: any) => [
-            location.zoneCode,
-            location.zoneName,
-            location.warehouseName,
-            location.warehouseCode,
-          ].filter(Boolean).join(' '))
-          .join(' ')
-        if (!zoneText.toLowerCase().includes(zoneFilter.toLowerCase())) return false
-      }
-
-      if (statusFilter) {
-        const status = stockStatus(item)
-        if (status !== statusFilter) return false
-      }
-      return true
-     })
-    .sort((a: any, b: any) => {
-      const codeA = a.materialCode ?? '';
-      const codeB = b.materialCode ?? '';
-      return codeA.localeCompare(codeB);
-    });
-  }, [rows, search, categoryFilter, usageFilter, zoneFilter, statusFilter])
-
-  const kpis = useMemo(() => {
-    const totalValue = filteredRows.reduce((acc: number, row: any) => acc + Number(row.inventoryValue ?? 0), 0)
-    const totalQty = filteredRows.reduce((acc: number, row: any) => acc + totalWarehouseStock(row), 0)
-    const low = filteredRows.filter((row: any) => stockStatus(row) === 'LOW').length
-    const out = filteredRows.filter((row: any) => stockStatus(row) === 'OUT').length
-    return {
-      totalValue,
-      totalQty,
-      totalCodes: filteredRows.length,
-      low,
-      out,
-    }
-  }, [filteredRows])
-
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
-  const activePage = Math.min(page, totalPages)
-  const pagedRows = filteredRows.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE)
+  const filteredRows = rows
+  const kpis = {
+    totalValue: num(overviewData?.summary?.totalValue),
+    totalQty: num(overviewData?.summary?.totalStock),
+    totalCodes: num(overviewData?.summary?.totalItems),
+    low: num(overviewData?.summary?.lowStock),
+    out: num(overviewData?.summary?.outOfStock),
+  }
+  const totalPages = materialsData?.totalPages ?? 1
+  const activePage = materialsData?.page ?? page
+  const pagedRows = rows
 
   async function handleDelete(id: string) {
     setDeleteError('')
@@ -440,20 +417,10 @@ export function InventoryMaterialsPage() {
   }
 
   const zoneDistribution = useMemo<Array<[string, number]>>(() => {
-    const map = new Map<string, number>()
-    filteredRows.forEach((row: any) => {
-      const locations = rowLocations(row)
-      if (!locations.length) {
-        map.set('KHU MẶC ĐỊNH', (map.get('KHU MẶC ĐỊNH') ?? 0) + totalWarehouseStock(row))
-        return
-      }
-      locations.forEach((location: any) => {
-        const key = locationLabel(location) || 'KHU MẶC ĐỊNH'
-        map.set(key, (map.get(key) ?? 0) + num(location.quantity))
-      })
-    })
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1])
-  }, [filteredRows])
+    return (overviewData?.facets?.warehouses ?? [])
+      .map((item: any) => [String(item.label), num(item.value)] as [string, number])
+      .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
+  }, [overviewData])
 
   const zoneSegments = useMemo(() => {
     const colors = ['#1d7cff', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4']
@@ -502,35 +469,27 @@ export function InventoryMaterialsPage() {
   }, [alerts, alertChartPage])
 
   const monthlyTrend = useMemo(() => {
-    const txRows = transactionRows(transactions)
-    const now = new Date()
-    const months = Array.from({ length: 6 }).map((_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      return { date, key }
-    })
-    const movements = months.map(({ key }) => {
-      return txRows
-        .filter((tx: any) => transactionDateKey(tx, 7) === key)
-        .reduce((sum: number, tx: any) => {
-          const type = String(tx.type ?? '').toUpperCase()
-          const amount = transactionAmount(tx)
-          if (type === 'OUTBOUND') return sum - amount
-          if (type === 'INBOUND' || type === 'ADJUSTMENT' || type === 'RETURN') return sum + amount
-          return sum
-        }, 0)
-    })
-    let runningValue = Math.max(0, kpis.totalValue - movements.reduce((sum, value) => sum + value, 0))
-    return months.map(({ date }, index) => {
-      runningValue = Math.max(0, runningValue + movements[index])
+    return (overviewData?.stockTrend ?? []).slice(-6).map((row: any) => {
+      const date = new Date(row.date)
       return {
         label: `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(2)}`,
-        value: runningValue,
+        value: num(row.value),
       }
     })
-  }, [transactions, kpis.totalValue])
+  }, [overviewData])
 
   const kpiTrend = useMemo(() => {
+    const stockRows = overviewData?.stockTrend ?? []
+    return {
+      value: stockRows.map((row: any) => num(row.value)),
+      quantity: stockRows.map((row: any) => num(row.quantity)),
+      codes: [],
+      low: [],
+      out: [],
+      newCodesThisMonth: 0,
+      newCodesPreviousMonth: 0,
+    }
+
     const txRows = transactionRows(transactions)
     const now = new Date()
 
@@ -685,7 +644,7 @@ export function InventoryMaterialsPage() {
         return monthKey(firstTxDate) === monthKey(previousMonth)
       }).length,
     }
-  }, [transactions, filteredRows, kpis])
+  }, [transactions, filteredRows, kpis, overviewData])
 
   const kpiDeltas = useMemo(() => {
     const percent = (curr: number, prev: number, suffix: string) => {
@@ -790,20 +749,17 @@ export function InventoryMaterialsPage() {
   }, [kpiTrend]);
 
   const quickStats = useMemo(() => {
-    const txRows = transactionRows(transactions)
-    const today = new Date().toISOString().slice(0, 10)
-    const month = new Date().toISOString().slice(0, 7)
-    const byTypeToday = (type: string) => txRows.filter((tx: any) => String(tx.type ?? '').toUpperCase() === type && transactionDateKey(tx, 10) === today)
-    const byTypeMonth = (type: string) => txRows.filter((tx: any) => String(tx.type ?? '').toUpperCase() === type && transactionDateKey(tx, 7) === month)
-    const sumQty = (list: any[]) => list.reduce((sum, tx) => sum + transactionQuantity(tx), 0)
+    const today = overviewData?.today ?? {}
+    const month = overviewData?.month ?? {}
+    const metric = (source: any, type: string) => source?.[type] ?? {}
     return [
-      { title: 'Nhập kho hôm nay', value: `${formatQuantity(sumQty(byTypeToday('INBOUND')), 0)} tấn`, note: `${byTypeToday('INBOUND').length} phiếu`, tone: 'text-cyan-300' },
-      { title: 'Xuất kho hôm nay', value: `${formatQuantity(sumQty(byTypeToday('OUTBOUND')), 0)} tấn`, note: `${byTypeToday('OUTBOUND').length} phiếu`, tone: 'text-red-300' },
-      { title: 'Điều chuyển hôm nay', value: `${formatQuantity(sumQty(byTypeToday('TRANSFER')), 0)} tấn`, note: `${byTypeToday('TRANSFER').length} phiếu`, tone: 'text-blue-300' },
-      { title: 'Kiểm kê tháng này', value: `${formatQuantity(sumQty(byTypeMonth('ADJUSTMENT')), 0)} tấn`, note: 'Hoàn thành', tone: 'text-emerald-300' },
-      { title: 'Chênh lệch tồn kho', value: `${kpis.totalCodes ? (((kpis.low + kpis.out) / kpis.totalCodes) * -100).toFixed(2) : '0.00'}%`, note: 'Theo cảnh báo tồn', tone: 'text-amber-300' },
+      { title: 'Nhập kho hôm nay', value: `${formatQuantity(num(metric(today, 'INBOUND').quantity), 0)} tấn`, note: `${num(metric(today, 'INBOUND').documents)} phiếu`, tone: 'text-cyan-300' },
+      { title: 'Xuất kho hôm nay', value: `${formatQuantity(num(metric(today, 'OUTBOUND').quantity), 0)} tấn`, note: `${num(metric(today, 'OUTBOUND').documents)} phiếu`, tone: 'text-red-300' },
+      { title: 'Điều chuyển hôm nay', value: `${formatQuantity(num(metric(today, 'TRANSFER').quantity), 0)} tấn`, note: `${num(metric(today, 'TRANSFER').documents)} phiếu`, tone: 'text-blue-300' },
+      { title: 'Điều chỉnh tháng này', value: `${formatQuantity(num(metric(month, 'ADJUSTMENT').quantity), 0)} tấn`, note: `${num(metric(month, 'ADJUSTMENT').documents)} phiếu`, tone: 'text-emerald-300' },
+      { title: 'Cảnh báo tồn kho', value: `${kpis.low + kpis.out} mã`, note: `${kpis.low} sắp hết · ${kpis.out} hết hàng`, tone: 'text-amber-300' },
     ]
-  }, [transactions, kpis.low, kpis.out, kpis.totalCodes])
+  }, [overviewData, kpis.low, kpis.out])
 
   const warehouseOptions = useMemo(() => {
     const map = new Map<string, string>()
@@ -830,7 +786,8 @@ export function InventoryMaterialsPage() {
     setPage(1)
     setZoneChartPage(1)
     setAlertChartPage(1)
-    void refetchAudit()
+    void refetchMaterials()
+    void refetchOverview()
   }
 
   return (
@@ -1053,7 +1010,7 @@ export function InventoryMaterialsPage() {
                         </table>
                       </CockpitTableShell>
                       </div>
-                      <MaterialsPagination page={activePage} pageCount={totalPages} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+                      <MaterialsPagination page={activePage} pageCount={totalPages} total={materialsData?.total ?? 0} pageSize={PAGE_SIZE} onPageChange={setPage} />
                     </InventoryPanel>
 
                    <div className="space-y-1 xl:col-span-3">
@@ -1125,7 +1082,7 @@ export function InventoryMaterialsPage() {
                   <div className="max-h-[90vh] w-full max-w-[95vw] overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-white">
-                        Toàn bộ danh sách tồn kho ({filteredRows.length} vật tư)
+                        Danh sách trang hiện tại ({filteredRows.length}/{materialsData?.total ?? 0} vật tư)
                       </h3>
                       <button
                         onClick={() => setShowAll(false)}
@@ -1300,6 +1257,13 @@ export function InventoryMaterialsPage() {
 }
 
 function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number }> }) {
+  if (rows.length === 0) {
+    return (
+      <div className="grid h-[90px] place-items-center text-xs text-slate-500">
+        Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ.
+      </div>
+    )
+  }
   const max = Math.max(1, ...rows.map((row) => row.value))
   const points = rows.map((row, index) => {
     const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100

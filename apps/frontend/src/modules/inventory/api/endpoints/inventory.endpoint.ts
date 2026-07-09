@@ -87,6 +87,54 @@ export async function getInventoryAudit() {
   return response.data
 }
 
+export type InventoryMaterialQuery = {
+  page?: number
+  pageSize?: number
+  search?: string
+  categoryId?: string
+  materialTypeId?: string
+  materialUsageType?: string
+  warehouse?: string
+  stockStatus?: string
+  sortBy?: 'code' | 'name' | 'currentStock' | 'inventoryValue' | 'updatedAt'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export async function getInventoryMaterials(
+  params: InventoryMaterialQuery,
+  signal?: AbortSignal,
+) {
+  const response = await http.get('/inventory/materials', {
+    params,
+    signal,
+  })
+  return response.data
+}
+
+export async function getInventoryOverview(
+  params: Omit<InventoryMaterialQuery, 'page' | 'pageSize' | 'sortBy' | 'sortOrder'>,
+  signal?: AbortSignal,
+) {
+  const response = await http.get('/inventory/overview', {
+    params,
+    signal,
+  })
+  return response.data
+}
+
+export async function getMaterialTransactions(
+  materialId: string,
+  page: number,
+  pageSize: number,
+  signal?: AbortSignal,
+) {
+  const response = await http.get('/inventory/transactions', {
+    params: { materialId, page, pageSize },
+    signal,
+  })
+  return response.data
+}
+
 export async function getTransactionDetail(
   id: string,
 ) {

@@ -1,4 +1,21 @@
 # Next Tasks
+- **Inventory inbound & outbound UI/UX remediation**: Implement the unified WMS Inbound and Outbound workspace proposed in [inventory-inbound-outbound-remediation-plan.md](file:///opt/projects/steeltrack/docs/design/inventory-inbound-outbound-remediation-plan.md) to support multi-line transactions, drawer-based layouts, and standardized selectors.
+- **Inventory historical chart remediation**: Implement the historical snapshot and background rebuild backfill plan outlined in [inventory-historical-chart-remediation-plan.md](file:///opt/projects/steeltrack/docs/audit/inventory-historical-chart-remediation-plan.md) to restore historical trends and deltas for all 8 KPI cards.
+- **Inventory pagination threshold review**: Benchmark deep offset pages with a
+  realistic high-write dataset before deciding whether material/history endpoints
+  need cursor pagination.
+- **Runtime Prisma profiler repair**: Investigate why request metrics report
+  `prisma=0` for repository queries so future large-data validation can include SQL
+  count and SQL time.
+- **Inventory UI browser smoke test**: Validate Overview and Materials search,
+  filters, page transitions, empty/error states, and Material Detail history with
+  an authenticated operator session.
+- **Automated broken link checker**: Phát triển hoặc tích hợp công cụ kiểm tra tự động các liên kết `file://` trong toàn bộ thư mục [docs/](file:///opt/projects/steeltrack/docs) trước khi thực hiện quy trình duyệt PR, nhằm đảm bảo không có liên kết hỏng.
+- **Weekly AI state sync validation**: Thiết lập kịch bản tự động kiểm tra tính đồng bộ của trạng thái AI, bảo đảm mọi thay đổi trong [CHANGELOG_AI.md](file:///opt/projects/steeltrack/docs/ai-state/CHANGELOG_AI.md) được ánh xạ chính xác sang [CURRENT_STATE.md](file:///opt/projects/steeltrack/docs/ai-state/CURRENT_STATE.md) và [PROJECT_STATUS.md](file:///opt/projects/steeltrack/docs/ai-state/PROJECT_STATUS.md) trước khi đóng phiên làm việc.
+- **Periodic Documentation Auditing Schedule**: Thiết lập chu kỳ kiểm toán định kỳ hàng tháng cho hệ thống tài liệu, trong đó Architecture Guardian cập nhật [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md) và di chuyển các báo cáo vận hành, báo cáo sửa lỗi cũ vào [docs/archive/](file:///opt/projects/steeltrack/docs/archive/).
+- **Document Compliance Review for active modules**: Trước khi bắt đầu các Sprint liên quan đến Production, Yard, QC hay Logistics, thực hiện đánh giá tính tuân thủ tài liệu để bảo đảm các đặc tả trong `docs/ai-state/modules/` khớp hoàn toàn với các bản thiết kế tĩnh trong `docs/architecture/`.
+- **Implement periodic archiving of stale documents**: Move the historical audit and runtime reports listed in [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md) and [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md) from `docs/audit/`, `docs/runtime/`, `docs/bugs/`, `docs/dev/`, and `docs/ui/` into [docs/archive/](file:///opt/projects/steeltrack/docs/archive/) during the next scheduled cleanup, ensuring all internal doc links are updated.
+- **Documentation Integrity Check**: Định kỳ kiểm tra tính toàn vẹn và cập nhật các blueprint hoặc báo cáo mới tạo vào [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md) và [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md).
 - **EPIC116 Projects Architecture Freeze validation**: Use `docs/runtime/project-architecture-freeze-v1.md` as the Projects architecture gate. Validate Project Detail snapshot parity with real operator activity across `overview`, `materials`, `components`, `progress`, `command`, `site`, `costs`, `documents`, and `logs`; then review Operations Center Project Detail snapshot hit/fallback/lag.
 - **Architecture inheritance rule**: Treat Inventory and Projects as Architecture Freeze v1.0 reference modules. Future Production, Purchasing, QC, Maintenance, Yard, and Logistics implementation should inherit repository boundaries, snapshot-first reads, read-model fallback, outbox events, background snapshot writers, runtime metrics, and Operations Center health signals.
 - **Architecture Audit - Performance, Versioning & Dependencies**: Verify that new business modules (Production, QC, Yard, Logistics, Finance) strictly adhere to response time SLAs, double-write migration protocols, and allowed/forbidden dependency paths as defined in [enterprise-performance-sla.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-performance-sla.md), [enterprise-versioning-policy.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-versioning-policy.md), and [enterprise-module-dependency-map.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-module-dependency-map.md).
@@ -232,3 +249,27 @@ Backlog after the locked order:
     - `pnpm -C apps/backend-api start:dev`
     - `pnpm -C apps/backend-api start:prod`
     - Confirm the production build output contains `dist/main.js` and not `dist/src/main.js`.
+38. EPIC117 P0 before Inventory Business Freeze:
+    - Reconcile the 3 `InventoryMaterialSnapshot` mismatches found in `docs/runtime/inventory-data-consistency-report.md`.
+    - Verify the approved background worker path refreshes affected material snapshots and re-run parity validation.
+    - Attach formal transaction DTO validation to `POST /inventory/transactions` without changing the public API contract.
+    - Extend `createTransactionSchema.items[]` to model existing line-level `warehouseId`, `zoneId`, `slotId`, `level`, `unitPrice`, and `totalAmount` fields.
+    - Decide whether current adjustment-backed Stock Take is business-acceptable for Freeze or whether a first-class Stock Take session lifecycle is required.
+39. EPIC117 P1 Inventory reporting backlog:
+    - Nhập theo ngày.
+    - Xuất theo ngày.
+    - Tồn theo kho.
+    - Tồn theo vị trí.
+    - Giá trị tồn.
+    - Tuổi tồn kho.
+    - Hàng chậm luân chuyển.
+    - Vật tư âm / exception report.
+- Inventory Business Freeze v1.0 is approved. Treat transaction-first mutation,
+  location stock authority, repository boundaries, persistent outbox, background
+  snapshots, snapshot-first reads, and Operations Center metrics as frozen
+  architectural constraints.
+- Plan Stock Take Phase 2 only as a dedicated business sprint:
+  `Session -> Count -> Recount -> Review -> Approval -> Adjustment -> Close`.
+- Add a non-destructive historical data-quality task for the one pre-validation
+  IMPORT line without slot/level metadata; do not rewrite the immutable
+  transaction without an approved reconciliation procedure.

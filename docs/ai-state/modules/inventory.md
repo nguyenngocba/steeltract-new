@@ -1,8 +1,67 @@
 # Inventory Module
 
+## EPIC119 Inventory Inbound & Outbound UI/UX Audit
+
+Status: **COMPLETED**
+
+- Audited all Inbound and Outbound UI elements, workflows, and database integration structures in a read-only manner.
+- Identified that both operations are limited to single-item transactions (P0), lack split-location export (P0), and use center modals instead of right drawers (P1).
+- Mapped Inbound/Outbound workflows and data-binding channels, highlighting the combined location selector and KPI card differences as inconsistencies.
+- Outlined a Drawer-based multi-line layout proposal in [inventory-inbound-outbound-layout-proposal.md](file:///opt/projects/steeltrack/docs/design/inventory-inbound-outbound-layout-proposal.md), component maps in [inventory-inbound-outbound-component-map.md](file:///opt/projects/steeltrack/docs/design/inventory-inbound-outbound-component-map.md), and remediation steps in [inventory-inbound-outbound-remediation-plan.md](file:///opt/projects/steeltrack/docs/design/inventory-inbound-outbound-remediation-plan.md).
+
+## EPIC118.2 Inventory Historical Chart Data Audit
+
+Status: **COMPLETED**
+
+- Audited all historical widgets and charts in `InventoryOverviewPage` in a read-only manner.
+- Identified that "Chưa có dữ liệu lịch sử" displays for 6 metric cards due to UI early returns (UI_BINDING_ERROR) and absence of database schema/fields for out-of-stock and categories in `InventoryDashboardSnapshot` (SNAPSHOT_PAYLOAD_MISSING).
+- Documented findings in [inventory-historical-chart-audit.md](file:///opt/projects/steeltrack/docs/audit/inventory-historical-chart-audit.md), mapped data flows in [inventory-historical-data-flow.md](file:///opt/projects/steeltrack/docs/audit/inventory-historical-data-flow.md), and formulated remediation steps in [inventory-historical-chart-remediation-plan.md](file:///opt/projects/steeltrack/docs/audit/inventory-historical-chart-remediation-plan.md).
+
+## EPIC118.1 UI/Data Binding Remediation
+
+Status: **APPROVED WITH LIMITATIONS**
+
+- Overview normal reads use `/inventory/overview`, backed by persisted material
+  and dashboard snapshots plus bounded repository aggregates.
+- Materials use `/inventory/materials` with server-side search, filters, sorting,
+  pagination, summary, and facets.
+- Material transaction/log history is page-scoped and lazy.
+- Transaction attachments are fetched by transaction ID on demand.
+- Synthetic inventory trends and incorrect today/stocktake/variance bindings were
+  removed.
+- Material/location/snapshot parity remains 23/23.
+- Remaining limitations: offset pagination needs large-data benchmarking; runtime
+  Prisma query-count telemetry currently reports zero.
+
+## EPIC118 UI/Data Binding Status
+
+Historical audit status: **REMEDIATED BY EPIC118.1**
+
+- Database parity at audit time: PASS for all 23 active materials.
+- Material Detail snapshot-first path: PASS.
+- Location snapshot-first path: PASS.
+- The original `/inventory/audit` binding, synthetic trend, and client-side
+  1,000/200-row limits were the blockers.
+- EPIC118.1 replaced those target-page paths. See
+  `docs/runtime/inventory-ui-data-parity-report.md`.
+
 ## Current Sprint
 
-SteelTrack EPIC112 - Inventory Snapshot Completion and Architecture Freeze
+SteelTrack EPIC118.1 - Inventory UI Data Binding Remediation
+
+Business Freeze audit update:
+
+- EPIC117 Inventory Business Completion was completed as an audit-only pass.
+- Ledger/location/item consistency checks passed:
+  - `inventory_items.quantity` matches `inventory_location_stocks` totals for audited items.
+  - `InventoryLocationSnapshot` totals match live location stock totals.
+  - No negative location stock rows were found.
+  - Inventory transaction items have complete valuation fields.
+- Inventory Business Freeze v1.0 is approved.
+- Formal DTO/Zod validation, transaction line location/valuation fields, and
+  material/location snapshot parity were completed in EPIC117.1.
+- Stock Take retains the approved adjustment-based v1 workflow; a first-class
+  session lifecycle remains Phase 2 scope.
 
 Scope:
 
@@ -662,3 +721,18 @@ Phase B - Database enhancement for steel-structure Material Master fields:
 - `defaultSupplier`
 - `leadTimeDays`
 - stronger unit/category/material type DTO alignment
+
+## Business Freeze v1.0
+
+Approved: 2026-07-09
+
+- Active stock authority: `inventory_location_stocks`.
+- Material snapshot parity: 23/23, zero mismatches.
+- Item quantity compatibility parity: zero mismatches.
+- Transaction valuation completeness: 78/78 lines.
+- Inventory controller validation: typed Zod DTOs; no `@Body() any`.
+- Snapshot repair path: persistent outbox -> Background Engine -> writer.
+- Operations Center: no pending/failed Inventory outbox events or jobs after
+  reconciliation.
+- Stock Take v1.0 remains adjustment-backed. A formal session and approval
+  lifecycle is documented for Phase 2.

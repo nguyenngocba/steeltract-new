@@ -9,6 +9,16 @@ import {
 } from '@nestjs/common'
 
 import { InventoryRepository } from './inventory.repository'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
+import {
+  createInventoryUnitSchema,
+  updateInventoryUnitSchema,
+} from './dto/inventory.dto'
+
+import type {
+  CreateInventoryUnitDto,
+  UpdateInventoryUnitDto,
+} from './dto/inventory.dto'
 
 @Controller('inventory/units')
 export class InventoryUnitsController {
@@ -26,7 +36,8 @@ export class InventoryUnitsController {
 
   @Post()
   async createUnit(
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createInventoryUnitSchema))
+    body: CreateInventoryUnitDto,
   ) {
     return this.inventoryRepository.createUnit({
         code: String(body.code ?? '').trim().toUpperCase(),
@@ -41,7 +52,8 @@ export class InventoryUnitsController {
   @Put(':id')
   async updateUnit(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateInventoryUnitSchema))
+    body: UpdateInventoryUnitDto,
   ) {
     return this.inventoryRepository.updateUnit(id, {
         code: body.code != null ? String(body.code).trim().toUpperCase() : undefined,

@@ -12,6 +12,19 @@ import { nextOperationalCode } from '../../common/utils/code-generator';
 
 type DbClient = PrismaService | Prisma.TransactionClient;
 
+export type InventoryMaterialQuery = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  categoryId?: string;
+  materialTypeId?: string;
+  materialUsageType?: string;
+  warehouse?: string;
+  stockStatus?: 'OUT' | 'LOW' | 'NORMAL';
+  sortBy?: 'code' | 'name' | 'currentStock' | 'inventoryValue' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
+};
+
 @Injectable()
 export class InventoryRepository {
   constructor(
@@ -52,6 +65,271 @@ export class InventoryRepository {
     return this.prisma.inventoryItem.count({
       where: this.buildItemWhere(search),
     });
+  }
+
+  async listMaterialSnapshotPage(params: InventoryMaterialQuery) {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 16;
+    const offset = (page - 1) * pageSize;
+    const where = this.materialSnapshotWhere(params);
+    const orderBy = this.materialSnapshotOrder(params);
+
+    const [idRows, countRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT i.id
+        FROM inventory_items i
+        LEFT JOIN inventory_material_snapshots all_snapshot
+          ON all_snapshot."materialId" = i.id
+          AND all_snapshot."scopeKey" = 'ALL'
+        LEFT JOIN inventory_material_snapshots main_snapshot
+          ON main_snapshot."materialId" = i.id
+          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        WHERE ${where}
+        ORDER BY ${orderBy}
+        LIMIT ${pageSize} OFFSET ${offset}
+      `),
+      this.prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS total
+        FROM inventory_items i
+        LEFT JOIN inventory_material_snapshots all_snapshot
+          ON all_snapshot."materialId" = i.id
+          AND all_snapshot."scopeKey" = 'ALL'
+        LEFT JOIN inventory_material_snapshots main_snapshot
+          ON main_snapshot."materialId" = i.id
+          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        WHERE ${where}
+      `),
+    ]);
+
+    const ids = idRows.map((row) => row.id);
+    const items = ids.length
+      ? await this.prisma.inventoryItem.findMany({
+          where: { id: { in: ids } },
+          include: {
+            category: true,
+            materialType: true,
+            unitMaster: true,
+            zone: { include: { warehouse: true } },
+            materialSnapshots: true,
+            locationStocks: {
+              where: { quantity: { gt: 0 } },
+              include: {
+                zone: { include: { warehouse: true } },
+              },
+            },
+          },
+        })
+      : [];
+    const itemMap = new Map(items.map((item) => [item.id, item]));
+
+    return {
+      items: ids.map((id) => itemMap.get(id)).filter(Boolean),
+      total: Number(countRows[0]?.total ?? 0),
+      page,
+      pageSize,
+    };
+  }
+
+  async materialSnapshotSummary(params: InventoryMaterialQuery) {
+    const where = this.materialSnapshotWhere(params);
+    const rows = await this.prisma.$queryRaw<Array<{
+      totalItems: bigint;
+      totalStock: number | null;
+      mainStock: number | null;
+      productionStock: number | null;
+      totalValue: number | null;
+      lowStock: bigint;
+      outOfStock: bigint;
+      primaryCount: bigint;
+      primaryStock: number | null;
+      secondaryCount: bigint;
+      secondaryStock: number | null;
+      consumableCount: bigint;
+      consumableStock: number | null;
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(*)::bigint AS "totalItems",
+        COALESCE(SUM(COALESCE(all_snapshot."currentStock", i.quantity, 0)), 0)::float8 AS "totalStock",
+        COALESCE(SUM(COALESCE(main_snapshot."currentStock", 0)), 0)::float8 AS "mainStock",
+        COALESCE(SUM(COALESCE(production_snapshot."currentStock", 0)), 0)::float8 AS "productionStock",
+        COALESCE(SUM(COALESCE(all_snapshot."inventoryValue", 0)), 0)::float8 AS "totalValue",
+        COUNT(*) FILTER (
+          WHERE COALESCE(main_snapshot."currentStock", 0) > 0
+            AND COALESCE(main_snapshot."currentStock", 0) <= i."minimumStock"
+        )::bigint AS "lowStock",
+        COUNT(*) FILTER (
+          WHERE COALESCE(main_snapshot."currentStock", 0) <= 0
+        )::bigint AS "outOfStock",
+        COUNT(*) FILTER (WHERE i."materialUsageType"::text = 'PRIMARY')::bigint AS "primaryCount",
+        COALESCE(SUM(COALESCE(all_snapshot."currentStock", 0))
+          FILTER (WHERE i."materialUsageType"::text = 'PRIMARY'), 0)::float8 AS "primaryStock",
+        COUNT(*) FILTER (WHERE i."materialUsageType"::text = 'SECONDARY')::bigint AS "secondaryCount",
+        COALESCE(SUM(COALESCE(all_snapshot."currentStock", 0))
+          FILTER (WHERE i."materialUsageType"::text = 'SECONDARY'), 0)::float8 AS "secondaryStock",
+        COUNT(*) FILTER (WHERE i."materialUsageType"::text = 'CONSUMABLE')::bigint AS "consumableCount",
+        COALESCE(SUM(COALESCE(all_snapshot."currentStock", 0))
+          FILTER (WHERE i."materialUsageType"::text = 'CONSUMABLE'), 0)::float8 AS "consumableStock"
+      FROM inventory_items i
+      LEFT JOIN inventory_material_snapshots all_snapshot
+        ON all_snapshot."materialId" = i.id AND all_snapshot."scopeKey" = 'ALL'
+      LEFT JOIN inventory_material_snapshots main_snapshot
+        ON main_snapshot."materialId" = i.id
+        AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+      LEFT JOIN inventory_material_snapshots production_snapshot
+        ON production_snapshot."materialId" = i.id
+        AND UPPER(COALESCE(production_snapshot."warehouseCode", '')) = 'PRODUCTION'
+      WHERE ${where}
+    `);
+    return rows[0];
+  }
+
+  materialSnapshotFacets(params: InventoryMaterialQuery) {
+    const where = this.materialSnapshotWhere(params);
+    return Promise.all([
+      this.prisma.$queryRaw<Array<{ label: string; value: number }>>(Prisma.sql`
+        SELECT COALESCE(c.name, 'Khác') AS label,
+          COALESCE(SUM(COALESCE(all_snapshot."currentStock", 0)), 0)::float8 AS value
+        FROM inventory_items i
+        LEFT JOIN inventory_categories c ON c.id = i."categoryId"
+        LEFT JOIN inventory_material_snapshots all_snapshot
+          ON all_snapshot."materialId" = i.id AND all_snapshot."scopeKey" = 'ALL'
+        LEFT JOIN inventory_material_snapshots main_snapshot
+          ON main_snapshot."materialId" = i.id
+          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        WHERE ${where}
+        GROUP BY c.name
+        ORDER BY value DESC
+        LIMIT 12
+      `),
+      this.prisma.$queryRaw<Array<{ label: string; value: number }>>(Prisma.sql`
+        SELECT COALESCE(s."warehouseCode", 'Chưa rõ') AS label,
+          COALESCE(SUM(s."currentStock"), 0)::float8 AS value
+        FROM inventory_material_snapshots s
+        JOIN inventory_items i ON i.id = s."materialId"
+        LEFT JOIN inventory_material_snapshots all_snapshot
+          ON all_snapshot."materialId" = i.id AND all_snapshot."scopeKey" = 'ALL'
+        LEFT JOIN inventory_material_snapshots main_snapshot
+          ON main_snapshot."materialId" = i.id
+          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        WHERE s."scopeKey" <> 'ALL' AND ${where}
+        GROUP BY s."warehouseCode"
+        ORDER BY value DESC
+        LIMIT 12
+      `),
+    ]);
+  }
+
+  async inventoryOverviewTransactionMetrics() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const trendStart = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+
+    const [todayRows, monthRows, trendRows, snapshotTrend] = await Promise.all([
+      this.transactionMetricsBetween(today, new Date(today.getTime() + 86_400_000)),
+      this.transactionMetricsBetween(monthStart, new Date()),
+      this.prisma.$queryRaw<Array<{
+        month: Date;
+        inboundValue: number;
+        outboundValue: number;
+      }>>(Prisma.sql`
+        SELECT date_trunc('month', t."transactionDate") AS month,
+          COALESCE(SUM(ABS(COALESCE(ti."totalAmount", ti.quantity * ti."unitPrice", 0)))
+            FILTER (WHERE t.type::text IN ('IMPORT', 'RETURN')), 0)::float8 AS "inboundValue",
+          COALESCE(SUM(ABS(COALESCE(ti."totalAmount", ti.quantity * ti."unitPrice", 0)))
+            FILTER (WHERE t.type::text = 'EXPORT'), 0)::float8 AS "outboundValue"
+        FROM inventory_transactions t
+        JOIN inventory_transaction_items ti ON ti."transactionId" = t.id
+        WHERE t."transactionDate" >= ${trendStart}
+        GROUP BY date_trunc('month', t."transactionDate")
+        ORDER BY month ASC
+      `),
+      this.prisma.inventoryDashboardSnapshot.groupBy({
+        by: ['snapshotDate'],
+        _sum: { inventoryValue: true, totalStock: true },
+        orderBy: { snapshotDate: 'asc' },
+        take: 12,
+      }),
+    ]);
+
+    return { todayRows, monthRows, trendRows, snapshotTrend };
+  }
+
+  private transactionMetricsBetween(from: Date, to: Date) {
+    return this.prisma.$queryRaw<Array<{
+      type: string;
+      documentCount: bigint;
+      quantity: number;
+      value: number;
+    }>>(Prisma.sql`
+      SELECT t.type::text AS type,
+        COUNT(DISTINCT t.id)::bigint AS "documentCount",
+        COALESCE(SUM(ABS(ti.quantity)), 0)::float8 AS quantity,
+        COALESCE(SUM(
+          CASE WHEN t.type::text = 'TRANSFER' AND ti.quantity < 0 THEN 0
+          ELSE ABS(COALESCE(ti."totalAmount", ti.quantity * ti."unitPrice", 0)) END
+        ), 0)::float8 AS value
+      FROM inventory_transactions t
+      JOIN inventory_transaction_items ti ON ti."transactionId" = t.id
+      WHERE t."transactionDate" >= ${from} AND t."transactionDate" < ${to}
+      GROUP BY t.type
+    `);
+  }
+
+  private materialSnapshotWhere(params: InventoryMaterialQuery) {
+    const clauses: Prisma.Sql[] = [Prisma.sql`i."deletedAt" IS NULL`];
+    if (params.search) {
+      const search = `%${params.search}%`;
+      clauses.push(Prisma.sql`(i.code ILIKE ${search} OR i.name ILIKE ${search})`);
+    }
+    if (params.categoryId) {
+      clauses.push(Prisma.sql`(
+        i."categoryId" = ${params.categoryId}
+        OR EXISTS (
+          SELECT 1 FROM inventory_categories category_filter
+          WHERE category_filter.id = i."categoryId"
+            AND category_filter.name = ${params.categoryId}
+        )
+      )`);
+    }
+    if (params.materialTypeId) clauses.push(Prisma.sql`i."materialTypeId" = ${params.materialTypeId}`);
+    if (params.materialUsageType) {
+      clauses.push(Prisma.sql`i."materialUsageType"::text = ${params.materialUsageType}`);
+    }
+    if (params.warehouse) {
+      clauses.push(Prisma.sql`EXISTS (
+        SELECT 1 FROM inventory_material_snapshots warehouse_snapshot
+        WHERE warehouse_snapshot."materialId" = i.id
+          AND warehouse_snapshot."scopeKey" <> 'ALL'
+          AND (
+            warehouse_snapshot."warehouseId" = ${params.warehouse}
+            OR UPPER(COALESCE(warehouse_snapshot."warehouseCode", '')) =
+              UPPER(${params.warehouse})
+          )
+          AND warehouse_snapshot."currentStock" > 0
+      )`);
+    }
+    if (params.stockStatus === 'OUT') {
+      clauses.push(Prisma.sql`COALESCE(main_snapshot."currentStock", 0) <= 0`);
+    } else if (params.stockStatus === 'LOW') {
+      clauses.push(Prisma.sql`COALESCE(main_snapshot."currentStock", 0) > 0
+        AND COALESCE(main_snapshot."currentStock", 0) <= i."minimumStock"`);
+    } else if (params.stockStatus === 'NORMAL') {
+      clauses.push(Prisma.sql`COALESCE(main_snapshot."currentStock", 0) > i."minimumStock"`);
+    }
+    return Prisma.join(clauses, ' AND ');
+  }
+
+  private materialSnapshotOrder(params: InventoryMaterialQuery) {
+    const direction = params.sortOrder === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    const field = {
+      code: Prisma.sql`i.code`,
+      name: Prisma.sql`i.name`,
+      currentStock: Prisma.sql`COALESCE(all_snapshot."currentStock", i.quantity, 0)`,
+      inventoryValue: Prisma.sql`COALESCE(all_snapshot."inventoryValue", 0)`,
+      updatedAt: Prisma.sql`i."updatedAt"`,
+    }[params.sortBy ?? 'code'];
+    return Prisma.sql`${field} ${direction}, i.id ASC`;
   }
 
   findItemById(id: string, db: DbClient = this.prisma) {
@@ -324,6 +602,7 @@ export class InventoryRepository {
     toDate?: Date
     supplierId?: string
     projectId?: string
+    materialId?: string
     transactionTypes?: Array<'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'>
   }) {
     const where: Prisma.InventoryTransactionWhereInput = {}
@@ -347,6 +626,14 @@ export class InventoryRepository {
       where.projectId = params.projectId
     }
 
+    if (params.materialId) {
+      where.items = {
+        some: {
+          inventoryItemId: params.materialId,
+        },
+      }
+    }
+
     if (params.transactionTypes?.length) {
       where.type = {
         in: params.transactionTypes,
@@ -360,7 +647,10 @@ export class InventoryRepository {
         warehouse: true,
         zone: true,
         project: true,
-        items: {
+      items: {
+          where: params.materialId
+            ? { inventoryItemId: params.materialId }
+            : undefined,
           include: {
             inventoryItem: true,
             unit: true,
@@ -374,6 +664,50 @@ export class InventoryRepository {
       },
       skip: params.skip,
       take: params.take,
+    });
+  }
+
+  countTransactions(params: {
+    fromDate?: Date
+    toDate?: Date
+    supplierId?: string
+    projectId?: string
+    materialId?: string
+    transactionTypes?: Array<'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'>
+  }) {
+    const where: Prisma.InventoryTransactionWhereInput = {
+      supplierId: params.supplierId,
+      projectId: params.projectId,
+      type: params.transactionTypes?.length
+        ? { in: params.transactionTypes }
+        : undefined,
+      transactionDate:
+        params.fromDate || params.toDate
+          ? {
+              gte: params.fromDate,
+              lte: params.toDate,
+            }
+          : undefined,
+      items: params.materialId
+        ? { some: { inventoryItemId: params.materialId } }
+        : undefined,
+    };
+    return this.prisma.inventoryTransaction.count({ where });
+  }
+
+  findTransactionAttachmentCounts(transactionIds: string[]) {
+    if (transactionIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.prisma.attachment.groupBy({
+      by: ['entityId'],
+      where: {
+        module: 'inventory',
+        entityType: 'transaction',
+        entityId: { in: transactionIds },
+        deletedAt: null,
+      },
+      _count: { _all: true },
     });
   }
 

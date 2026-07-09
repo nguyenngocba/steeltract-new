@@ -1,11 +1,44 @@
 # Current State
 
+## EPIC119 Inventory Inbound & Outbound UI/UX Audit
+
+Status: **COMPLETED**
+
+A comprehensive read-only audit of the Inbound and Outbound UI/UX, workflow, and data binding has been completed. The audit identified key operational gaps including: a single-line transaction limit (P0), lack of split-location exports (P0), modal-based creation layouts conflicting with the Enterprise UI Guidelines (P1), and severe selector inconsistencies between tabs (P1). A complete layout proposal and component map were drafted to standardize both tabs under a right-side Slide-out Drawer configuration with multi-line support. No application source code changes were made during this audit sprint.
+
+## EPIC118.2 Inventory Historical Chart Data Audit
+
+Status: **COMPLETED**
+
+A comprehensive read-only audit of all inventory historical charts and metrics on the Inventory Overview page has been completed. The audit identified that the display of "Chưa có dữ liệu lịch sử" for several cards is caused by a combination of a UI early return bypassing the calculations (UI_BINDING_ERROR) and the backend database schema not storing/aggregating historical categories or out-of-stock figures (SNAPSHOT_PAYLOAD_MISSING). The baseline 12-month data cleanup on 2026-06-24 correctly accounts for empty historical snapshot tables prior to 2026-07-06 (EXPECTED_EMPTY). No source code changes were made, and all deliverables have been added under `docs/audit/`.
+
+## EPIC118.1 Inventory UI Data Binding
+
+Status: **APPROVED WITH LIMITATIONS**
+
+Inventory Overview and Materials now use snapshot/read-model APIs with server-side
+query state. The target pages no longer depend on `/inventory/audit`, the latest
+200 transactions, or synthetic trends. Material Detail transaction/log history is
+server-paginated and transaction attachments are loaded on demand. Persisted
+material/location parity remains 23/23. Remaining limits are documented offset
+pagination thresholds and unavailable Prisma query-count telemetry.
+
+## EPIC118 Inventory UI/Data Binding Audit
+
+Inventory architecture and persisted data remain frozen and unchanged. Read-only
+validation found 23/23 active materials consistent across item quantity, location
+stock, and material snapshot. The current Overview and Materials workspaces are
+not UI/data-binding approved: they use `/inventory/audit` runtime reconstruction,
+assume capped responses are complete, and contain incorrect or fabricated metrics.
+Material Detail and location reads remain snapshot-first.
+
 This document summarizes the current operational state of SteelTrack as of 2026-06-24. Percentages and detailed task ordering remain tracked in `PROJECT_STATUS.md` and `NEXT_TASKS.md`.
 
 ## Performance Foundation
 
 Status:
 
+- Chuẩn hóa và tạo mới 3 tài liệu kiến thức cốt lõi (README.md, MASTER_INDEX.md, DOCUMENTATION_MAP.md) tại thư mục gốc docs/ vào ngày 2026-07-08.
 - Sprint PERF Foundation completed on 2026-07-07.
 - EPIC 100 Core Foundation repository/query pass completed on 2026-07-07.
 - EPIC 101 Enterprise Scalability Foundation audit completed on 2026-07-07.
@@ -27,6 +60,7 @@ Status:
 - EPIC 211 Enterprise Architecture Governance & Checklist (PR checklists, release policy) completed on 2026-07-08.
 - Enterprise Architecture Governance & ADRs (ADR001-ADR010) completed on 2026-07-08.
 - Core Platform Architecture documents (Naming Conventions, API Contracts, Domain Boundaries, Performance SLA, Versioning Policy, Module Dependency Map) completed on 2026-07-08.
+- EPIC 212 Enterprise Knowledge Base (README.md, MASTER_INDEX.md, DOCUMENTATION_MAP.md, guides, and audits) completed on 2026-07-08.
 
 Current architecture:
 
@@ -135,6 +169,20 @@ Current focus:
 - Use `docs/architecture/background-engine.md`, `docs/architecture/snapshot-update-engine.md`, and `docs/architecture/event-bus-foundation.md` as the design gate before implementing snapshot jobs or event-driven snapshot updates.
 - Use `docs/runtime/background-engine-implementation-report.md` before enabling snapshot-first reads. The current implementation only provides background plumbing and safe skipped snapshot jobs.
 - Use `docs/runtime/operations-center-system-health-report.md` before OPS.2+ work so Operations Center stays a system cockpit instead of drifting into business dashboards.
+
+## Inventory Business Freeze v1.0
+
+Status:
+
+- APPROVED on 2026-07-09 after EPIC117.1.
+- Material snapshot stock now derives from canonical `inventory_location_stocks`.
+- Persisted material snapshot parity is 23/23 with zero mismatches.
+- Inventory write controllers use typed Zod validation; transaction lines retain
+  warehouse/location/valuation fields.
+- Reconciliation ran through persistent outbox events and Background Engine
+  snapshot jobs; Operations Center Inventory event/job health is clean.
+- Current adjustment-backed Stock Take remains frozen for v1.0. A formal
+  session/count/review/approval/close lifecycle is Phase 2 scope.
 
 ## Projects Runtime & PMS Blueprint
 
@@ -940,6 +988,21 @@ Current focus:
 - Validate Inventory transaction creation, Material Detail, inbound suggestions, Return Requests, and Operations Center overview under real operator data.
 - Plan the schema-enabled persisted Material Detail / Location read-model sprint only after parity rules are defined.
 
+Business Freeze audit:
+
+- EPIC117 completed Inventory Business Freeze Phase 1 as an audit-only sprint.
+- Current database consistency is strong for transaction/location/item compatibility data:
+  - `inventory_items.quantity` vs location stock: PASS.
+  - transaction-derived location buckets vs `inventory_location_stocks`: PASS.
+  - transaction item valuation: PASS.
+  - negative location stock rows: PASS.
+  - location snapshot quantity vs live location stock quantity: PASS.
+- Inventory Business Freeze is currently BLOCKED because:
+  - 3 `InventoryMaterialSnapshot` rows differ from live location stock.
+  - `POST /inventory/transactions` relies on service-level inbound location validation, but the controller does not attach the Zod transaction schema.
+  - the DTO schema does not formally model per-line Zone/Slot/Level even though the business requires them for inbound.
+  - Stock Take needs a final business decision on whether adjustment-backed stocktake is acceptable or a first-class stocktake session lifecycle is required before Freeze.
+
 ## Project Architecture Freeze v1.0
 
 Status:
@@ -986,3 +1049,47 @@ Known limitations:
 Current focus:
 
 - Present blueprints to engineering leads and warehouse managers for validation before scheduling Sprints AI.1 and INT.1.
+
+## Enterprise Knowledge Base & AI Context Strategy (EPIC212)
+
+Status:
+
+- Completed the Enterprise Knowledge Base (EPIC212) implementation on 2026-07-08, establishing a structured documentation zoning system and an optimized AI context loading strategy.
+
+Current architecture:
+
+- **Documentation Zoning (Phân vùng Kho Tri thức Doanh nghiệp)**: Standardized the documentation system into nine distinct, logically grouped zones to ensure clear categorization, eliminate redundancy, and maximize searchability for both human developers and AI agents:
+  1. *Source of Truth (Nguồn Sự Thật)*: Running project state files, WBS tracking, and operational change logs.
+  2. *Architecture (Kiến Trúc Cốt Lõi)*: Core structural blueprints, Event Bus foundations, and ADRs.
+  3. *Blueprint (Bản Thiết Kế Phân Hệ)*: High-level functional specifications for individual modules.
+  4. *Standards (Tiêu Chuẩn Phát Triển)*: Quality checklists, naming conventions, and UI standard guidelines.
+  5. *Governance (Quản Trị Hệ Thống)*: Software quality framework, release policies, and architecture freeze rules.
+  6. *Runtime (Vận Hành & Telemetry)*: Live metrics, performance baselines, and database query logs.
+  7. *Audit (Báo Cáo Kiểm Toán)*: Static audits, query budgets, and technical debt lists.
+  8. *Verification (Xác Minh & Ghi Vết)*: Hotfix reports, parity reviews, and smoke test logs.
+  9. *Archive (Kho Lưu Trữ)*: Historical design documents and obsolete reports.
+
+- **Completed Core Knowledge Base Documents**:
+  - [README.md](file:///opt/projects/steeltrack/docs/README.md): Acts as the main entry point to the SteelTrack knowledge base, introducing the system architecture and documenting onboarding protocols.
+  - [MASTER_INDEX.md](file:///opt/projects/steeltrack/docs/MASTER_INDEX.md): The supreme index mapping and linking the entire documentation corpus using absolute `file://` URIs for quick cross-referencing.
+  - [DOCUMENTATION_MAP.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_MAP.md): A detailed directory tree structure mapping file assignments and explaining folder-level responsibilities.
+  - [KNOWLEDGE_BASE_GUIDE.md](file:///opt/projects/steeltrack/docs/KNOWLEDGE_BASE_GUIDE.md): Human-oriented guide covering document lifecycle rules (DRAFT, PROPOSED, ACTIVE, FROZEN), freeze criteria, and weekly archiving policies.
+  - [AI_LOADING_GUIDE.md](file:///opt/projects/steeltrack/docs/AI_LOADING_GUIDE.md): Defines the AI Context Loading Strategy, establishing a strict 10k-15k token budget per session and mapping specific document pipelines for all 10 core modules.
+  - [DOCUMENTATION_AUDIT.md](file:///opt/projects/steeltrack/docs/DOCUMENTATION_AUDIT.md): Reviews and classifies all 200+ active markdown files, highlighting obsolete query profiles, UI polish logs, and staging audits to be archived.
+
+- **AI Context Loading Strategy (Chiến lược Nạp Ngữ Cảnh Tối Ưu)**: Establishes a 5-layer context hierarchy to prevent context window overflow:
+  - *Layer 1 (Workflow/Rules)*: [CODEX_WORKFLOW.md](file:///opt/projects/steeltrack/docs/ai-state/CODEX_WORKFLOW.md)
+  - *Layer 2 (Operational State)*: `CURRENT_STATE.md` / `PROJECT_STATUS.md` / `NEXT_TASKS.md`
+  - *Layer 3 (Module Specs)*: `docs/ai-state/modules/<module>.md`
+  - *Layer 4 (Design Blueprint)*: `docs/architecture/<module>-blueprint.md`
+  - *Layer 5 (Source Code)*: Targeted controller/service/repository files.
+
+Known limitations:
+
+- The guides and indexes are documentation-only resources and do not contain database schema alterations or compiled application code.
+- Stale audit logs and runtime reports are scheduled for movement into the archive directory but have not yet been moved physically.
+
+Current focus:
+
+- Implement the documentation archiving protocol, moving stale audits and runtime files into [docs/archive/](file:///opt/projects/steeltrack/docs/archive/) and updating all internal `file://` link references.
+- Audit all newly generated blueprints and guidelines to ensure full compliance with the 14 core rules in `AI_RULES.md` and naming conventions.

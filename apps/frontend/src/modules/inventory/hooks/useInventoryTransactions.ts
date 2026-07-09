@@ -7,17 +7,22 @@ type TransactionFilters = {
   toDate?: string
   supplierId?: string
   projectId?: string
+  materialId?: string
   type?: string
+  page?: number
+  pageSize?: number
 }
 
 async function fetchTransactions(
   filters: TransactionFilters,
+  signal?: AbortSignal,
 ) {
   const response =
     await inventoryApi.get(
       '/inventory/transactions',
       {
         params: filters,
+        signal,
       },
     )
 
@@ -32,8 +37,8 @@ export function useInventoryTransactions(
       'inventory-transactions',
       filters,
     ],
-    queryFn: () =>
-      fetchTransactions(filters),
+    queryFn: ({ signal }) =>
+      fetchTransactions(filters, signal),
     refetchInterval: 4000,
   })
 }

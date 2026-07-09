@@ -6,6 +6,10 @@ import { SnapshotReaderService } from '../../core/snapshots/snapshot-reader.serv
 import { SnapshotUpdateDispatcher } from '../../core/jobs/snapshot-update-dispatcher.service';
 import { PerformanceMetricsService } from '../../core/performance/performance-metrics.service';
 import { InventoryRepository } from './inventory.repository';
+import type {
+  InventoryMaterialListQueryDto,
+  InventoryOverviewQueryDto,
+} from './dto/inventory.dto';
 
 @Injectable()
 export class InventoryReadModelService {
@@ -15,6 +19,91 @@ export class InventoryReadModelService {
     private readonly snapshots: SnapshotReaderService,
     private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
   ) {}
+
+  async materialList(query: InventoryMaterialListQueryDto) {
+    const [page, summary, facets] = await Promise.all([
+      this.repository.listMaterialSnapshotPage(query),
+      this.repository.materialSnapshotSummary(query),
+      this.repository.materialSnapshotFacets(query),
+    ]);
+    const items = page.items.map((item: any) => this.toMaterialListRow(item));
+    const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
+
+    if (items.some((item: any) => item.readSource !== 'snapshot')) {
+      this.metrics.recordSnapshotFallback();
+    } else {
+      this.metrics.recordReadModelHit();
+    }
+
+    return {
+      items,
+      page: page.page,
+      pageSize: page.pageSize,
+      total: page.total,
+      totalPages,
+      summary: this.normalizeSummary(summary),
+      facets: {
+        categories: facets[0],
+        warehouses: facets[1],
+      },
+    };
+  }
+
+  async overview(query: InventoryOverviewQueryDto) {
+    const [summary, facets, transactionMetrics] = await Promise.all([
+      this.repository.materialSnapshotSummary(query),
+      this.repository.materialSnapshotFacets(query),
+      this.repository.inventoryOverviewTransactionMetrics(),
+    ]);
+    const transactionMap = (rows: any[]) =>
+      Object.fromEntries(rows.map((row) => [
+        this.toBusinessType(row.type),
+        {
+          documents: Number(row.documentCount ?? 0),
+          quantity: Number(row.quantity ?? 0),
+          value: Number(row.value ?? 0),
+        },
+      ]));
+    const normalizedSummary = this.normalizeSummary(summary);
+    const stockTrend = transactionMetrics.snapshotTrend
+      .slice()
+      .reverse()
+      .map((row: any) => ({
+        date: row.snapshotDate,
+        value: Number(row._sum.inventoryValue ?? 0),
+        quantity: Number(row._sum.totalStock ?? 0),
+      }))
+      .reverse();
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const latestKey = stockTrend.at(-1)?.date
+      ? new Date(stockTrend.at(-1).date).toISOString().slice(0, 10)
+      : null;
+    if (latestKey !== todayKey) {
+      stockTrend.push({
+        date: new Date(),
+        value: normalizedSummary.totalValue,
+        quantity: normalizedSummary.totalStock,
+      });
+    }
+
+    this.metrics.recordReadModelHit();
+    return {
+      summary: normalizedSummary,
+      facets: {
+        categories: facets[0],
+        warehouses: facets[1],
+      },
+      today: transactionMap(transactionMetrics.todayRows),
+      month: transactionMap(transactionMetrics.monthRows),
+      movementTrend: transactionMetrics.trendRows.map((row: any) => ({
+        date: row.month,
+        inboundValue: Number(row.inboundValue ?? 0),
+        outboundValue: Number(row.outboundValue ?? 0),
+      })),
+      stockTrend,
+      source: 'snapshot',
+    };
+  }
 
   async materialDetail(id: string) {
     const snapshot = await this.snapshots.inventoryMaterial(id);
@@ -58,6 +147,93 @@ export class InventoryReadModelService {
       snapshots.length > 0 ? 'stale-snapshot' : 'fallback-miss',
     );
     return this.locationsFromRepository();
+  }
+
+  private toMaterialListRow(item: any) {
+    const allSnapshot = item.materialSnapshots.find(
+      (snapshot: any) => snapshot.scopeKey === 'ALL',
+    );
+    const snapshotFresh = Boolean(
+      allSnapshot?.updatedAt && this.isFresh(allSnapshot.updatedAt),
+    );
+    const locations = snapshotFresh && Array.isArray(allSnapshot?.locationPayload)
+      ? allSnapshot.locationPayload
+      : item.locationStocks.map((row: any) => ({
+          zoneId: row.zoneId,
+          zoneCode: row.zone?.code ?? null,
+          zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
+          slotId: row.slotId,
+          level: row.level,
+          row: row.zone?.row ?? null,
+          column: row.zone?.column ?? null,
+          warehouseName: row.zone?.warehouse?.name ?? null,
+          warehouseCode: row.zone?.warehouse?.code ?? null,
+          quantity: Number(row.quantity ?? 0),
+        }));
+    const currentStock = snapshotFresh
+      ? Number(allSnapshot.currentStock ?? 0)
+      : locations.reduce(
+          (sum: number, row: any) => sum + Number(row.quantity ?? 0),
+          0,
+        );
+    const averageCost =
+      Number(allSnapshot?.currentStock ?? 0) > 0
+        ? Number(allSnapshot?.inventoryValue ?? 0) /
+          Number(allSnapshot.currentStock)
+        : 0;
+
+    return {
+      materialId: item.id,
+      materialCode: item.code,
+      materialName: item.name,
+      description: item.description,
+      categoryId: item.categoryId,
+      category: item.category?.name ?? '',
+      materialTypeId: item.materialTypeId,
+      materialType: item.materialType?.name ?? '',
+      materialUsageType: item.materialUsageType,
+      minimumStock: Number(item.minimumStock ?? 0),
+      unit: item.unit ?? item.unitMaster?.code ?? 'PCS',
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      zoneId: item.zoneId,
+      slotId: item.slotId,
+      level: item.level,
+      zoneCode: item.zone?.code ?? '',
+      zoneName: item.zone?.name ?? '',
+      zone: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
+      position: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
+      locationBalances: locations,
+      currentStock,
+      averageCost,
+      inventoryValue: currentStock * averageCost,
+      lastMovementDate:
+        allSnapshot?.lastInboundAt && allSnapshot?.lastOutboundAt
+          ? new Date(allSnapshot.lastInboundAt) > new Date(allSnapshot.lastOutboundAt)
+            ? allSnapshot.lastInboundAt
+            : allSnapshot.lastOutboundAt
+          : allSnapshot?.lastInboundAt ?? allSnapshot?.lastOutboundAt ?? null,
+      readSource: snapshotFresh ? 'snapshot' : 'repository-fallback',
+      snapshotUpdatedAt: allSnapshot?.updatedAt ?? null,
+    };
+  }
+
+  private normalizeSummary(row: any) {
+    return {
+      totalItems: Number(row?.totalItems ?? 0),
+      totalStock: Number(row?.totalStock ?? 0),
+      mainStock: Number(row?.mainStock ?? 0),
+      productionStock: Number(row?.productionStock ?? 0),
+      totalValue: Number(row?.totalValue ?? 0),
+      lowStock: Number(row?.lowStock ?? 0),
+      outOfStock: Number(row?.outOfStock ?? 0),
+      primaryCount: Number(row?.primaryCount ?? 0),
+      primaryStock: Number(row?.primaryStock ?? 0),
+      secondaryCount: Number(row?.secondaryCount ?? 0),
+      secondaryStock: Number(row?.secondaryStock ?? 0),
+      consumableCount: Number(row?.consumableCount ?? 0),
+      consumableStock: Number(row?.consumableStock ?? 0),
+    };
   }
 
   private async materialDetailFromRepository(id: string) {

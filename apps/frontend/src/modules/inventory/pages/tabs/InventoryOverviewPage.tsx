@@ -28,10 +28,10 @@ import {
   inventoryTableShell,
   HorizontalBars,
 } from '../../components/InventoryVisuals'
-import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
+import { useInventoryMaterials, useInventoryOverview } from '../../hooks/useInventoryReadModels'
 import { CircleDollarSign, Clock, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
 import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import { getReturnRequests } from '../../api/transactions.api'
@@ -72,6 +72,13 @@ function ChartCard({
 
 // ================= STOCK TREND CHART =================
 function StockTrendChart({ rows }: { rows: Array<{ label: string; value: number }> }) {
+  if (rows.length === 0) {
+    return (
+      <div className="grid h-[90px] place-items-center text-xs text-slate-500">
+        Dữ liệu sẽ xuất hiện khi phát sinh nghiệp vụ.
+      </div>
+    )
+  }
   const max = Math.max(1, ...rows.map((row) => row.value))
   const points = rows.map((row, index) => {
     const x = rows.length <= 1 ? 0 : (index / (rows.length - 1)) * 100
@@ -374,15 +381,6 @@ function OverviewMetricCard({
 
 export function InventoryOverviewPage() {
   const navigate = useNavigate()
-  const { data: auditRows = [], isLoading: isLoadingAudit, refetch: refetchAudit } = useInventoryAudit()
-  const { data: zones = [] } = useZones()
-  const { data: transactionsData = [], isLoading: isLoadingTransactions } = useInventoryTransactions({})
-  const { data: returnRequests = [], isLoading: isLoadingReturns } = useQuery({
-    queryKey: ['inventory-return-requests-overview'],
-    queryFn: () => getReturnRequests({ flowType: 'SITE_RETURN' }),
-  })
-  const isLoading = isLoadingAudit || isLoadingTransactions
-
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
@@ -393,6 +391,46 @@ export function InventoryOverviewPage() {
   const [page, setPage] = useState(1)
   const [transactionModal, setTransactionModal] = useState<null | 'inbound' | 'outbound' | 'transfer' | 'stock-take' | 'adjustment'>(null)
   const [overviewPopup, setOverviewPopup] = useState<null | 'recent-inbound' | 'recent-outbound' | 'stock-full' | 'alerts-full'>(null)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchDraft)
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchDraft])
+
+  const materialQuery = {
+    page,
+    pageSize: PAGE_SIZE,
+    search: search || undefined,
+    categoryId: categoryFilter || undefined,
+    materialUsageType: usageFilter || undefined,
+    warehouse: warehouseFilter || undefined,
+    stockStatus: statusFilter || undefined,
+    sortBy: 'code' as const,
+    sortOrder: 'asc' as const,
+  }
+  const overviewQuery = {
+    search: search || undefined,
+    categoryId: categoryFilter || undefined,
+    materialUsageType: usageFilter || undefined,
+    warehouse: warehouseFilter || undefined,
+    stockStatus: statusFilter || undefined,
+  }
+  const { data: materialsData, isLoading: isLoadingMaterials, refetch: refetchMaterials } =
+    useInventoryMaterials(materialQuery)
+  const { data: overviewData, isLoading: isLoadingOverview, refetch: refetchOverview } =
+    useInventoryOverview(overviewQuery)
+  const { data: zones = [] } = useZones()
+  const { data: transactionsData = [], isLoading: isLoadingTransactions } =
+    useInventoryTransactions({ page: 1, pageSize: 50 })
+  const { data: returnRequests = [], isLoading: isLoadingReturns } = useQuery({
+    queryKey: ['inventory-return-requests-overview'],
+    queryFn: () => getReturnRequests({ flowType: 'SITE_RETURN' }),
+  })
+  const isLoading = isLoadingMaterials || isLoadingOverview || isLoadingTransactions
+  const auditRows = materialsData?.items ?? []
 
   const { data: selectedMaterialDetail } = useMaterialDetail(selectedMaterialId || undefined)
   const rows = useMemo(() => {
@@ -417,14 +455,17 @@ export function InventoryOverviewPage() {
   }, [auditRows])
 
   const categoryOptions = useMemo(() => {
-    return Array.from(new Set(rows.map((item: any) => String(item.category ?? '').trim()).filter(Boolean))).sort()
-  }, [rows])
+    return (overviewData?.facets?.categories ?? [])
+      .map((item: any) => String(item.label ?? '').trim())
+      .filter(Boolean)
+      .sort()
+  }, [overviewData])
 
   const warehouseOptions = useMemo(() => {
     const fromZones = zones
       .map((z: any) => ({
-        value: String(z.id ?? z.code ?? ''),
-        label: `${String(z.code ?? '').trim()}${z.name ? ` - ${z.name}` : ''}`.trim(),
+        value: String(z.warehouse?.code ?? z.warehouseCode ?? z.code ?? ''),
+        label: String(z.warehouse?.name ?? z.warehouseName ?? z.name ?? z.code ?? ''),
       }))
       .filter((z: any) => z.value && z.label)
     const fromBalances = Array.from(
@@ -438,33 +479,10 @@ export function InventoryOverviewPage() {
     return [...fromZones, ...fromBalances].filter((item, index, list) => list.findIndex((x) => x.value === item.value) === index)
   }, [rows, zones])
 
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((item: any) => {
-      if (categoryFilter && String(item.category ?? '') !== categoryFilter) return false
-      if (usageFilter && String(item.materialUsageType ?? 'PRIMARY') !== usageFilter) return false
-      if (warehouseFilter && !rowMatchesWarehouse(item, warehouseFilter)) return false
-      if (statusFilter && statusOf(item) !== statusFilter) return false
-      if (!q) return true
-      return [
-        item.code,
-        item.name,
-        item.materialType,
-        item.specification,
-        item.category,
-        displayLocation(item),
-      ].join(' ').toLowerCase().includes(q)
-    })
-    .sort((a: any, b: any) => {
-      const codeA = a.code ?? '';
-      const codeB = b.code ?? '';
-      return codeA.localeCompare(codeB);
-    });
-  }, [rows, search, categoryFilter, usageFilter, warehouseFilter, statusFilter])
-
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
-  const activePage = Math.min(page, pageCount)
-  const pagedRows = filteredRows.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE)
+  const filteredRows = rows
+  const pageCount = materialsData?.totalPages ?? 1
+  const activePage = materialsData?.page ?? page
+  const pagedRows = rows
 
   const transactions = useMemo(() => {
     return transactionRows(transactionsData)
@@ -481,54 +499,22 @@ export function InventoryOverviewPage() {
       ),
     [transactions],
   )
-  const summary = useMemo(() => {
-    const totalQty = filteredRows.reduce((sum: number, item: any) => sum + num(item.quantity), 0)
-    const mainQty = filteredRows.reduce((sum: number, item: any) => sum + mainWarehouseStock(item), 0)
-    const productionQty = filteredRows.reduce((sum: number, item: any) => sum + productionWarehouseStock(item), 0)
-    const totalValue = filteredRows.reduce((sum: number, item: any) => sum + num(item.inventoryValue), 0)
-    const low = filteredRows.filter((item: any) => statusOf(item) === 'LOW').length
-    const out = filteredRows.filter((item: any) => statusOf(item) === 'OUT').length
-    const reserved = filteredRows.reduce((sum: number, item: any) => sum + num(item.reservedQuantity ?? item.reservedStock), 0)
-
-    let primaryCount = 0
-    let primaryQty = 0
-    let secondaryCount = 0
-    let secondaryQty = 0
-    let consumableCount = 0
-    let consumableQty = 0
-
-    filteredRows.forEach((item: any) => {
-      const usage = String(item.materialUsageType ?? 'PRIMARY').toUpperCase()
-      const qty = num(item.quantity)
-      if (usage === 'PRIMARY') {
-        primaryCount += 1
-        primaryQty += qty
-      } else if (usage === 'SECONDARY') {
-        secondaryCount += 1
-        secondaryQty += qty
-      } else if (usage === 'CONSUMABLE') {
-        consumableCount += 1
-        consumableQty += qty
-      }
-    })
-
-    return {
-      totalItems: filteredRows.length,
-      totalQty,
-      mainQty,
-      productionQty,
-      totalValue,
-      low,
-      out,
-      reserved,
-      primaryCount,
-      primaryQty,
-      secondaryCount,
-      secondaryQty,
-      consumableCount,
-      consumableQty,
-    }
-  }, [filteredRows])
+  const summary = {
+    totalItems: num(overviewData?.summary?.totalItems),
+    totalQty: num(overviewData?.summary?.totalStock),
+    mainQty: num(overviewData?.summary?.mainStock),
+    productionQty: num(overviewData?.summary?.productionStock),
+    totalValue: num(overviewData?.summary?.totalValue),
+    low: num(overviewData?.summary?.lowStock),
+    out: num(overviewData?.summary?.outOfStock),
+    reserved: 0,
+    primaryCount: num(overviewData?.summary?.primaryCount),
+    primaryQty: num(overviewData?.summary?.primaryStock),
+    secondaryCount: num(overviewData?.summary?.secondaryCount),
+    secondaryQty: num(overviewData?.summary?.secondaryStock),
+    consumableCount: num(overviewData?.summary?.consumableCount),
+    consumableQty: num(overviewData?.summary?.consumableStock),
+  }
   const pendingReturns = useMemo(() => {
     const rows = returnRequests.filter((request: any) => ['REQUESTED', 'APPROVED'].includes(request.status))
     const quantity = rows.reduce((sum: number, request: any) => {
@@ -546,58 +532,30 @@ export function InventoryOverviewPage() {
   }, [returnRequests])
 
   const zoneSegments = useMemo(() => {
-    const map = new Map<string, number>()
-    filteredRows.forEach((item: any) => {
-      const locations = rowLocations(item)
-      if (!locations.length) {
-        map.set('Chưa rõ', (map.get('Chưa rõ') ?? 0) + num(item.quantity))
-        return
-      }
-      locations.forEach((location: any) => {
-        const key = locationLabel(location) || 'Chưa rõ'
-        map.set(key, (map.get(key) ?? 0) + num(location.quantity))
-      })
-    })
-    return Array.from(map.entries())
+    return (overviewData?.facets?.warehouses ?? [])
+      .map((item: any) => [String(item.label), num(item.value)] as [string, number])
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([label, value], index) => ({ label, value, color: donutColors[index % donutColors.length] }))
-  }, [filteredRows])
+  }, [overviewData])
 
   const categorySegments = useMemo(() => {
-    const map = new Map<string, number>()
-    filteredRows.forEach((item: any) => {
-      const key = String(item.category ?? item.materialType ?? 'Khác')
-      map.set(key, (map.get(key) ?? 0) + num(item.quantity))
-    })
-    return Array.from(map.entries())
+    return (overviewData?.facets?.categories ?? [])
+      .map((item: any) => [String(item.label), num(item.value)] as [string, number])
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([label, value], index) => ({ label, value, color: donutColors[index % donutColors.length] }))
-  }, [filteredRows])
+  }, [overviewData])
 
   const valueTrend = useMemo(() => {
-    const map = new Map<string, number>()
-    transactions.forEach((tx: any) => {
-      const date = transactionDate(tx)
-      if (!date) return
-      const key = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
-      const sign = String(tx.type ?? '').toUpperCase() === 'OUTBOUND' ? -1 : 1
-      map.set(key, (map.get(key) ?? 0) + sign * transactionAmount(tx))
+    return (overviewData?.stockTrend ?? []).slice(-6).map((row: any) => {
+      const date = new Date(row.date)
+      return {
+        label: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`,
+        value: num(row.value),
+      }
     })
-    const latest = Array.from(map.entries()).slice(-6)
-    if (latest.length === 0) {
-      return Array.from({ length: 6 }, (_, index) => ({
-        label: `${String(index + 1).padStart(2, '0')}/06`,
-        value: summary.totalValue * (0.82 + index * 0.035),
-      }))
-    }
-    let running = Math.max(0, summary.totalValue - latest.reduce((sum, [, value]) => sum + value, 0))
-    return latest.map(([label, value]) => {
-      running = Math.max(0, running + value)
-      return { label, value: running }
-    })
-  }, [transactions, summary.totalValue])
+  }, [overviewData])
   const dateAgeInfo = useMemo(() => {
     const dates: Date[] = []
 
@@ -631,6 +589,57 @@ export function InventoryOverviewPage() {
   }, [transactionsData, auditRows])
 
   const { kpiTrend, kpiDeltas, kpiNoteColors } = useMemo(() => {
+    const stockRows = overviewData?.stockTrend ?? []
+    const values = stockRows.map((row: any) => num(row.value))
+    const quantities = stockRows.map((row: any) => num(row.quantity))
+    const deltaText = (series: number[], suffix: string) => {
+      if (series.length < 2) return 'Chưa có dữ liệu lịch sử'
+      const current = series.at(-1) ?? 0
+      const previous = series.at(-2) ?? 0
+      const difference = current - previous
+      if (difference === 0) return `0 ${suffix} (0%)`
+      const percent = previous ? (difference / Math.abs(previous)) * 100 : null
+      const value = suffix === 'đ'
+        ? formatCurrencyVnd(Math.abs(difference))
+        : `${formatQuantity(Math.abs(difference), 1)} ${suffix}`
+      return `${difference > 0 ? '▲' : '▼'}${value}${
+        percent == null ? '' : ` (${percent > 0 ? '+' : ''}${percent.toFixed(1)}%)`
+      }`
+    }
+    const emptyDelta = 'Chưa có dữ liệu lịch sử'
+    return {
+      kpiTrend: {
+        value: values,
+        quantity: quantities,
+        low: [],
+        out: [],
+        primary: [],
+        secondary: [],
+        consumable: [],
+        items: [],
+      },
+      kpiDeltas: {
+        value: deltaText(values, 'đ'),
+        quantity: deltaText(quantities, 'tấn'),
+        low: emptyDelta,
+        out: emptyDelta,
+        primary: emptyDelta,
+        secondary: emptyDelta,
+        consumable: emptyDelta,
+        items: emptyDelta,
+      },
+      kpiNoteColors: {
+        value: 'text-slate-400',
+        quantity: 'text-slate-400',
+        low: 'text-slate-400',
+        out: 'text-slate-400',
+        primary: 'text-slate-400',
+        secondary: 'text-slate-400',
+        consumable: 'text-slate-400',
+        items: 'text-slate-400',
+      },
+    }
+
     const ageInDays = dateAgeInfo.ageInDays
 
     const now = new Date()
@@ -829,7 +838,7 @@ export function InventoryOverviewPage() {
     }
 
     return { kpiTrend: trend, kpiDeltas: deltas, kpiNoteColors: noteColors }
-  }, [dateAgeInfo, filteredRows, transactionsData, summary])
+  }, [dateAgeInfo, filteredRows, transactionsData, summary, overviewData])
 
   const alerts = useMemo(() => {
     return filteredRows
@@ -878,44 +887,22 @@ export function InventoryOverviewPage() {
   }, [filteredRows]);
 
   const todayStats = useMemo(() => {
-    const todayKey = new Date().toISOString().slice(0, 10)
-
-    const inboundToday = recentInboundRows.filter(
-      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
-    )
-
-    const outboundToday = recentOutboundRows.filter(
-      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
-    )
-
-    const transferToday = recentTransferRows.filter(
-      (tx: any) => String(tx.transactionDate ?? tx.createdAt).slice(0, 10) === todayKey,
-    )
+    const inbound = overviewData?.today?.INBOUND ?? {}
+    const outbound = overviewData?.today?.OUTBOUND ?? {}
+    const transfer = overviewData?.today?.TRANSFER ?? {}
 
     return {
-      inboundDocs: inboundToday.length,
-      inboundQty: inboundToday.reduce(
-        (sum: number, tx: any) => sum + transactionQuantity(tx),
-        0,
-      ),
-
-      outboundDocs: outboundToday.length,
-      outboundQty: outboundToday.reduce(
-        (sum: number, tx: any) => sum + transactionQuantity(tx),
-        0,
-      ),
-
-      transferDocs: transferToday.length,
-      transferQty: transferToday.reduce(
-        (sum: number, tx: any) => sum + transactionQuantity(tx),
-        0,
-      ),
+      inboundDocs: num(inbound.documents),
+      inboundQty: num(inbound.quantity),
+      inboundValue: num(inbound.value),
+      outboundDocs: num(outbound.documents),
+      outboundQty: num(outbound.quantity),
+      outboundValue: num(outbound.value),
+      transferDocs: num(transfer.documents),
+      transferQty: num(transfer.quantity),
+      transferValue: num(transfer.value),
     }
-  }, [
-    recentInboundRows,
-    recentOutboundRows,
-    recentTransferRows,
-  ])
+  }, [overviewData])
 
   const warehouseStatus = useMemo(() => {
     const bases = warehouseOptions.length ? warehouseOptions : [{ value: '', label: 'Tất cả kho' }]
@@ -953,7 +940,8 @@ export function InventoryOverviewPage() {
     setWarehouseFilter('')
     setStatusFilter('')
     setPage(1)
-    refetchAudit()
+    void refetchMaterials()
+    void refetchOverview()
   }
 
   return (
@@ -1149,13 +1137,13 @@ export function InventoryOverviewPage() {
                 </div>
               </InventoryChartCard>
               <InventoryChartCard title="Nhập kho hôm nay" className="border-cyan-500/20 bg-cyan-500/5">
-                <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={recentInboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="cyan" />
+                <TransactionSummary title="phiếu" count={todayStats.inboundDocs} quantity={todayStats.inboundQty} amount={todayStats.inboundValue} tone="cyan" />
               </InventoryChartCard>
               <InventoryChartCard title="Xuất kho hôm nay" className="border-amber-500/20 bg-amber-500/5">
-                <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={recentOutboundRows.slice(0, 5).reduce((sum: number, tx: any) => sum + transactionAmount(tx), 0)} tone="amber" />
+                <TransactionSummary title="phiếu" count={todayStats.outboundDocs} quantity={todayStats.outboundQty} amount={todayStats.outboundValue} tone="amber" />
               </InventoryChartCard>
               <InventoryChartCard title="Điều chuyển hôm nay" className="border-purple-500/20 bg-purple-500/5 p-1.5">
-                <TransactionSummary title="phiếu" count={todayStats.transferDocs} quantity={todayStats.transferQty} amount={0} tone="purple" />
+                <TransactionSummary title="phiếu" count={todayStats.transferDocs} quantity={todayStats.transferQty} amount={todayStats.transferValue} tone="purple" />
               </InventoryChartCard>
             </div>
             <InventoryPanel>
@@ -1237,7 +1225,7 @@ export function InventoryOverviewPage() {
                   </tbody>
                 </table>
               </div>
-              <OverviewPagination page={activePage} pageCount={pageCount} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+              <OverviewPagination page={activePage} pageCount={pageCount} total={materialsData?.total ?? 0} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </InventoryPanel>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1">

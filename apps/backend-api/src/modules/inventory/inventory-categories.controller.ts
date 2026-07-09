@@ -9,6 +9,16 @@ import {
 } from '@nestjs/common'
 
 import { InventoryRepository } from './inventory.repository'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
+import {
+  createInventoryCategorySchema,
+  updateInventoryCategorySchema,
+} from './dto/inventory.dto'
+
+import type {
+  CreateInventoryCategoryDto,
+  UpdateInventoryCategoryDto,
+} from './dto/inventory.dto'
 
 @Controller('inventory/categories')
 export class InventoryCategoriesController {
@@ -26,7 +36,8 @@ export class InventoryCategoriesController {
 
   @Post()
   async createCategory(
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createInventoryCategorySchema))
+    body: CreateInventoryCategoryDto,
   ) {
 
     return this.inventoryRepository.createCategory({
@@ -48,7 +59,8 @@ export class InventoryCategoriesController {
   @Put(':id')
   async updateCategory(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateInventoryCategorySchema))
+    body: UpdateInventoryCategoryDto,
   ) {
 
     return this.inventoryRepository.updateCategory(id, {

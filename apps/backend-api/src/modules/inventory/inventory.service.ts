@@ -8,6 +8,15 @@ import { InventoryRepository } from './inventory.repository'
 import { InventoryEventService } from './inventory-event.service'
 import { InventoryReadModelService } from './inventory-read-model.service'
 
+import type {
+  CreateInventoryItemDto,
+  CreateTransactionDto,
+  InventoryMaterialListQueryDto,
+  InventoryOverviewQueryDto,
+  InventoryTransactionListQueryDto,
+  UpdateInventoryItemDto,
+} from './dto/inventory.dto'
+
 type NormalizedInventoryLine = {
   inventoryItemId: string
   quantity: number
@@ -294,7 +303,15 @@ export class InventoryService {
     })
   }
 
-  async createItem(payload: any) {
+  getOverview(query: InventoryOverviewQueryDto) {
+    return this.readModel.overview(query)
+  }
+
+  getMaterialList(query: InventoryMaterialListQueryDto) {
+    return this.readModel.materialList(query)
+  }
+
+  async createItem(payload: CreateInventoryItemDto) {
     const defaultCategory =
       await this.inventoryRepository.findDefaultCategory()
 
@@ -347,7 +364,7 @@ export class InventoryService {
   }
   async updateItem(
     id: string,
-    payload: any,
+    payload: UpdateInventoryItemDto,
   ) {
     const data: Prisma.InventoryItemUpdateInput = {
       code:
@@ -432,13 +449,7 @@ export class InventoryService {
     return item
   }
 
-  async listTransactions(filters?: {
-    fromDate?: string
-    toDate?: string
-    supplierId?: string
-    projectId?: string
-    type?: string
-  }) {
+  async listTransactions(filters: InventoryTransactionListQueryDto = {}) {
     const dbTypes = this.mapBusinessTypeToDbTypes(
       filters?.type,
     )
@@ -449,8 +460,19 @@ export class InventoryService {
     if (toDate) {
       toDate.setHours(23, 59, 59, 999)
     }
-    const rows = await this.inventoryRepository.listTransactions({
-      take: 200,
+    const paginated =
+      filters.page != null ||
+      filters.pageSize != null ||
+      filters.materialId != null
+    const page = filters.page ?? 1
+    const pageSize = filters.pageSize ?? 50
+    const repositoryFilters = {
+      ...(paginated
+        ? {
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+          }
+        : { take: 200 }),
       ...(filters?.fromDate && {
         fromDate: new Date(filters.fromDate),
       }),
@@ -459,10 +481,17 @@ export class InventoryService {
       }),
       supplierId: filters?.supplierId,
       projectId: filters?.projectId,
+      materialId: filters?.materialId,
       ...(dbTypes.length && {
         transactionTypes: dbTypes,
       }),
-    })
+    }
+    const [rows, total] = await Promise.all([
+      this.inventoryRepository.listTransactions(repositoryFilters),
+      paginated
+        ? this.inventoryRepository.countTransactions(repositoryFilters)
+        : Promise.resolve(0),
+    ])
 
     const supplierIds = Array.from(
       new Set(
@@ -471,13 +500,24 @@ export class InventoryService {
           .filter(Boolean),
       ),
     ) as string[]
-    const suppliers = supplierIds.length
-      ? await this.inventoryRepository.findSuppliersByIds(supplierIds)
-      : []
+    const [suppliers, attachmentCounts] = await Promise.all([
+      supplierIds.length
+        ? this.inventoryRepository.findSuppliersByIds(supplierIds)
+        : Promise.resolve([]),
+      this.inventoryRepository.findTransactionAttachmentCounts(
+        rows.map((row) => row.id),
+      ),
+    ])
     const supplierMap = new Map(
       suppliers.map((supplier) => [
         supplier.id,
         supplier.name,
+      ]),
+    )
+    const attachmentCountMap = new Map(
+      attachmentCounts.map((row) => [
+        String(row.entityId ?? ''),
+        row._count._all,
       ]),
     )
     const averageCosts =
@@ -493,7 +533,7 @@ export class InventoryService {
         ),
       )
 
-    return rows.map((row) => {
+    const data = rows.map((row) => {
       const businessType =
         this.toBusinessType(row.type)
       const items = row.items.map((line) =>
@@ -518,8 +558,19 @@ export class InventoryService {
             row.supplierId
           : null,
         projectName: row.project?.name ?? null,
+        attachmentCount: attachmentCountMap.get(row.id) ?? 0,
       }
     })
+    if (!paginated) {
+      return data
+    }
+    return {
+      data,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    }
   }
 
   async getTransactionDetail(id: string) {
@@ -565,7 +616,7 @@ export class InventoryService {
   }
 
   async createTransaction(
-    payload: any,
+    payload: CreateTransactionDto,
   ) {
     const typeMap: Record<string, TransactionType> =
       {

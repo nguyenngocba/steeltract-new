@@ -10,6 +10,24 @@ import {
 } from '@nestjs/common'
 
 import { InventoryService } from './inventory.service'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
+import {
+  createInventoryItemSchema,
+  createTransactionSchema,
+  inventoryMaterialListQuerySchema,
+  inventoryOverviewQuerySchema,
+  inventoryTransactionListQuerySchema,
+  updateInventoryItemSchema,
+} from './dto/inventory.dto'
+
+import type {
+  CreateInventoryItemDto,
+  CreateTransactionDto,
+  InventoryMaterialListQueryDto,
+  InventoryOverviewQueryDto,
+  InventoryTransactionListQueryDto,
+  UpdateInventoryItemDto,
+} from './dto/inventory.dto'
 
 @Controller('inventory')
 export class InventoryController {
@@ -48,9 +66,26 @@ export class InventoryController {
     return this.inventoryService.getInventoryAudit()
   }
 
+  @Get('overview')
+  async getOverview(
+    @Query(new ZodValidationPipe(inventoryOverviewQuerySchema))
+    query: InventoryOverviewQueryDto,
+  ) {
+    return this.inventoryService.getOverview(query)
+  }
+
+  @Get('materials')
+  async getMaterialList(
+    @Query(new ZodValidationPipe(inventoryMaterialListQuerySchema))
+    query: InventoryMaterialListQueryDto,
+  ) {
+    return this.inventoryService.getMaterialList(query)
+  }
+
   @Post('items')
   async createItem(
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createInventoryItemSchema))
+    body: CreateInventoryItemDto,
   ) {
     return this.inventoryService.createItem(
       body,
@@ -60,7 +95,8 @@ export class InventoryController {
   @Put('items/:id')
   async updateItem(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(updateInventoryItemSchema))
+    body: UpdateInventoryItemDto,
   ) {
     return this.inventoryService.updateItem(
       id,
@@ -79,24 +115,16 @@ export class InventoryController {
 
   @Get('transactions')
   async getTransactions(
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-    @Query('supplierId') supplierId?: string,
-    @Query('projectId') projectId?: string,
-    @Query('type') type?: string,
+    @Query(new ZodValidationPipe(inventoryTransactionListQuerySchema))
+    query: InventoryTransactionListQueryDto,
   ) {
-    return this.inventoryService.listTransactions({
-      fromDate,
-      toDate,
-      supplierId,
-      projectId,
-      type,
-    })
+    return this.inventoryService.listTransactions(query)
   }
 
   @Post('transactions')
   async createTransaction(
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createTransactionSchema))
+    body: CreateTransactionDto,
   ) {
     return this.inventoryService.createTransaction(
       body,

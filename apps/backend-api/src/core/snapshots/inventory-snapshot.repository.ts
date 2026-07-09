@@ -557,7 +557,11 @@ export class InventorySnapshotRepository {
       );
       const inboundLines = itemLines.filter((line) => Number(line.quantity) > 0);
       const outboundLines = itemLines.filter((line) => Number(line.quantity) < 0);
-      const currentStock = this.sum(itemLines.map((line) => Number(line.quantity ?? 0)));
+      // Location balances are the canonical live stock source. Transaction
+      // history may contain legacy baselines that cannot reconstruct stock.
+      const currentStock = this.sum(
+        itemStocks.map((stock) => Number(stock.quantity ?? 0)),
+      );
       const inboundQuantity = this.sum(inboundLines.map((line) => Number(line.quantity ?? 0)));
       const outboundQuantity = this.sum(outboundLines.map((line) => Math.abs(Number(line.quantity ?? 0))));
       const inboundCost = this.sum(

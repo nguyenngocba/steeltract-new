@@ -20,6 +20,7 @@ import {
   moduleTableRow,
   type ModuleTone,
 } from '@/shared/ui/modules';
+import { useMaterialTransactions } from '../hooks/useInventoryReadModels';
 
 type Props = {
   open: boolean
@@ -185,14 +186,16 @@ function MaterialImageGallery({
 
 function AttachmentCountChip({
   attachments,
+  knownCount,
   emptyLabel = 'Không có',
   onOpen,
 }: {
   attachments: Attachment[]
+  knownCount?: number
   emptyLabel?: string
   onOpen: () => void
 }) {
-  if (!attachments.length) {
+  if (!attachments.length && !knownCount) {
     return (
       <span className="inline-flex rounded-lg border border-white/10 bg-white/[0.035] px-2 py-1 text-[11px] font-semibold text-slate-500">
         {emptyLabel}
@@ -201,16 +204,19 @@ function AttachmentCountChip({
   }
 
   const first = attachments[0]
+  const count = attachments.length || knownCount || 0
   const label = attachments.length === 1
     ? attachmentDisplayName(first)
-    : `${formatQuantity(attachments.length, 0)} tài liệu`
+    : `${formatQuantity(count, 0)} tài liệu`
 
   return (
     <button
       type="button"
       onClick={onOpen}
       className="inline-flex max-w-[220px] items-center gap-1.5 rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-2 py-1 text-left text-[11px] font-semibold text-cyan-100 transition hover:border-cyan-300/45 hover:bg-cyan-400/15"
-      title={attachments.map(attachmentDisplayName).join('\n')}
+      title={attachments.length
+        ? attachments.map(attachmentDisplayName).join('\n')
+        : 'Mở tài liệu giao dịch'}
     >
       <FileText size={13} className="shrink-0" />
       <span className="truncate">{label}</span>
@@ -577,28 +583,28 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
   // ===== 5. TRANSACTIONS (useMemo) =====
   const transactionRows = useMemo(() => buildTransactionRows(inbound, outbound), [inbound, outbound])
-  const pagedTransactionRows = useMemo(() => {
-    const start = (transactionPage - 1) * transactionPageSize
-    return transactionRows.slice(start, start + transactionPageSize)
-  }, [transactionRows, transactionPage])
-  const totalTransactionPages = Math.ceil(transactionRows.length / transactionPageSize)
+  const historyPage = activeTab === 'logs' ? logPage : transactionPage
+  const materialTransactionsQuery = useMaterialTransactions(
+    materialId ? String(materialId) : undefined,
+    historyPage,
+    transactionPageSize,
+    activeTab === 'transactions' || activeTab === 'logs',
+  )
+  const serverTransactionRows = useMemo(
+    () => buildServerTransactionRows(materialTransactionsQuery.data?.data ?? []),
+    [materialTransactionsQuery.data],
+  )
+  const pagedTransactionRows = activeTab === 'transactions'
+    ? serverTransactionRows
+    : []
+  const totalTransactionPages = materialTransactionsQuery.data?.totalPages ?? 1
 
   // Phân trang logs
-  const pagedLogRows = useMemo(() => {
-    const start = (logPage - 1) * logPageSize;
-    return transactionRows.slice(start, start + logPageSize);
-  }, [transactionRows, logPage]);
-
-  const totalLogPages = Math.ceil(transactionRows.length / logPageSize);
+  const pagedLogRows = activeTab === 'logs' ? serverTransactionRows : []
+  const totalLogPages = materialTransactionsQuery.data?.totalPages ?? 1
 
   // ===== 6. TRANSACTION ATTACHMENTS =====
-  const { data: transactionAttachmentResult = [] } = useQuery({
-    queryKey: ['attachments', 'inventory', 'transaction', 'material-detail', materialId, activeTab],
-    queryFn: () => getAttachments({ module: 'inventory', entityType: 'transaction' }),
-    enabled: Boolean(materialId) && ['transactions', 'documents', 'logs', 'projects', 'suppliers'].includes(activeTab),
-    staleTime: 10_000,
-  })
-  const allTransactionAttachments = normalizeAttachmentList(transactionAttachmentResult)
+  const allTransactionAttachments: Attachment[] = []
   const transactionRowsById = useMemo(() => {
     const map = new Map<string, any>()
     transactionRows.forEach((row) => {
@@ -615,6 +621,24 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
     })
   }, [allTransactionAttachments, transactionRows, transactionRowsById])
   const transactionAttachmentGroups = useMemo(() => groupTransactionAttachments(transactionAttachments, transactionRows), [transactionAttachments, transactionRows])
+  async function openTransactionAttachments(row: any) {
+    const transactionId = String(row.transactionId ?? row.id ?? '')
+    if (!transactionId) return
+    const result = await queryClient.fetchQuery({
+      queryKey: ['attachments', 'inventory', 'transaction', transactionId],
+      queryFn: () => getAttachments({
+        module: 'inventory',
+        entityType: 'transaction',
+        entityId: transactionId,
+      }),
+      staleTime: 10_000,
+    })
+    setAttachmentContext({
+      title: row.transactionNo ?? 'Tài liệu giao dịch',
+      subtitle: transactionSourceLabel(row),
+      attachments: normalizeAttachmentList(result),
+    })
+  }
 
   // ===== 7. DOCUMENT SOURCE ROWS =====
   const documentSourceRows = useMemo<AttachmentSourceRow[]>(() => {
@@ -971,11 +995,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                           <td className="truncate px-2 py-1.5 text-left">
                             <AttachmentCountChip
                               attachments={attachmentsForTransactionRow(row, transactionAttachmentGroups)}
-                              onOpen={() => setAttachmentContext({
-                                title: row.transactionNo ?? 'Tài liệu giao dịch',
-                                subtitle: transactionSourceLabel(row),
-                                attachments: attachmentsForTransactionRow(row, transactionAttachmentGroups),
-                              })}
+                              knownCount={num(row.attachmentCount)}
+                              onOpen={() => void openTransactionAttachments(row)}
                             />
                           </td>
                         </tr>
@@ -996,7 +1017,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                 <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
                   <span>
                     Hiển thị {(transactionPage - 1) * transactionPageSize + 1}-
-                    {Math.min(transactionPage * transactionPageSize, transactionRows.length)}/{transactionRows.length} giao dịch
+                    {Math.min(transactionPage * transactionPageSize, materialTransactionsQuery.data?.total ?? 0)}/{materialTransactionsQuery.data?.total ?? 0} giao dịch
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -1094,8 +1115,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedProjectRows.map((row: any) => (
-                        <tr key={row.projectId ?? row.id ?? Math.random()} className={moduleTableRow}>
+                        {pagedProjectRows.map((row: any, index: number) => (
+                          <tr key={row.projectId ?? row.id ?? `${projectPage}:${index}`} className={moduleTableRow}>
                           <td className="truncate px-3 py-2 text-slate-400" title={row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}>
                             {row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}
                           </td>
@@ -1231,8 +1252,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedSupplierRows.map((row: any) => (
-                          <tr key={row.supplierId ?? row.id ?? Math.random()} className={moduleTableRow}>
+                        {pagedSupplierRows.map((row: any, index: number) => (
+                          <tr key={row.supplierId ?? row.id ?? `${supplierPage}:${index}`} className={moduleTableRow}>
                             <td className="truncate px-3 py-2 text-slate-400" title={row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}>
                               {row.transactionDate ? formatDateTime(row.transactionDate) : (row.createdAt ? formatDateTime(row.createdAt) : '-')}
                             </td>
@@ -1334,8 +1355,8 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedLogRows.map((row) => (
-                        <tr key={row.transactionNo ?? row.id ?? Math.random()} className="border-t border-white/10 hover:bg-white/[0.04]">
+                      {pagedLogRows.map((row, index) => (
+                        <tr key={row.transactionNo ?? row.id ?? `${logPage}:${index}`} className="border-t border-white/10 hover:bg-white/[0.04]">
                           <td className="px-3 py-2 text-slate-300">
                             {row.transactionDate ? formatDateTime(row.transactionDate) : '-'}
                           </td>
@@ -1368,7 +1389,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                   <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
                     <span>
                       Hiển thị {(logPage - 1) * logPageSize + 1}-
-                      {Math.min(logPage * logPageSize, transactionRows.length)}/{transactionRows.length} giao dịch
+                        {Math.min(logPage * logPageSize, materialTransactionsQuery.data?.total ?? 0)}/{materialTransactionsQuery.data?.total ?? 0} giao dịch
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -1451,7 +1472,11 @@ function LocationBalancePanel({ rows, unit, onFocus }: { rows: any[]; unit: stri
       const level = row.level ?? 'Khác';
       map.set(level, (map.get(level) || 0) + num(row.quantity));
     });
-    return Array.from(map.entries()).map(([label, value]) => ({ label, value, color: ['#38bdf8', '#f59e0b', '#ef4444', '#8b5cf6'][Math.floor(Math.random() * 4)] }));
+    return Array.from(map.entries()).map(([label, value], index) => ({
+      label,
+      value,
+      color: ['#38bdf8', '#f59e0b', '#ef4444', '#8b5cf6'][index % 4],
+    }));
   }, [rows]);
 
   return (
@@ -2023,6 +2048,42 @@ function buildTransactionRows(inbound: any[], outbound: any[]) {
           0,
         ),
     )
+}
+
+function buildServerTransactionRows(transactions: any[]) {
+  return transactions.flatMap((transaction: any) => {
+    const items = Array.isArray(transaction?.items) ? transaction.items : []
+    return items.map((line: any) => ({
+      ...line,
+      id: line.id ?? `${transaction.id}:${line.inventoryItemId}`,
+      transactionId: transaction.id,
+      transactionNo: transaction.transactionNo ?? transaction.code,
+      transactionDate: transaction.transactionDate ?? transaction.createdAt,
+      type: transaction.businessType ?? transaction.type,
+      rawType: transaction.rawType,
+      direction: transaction.direction,
+      quantity: num(line.quantity),
+      unitPrice: num(line.unitPrice),
+      totalAmount: num(
+        line.totalAmount ?? num(line.quantity) * num(line.unitPrice),
+      ),
+      supplierId: transaction.supplierId,
+      supplierName: transaction.supplierName,
+      projectId: transaction.projectId,
+      projectName: transaction.projectName,
+      projectCode: transaction.project?.code,
+      referenceModule: transaction.referenceModule,
+      referenceId: transaction.referenceId,
+      note: transaction.note,
+      remarks: transaction.remarks,
+      attachmentCount: num(transaction.attachmentCount),
+      counterparty:
+        transaction.projectName ??
+        transaction.supplierName ??
+        transaction.performedBy ??
+        '-',
+    }))
+  })
 }
 
 function transactionEntityKeys(row: any) {
