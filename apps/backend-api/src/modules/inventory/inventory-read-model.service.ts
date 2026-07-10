@@ -50,10 +50,11 @@ export class InventoryReadModelService {
   }
 
   async overview(query: InventoryOverviewQueryDto) {
-    const [summary, facets, transactionMetrics] = await Promise.all([
+    const [summary, facets, transactionMetrics, overviewHistory] = await Promise.all([
       this.repository.materialSnapshotSummary(query),
       this.repository.materialSnapshotFacets(query),
       this.repository.inventoryOverviewTransactionMetrics(),
+      this.snapshots.inventoryOverviewHistory(12),
     ]);
     const transactionMap = (rows: any[]) =>
       Object.fromEntries(rows.map((row) => [
@@ -67,24 +68,41 @@ export class InventoryReadModelService {
     const normalizedSummary = this.normalizeSummary(summary);
     const stockTrend = transactionMetrics.snapshotTrend
       .slice()
-      .reverse()
       .map((row: any) => ({
         date: row.snapshotDate,
         value: Number(row._sum.inventoryValue ?? 0),
         quantity: Number(row._sum.totalStock ?? 0),
       }))
       .reverse();
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const latestKey = stockTrend.at(-1)?.date
-      ? new Date(stockTrend.at(-1).date).toISOString().slice(0, 10)
-      : null;
-    if (latestKey !== todayKey) {
-      stockTrend.push({
-        date: new Date(),
-        value: normalizedSummary.totalValue,
-        quantity: normalizedSummary.totalStock,
-      });
-    }
+    const historicalMetrics = overviewHistory
+      .slice()
+      .reverse()
+      .map((row) => ({
+        date: row.snapshotDate,
+        totalItems: row.totalMaterials,
+        lowStock: row.lowStockCount,
+        ...(row.outOfStockCount == null
+          ? {}
+          : { outOfStock: row.outOfStockCount }),
+        ...(row.primaryMaterialCount == null
+          ? {}
+          : { primaryCount: row.primaryMaterialCount }),
+        ...(row.primaryStock == null
+          ? {}
+          : { primaryStock: row.primaryStock }),
+        ...(row.secondaryMaterialCount == null
+          ? {}
+          : { secondaryCount: row.secondaryMaterialCount }),
+        ...(row.secondaryStock == null
+          ? {}
+          : { secondaryStock: row.secondaryStock }),
+        ...(row.consumableMaterialCount == null
+          ? {}
+          : { consumableCount: row.consumableMaterialCount }),
+        ...(row.consumableStock == null
+          ? {}
+          : { consumableStock: row.consumableStock }),
+      }));
 
     this.metrics.recordReadModelHit();
     return {
@@ -101,6 +119,7 @@ export class InventoryReadModelService {
         outboundValue: Number(row.outboundValue ?? 0),
       })),
       stockTrend,
+      historicalMetrics,
       source: 'snapshot',
     };
   }

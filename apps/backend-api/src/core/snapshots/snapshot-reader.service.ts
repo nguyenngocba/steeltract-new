@@ -36,6 +36,12 @@ export class SnapshotReaderService {
     return rows;
   }
 
+  async inventoryOverviewHistory(take = 12) {
+    const rows = await this.inventorySnapshots.findOverviewHistory(take);
+    this.recordMany(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
   async inventoryMaterial(materialId: string) {
     const row = await this.inventorySnapshots.findMaterialDetailSnapshot(
       materialId,

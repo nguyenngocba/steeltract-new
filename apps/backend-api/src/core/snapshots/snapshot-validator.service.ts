@@ -34,27 +34,38 @@ export class SnapshotValidatorService {
     const warnings: SnapshotValidationWarning[] = [];
 
     for (const row of rows) {
-      const persisted = await this.inventorySnapshots.findLatest(
-        row.warehouseId,
-        row.snapshotDate,
-      );
+      const persisted = row.scopeKey === 'ALL'
+        ? await this.inventorySnapshots.findOverviewSnapshot(row.snapshotDate)
+        : await this.inventorySnapshots.findLatest(
+            row.warehouseId as string,
+            row.snapshotDate,
+          );
 
       if (!persisted) {
         warnings.push({
-          key: row.warehouseId,
+          key: row.scopeKey,
           reason: 'MISSING_SNAPSHOT',
         });
         continue;
       }
 
-      this.compareNumber(warnings, row.warehouseId, 'totalStock', row.totalStock, persisted.totalStock);
-      this.compareNumber(warnings, row.warehouseId, 'availableStock', row.availableStock, persisted.availableStock);
-      this.compareNumber(warnings, row.warehouseId, 'reservedStock', row.reservedStock, persisted.reservedStock);
-      this.compareNumber(warnings, row.warehouseId, 'movementToday', row.movementToday, persisted.movementToday);
-      this.compareNumber(warnings, row.warehouseId, 'movementMonth', row.movementMonth, persisted.movementMonth);
-      this.compareNumber(warnings, row.warehouseId, 'inventoryValue', row.inventoryValue, persisted.inventoryValue);
-      this.compareNumber(warnings, row.warehouseId, 'totalMaterials', row.totalMaterials, persisted.totalMaterials);
-      this.compareNumber(warnings, row.warehouseId, 'lowStockCount', row.lowStockCount, persisted.lowStockCount);
+      this.compareNumber(warnings, row.scopeKey, 'totalStock', row.totalStock, persisted.totalStock);
+      this.compareNumber(warnings, row.scopeKey, 'availableStock', row.availableStock, persisted.availableStock);
+      this.compareNumber(warnings, row.scopeKey, 'reservedStock', row.reservedStock, persisted.reservedStock);
+      this.compareNumber(warnings, row.scopeKey, 'movementToday', row.movementToday, persisted.movementToday);
+      this.compareNumber(warnings, row.scopeKey, 'movementMonth', row.movementMonth, persisted.movementMonth);
+      this.compareNumber(warnings, row.scopeKey, 'inventoryValue', row.inventoryValue, persisted.inventoryValue);
+      this.compareNumber(warnings, row.scopeKey, 'totalMaterials', row.totalMaterials, persisted.totalMaterials);
+      this.compareNumber(warnings, row.scopeKey, 'lowStockCount', row.lowStockCount, persisted.lowStockCount);
+      if (row.scopeKey === 'ALL') {
+        this.compareNumber(warnings, row.scopeKey, 'outOfStockCount', row.outOfStockCount ?? 0, persisted.outOfStockCount ?? 0);
+        this.compareNumber(warnings, row.scopeKey, 'primaryMaterialCount', row.primaryMaterialCount ?? 0, persisted.primaryMaterialCount ?? 0);
+        this.compareNumber(warnings, row.scopeKey, 'primaryStock', row.primaryStock ?? 0, persisted.primaryStock ?? 0);
+        this.compareNumber(warnings, row.scopeKey, 'secondaryMaterialCount', row.secondaryMaterialCount ?? 0, persisted.secondaryMaterialCount ?? 0);
+        this.compareNumber(warnings, row.scopeKey, 'secondaryStock', row.secondaryStock ?? 0, persisted.secondaryStock ?? 0);
+        this.compareNumber(warnings, row.scopeKey, 'consumableMaterialCount', row.consumableMaterialCount ?? 0, persisted.consumableMaterialCount ?? 0);
+        this.compareNumber(warnings, row.scopeKey, 'consumableStock', row.consumableStock ?? 0, persisted.consumableStock ?? 0);
+      }
     }
 
     if (warnings.length > 0) {

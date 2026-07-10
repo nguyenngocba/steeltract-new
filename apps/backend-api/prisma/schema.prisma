@@ -1638,25 +1638,35 @@ model DispatchEvent {
 }
 
 model InventoryDashboardSnapshot {
-  id             String   @id @default(cuid())
-  warehouseId    String?
-  warehouseCode  String?
-  snapshotDate   DateTime @db.Date
-  totalMaterials Int      @default(0)
-  totalStock     Float    @default(0)
-  availableStock Float    @default(0)
-  reservedStock  Float    @default(0)
-  lowStockCount  Int      @default(0)
-  movementToday  Float    @default(0)
-  movementMonth  Float    @default(0)
-  inventoryValue Float    @default(0)
-  updatedAt      DateTime @updatedAt
-  createdAt      DateTime @default(now())
+  id                      String   @id @default(cuid())
+  warehouseId             String?
+  warehouseCode           String?
+  scopeKey                 String
+  snapshotDate             DateTime @db.Date
+  totalMaterials           Int      @default(0)
+  totalStock               Float    @default(0)
+  availableStock           Float    @default(0)
+  reservedStock            Float    @default(0)
+  lowStockCount            Int      @default(0)
+  outOfStockCount          Int?
+  primaryMaterialCount     Int?
+  primaryStock             Float?
+  secondaryMaterialCount   Int?
+  secondaryStock           Float?
+  consumableMaterialCount  Int?
+  consumableStock          Float?
+  movementToday            Float    @default(0)
+  movementMonth            Float    @default(0)
+  inventoryValue           Float    @default(0)
+  updatedAt                DateTime @updatedAt
+  createdAt                DateTime @default(now())
 
   warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
 
   @@unique([warehouseId, snapshotDate])
+  @@unique([scopeKey, snapshotDate])
   @@index([snapshotDate])
+  @@index([scopeKey, snapshotDate])
   @@index([warehouseCode])
   @@map("inventory_dashboard_snapshots")
 }

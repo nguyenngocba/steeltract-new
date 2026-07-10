@@ -245,9 +245,14 @@ export class InventoryRepository {
         ORDER BY month ASC
       `),
       this.prisma.inventoryDashboardSnapshot.groupBy({
+        where: {
+          scopeKey: {
+            startsWith: 'WAREHOUSE:',
+          },
+        },
         by: ['snapshotDate'],
         _sum: { inventoryValue: true, totalStock: true },
-        orderBy: { snapshotDate: 'asc' },
+        orderBy: { snapshotDate: 'desc' },
         take: 12,
       }),
     ]);

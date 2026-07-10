@@ -150,14 +150,6 @@ function isMainWarehouseLocation(location: any) {
   return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
 }
 
-function isMainWarehouseLine(line: any) {
-  const warehouse = line?.warehouse ?? line?.zone?.warehouse
-  if (!warehouse) return true
-  const code = String(warehouse.code ?? '').trim().toUpperCase()
-  const name = String(warehouse.name ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
-}
-
 function isProductionWarehouseLocation(location: any) {
   const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
   const name = String(location?.warehouseName ?? '').trim().toLowerCase()
@@ -556,289 +548,71 @@ export function InventoryOverviewPage() {
       }
     })
   }, [overviewData])
-  const dateAgeInfo = useMemo(() => {
-    const dates: Date[] = []
-
-    // 1. Transaction dates
-    const txRows = transactionRows(transactionsData)
-    txRows.forEach((tx: any) => {
-      const d = transactionDate(tx)
-      if (d && !isNaN(d.getTime())) {
-        dates.push(d)
-      }
-    })
-
-    // 2. Material creation dates
-    auditRows.forEach((row: any) => {
-      const d = row.createdAt ? new Date(row.createdAt) : null
-      if (d && !isNaN(d.getTime())) {
-        dates.push(d)
-      }
-    })
-
-    if (dates.length === 0) {
-      return { oldestDate: new Date(), ageInDays: 0 }
-    }
-
-    const oldest = new Date(Math.min(...dates.map(d => d.getTime())))
-    const now = new Date()
-    const ageInMs = now.getTime() - oldest.getTime()
-    const ageInDays = ageInMs / (1000 * 60 * 60 * 24)
-
-    return { oldestDate: oldest, ageInDays }
-  }, [transactionsData, auditRows])
-
   const { kpiTrend, kpiDeltas, kpiNoteColors } = useMemo(() => {
     const stockRows = overviewData?.stockTrend ?? []
+    const historicalRows = overviewData?.historicalMetrics ?? []
     const values = stockRows.map((row: any) => num(row.value))
     const quantities = stockRows.map((row: any) => num(row.quantity))
+    const metricSeries = (field: string) =>
+      historicalRows
+        .filter((row: any) => typeof row?.[field] === 'number')
+        .map((row: any) => Number(row[field]))
     const deltaText = (series: number[], suffix: string) => {
       if (series.length < 2) return 'Chưa có dữ liệu lịch sử'
       const current = series.at(-1) ?? 0
       const previous = series.at(-2) ?? 0
       const difference = current - previous
-      if (difference === 0) return `0 ${suffix} (0%)`
+      if (difference === 0) return `0 ${suffix} (0%) so với lần ghi nhận trước`
       const percent = previous ? (difference / Math.abs(previous)) * 100 : null
       const value = suffix === 'đ'
         ? formatCurrencyVnd(Math.abs(difference))
         : `${formatQuantity(Math.abs(difference), 1)} ${suffix}`
       return `${difference > 0 ? '▲' : '▼'}${value}${
         percent == null ? '' : ` (${percent > 0 ? '+' : ''}${percent.toFixed(1)}%)`
-      }`
+      } so với lần ghi nhận trước`
     }
-    const emptyDelta = 'Chưa có dữ liệu lịch sử'
+    const trend = {
+      value: values,
+      quantity: quantities,
+      low: metricSeries('lowStock'),
+      out: metricSeries('outOfStock'),
+      primary: metricSeries('primaryStock'),
+      secondary: metricSeries('secondaryStock'),
+      consumable: metricSeries('consumableStock'),
+      items: metricSeries('totalItems'),
+    }
+    const noteColor = (series: number[], alertMetric = false) => {
+      if (series.length < 2) return 'text-slate-400'
+      const difference = (series.at(-1) ?? 0) - (series.at(-2) ?? 0)
+      if (difference === 0) return 'text-slate-400'
+      if (alertMetric) return difference < 0 ? 'text-emerald-400' : 'text-red-400'
+      return difference > 0 ? 'text-emerald-400' : 'text-red-400'
+    }
+
     return {
-      kpiTrend: {
-        value: values,
-        quantity: quantities,
-        low: [],
-        out: [],
-        primary: [],
-        secondary: [],
-        consumable: [],
-        items: [],
-      },
+      kpiTrend: trend,
       kpiDeltas: {
         value: deltaText(values, 'đ'),
         quantity: deltaText(quantities, 'tấn'),
-        low: emptyDelta,
-        out: emptyDelta,
-        primary: emptyDelta,
-        secondary: emptyDelta,
-        consumable: emptyDelta,
-        items: emptyDelta,
+        low: deltaText(trend.low, 'mã'),
+        out: deltaText(trend.out, 'mã'),
+        primary: deltaText(trend.primary, 'tấn'),
+        secondary: deltaText(trend.secondary, 'tấn'),
+        consumable: deltaText(trend.consumable, 'tấn'),
+        items: deltaText(trend.items, 'mã'),
       },
       kpiNoteColors: {
-        value: 'text-slate-400',
-        quantity: 'text-slate-400',
-        low: 'text-slate-400',
-        out: 'text-slate-400',
-        primary: 'text-slate-400',
-        secondary: 'text-slate-400',
-        consumable: 'text-slate-400',
-        items: 'text-slate-400',
+        value: noteColor(values),
+        quantity: noteColor(quantities),
+        low: noteColor(trend.low, true),
+        out: noteColor(trend.out, true),
+        primary: noteColor(trend.primary),
+        secondary: noteColor(trend.secondary),
+        consumable: noteColor(trend.consumable),
+        items: noteColor(trend.items),
       },
     }
-
-    const ageInDays = dateAgeInfo.ageInDays
-
-    const now = new Date()
-    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const prevMonthLabel = `Tháng ${prevMonthDate.getMonth() + 1}/${prevMonthDate.getFullYear()}`
-
-    // 12 snapshot dates: last day of month going back 11 months to current month-end (capped at now)
-    const snapshotDates = Array.from({ length: 12 }).map((_, index) => {
-      const monthsBack = 11 - index
-      const date = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0, 23, 59, 59, 999)
-      return date > now ? now : date
-    })
-
-    const selectedIds = new Set(filteredRows.map((row: any) => String(row.id)))
-    const txRows = transactionRows(transactionsData)
-    const movements = txRows.flatMap((tx: any) => {
-      const txDate = transactionDate(tx)
-      if (!txDate) return []
-      const items = Array.isArray(tx.items) ? tx.items : []
-      return items
-        .map((line: any) => ({
-          inventoryItemId: String(line.inventoryItemId ?? line.inventoryItem?.id ?? ''),
-          quantity: num(line.quantity),
-          transactionDate: txDate,
-          rawLine: line,
-        }))
-        .filter((line: any) => line.inventoryItemId && selectedIds.has(line.inventoryItemId))
-    })
-
-    const firstTxDateMap = new Map<string, Date>()
-    movements.forEach((m: any) => {
-      const itemId = m.inventoryItemId
-      const mDate = m.transactionDate
-      if (mDate) {
-        const currentMin = firstTxDateMap.get(itemId)
-        if (!currentMin || mDate < currentMin) {
-          firstTxDateMap.set(itemId, mDate)
-        }
-      }
-    })
-
-    const getHistoricalSummary = (targetDate: Date) => {
-      let totalQty = 0
-      let totalValue = 0
-      let low = 0
-      let out = 0
-      let primaryCount = 0
-      let primaryQty = 0
-      let secondaryCount = 0
-      let secondaryQty = 0
-      let consumableCount = 0
-      let consumableQty = 0
-      let totalItems = 0
-
-      filteredRows.forEach((row: any) => {
-        const itemId = String(row.id)
-        const firstTxDate = firstTxDateMap.get(itemId)
-        const existed = firstTxDate && firstTxDate <= targetDate
-        if (!existed) return
-
-        totalItems += 1
-
-        const afterEndTotal = movements
-          .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > targetDate)
-          .reduce((sum: number, line: any) => sum + line.quantity, 0)
-        const totalStock = Math.max(0, totalWarehouseStock(row) - afterEndTotal)
-
-        const afterEndMain = movements
-          .filter((line: any) => line.inventoryItemId === itemId && line.transactionDate > targetDate && isMainWarehouseLine(line.rawLine))
-          .reduce((sum: number, line: any) => sum + line.quantity, 0)
-        const mainStock = Math.max(0, mainWarehouseStock(row) - afterEndMain)
-
-        const averageCost = num(row.averageCost)
-        totalQty += totalStock
-        totalValue += totalStock * averageCost
-
-        const usage = String(row.materialUsageType ?? 'PRIMARY').toUpperCase()
-        if (usage === 'PRIMARY') {
-          primaryCount += 1
-          primaryQty += totalStock
-        } else if (usage === 'SECONDARY') {
-          secondaryCount += 1
-          secondaryQty += totalStock
-        } else if (usage === 'CONSUMABLE') {
-          consumableCount += 1
-          consumableQty += totalStock
-        }
-
-        const min = num(row.minimumStock ?? 5)
-        if (mainStock <= 0) {
-          out += 1
-        } else if (min > 0 && mainStock <= min) {
-          low += 1
-        }
-      })
-
-      return {
-        totalItems,
-        totalQty,
-        totalValue,
-        low,
-        out,
-        primaryCount,
-        primaryQty,
-        secondaryCount,
-        secondaryQty,
-        consumableCount,
-        consumableQty,
-      }
-    }
-
-    const snapshots = snapshotDates.map(date => getHistoricalSummary(date))
-
-    const realTrend = {
-      value: snapshots.map(s => s.totalValue),
-      quantity: snapshots.map(s => s.totalQty),
-      low: snapshots.map(s => s.low),
-      out: snapshots.map(s => s.out),
-      primary: snapshots.map(s => s.primaryQty),
-      secondary: snapshots.map(s => s.secondaryQty),
-      consumable: snapshots.map(s => s.consumableQty),
-      items: snapshots.map(s => s.totalItems),
-    }
-
-    const flat = (val: number) => Array.from({ length: 12 }, () => val)
-    const trend = ageInDays >= 365 ? realTrend : {
-      value: flat(summary.totalValue),
-      quantity: flat(summary.totalQty),
-      low: flat(summary.low),
-      out: flat(summary.out),
-      primary: flat(summary.primaryQty),
-      secondary: flat(summary.secondaryQty),
-      consumable: flat(summary.consumableQty),
-      items: flat(summary.totalItems),
-    }
-
-    const percent = (curr: number, prev: number, suffix: string) => {
-      const diff = curr - prev
-      const absDiff = Math.abs(diff)
-      const formattedDiff = suffix === 'đ' ? formatCurrencyVnd(absDiff) : `${formatQuantity(absDiff)} ${suffix}`
-      
-      const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
-      const arrowPrefix = arrow ? `${arrow}${formattedDiff}` : `0 ${suffix}`
-      
-      if (!prev) {
-        if (!curr) return `0 ${suffix} (0%)`
-        return `▲${formattedDiff} (+100%)`
-      }
-      
-      const delta = (diff / Math.abs(prev)) * 100
-      if (delta === 0) return `0 ${suffix} (0%)`
-      
-      const sign = delta > 0 ? '+' : '-'
-      const formattedDelta = delta % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(1)
-      
-      return `${arrowPrefix} (${sign}${formattedDelta}%)`
-    }
-
-    const count = (curr: number, prev: number) => {
-      const diff = curr - prev
-      if (diff === 0) return '0 mã'
-      const arrow = diff > 0 ? '▲' : '▼'
-      return `${arrow}${Math.abs(diff)} mã`
-    }
-
-    const deltas = {
-      value: percent(snapshots[11].totalValue, snapshots[10].totalValue, 'đ'),
-      quantity: percent(snapshots[11].totalQty, snapshots[10].totalQty, 'tấn'),
-      low: count(snapshots[11].low, snapshots[10].low),
-      out: count(snapshots[11].out, snapshots[10].out),
-      primary: percent(snapshots[11].primaryQty, snapshots[10].primaryQty, 'tấn'),
-      secondary: percent(snapshots[11].secondaryQty, snapshots[10].secondaryQty, 'tấn'),
-      consumable: percent(snapshots[11].consumableQty, snapshots[10].consumableQty, 'tấn'),
-      items: count(snapshots[11].totalItems, snapshots[10].totalItems),
-    }
-
-    const getNoteColorClass = (curr: number, prev: number, isAlertMetric: boolean) => {
-      const diff = curr - prev
-      if (diff === 0) return 'text-slate-400'
-      if (isAlertMetric) {
-        return diff < 0 ? 'text-emerald-400' : 'text-red-400'
-      } else {
-        return diff > 0 ? 'text-emerald-400' : 'text-red-400'
-      }
-    }
-
-    const noteColors = {
-      value: getNoteColorClass(snapshots[11].totalValue, snapshots[10].totalValue, false),
-      quantity: getNoteColorClass(snapshots[11].totalQty, snapshots[10].totalQty, false),
-      items: getNoteColorClass(snapshots[11].totalItems, snapshots[10].totalItems, false),
-      primary: getNoteColorClass(snapshots[11].primaryQty, snapshots[10].primaryQty, false),
-      secondary: getNoteColorClass(snapshots[11].secondaryQty, snapshots[10].secondaryQty, false),
-      consumable: getNoteColorClass(snapshots[11].consumableQty, snapshots[10].consumableQty, false),
-      low: getNoteColorClass(snapshots[11].low, snapshots[10].low, true),
-      out: getNoteColorClass(snapshots[11].out, snapshots[10].out, true),
-    }
-
-    return { kpiTrend: trend, kpiDeltas: deltas, kpiNoteColors: noteColors }
-  }, [dateAgeInfo, filteredRows, transactionsData, summary, overviewData])
+  }, [overviewData])
 
   const alerts = useMemo(() => {
     return filteredRows

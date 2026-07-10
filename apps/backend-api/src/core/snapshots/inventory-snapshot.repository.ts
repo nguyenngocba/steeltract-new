@@ -13,14 +13,22 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface InventorySnapshotPayload {
-  warehouseId: string;
-  warehouseCode: string;
+  warehouseId?: string | null;
+  warehouseCode?: string | null;
+  scopeKey: string;
   snapshotDate: Date;
   totalMaterials: number;
   totalStock: number;
   availableStock: number;
   reservedStock: number;
   lowStockCount: number;
+  outOfStockCount?: number | null;
+  primaryMaterialCount?: number | null;
+  primaryStock?: number | null;
+  secondaryMaterialCount?: number | null;
+  secondaryStock?: number | null;
+  consumableMaterialCount?: number | null;
+  consumableStock?: number | null;
   movementToday: number;
   movementMonth: number;
   inventoryValue: number;
@@ -87,9 +95,35 @@ export class InventorySnapshotRepository {
     return this.prisma.inventoryDashboardSnapshot.findMany({
       where: {
         snapshotDate,
+        scopeKey: {
+          startsWith: 'WAREHOUSE:',
+        },
       },
       orderBy: {
         warehouseCode: 'asc',
+      },
+    });
+  }
+
+  findOverviewHistory(take = 12) {
+    return this.prisma.inventoryDashboardSnapshot.findMany({
+      where: {
+        scopeKey: 'ALL',
+      },
+      orderBy: {
+        snapshotDate: 'desc',
+      },
+      take,
+    });
+  }
+
+  findOverviewSnapshot(snapshotDate: Date) {
+    return this.prisma.inventoryDashboardSnapshot.findUnique({
+      where: {
+        scopeKey_snapshotDate: {
+          scopeKey: 'ALL',
+          snapshotDate,
+        },
       },
     });
   }
@@ -169,6 +203,7 @@ export class InventorySnapshotRepository {
 
     const [
       warehouses,
+      items,
       stocks,
       reservationLines,
       todayItems,
@@ -184,15 +219,17 @@ export class InventorySnapshotRepository {
           code: true,
         },
       }),
-      this.prisma.inventoryLocationStock.findMany({
-        include: {
-          inventoryItem: {
-            select: {
-              id: true,
-              minimumStock: true,
-            },
-          },
+      this.prisma.inventoryItem.findMany({
+        where: {
+          deletedAt: null,
         },
+        select: {
+          id: true,
+          minimumStock: true,
+          materialUsageType: true,
+        },
+      }),
+      this.prisma.inventoryLocationStock.findMany({
       }),
       this.prisma.productionMaterialReservationLine.findMany({
         where: {
@@ -236,7 +273,8 @@ export class InventorySnapshotRepository {
       }
     }
 
-    return warehouses.map((warehouse) => {
+    const itemById = new Map(items.map((item) => [item.id, item]));
+    const warehouseRows = warehouses.map((warehouse) => {
       const warehouseStocks = stocks.filter(
         (stock) => stock.warehouseId === warehouse.id,
       );
@@ -268,6 +306,7 @@ export class InventorySnapshotRepository {
       return {
         warehouseId: warehouse.id,
         warehouseCode: warehouse.code,
+        scopeKey: `WAREHOUSE:${warehouse.id}`,
         snapshotDate: dayStart,
         totalMaterials: materialIds.size,
         totalStock,
@@ -276,31 +315,123 @@ export class InventorySnapshotRepository {
         lowStockCount: warehouseStocks.filter(
           (stock) =>
             Number(stock.quantity ?? 0) <=
-            Number(stock.inventoryItem.minimumStock ?? 0),
+            Number(itemById.get(stock.inventoryItemId)?.minimumStock ?? 0),
         ).length,
         movementToday: this.movementTotal(todayItems, warehouse.id),
         movementMonth: this.movementTotal(monthItems, warehouse.id),
         inventoryValue,
       };
     });
+
+    const warehouseCodeById = new Map(
+      warehouses.map((warehouse) => [warehouse.id, warehouse.code.toUpperCase()]),
+    );
+    const stockByMaterial = new Map<string, number>();
+    const mainStockByMaterial = new Map<string, number>();
+    for (const stock of stocks) {
+      const quantity = Number(stock.quantity ?? 0);
+      stockByMaterial.set(
+        stock.inventoryItemId,
+        (stockByMaterial.get(stock.inventoryItemId) ?? 0) + quantity,
+      );
+      if (warehouseCodeById.get(stock.warehouseId ?? '') === 'MAIN') {
+        mainStockByMaterial.set(
+          stock.inventoryItemId,
+          (mainStockByMaterial.get(stock.inventoryItemId) ?? 0) + quantity,
+        );
+      }
+    }
+
+    const stockForUsage = (usage: string) =>
+      this.sum(
+        items
+          .filter((item) => item.materialUsageType === usage)
+          .map((item) => stockByMaterial.get(item.id) ?? 0),
+      );
+    const totalStock = this.sum(
+      items.map((item) => stockByMaterial.get(item.id) ?? 0),
+    );
+    const reservedStock = this.sum(
+      reservationLines.map((line) =>
+        Math.max(
+          0,
+          Number(line.reservedQty ?? 0) -
+            Number(line.issuedQty ?? 0) -
+            Number(line.returnedQty ?? 0),
+        ),
+      ),
+    );
+    const globalRow: InventorySnapshotPayload = {
+      warehouseId: null,
+      warehouseCode: null,
+      scopeKey: 'ALL',
+      snapshotDate: dayStart,
+      totalMaterials: items.length,
+      totalStock,
+      availableStock: Math.max(0, totalStock - reservedStock),
+      reservedStock,
+      lowStockCount: items.filter((item) => {
+        const stock = mainStockByMaterial.get(item.id) ?? 0;
+        return stock > 0 && stock <= Number(item.minimumStock ?? 0);
+      }).length,
+      outOfStockCount: items.filter(
+        (item) => (mainStockByMaterial.get(item.id) ?? 0) <= 0,
+      ).length,
+      primaryMaterialCount: items.filter(
+        (item) => item.materialUsageType === 'PRIMARY',
+      ).length,
+      primaryStock: stockForUsage('PRIMARY'),
+      secondaryMaterialCount: items.filter(
+        (item) => item.materialUsageType === 'SECONDARY',
+      ).length,
+      secondaryStock: stockForUsage('SECONDARY'),
+      consumableMaterialCount: items.filter(
+        (item) => item.materialUsageType === 'CONSUMABLE',
+      ).length,
+      consumableStock: stockForUsage('CONSUMABLE'),
+      movementToday: this.sum(
+        todayItems.map((row) => Math.abs(Number(row.quantity ?? 0))),
+      ),
+      movementMonth: this.sum(
+        monthItems.map((row) => Math.abs(Number(row.quantity ?? 0))),
+      ),
+      inventoryValue: this.sum(
+        stocks.map(
+          (stock) =>
+            Number(stock.quantity ?? 0) *
+            (latestPrice.get(stock.inventoryItemId) ?? 0),
+        ),
+      ),
+    };
+
+    return [...warehouseRows, globalRow];
   }
 
   upsert(payload: InventorySnapshotPayload, tx: Prisma.TransactionClient) {
     return tx.inventoryDashboardSnapshot.upsert({
       where: {
-        warehouseId_snapshotDate: {
-          warehouseId: payload.warehouseId,
+        scopeKey_snapshotDate: {
+          scopeKey: payload.scopeKey,
           snapshotDate: payload.snapshotDate,
         },
       },
       create: payload,
       update: {
         warehouseCode: payload.warehouseCode,
+        warehouseId: payload.warehouseId,
+        scopeKey: payload.scopeKey,
         totalMaterials: payload.totalMaterials,
         totalStock: payload.totalStock,
         availableStock: payload.availableStock,
         reservedStock: payload.reservedStock,
         lowStockCount: payload.lowStockCount,
+        outOfStockCount: payload.outOfStockCount,
+        primaryMaterialCount: payload.primaryMaterialCount,
+        primaryStock: payload.primaryStock,
+        secondaryMaterialCount: payload.secondaryMaterialCount,
+        secondaryStock: payload.secondaryStock,
+        consumableMaterialCount: payload.consumableMaterialCount,
+        consumableStock: payload.consumableStock,
         movementToday: payload.movementToday,
         movementMonth: payload.movementMonth,
         inventoryValue: payload.inventoryValue,
