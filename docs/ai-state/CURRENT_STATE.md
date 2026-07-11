@@ -1,5 +1,58 @@
 # Current State
 
+## EPIC130 Production Core Platform Foundation
+
+Status: **FOUNDATION AUDIT COMPLETE, CORE COMPLIANCE BLOCKED**
+
+Production was audited as the first module intended to inherit the Inventory Core Platform and ADR011 standard. Current Production workspaces read live data rather than persisted snapshots, so no workspace-snapshot violation was found. However, Production is not yet Core Platform compliant: `ProductionRepository` exists but service-to-Prisma direct access remains in `ProductionService`, `BOMService`, `MaterialIssueService`, `ProductionReservationService`, `ProductionConsumptionService`, `ProductionMaterialLedgerService`, and `WorkOrderService`; Production snapshot models/repositories/readers/writers are not present in the active schema/code; `SnapshotFeatureFlagService` supports only Inventory, Projects, and Logistics; and Operations Center exposes Inventory/Projects/Dispatch platform health but not Production.
+
+EPIC130 produced runtime reports and did not change Inventory, Core Platform, Operations Center, Production APIs, UI, workflow, or business logic. Production next step is a focused Repository Boundary implementation before Production Dashboard Snapshot work.
+
+## EPIC120 Workspace Read Model Standardization
+
+Status: **COMPLETED**
+
+SteelTrack now has an enterprise data-source rule derived from the Inventory production-readiness work:
+
+```text
+Dashboard / Cockpit / Analytics -> Persisted Snapshot -> Eventual consistency
+Workspace / Operator Grid / Queue -> Repository Live Read Model -> Strong read-after-write
+```
+
+The standard is documented in the architecture folder and accepted as ADR011. The audit classified Inventory, Production, Projects, QC, Yard, Logistics, Suppliers, and Operations Center screens. Production was reviewed as the pilot module; no persisted-snapshot workspace violation was found, so no Production code rollout was needed. Projects detail tabs are the main future compatibility item because several operator tabs can currently read fresh `ProjectDetailSnapshot` payloads.
+
+## EPIC118.5.1 Inventory React Query Root Cause Fix
+
+Status: **CODE FIX COMPLETE, OPERATOR SMOKE PENDING**
+
+The remaining Materials table stale-after-outbound behavior was traced past React Query. Invalidation and active refetch targeted the correct query family, and `InventoryMaterialsPage` derives rows directly from `materialsData.items`. The stale payload came from `InventoryReadModelService.toMaterialListRow()`, which selected `InventoryMaterialSnapshot` stock/location data while the snapshot was still "fresh by age" but not yet updated by Background Engine.
+
+The Materials list row mapper now reads live repository-included `inventory_location_stocks` for `locationBalances` and `currentStock`, while preserving snapshot-derived valuation metadata. This removes the need for retry or polling as a consistency workaround. Operator smoke testing in an authenticated browser session is still required to confirm inbound, outbound, transfer, adjustment, and return flows update Materials, Locations, Material Detail, and History without F5.
+
+## EPIC118.5 Inventory React Query Consistency
+
+Status: **SUPERSEDED BY EPIC118.5.1 ROOT-CAUSE FIX**
+
+Inventory read-after-write behavior now uses an explicit dependency map and targeted active refetch after stock-affecting mutations. `invalidateInventoryReadState` covers Overview, Materials, Material Detail, Material History, Transactions, Locations, Return Requests, legacy Inventory reads, and Dashboard keys. The later EPIC118.5.1 root-cause pass removed retry-based remediation and fixed the stale Materials API payload at the read-model mapper.
+
+`InventoryMaterialsPage` does not hold a local row copy. Manual operator smoke testing is still required in an authenticated browser session to verify inbound, outbound, transfer, adjustment, and return flows without F5.
+
+## EPIC118.4 Inventory Read-after-Write Consistency
+
+Status: **COMPLETED**
+
+Inventory stock-affecting frontend mutations now invalidate the active Inventory query families used by the current UI: Overview, Materials, Material Detail, Material transaction history, transaction workspace, locations, return requests, and dashboard. The fix is frontend-only and does not change Repository, business logic, Event/Outbox, Snapshot Engine, API contract, or database schema.
+
+Transaction/detail/location workspaces are refreshed immediately through React Query invalidation. Inventory Overview remains snapshot-first and now refetches every 5 seconds while mounted so Background Engine snapshot updates are picked up without F5; its refresh control shows `Đang đồng bộ...` during background refetch.
+
+## EPIC118.3 Inventory Historical Metrics
+
+Status: **APPROVED WITH LIMITED HISTORY**
+
+Inventory Overview historical metrics now use persisted snapshot history instead of synthetic or reconstructed frontend history. The canonical global dashboard snapshot row is keyed by `scopeKey = 'ALL'` and stores out-of-stock, material-usage counts, and material-usage stock fields as nullable historical metrics. Existing warehouse snapshots remain valid for stock value/quantity trend, while old rows are not backfilled with guessed category/out-of-stock data.
+
+Current database evidence: one real `ALL` snapshot exists for 2026-07-09, and it matches live inventory under the frozen MAIN-stock low/out-of-stock rule. Category/out-of-stock KPI deltas will show `Chưa có dữ liệu lịch sử` until at least two real `ALL` snapshots exist.
+
 ## EPIC119 Inventory Inbound & Outbound UI/UX Audit
 
 Status: **COMPLETED**

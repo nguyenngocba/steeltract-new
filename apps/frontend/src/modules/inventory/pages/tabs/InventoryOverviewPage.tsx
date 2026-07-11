@@ -999,7 +999,13 @@ export function InventoryOverviewPage() {
                   </tbody>
                 </table>
               </div>
-              <OverviewPagination page={activePage} pageCount={pageCount} total={materialsData?.total ?? 0} pageSize={PAGE_SIZE} onPageChange={setPage} />
+              <InventoryPagination
+                page={activePage}
+                pageCount={pageCount}
+                total={materialsData?.total ?? 0}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
             </InventoryPanel>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -1128,6 +1134,12 @@ export function InventoryOverviewPage() {
           alerts={alerts}
           inboundRows={recentInboundRows}
           outboundRows={recentOutboundRows}
+          // thêm các filter
+          search={search}
+          categoryFilter={categoryFilter}
+          usageFilter={usageFilter}
+          warehouseFilter={warehouseFilter}
+          statusFilter={statusFilter}
         />
       )}
       <InboundTransactionModal open={transactionModal === 'inbound'} onClose={() => setTransactionModal(null)} />
@@ -1344,13 +1356,34 @@ function OverviewModal({
   alerts,
   inboundRows,
   outboundRows,
+
+  search,
+  categoryFilter,
+  usageFilter,
+  warehouseFilter,
+  statusFilter,
 }: {
   type: 'recent-inbound' | 'recent-outbound' | 'stock-full' | 'alerts-full'
+
   onClose: () => void
+
   rows: any[]
+
   alerts: any[]
+
   inboundRows: any[]
+
   outboundRows: any[]
+
+  search?: string
+
+  categoryFilter?: string
+
+  usageFilter?: string
+
+  warehouseFilter?: string
+
+  statusFilter?: string
 }) {
   const title = {
     'recent-inbound': 'Toàn bộ nhập kho gần đây',
@@ -1362,6 +1395,52 @@ function OverviewModal({
 
   // Phân trang cho recent-inbound / recent-outbound
   const [page, setPage] = useState(1)
+  const [pageStock, setPageStock] = useState(1)
+  const STOCK_PAGE_SIZE = 13
+
+  const {
+  data: fullStockData,
+  isLoading: isLoadingFullStock,
+} = useInventoryMaterials({
+  page: pageStock,
+  pageSize: STOCK_PAGE_SIZE,
+  search: search || undefined,
+  categoryId: categoryFilter || undefined,
+  materialUsageType: usageFilter || undefined,
+  warehouse: warehouseFilter || undefined,
+  stockStatus: statusFilter || undefined,
+  sortBy: 'code',
+  sortOrder: 'asc',
+})
+
+  const fullStockRows = useMemo(() => {
+    return (fullStockData?.items ?? []).map((item: any) => {
+      const averageCost = num(item.averageCost ?? item.unitPrice)
+      const mainStock = mainWarehouseStock(item)
+      const productionStock = productionWarehouseStock(item)
+      const totalStock = totalWarehouseStock(item)
+
+      return {
+        ...item,
+        id: item.materialId ?? item.inventoryItemId ?? item.id,
+        code: item.materialCode ?? item.code,
+        name: item.materialName ?? item.name,
+        quantity: totalStock,
+        mainStock,
+        productionStock,
+        totalStock,
+        averageCost,
+        inventoryValue:
+          num(item.inventoryValue ?? totalStock * averageCost),
+      }
+    })
+  }, [fullStockData])
+
+  const totalStock = fullStockData?.total ?? 0
+
+  const totalStockPages =
+    fullStockData?.totalPages ??
+    Math.max(1, Math.ceil(totalStock / STOCK_PAGE_SIZE))
   const pageSize = 16
   const pagedTxRows = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -1375,13 +1454,18 @@ function OverviewModal({
     setPage(totalPages)
   }
 }, [txRows, totalPages, page])
+  useEffect(() => {
+    if (pageStock > totalStockPages) {
+      setPageStock(totalStockPages)
+    }
+  }, [rows, totalStockPages, pageStock])
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
       <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">
-            {type === 'stock-full' ? `Toàn bộ danh sách tồn kho (${rows.length} vật tư)` : title}
+            {type === 'stock-full' ? `Toàn bộ danh sách tồn kho (${totalStock} vật tư)` : title}
           </h3>
           <button onClick={onClose} className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white">
             Đóng
@@ -1492,7 +1576,7 @@ function OverviewModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((item: any) => {
+                  {fullStockRows.map((item: any) => {
                     const status = statusOf(item)
                     return (
                       <tr key={item.id} className={inventoryTableRow}>
@@ -1533,8 +1617,40 @@ function OverviewModal({
                   })}
                 </tbody>
               </table>
-            </div>
-          ) : null}
+
+              <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-2 text-xs text-slate-400">
+                <span>
+                  Hiển thị {totalStock === 0 ? 0 : (pageStock - 1) * STOCK_PAGE_SIZE + 1}
+                  -
+                  {Math.min(pageStock * STOCK_PAGE_SIZE, totalStock)}
+                  / {totalStock} vật tư
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPageStock((p) => Math.max(1, p - 1))}
+                    disabled={pageStock <= 1}
+                    className={inventoryMutedButton}
+                  >
+                    Trước
+                  </button>
+
+                  <span className="px-2 py-1 text-slate-300">
+                    {pageStock}/{totalStockPages}
+                  </span>
+
+                  <button
+                    onClick={() => setPageStock((p) => Math.min(totalStockPages, p + 1))}
+                    disabled={pageStock >= totalStockPages}
+                    className={inventoryMutedButton}
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+
+              </div>
+              ) : null}
 
           {type === 'alerts-full' ? (
             <div className="grid max-h-[74vh] gap-4 overflow-auto xl:grid-cols-[1fr_320px]">

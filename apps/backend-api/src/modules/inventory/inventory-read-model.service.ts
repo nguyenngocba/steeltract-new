@@ -175,26 +175,22 @@ export class InventoryReadModelService {
     const snapshotFresh = Boolean(
       allSnapshot?.updatedAt && this.isFresh(allSnapshot.updatedAt),
     );
-    const locations = snapshotFresh && Array.isArray(allSnapshot?.locationPayload)
-      ? allSnapshot.locationPayload
-      : item.locationStocks.map((row: any) => ({
-          zoneId: row.zoneId,
-          zoneCode: row.zone?.code ?? null,
-          zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
-          slotId: row.slotId,
-          level: row.level,
-          row: row.zone?.row ?? null,
-          column: row.zone?.column ?? null,
-          warehouseName: row.zone?.warehouse?.name ?? null,
-          warehouseCode: row.zone?.warehouse?.code ?? null,
-          quantity: Number(row.quantity ?? 0),
-        }));
-    const currentStock = snapshotFresh
-      ? Number(allSnapshot.currentStock ?? 0)
-      : locations.reduce(
-          (sum: number, row: any) => sum + Number(row.quantity ?? 0),
-          0,
-        );
+    const locations = item.locationStocks.map((row: any) => ({
+      zoneId: row.zoneId,
+      zoneCode: row.zone?.code ?? null,
+      zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
+      slotId: row.slotId,
+      level: row.level,
+      row: row.zone?.row ?? null,
+      column: row.zone?.column ?? null,
+      warehouseName: row.zone?.warehouse?.name ?? null,
+      warehouseCode: row.zone?.warehouse?.code ?? null,
+      quantity: Number(row.quantity ?? 0),
+    }));
+    const currentStock = locations.reduce(
+      (sum: number, row: any) => sum + Number(row.quantity ?? 0),
+      0,
+    );
     const averageCost =
       Number(allSnapshot?.currentStock ?? 0) > 0
         ? Number(allSnapshot?.inventoryValue ?? 0) /
@@ -232,7 +228,7 @@ export class InventoryReadModelService {
             ? allSnapshot.lastInboundAt
             : allSnapshot.lastOutboundAt
           : allSnapshot?.lastInboundAt ?? allSnapshot?.lastOutboundAt ?? null,
-      readSource: snapshotFresh ? 'snapshot' : 'repository-fallback',
+      readSource: snapshotFresh ? 'repository-live-stock' : 'repository-fallback',
       snapshotUpdatedAt: allSnapshot?.updatedAt ?? null,
     };
   }

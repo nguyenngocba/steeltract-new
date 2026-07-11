@@ -1157,6 +1157,13 @@ export function InventoryMaterialsPage() {
                   </tbody>
                 </table>
               </div>
+              <MaterialsPagination
+                page={activePage}
+                pageCount={totalPages}
+                total={materialsData?.total ?? 0}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
             </div>
           </div>
         )}

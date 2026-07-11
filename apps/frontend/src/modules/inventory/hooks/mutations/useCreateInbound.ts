@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   createTransaction,
 } from '../../api/createTransaction'
+import { invalidateInventoryReadState } from '../invalidateInventoryReadState'
 
 type InboundPayload = {
   inventoryItemId: string
@@ -23,6 +24,7 @@ export function useCreateInbound() {
     useQueryClient()
 
   return useMutation({
+    mutationKey: ['inventory', 'transaction', 'create', 'inbound'],
 
     mutationFn: (
       payload: InboundPayload,
@@ -54,19 +56,7 @@ export function useCreateInbound() {
         ],
       }),
 
-    onSuccess() {
-
-      queryClient.invalidateQueries({
-        queryKey: [
-          'inventory-transactions',
-        ],
-      })
-
-      queryClient.invalidateQueries({
-        queryKey: [
-          'materials',
-        ],
-      })
-    },
+    onSuccess: () =>
+      invalidateInventoryReadState(queryClient),
   })
 }

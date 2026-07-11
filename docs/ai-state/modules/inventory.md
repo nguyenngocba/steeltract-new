@@ -1,5 +1,50 @@
 # Inventory Module
 
+## EPIC118.5.1 React Query Root Cause Fix
+
+Status: **CODE FIX COMPLETE, OPERATOR SMOKE PENDING**
+
+- Remaining Materials stale-after-outbound behavior was traced beyond React Query invalidation.
+- `InventoryMaterialsPage` derives rows directly from `materialsData.items`; no persistent table row copy or derived state bug was found.
+- The exact root cause was `InventoryReadModelService.toMaterialListRow()` using fresh-by-age `InventoryMaterialSnapshot` stock/location values for Materials rows during the Background Engine snapshot lag window.
+- Materials list rows now use live repository-included `inventory_location_stocks` for `locationBalances` and `currentStock`.
+- Snapshot valuation metadata remains available for average-cost/value display, but operational row stock is no longer blocked by snapshot lag.
+- Retry/polling-style remediation was removed from the active read-after-write path; `invalidateInventoryReadState` now performs explicit invalidation plus active refetch.
+- Operator browser smoke testing is still required before declaring full operational acceptance.
+
+## EPIC118.5 React Query Consistency
+
+Status: **SUPERSEDED BY EPIC118.5.1 ROOT-CAUSE FIX**
+
+- Inventory read-after-write query dependencies are mapped in `docs/audit/inventory-react-query-dependency-map.md`.
+- `invalidateInventoryReadState` now invalidates concrete Inventory query families and actively refetches active queries.
+- Covered surfaces include Materials, Overview, Material Detail, Material History, Transactions, Locations, Return Requests, legacy Inventory reads, and Dashboard.
+- `InventoryMaterialsPage` table rows are derived from `materialsData.items`; EPIC118.5.1 confirmed the remaining stale behavior was caused by stale API payload mapping, not local row-state mutation.
+- Backend Repository, business logic, Event/Outbox, Snapshot Engine, Prisma schema, API contract, and workflow remain unchanged.
+- Manual browser/operator smoke testing is still required before declaring full operational acceptance.
+
+## EPIC118.4 Read-after-Write Consistency
+
+Status: **COMPLETED**
+
+- Added a centralized frontend query invalidation helper for stock-affecting Inventory mutations.
+- Covered active keys for Overview, Materials, Material Detail, Material transaction history, transactions, locations, return requests, and dashboard.
+- Inbound, outbound, shared transaction, transaction-engine, return receive/reject, and project material return creation now use the same invalidation matrix.
+- Overview remains snapshot-first and now refetches every 5 seconds while mounted to pick up Background Engine snapshot updates automatically.
+- Overview shows `Đang đồng bộ...` on the refresh control while its snapshot-backed query is refetching.
+- No Repository, business logic, Event/Outbox, Snapshot Engine, API contract, or database changes were made.
+
+## EPIC118.3 Inventory Historical Metrics Remediation
+
+Status: **APPROVED WITH LIMITED HISTORY**
+
+- Inventory Overview historical KPI metrics now read persisted snapshot history instead of frontend-generated or reconstructed history.
+- `InventoryDashboardSnapshot` uses `scopeKey = 'ALL'` for canonical global Overview history and warehouse-scoped rows for stock value/quantity history.
+- New historical fields for out-of-stock, primary, secondary, and consumable counts/stocks are nullable, so legacy snapshots do not create fake data.
+- KPI deltas now compare adjacent persisted snapshots and use `so với lần ghi nhận trước`.
+- Latest `ALL` snapshot parity against live inventory is PASS under the frozen MAIN-stock low/out-of-stock rule.
+- Current limitation: only one real `ALL` snapshot exists, so new metric deltas correctly show `Chưa có dữ liệu lịch sử` until another background snapshot is written.
+
 ## EPIC119 Inventory Inbound & Outbound UI/UX Audit
 
 Status: **COMPLETED**

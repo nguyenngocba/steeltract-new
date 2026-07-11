@@ -30,6 +30,7 @@ import {
 } from '@/shared/ui/cockpit'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format'
+import { invalidateInventoryReadState } from '../../inventory/hooks/invalidateInventoryReadState'
 import {
   createProjectMaterialReturn,
   createProjectTemplate,
@@ -229,9 +230,7 @@ export function ProjectsPage() {
         queryClient.invalidateQueries({ queryKey: ['project-runtime'] }),
         queryClient.invalidateQueries({ queryKey: ['project-wbs'] }),
         queryClient.invalidateQueries({ queryKey: ['project-detail'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-material-detail'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-transactions'] }),
+        invalidateInventoryReadState(queryClient),
       ])
     },
     onError: () => toast.error('Không thể tạo phiếu trả vật tư'),

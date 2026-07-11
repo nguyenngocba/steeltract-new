@@ -1,5 +1,27 @@
 # Production Module
 
+## Core Platform Status
+
+EPIC130 on 2026-07-11 audited Production as the first module intended to inherit the Inventory Core Platform and ADR011 standard.
+
+Status: **FOUNDATION AUDIT COMPLETE, CORE COMPLIANCE BLOCKED**
+
+Findings:
+
+* Production workspaces currently use live reads rather than persisted snapshots, so no ADR011 workspace-snapshot violation was found.
+* `ProductionRepository` exists and covers part of the Production Order, Stage, Task, Log, Work Center, Machine, Schedule, ActivityLog, and metrics surface.
+* Repository Boundary is incomplete. Several services still inject `PrismaService` directly: `ProductionService`, `BOMService`, `MaterialIssueService`, `ProductionReservationService`, `ProductionConsumptionService`, `ProductionMaterialLedgerService`, and `WorkOrderService`.
+* Production dashboard snapshots are not implemented in active Prisma schema/code. `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and `WorkCenterSnapshot` remain target/future models, not verified active models.
+* Snapshot feature flags and event consumer mappings currently cover Inventory, Projects, and Logistics/Dispatch, not Production.
+* Operations Center exposes Inventory, Projects, and Dispatch snapshot health but does not yet expose Production Platform Health.
+
+Next architecture order:
+
+1. Complete Production Repository Boundary.
+2. Add repository-backed live read models for Production workspaces.
+3. Add Production dashboard snapshots for cockpit/analytics only.
+4. Register Production runtime and Operations Center health.
+
 ## Scope
 
 Production covers BOM, Manufacturing Orders, routing stages, production logs, production material issues, QC gate handoff, and Yard staging for finished components.
@@ -88,6 +110,9 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * `ProductionScrap`
 * `MachineDowntime`
 * `MachineOee`
+
+Planned Core Platform snapshot targets, not active schema-confirmed models:
+
 * `ProductionDashboardSnapshot`
 * `ProductionOrderSnapshot`
 * `WorkCenterSnapshot`

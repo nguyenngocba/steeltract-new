@@ -7,6 +7,7 @@ import {
 import {
   queryKeys,
 } from '../../../lib/query/query-keys'
+import { invalidateInventoryReadState } from './invalidateInventoryReadState'
 import {
   createInventoryTransaction,
   createReturnRequest,
@@ -27,11 +28,8 @@ export function useCreateInventoryTransactionMutation() {
 
   return useMutation({
     mutationFn: createInventoryTransaction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.inventory.all,
-      })
-    },
+    onSuccess: () =>
+      invalidateInventoryReadState(queryClient),
   })
 }
 
@@ -47,11 +45,8 @@ export function useCreateReturnRequestMutation() {
 
   return useMutation({
     mutationFn: createReturnRequest,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.inventory.all,
-      })
-    },
+    onSuccess: () =>
+      invalidateInventoryReadState(queryClient),
   })
 }
 
@@ -60,10 +55,7 @@ export function useAdvanceReturnRequestMutation() {
 
   return useMutation({
     mutationFn: advanceReturnRequest,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.inventory.all,
-      })
-    },
+    onSuccess: () =>
+      invalidateInventoryReadState(queryClient),
   })
 }

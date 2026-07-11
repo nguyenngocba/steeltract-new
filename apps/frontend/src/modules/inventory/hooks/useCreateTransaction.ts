@@ -4,34 +4,17 @@ import {
 } from '@tanstack/react-query'
 
 import { createTransaction } from '../api/createTransaction'
+import { invalidateInventoryReadState } from './invalidateInventoryReadState'
 
 export function useCreateTransaction() {
   const queryClient =
     useQueryClient()
 
   return useMutation({
+    mutationKey: ['inventory', 'transaction', 'create'],
     mutationFn: createTransaction,
 
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['inventory-transactions'],
-      })
-
-      queryClient.invalidateQueries({
-        queryKey: ['inventory-items'],
-      })
-
-      queryClient.invalidateQueries({
-        queryKey: ['material-detail'],
-      })
-
-      queryClient.invalidateQueries({
-        queryKey: ['zones'],
-      })
-
-      queryClient.invalidateQueries({
-        queryKey: ['inventory-audit'],
-      })
-    },
+    onSuccess: () =>
+      invalidateInventoryReadState(queryClient),
   })
 }

@@ -30,6 +30,7 @@ import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { advanceReturnRequest, getReturnRequests } from '../../api/transactions.api'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import { invalidateInventoryReadState } from '../../hooks/invalidateInventoryReadState'
 import type { ReturnRequest } from '../../types/transaction-engine.types'
 
 type ReturnTab = 'requested' | 'received' | 'accepted' | 'rejected'
@@ -258,13 +259,11 @@ export function InventoryReturnRequestsPage() {
 
 async function invalidateReturnWorkspace(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['inventory-return-requests'] }),
+    invalidateInventoryReadState(queryClient),
     queryClient.invalidateQueries({ queryKey: ['projects-runtime'] }),
     queryClient.invalidateQueries({ queryKey: ['project-runtime'] }),
     queryClient.invalidateQueries({ queryKey: ['project-detail'] }),
     queryClient.invalidateQueries({ queryKey: ['project-wbs'] }),
-    queryClient.invalidateQueries({ queryKey: ['inventory-material-detail'] }),
-    queryClient.invalidateQueries({ queryKey: ['inventory-transactions'] }),
   ])
 }
 
