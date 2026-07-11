@@ -38,6 +38,7 @@ import {
   returnMaterialIssueSchema,
   stageProductionToYardSchema,
   startProductionSchema,
+  productionOrderTransitionSchema,
   updateProductionOrderSchema,
   updateProductionTaskSchema,
   updateBomSchema,
@@ -73,6 +74,7 @@ import type {
   ReserveProductionReservationDto,
   StageProductionToYardDto,
   StartProductionDto,
+  ProductionOrderTransitionDto,
   UpdateProductionOrderDto,
   UpdateProductionTaskDto,
   UpdateBomDto,
@@ -152,9 +154,7 @@ export class ProductionController {
   }
 
   @Post('boms')
-  createBom(
-    @Body(new ZodValidationPipe(createBomSchema)) body: CreateBomDto,
-  ) {
+  createBom(@Body(new ZodValidationPipe(createBomSchema)) body: CreateBomDto) {
     return this.bomService.create(body);
   }
 
@@ -251,7 +251,11 @@ export class ProductionController {
     body: ReleaseProductionReservationDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.productionReservationService.release(id, body, request.user?.id);
+    return this.productionReservationService.release(
+      id,
+      body,
+      request.user?.id,
+    );
   }
 
   @Post('reservations/:id/expire')
@@ -336,7 +340,11 @@ export class ProductionController {
     body: CreateProductionConsumptionDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.productionConsumptionService.consume(id, body, request.user?.id);
+    return this.productionConsumptionService.consume(
+      id,
+      body,
+      request.user?.id,
+    );
   }
 
   @Get(':id')
@@ -368,6 +376,26 @@ export class ProductionController {
     return this.productionService.update(id, body, request.user?.id);
   }
 
+  @Post(':id/release')
+  releaseOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.release(id, body, request.user?.id);
+  }
+
+  @Post(':id/ready')
+  readyOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.ready(id, body, request.user?.id);
+  }
+
   @Post(':id/start')
   start(
     @Param('id') id: string,
@@ -376,6 +404,56 @@ export class ProductionController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.productionService.start(id, body, request.user?.id);
+  }
+
+  @Post(':id/pause')
+  pauseOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.pause(id, body, request.user?.id);
+  }
+
+  @Post(':id/resume')
+  resumeOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.resume(id, body, request.user?.id);
+  }
+
+  @Post(':id/complete')
+  completeOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.complete(id, body, request.user?.id);
+  }
+
+  @Post(':id/close')
+  closeOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.close(id, body, request.user?.id);
+  }
+
+  @Post(':id/cancel')
+  cancelOrder(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(productionOrderTransitionSchema))
+    body: ProductionOrderTransitionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productionService.cancel(id, body, request.user?.id);
   }
 
   @Post(':id/stage-to-yard')

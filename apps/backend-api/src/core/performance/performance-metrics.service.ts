@@ -130,6 +130,18 @@ export class PerformanceMetricsService {
   private readonly projectSnapshotMissSamples: number[] = [];
   private readonly projectReadModelHitSamples: number[] = [];
   private readonly projectFallbackSamples: number[] = [];
+  private readonly productionSnapshotHitSamples: number[] = [];
+  private readonly productionSnapshotMissSamples: number[] = [];
+  private readonly productionReadModelHitSamples: number[] = [];
+  private readonly productionFallbackSamples: number[] = [];
+  private readonly productionSnapshotAgeSamples: Array<{
+    timestampMs: number;
+    ageSeconds: number;
+  }> = [];
+  private readonly productionSnapshotLagSamples: Array<{
+    timestampMs: number;
+    lagMs: number;
+  }> = [];
   private readonly projectDetailSnapshotHitSamples: number[] = [];
   private readonly planningSnapshotHitSamples: number[] = [];
   private readonly timelineSnapshotHitSamples: number[] = [];
@@ -455,6 +467,42 @@ export class PerformanceMetricsService {
     this.pruneRuntimeSamples(Date.now());
   }
 
+  recordProductionSnapshotHit() {
+    this.snapshotHitSamples.push(Date.now());
+    this.productionSnapshotHitSamples.push(Date.now());
+    this.pruneRuntimeSamples(Date.now());
+  }
+
+  recordProductionSnapshotMiss() {
+    this.snapshotMissSamples.push(Date.now());
+    this.productionSnapshotMissSamples.push(Date.now());
+    this.pruneRuntimeSamples(Date.now());
+  }
+
+  recordProductionReadModelHit() {
+    this.recordReadModelHit();
+    this.productionReadModelHitSamples.push(Date.now());
+    this.pruneRuntimeSamples(Date.now());
+  }
+
+  recordProductionFallback() {
+    this.recordReadModelFallback();
+    this.productionFallbackSamples.push(Date.now());
+    this.pruneRuntimeSamples(Date.now());
+  }
+
+  recordProductionSnapshotAge(ageSeconds: number) {
+    const now = Date.now();
+    this.productionSnapshotAgeSamples.push({ timestampMs: now, ageSeconds });
+    this.recordSnapshotAge(ageSeconds);
+  }
+
+  recordProductionSnapshotLag(lagMs: number) {
+    const now = Date.now();
+    this.productionSnapshotLagSamples.push({ timestampMs: now, lagMs });
+    this.recordSnapshotLag(lagMs);
+  }
+
   recordProjectDetailSnapshotHit(tab?: string) {
     const now = Date.now();
     this.snapshotHitSamples.push(now);
@@ -724,6 +772,12 @@ export class PerformanceMetricsService {
     this.pruneNumberSamples(this.projectSnapshotMissSamples, minTimestamp);
     this.pruneNumberSamples(this.projectReadModelHitSamples, minTimestamp);
     this.pruneNumberSamples(this.projectFallbackSamples, minTimestamp);
+    this.pruneNumberSamples(this.productionSnapshotHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.productionSnapshotMissSamples, minTimestamp);
+    this.pruneNumberSamples(this.productionReadModelHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.productionFallbackSamples, minTimestamp);
+    this.pruneByTimestamp(this.productionSnapshotAgeSamples, minTimestamp);
+    this.pruneByTimestamp(this.productionSnapshotLagSamples, minTimestamp);
     this.pruneNumberSamples(this.projectDetailSnapshotHitSamples, minTimestamp);
     this.pruneNumberSamples(this.planningSnapshotHitSamples, minTimestamp);
     this.pruneNumberSamples(this.timelineSnapshotHitSamples, minTimestamp);
@@ -777,6 +831,20 @@ export class PerformanceMetricsService {
       projectSnapshotMiss: this.countSince(this.projectSnapshotMissSamples, since),
       projectReadModelHit: this.countSince(this.projectReadModelHitSamples, since),
       projectFallbackCount: this.countSince(this.projectFallbackSamples, since),
+      productionSnapshotHit: this.countSince(this.productionSnapshotHitSamples, since),
+      productionSnapshotMiss: this.countSince(this.productionSnapshotMissSamples, since),
+      productionReadModelHit: this.countSince(this.productionReadModelHitSamples, since),
+      productionFallbackCount: this.countSince(this.productionFallbackSamples, since),
+      productionAverageAgeSeconds: this.average(
+        this.productionSnapshotAgeSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.ageSeconds),
+      ),
+      productionAverageLagMs: this.average(
+        this.productionSnapshotLagSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.lagMs),
+      ),
       projectDetailSnapshotHit: this.countSince(this.projectDetailSnapshotHitSamples, since),
       planningSnapshotHit: this.countSince(this.planningSnapshotHitSamples, since),
       timelineSnapshotHit: this.countSince(this.timelineSnapshotHitSamples, since),

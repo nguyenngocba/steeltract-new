@@ -14,6 +14,64 @@ Dashboard        60%
 Operations Center 20%
 Documentation   100%
 
+EPIC135A on 2026-07-11 completed Production-Inventory Transaction Boundary
+Alignment. Inventory is the only writer of Inventory transactions, item quantity
+compatibility state, location stock, and Inventory posting Outbox rows.
+Production Issue/Return, Inventory posting, Production ledger/status, and Outbox
+now share one transaction context with automatic rollback. Reservation and
+Consumption/Scrap semantics were clarified. Production-Inventory Boundary is
+APPROVED; EPIC135B remains responsible for full canonical Production material
+event emission and Material Flow verification.
+
+EPIC134 on 2026-07-11 implemented the canonical Production Order lifecycle end
+to end. Dedicated commands enforce `DRAFT -> RELEASED -> READY -> IN_PROGRESS
+<-> PAUSED -> COMPLETED -> CLOSED` and `DRAFT -> CANCELLED`; compatibility
+statuses have no new outgoing transitions. Order, activity, and canonical
+Outbox writes are atomic in the Production repository transaction. Background
+Engine snapshot routing and EPIC133 Runtime/Operations telemetry remain the
+post-commit path. Production Order Lifecycle is APPROVED.
+
+Production Blueprint Alignment on 2026-07-11 synchronized the approved MES
+blueprint, Production domain/workflow/event specifications, and Prisma enum
+foundation. The canonical lifecycle is now `DRAFT -> RELEASED -> READY ->
+IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED`, with cancellation only from
+`DRAFT`. New lifecycle events use `production.order.*`; legacy event names and
+the persisted `PLANNED`/`DELAYED` values are compatibility-only. The additive
+migration adds `READY`, `PAUSED`, and `CLOSED` without rewriting existing rows.
+EPIC134 lifecycle implementation is now unblocked but was not started in this
+alignment sprint.
+
+EPIC133 on 2026-07-11 completed Production Runtime Metrics and Operations
+Center Integration. Production now records module-specific snapshot hit/miss,
+snapshot age/lag, read-model hit, and fallback counters through the existing
+Runtime Metrics service. `/production/metrics` is snapshot-reader ready through
+`DashboardReaderService` with repository fallback and the same response shape.
+Operations Center now exposes Production Platform Health with repository,
+snapshot, feature flag, event/outbox, background job, runtime, and parity
+readiness status. No Inventory, UI, workflow, API contract, repository schema,
+or snapshot foundation behavior was changed. Production Runtime Platform is
+APPROVED; broader Production event contracts remain future work.
+
+EPIC132 on 2026-07-11 completed Production Snapshot Foundation. Production now
+has additive persisted snapshot schema for dashboard, order, and work-center
+summaries, plus `ProductionSnapshotRepository`, reader/writer/rebuilder
+integration, `USE_PRODUCTION_SNAPSHOT` feature registration, and Background
+Engine event registration for existing `production.*` lifecycle events. Existing
+Production workspaces remain live Repository read models under ADR011. No
+Inventory, UI, API contract, workflow, Operations Center UI, or business logic
+behavior was changed. Production Snapshot Foundation is APPROVED; dashboard
+read cutover, Production-specific Runtime Metrics, and Operations Center
+Production Health remain future work.
+
+EPIC131 on 2026-07-11 completed Production Repository Foundation. Production
+now has focused repository classes for BOM, Material Issue, Consumption,
+Ledger, Production Order, Reservation, Routing, Work Center, and Work Order
+paths, and Production services no longer inject or call Prisma directly.
+Existing API contracts, UI, Inventory, workflow logic, snapshots, Background
+Engine, Runtime Metrics, and Operations Center behavior were left unchanged.
+Production Repository Foundation is APPROVED, while Production Dashboard
+Snapshots and Operations Center Production Health remain future work.
+
 EPIC130 on 2026-07-11 completed the Production Core Platform Foundation audit.
 Production remains business-useful but is not yet Core Platform compliant.
 Current workspaces use live reads and do not violate ADR011, but repository

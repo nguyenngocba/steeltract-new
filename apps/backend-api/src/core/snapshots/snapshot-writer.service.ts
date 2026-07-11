@@ -7,6 +7,7 @@ import { PerformanceMetricsService } from '../performance/performance-metrics.se
 import { PrismaService } from '../prisma/prisma.service';
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
+import { ProductionSnapshotRepository } from './production-snapshot.repository';
 import { ProjectSnapshotRepository } from './project-snapshot.repository';
 
 import type { SnapshotUpdateRequest } from '../jobs/snapshot-update-dispatcher.service';
@@ -35,6 +36,8 @@ export class SnapshotWriterService {
     private readonly projectSnapshots: ProjectSnapshotRepository,
     @Inject(DispatchSnapshotRepository)
     private readonly dispatchSnapshots: DispatchSnapshotRepository,
+    @Inject(ProductionSnapshotRepository)
+    private readonly productionSnapshots: ProductionSnapshotRepository,
   ) {}
 
   async rebuild(request: SnapshotUpdateRequest): Promise<SnapshotWriteResult> {
@@ -118,6 +121,33 @@ export class SnapshotWriterService {
       return this.result(request, rows.length, rows.length, startedAt);
     }
 
+    if (request.scope.module === 'production') {
+      const [dashboardRows, orderRows, workCenterRows] = await Promise.all([
+        this.productionSnapshots.calculateDashboard(new Date()),
+        this.productionSnapshots.calculateOrderSnapshots(
+          request.scope.productionOrderId,
+        ),
+        this.productionSnapshots.calculateWorkCenterSnapshots(
+          request.scope.workCenterId,
+        ),
+      ]);
+      await this.prisma.$transaction(async (tx) => {
+        for (const row of dashboardRows) {
+          await this.productionSnapshots.upsertDashboard(row, tx);
+        }
+        for (const row of orderRows) {
+          await this.productionSnapshots.upsertOrder(row, tx);
+        }
+        for (const row of workCenterRows) {
+          await this.productionSnapshots.upsertWorkCenter(row, tx);
+        }
+      });
+
+      const count =
+        dashboardRows.length + orderRows.length + workCenterRows.length;
+      return this.result(request, count, count, startedAt);
+    }
+
     const result = this.result(request, 0, 0, startedAt);
     this.metrics.recordSnapshotRebuild(result.durationMs);
     return result;
@@ -154,7 +184,9 @@ export class SnapshotWriterService {
         request.scope.scopeId ??
         request.scope.projectId ??
         request.scope.inventoryItemId ??
-        request.scope.dispatchOrderId,
+        request.scope.dispatchOrderId ??
+        request.scope.productionOrderId ??
+        request.scope.workCenterId,
       generatedAt: new Date().toISOString(),
       rowsRead,
       rowsWritten,

@@ -71,3 +71,34 @@ Client Request
 2. **Decimal Support**: Toàn bộ các trường số lượng (Quantity), trọng lượng (Weight), thời gian chạy máy (Downtime/Expected Hours) phải hỗ trợ số thập phân để đảm bảo độ chính xác cho ngành kết cấu thép (ví dụ: cấp phát `1.5` tấn thép hình, ghi nhận `0.125` giờ downtime).
 3. **Immutability of Ledger**: Mọi biến động vật tư trong sản xuất (Cấp phát, Sử dụng thực tế, Rework, Scrap, Trả lại) đều phải đi qua `ProductionMaterialLedger` dưới dạng các dòng nhật ký bất biến. Tuyệt đối không cập nhật trực tiếp số dư tạm tính.
 4. **Operations Center Transparency**: Mọi tác vụ nền liên quan đến tính toán OEE, cập nhật hàng đợi tại Work Center và tái dựng Snapshot sản xuất đều phải được đăng ký chỉ số giám sát lên Operations Center để theo dõi độ trễ (Lag) và tỷ lệ lỗi (Error rate).
+
+---
+
+## 5. Production Order Lifecycle Standard
+
+EPIC134 Blueprint Alignment establishes one canonical lifecycle for
+`ProductionOrder`:
+
+```text
+DRAFT -> RELEASED -> READY -> IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED
+   |
+   +-> CANCELLED
+```
+
+Rules:
+
+* `CLOSED` and `CANCELLED` are terminal states.
+* `COMPLETED` cannot return to an execution state.
+* `PAUSED` resumes only to `IN_PROGRESS`.
+* `PLANNED` and `DELAYED` remain in the database enum for compatibility with
+  existing rows and APIs, but are not canonical lifecycle targets for new
+  Production Order commands. Delay is derived operational information, not a
+  lifecycle command.
+* Lifecycle mutations and their Outbox event must commit atomically in the same
+  repository transaction.
+* Snapshot updates remain asynchronous through Outbox and Background Engine.
+
+Canonical lifecycle events use the `production.order.*` namespace. Legacy
+`production.started`, `production.completed`, and `production.delayed` names
+must be treated as compatibility inputs during rollout, not emitted by new
+lifecycle commands.

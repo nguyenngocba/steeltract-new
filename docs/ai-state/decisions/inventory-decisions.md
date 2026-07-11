@@ -236,3 +236,22 @@ Implications:
 - A material with `MAIN = 0`, `PRODUCTION = 250`, and `TOTAL = 250` is still `Hết hàng` for purchasing.
 - A material with `MAIN <= minimumStock` is `Sắp hết hàng` even if production stock is high.
 - Tables and detail views should display main, production, and total stock separately so users can see why the status was assigned.
+
+## INV-015: Cross-Module Stock Posting Remains Inventory-Owned
+
+Decision:
+
+- Cross-module workflows use the internal `InventoryPostingService` for stock
+  Issue and Return.
+- The caller may provide an existing transaction context so its domain records
+  and Inventory posting commit atomically.
+- Inventory retains validation, valuation, Inventory transaction creation,
+  item/location balance mutation, and Inventory Outbox ownership.
+
+Implications:
+
+- Production repositories must not write Inventory tables.
+- The internal posting interface is not a public HTTP API and does not alter
+  Inventory business rules.
+- A posting error rolls back the entire caller transaction; compensating deletes
+  are prohibited.

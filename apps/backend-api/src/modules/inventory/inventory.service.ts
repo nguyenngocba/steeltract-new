@@ -7,6 +7,7 @@ import { TelemetryService } from '../../core/telemetry/telemetry.service'
 import { InventoryRepository } from './inventory.repository'
 import { InventoryEventService } from './inventory-event.service'
 import { InventoryReadModelService } from './inventory-read-model.service'
+import { inventoryCodePrefix } from './inventory-transaction-code'
 
 import type {
   CreateInventoryItemDto,
@@ -1438,12 +1439,4 @@ export class InventoryService {
       | 'ADJUSTMENT'
     >
   }
-}
-
-function inventoryCodePrefix(type: TransactionType) {
-  if (type === TransactionType.IMPORT) return 'NK'
-  if (type === TransactionType.EXPORT) return 'XK'
-  if (type === TransactionType.TRANSFER) return 'DC'
-  if (type === TransactionType.ADJUSTMENT) return 'KK'
-  return 'INV'
 }

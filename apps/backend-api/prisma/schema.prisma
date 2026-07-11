@@ -273,9 +273,12 @@ enum ProductionOrderStatus {
   DRAFT
   PLANNED
   RELEASED
+  READY
   IN_PROGRESS
+  PAUSED
   DELAYED
   COMPLETED
+  CLOSED
   CANCELLED
 }
 
@@ -1800,6 +1803,81 @@ model DispatchDashboardSnapshot {
   @@map("dispatch_dashboard_snapshots")
 }
 
+model ProductionDashboardSnapshot {
+  id                 String   @id @default(cuid())
+  scopeKey           String
+  snapshotDate       DateTime @db.Date
+  totalOrders        Int      @default(0)
+  inProgress         Int      @default(0)
+  delayed            Int      @default(0)
+  completed          Int      @default(0)
+  completionRate     Float    @default(0)
+  throughput         Float    @default(0)
+  activeWorkCenters  Int      @default(0)
+  machineUtilization Float    @default(0)
+  bottleneckCount    Int      @default(0)
+  payload            Json?
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  @@unique([scopeKey, snapshotDate])
+  @@index([snapshotDate])
+  @@index([scopeKey, snapshotDate])
+  @@index([updatedAt])
+  @@map("production_dashboard_snapshots")
+}
+
+model ProductionOrderSnapshot {
+  id                  String   @id @default(cuid())
+  productionOrderId   String   @unique
+  orderNo             String
+  status              String
+  currentStageCode    String?
+  progress            Float    @default(0)
+  stageCount          Int      @default(0)
+  completedStageCount Int      @default(0)
+  taskCount           Int      @default(0)
+  blockedTaskCount    Int      @default(0)
+  materialIssueCount  Int      @default(0)
+  materialIssuedQty   Float    @default(0)
+  materialReturnedQty Float    @default(0)
+  materialConsumedQty Float    @default(0)
+  actualCost          Float    @default(0)
+  payload             Json?
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([currentStageCode])
+  @@index([updatedAt])
+  @@map("production_order_snapshots")
+}
+
+model WorkCenterSnapshot {
+  id               String   @id @default(cuid())
+  workCenterId     String   @unique
+  code             String
+  status           String
+  machineCount     Int      @default(0)
+  activeOrderCount Int      @default(0)
+  activeTaskCount  Int      @default(0)
+  blockedTaskCount Int      @default(0)
+  capacityPerDay   Float?
+  utilization      Float    @default(0)
+  payload          Json?
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  workCenter WorkCenter @relation(fields: [workCenterId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([status])
+  @@index([updatedAt])
+  @@map("work_center_snapshots")
+}
+
 //
 // SAFETY
 //
@@ -2530,6 +2608,7 @@ model WorkCenter {
   stages    ProductionStage[]
   tasks     ProductionTask[]
   schedules ProductionSchedule[]
+  snapshot  WorkCenterSnapshot?
 
   @@index([status])
   @@map("work_centers")
@@ -2591,6 +2670,7 @@ model ProductionOrder {
   materialLedgers      ProductionMaterialLedger[]
   materialConsumptions ProductionMaterialConsumption[]
   componentCostings    ComponentCosting[]
+  snapshot             ProductionOrderSnapshot?
 
   @@index([status])
   @@index([projectId])

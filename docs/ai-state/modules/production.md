@@ -1,25 +1,171 @@
 # Production Module
 
+## Production-Inventory Transaction Boundary
+
+EPIC135A completed on 2026-07-11.
+
+Status: **APPROVED**
+
+Production no longer mutates Inventory transaction, item, or location-stock
+tables. Issue and Return call Inventory-owned `InventoryPostingService` inside
+the same repository transaction as Production issue/reservation/ledger changes.
+Inventory owns validation, valuation, stock mutation, Inventory transaction, and
+Inventory Outbox writes.
+
+Draft Reservation is demand-only and writes no `RESERVE` ledger row. Actual
+reserve allocation writes the single `RESERVE` semantic. `CONSUME` ledger rows
+exclude Scrap. Canonical material command/event contracts are ready for EPIC135B.
+
+## Production Order Lifecycle
+
+EPIC134 completed on 2026-07-11.
+
+Status: **APPROVED**
+
+Implemented lifecycle:
+
+```text
+DRAFT -> RELEASED -> READY -> IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED
+DRAFT -> CANCELLED
+```
+
+Dedicated command endpoints validate every transition. Create is restricted to
+`DRAFT`, generic update cannot change status, and `PLANNED`/`DELAYED` remain
+read-compatible without becoming command targets. Each lifecycle transition,
+ActivityLog, and canonical `production.order.*` Outbox event commits atomically
+through `ProductionOrderRepository`. Background Engine updates the existing
+Production snapshot foundation after Outbox dispatch.
+
+## Blueprint Alignment
+
+Production Blueprint Alignment completed on 2026-07-11.
+
+Status: **APPROVED FOR EPIC134 IMPLEMENTATION**
+
+Canonical order lifecycle:
+
+```text
+DRAFT -> RELEASED -> READY -> IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED
+DRAFT -> CANCELLED
+```
+
+Canonical order events use `production.order.*`. `PLANNED`, `DELAYED`, and the
+legacy event names remain compatibility inputs only. The additive enum migration
+is prepared; command/state-machine and atomic Outbox implementation remain the
+next sprint.
+
 ## Core Platform Status
+
+EPIC133 on 2026-07-11 completed Production Runtime Metrics and Operations Center Integration.
+
+Status: **RUNTIME PLATFORM APPROVED**
+
+Runtime additions:
+
+* Production-specific snapshot hit/miss counters.
+* Production snapshot age and lag counters.
+* Production read-model hit counter.
+* Production fallback counter.
+* `/production/metrics` dashboard-reader strategy using `ProductionDashboardSnapshot` with repository fallback.
+* Production Platform Health in Operations Center.
+
+Operations Center health includes:
+
+* Repository status.
+* Read Model status.
+* Snapshot status.
+* `USE_PRODUCTION_SNAPSHOT` feature flag status.
+* Event/outbox status.
+* Background job status.
+* Runtime metrics status.
+* Snapshot parity readiness.
+
+Not included in EPIC133:
+
+* New MES business workflows.
+* UI changes.
+* Inventory changes.
+* Broader Production event contracts for reservation/issue/return/consumption/scrap/rework.
+
+EPIC132 on 2026-07-11 completed Production Snapshot Foundation.
+
+Status: **SNAPSHOT FOUNDATION APPROVED**
+
+Snapshot additions:
+
+* `ProductionDashboardSnapshot`
+* `ProductionOrderSnapshot`
+* `WorkCenterSnapshot`
+* `ProductionSnapshotRepository`
+* Production snapshot reader methods in `SnapshotReaderService`
+* Production snapshot writer branch in `SnapshotWriterService`
+* Production snapshot validation hook in `SnapshotValidatorService`
+* `USE_PRODUCTION_SNAPSHOT` feature flag registration
+* Existing `production.started`, `production.stage.completed`, `production.delayed`, and `production.completed` events mapped to Background Engine snapshot jobs
+
+Boundary result:
+
+* Production workspaces remain Repository Live Read Models under ADR011.
+* Production dashboard/cockpit/analytics surfaces are prepared for persisted snapshot cutover.
+* No Production UI, API contract, Inventory, business workflow, Operations Center UI, or Runtime Metrics behavior was changed.
+
+Not included in EPIC132:
+
+* Production dashboard API cutover to snapshot-first reads.
+* Production-specific Runtime Metrics counters.
+* Operations Center Production Platform Health.
+* Expanded Production event contracts beyond existing lifecycle events.
+
+EPIC131 on 2026-07-11 completed Production Repository Foundation.
+
+Status: **REPOSITORY FOUNDATION APPROVED**
+
+Repository additions:
+
+* `BomRepository`
+* `MaterialIssueRepository`
+* `ProductionConsumptionRepository`
+* `ProductionMaterialLedgerRepository`
+* `ProductionOrderRepository`
+* `ProductionReservationRepository`
+* `RoutingRepository`
+* `WorkCenterRepository`
+* `WorkOrderRepository`
+
+Boundary result:
+
+* Production services no longer inject `PrismaService`.
+* Production services no longer call `this.prisma`.
+* Production services no longer call direct model methods on `Prisma.TransactionClient`.
+* `PrismaService` is now confined to Production repositories.
+
+Not included in EPIC131:
+
+* Production snapshots.
+* Production Background Engine jobs.
+* Production Runtime Metrics counters.
+* Operations Center Production Health.
+* New MES workflows.
+* UI/API changes.
 
 EPIC130 on 2026-07-11 audited Production as the first module intended to inherit the Inventory Core Platform and ADR011 standard.
 
-Status: **FOUNDATION AUDIT COMPLETE, CORE COMPLIANCE BLOCKED**
+Status: **FOUNDATION AUDIT COMPLETE, REPOSITORY BLOCKER REMEDIATED BY EPIC131**
 
 Findings:
 
 * Production workspaces currently use live reads rather than persisted snapshots, so no ADR011 workspace-snapshot violation was found.
 * `ProductionRepository` exists and covers part of the Production Order, Stage, Task, Log, Work Center, Machine, Schedule, ActivityLog, and metrics surface.
-* Repository Boundary is incomplete. Several services still inject `PrismaService` directly: `ProductionService`, `BOMService`, `MaterialIssueService`, `ProductionReservationService`, `ProductionConsumptionService`, `ProductionMaterialLedgerService`, and `WorkOrderService`.
-* Production dashboard snapshots are not implemented in active Prisma schema/code. `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and `WorkCenterSnapshot` remain target/future models, not verified active models.
-* Snapshot feature flags and event consumer mappings currently cover Inventory, Projects, and Logistics/Dispatch, not Production.
+* Repository Boundary was incomplete in EPIC130 and remediated in EPIC131.
+* Production dashboard snapshots were not implemented during EPIC130; EPIC132 later added `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and `WorkCenterSnapshot`.
+* Snapshot feature flags and event consumer mappings were missing during EPIC130; EPIC132 later registered `USE_PRODUCTION_SNAPSHOT` and existing `production.*` lifecycle events.
 * Operations Center exposes Inventory, Projects, and Dispatch snapshot health but does not yet expose Production Platform Health.
 
 Next architecture order:
 
-1. Complete Production Repository Boundary.
-2. Add repository-backed live read models for Production workspaces.
-3. Add Production dashboard snapshots for cockpit/analytics only.
+1. Add repository-backed live read models for Production workspaces.
+2. Cut Production dashboard/cockpit analytics over to persisted snapshots with fallback.
+3. Expand Production event/outbox contracts.
 4. Register Production runtime and Operations Center health.
 
 ## Scope
@@ -111,7 +257,7 @@ Production covers BOM, Manufacturing Orders, routing stages, production logs, pr
 * `MachineDowntime`
 * `MachineOee`
 
-Planned Core Platform snapshot targets, not active schema-confirmed models:
+Core Platform snapshot models:
 
 * `ProductionDashboardSnapshot`
 * `ProductionOrderSnapshot`
@@ -174,7 +320,7 @@ Planned Core Platform snapshot targets, not active schema-confirmed models:
 * **Sprint 2 (Shopfloor Runtime & Downtime)**: Implement `Shift`, `MachineDowntime`, and downtime tracking APIs.
 * **Sprint 3 (Scrap & Rework Workflows)**: Implement `ProductionScrap`, `ProductionRework` tables, validations, and NCR connection.
 * **Sprint 4 (Outbox Events & Event Consumer)**: Implement persistent outbox events for production transitions and event listener routing.
-* **Sprint 5 (Persisted Snapshots)**: Create `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and rebuilder background jobs.
+* **Sprint 5 (Persisted Snapshots)**: Completed foundation in EPIC132; remaining work is dashboard cutover, broader event contracts, and Operations Center health.
 * **Sprint 6 (WMS & Costing Integration)**: Hardening material issue/return balance equations and average-cost ledger reconciliations.
 * **Sprint 7 (Shopfloor Dashboard & Cockpits)**: Build dynamic manager and operator interfaces, including OEE and downtime gauges.
 * **Sprint 8 (Operations Center & AI Optimizer)**: Integrate production alerts into the Operations Center and add AI-driven queue scheduling optimization.

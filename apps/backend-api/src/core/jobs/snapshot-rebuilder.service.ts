@@ -61,6 +61,10 @@ export class SnapshotRebuilder {
       return this.validator.validateDispatch(request.scope.dispatchOrderId);
     }
 
+    if (request.scope.module === 'production') {
+      return this.validator.validateProduction(request.scope.productionOrderId);
+    }
+
     return Promise.resolve(undefined);
   }
 }

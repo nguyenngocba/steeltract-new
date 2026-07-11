@@ -1,95 +1,73 @@
-# EPIC130 - Production Repository Boundary Report
+# EPIC131 - Production Repository Boundary Report
 
 Date: 2026-07-11
-Status: BOUNDARY INCOMPLETE
+Status: PASS
 
 ## Summary
 
-Production has a `ProductionRepository`, but the repository boundary is not complete. Prisma access remains distributed across multiple Production services.
+EPIC130 found Production repository coverage incomplete. EPIC131 remediated the boundary by adding focused repositories and removing direct Prisma access from Production service classes.
 
-## Current Repository Coverage
+## Boundary Verification
 
-`ProductionRepository` currently covers:
-
-- `ProductionOrder` create/update/find/list/count;
-- `ProductionStage` find/update;
-- `ProductionTask` create/update;
-- `ProductionLog` create/list;
-- `WorkCenter` create/list;
-- `Machine` create/list;
-- `ProductionSchedule` create/list;
-- `ActivityLog` create;
-- simple metrics counts.
-
-## Direct Prisma Usage Outside Repository
-
-| File | Evidence | Impact |
-| --- | --- | --- |
-| `production.service.ts` | Injects `PrismaService` in constructor. | Main service can bypass repository. |
-| `production.service.ts` | `stageToYard()` directly reads QC, Yard slot, Yard placements and updates Component, Timeline, Log, Order. | Cross-module workflow and persistence boundary are mixed. |
-| `production.service.ts` | `createComponentFromProductionOrder()` starts with direct `productionOrder.findUnique()`. | Component creation path bypasses repository. |
-| `material-issue.service.ts` | Injects Prisma and directly creates/updates issues, stock, transactions, item quantities. | Material issue/return workflow is not repository-routed. |
-| `production-reservation.service.ts` | Injects Prisma and owns reservation creation, reserve/release/expire, stock bucket reads. | Reservation workflow is not repository-routed. |
-| `production-consumption.service.ts` | Injects Prisma and reads order/item/issues/consumptions and writes consumption rows. | Consumption workflow is not repository-routed. |
-| `production-material-ledger.service.ts` | Injects Prisma and reads/writes ledger rows. | Ledger read/write boundary is service-local. |
-| `bom.service.ts` | Injects Prisma and handles BOM CRUD plus material/transaction/issue reads. | BOM is not repository-routed. |
-| `workorder.service.ts` | Injects Prisma directly. | WorkOrder path is not repository-routed. |
-
-## Controller Boundary
-
-Controller boundary is mostly acceptable:
-
-- no Prisma injection in `ProductionController`;
-- endpoints delegate to services;
-- request bodies use Zod validation pipes.
-
-Remaining issue:
-
-- controller delegates to many services that each own persistence directly. For Inventory-level compliance, these services should call repository methods.
-
-## Refactor Plan
-
-### Step 1 - Expand ProductionRepository
-
-Add repository method groups without changing response shapes:
-
-- BOM repository methods;
-- reservation repository methods;
-- issue repository methods;
-- consumption repository methods;
-- ledger repository methods;
-- production warehouse bucket methods;
-- QC/Yard lookup methods required by Production workflows.
-
-### Step 2 - Move Transaction Blocks
-
-Keep business logic in services, but route all `tx.*` persistence through repository transaction helpers where practical.
-
-### Step 3 - Split Read Model Methods
-
-Add read methods for:
-
-- order list page;
-- reservation queue;
-- material issue queue;
-- ledger page;
-- consumption page;
-- execution board;
-- production warehouse.
-
-### Step 4 - Enforce
-
-After refactor:
+Command:
 
 ```bash
-rg "PrismaService" apps/backend-api/src/modules/production/services
+rg -n "PrismaService|this\\.prisma|nextOperationalCode|\\btx\\.[a-zA-Z]+\\.(find|create|update|delete|count|groupBy|createMany|updateMany|deleteMany)" apps/backend-api/src/modules/production/services
 ```
 
-should return no Production service constructors except approved transitional comments, if any.
+Result:
 
-## Current Verdict
+```text
+no matches
+```
 
-Repository Boundary: **BLOCKED**
+Command:
 
-Production cannot be declared Core Platform compliant until service-to-Prisma direct access is removed or explicitly isolated behind repository abstractions.
+```bash
+rg -n "PrismaService" apps/backend-api/src/modules/production
+```
+
+Result:
+
+```text
+matches only in apps/backend-api/src/modules/production/repositories/*
+```
+
+## Repository Inventory
+
+| Repository | Status |
+| --- | --- |
+| `ProductionRepository` | Existing compatibility facade, expanded for component/Yard staging and production stock reads. |
+| `ProductionOrderRepository` | Added as blueprint-aligned order repository facade. |
+| `WorkOrderRepository` | Added and used by `WorkOrderService`. |
+| `RoutingRepository` | Added for routing/stage/task/log foundation. |
+| `WorkCenterRepository` | Added for work center/machine/schedule foundation. |
+| `BomRepository` | Added and used by `BOMService`. |
+| `MaterialIssueRepository` | Added and used by `MaterialIssueService`. |
+| `ProductionReservationRepository` | Added and used by `ProductionReservationService`. |
+| `ProductionConsumptionRepository` | Added and used by `ProductionConsumptionService`. |
+| `ProductionMaterialLedgerRepository` | Added and used by `ProductionMaterialLedgerService`. |
+
+## Service Boundary
+
+| Service | Boundary Result |
+| --- | --- |
+| `ProductionController` | PASS, no DB access. |
+| `ProductionService` | PASS, no direct Prisma access. |
+| `BOMService` | PASS, repository-routed. |
+| `MaterialIssueService` | PASS, repository-routed. |
+| `ProductionReservationService` | PASS, repository-routed. |
+| `ProductionConsumptionService` | PASS, repository-routed. |
+| `ProductionMaterialLedgerService` | PASS, repository-routed. |
+| `WorkOrderService` | PASS, repository-routed. |
+
+## Notes
+
+- This sprint intentionally did not implement Production snapshots, background snapshot jobs, Runtime Metrics counters, Operations Center Production Health, or new MES workflows.
+- Business logic stayed in services; persistence and transaction model calls moved to repositories.
+- The next hardening pass should consolidate read-model DTO shaping and server-side pagination, not reintroduce Prisma into services.
+
+## Verdict
+
+Repository Boundary: **PASS**
 

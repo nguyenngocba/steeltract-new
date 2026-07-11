@@ -6,6 +6,7 @@ import {
 
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
+import { ProductionSnapshotRepository } from './production-snapshot.repository';
 import { ProjectSnapshotRepository } from './project-snapshot.repository';
 
 type SnapshotValidationWarning = {
@@ -27,6 +28,8 @@ export class SnapshotValidatorService {
     private readonly projectSnapshots: ProjectSnapshotRepository,
     @Inject(DispatchSnapshotRepository)
     private readonly dispatchSnapshots: DispatchSnapshotRepository,
+    @Inject(ProductionSnapshotRepository)
+    private readonly productionSnapshots: ProductionSnapshotRepository,
   ) {}
 
   async validateInventory(snapshotDate = new Date()) {
@@ -291,6 +294,98 @@ export class SnapshotValidatorService {
     return {
       module: 'logistics',
       checkedRows: rows.length,
+      warnings,
+    };
+  }
+
+  async validateProduction(productionOrderId?: string) {
+    const [dashboardRows, orderRows, workCenterRows] = await Promise.all([
+      this.productionSnapshots.calculateDashboard(new Date()),
+      this.productionSnapshots.calculateOrderSnapshots(productionOrderId),
+      this.productionSnapshots.calculateWorkCenterSnapshots(),
+    ]);
+    const warnings: SnapshotValidationWarning[] = [];
+
+    for (const row of dashboardRows) {
+      const persisted = await this.productionSnapshots.findDashboardSnapshot(
+        row.snapshotDate,
+        row.scopeKey,
+      );
+
+      if (!persisted) {
+        warnings.push({
+          key: row.scopeKey,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.scopeKey, 'totalOrders', row.totalOrders, persisted.totalOrders);
+      this.compareNumber(warnings, row.scopeKey, 'inProgress', row.inProgress, persisted.inProgress);
+      this.compareNumber(warnings, row.scopeKey, 'delayed', row.delayed, persisted.delayed);
+      this.compareNumber(warnings, row.scopeKey, 'completed', row.completed, persisted.completed);
+      this.compareNumber(warnings, row.scopeKey, 'completionRate', row.completionRate, persisted.completionRate);
+      this.compareNumber(warnings, row.scopeKey, 'throughput', row.throughput, persisted.throughput);
+      this.compareNumber(warnings, row.scopeKey, 'activeWorkCenters', row.activeWorkCenters, persisted.activeWorkCenters);
+      this.compareNumber(warnings, row.scopeKey, 'machineUtilization', row.machineUtilization, persisted.machineUtilization);
+      this.compareNumber(warnings, row.scopeKey, 'bottleneckCount', row.bottleneckCount, persisted.bottleneckCount);
+    }
+
+    for (const row of orderRows) {
+      const persisted = await this.productionSnapshots.findOrderSnapshot(
+        row.productionOrderId,
+      );
+
+      if (!persisted) {
+        warnings.push({
+          key: row.productionOrderId,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.productionOrderId, 'progress', row.progress, persisted.progress);
+      this.compareNumber(warnings, row.productionOrderId, 'stageCount', row.stageCount, persisted.stageCount);
+      this.compareNumber(warnings, row.productionOrderId, 'completedStageCount', row.completedStageCount, persisted.completedStageCount);
+      this.compareNumber(warnings, row.productionOrderId, 'taskCount', row.taskCount, persisted.taskCount);
+      this.compareNumber(warnings, row.productionOrderId, 'blockedTaskCount', row.blockedTaskCount, persisted.blockedTaskCount);
+      this.compareNumber(warnings, row.productionOrderId, 'materialIssueCount', row.materialIssueCount, persisted.materialIssueCount);
+      this.compareNumber(warnings, row.productionOrderId, 'materialIssuedQty', row.materialIssuedQty, persisted.materialIssuedQty);
+      this.compareNumber(warnings, row.productionOrderId, 'materialReturnedQty', row.materialReturnedQty, persisted.materialReturnedQty);
+      this.compareNumber(warnings, row.productionOrderId, 'materialConsumedQty', row.materialConsumedQty, persisted.materialConsumedQty);
+      this.compareNumber(warnings, row.productionOrderId, 'actualCost', row.actualCost, persisted.actualCost);
+    }
+
+    for (const row of workCenterRows) {
+      const persisted = await this.productionSnapshots.findWorkCenterSnapshot(
+        row.workCenterId,
+      );
+
+      if (!persisted) {
+        warnings.push({
+          key: row.workCenterId,
+          reason: 'MISSING_SNAPSHOT',
+        });
+        continue;
+      }
+
+      this.compareNumber(warnings, row.workCenterId, 'machineCount', row.machineCount, persisted.machineCount);
+      this.compareNumber(warnings, row.workCenterId, 'activeOrderCount', row.activeOrderCount, persisted.activeOrderCount);
+      this.compareNumber(warnings, row.workCenterId, 'activeTaskCount', row.activeTaskCount, persisted.activeTaskCount);
+      this.compareNumber(warnings, row.workCenterId, 'blockedTaskCount', row.blockedTaskCount, persisted.blockedTaskCount);
+      this.compareNumber(warnings, row.workCenterId, 'utilization', row.utilization, persisted.utilization);
+    }
+
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Production snapshot validation detected ${warnings.length} warning(s).`,
+      );
+    }
+
+    return {
+      module: 'production',
+      checkedRows:
+        dashboardRows.length + orderRows.length + workCenterRows.length,
       warnings,
     };
   }

@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-export type SnapshotDashboardModule = 'inventory' | 'projects' | 'logistics';
+export type SnapshotDashboardModule =
+  | 'inventory'
+  | 'projects'
+  | 'logistics'
+  | 'production';
 
 @Injectable()
 export class SnapshotFeatureFlagService {
@@ -29,6 +33,10 @@ export class SnapshotFeatureFlagService {
 
     if (module === 'projects') {
       return 'USE_PROJECT_SNAPSHOT';
+    }
+
+    if (module === 'production') {
+      return 'USE_PRODUCTION_SNAPSHOT';
     }
 
     return 'USE_DISPATCH_SNAPSHOT';

@@ -42,13 +42,31 @@ Toàn bộ sự kiện thuộc phân hệ Sản xuất đều bắt đầu bằn
 | Tên Sự Kiện | Ý Nghĩa | Mô Tả Payload |
 | --- | --- | --- |
 | `production.order.created` | Tạo lệnh sản xuất cấu kiện mới | `orderId`, `orderNo`, `bomId`, `quantity`, `projectId` |
+| `production.order.released` | Phát hành lệnh sản xuất | `orderId`, `orderNo`, `releasedAt`, `actorId` |
+| `production.order.ready` | Lệnh đủ điều kiện sẵn sàng chạy | `orderId`, `orderNo`, `readyAt`, `actorId` |
 | `production.order.started` | Lệnh bắt đầu gia công thực tế | `orderId`, `orderNo`, `startedAt`, `operatorId` |
+| `production.order.paused` | Tạm dừng lệnh đang chạy | `orderId`, `orderNo`, `pausedAt`, `actorId`, `reason` |
+| `production.order.resumed` | Tiếp tục lệnh đang tạm dừng | `orderId`, `orderNo`, `resumedAt`, `actorId` |
+| `production.order.completed` | Hoàn thành thực thi lệnh | `orderId`, `orderNo`, `completedAt`, `actorId` |
+| `production.order.closed` | Đóng lệnh sau đối soát | `orderId`, `orderNo`, `closedAt`, `actorId` |
+| `production.order.cancelled` | Hủy lệnh nháp | `orderId`, `orderNo`, `cancelledAt`, `actorId`, `reason` |
 | `production.stage.started` | Bắt đầu chạy một công đoạn | `orderId`, `stageId`, `stageCode`, `machineId`, `workerId` |
 | `production.stage.completed` | Hoàn thành một công đoạn | `orderId`, `stageId`, `stageCode`, `scrapWeight`, `durationHours` |
 | `production.material.issued` | Cấp phát vật tư từ Kho SX ra tổ | `orderId`, `issueId`, `materialId`, `quantity`, `location` |
 | `production.material.returned`| Trả lại vật tư thừa về Kho chính | `orderId`, `returnId`, `materialId`, `quantity` |
 | `production.component.completed`| Cấu kiện hoàn thành & đạt QC | `orderId`, `componentId`, `qcInspectionNo`, `passedAt` |
 | `production.downtime.logged` | Máy sản xuất gặp sự cố dừng chạy | `machineId`, `downtimeId`, `category`, `startedAt` |
+
+Lifecycle naming policy:
+
+* New Production Order lifecycle publishers emit only `production.order.*`.
+* `production.started`, `production.completed`, and `production.delayed` are
+  legacy compatibility names. Consumers may continue accepting them while old
+  Outbox rows drain, but new command handlers must not publish them.
+* `production.order.delayed` may be emitted as an operational warning, but it
+  does not represent a canonical state transition.
+* The Outbox row and Production Order mutation must be written in the same
+  database transaction. Event handlers and snapshot jobs run only after commit.
 
 ---
 

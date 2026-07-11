@@ -2,10 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { Prisma, ProductionMaterialLedgerEventType } from '@prisma/client';
 
-import { PrismaService } from '../../../core/prisma/prisma.service';
 import { ListProductionMaterialLedgerDto } from '../dto/production.dto';
+import {
+  ProductionLedgerTx,
+  ProductionMaterialLedgerRepository,
+} from '../repositories/production-material-ledger.repository';
 
-type ProductionTx = Prisma.TransactionClient;
+type ProductionTx = ProductionLedgerTx;
 
 type LedgerSourceLine = {
   inventoryItemId: string;
@@ -18,23 +21,17 @@ type LedgerSourceLine = {
 
 @Injectable()
 export class ProductionMaterialLedgerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: ProductionMaterialLedgerRepository) {}
 
   findAll(query: ListProductionMaterialLedgerDto = {}) {
-    return this.prisma.productionMaterialLedger.findMany({
-      where: this.buildWhere(query),
-      include: this.ledgerInclude(),
-      orderBy: { eventDate: 'desc' },
+    return this.repository.findMany(this.buildWhere(query), {
       take: query.limit ?? 100,
       skip: query.page && query.limit ? (query.page - 1) * query.limit : undefined,
     });
   }
 
   async findOne(id: string) {
-    const row = await this.prisma.productionMaterialLedger.findUnique({
-      where: { id },
-      include: this.ledgerInclude(),
-    });
+    const row = await this.repository.findById(id);
 
     if (!row) {
       throw new NotFoundException('Production material ledger record not found');
@@ -57,7 +54,7 @@ export class ProductionMaterialLedgerService {
       createdBy?: string;
       eventDate?: Date;
     },
-    tx: ProductionTx = this.prisma,
+    tx?: ProductionTx,
   ) {
     const eventDate = params.eventDate ?? new Date();
     const data = params.lines
@@ -81,7 +78,7 @@ export class ProductionMaterialLedgerService {
       return Promise.resolve({ count: 0 });
     }
 
-    return tx.productionMaterialLedger.createMany({ data });
+    return this.repository.createMany(data, tx);
   }
 
   private buildWhere(query: ListProductionMaterialLedgerDto) {
@@ -102,25 +99,4 @@ export class ProductionMaterialLedgerService {
     } satisfies Prisma.ProductionMaterialLedgerWhereInput;
   }
 
-  private ledgerInclude() {
-    return {
-      productionOrder: {
-        select: { id: true, orderNo: true, title: true, status: true },
-      },
-      reservation: {
-        select: { id: true, reservationNo: true, status: true },
-      },
-      inventoryItem: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          unit: true,
-          unitMaster: { select: { symbol: true } },
-        },
-      },
-      warehouse: { select: { id: true, code: true, name: true } },
-      zone: { select: { id: true, code: true, name: true } },
-    } satisfies Prisma.ProductionMaterialLedgerInclude;
-  }
 }

@@ -3,6 +3,8 @@
 Date: 2026-07-11
 Status: FOUNDATION AUDIT COMPLETE - CORE COMPLIANCE NOT YET APPROVED
 
+Update: EPIC131 on 2026-07-11 remediated the Repository Boundary blocker identified in this report. Production services no longer inject Prisma directly. Snapshot, Runtime Metrics, Background Snapshot, and Operations Center Production Health gaps remain future work.
+
 ## Scope
 
 EPIC130 audited the current Production module against the frozen Inventory Core Platform pattern and ADR011:
@@ -111,4 +113,3 @@ Overall: **Production Core Platform Foundation is documented, but Production is 
 
 4. **EPIC130C - Production Operations Center Health**
    Expose repository/read-model/event/outbox/job/snapshot health for Production through existing Operations Center contracts.
-

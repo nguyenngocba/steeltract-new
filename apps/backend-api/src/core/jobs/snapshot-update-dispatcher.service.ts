@@ -5,7 +5,12 @@ import {
 
 import { BackgroundJobManager } from './background-job-manager.service';
 
-export type SnapshotModule = 'inventory' | 'projects' | 'logistics' | 'dashboard';
+export type SnapshotModule =
+  | 'inventory'
+  | 'projects'
+  | 'logistics'
+  | 'production'
+  | 'dashboard';
 
 export interface SnapshotScope {
   module: SnapshotModule;
@@ -15,6 +20,8 @@ export interface SnapshotScope {
   inventoryItemId?: string;
   warehouseId?: string;
   dispatchOrderId?: string;
+  productionOrderId?: string;
+  workCenterId?: string;
   fromDate?: string;
   toDate?: string;
 }
@@ -79,6 +86,8 @@ export class SnapshotUpdateDispatcher {
       scope.projectId ??
       scope.inventoryItemId ??
       scope.dispatchOrderId ??
+      scope.productionOrderId ??
+      scope.workCenterId ??
       scope.warehouseId ??
       'global';
     const watermark =

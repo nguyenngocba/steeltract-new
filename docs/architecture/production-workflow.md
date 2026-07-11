@@ -2,6 +2,31 @@
 
 Tài liệu này chi tiết hóa các quy trình nghiệp vụ sản xuất (Workflows), quy tắc kiểm soát và hướng dẫn từng bước (SOP) cho các vị trí vận hành hệ thống SteelTrack.
 
+## 0. Production Order Lifecycle
+
+The Production Order command lifecycle is:
+
+| Command | From | To |
+| --- | --- | --- |
+| Create | none | `DRAFT` |
+| Release | `DRAFT` | `RELEASED` |
+| Mark ready | `RELEASED` | `READY` |
+| Start | `READY` | `IN_PROGRESS` |
+| Pause | `IN_PROGRESS` | `PAUSED` |
+| Resume | `PAUSED` | `IN_PROGRESS` |
+| Complete | `IN_PROGRESS` | `COMPLETED` |
+| Close | `COMPLETED` | `CLOSED` |
+| Cancel | `DRAFT` | `CANCELLED` |
+
+`Update` may change editable order data but must not bypass this table by writing
+`status` directly. `CLOSED` and `CANCELLED` reject every further lifecycle
+transition. Readiness validation, material issue, stage execution, QC, and Yard
+handoff remain governed by their existing workflow rules.
+
+Every command must persist the order transition, activity/audit record, and
+canonical Outbox event in one repository transaction. Snapshot work is not part
+of the HTTP transaction.
+
 ---
 
 ## 1. Quy Trình Cấp Phát Vật Tư Sản Xuất (Material Reservation & Issue)

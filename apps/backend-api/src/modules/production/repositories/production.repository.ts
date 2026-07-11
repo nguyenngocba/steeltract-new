@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { Prisma } from '@prisma/client';
 
+import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
 export type ProductionTx = Prisma.TransactionClient;
@@ -56,6 +57,194 @@ export class ProductionRepository {
   findComponentById(id: string, tx: ProductionTx = this.prisma) {
     return tx.component.findUnique({
       where: { id },
+    });
+  }
+
+  findApprovedQcInspection(productionOrderId: string) {
+    return this.prisma.qcInspection.findFirst({
+      where: {
+        productionOrderId,
+        status: {
+          in: ['PASSED', 'APPROVED'],
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+  }
+
+  findYardSlot(id: string) {
+    return this.prisma.yardSlot.findUnique({
+      where: { id },
+      include: { zone: true },
+    });
+  }
+
+  findActiveYardPlacementsForProduction(input: {
+    componentId: string;
+    productionOrderId: string;
+  }) {
+    return this.prisma.yardItemPlacement.findMany({
+      where: {
+        itemType: 'COMPONENT',
+        itemId: input.componentId,
+        removedAt: null,
+        metadata: {
+          path: ['productionOrderId'],
+          equals: input.productionOrderId,
+        },
+      },
+    });
+  }
+
+  markComponentStagedFromProduction(input: {
+    componentId: string;
+    orderId: string;
+    orderNo: string;
+    status: Prisma.EnumComponentStatusFieldUpdateOperationsInput['set'];
+    floor: string;
+    zoneCode: string;
+    slotCode: string;
+    x: number;
+    y: number;
+    stackLevel: number;
+    placementId: string;
+    slotId: string;
+    actorId?: string;
+  }) {
+    return this.prisma.$transaction([
+      this.prisma.component.update({
+        where: { id: input.componentId },
+        data: {
+          status: input.status,
+          floor: input.floor,
+          zone: input.zoneCode,
+          position: input.slotCode,
+          x: input.x,
+          y: input.y,
+        },
+      }),
+      this.prisma.componentTimeline.create({
+        data: {
+          componentId: input.componentId,
+          action: 'MOVED_TO_YARD',
+          note: `${input.orderNo} completed and staged at ${input.zoneCode}/${input.slotCode}/L${input.stackLevel}`,
+        },
+      }),
+      this.prisma.productionLog.create({
+        data: {
+          productionOrderId: input.orderId,
+          type: 'NOTE',
+          message: `Finished component staged at ${input.zoneCode}/${input.slotCode}/L${input.stackLevel}`,
+          workerId: input.actorId,
+          metadata: {
+            yardPlacementId: input.placementId,
+            yardSlotId: input.slotId,
+          },
+        },
+      }),
+    ]);
+  }
+
+  updateComponentStatus(
+    id: string,
+    status: Prisma.EnumComponentStatusFieldUpdateOperationsInput['set'],
+    tx: ProductionTx,
+  ) {
+    return tx.component.update({
+      where: { id },
+      data: { status },
+    });
+  }
+
+  findOrderForComponentCreation(id: string) {
+    return this.prisma.productionOrder.findUnique({
+      where: { id },
+      include: {
+        component: true,
+        materialIssues: true,
+      },
+    });
+  }
+
+  async upsertComponentFromProductionOrder(input: {
+    orderId: string;
+    orderNo: string;
+    title: string;
+    projectId: string | null;
+    component?: { id: string; projectId: string | null } | null;
+    actorId?: string;
+  }) {
+    const component = input.component
+      ? await this.prisma.component.update({
+          where: { id: input.component.id },
+          data: {
+            status: 'READY',
+            projectId: input.projectId ?? input.component.projectId,
+          },
+          include: { project: true },
+        })
+      : await this.prisma.component.create({
+          data: {
+            code: await this.nextComponentCode(),
+            name: input.title,
+            projectId: input.projectId,
+            status: 'READY',
+            description: JSON.stringify({
+              productionOrderId: input.orderId,
+              source: 'production',
+            }),
+          },
+          include: { project: true },
+        });
+
+    if (!input.component) {
+      await this.prisma.productionOrder.update({
+        where: { id: input.orderId },
+        data: { componentId: component.id },
+      });
+    }
+
+    await this.prisma.componentTimeline.create({
+      data: {
+        componentId: component.id,
+        action: 'READY',
+        note: `${input.orderNo} material issued and component created by production execution`,
+      },
+    });
+
+    await this.prisma.productionLog.create({
+      data: {
+        productionOrderId: input.orderId,
+        type: 'NOTE',
+        message: `Component ${component.code} created from production execution`,
+        workerId: input.actorId,
+      },
+    });
+
+    return component;
+  }
+
+  nextIssueNo() {
+    return nextOperationalCode(
+      this.prisma,
+      'productionMaterialIssue',
+      'issueNo',
+      'ISS',
+    );
+  }
+
+  nextComponentCode() {
+    return nextOperationalCode(this.prisma, 'component', 'code', 'CPL');
+  }
+
+  findIssuedMaterialIssues(materialIds: string[]) {
+    return this.prisma.productionMaterialIssue.findMany({
+      where: {
+        inventoryItemId: { in: materialIds },
+        status: 'ISSUED',
+      },
     });
   }
 

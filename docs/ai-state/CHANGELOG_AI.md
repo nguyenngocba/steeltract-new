@@ -1,5 +1,71 @@
 # SteelTrack AI Changelog
 
+## 2026-07-11 EPIC135A Production-Inventory Transaction Boundary Alignment
+
+Completed:
+
+* Added Inventory-owned `InventoryPostingService` and internal Issue/Return posting command types.
+* Moved Production material Issue and Return stock mutation, Inventory transaction creation, valuation, and Inventory Outbox writes behind the Inventory repository boundary.
+* Removed all Inventory table mutations from Production repositories and removed manual issue delete compensation.
+* Standardized Draft Reservation as demand-only; `RESERVE` ledger is now written only when allocation becomes reserved.
+* Separated Consumption and Scrap ledger semantics so `CONSUME` records only consumed quantity.
+* Added canonical Production material command types and `production.material.*` event constants for EPIC135B.
+* Created four EPIC135A runtime architecture reports.
+
+## 2026-07-11 EPIC134 Production Order Lifecycle
+
+Completed:
+
+* Implemented the canonical Production Order state machine and command endpoints for release, ready, start, pause, resume, complete, close, and cancel.
+* Restricted create to `DRAFT` and blocked direct Production Order status writes through generic update.
+* Moved canonical lifecycle Outbox creation into the same repository transaction as order and activity mutations.
+* Registered all `production.order.*` lifecycle events for Background Engine snapshot updates while retaining legacy event subscriptions for pending historical Outbox rows.
+* Added state-machine tests covering valid, invalid, legacy, and terminal transitions.
+* Applied Production Snapshot and Production Order lifecycle migrations successfully.
+* Created the four EPIC134 runtime validation reports.
+
+## 2026-07-11 Production Blueprint Alignment
+
+Completed:
+
+* Aligned the Production blueprint, domain, workflow, and event-flow documents on one canonical Production Order lifecycle.
+* Standardized new lifecycle event names under `production.order.*`.
+* Added `READY`, `PAUSED`, and `CLOSED` to `ProductionOrderStatus` through an additive migration while retaining `PLANNED` and `DELAYED` for compatibility.
+* Recorded PROD-014: lifecycle transitions and Outbox rows must commit atomically in the repository transaction; snapshot work remains asynchronous.
+* Created `docs/runtime/production-blueprint-alignment-report.md` and explicitly deferred lifecycle commands/state-machine implementation to EPIC134.
+
+## 2026-07-11 EPIC133 Production Runtime Metrics & Operations Center Integration
+
+Completed:
+
+* Added Production-specific runtime counters to `PerformanceMetricsService`: snapshot hit/miss, snapshot age/lag, read-model hit, and fallback count.
+* Connected Production snapshot reads in `SnapshotReaderService` to the Production runtime counters.
+* Prepared `/production/metrics` for dashboard snapshot-first reads through `DashboardReaderService` with repository fallback and unchanged response shape.
+* Added Production Platform Health to Operations Center overview, including repository, read model, snapshot, feature flag, event/outbox, background job, runtime, and parity readiness status.
+* Extended Operations Center snapshot modules and table counts to include Production dashboard/order/work-center snapshots and core Production tables.
+* Created `docs/runtime/production-runtime-metrics-report.md`, `docs/runtime/production-operations-center-report.md`, `docs/runtime/production-runtime-readiness-report.md`, and `docs/runtime/production-platform-health-report.md`.
+
+## 2026-07-11 EPIC132 Production Snapshot Foundation
+
+Completed:
+
+* Added additive persisted Production snapshot schema and migration for `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and `WorkCenterSnapshot`.
+* Added `ProductionSnapshotRepository` with read, calculate, and upsert paths for dashboard, order, and work-center summaries.
+* Wired Production snapshots into `SnapshotsModule`, `SnapshotReaderService`, `SnapshotWriterService`, `SnapshotRebuilder`, `SnapshotUpdateDispatcher`, and `SnapshotFeatureFlagService`.
+* Registered existing `production.started`, `production.stage.completed`, `production.delayed`, and `production.completed` events for Background Engine snapshot update jobs.
+* Preserved ADR011: Production workspaces remain Repository Live Read Models; only dashboard/cockpit/analytics surfaces are prepared for persisted snapshots.
+* Created `docs/runtime/production-snapshot-foundation-report.md`, `docs/runtime/production-snapshot-reader-report.md`, `docs/runtime/production-snapshot-writer-report.md`, and `docs/runtime/production-snapshot-readiness.md`.
+
+## 2026-07-11 EPIC131 Production Repository Foundation
+
+Completed:
+
+* Added focused Production repositories: `BomRepository`, `MaterialIssueRepository`, `ProductionConsumptionRepository`, `ProductionMaterialLedgerRepository`, `ProductionOrderRepository`, `ProductionReservationRepository`, `RoutingRepository`, `WorkCenterRepository`, and `WorkOrderRepository`.
+* Expanded `ProductionRepository` for remaining ProductionService persistence paths such as component status updates, QC/Yard staging lookups, component creation, issue numbering, and production stock reads.
+* Removed direct `PrismaService`, `this.prisma`, `nextOperationalCode`, and direct transaction model calls from `apps/backend-api/src/modules/production/services/*`.
+* Preserved existing Production APIs, UI, workflow behavior, Inventory, Core Platform, Operations Center, snapshots, background jobs, and runtime metrics.
+* Created/updated `docs/runtime/production-repository-foundation-report.md`, `docs/runtime/production-repository-boundary-report.md`, and `docs/runtime/production-read-model-foundation-report.md`.
+
 ## 2026-07-11 EPIC130 Production Core Platform Foundation
 
 Completed:

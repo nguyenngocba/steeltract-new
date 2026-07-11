@@ -1,5 +1,76 @@
 # Current State
 
+## EPIC135A Production-Inventory Transaction Boundary
+
+Status: **APPROVED**
+
+Inventory is now the exclusive stock-mutation owner for Production material
+Issue and Return. Production orchestrates one repository transaction and calls
+the internal `InventoryPostingService`; Inventory validates stock, creates the
+Inventory transaction, updates item/location balances, and writes Inventory
+Outbox rows using the shared transaction client.
+
+Production repositories no longer mutate Inventory tables, and manual issue no
+longer uses create-then-delete compensation across separate transactions. Draft
+Reservation no longer writes a duplicate `RESERVE` ledger entry. Consumption
+and Scrap now have separate ledger boundaries. Canonical Production material
+commands/events are standardized but full event publication remains EPIC135B.
+
+## EPIC134 Production Order Lifecycle
+
+Status: **APPROVED**
+
+Production Orders now follow the canonical state machine approved by PROD-014.
+Create starts in `DRAFT`; lifecycle changes use dedicated command endpoints; and
+generic update cannot bypass status validation. Each transition writes the
+Production Order, ActivityLog, and canonical `production.order.*` Outbox event
+atomically through `ProductionOrderRepository`.
+
+Outbox dispatch continues through the existing Background Engine and updates
+Production dashboard/order/work-center snapshots. Legacy Order event names are
+accepted by consumers only for compatibility with existing pending Outbox rows.
+Inventory, Core Platform, Runtime Platform, Snapshot Framework, Operations
+Center, ADR011, UI, and Blueprint remain unchanged.
+
+## Production Blueprint Alignment
+
+Status: **APPROVED FOR EPIC134 IMPLEMENTATION**
+
+The Production specification, Prisma enum foundation, and event naming now use
+one canonical standard. The Production Order lifecycle is
+`DRAFT -> RELEASED -> READY -> IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED`,
+with `DRAFT -> CANCELLED`. New lifecycle events use `production.order.*`.
+
+The schema change is additive: `READY`, `PAUSED`, and `CLOSED` were added while
+legacy `PLANNED` and `DELAYED` values remain readable for compatibility. No
+lifecycle endpoints, state-machine commands, repository transitions, or Outbox
+relocation were implemented in this alignment sprint; those are now unblocked
+for EPIC134.
+
+## EPIC133 Production Runtime Metrics & Operations Center Integration
+
+Status: **APPROVED**
+
+Production now has Runtime Platform integration aligned with Inventory and Projects. Production snapshot reads record module-specific snapshot hit/miss, age, lag, read-model hit, and fallback metrics through the existing `PerformanceMetricsService`. `/production/metrics` is dashboard-reader ready: it prefers `ProductionDashboardSnapshot` when enabled/fresh and falls back to the existing repository aggregate without changing the response contract.
+
+Operations Center now includes a Production Platform Health block with repository, read model, snapshot, feature flag, event/outbox, background job, runtime, and parity readiness status. No Inventory code, UI, business workflow, API contract, repository schema, or snapshot foundation model was changed.
+
+## EPIC132 Production Snapshot Foundation
+
+Status: **APPROVED**
+
+Production now has persisted snapshot foundation coverage aligned with the Inventory Core Platform pattern. EPIC132 added additive Prisma models and migration for `ProductionDashboardSnapshot`, `ProductionOrderSnapshot`, and `WorkCenterSnapshot`; added `ProductionSnapshotRepository`; and wired Production into the existing snapshot reader, writer, rebuilder, dispatcher, event-consumer, and feature-flag layers.
+
+Existing Production workspaces remain Repository Live Read Models under ADR011. EPIC132 does not cut Production dashboard APIs over to snapshot-first reads, does not change UI/API/workflow behavior, does not change Inventory, and does not add Production-specific Runtime Metrics or Operations Center health. Those are follow-up compliance steps.
+
+## EPIC131 Production Repository Foundation
+
+Status: **APPROVED**
+
+Production now has a repository foundation aligned with the Inventory Core Platform pattern. Focused repositories were added for BOM, Material Issue, Consumption, Ledger, Production Order, Reservation, Routing, Work Center, and Work Order paths. Direct Prisma access was removed from Production services: `rg` over `apps/backend-api/src/modules/production/services` for `PrismaService`, `this.prisma`, `nextOperationalCode`, and direct transaction model operations returns no matches.
+
+This sprint did not implement Production snapshots, Background Engine integration, Runtime Metrics counters, Operations Center health, UI changes, API contract changes, or new MES workflows. Production Repository Foundation is approved; Production Snapshot and Operations Center compliance remain future work.
+
 ## EPIC130 Production Core Platform Foundation
 
 Status: **FOUNDATION AUDIT COMPLETE, CORE COMPLIANCE BLOCKED**

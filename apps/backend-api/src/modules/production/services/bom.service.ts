@@ -1,26 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 
-import { PrismaService } from '../../../core/prisma/prisma.service';
-import { nextOperationalCode } from '../../../common/utils/code-generator';
+import { InventoryRepository } from '../../inventory/inventory.repository';
 import { CreateBomDto, UpdateBomDto } from '../dto/production.dto';
+import { BomRepository } from '../repositories/bom.repository';
 
 @Injectable()
 export class BOMService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly repository: BomRepository,
+    private readonly inventoryRepository: InventoryRepository,
+  ) {}
 
   findAll() {
-    return this.prisma.bOM.findMany({
-      include: this.include(),
-      orderBy: { updatedAt: 'desc' },
-    });
+    return this.repository.findAll();
   }
 
   async findOne(id: string) {
-    const bom = await this.prisma.bOM.findUnique({
-      where: { id },
-      include: this.include(),
-    });
+    const bom = await this.repository.findById(id);
 
     if (!bom) {
       throw new NotFoundException('BOM not found');
@@ -33,62 +29,49 @@ export class BOMService {
     await this.ensureProductionStockForBom(body.items);
     const bomItems = this.toBomItemCreates(body.items);
 
-    return this.prisma.bOM.create({
-      data: {
-        bomNo: body.bomNo ?? await nextOperationalCode(this.prisma, 'bOM', 'bomNo', 'BOM'),
-        productCode: body.productCode,
-        productName: body.productName,
-        structureType: body.structureType,
-        projectId: body.projectId,
-        unit: body.unit,
-        estimatedWeight: body.estimatedWeight,
-        version: body.version,
-        status: body.status,
-        items: { create: bomItems },
-        routingSteps: { create: body.routingSteps },
-      },
-      include: this.include(),
+    return this.repository.create({
+      bomNo: body.bomNo ?? await this.repository.nextBomNo(),
+      productCode: body.productCode,
+      productName: body.productName,
+      structureType: body.structureType,
+      projectId: body.projectId,
+      unit: body.unit,
+      estimatedWeight: body.estimatedWeight,
+      version: body.version,
+      status: body.status,
+      items: { create: bomItems },
+      routingSteps: { create: body.routingSteps },
     });
   }
 
   async update(id: string, body: UpdateBomDto) {
     await this.findOne(id);
 
-    return this.prisma.$transaction(async (tx) => {
-      if (body.items) {
-        await tx.bOMItem.deleteMany({ where: { bomId: id } });
-      }
-      if (body.routingSteps) {
-        await tx.bOMRoutingStep.deleteMany({ where: { bomId: id } });
-      }
-
-      return tx.bOM.update({
-        where: { id },
-        data: {
-          bomNo: body.bomNo,
-          productCode: body.productCode,
-          productName: body.productName,
-          structureType: body.structureType,
-          projectId: body.projectId,
-          unit: body.unit,
-          estimatedWeight: body.estimatedWeight,
-          version: body.version,
-          status: body.status,
-          items: body.items
-            ? { create: this.toBomItemCreates(body.items) }
-            : undefined,
-          routingSteps: body.routingSteps
-            ? { create: body.routingSteps }
-            : undefined,
-        },
-        include: this.include(),
-      });
+    return this.repository.updateWithChildren(id, {
+      bomNo: body.bomNo,
+      productCode: body.productCode,
+      productName: body.productName,
+      structureType: body.structureType,
+      projectId: body.projectId,
+      unit: body.unit,
+      estimatedWeight: body.estimatedWeight,
+      version: body.version,
+      status: body.status,
+      items: body.items
+        ? { create: this.toBomItemCreates(body.items) }
+        : undefined,
+      routingSteps: body.routingSteps
+        ? { create: body.routingSteps }
+        : undefined,
+    }, {
+      replaceItems: Boolean(body.items),
+      replaceRoutingSteps: Boolean(body.routingSteps),
     });
   }
 
   async clone(id: string) {
     const source = await this.findOne(id);
-    const cloneNo = await nextOperationalCode(this.prisma, 'bOM', 'bomNo', 'BOM');
+    const cloneNo = await this.repository.nextBomNo();
 
     return this.create({
       bomNo: cloneNo,
@@ -121,38 +104,6 @@ export class BOMService {
 
   archive(id: string) {
     return this.update(id, { status: 'ARCHIVED' });
-  }
-
-  private include() {
-    return {
-      items: {
-        include: {
-          material: {
-            include: {
-              category: true,
-              unitMaster: true,
-            },
-          },
-        },
-      },
-      routingSteps: {
-        orderBy: {
-          stepNo: 'asc' as const,
-        },
-      },
-      productionOrders: {
-        select: {
-          id: true,
-          orderNo: true,
-          status: true,
-        },
-      },
-      _count: {
-        select: {
-          productionOrders: true,
-        },
-      },
-    } satisfies Prisma.BOMInclude;
   }
 
   private toBomItemCreates(items: CreateBomDto['items']) {
@@ -191,10 +142,9 @@ export class BOMService {
 
     if (!shortages.length) return;
 
-    const materials = await this.prisma.inventoryItem.findMany({
-      where: { id: { in: shortages.map((row) => row.materialId) } },
-      select: { id: true, code: true, name: true },
-    });
+    const materials = await this.inventoryRepository.findItemsByIds(
+      shortages.map((row) => row.materialId),
+    );
     const materialMap = new Map(materials.map((material) => [material.id, material]));
     const detail = shortages
       .map((row) => {
@@ -208,25 +158,10 @@ export class BOMService {
 
   private async productionStockByMaterial(materialIds: string[]) {
     const stockByMaterial = new Map<string, number>();
-    const transactions = await this.prisma.inventoryTransaction.findMany({
-      where: {
-        items: { some: { inventoryItemId: { in: materialIds } } },
-        OR: [
-          { remarks: { contains: '[COMPONENT_PRODUCTION]' } },
-          { remarks: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
-          { note: { contains: '[COMPONENT_PRODUCTION]' } },
-          { note: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
-        ],
-      },
-      include: {
-        warehouse: true,
-        items: {
-          include: {
-            warehouse: true,
-          },
-        },
-      },
-    });
+    const transactions =
+      await this.inventoryRepository.findProductionInventoryTransactions(
+        materialIds,
+      );
 
     for (const transaction of transactions) {
       const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
@@ -246,12 +181,7 @@ export class BOMService {
       }
     }
 
-    const issues = await this.prisma.productionMaterialIssue.findMany({
-      where: {
-        inventoryItemId: { in: materialIds },
-        status: 'ISSUED',
-      },
-    });
+    const issues = await this.repository.findIssuedMaterialIssues(materialIds);
 
     for (const issue of issues) {
       stockByMaterial.set(

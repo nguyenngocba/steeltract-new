@@ -13,15 +13,17 @@ import {
   ProductionStageCode,
   ProductionStageStatus,
   ProductionTaskStatus,
-  QcInspectionStatus,
   YardItemType,
 } from '@prisma/client';
 
 import { EventBusService } from '../../../core/events/event-bus.service';
-import { PrismaService } from '../../../core/prisma/prisma.service';
-import { nextOperationalCode } from '../../../common/utils/code-generator';
+import { SnapshotUpdateDispatcher } from '../../../core/jobs/snapshot-update-dispatcher.service';
+import { PerformanceMetricsService } from '../../../core/performance/performance-metrics.service';
+import { DashboardReaderService } from '../../../core/snapshots/dashboard-reader.service';
+import { SnapshotReaderService } from '../../../core/snapshots/snapshot-reader.service';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
 import { ComponentCostingService } from '../../components/services/component-costing.service';
+import { InventoryRepository } from '../../inventory/inventory.repository';
 import { YardService } from '../../yard/services/yard.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import {
@@ -38,8 +40,15 @@ import {
   StartProductionDto,
   UpdateProductionOrderDto,
   UpdateProductionTaskDto,
+  ProductionOrderTransitionDto,
 } from '../dto/production.dto';
+import {
+  InvalidProductionOrderTransitionError,
+  ProductionOrderLifecycleCommand,
+  productionOrderTransition,
+} from '../domain/production-order-state-machine';
 import { MaterialIssueService } from './material-issue.service';
+import { ProductionOrderRepository } from '../repositories/production-order.repository';
 import {
   ProductionRepository,
   ProductionTx,
@@ -73,16 +82,46 @@ type BomMaterialIssuePlan = {
   materialCode: string;
 };
 
+type CanonicalProductionOrderEventName =
+  | 'production.order.created'
+  | 'production.order.released'
+  | 'production.order.ready'
+  | 'production.order.started'
+  | 'production.order.paused'
+  | 'production.order.resumed'
+  | 'production.order.completed'
+  | 'production.order.closed'
+  | 'production.order.cancelled';
+
+const lifecycleEventByCommand: Record<
+  ProductionOrderLifecycleCommand,
+  CanonicalProductionOrderEventName
+> = {
+  release: 'production.order.released',
+  ready: 'production.order.ready',
+  start: 'production.order.started',
+  pause: 'production.order.paused',
+  resume: 'production.order.resumed',
+  complete: 'production.order.completed',
+  close: 'production.order.closed',
+  cancel: 'production.order.cancelled',
+};
+
 @Injectable()
 export class ProductionService {
   private readonly logger = new Logger(ProductionService.name);
 
   constructor(
     private readonly repository: ProductionRepository,
+    private readonly orderRepository: ProductionOrderRepository,
+    private readonly inventoryRepository: InventoryRepository,
     private readonly eventBus: EventBusService,
+    private readonly dashboardReader: DashboardReaderService,
+    private readonly snapshotReader: SnapshotReaderService,
+    private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
+    private readonly metricsService: PerformanceMetricsService,
     private readonly workflowService: WorkflowService,
     private readonly attachmentsService: AttachmentsService,
-    private readonly prisma: PrismaService,
     private readonly yardService: YardService,
     private readonly materialIssueService: MaterialIssueService,
     private readonly componentCostingService: ComponentCostingService,
@@ -128,6 +167,12 @@ export class ProductionService {
   }
 
   async create(dto: CreateProductionOrderDto, actorId?: string) {
+    if (dto.status !== ProductionOrderStatus.DRAFT) {
+      throw new BadRequestException(
+        'New production orders must be created in DRAFT status',
+      );
+    }
+
     const order = await this.repository.transaction(async (tx) => {
       const [component, bom] = await Promise.all([
         dto.componentId
@@ -186,13 +231,13 @@ export class ProductionService {
             }))
           : routingStages.length > 0
             ? routingStages
-          : defaultStages.map((stage) => ({
-              ...stage,
-              status:
-                stage.sequence === 1
-                  ? ProductionStageStatus.READY
-                  : ProductionStageStatus.PENDING,
-            }));
+            : defaultStages.map((stage) => ({
+                ...stage,
+                status:
+                  stage.sequence === 1
+                    ? ProductionStageStatus.READY
+                    : ProductionStageStatus.PENDING,
+              }));
 
       const order = await this.repository.createOrder(
         {
@@ -230,6 +275,12 @@ export class ProductionService {
       );
 
       await this.logActivity(tx, 'PRODUCTION_ORDER_CREATED', order, actorId);
+      await this.createLifecycleOutboxEvent(
+        tx,
+        'production.order.created',
+        order,
+        actorId,
+      );
 
       return order;
     });
@@ -262,6 +313,12 @@ export class ProductionService {
   }
 
   async update(id: string, dto: UpdateProductionOrderDto, actorId?: string) {
+    if (dto.status !== undefined) {
+      throw new BadRequestException(
+        'Production order status must be changed through a lifecycle command',
+      );
+    }
+
     const order = await this.repository.transaction(async (tx) => {
       await this.getOrderOrThrow(id, tx);
 
@@ -273,14 +330,9 @@ export class ProductionService {
           bom: dto.bomId ? { connect: { id: dto.bomId } } : undefined,
           quantity: dto.quantity,
           priority: dto.priority,
-          status: dto.status,
           plannedStartAt: dto.plannedStartAt,
           plannedEndAt: dto.plannedEndAt,
           delayReason: dto.delayReason,
-          delayedAt:
-            dto.status === ProductionOrderStatus.DELAYED
-              ? new Date()
-              : undefined,
           metadata: this.toJson(dto.metadata),
         },
         tx,
@@ -291,19 +343,45 @@ export class ProductionService {
       return updated;
     });
 
-    if (order.status === ProductionOrderStatus.DELAYED) {
-      await this.emitProductionEvent('production.delayed', order);
-    }
-
     return order;
+  }
+
+  release(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'release', dto, actorId);
+  }
+
+  ready(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'ready', dto, actorId);
+  }
+
+  pause(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'pause', dto, actorId);
+  }
+
+  resume(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'resume', dto, actorId);
+  }
+
+  complete(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'complete', dto, actorId);
+  }
+
+  close(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'close', dto, actorId);
+  }
+
+  cancel(id: string, dto: ProductionOrderTransitionDto, actorId?: string) {
+    return this.transitionOrder(id, 'cancel', dto, actorId);
   }
 
   async start(id: string, dto: StartProductionDto, actorId?: string) {
     const existingOrder = await this.getOrderOrThrow(id);
+    this.nextLifecycleStatus(existingOrder.status, 'start');
     const issuePlans = await this.planMissingBomMaterialIssues(existingOrder);
 
     const order = await this.repository.transaction(async (tx) => {
       const existing = await this.getOrderOrThrow(id, tx);
+      const nextStatus = this.nextLifecycleStatus(existing.status, 'start');
       const firstStage = existing.stages[0];
 
       if (!firstStage) {
@@ -313,7 +391,7 @@ export class ProductionService {
       const updated = await this.repository.updateOrder(
         id,
         {
-          status: ProductionOrderStatus.IN_PROGRESS,
+          status: nextStatus,
           startedAt: existing.startedAt ?? new Date(),
           currentStageCode: firstStage.code,
         },
@@ -330,10 +408,11 @@ export class ProductionService {
       );
 
       if (existing.componentId) {
-        await tx.component.update({
-          where: { id: existing.componentId },
-          data: { status: ComponentStatus.CUTTING },
-        });
+        await this.repository.updateComponentStatus(
+          existing.componentId,
+          ComponentStatus.CUTTING,
+          tx,
+        );
       }
 
       await this.createLog(
@@ -349,11 +428,18 @@ export class ProductionService {
       );
 
       await this.logActivity(tx, 'PRODUCTION_STARTED', updated, actorId);
+      const transitioned = await this.getOrderOrThrow(id, tx);
+      await this.createLifecycleOutboxEvent(
+        tx,
+        lifecycleEventByCommand.start,
+        transitioned,
+        actorId,
+        dto,
+      );
 
-      return this.getOrderOrThrow(id, tx);
+      return transitioned;
     });
 
-    await this.emitProductionEvent('production.started', order);
     await this.createPlannedMaterialIssues(order, issuePlans, actorId);
 
     return order;
@@ -371,6 +457,9 @@ export class ProductionService {
         throw new NotFoundException('Production stage not found');
       }
 
+      const order = await this.getOrderOrThrow(stage.productionOrderId, tx);
+      this.nextLifecycleStatus(order.status, 'complete');
+
       await this.repository.updateStage(
         stageId,
         {
@@ -382,7 +471,6 @@ export class ProductionService {
         tx,
       );
 
-      const order = await this.getOrderOrThrow(stage.productionOrderId, tx);
       const nextStage = order.stages.find(
         (item) => item.sequence > stage.sequence,
       );
@@ -407,10 +495,14 @@ export class ProductionService {
           tx,
         );
       } else {
+        const completedStatus = this.nextLifecycleStatus(
+          order.status,
+          'complete',
+        );
         updatedOrder = await this.repository.updateOrder(
           order.id,
           {
-            status: ProductionOrderStatus.COMPLETED,
+            status: completedStatus,
             completedAt: new Date(),
             currentStageCode: null,
           },
@@ -419,14 +511,13 @@ export class ProductionService {
       }
 
       if (order.componentId) {
-        await tx.component.update({
-          where: { id: order.componentId },
-          data: {
-            status: nextStage
-              ? this.componentStatusForStage(nextStage.code)
-              : ComponentStatus.READY,
-          },
-        });
+        await this.repository.updateComponentStatus(
+          order.componentId,
+          nextStage
+            ? this.componentStatusForStage(nextStage.code)
+            : ComponentStatus.READY,
+          tx,
+        );
       }
 
       await this.createLog(
@@ -450,6 +541,16 @@ export class ProductionService {
         actorId,
       );
 
+      if (!nextStage) {
+        await this.createLifecycleOutboxEvent(
+          tx,
+          lifecycleEventByCommand.complete,
+          updatedOrder,
+          actorId,
+          dto,
+        );
+      }
+
       return updatedOrder;
     });
 
@@ -457,7 +558,6 @@ export class ProductionService {
     await this.emitProductionEvent('production.stage.completed', order);
 
     if (order.status === ProductionOrderStatus.COMPLETED) {
-      await this.emitProductionEvent('production.completed', order);
       await this.autoRecalculateComponentCosting(order);
     }
 
@@ -483,20 +583,7 @@ export class ProductionService {
       );
     }
 
-    const approvedQc = await this.prisma.qcInspection.findFirst({
-      where: {
-        productionOrderId: order.id,
-        status: {
-          in: [
-            QcInspectionStatus.PASSED,
-            QcInspectionStatus.APPROVED,
-          ],
-        },
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    });
+    const approvedQc = await this.repository.findApprovedQcInspection(order.id);
 
     if (!approvedQc) {
       throw new BadRequestException(
@@ -504,26 +591,17 @@ export class ProductionService {
       );
     }
 
-    const slot = await this.prisma.yardSlot.findUnique({
-      where: { id: dto.slotId },
-      include: { zone: true },
-    });
+    const slot = await this.repository.findYardSlot(dto.slotId);
 
     if (!slot) {
       throw new NotFoundException('Yard slot not found');
     }
 
-    const placements = await this.prisma.yardItemPlacement.findMany({
-      where: {
-        itemType: YardItemType.COMPONENT,
-        itemId: order.component.id,
-        removedAt: null,
-        metadata: {
-          path: ['productionOrderId'],
-          equals: order.id,
-        },
-      },
-    });
+    const placements =
+      await this.repository.findActiveYardPlacementsForProduction({
+        componentId: order.component.id,
+        productionOrderId: order.id,
+      });
 
     const stagedQuantity = placements.reduce(
       (sum, row) => sum + Number(row.quantity ?? 0),
@@ -565,49 +643,21 @@ export class ProductionService {
       actorId,
     );
 
-    await this.prisma.$transaction([
-      this.prisma.component.update({
-        where: { id: order.component.id },
-        data: {
-          status: ComponentStatus.STOCK,
-          floor: `L${placement.stackLevel}`,
-          zone: slot.zone.code,
-          position: slot.code,
-          x: slot.x,
-          y: slot.y,
-        },
-      }),
-      this.prisma.componentTimeline.create({
-        data: {
-          componentId: order.component.id,
-          action: 'MOVED_TO_YARD',
-          note: `${order.orderNo} completed and staged at ${slot.zone.code}/${slot.code}/L${placement.stackLevel}`,
-        },
-      }),
-      this.prisma.productionLog.create({
-        data: {
-          productionOrderId: order.id,
-          type: ProductionLogType.NOTE,
-          message: `Finished component staged at ${slot.zone.code}/${slot.code}/L${placement.stackLevel}`,
-          workerId: actorId,
-          metadata: {
-            yardPlacementId: placement.id,
-            yardSlotId: slot.id,
-          },
-        },
-      }),
-    ]);
-    const totalStaged = stagedQuantity + quantity;
-
-    if (totalStaged >= Number(order.quantity)) {
-      await this.prisma.productionOrder.update({
-        where: { id: order.id },
-        data: {
-          status: ProductionOrderStatus.COMPLETED,
-        },
-      });
-    }
-
+    await this.repository.markComponentStagedFromProduction({
+      componentId: order.component.id,
+      orderId: order.id,
+      orderNo: order.orderNo,
+      status: ComponentStatus.STOCK,
+      floor: `L${placement.stackLevel}`,
+      zoneCode: slot.zone.code,
+      slotCode: slot.code,
+      x: slot.x,
+      y: slot.y,
+      stackLevel: placement.stackLevel,
+      placementId: placement.id,
+      slotId: slot.id,
+      actorId,
+    });
     await this.eventBus.emit(
       'production.staged.to-yard',
       {
@@ -631,13 +681,7 @@ export class ProductionService {
   }
 
   async createComponentFromProductionOrder(id: string, actorId?: string) {
-    const order = await this.prisma.productionOrder.findUnique({
-      where: { id },
-      include: {
-        component: true,
-        materialIssues: true,
-      },
-    });
+    const order = await this.repository.findOrderForComponentCreation(id);
 
     if (!order) {
       throw new NotFoundException('Production order not found');
@@ -655,51 +699,13 @@ export class ProductionService {
       );
     }
 
-    const component = order.component
-      ? await this.prisma.component.update({
-          where: { id: order.component.id },
-          data: {
-            status: ComponentStatus.READY,
-            projectId: order.projectId ?? order.component.projectId,
-          },
-          include: { project: true },
-        })
-      : await this.prisma.component.create({
-          data: {
-            code: await nextOperationalCode(this.prisma, 'component', 'code', 'CPL'),
-            name: order.title,
-            projectId: order.projectId,
-            status: ComponentStatus.READY,
-            description: JSON.stringify({
-              productionOrderId: order.id,
-              source: 'production',
-            }),
-          },
-          include: { project: true },
-        });
-
-    if (!order.componentId) {
-      await this.prisma.productionOrder.update({
-        where: { id: order.id },
-        data: { componentId: component.id },
-      });
-    }
-
-    await this.prisma.componentTimeline.create({
-      data: {
-        componentId: component.id,
-        action: ComponentStatus.READY,
-        note: `${order.orderNo} material issued and component created by production execution`,
-      },
-    });
-
-    await this.prisma.productionLog.create({
-      data: {
-        productionOrderId: order.id,
-        type: ProductionLogType.NOTE,
-        message: `Component ${component.code} created from production execution`,
-        workerId: actorId,
-      },
+    const component = await this.repository.upsertComponentFromProductionOrder({
+      orderId: order.id,
+      orderNo: order.orderNo,
+      title: order.title,
+      projectId: order.projectId,
+      component: order.component,
+      actorId,
     });
 
     await this.autoRecalculateComponentCosting({
@@ -938,7 +944,8 @@ export class ProductionService {
     return (order.bom?.items ?? []).map((item) => {
       const requiredQty =
         item.quantity * (1 + item.wastePercent / 100) * order.quantity;
-      const availableQty = productionStockByMaterialId.get(item.materialId) ?? 0;
+      const availableQty =
+        productionStockByMaterialId.get(item.materialId) ?? 0;
       const issuedQty = order.materialIssues
         .filter((issue) => issue.inventoryItemId === item.materialId)
         .reduce((total, issue) => total + issue.issuedQty, 0);
@@ -1051,7 +1058,7 @@ export class ProductionService {
     for (const plan of issuePlans) {
       await this.materialIssueService.create(
         {
-          issueNo: await nextOperationalCode(this.prisma, 'productionMaterialIssue', 'issueNo', 'ISS'),
+          issueNo: await this.repository.nextIssueNo(),
           productionOrderId: order.id,
           inventoryItemId: plan.inventoryItemId,
           warehouseId: plan.warehouseId,
@@ -1080,25 +1087,10 @@ export class ProductionService {
       }>
     >();
 
-    const transactions = await this.prisma.inventoryTransaction.findMany({
-      where: {
-        items: { some: { inventoryItemId: { in: materialIds } } },
-        OR: [
-          { remarks: { contains: '[COMPONENT_PRODUCTION]' } },
-          { remarks: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
-          { note: { contains: '[COMPONENT_PRODUCTION]' } },
-          { note: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
-        ],
-      },
-      include: {
-        warehouse: true,
-        items: {
-          include: {
-            warehouse: true,
-          },
-        },
-      },
-    });
+    const transactions =
+      await this.inventoryRepository.findProductionInventoryTransactions(
+        materialIds,
+      );
 
     for (const transaction of transactions) {
       const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
@@ -1114,7 +1106,8 @@ export class ProductionService {
 
         const rows = buckets.get(line.inventoryItemId) ?? [];
         const zoneId = line.zoneId ?? transaction.zoneId ?? undefined;
-        const warehouseId = line.warehouseId ?? transaction.warehouseId ?? undefined;
+        const warehouseId =
+          line.warehouseId ?? transaction.warehouseId ?? undefined;
         const slotId = line.slotId ?? undefined;
         const level = line.level ?? undefined;
         const existing = rows.find(
@@ -1133,12 +1126,7 @@ export class ProductionService {
       }
     }
 
-    const issues = await this.prisma.productionMaterialIssue.findMany({
-      where: {
-        inventoryItemId: { in: materialIds },
-        status: 'ISSUED',
-      },
-    });
+    const issues = await this.repository.findIssuedMaterialIssues(materialIds);
 
     for (const issue of issues) {
       let remaining = Number(issue.issuedQty ?? 0);
@@ -1150,7 +1138,10 @@ export class ProductionService {
           (!issue.slotId || row.slotId === issue.slotId) &&
           (!issue.level || row.level === issue.level),
       );
-      const orderedRows = [...preferred, ...rows.filter((row) => !preferred.includes(row))];
+      const orderedRows = [
+        ...preferred,
+        ...rows.filter((row) => !preferred.includes(row)),
+      ];
 
       for (const row of orderedRows) {
         if (remaining <= 0.000001) break;
@@ -1166,7 +1157,9 @@ export class ProductionService {
 
   private isProductionWarehouseLine(
     line: { warehouse?: { code?: string | null; name?: string | null } | null },
-    transaction: { warehouse?: { code?: string | null; name?: string | null } | null },
+    transaction: {
+      warehouse?: { code?: string | null; name?: string | null } | null;
+    },
   ) {
     const warehouseCode = String(
       line.warehouse?.code ?? transaction.warehouse?.code ?? '',
@@ -1178,6 +1171,56 @@ export class ProductionService {
   }
 
   async metrics() {
+    const result = await this.dashboardReader.read({
+      module: 'production',
+      snapshotType: 'ProductionDashboardSnapshot',
+      loadSnapshot: async () => {
+        const snapshot = await this.snapshotReader.productionDashboard(
+          this.startOfDay(new Date()),
+        );
+        if (!snapshot) {
+          return null;
+        }
+
+        return {
+          data: snapshot,
+          updatedAt: snapshot.updatedAt,
+          rowCount: 1,
+        };
+      },
+      readSnapshot: (snapshot) => this.productionMetricsFromSnapshot(snapshot),
+      readRuntime: () => this.productionMetricsRuntime(),
+      compare: (snapshot, runtime) =>
+        this.compareRuntimeNumbers(snapshot, runtime, [
+          'totalOrders',
+          'inProgress',
+          'delayed',
+          'completed',
+          'completionRate',
+        ]),
+    });
+
+    if (result.source === 'snapshot') {
+      this.metricsService.recordProductionReadModelHit();
+    } else {
+      this.metricsService.recordProductionFallback();
+      void this.snapshotDispatcher.requestUpdate({
+        scope: {
+          module: 'production',
+          snapshotType: 'ProductionDashboardSnapshot',
+        },
+        reason:
+          result.meta.fallbackReason === 'stale'
+            ? 'stale-snapshot'
+            : 'fallback-miss',
+        priority: 60,
+      });
+    }
+
+    return result.data;
+  }
+
+  private async productionMetricsRuntime() {
     const metrics = await this.repository.metrics();
     const throughputBase = metrics.completed + metrics.inProgress;
 
@@ -1207,6 +1250,66 @@ export class ProductionService {
           count: stage._count,
         })),
     };
+  }
+
+  private productionMetricsFromSnapshot(snapshot: {
+    totalOrders: number;
+    inProgress: number;
+    delayed: number;
+    completed: number;
+    completionRate: number;
+    throughput: number;
+    payload?: unknown;
+  }) {
+    const payload = this.asRecord(snapshot.payload);
+
+    return {
+      totalOrders: Number(snapshot.totalOrders ?? 0),
+      inProgress: Number(snapshot.inProgress ?? 0),
+      delayed: Number(snapshot.delayed ?? 0),
+      completed: Number(snapshot.completed ?? 0),
+      completionRate: Number(snapshot.completionRate ?? 0),
+      throughput: Number(snapshot.throughput ?? 0),
+      stageStatus: this.asArray(payload.stageStatus),
+      machineUtilization: this.asArray(payload.machineUtilization),
+      bottlenecks: this.asArray(payload.bottlenecks),
+    };
+  }
+
+  private compareRuntimeNumbers(
+    snapshot: Record<string, unknown>,
+    runtime: Record<string, unknown>,
+    fields: string[],
+  ) {
+    return fields.flatMap((field) => {
+      const snapshotValue = Number(snapshot[field] ?? 0);
+      const runtimeValue = Number(runtime[field] ?? 0);
+
+      return Math.abs(snapshotValue - runtimeValue) > 0.0001
+        ? [
+            {
+              field,
+              snapshotValue,
+              runtimeValue,
+              reason: 'VALUE_MISMATCH' as const,
+            },
+          ]
+        : [];
+    });
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
+
+  private asArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
+  }
+
+  private startOfDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
 
   private async getOrderOrThrow(id: string, tx?: ProductionTx) {
@@ -1262,6 +1365,150 @@ export class ProductionService {
     }
   }
 
+  private async transitionOrder(
+    id: string,
+    command: Exclude<ProductionOrderLifecycleCommand, 'start'>,
+    dto: ProductionOrderTransitionDto,
+    actorId?: string,
+  ) {
+    const order = await this.orderRepository.transaction(async (tx) => {
+      const existing = await this.orderRepository.findById(id, tx);
+
+      if (!existing) {
+        throw new NotFoundException('Production order not found');
+      }
+
+      const nextStatus = this.nextLifecycleStatus(existing.status, command);
+      const updated = await this.orderRepository.update(
+        id,
+        {
+          status: nextStatus,
+          completedAt:
+            nextStatus === ProductionOrderStatus.COMPLETED
+              ? (existing.completedAt ?? new Date())
+              : undefined,
+          currentStageCode:
+            nextStatus === ProductionOrderStatus.COMPLETED ? null : undefined,
+        },
+        tx,
+      );
+
+      await this.orderRepository.createActivity(
+        {
+          action: `PRODUCTION_ORDER_${command.toUpperCase()}`,
+          entity: 'ProductionOrder',
+          entityId: updated.id,
+          module: 'production',
+          userId: actorId,
+          metadata: {
+            orderNo: updated.orderNo,
+            previousStatus: existing.status,
+            status: updated.status,
+            message: dto.message ?? null,
+            reason: dto.reason ?? null,
+          },
+        },
+        tx,
+      );
+
+      await this.createLifecycleOutboxEvent(
+        tx,
+        lifecycleEventByCommand[command],
+        updated,
+        actorId,
+        dto,
+      );
+
+      return updated;
+    });
+
+    if (order.status === ProductionOrderStatus.COMPLETED) {
+      await this.autoRecalculateComponentCosting(order);
+    }
+
+    return order;
+  }
+
+  private nextLifecycleStatus(
+    status: ProductionOrderStatus,
+    command: ProductionOrderLifecycleCommand,
+  ) {
+    try {
+      return productionOrderTransition(status, command);
+    } catch (error) {
+      if (error instanceof InvalidProductionOrderTransitionError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private createLifecycleOutboxEvent(
+    tx: ProductionTx,
+    eventName: CanonicalProductionOrderEventName,
+    order: ProductionOrderWithDetails,
+    actorId?: string,
+    details: ProductionOrderTransitionDto = {},
+  ) {
+    const occurredAt = new Date();
+    const timestampField = this.lifecycleTimestampField(eventName);
+    const timestamp =
+      eventName === 'production.order.created'
+        ? order.createdAt
+        : eventName === 'production.order.started'
+          ? (order.startedAt ?? occurredAt)
+          : eventName === 'production.order.completed'
+            ? (order.completedAt ?? occurredAt)
+            : occurredAt;
+    const payload = {
+      orderId: order.id,
+      productionOrderId: order.id,
+      orderNo: order.orderNo,
+      status: order.status,
+      currentStageCode: order.currentStageCode,
+      projectId: order.projectId,
+      componentId: order.componentId,
+      actorId: actorId ?? null,
+      operatorId: actorId ?? null,
+      reason: details.reason ?? null,
+      message: details.message ?? null,
+      occurredAt: occurredAt.toISOString(),
+      [timestampField]: timestamp.toISOString(),
+      sourceVersion: order.updatedAt.toISOString(),
+    } as Prisma.InputJsonObject;
+
+    return this.orderRepository.createOutboxEvent(
+      {
+        eventName,
+        payload,
+        metadata: {
+          module: 'production',
+        },
+        idempotencyKey: `${eventName}:${order.id}:${order.updatedAt.toISOString()}`,
+      },
+      tx,
+    );
+  }
+
+  private lifecycleTimestampField(
+    eventName: CanonicalProductionOrderEventName,
+  ) {
+    const fields: Record<CanonicalProductionOrderEventName, string> = {
+      'production.order.created': 'createdAt',
+      'production.order.released': 'releasedAt',
+      'production.order.ready': 'readyAt',
+      'production.order.started': 'startedAt',
+      'production.order.paused': 'pausedAt',
+      'production.order.resumed': 'resumedAt',
+      'production.order.completed': 'completedAt',
+      'production.order.closed': 'closedAt',
+      'production.order.cancelled': 'cancelledAt',
+    };
+
+    return fields[eventName];
+  }
+
   private logActivity(
     tx: ProductionTx,
     action: string,
@@ -1286,11 +1533,7 @@ export class ProductionService {
   }
 
   private emitProductionEvent(
-    eventName:
-      | 'production.started'
-      | 'production.stage.completed'
-      | 'production.delayed'
-      | 'production.completed',
+    eventName: 'production.stage.completed',
     order: ProductionOrderWithDetails,
   ) {
     return this.eventBus.emit(

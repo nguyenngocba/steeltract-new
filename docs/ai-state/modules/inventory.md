@@ -1,5 +1,17 @@
 # Inventory Module
 
+## Cross-Module Posting Boundary
+
+EPIC135A added an internal Inventory-owned posting boundary for Production
+material Issue and Return. `InventoryPostingService` performs validation,
+valuation, Inventory transaction creation, compatibility item quantity and
+location-stock mutation, and Inventory Outbox persistence using a caller-provided
+transaction context. External Inventory APIs and business rules are unchanged.
+
+Production no longer writes Inventory tables directly. This preserves Inventory
+Business Freeze while allowing Production and Inventory records to commit or
+roll back atomically.
+
 ## EPIC118.5.1 React Query Root Cause Fix
 
 Status: **CODE FIX COMPLETE, OPERATOR SMOKE PENDING**

@@ -6,6 +6,7 @@ import { cpus, freemem, loadavg, totalmem } from 'os';
 
 import { CacheService } from '../../core/performance/cache.service';
 import { PerformanceMetricsService } from '../../core/performance/performance-metrics.service';
+import { SnapshotFeatureFlagService } from '../../core/snapshots/snapshot-feature-flag.service';
 import { InventoryRepository } from '../inventory/inventory.repository';
 import { OperationsCenterRepository } from './operations-center.repository';
 
@@ -18,6 +19,7 @@ export class OperationsCenterService {
     private readonly inventoryRepository: InventoryRepository,
     private readonly cache: CacheService,
     private readonly metrics: PerformanceMetricsService,
+    private readonly snapshotFlags: SnapshotFeatureFlagService,
   ) {}
 
   async overview() {
@@ -31,6 +33,7 @@ export class OperationsCenterService {
       databaseSize,
       inventoryHealth,
       projectHealth,
+      productionHealth,
     ] = await Promise.all([
       this.repository.countBackgroundJobsByStatus(),
       this.repository.recentBackgroundJobs(),
@@ -41,6 +44,7 @@ export class OperationsCenterService {
       this.repository.databaseSize(),
       this.inventoryRepository.inventoryPlatformHealth(),
       this.repository.projectPlatformHealth(),
+      this.repository.productionPlatformHealth(),
     ]);
     const runtime = this.metrics.snapshot();
     const analytics = this.asRecord(runtime.analytics);
@@ -196,6 +200,7 @@ export class OperationsCenterService {
       },
       inventory: this.inventoryHealth(inventoryHealth, snapshots, readModel, events, jobs),
       projects: this.projectHealth(projectHealth, snapshots, readModel, events, jobs),
+      production: this.productionHealth(productionHealth, snapshots, readModel, events, jobs),
       alerts,
     };
   }
@@ -405,12 +410,142 @@ export class OperationsCenterService {
     };
   }
 
+  private productionHealth(
+    health: Awaited<ReturnType<OperationsCenterRepository['productionPlatformHealth']>>,
+    snapshots: Record<string, unknown>,
+    readModel: Record<string, unknown>,
+    events: Record<string, number>,
+    jobs: Record<string, number>,
+  ) {
+    const dashboardAgeSeconds = health.latestDashboardSnapshotAt
+      ? Math.round((Date.now() - health.latestDashboardSnapshotAt.getTime()) / 1000)
+      : null;
+    const orderAgeSeconds = health.latestOrderSnapshotAt
+      ? Math.round((Date.now() - health.latestOrderSnapshotAt.getTime()) / 1000)
+      : null;
+    const workCenterAgeSeconds = health.latestWorkCenterSnapshotAt
+      ? Math.round((Date.now() - health.latestWorkCenterSnapshotAt.getTime()) / 1000)
+      : null;
+    const productionSnapshotHits = Number(snapshots.productionSnapshotHit ?? 0);
+    const productionSnapshotMisses = Number(snapshots.productionSnapshotMiss ?? 0);
+    const productionSnapshotTotal =
+      productionSnapshotHits + productionSnapshotMisses;
+    const dashboardSnapshotStatus =
+      health.dashboardSnapshotCount === 0
+        ? 'critical'
+        : dashboardAgeSeconds !== null && dashboardAgeSeconds > 3600
+          ? 'warning'
+          : 'healthy';
+    const orderSnapshotStatus =
+      health.orderSnapshotCount === 0
+        ? 'critical'
+        : orderAgeSeconds !== null && orderAgeSeconds > 3600
+          ? 'warning'
+          : 'healthy';
+    const workCenterSnapshotStatus =
+      health.workCenterSnapshotCount === 0
+        ? 'critical'
+        : workCenterAgeSeconds !== null && workCenterAgeSeconds > 3600
+          ? 'warning'
+          : 'healthy';
+
+    return {
+      repository: {
+        status: 'healthy',
+        coverage: 100,
+        detail: 'Production persistence is routed through Production repositories.',
+      },
+      readModel: {
+        status: Number(snapshots.productionReadModelHit ?? 0) > 0
+          ? 'healthy'
+          : 'unknown',
+        hits: Number(snapshots.productionReadModelHit ?? 0),
+        fallbackCount: Number(snapshots.productionFallbackCount ?? 0),
+        globalHitRate: Number(readModel.hitRate ?? 0),
+      },
+      snapshot: {
+        status:
+          dashboardSnapshotStatus === 'critical' ||
+          orderSnapshotStatus === 'critical' ||
+          workCenterSnapshotStatus === 'critical'
+            ? 'critical'
+            : dashboardSnapshotStatus === 'warning' ||
+                orderSnapshotStatus === 'warning' ||
+                workCenterSnapshotStatus === 'warning'
+              ? 'warning'
+              : 'healthy',
+        featureFlagEnabled: this.snapshotFlags.isEnabled('production'),
+        dashboard: {
+          status: dashboardSnapshotStatus,
+          count: health.dashboardSnapshotCount,
+          latestSnapshotAt:
+            health.latestDashboardSnapshotAt?.toISOString() ?? null,
+          ageSeconds: dashboardAgeSeconds,
+        },
+        orders: {
+          status: orderSnapshotStatus,
+          count: health.orderSnapshotCount,
+          latestSnapshotAt: health.latestOrderSnapshotAt?.toISOString() ?? null,
+          ageSeconds: orderAgeSeconds,
+        },
+        workCenters: {
+          status: workCenterSnapshotStatus,
+          count: health.workCenterSnapshotCount,
+          latestSnapshotAt:
+            health.latestWorkCenterSnapshotAt?.toISOString() ?? null,
+          ageSeconds: workCenterAgeSeconds,
+        },
+        hits: productionSnapshotHits,
+        misses: productionSnapshotMisses,
+        hitRatio:
+          productionSnapshotTotal > 0
+            ? Math.round((productionSnapshotHits / productionSnapshotTotal) * 100)
+            : 0,
+        averageAgeSeconds: Number(snapshots.productionAverageAgeSeconds ?? 0),
+        averageLagMs: Number(snapshots.productionAverageLagMs ?? 0),
+        rebuild: {
+          count: Number(snapshots.rebuilds ?? 0),
+          averageDurationMs: Number(snapshots.averageRebuildMs ?? 0),
+        },
+      },
+      event: {
+        status: health.failedOutbox > 0 ? 'warning' : 'healthy',
+        pendingOutbox: health.pendingOutbox,
+        failedOutbox: health.failedOutbox,
+        globalPending: Number(events.PENDING ?? 0),
+      },
+      jobs: {
+        status: health.failedJobs > 0 ? 'warning' : 'healthy',
+        activeJobs: health.activeJobs,
+        failedJobs: health.failedJobs,
+        globalRunning: Number(jobs.RUNNING ?? 0),
+      },
+      parity: {
+        status: 'prepared',
+        detail: 'SnapshotValidatorService exposes Production parity checks; full parity execution is deferred.',
+      },
+      runtime: {
+        status: 'healthy',
+        trackedByRuntimeMetrics: true,
+      },
+      counts: {
+        productionOrderCount: health.productionOrderCount,
+        workCenterCount: health.workCenterCount,
+        stageCount: health.stageCount,
+        taskCount: health.taskCount,
+      },
+    };
+  }
+
   private snapshotHealth(rows: Awaited<ReturnType<OperationsCenterRepository['snapshotStats']>>) {
     const now = Date.now();
     return [
       this.snapshotModule('Inventory', Number(rows[0] ?? 0), rows[1]?.updatedAt, now),
       this.snapshotModule('Projects', Number(rows[2] ?? 0), rows[3]?.updatedAt, now),
       this.snapshotModule('Dispatch', Number(rows[4] ?? 0), rows[5]?.updatedAt, now),
+      this.snapshotModule('Production', Number(rows[6] ?? 0), rows[7]?.updatedAt, now),
+      this.snapshotModule('Production Orders', Number(rows[8] ?? 0), rows[9]?.updatedAt, now),
+      this.snapshotModule('Work Centers', Number(rows[10] ?? 0), rows[11]?.updatedAt, now),
     ];
   }
 
@@ -434,6 +569,9 @@ export class OperationsCenterService {
       'projects',
       'project_tasks',
       'dispatch_orders',
+      'production_orders',
+      'work_centers',
+      'production_stages',
       'background_jobs',
       'outbox_events',
       'attachments',

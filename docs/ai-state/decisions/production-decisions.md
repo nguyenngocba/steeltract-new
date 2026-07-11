@@ -255,3 +255,49 @@ Implications:
 
 - Sprint 20B should compare this read model with persisted `ComponentCosting` and decide what should become the official accounting snapshot.
 - Sprint 20C should build Project Cost Control on the read model first, then add persisted project cost snapshots only after variance rules are approved.
+
+## PROD-014: Canonical Production Order Lifecycle And Event Namespace
+
+Decision:
+
+- Canonical lifecycle:
+  `DRAFT -> RELEASED -> READY -> IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED`.
+- Cancellation is allowed only from `DRAFT`; `CLOSED` and `CANCELLED` are terminal.
+- Canonical lifecycle events use `production.order.*`.
+- A lifecycle transition and its Outbox row must be persisted atomically in one
+  repository transaction. Snapshot updates remain asynchronous.
+
+Compatibility:
+
+- `PLANNED` and `DELAYED` remain persisted enum values for existing data and API
+  compatibility, but new lifecycle commands must not target them.
+- Existing `production.started`, `production.completed`, and
+  `production.delayed` events may be consumed while old Outbox rows drain. New
+  lifecycle publishers use the canonical namespace.
+
+Implementation boundary:
+
+- The Blueprint Alignment sprint changes the specification and additive enum
+  foundation only.
+- State-machine commands, atomic Outbox persistence, endpoints, and transition
+  tests belong to EPIC134 Production Order Lifecycle.
+
+## PROD-015: Inventory Owns Production Material Stock Posting
+
+Decision:
+
+- Production orchestrates Reservation, Issue, Consumption, Return, and its
+  immutable material ledger, but Inventory exclusively owns stock mutation.
+- Issue and Return call the internal Inventory posting boundary with the shared
+  repository transaction context.
+- Production repositories do not create/update/delete Inventory transactions,
+  item quantity, or location stock.
+
+Semantics:
+
+- Draft Reservation records demand only. `RESERVE` ledger rows begin when stock
+  is actually allocated.
+- `CONSUME` ledger quantity excludes Scrap. Scrap requires a separate future
+  command/event/ledger semantic.
+- Canonical material events use `production.material.*` and must be persisted to
+  Outbox atomically when EPIC135B activates publishing.

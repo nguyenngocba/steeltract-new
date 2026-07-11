@@ -61,6 +61,84 @@ export class InventoryRepository {
     });
   }
 
+  findItemsByIds(ids: string[], db: DbClient = this.prisma) {
+    return db.inventoryItem.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, code: true, name: true },
+    })
+  }
+
+  findWarehouseByCode(code: string, db: DbClient = this.prisma) {
+    return db.masterWarehouse.findUnique({
+      where: { code },
+      select: { id: true, code: true, name: true },
+    })
+  }
+
+  findPositiveLocationStocks(
+    materialIds: string[],
+    warehouseId: string,
+    warehouseCode: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.inventoryLocationStock.findMany({
+      where: {
+        inventoryItemId: { in: materialIds },
+        quantity: { gt: 0.000001 },
+        OR: [
+          { warehouseId },
+          { zone: { warehouse: { code: warehouseCode } } },
+        ],
+      },
+      include: { zone: { include: { warehouse: true } } },
+      orderBy: [
+        { inventoryItemId: 'asc' },
+        { zoneId: 'asc' },
+        { slotId: 'asc' },
+        { level: 'asc' },
+      ],
+    })
+  }
+
+  findPositiveLocationStock(
+    inventoryItemId: string,
+    warehouseId: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.inventoryLocationStock.findFirst({
+      where: { inventoryItemId, warehouseId, quantity: { gt: 0 } },
+    })
+  }
+
+  findActiveWarehouseZone(code: string, db: DbClient = this.prisma) {
+    return db.warehouseZone.findFirst({
+      where: { active: true, warehouse: { code } },
+      include: { warehouse: true },
+      orderBy: { code: 'asc' },
+    })
+  }
+
+  findProductionInventoryTransactions(
+    materialIds: string[],
+    db: DbClient = this.prisma,
+  ) {
+    return db.inventoryTransaction.findMany({
+      where: {
+        items: { some: { inventoryItemId: { in: materialIds } } },
+        OR: [
+          { remarks: { contains: '[COMPONENT_PRODUCTION]' } },
+          { remarks: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+          { note: { contains: '[COMPONENT_PRODUCTION]' } },
+          { note: { contains: '[COMPONENT_PRODUCTION_RETURN]' } },
+        ],
+      },
+      include: {
+        warehouse: true,
+        items: { include: { warehouse: true } },
+      },
+    })
+  }
+
   countItems(search?: string) {
     return this.prisma.inventoryItem.count({
       where: this.buildItemWhere(search),
@@ -838,8 +916,29 @@ export class InventoryRepository {
     });
   }
 
-  nextOperationalCode(modelName: string, fieldName: string, prefix: string) {
-    return nextOperationalCode(this.prisma, modelName as any, fieldName, prefix);
+  nextOperationalCode(
+    modelName: string,
+    fieldName: string,
+    prefix: string,
+    db: DbClient = this.prisma,
+  ) {
+    return nextOperationalCode(db, modelName as any, fieldName, prefix);
+  }
+
+  createOutboxEvent(
+    data: {
+      eventName: string
+      payload: Prisma.InputJsonValue
+      metadata: Prisma.InputJsonValue
+      idempotencyKey: string
+    },
+    db: DbClient = this.prisma,
+  ) {
+    return db.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    })
   }
 
   findTransactionById(id: string) {
@@ -1010,8 +1109,8 @@ export class InventoryRepository {
     });
   }
 
-  findInboundCostLines(materialIds: string[]) {
-    return this.prisma.inventoryTransactionItem.findMany({
+  findInboundCostLines(materialIds: string[], db: DbClient = this.prisma) {
+    return db.inventoryTransactionItem.findMany({
       where: {
         inventoryItemId: {
           in: materialIds,

@@ -51,9 +51,21 @@ Mỗi cấu kiện (Component) đơn lẻ có một `ProductionOrder` tương �
 *   `projectId`: String (FK liên kết với `Project`)
 *   `quantity`: Float (Thường là 1 cho cấu kiện đơn chiếc hoặc theo lô nhỏ)
 *   `priority`: Enum (`LOW`, `MEDIUM`, `HIGH`, `URGENT`)
-*   `status`: Enum (`DRAFT`, `RELEASED`, `IN_PROGRESS`, `COMPLETED`, `DELAYED`, `CANCELLED`)
+*   `status`: Enum (`DRAFT`, `RELEASED`, `READY`, `IN_PROGRESS`, `PAUSED`, `COMPLETED`, `CLOSED`, `CANCELLED`)
 *   `currentStageCode`: Enum (`CUTTING`, `ASSEMBLY`, `WELDING`, `PAINTING`, `QC`, `COMPLETED`)
 *   `plannedStartAt`, `plannedEndAt`, `startedAt`, `completedAt`: DateTime
+
+Canonical transitions:
+
+```text
+DRAFT -> RELEASED -> READY -> IN_PROGRESS <-> PAUSED -> COMPLETED -> CLOSED
+DRAFT -> CANCELLED
+```
+
+`PLANNED` and `DELAYED` are retained as legacy-compatible persisted enum values.
+They are not valid targets for new lifecycle commands. Existing rows may still
+be read and migrated deliberately; application code must not silently reinterpret
+either value as `READY` or `PAUSED`.
 
 ### 1.3. BOMRoutingStep & ProductionStage (Công đoạn & Routing thực tế)
 *   `BOMRoutingStep` định nghĩa quy trình lý thuyết trong BOM (ví dụ: Step 10: Cắt bản mã).

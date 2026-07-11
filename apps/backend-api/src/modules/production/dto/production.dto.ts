@@ -94,6 +94,11 @@ export const startProductionSchema = z.object({
   message: z.string().optional(),
 });
 
+export const productionOrderTransitionSchema = z.object({
+  message: z.string().optional(),
+  reason: z.string().optional(),
+});
+
 export const completeStageSchema = z.object({
   message: z.string().optional(),
   qualityStatus: z.string().optional(),
@@ -318,6 +323,9 @@ export type ListProductionOrdersDto = z.infer<
   typeof listProductionOrdersSchema
 >;
 export type StartProductionDto = z.infer<typeof startProductionSchema>;
+export type ProductionOrderTransitionDto = z.infer<
+  typeof productionOrderTransitionSchema
+>;
 export type CompleteStageDto = z.infer<typeof completeStageSchema>;
 export type StageProductionToYardDto = z.infer<
   typeof stageProductionToYardSchema

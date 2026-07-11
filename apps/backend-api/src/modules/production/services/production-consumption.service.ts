@@ -6,11 +6,13 @@ import {
 
 import { Prisma, ProductionMaterialLedgerEventType } from '@prisma/client';
 
-import { PrismaService } from '../../../core/prisma/prisma.service';
+import { InventoryRepository } from '../../inventory/inventory.repository';
+
 import {
   CreateProductionConsumptionDto,
   ListProductionConsumptionsDto,
 } from '../dto/production.dto';
+import { ProductionConsumptionRepository } from '../repositories/production-consumption.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
 const epsilon = 0.000001;
@@ -27,21 +29,25 @@ type IssueBucket = {
 @Injectable()
 export class ProductionConsumptionService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly repository: ProductionConsumptionRepository,
+    private readonly inventoryRepository: InventoryRepository,
     private readonly materialLedgerService: ProductionMaterialLedgerService,
   ) {}
 
   findAll(query: ListProductionConsumptionsDto = {}) {
-    return this.prisma.productionMaterialConsumption.findMany({
-      where: {
+    return this.repository.findMany(
+      {
         productionOrderId: query.productionOrderId,
         inventoryItemId: query.inventoryItemId,
       },
-      include: this.consumptionInclude(),
-      orderBy: { createdAt: 'desc' },
-      take: query.limit ?? 100,
-      skip: query.page && query.limit ? (query.page - 1) * query.limit : undefined,
-    });
+      {
+        take: query.limit ?? 100,
+        skip:
+          query.page && query.limit
+            ? (query.page - 1) * query.limit
+            : undefined,
+      },
+    );
   }
 
   findByProductionOrder(productionOrderId: string) {
@@ -54,14 +60,8 @@ export class ProductionConsumptionService {
     actorId?: string,
   ) {
     const [order, material] = await Promise.all([
-      this.prisma.productionOrder.findUnique({
-        where: { id: productionOrderId },
-        select: { id: true, orderNo: true },
-      }),
-      this.prisma.inventoryItem.findUnique({
-        where: { id: dto.inventoryItemId },
-        select: { id: true, code: true },
-      }),
+      this.repository.findOrderForConsumption(productionOrderId),
+      this.inventoryRepository.findItemById(dto.inventoryItemId),
     ]);
 
     if (!order) {
@@ -72,24 +72,22 @@ export class ProductionConsumptionService {
     }
 
     const [issues, previousConsumptions] = await Promise.all([
-      this.prisma.productionMaterialIssue.findMany({
-        where: {
-          productionOrderId,
-          inventoryItemId: dto.inventoryItemId,
-          status: { in: ['ISSUED', 'RETURNED'] },
-        },
-        orderBy: { issuedDate: 'asc' },
-      }),
-      this.prisma.productionMaterialConsumption.findMany({
-        where: {
-          productionOrderId,
-          inventoryItemId: dto.inventoryItemId,
-        },
-      }),
+      this.repository.findIssuesForConsumption(
+        productionOrderId,
+        dto.inventoryItemId,
+      ),
+      this.repository.findConsumptionsForMaterial(
+        productionOrderId,
+        dto.inventoryItemId,
+      ),
     ]);
 
-    const issuedQty = this.sum(issues.map((issue) => Number(issue.issuedQty ?? 0)));
-    const returnedQty = this.sum(issues.map((issue) => Number(issue.returnedQty ?? 0)));
+    const issuedQty = this.sum(
+      issues.map((issue) => Number(issue.issuedQty ?? 0)),
+    );
+    const returnedQty = this.sum(
+      issues.map((issue) => Number(issue.returnedQty ?? 0)),
+    );
     const previousConsumedQty = this.sum(
       previousConsumptions.map((row) => Number(row.consumedQty ?? 0)),
     );
@@ -102,16 +100,24 @@ export class ProductionConsumptionService {
     const remainingQty = netIssuedQty - previousConsumedQty - previousScrapQty;
 
     if (issuedQty <= epsilon || netIssuedQty <= epsilon) {
-      throw new BadRequestException('No net issued material available to consume');
+      throw new BadRequestException(
+        'No net issued material available to consume',
+      );
     }
     if (consumedQty > netIssuedQty + epsilon) {
-      throw new BadRequestException('Consumed quantity cannot exceed net issued quantity');
+      throw new BadRequestException(
+        'Consumed quantity cannot exceed net issued quantity',
+      );
     }
     if (consumedQty > remainingQty + epsilon) {
-      throw new BadRequestException('Consumed quantity cannot exceed remaining quantity');
+      throw new BadRequestException(
+        'Consumed quantity cannot exceed remaining quantity',
+      );
     }
     if (scrapQty > Math.max(remainingQty - consumedQty, 0) + epsilon) {
-      throw new BadRequestException('Scrap quantity cannot exceed remaining quantity');
+      throw new BadRequestException(
+        'Scrap quantity cannot exceed remaining quantity',
+      );
     }
     if (
       returnedQty +
@@ -121,15 +127,20 @@ export class ProductionConsumptionService {
         scrapQty >
       issuedQty + epsilon
     ) {
-      throw new BadRequestException('Return, consume, and scrap quantities cannot exceed issued quantity');
+      throw new BadRequestException(
+        'Return, consume, and scrap quantities cannot exceed issued quantity',
+      );
     }
 
-    const ledgerQuantity = consumedQty + scrapQty;
-    const ledgerLines = this.allocateConsumptionLedger(issues, previousConsumedQty + previousScrapQty, ledgerQuantity);
+    const ledgerLines = this.allocateConsumptionLedger(
+      issues,
+      previousConsumedQty + previousScrapQty,
+      consumedQty,
+    );
 
-    return this.prisma.$transaction(async (tx) => {
-      const consumption = await tx.productionMaterialConsumption.create({
-        data: {
+    return this.repository.transaction(async (tx) => {
+      const consumption = await this.repository.create(
+        {
           productionOrderId,
           inventoryItemId: dto.inventoryItemId,
           issuedQty,
@@ -139,21 +150,23 @@ export class ProductionConsumptionService {
           remark: dto.remark,
           createdBy: actorId,
         },
-        include: this.consumptionInclude(),
-      });
-
-      await this.materialLedgerService.createReservationEntries(
-        {
-          productionOrderId,
-          eventType: ProductionMaterialLedgerEventType.CONSUME,
-          lines: ledgerLines,
-          remark:
-            dto.remark ??
-            `Consume material ${material.code}: consumed ${consumedQty}, scrap ${scrapQty}`,
-          createdBy: actorId,
-        },
         tx,
       );
+
+      if (consumedQty > epsilon) {
+        await this.materialLedgerService.createReservationEntries(
+          {
+            productionOrderId,
+            eventType: ProductionMaterialLedgerEventType.CONSUME,
+            lines: ledgerLines,
+            remark:
+              dto.remark ??
+              `Consume material ${material.code}: consumed ${consumedQty}`,
+            createdBy: actorId,
+          },
+          tx,
+        );
+      }
 
       return consumption;
     });
@@ -179,7 +192,10 @@ export class ProductionConsumptionService {
         zoneId: issue.zoneId,
         slotId: issue.slotId,
         level: issue.level,
-        quantity: Math.max(Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0), 0),
+        quantity: Math.max(
+          Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0),
+          0,
+        ),
       }))
       .filter((bucket) => bucket.quantity > epsilon);
 
@@ -201,30 +217,18 @@ export class ProductionConsumptionService {
     }
 
     if (remaining > epsilon) {
-      throw new BadRequestException('Consumption quantity exceeds issued material buckets');
+      throw new BadRequestException(
+        'Consumption quantity exceeds issued material buckets',
+      );
     }
 
     return lines;
   }
 
-  private consumptionInclude() {
-    return {
-      productionOrder: {
-        select: { id: true, orderNo: true, title: true, status: true },
-      },
-      inventoryItem: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          unit: true,
-          unitMaster: { select: { symbol: true } },
-        },
-      },
-    } satisfies Prisma.ProductionMaterialConsumptionInclude;
-  }
-
   private sum(values: number[]) {
-    return values.reduce((total, value) => total + (Number.isFinite(value) ? value : 0), 0);
+    return values.reduce(
+      (total, value) => total + (Number.isFinite(value) ? value : 0),
+      0,
+    );
   }
 }

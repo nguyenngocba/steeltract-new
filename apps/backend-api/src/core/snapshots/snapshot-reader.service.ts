@@ -6,6 +6,7 @@ import {
 import { PerformanceMetricsService } from '../performance/performance-metrics.service';
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
+import { ProductionSnapshotRepository } from './production-snapshot.repository';
 import { ProjectSnapshotRepository } from './project-snapshot.repository';
 
 @Injectable()
@@ -19,6 +20,8 @@ export class SnapshotReaderService {
     private readonly projectSnapshots: ProjectSnapshotRepository,
     @Inject(DispatchSnapshotRepository)
     private readonly dispatchSnapshots: DispatchSnapshotRepository,
+    @Inject(ProductionSnapshotRepository)
+    private readonly productionSnapshots: ProductionSnapshotRepository,
   ) {}
 
   async inventory(warehouseId: string, snapshotDate: Date) {
@@ -83,6 +86,52 @@ export class SnapshotReaderService {
   async dispatchDashboard() {
     const rows = await this.dispatchSnapshots.findManyLatest();
     this.recordMany(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async productionDashboard(snapshotDate: Date) {
+    const row = await this.productionSnapshots.findDashboardSnapshot(
+      snapshotDate,
+    );
+    this.recordProduction(row?.updatedAt);
+    return row;
+  }
+
+  async productionDashboardHistory(take = 12) {
+    const rows = await this.productionSnapshots.findDashboardHistory(take);
+    this.recordProductionMany(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async productionOrder(productionOrderId: string) {
+    const row = await this.productionSnapshots.findOrderSnapshot(
+      productionOrderId,
+    );
+    this.recordProduction(row?.updatedAt);
+    return row;
+  }
+
+  async productionOrders(productionOrderId?: string) {
+    const rows = await this.productionSnapshots.findOrderSnapshots(
+      productionOrderId,
+    );
+    this.recordProductionMany(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async productionWorkCenter(workCenterId: string) {
+    const row = await this.productionSnapshots.findWorkCenterSnapshot(
+      workCenterId,
+    );
+    this.recordProduction(row?.updatedAt);
+    return row;
+  }
+
+  async productionWorkCenters(workCenterId?: string) {
+    const rows = await this.productionSnapshots.findWorkCenterSnapshots(
+      workCenterId,
+    );
+    this.recordProductionMany(rows.map((row) => row.updatedAt));
     return rows;
   }
 
@@ -170,5 +219,31 @@ export class SnapshotReaderService {
       row.getTime() < min.getTime() ? row : min,
     );
     this.metrics.recordSnapshotLag(Date.now() - oldest.getTime());
+  }
+
+  private recordProduction(updatedAt?: Date) {
+    if (!updatedAt) {
+      this.metrics.recordProductionSnapshotMiss();
+      return;
+    }
+
+    const now = Date.now();
+    this.metrics.recordProductionSnapshotHit();
+    this.metrics.recordProductionSnapshotLag(now - updatedAt.getTime());
+    this.metrics.recordProductionSnapshotAge(
+      Math.max(0, Math.round((now - updatedAt.getTime()) / 1000)),
+    );
+  }
+
+  private recordProductionMany(updatedRows: Date[]) {
+    if (updatedRows.length === 0) {
+      this.metrics.recordProductionSnapshotMiss();
+      return;
+    }
+
+    const oldest = updatedRows.reduce((min, row) =>
+      row.getTime() < min.getTime() ? row : min,
+    );
+    this.recordProduction(oldest);
   }
 }

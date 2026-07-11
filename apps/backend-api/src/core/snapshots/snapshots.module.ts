@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
 import { DashboardReaderService } from './dashboard-reader.service';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
+import { ProductionSnapshotRepository } from './production-snapshot.repository';
 import { ProjectSnapshotRepository } from './project-snapshot.repository';
 import { RuntimeAggregateStrategy } from './runtime-aggregate.strategy';
 import { SnapshotFeatureFlagService } from './snapshot-feature-flag.service';
@@ -22,6 +23,7 @@ import { SnapshotWriterService } from './snapshot-writer.service';
     DispatchSnapshotRepository,
     DashboardReaderService,
     InventorySnapshotRepository,
+    ProductionSnapshotRepository,
     ProjectSnapshotRepository,
     RuntimeAggregateStrategy,
     SnapshotFeatureFlagService,
@@ -34,6 +36,7 @@ import { SnapshotWriterService } from './snapshot-writer.service';
     DispatchSnapshotRepository,
     DashboardReaderService,
     InventorySnapshotRepository,
+    ProductionSnapshotRepository,
     ProjectSnapshotRepository,
     SnapshotFeatureFlagService,
     SnapshotReaderService,

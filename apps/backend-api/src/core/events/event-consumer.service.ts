@@ -13,11 +13,15 @@ import { DomainEvent } from './domain-event.interface';
 import { EventBusService } from './event-bus.service';
 
 interface SnapshotEventPayload {
+  id?: string;
+  orderId?: string;
   aggregateId?: string;
   projectId?: string;
   inventoryItemId?: string;
   warehouseId?: string;
   dispatchOrderId?: string;
+  productionOrderId?: string;
+  workCenterId?: string;
   sourceVersion?: string;
 }
 
@@ -100,6 +104,58 @@ const snapshotEventMap: Record<
     module: 'logistics',
     snapshotType: 'LogisticsDispatchSnapshot',
   },
+  'production.started': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.stage.completed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.delayed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.completed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.created': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.released': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.ready': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.started': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.paused': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.resumed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.completed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.closed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.order.cancelled': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
 };
 
 @Injectable()
@@ -116,9 +172,8 @@ export class EventConsumerService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     Object.keys(snapshotEventMap).forEach((eventName) => {
       this.unsubscribers.push(
-        this.eventBus.subscribe<SnapshotEventPayload>(
-          eventName,
-          (event) => this.handleSnapshotEvent(event),
+        this.eventBus.subscribe<SnapshotEventPayload>(eventName, (event) =>
+          this.handleSnapshotEvent(event),
         ),
       );
     });
@@ -146,6 +201,12 @@ export class EventConsumerService implements OnModuleInit, OnModuleDestroy {
         inventoryItemId: event.payload.inventoryItemId,
         warehouseId: event.payload.warehouseId,
         dispatchOrderId: event.payload.dispatchOrderId,
+        productionOrderId:
+          event.payload.productionOrderId ??
+          event.payload.orderId ??
+          event.payload.aggregateId ??
+          event.payload.id,
+        workCenterId: event.payload.workCenterId,
       },
       reason: 'domain-event',
       sourceEventId: event.metadata?.eventId,

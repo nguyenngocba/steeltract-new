@@ -11,14 +11,15 @@ import {
   ProductionMaterialReservationLineStatus,
 } from '@prisma/client';
 
-import { PrismaService } from '../../../core/prisma/prisma.service';
-import { nextOperationalCode } from '../../../common/utils/code-generator';
+import { InventoryRepository } from '../../inventory/inventory.repository';
+
 import {
   CreateProductionReservationDto,
   ListProductionReservationsDto,
   ReserveProductionReservationDto,
   ReleaseProductionReservationDto,
 } from '../dto/production.dto';
+import { ProductionReservationRepository } from '../repositories/production-reservation.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
 const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
@@ -74,29 +75,23 @@ type PreviewLine = {
 @Injectable()
 export class ProductionReservationService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly repository: ProductionReservationRepository,
+    private readonly inventoryRepository: InventoryRepository,
     private readonly materialLedgerService: ProductionMaterialLedgerService,
   ) {}
 
   findAll(query: ListProductionReservationsDto = {}) {
-    return this.prisma.productionMaterialReservation.findMany({
-      where: {
-        productionOrderId: query.productionOrderId,
-        status: query.status,
-      },
-      include: this.reservationInclude(),
-      orderBy: { createdAt: 'desc' },
+    return this.repository.findMany({
+      productionOrderId: query.productionOrderId,
+      status: query.status,
       take: query.limit,
-      skip: query.page && query.limit ? (query.page - 1) * query.limit : undefined,
+      skip:
+        query.page && query.limit ? (query.page - 1) * query.limit : undefined,
     });
   }
 
   async findOne(id: string) {
-    const reservation =
-      await this.prisma.productionMaterialReservation.findUnique({
-        where: { id },
-        include: this.reservationInclude(),
-      });
+    const reservation = await this.repository.findById(id);
 
     if (!reservation) {
       throw new NotFoundException('Production material reservation not found');
@@ -133,45 +128,26 @@ export class ProductionReservationService {
     actorId?: string,
   ) {
     const order = await this.getOrderWithBom(productionOrderId);
-    const reservation = await this.prisma.productionMaterialReservation.create({
-      data: {
-        reservationNo: await this.nextReservationNo(order.orderNo),
-        productionOrderId: order.id,
-        bomId: order.bomId,
-        expiresAt: dto.expiresAt,
-        note: dto.note,
-        lines: {
-          create: (order.bom?.items ?? []).map((item) => ({
-            bomItemId: item.id,
-            inventoryItemId: item.materialId,
-            requiredQty:
-              item.quantity * (1 + item.wastePercent / 100) * order.quantity,
-            status: ProductionMaterialReservationLineStatus.OPEN,
-          })),
-        },
+    const reservation = await this.repository.create({
+      reservationNo: await this.nextReservationNo(order.orderNo),
+      productionOrderId: order.id,
+      bomId: order.bomId,
+      expiresAt: dto.expiresAt,
+      note: dto.note,
+      lines: {
+        create: (order.bom?.items ?? []).map((item) => ({
+          bomItemId: item.id,
+          inventoryItemId: item.materialId,
+          requiredQty:
+            item.quantity * (1 + item.wastePercent / 100) * order.quantity,
+          status: ProductionMaterialReservationLineStatus.OPEN,
+        })),
       },
-      include: this.reservationInclude(),
     });
 
     if (dto.autoReserve) {
       return this.reserve(reservation.id, { note: dto.note }, actorId);
     }
-
-    await this.materialLedgerService.createReservationEntries({
-      productionOrderId: reservation.productionOrderId,
-      reservationId: reservation.id,
-      eventType: ProductionMaterialLedgerEventType.RESERVE,
-      lines: reservation.lines.map((line) => ({
-        inventoryItemId: line.inventoryItemId,
-        warehouseId: line.warehouseId,
-        zoneId: line.zoneId,
-        slotId: line.slotId,
-        level: line.level,
-        quantity: line.requiredQty,
-      })),
-      remark: dto.note ?? `Reservation ${reservation.reservationNo} created as draft`,
-      createdBy: actorId,
-    });
 
     return reservation;
   }
@@ -200,10 +176,8 @@ export class ProductionReservationService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.productionMaterialReservationLine.deleteMany({
-        where: { reservationId: id },
-      });
+    await this.repository.transaction(async (tx) => {
+      await this.repository.deleteLines(id, tx);
 
       const ledgerLines: Array<{
         inventoryItemId: string;
@@ -217,8 +191,8 @@ export class ProductionReservationService {
       for (const line of previewLines) {
         for (const allocation of line.allocations) {
           if (allocation.reservedQty <= epsilon) continue;
-          await tx.productionMaterialReservationLine.create({
-            data: {
+          await this.repository.createLine(
+            {
               reservationId: id,
               bomItemId: line.bomItemId,
               inventoryItemId: line.materialId,
@@ -230,7 +204,8 @@ export class ProductionReservationService {
               reservedQty: allocation.reservedQty,
               status: ProductionMaterialReservationLineStatus.OPEN,
             },
-          });
+            tx,
+          );
           ledgerLines.push({
             inventoryItemId: line.materialId,
             warehouseId: allocation.warehouseId,
@@ -242,15 +217,16 @@ export class ProductionReservationService {
         }
       }
 
-      await tx.productionMaterialReservation.update({
-        where: { id },
-        data: {
+      await this.repository.updateReservation(
+        id,
+        {
           status: ProductionMaterialReservationStatus.RESERVED,
           reservedAt: new Date(),
           reservedBy: actorId,
           note: dto.note ?? existing.note,
         },
-      });
+        tx,
+      );
 
       await this.materialLedgerService.createReservationEntries(
         {
@@ -278,7 +254,7 @@ export class ProductionReservationService {
       throw new BadRequestException('Only active reservations can be released');
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.repository.transaction(async (tx) => {
       await this.materialLedgerService.createReservationEntries(
         {
           productionOrderId: reservation.productionOrderId,
@@ -295,15 +271,16 @@ export class ProductionReservationService {
               0,
             ),
           })),
-          remark: dto.note ?? `Reservation ${reservation.reservationNo} released`,
+          remark:
+            dto.note ?? `Reservation ${reservation.reservationNo} released`,
           createdBy: actorId,
         },
         tx,
       );
 
-      await tx.productionMaterialReservation.update({
-        where: { id },
-        data: {
+      await this.repository.updateReservation(
+        id,
+        {
           status: ProductionMaterialReservationStatus.CANCELLED,
           releasedAt: new Date(),
           note: dto.note ?? reservation.note,
@@ -317,7 +294,8 @@ export class ProductionReservationService {
             },
           },
         },
-      });
+        tx,
+      );
     });
 
     return this.findOne(id);
@@ -338,7 +316,7 @@ export class ProductionReservationService {
       throw new BadRequestException('Reservation cannot be expired');
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.repository.transaction(async (tx) => {
       await this.materialLedgerService.createReservationEntries(
         {
           productionOrderId: reservation.productionOrderId,
@@ -355,15 +333,16 @@ export class ProductionReservationService {
               0,
             ),
           })),
-          remark: dto.note ?? `Reservation ${reservation.reservationNo} expired`,
+          remark:
+            dto.note ?? `Reservation ${reservation.reservationNo} expired`,
           createdBy: actorId,
         },
         tx,
       );
 
-      await tx.productionMaterialReservation.update({
-        where: { id },
-        data: {
+      await this.repository.updateReservation(
+        id,
+        {
           status: ProductionMaterialReservationStatus.EXPIRED,
           releasedAt: new Date(),
           note: dto.note ?? reservation.note,
@@ -377,7 +356,8 @@ export class ProductionReservationService {
             },
           },
         },
-      });
+        tx,
+      );
     });
 
     return this.findOne(id);
@@ -465,22 +445,7 @@ export class ProductionReservationService {
   }
 
   private async getOrderWithBom(productionOrderId: string) {
-    const order = await this.prisma.productionOrder.findUnique({
-      where: { id: productionOrderId },
-      include: {
-        bom: {
-          include: {
-            items: {
-              include: {
-                material: {
-                  include: { unitMaster: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const order = await this.repository.findOrderWithBom(productionOrderId);
 
     if (!order) {
       throw new NotFoundException('Production order not found');
@@ -499,36 +464,17 @@ export class ProductionReservationService {
     const buckets = new Map<string, StockBucket[]>();
     if (!materialIds.length) return buckets;
 
-    const productionWarehouse = await this.prisma.masterWarehouse.findUnique({
-      where: { code: 'PRODUCTION' },
-      select: { id: true, code: true, name: true },
-    });
+    const productionWarehouse = await this.inventoryRepository.findWarehouseByCode(
+      'PRODUCTION',
+    );
 
     if (!productionWarehouse) return buckets;
 
-    const locationStocks = await this.prisma.inventoryLocationStock.findMany({
-      where: {
-        inventoryItemId: { in: materialIds },
-        quantity: { gt: epsilon },
-        OR: [
-          { warehouseId: productionWarehouse.id },
-          { zone: { warehouse: { code: 'PRODUCTION' } } },
-        ],
-      },
-      include: {
-        zone: {
-          include: {
-            warehouse: true,
-          },
-        },
-      },
-      orderBy: [
-        { inventoryItemId: 'asc' },
-        { zoneId: 'asc' },
-        { slotId: 'asc' },
-        { level: 'asc' },
-      ],
-    });
+    const locationStocks = await this.inventoryRepository.findPositiveLocationStocks(
+      materialIds,
+      productionWarehouse.id,
+      'PRODUCTION',
+    );
 
     for (const row of locationStocks) {
       this.addBucketQuantity(buckets, row.inventoryItemId, {
@@ -555,17 +501,11 @@ export class ProductionReservationService {
     const reservedByBucket = new Map<string, number>();
     if (!materialIds.length) return reservedByBucket;
 
-    const lines = await this.prisma.productionMaterialReservationLine.findMany({
-      where: {
-        inventoryItemId: { in: materialIds },
-        reservationId: excludeReservationId
-          ? { not: excludeReservationId }
-          : undefined,
-        reservation: {
-          status: { in: activeReservationStatuses },
-        },
-      },
-    });
+    const lines = await this.repository.findActiveReservationLines(
+      materialIds,
+      activeReservationStatuses,
+      excludeReservationId,
+    );
 
     for (const line of lines) {
       const openQty = Math.max(
@@ -624,34 +564,7 @@ export class ProductionReservationService {
   }
 
   private async nextReservationNo(_orderNo: string) {
-    return nextOperationalCode(this.prisma, 'productionMaterialReservation', 'reservationNo', 'RSV');
-  }
-
-  private reservationInclude() {
-    return {
-      productionOrder: {
-        select: { id: true, orderNo: true, title: true, status: true },
-      },
-      bom: {
-        select: { id: true, bomNo: true, productCode: true, productName: true },
-      },
-      lines: {
-        include: {
-          inventoryItem: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              unit: true,
-              unitMaster: { select: { symbol: true } },
-            },
-          },
-          warehouse: { select: { id: true, code: true, name: true } },
-          zone: { select: { id: true, code: true, name: true } },
-        },
-        orderBy: [{ inventoryItemId: 'asc' }, { zoneId: 'asc' }],
-      },
-    } satisfies Prisma.ProductionMaterialReservationInclude;
+    return this.repository.nextReservationNo();
   }
 
   private sum(values: number[]) {

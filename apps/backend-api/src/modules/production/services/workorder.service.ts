@@ -2,31 +2,22 @@ import {
   Injectable,
 } from '@nestjs/common'
 
-import { PrismaService }
-from '../../../core/prisma/prisma.service'
-import { nextOperationalCode }
-from '../../../common/utils/code-generator'
+import { WorkOrderRepository } from '../repositories/work-order.repository'
 
 @Injectable()
 export class WorkOrderService {
 
   constructor(
 
-    private readonly prisma:
-      PrismaService,
+    private readonly repository:
+      WorkOrderRepository,
   ) {}
 
   async create(
     body: any,
   ) {
 
-    return this.prisma.workOrder.create({
-
-      data: {
-
-        workOrderNo:
-          await nextOperationalCode(this.prisma, 'workOrder', 'workOrderNo', 'WO'),
-
+    return this.repository.create({
         productCode:
           body.productCode,
 
@@ -38,7 +29,6 @@ export class WorkOrderService {
 
         status:
           'PLANNED',
-      },
     })
   }
 
@@ -46,30 +36,11 @@ export class WorkOrderService {
     id: string,
   ) {
 
-    return this.prisma.workOrder.update({
-
-      where: {
-
-        id,
-      },
-
-      data: {
-
-        status:
-          'RELEASED',
-      },
-    })
+    return this.repository.release(id)
   }
 
   async findAll() {
 
-    return this.prisma.workOrder.findMany({
-
-      orderBy: {
-
-        createdAt:
-          'desc',
-      },
-    })
+    return this.repository.findAll()
   }
 }

@@ -110,6 +110,33 @@ export class OperationsCenterRepository {
           updatedAt: true,
         },
       }),
+      this.prisma.productionDashboardSnapshot.count(),
+      this.prisma.productionDashboardSnapshot.findFirst({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          updatedAt: true,
+        },
+      }),
+      this.prisma.productionOrderSnapshot.count(),
+      this.prisma.productionOrderSnapshot.findFirst({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          updatedAt: true,
+        },
+      }),
+      this.prisma.workCenterSnapshot.count(),
+      this.prisma.workCenterSnapshot.findFirst({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          updatedAt: true,
+        },
+      }),
     ]);
   }
 
@@ -121,6 +148,9 @@ export class OperationsCenterRepository {
       this.prisma.project.count(),
       this.prisma.projectTask.count(),
       this.prisma.dispatchOrder.count(),
+      this.prisma.productionOrder.count(),
+      this.prisma.workCenter.count(),
+      this.prisma.productionStage.count(),
       this.prisma.backgroundJob.count(),
       this.prisma.outboxEvent.count(),
       this.prisma.attachment.count(),
@@ -209,6 +239,86 @@ export class OperationsCenterRepository {
       staleDetailSnapshots,
       detailSnapshotWarnings:
         Number(detailSnapshotWarnings._sum.warningCount ?? 0),
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    };
+  }
+
+  async productionPlatformHealth() {
+    const [
+      productionOrderCount,
+      workCenterCount,
+      stageCount,
+      taskCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshot,
+      orderSnapshotCount,
+      latestOrderSnapshot,
+      workCenterSnapshotCount,
+      latestWorkCenterSnapshot,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    ] = await Promise.all([
+      this.prisma.productionOrder.count(),
+      this.prisma.workCenter.count(),
+      this.prisma.productionStage.count(),
+      this.prisma.productionTask.count(),
+      this.prisma.productionDashboardSnapshot.count(),
+      this.prisma.productionDashboardSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.productionOrderSnapshot.count(),
+      this.prisma.productionOrderSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.workCenterSnapshot.count(),
+      this.prisma.workCenterSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'production.' },
+          status: { in: ['PENDING', 'DISPATCHING'] },
+        },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'production.' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.production' },
+          status: { in: ['QUEUED', 'RUNNING', 'RETRYING'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.production' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+    ]);
+
+    return {
+      productionOrderCount,
+      workCenterCount,
+      stageCount,
+      taskCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshotAt: latestDashboardSnapshot?.updatedAt ?? null,
+      orderSnapshotCount,
+      latestOrderSnapshotAt: latestOrderSnapshot?.updatedAt ?? null,
+      workCenterSnapshotCount,
+      latestWorkCenterSnapshotAt: latestWorkCenterSnapshot?.updatedAt ?? null,
       pendingOutbox,
       failedOutbox,
       activeJobs,
