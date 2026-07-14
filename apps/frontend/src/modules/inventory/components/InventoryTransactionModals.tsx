@@ -522,7 +522,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         <div className="font-semibold">Vui lòng chọn vị trí lưu kho.</div>
         <div className="mt-1 text-red-100/90">{missingInboundLocationCount} vật tư chưa chọn vị trí lưu kho.</div>
       </div> : null}
-      {form.zoneId ? <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-sm md:flex-row md:items-center md:justify-between ${
+      {form.zoneId ? <div className={`mt-2 flex flex-col gap-3 rounded-xl border p-2 text-sm md:flex-row md:items-center md:justify-between ${
         selectedInboundCellOccupied
           ? 'border-red-400/40 bg-red-500/10 text-red-200'
           : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
@@ -534,11 +534,11 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
               ? `Ô trống gợi ý: ${inboundEmptyCell.cell} / ${inboundEmptyCell.level}.`
               : 'Vị trí này chưa còn ô/tầng trống khả dụng.'}
         </span>
-        <button type="button" onClick={suggestInboundLocation} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+        <button type="button" onClick={suggestInboundLocation} className="rounded-lg border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15">
           Gợi ý ô trống
         </button>
       </div> : null}
-      {form.inventoryItemId ? <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-500/10 p-3 text-sm text-slate-200">
+      {form.inventoryItemId ? <div className="mt-2 rounded-xl border border-cyan-300/20 bg-cyan-500/10 p-2 text-sm text-slate-200">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Vị trí gợi ý</div>
@@ -574,7 +574,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
             </button>
           ) : null}
         </div>
-        <div className="mt-3 border-t border-cyan-300/10 pt-3">
+        <div className="mt-1 border-t border-cyan-300/10 pt-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Đơn giá gần nhất</div>
           {inboundSuggestion?.lastPrice ? (
             <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -608,7 +608,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           ) : (
             <div className="mt-1 text-slate-400">Chưa có lịch sử đơn giá nhập.</div>
           )}
-          <div className="mt-2 text-xs text-slate-300">
+          <div className="mt-1 text-xs text-slate-300">
             Giá trung bình 30 ngày:{' '}
             <span className="font-semibold text-cyan-200">
               {inboundSuggestion?.averagePrice30Days
@@ -623,7 +623,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           ) : null}
         </div>
       </div> : null}
-      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
+      <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
         <div className="text-slate-300">Thành tiền trước VAT: <span className="font-semibold text-cyan-300">{formatCurrency(subTotal)}</span></div>
         <div className="mt-1 text-slate-300">Tiền VAT: <span className="font-semibold text-cyan-300">{formatCurrency(vatAmount)}</span></div>
         <div className="mt-1 text-xl font-semibold text-white">Tổng thanh toán: <span className="text-cyan-300">{formatCurrency(total)}</span></div>

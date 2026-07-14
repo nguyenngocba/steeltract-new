@@ -1,5 +1,46 @@
 # Current State
 
+## EPIC182 Multi-material Business Specification
+
+Status: **SPECIFICATION APPROVED - UI CONDITIONALLY READY**
+
+The operator workflow is frozen before frontend implementation. Pending Items
+is a local command buffer with automatic exact-duplicate merge, edit/remove,
+grouped unit totals, dirty-close protection, one final `items[]` submit and full
+rollback on any line failure. Phase 1 supports up to 50 business entries and one
+transfer route per material. It does not provide persistent drafts,
+lot/batch/serial tracking, partial posting, mutation auto-retry or durable public
+idempotency. No application code, API, schema, migration or data changed.
+
+## EPIC181 Multi-material Business Foundation
+
+Status: **APPROVED WITH EXPLICIT LIMITATIONS**
+
+Inventory now validates and mutates duplicate material/location buckets as one
+aggregate while retaining every original transaction line as immutable audit
+evidence. Multi-line return metadata, activity, history, CSV and adjustment
+summaries no longer use first-line document assumptions. Material Movements now
+persists through `InventoryRepository`; canonical commands support stable
+reference idempotency and deterministic one-source/one-destination transfer
+pairs per material. Public requests without a stable idempotency key and
+multiple transfer pairs for the same material remain separately approved
+additive work. No schema, migration, API contract, Snapshot Engine, Runtime,
+Operations Center, workflow or presentation layout changed.
+
+## RFC-001 Multi-material Inventory Transaction Assessment
+
+Status: **ASSESSMENT COMPLETE - OPTION B RECOMMENDED**
+
+Inventory already persists transaction headers with N transaction-item lines,
+and the canonical API/repository/posting paths are array-capable. Read-only data
+shows 99 headers and 109 lines: 10 transfers use two source/destination lines,
+but no persisted header currently contains more than one distinct material.
+Enterprise rollout is therefore conditionally ready, not certified. The
+recommended additive path preserves the existing Core Platform and drawer/2D
+operator experience while adding batch invariants, idempotency, deterministic
+transfer pairing, Pending Items UX, and line-aware reports. No code, schema,
+API, workflow, or data changed in this RFC.
+
 ## EPIC174 Core Platform Final Certification
 
 Status: **CORE PLATFORM v1.0 CERTIFIED**

@@ -76,15 +76,27 @@ export class DashboardActivityService {
     ])
 
     const inventoryItems: ExecutiveActivity[] = inventoryTransactions.map((transaction) => {
-      const totalQty = transaction.items.reduce((sum, item) => sum + Math.abs(item.quantity), 0)
-      const firstMaterial = transaction.items[0]?.inventoryItem
+      const totalQty = transaction.items.reduce((sum, item) => {
+        if (transaction.type === 'TRANSFER') {
+          return sum + Math.max(0, Number(item.quantity ?? 0))
+        }
+        return sum + Math.abs(Number(item.quantity ?? 0))
+      }, 0)
+      const materialNames = Array.from(new Set(
+        transaction.items
+          .map((item) => item.inventoryItem?.name ?? item.inventoryItem?.code)
+          .filter(Boolean),
+      ))
+      const materialSummary = materialNames.length
+        ? materialNames.join(', ')
+        : (transaction.transactionNo ?? transaction.code)
       const sign = transaction.type === 'IMPORT' || transaction.type === 'RETURN' ? '+' : transaction.type === 'EXPORT' ? '-' : ''
       return {
         id: `inventory-${transaction.id}`,
         module: 'Inventory',
         type: transaction.type,
         title: this.inventoryTitle(transaction.type),
-        description: `${firstMaterial?.name ?? transaction.transactionNo ?? transaction.code}${totalQty ? ` · ${sign}${totalQty}` : ''}`,
+        description: `${materialSummary}${totalQty ? ` · ${sign}${totalQty}` : ''}`,
         entityCode: transaction.transactionNo ?? transaction.code,
         occurredAt: transaction.transactionDate.toISOString(),
         relativeTime: relativeTime(transaction.transactionDate),

@@ -5,6 +5,11 @@ import { Prisma, TransactionType } from '@prisma/client';
 import { inventoryCodePrefix } from './inventory-transaction-code';
 import { InventoryRepository } from './inventory.repository';
 import {
+  aggregateInventoryBuckets,
+  aggregateInventoryMaterials,
+  sharedLineValue,
+} from './inventory-transaction-lines';
+import {
   InventoryMaterialPostingCommand,
   InventoryPostingTransaction,
 } from './inventory-posting.types';
@@ -62,11 +67,18 @@ export class InventoryPostingService {
         );
       }
 
-      if (kind === 'ISSUE') {
-        const stock = await this.repository.findLocationStockBucket(line, tx);
-        if (Number(stock?.quantity ?? 0) + 0.000001 < line.quantity) {
+    }
+
+    if (kind === 'ISSUE') {
+      for (const bucket of aggregateInventoryBuckets(command.lines)) {
+        const stock = await this.repository.findLocationStockBucket(bucket, tx);
+        if (Number(stock?.quantity ?? 0) + 0.000001 < bucket.quantity) {
+          const item = await this.repository.findItemById(
+            bucket.inventoryItemId,
+            tx,
+          );
           throw new BadRequestException(
-            `Insufficient stock for ${item.code} at selected location`,
+            `Insufficient stock for ${item?.code ?? bucket.inventoryItemId} at selected location`,
           );
         }
       }
@@ -89,6 +101,14 @@ export class InventoryPostingService {
         totalAmount: Math.abs(quantity) * unitPrice,
       };
     });
+    const headerWarehouseId = sharedLineValue(
+      command.lines,
+      (line) => line.warehouseId,
+    );
+    const headerZoneId = sharedLineValue(
+      command.lines,
+      (line) => line.zoneId,
+    );
     const transaction = await this.repository.createTransaction(
       {
         code: transactionNo,
@@ -99,11 +119,11 @@ export class InventoryPostingService {
         referenceModule: command.referenceModule,
         referenceId: command.referenceId,
         remarks: command.remarks ?? '',
-        ...(command.lines[0]?.warehouseId && {
-          warehouse: { connect: { id: command.lines[0].warehouseId } },
+        ...(headerWarehouseId && {
+          warehouse: { connect: { id: headerWarehouseId } },
         }),
-        ...(command.lines[0]?.zoneId && {
-          zone: { connect: { id: command.lines[0].zoneId } },
+        ...(headerZoneId && {
+          zone: { connect: { id: headerZoneId } },
         }),
         items: {
           create: signedLines.map((line) => ({
@@ -125,12 +145,15 @@ export class InventoryPostingService {
       tx,
     );
 
-    for (const line of signedLines) {
+    for (const line of aggregateInventoryMaterials(signedLines)) {
       await this.repository.updateItemQuantitySnapshot(
         line.inventoryItemId,
         line.quantity,
         tx,
       );
+    }
+    const bucketDeltas = aggregateInventoryBuckets(signedLines);
+    for (const line of bucketDeltas) {
       await this.repository.upsertLocationStock(
         {
           inventoryItemId: line.inventoryItemId,
@@ -160,7 +183,7 @@ export class InventoryPostingService {
       tx,
     );
 
-    for (const line of signedLines) {
+    for (const line of bucketDeltas) {
       await this.repository.createOutboxEvent(
         {
           eventName: 'inventory.stock.changed',

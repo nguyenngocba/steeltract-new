@@ -167,13 +167,28 @@ function locationKey(line: any) {
   ].join(' / ')
 }
 
+function uniqueLineSummary(lines: any[], select: (line: any) => string) {
+  return Array.from(new Set(lines.map(select).filter((value) => value && value !== '-'))).join(', ') || '-'
+}
+
+function transferPairs(tx: any) {
+  const pairs = new Map<string, { source?: any; destination?: any }>()
+  transactionItems(tx).forEach((line: any) => {
+    const key = String(line?.inventoryItemId ?? line?.inventoryItem?.id ?? '')
+    const pair = pairs.get(key) ?? {}
+    if (num(line?.quantity) < 0) pair.source = line
+    if (num(line?.quantity) > 0) pair.destination = line
+    pairs.set(key, pair)
+  })
+  return Array.from(pairs.values()).filter((pair) => pair.source || pair.destination)
+}
+
 function transferRoute(tx: any) {
-  const source = outboundLines(tx)[0]
-  const destination = inboundLines(tx)[0]
+  const labels = transferPairs(tx).map(
+    (pair) => `${lineZone(pair.source)} -> ${lineZone(pair.destination)}`,
+  )
   return {
-    source,
-    destination,
-    label: `${lineZone(source)} -> ${lineZone(destination)}`,
+    label: Array.from(new Set(labels)).join(', ') || '- -> -',
   }
 }
 
@@ -198,6 +213,8 @@ function TransferDetailDrawer({
   onClose: () => void
 }) {
   const items = transactionItems(transaction)
+  const sources = outboundLines(transaction)
+  const destinations = inboundLines(transaction)
   const route = transferRoute(transaction)
 
   return (
@@ -240,19 +257,19 @@ function TransferDetailDrawer({
             <div className="rounded-xl border border-red-300/15 bg-red-400/[0.045] p-3">
               <div className="mb-2 text-sm font-semibold text-red-100">Vị trí nguồn</div>
               <div className="grid gap-2 text-sm md:grid-cols-2">
-                <InfoLine label="Warehouse" value={lineWarehouse(route.source)} />
-                <InfoLine label="Zone" value={lineZone(route.source)} />
-                <InfoLine label="Slot" value={route.source?.slotId ?? '-'} />
-                <InfoLine label="Level" value={route.source?.level ?? '-'} />
+                <InfoLine label="Warehouse" value={uniqueLineSummary(sources, lineWarehouse)} />
+                <InfoLine label="Zone" value={uniqueLineSummary(sources, lineZone)} />
+                <InfoLine label="Slot" value={uniqueLineSummary(sources, (line) => line?.slotId ?? '-')} />
+                <InfoLine label="Level" value={uniqueLineSummary(sources, (line) => line?.level ?? '-')} />
               </div>
             </div>
             <div className="rounded-xl border border-emerald-300/15 bg-emerald-400/[0.045] p-3">
               <div className="mb-2 text-sm font-semibold text-emerald-100">Vị trí đích</div>
               <div className="grid gap-2 text-sm md:grid-cols-2">
-                <InfoLine label="Warehouse" value={lineWarehouse(route.destination)} />
-                <InfoLine label="Zone" value={lineZone(route.destination)} />
-                <InfoLine label="Slot" value={route.destination?.slotId ?? '-'} />
-                <InfoLine label="Level" value={route.destination?.level ?? '-'} />
+                <InfoLine label="Warehouse" value={uniqueLineSummary(destinations, lineWarehouse)} />
+                <InfoLine label="Zone" value={uniqueLineSummary(destinations, lineZone)} />
+                <InfoLine label="Slot" value={uniqueLineSummary(destinations, (line) => line?.slotId ?? '-')} />
+                <InfoLine label="Level" value={uniqueLineSummary(destinations, (line) => line?.level ?? '-')} />
               </div>
             </div>
           </div>
@@ -343,13 +360,12 @@ export function InventoryTransferPage() {
   const rows = useMemo(() => {
     return (tx as any[])
       .filter((x: any) => {
-        const outboundLine = x.items?.find((line: any) => num(line.quantity) < 0)
         if (date) {
           const d = new Date(x.transactionDate ?? x.createdAt).toISOString().slice(0, 10)
           if (d !== date) return false
         }
         if (materialFilter && !x.items?.some((line: any) => String(line.inventoryItemId) === materialFilter)) return false
-        if (fromZoneFilter && String(outboundLine?.zoneId ?? '') !== fromZoneFilter) return false
+        if (fromZoneFilter && !outboundLines(x).some((line: any) => String(line?.zoneId ?? '') === fromZoneFilter)) return false
         if (statusFilter && String(x.status ?? 'COMPLETED').toUpperCase() !== statusFilter) return false
         return true
       })
@@ -374,9 +390,10 @@ export function InventoryTransferPage() {
   const zoneValue = useMemo(() => {
     const m = new Map<string, number>()
     rows.forEach((x: any) => {
-      const out = outboundLines(x)[0]
-      const key = lineZone(out)
-      m.set(key, (m.get(key) ?? 0) + transferAmount(x))
+      outboundLines(x).forEach((line: any) => {
+        const key = lineZone(line)
+        m.set(key, (m.get(key) ?? 0) + lineAmount(line))
+      })
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
   }, [rows])
@@ -397,12 +414,14 @@ export function InventoryTransferPage() {
   const topRoutes = useMemo(() => {
     const m = new Map<string, { label: string; count: number; quantity: number; value: number }>()
     rows.forEach((x: any) => {
-      const route = transferRoute(x)
-      const current = m.get(route.label) ?? { label: route.label, count: 0, quantity: 0, value: 0 }
-      current.count += 1
-      current.quantity += transferQuantity(x)
-      current.value += transferAmount(x)
-      m.set(route.label, current)
+      transferPairs(x).forEach((pair) => {
+        const label = `${lineZone(pair.source)} -> ${lineZone(pair.destination)}`
+        const current = m.get(label) ?? { label, count: 0, quantity: 0, value: 0 }
+        current.count += 1
+        current.quantity += Math.abs(num(pair.source?.quantity ?? pair.destination?.quantity))
+        current.value += lineAmount(pair.source ?? pair.destination)
+        m.set(label, current)
+      })
     })
     return Array.from(m.values()).sort((a, b) => b.value - a.value).slice(0, 5)
   }, [rows])
@@ -410,9 +429,10 @@ export function InventoryTransferPage() {
   const topSourceLocations = useMemo(() => {
     const m = new Map<string, number>()
     rows.forEach((x: any) => {
-      const source = outboundLines(x)[0]
-      const key = locationKey(source)
-      m.set(key, (m.get(key) ?? 0) + transferAmount(x))
+      outboundLines(x).forEach((source: any) => {
+        const key = locationKey(source)
+        m.set(key, (m.get(key) ?? 0) + lineAmount(source))
+      })
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [rows])
@@ -420,9 +440,10 @@ export function InventoryTransferPage() {
   const topDestinationLocations = useMemo(() => {
     const m = new Map<string, number>()
     rows.forEach((x: any) => {
-      const destination = inboundLines(x)[0]
-      const key = locationKey(destination)
-      m.set(key, (m.get(key) ?? 0) + transferAmount(x))
+      inboundLines(x).forEach((destination: any) => {
+        const key = locationKey(destination)
+        m.set(key, (m.get(key) ?? 0) + lineAmount(destination))
+      })
     })
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [rows])
@@ -583,8 +604,8 @@ export function InventoryTransferPage() {
                 <tbody>
                   {!isLoading &&
                     paged.map((x: any) => {
-                      const out = outboundLines(x)[0]
-                      const input = inboundLines(x)[0]
+                      const sources = outboundLines(x)
+                      const destinations = inboundLines(x)
                       return (
                         <tr
                           key={x.id}
@@ -593,8 +614,8 @@ export function InventoryTransferPage() {
                         >
                           <td className="px-3 py-1.5 text-cyan-300">{x.transactionNo}</td>
                           <td className="px-3 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-3 py-1.5">{lineZone(out)}</td>
-                          <td className="px-3 py-1.5">{lineZone(input)}</td>
+                          <td className="px-3 py-1.5">{uniqueLineSummary(sources, lineZone)}</td>
+                          <td className="px-3 py-1.5">{uniqueLineSummary(destinations, lineZone)}</td>
                           <td className="px-3 py-1.5">{x.referenceType ?? 'Điều chuyển nội bộ'}</td>
                           <td className="px-3 py-1.5">{formatQuantity(transferQuantity(x), 3)}</td>
                           <td className="px-3 py-1.5">{formatCurrency(transferAmount(x))}</td>

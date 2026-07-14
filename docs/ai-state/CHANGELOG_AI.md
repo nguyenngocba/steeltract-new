@@ -1,5 +1,42 @@
 # SteelTrack AI Changelog
 
+## 2026-07-14 EPIC182 Multi-material Business Specification
+
+Completed:
+
+* Froze the repeated Drawer -> 2D selection -> Add to Pending -> Confirm operator
+  workflow without application changes.
+* Selected automatic merge for exact duplicate material/location/business
+  identities and separate entries for different buckets or attributes.
+* Defined Pending edit/remove, dirty-close confirmation, grouped unit totals,
+  honest unknown weight/value and a Phase 1 limit of 50 business entries.
+* Defined ordered validation, advisory local stock checks, authoritative server
+  validation, one mutation request and full rollback for any failed line.
+* Restricted Phase 1 Transfer to one route per material and prohibited fake
+  lot/batch/serial, persistent drafts, partial posting and mutation auto-retry.
+* Produced five architecture specifications, two readiness/risk reports and
+  synchronized RFC-001 and rollout documentation.
+* No backend, frontend, API, schema, migration or data was changed.
+
+## 2026-07-14 EPIC181 Multi-material Business Foundation
+
+Completed:
+
+* Aggregated duplicate material/warehouse/zone/slot/level buckets before stock
+  validation, balance mutation and stock-event fan-out while retaining original
+  transaction lines.
+* Aggregated compatibility quantity updates once per material and hardened the
+  Production-owned Inventory posting boundary for duplicate buckets.
+* Added deterministic transfer validation and source-before-destination ordering
+  for one pair per material without changing the API or schema.
+* Added stable-reference idempotency inside the repository transaction and
+  bounded retry for Serializable transaction conflicts.
+* Removed direct Prisma persistence from `MaterialMovementsService` and kept its
+  transaction-created Outbox record atomic.
+* Made Return, dashboard activity, transaction CSV/history, location activity
+  and Adjustment summaries line-aware without changing layout or styling.
+* Added 3 focused suites/10 passing tests and five EPIC181 reports.
+
 ## 2026-07-13 EPIC174 Core Platform Final Certification
 
 Completed:

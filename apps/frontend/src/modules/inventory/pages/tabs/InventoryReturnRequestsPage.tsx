@@ -220,13 +220,15 @@ export function InventoryReturnRequestsPage() {
             </thead>
             <tbody>
               {pagedRows.map((request) => {
-                const firstItem = request.items[0]
                 const quantity = request.items.reduce((sum, item) => sum + Number(item.requestedQuantity ?? 0), 0)
+                const materials = request.items
+                  .map((item) => `${item.inventoryItem.code} · ${item.inventoryItem.name}`)
+                  .join(', ')
                 return (
                   <tr key={request.id} onClick={() => setSelected(request)} className="cursor-pointer border-b border-cyan-300/10 text-slate-300 transition hover:bg-cyan-300/[0.055]">
                     <td className="px-1.5 py-2 font-mono text-cyan-300">{request.returnNo}</td>
                     <td className="truncate px-1.5 py-2 text-white">{request.project ? `${request.project.code} · ${request.project.name}` : '-'}</td>
-                    <td className="truncate px-1.5 py-2">{firstItem ? `${firstItem.inventoryItem.code} · ${firstItem.inventoryItem.name}` : '-'}</td>
+                    <td className="truncate px-1.5 py-2">{materials || '-'}</td>
                     <td className="px-1.5 py-2 text-right font-mono tabular-nums">{formatQuantity(quantity)}</td>
                     <td className="px-1.5 py-2"><ReturnStatusBadge status={request.status} /></td>
                     <td className="truncate px-1.5 py-2">{request.requestedBy ?? '-'}</td>

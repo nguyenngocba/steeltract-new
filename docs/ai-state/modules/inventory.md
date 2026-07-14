@@ -1,5 +1,45 @@
 # Inventory Module
 
+## EPIC182 Multi-material Operator Specification
+
+Status: **SPECIFICATION APPROVED - UI CONDITIONALLY READY** (2026-07-14)
+
+- Pending Items is local drawer state, not a stock reservation or persisted
+  draft.
+- Exact duplicate material/location/business identities merge automatically.
+- Different buckets, units, price bases, reasons, dispositions or future
+  tracking identities remain separate.
+- Operators may edit, change location/quantity and remove Pending entries before
+  one final Confirm.
+- Dirty close requires explicit discard confirmation; no automatic draft save.
+- Any failed line rolls back the complete transaction and preserves Pending
+  state for correction.
+- Summary quantities are grouped by unit; weight/value are shown only when
+  authoritative.
+- Phase 1 limit is 50 business entries and one transfer route per material.
+- Inbound UI foundation is the first rollout gate. Adjustment, Stock Take and
+  Return require workflow-specific line evidence before reuse.
+- No application code, API, schema, migration or data changed in EPIC182.
+
+## EPIC181 Multi-material Business Foundation
+
+Status: **APPROVED WITH EXPLICIT LIMITATIONS** (2026-07-14)
+
+- Header/Line and canonical `items[]` remain the architecture of record.
+- Duplicate material/location buckets are aggregated before availability,
+  compatibility quantity, location-stock and bucket-event side effects.
+- Original lines remain persisted independently for audit and valuation.
+- Transfers support deterministic one-source/one-destination pairs per material;
+  ambiguous repeated pairs are rejected pending an approved pair identifier.
+- Stable `type + referenceModule + referenceId` callers are idempotent inside
+  the Serializable repository transaction. Public requests without such a key
+  still require an additive durable idempotency contract.
+- Return, activity, transaction CSV/history and Adjustment summaries are
+  line-aware. No Inventory layout or styling changed.
+- Material Movements no longer accesses Prisma directly.
+- Snapshot Engine, Runtime, Operations Center, API contract, schema and
+  migrations are unchanged.
+
 ## Core Platform v1.0 Certification
 
 Status: **PASS** (EPIC174, 2026-07-13)

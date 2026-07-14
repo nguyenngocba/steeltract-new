@@ -1,5 +1,23 @@
 # Project Status
 
+EPIC182 on 2026-07-14 approved the Multi-material Business Specification and
+Operator Workflow. Gemini now has fixed rules for Pending state, exact-duplicate
+merge, edit/remove, grouped totals, validation order, dirty cancellation,
+single-request submit and full rollback. UI foundation work is conditionally
+ready; production rollout remains gated by workflow tests, durable public
+idempotency and the documented transfer/tracking limits. EPIC182 changed
+documentation only.
+
+EPIC181 on 2026-07-14 completed the Multi-material Business Foundation.
+Canonical Inventory commands now aggregate duplicate stock buckets before
+validation and side effects, retain all ledger lines, enforce deterministic
+transfer pairs, support stable-reference idempotency, and expose line-aware
+activity/report summaries. Direct Prisma access was removed from Material
+Movements. Public anonymous request idempotency and multiple same-material
+transfer pairs remain explicit future additive decisions. Core Platform v1.0
+remains certified; no schema, migration, public API, Snapshot Engine or workflow
+changed.
+
 EPIC174 on 2026-07-13 completed the final Core Platform certification rerun.
 **CORE PLATFORM v1.0 is CERTIFIED** for Inventory, Components, Production, QC
 and Yard. Atomic business/audit/domain Outbox persistence, ADR011 boundaries,

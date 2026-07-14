@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, TransactionType } from '@prisma/client';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
 
@@ -918,6 +918,66 @@ export class InventoryRepository {
             zone: true,
           },
         },
+      },
+    });
+  }
+
+  findTransactionByReference(
+    reference: {
+      type: TransactionType;
+      referenceModule: string;
+      referenceId: string;
+    },
+    db: DbClient = this.prisma,
+  ) {
+    return db.inventoryTransaction.findFirst({
+      where: reference,
+      include: {
+        transactionType: true,
+        warehouse: true,
+        zone: true,
+        project: true,
+        items: {
+          include: {
+            inventoryItem: true,
+            unit: true,
+            warehouse: true,
+            zone: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  listMaterialMovementLines(take = 50) {
+    return this.prisma.inventoryTransactionItem.findMany({
+      take,
+      include: {
+        inventoryItem: true,
+        transaction: {
+          include: {
+            zone: true,
+            warehouse: true,
+          },
+        },
+        zone: true,
+        warehouse: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findInventoryItemByIdentity(
+    input: { id?: string; code?: string },
+    db: DbClient = this.prisma,
+  ) {
+    return db.inventoryItem.findFirst({
+      where: {
+        OR: [
+          ...(input.id ? [{ id: input.id }] : []),
+          ...(input.code ? [{ code: input.code }] : []),
+        ],
       },
     });
   }

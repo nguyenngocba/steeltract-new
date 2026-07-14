@@ -200,11 +200,15 @@ export class ReturnWorkflowService {
       );
 
       if (result.flowType === ReturnFlowType.SITE_RETURN) {
-        const firstItem = result.items[0];
-        const firstMaterialName =
-          firstItem?.inventoryItem?.name ??
-          firstItem?.inventoryItem?.code ??
-          'vật tư';
+        const materialNames = result.items.map(
+          (item) =>
+            item.inventoryItem?.name ??
+            item.inventoryItem?.code ??
+            item.inventoryItemId,
+        );
+        const materialSummary = materialNames.length
+          ? materialNames.join(', ')
+          : 'vật tư';
         const receivedQuantity = result.items.reduce(
           (sum, item) =>
             sum + Number(item.receivedQuantity ?? item.requestedQuantity ?? 0),
@@ -223,8 +227,10 @@ export class ReturnWorkflowService {
             projectName: result.project?.name,
             itemCount: result.items.length,
             quantity: receivedQuantity,
-            materialName: firstMaterialName,
-            message: `Kho đã nhận lại ${receivedQuantity} ${firstMaterialName} từ công trình ${result.project?.code ?? result.projectId ?? ''}.`,
+            materialNames,
+            materialName:
+              materialNames.length === 1 ? materialNames.at(0) : null,
+            message: `Kho đã nhận lại ${receivedQuantity} (${materialSummary}) từ công trình ${result.project?.code ?? result.projectId ?? ''}.`,
             remarks: result.remarks,
           },
         } satisfies Prisma.ActivityLogCreateInput;
@@ -242,7 +248,7 @@ export class ReturnWorkflowService {
     });
 
     if (updated.flowType === ReturnFlowType.SITE_RETURN) {
-      const firstItem = updated.items[0];
+      const singleItem = updated.items.length === 1 ? updated.items.at(0) : null;
       const projectLabel = updated.project
         ? `${updated.project.code} - ${updated.project.name}`
         : (updated.projectId ?? 'công trình');
@@ -261,9 +267,16 @@ export class ReturnWorkflowService {
         returnNo: updated.returnNo,
         taskId: null,
         taskName: null,
-        materialId: firstItem?.inventoryItemId ?? null,
-        materialCode: firstItem?.inventoryItem?.code ?? null,
-        materialName: firstItem?.inventoryItem?.name ?? null,
+        materialId: singleItem?.inventoryItemId ?? null,
+        materialCode: singleItem?.inventoryItem?.code ?? null,
+        materialName: singleItem?.inventoryItem?.name ?? null,
+        materialIds: updated.items.map((item) => item.inventoryItemId),
+        materialCodes: updated.items.map(
+          (item) => item.inventoryItem?.code ?? item.inventoryItemId,
+        ),
+        materialNames: updated.items.map(
+          (item) => item.inventoryItem?.name ?? item.inventoryItem?.code ?? item.inventoryItemId,
+        ),
         quantity: receivedQuantity,
       };
       await this.inventoryService.createTransaction({

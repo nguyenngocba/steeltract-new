@@ -1,4 +1,35 @@
 # Next Tasks
+- **EPIC182 Multi-material Business Specification**: Completed. Pending Items
+  behavior, duplicate merge, validation order, cancel/rollback and rollout gates
+  are frozen in `docs/architecture/multi-material-*.md`.
+- **EPIC183 Pending Items + Inbound Pilot**: Gemini may implement the local
+  command buffer in the existing Drawer/2D workflow. Preserve presentation,
+  submit one `items[]` request only on Confirm, and keep Pending state on failure.
+- **Public idempotency decision**: Approve durable request-key storage before
+  broad Outbound rollout or any mutation auto-retry. Do not use payload hashes
+  or time-window deduplication as a substitute.
+- **Transfer expansion decision**: Phase 1 allows one route per material. A pair
+  ID/line-group contract requires separate approval before multiple routes for
+  the same material are supported.
+- **EPIC181 Multi-material Business Foundation**: Completed. Duplicate buckets
+  are validated/mutated once, all ledger lines are retained, first-line report
+  assumptions are removed, and stable-reference idempotency is active.
+- **Multi-material decision gate**: Before public rollout, approve a durable
+  public idempotency key/storage contract and decide whether transfers must
+  support multiple source/destination pairs for the same material. Both require
+  additive work; neither should be inferred from array order.
+- **Adjustment/Stock Take/Return rollout gate**: Do not reuse generic Pending
+  Items until each workflow's line-level reason, evidence and disposition rules
+  are approved.
+- **EPIC183 Inventory rollout (proposed)**: Certify multi-material Inbound and
+  Outbound first with real operators, then retain the single-material contract
+  during compatibility rollout.
+- **EPIC184 workflow completion (proposed)**: Handle explicit transfer pairs,
+  per-line Adjustment/Stock Take evidence, and multi-item Return semantics.
+  Approve any additive migration separately.
+- **EPIC185 cross-module certification (proposed)**: Make transaction reports,
+  CSV, recent activity and first-line consumers line-aware; regression-test
+  Production, Components, Projects, Suppliers, snapshots and runtime behavior.
 - **Core Platform v1.0**: CERTIFIED on 2026-07-13 for Inventory, Components,
   Production, QC and Yard. New platform modules must inherit ADR011, shared
   Snapshot/Runtime/Background infrastructure and repository-atomic Outbox.

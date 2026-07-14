@@ -103,4 +103,82 @@ describe('InventoryPostingService', () => {
     expect(repository.createTransaction).not.toHaveBeenCalled();
     expect(repository.createOutboxEvent).not.toHaveBeenCalled();
   });
+
+  it('validates duplicate issue lines against their aggregate bucket quantity', async () => {
+    const { repository, service } = setup(10);
+
+    await expect(
+      service.issueMaterial(
+        {
+          referenceModule: 'production_material_issue',
+          referenceId: 'issue-1',
+          lines: [
+            {
+              inventoryItemId: 'material-1',
+              quantity: 6,
+              warehouseId: 'warehouse-1',
+              zoneId: 'zone-1',
+              slotId: 'A01',
+              level: 'L1',
+            },
+            {
+              inventoryItemId: 'material-1',
+              quantity: 6,
+              warehouseId: 'warehouse-1',
+              zoneId: 'zone-1',
+              slotId: 'A01',
+              level: 'L1',
+            },
+          ],
+        },
+        tx as never,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.findLocationStockBucket).toHaveBeenCalledTimes(1);
+    expect(repository.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('coalesces duplicate bucket and material updates after persisting every line', async () => {
+    const { repository, service } = setup(20);
+
+    await service.issueMaterial(
+      {
+        referenceModule: 'production_material_issue',
+        referenceId: 'issue-1',
+        lines: [
+          {
+            inventoryItemId: 'material-1',
+            quantity: 6,
+            warehouseId: 'warehouse-1',
+            zoneId: 'zone-1',
+            slotId: 'A01',
+            level: 'L1',
+          },
+          {
+            inventoryItemId: 'material-1',
+            quantity: 4,
+            warehouseId: 'warehouse-1',
+            zoneId: 'zone-1',
+            slotId: 'A01',
+            level: 'L1',
+          },
+        ],
+      },
+      tx as never,
+    );
+
+    expect(repository.updateItemQuantitySnapshot).toHaveBeenCalledTimes(1);
+    expect(repository.updateItemQuantitySnapshot).toHaveBeenCalledWith(
+      'material-1',
+      -10,
+      tx,
+    );
+    expect(repository.upsertLocationStock).toHaveBeenCalledTimes(1);
+    expect(repository.upsertLocationStock).toHaveBeenCalledWith(
+      expect.objectContaining({ quantity: -10 }),
+      tx,
+    );
+    expect(repository.createOutboxEvent).toHaveBeenCalledTimes(2);
+  });
 });

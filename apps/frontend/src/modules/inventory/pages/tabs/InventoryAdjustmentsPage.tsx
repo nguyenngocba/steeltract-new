@@ -65,14 +65,20 @@ function transactionQuantity(transaction: any) {
   return transactionItems(transaction).reduce((sum, line) => sum + lineQuantity(line), 0)
 }
 
-function firstLine(transaction: any) {
-  return transactionItems(transaction)[0]
-}
-
 function materialLabel(line: any) {
   const material = line?.inventoryItem
   if (!material) return '-'
   return `${material.code ?? ''} ${material.name ? `· ${material.name}` : ''}`.trim()
+}
+
+function transactionLineLabels(
+  transaction: any,
+  select: (line: any) => string,
+) {
+  const values = Array.from(
+    new Set(transactionItems(transaction).map(select).filter((value) => value !== '-')),
+  )
+  return values.join(', ') || '-'
 }
 
 function locationLabel(line: any) {
@@ -130,10 +136,10 @@ function AdjustmentDetailDrawer({
   onClose: () => void
 }) {
   if (!transaction) return null
-  const line = firstLine(transaction)
-  const qty = lineQuantity(line)
-  const material = line?.inventoryItem
-  const unit = unitOf(material, line)
+  const items = transactionItems(transaction)
+  const singleLine = items.length === 1 ? items.at(0) : null
+  const qty = transactionQuantity(transaction)
+  const unit = singleLine ? unitOf(singleLine.inventoryItem, singleLine) : ''
   const varianceValue = transactionAmount(transaction)
   const audit = adjustmentAudit(transaction)
 
@@ -142,10 +148,10 @@ function AdjustmentDetailDrawer({
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-3">
           <MetricBox title="Adjustment No" value={transactionNo(transaction)} />
-          <MetricBox title="Material" value={materialLabel(line)} />
-          <MetricBox title="Location" value={locationLabel(line)} />
-          <MetricBox title="System Qty" value={audit ? `${formatQuantity(audit.systemQty)} ${unit}`.trim() : 'Không lưu ở phiếu cũ'} />
-          <MetricBox title="Actual Qty" value={audit ? `${formatQuantity(audit.actualQty)} ${unit}`.trim() : 'Không lưu ở phiếu cũ'} />
+          <MetricBox title="Material" value={transactionLineLabels(transaction, materialLabel)} />
+          <MetricBox title="Location" value={transactionLineLabels(transaction, locationLabel)} />
+          <MetricBox title="System Qty" value={singleLine && audit ? `${formatQuantity(audit.systemQty)} ${unit}`.trim() : items.length > 1 ? 'Xem chi tiết từng dòng' : 'Không lưu ở phiếu cũ'} />
+          <MetricBox title="Actual Qty" value={singleLine && audit ? `${formatQuantity(audit.actualQty)} ${unit}`.trim() : items.length > 1 ? 'Xem chi tiết từng dòng' : 'Không lưu ở phiếu cũ'} />
           <MetricBox title="Difference" value={`${qty > 0 ? '+' : ''}${formatQuantity(qty)} ${unit}`.trim()} tone={qty >= 0 ? 'text-emerald-300' : 'text-red-300'} />
           <MetricBox title="Variance Value" value={formatCurrencyVnd(varianceValue)} tone="text-cyan-200" />
           <MetricBox title="Reason" value={audit?.reason || transaction?.remarks || '-'} className="md:col-span-2" />
@@ -360,15 +366,14 @@ export function InventoryAdjustmentsPage() {
                   </tr>
                 ) : pageRows.length ? (
                   pageRows.map((transaction: any) => {
-                    const line = firstLine(transaction)
                     const qty = transactionQuantity(transaction)
                     return (
                       <tr key={transaction.id} className={`${inventoryTableRow} cursor-pointer`} onClick={() => setSelectedAdjustment(transaction)}>
                         <td className="px-3 py-2 font-semibold text-cyan-200">{transactionNo(transaction)}</td>
                         <td className="px-3 py-2 text-slate-300">{formatDateTime(transactionDate(transaction))}</td>
-                        <td className="px-3 py-2 text-white">{materialLabel(line)}</td>
-                        <td className="px-3 py-2 text-slate-300">{locationLabel(line)}</td>
-                        <td className={`px-3 py-2 font-semibold ${qty >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{qty > 0 ? '+' : ''}{formatQuantity(qty)} {unitOf(line?.inventoryItem, line)}</td>
+                        <td className="px-3 py-2 text-white">{transactionLineLabels(transaction, materialLabel)}</td>
+                        <td className="px-3 py-2 text-slate-300">{transactionLineLabels(transaction, locationLabel)}</td>
+                        <td className={`px-3 py-2 font-semibold ${qty >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{qty > 0 ? '+' : ''}{formatQuantity(qty)} {transactionItems(transaction).length === 1 ? unitOf(transactionItems(transaction).at(0)?.inventoryItem, transactionItems(transaction).at(0)) : ''}</td>
                         <td className="px-3 py-2 text-cyan-200">{formatCurrencyVnd(transactionAmount(transaction))}</td>
                         <td className="max-w-[280px] truncate px-3 py-2 text-slate-300">{transaction?.remarks || transaction?.note || '-'}</td>
                         <td className="px-3 py-2">

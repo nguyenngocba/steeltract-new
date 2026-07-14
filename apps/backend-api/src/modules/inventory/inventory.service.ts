@@ -8,6 +8,13 @@ import { InventoryRepository } from './inventory.repository';
 import { InventoryEventService } from './inventory-event.service';
 import { InventoryReadModelService } from './inventory-read-model.service';
 import { inventoryCodePrefix } from './inventory-transaction-code';
+import {
+  aggregateInventoryBuckets,
+  aggregateInventoryMaterials,
+  orderAndValidateTransferLines,
+} from './inventory-transaction-lines';
+
+import type { InventoryTransactionLine } from './inventory-transaction-lines';
 
 import type {
   CreateInventoryItemDto,
@@ -18,14 +25,7 @@ import type {
   UpdateInventoryItemDto,
 } from './dto/inventory.dto';
 
-type NormalizedInventoryLine = {
-  inventoryItemId: string;
-  quantity: number;
-  unitId?: string;
-  warehouseId?: string;
-  zoneId?: string;
-  slotId?: string;
-  level?: string;
+type NormalizedInventoryLine = InventoryTransactionLine & {
   unitPrice: number | null;
   totalAmount: number | null;
 };
@@ -554,10 +554,14 @@ export class InventoryService {
     const resolvedItems = await this.resolveLineWarehouses(
       this.normalizeItems(payload, type),
     );
-    const baseItems = this.applyValuationToLines(
+    const orderedItems = this.validateAndOrderTransactionLines(
       resolvedItems,
+      type,
+    );
+    const baseItems = this.applyValuationToLines(
+      orderedItems,
       await this.averageCostsByMaterial(
-        resolvedItems.map((line) => line.inventoryItemId),
+        orderedItems.map((line) => line.inventoryItemId),
       ),
     );
     if (!baseItems.length) {
@@ -569,15 +573,37 @@ export class InventoryService {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         return await this.inventoryRepository.transaction(async (tx) => {
-          for (const line of baseItems) {
+          if (payload.referenceModule && payload.referenceId) {
+            const existing =
+              await this.inventoryRepository.findTransactionByReference(
+                {
+                  type,
+                  referenceModule: payload.referenceModule,
+                  referenceId: payload.referenceId,
+                },
+                tx,
+              );
+            if (existing) {
+              return existing;
+            }
+          }
+
+          const itemsById = new Map<string, { id: string; code: string }>();
+          for (const materialId of new Set(
+            baseItems.map((line) => line.inventoryItemId),
+          )) {
             const item = await this.inventoryRepository.findItemById(
-              line.inventoryItemId,
+              materialId,
               tx,
             );
             if (!item) {
-              throw new Error(`Material not found: ${line.inventoryItemId}`);
+              throw new Error(`Material not found: ${materialId}`);
             }
+            itemsById.set(materialId, item);
+          }
 
+          const bucketDeltas = aggregateInventoryBuckets(baseItems);
+          for (const line of bucketDeltas) {
             if (line.quantity < 0) {
               const hasLocation =
                 Boolean(line.warehouseId) ||
@@ -591,6 +617,7 @@ export class InventoryService {
                 ? locationLookup.quantity
                 : await this.getCurrentStock(line.inventoryItemId, tx);
               if (currentStock + line.quantity < 0) {
+                const item = itemsById.get(line.inventoryItemId);
                 console.warn('[inventory.stock-check] insufficient stock', {
                   requestPayload: payload,
                   normalizedLine: line,
@@ -601,8 +628,8 @@ export class InventoryService {
                 });
                 throw new Error(
                   hasLocation
-                    ? `Insufficient stock for ${item.code} at selected location`
-                    : `Insufficient stock for ${item.code}`,
+                    ? `Insufficient stock for ${item?.code ?? line.inventoryItemId} at selected location`
+                    : `Insufficient stock for ${item?.code ?? line.inventoryItemId}`,
                 );
               }
             }
@@ -613,6 +640,7 @@ export class InventoryService {
               'inventoryTransaction',
               'transactionNo',
               inventoryCodePrefix(type),
+              tx,
             );
           console.log('[inventory.transaction-numbering]', {
             generatedNo,
@@ -705,26 +733,29 @@ export class InventoryService {
           );
 
           // Keep backward compatibility for modules still reading snapshot quantity.
-          for (const line of baseItems) {
+          for (const line of aggregateInventoryMaterials(baseItems)) {
             await this.inventoryRepository.updateItemQuantitySnapshot(
               line.inventoryItemId,
               line.quantity,
               tx,
             );
+          }
 
-            if (line.warehouseId || line.zoneId || line.slotId || line.level) {
-              await this.inventoryRepository.upsertLocationStock(
-                {
-                  inventoryItemId: line.inventoryItemId,
-                  warehouseId: line.warehouseId,
-                  zoneId: line.zoneId,
-                  slotId: line.slotId,
-                  level: line.level,
-                  quantity: line.quantity,
-                },
-                tx,
-              );
+          for (const line of bucketDeltas) {
+            if (!(line.warehouseId || line.zoneId || line.slotId || line.level)) {
+              continue;
             }
+            await this.inventoryRepository.upsertLocationStock(
+              {
+                inventoryItemId: line.inventoryItemId,
+                warehouseId: line.warehouseId,
+                zoneId: line.zoneId,
+                slotId: line.slotId,
+                level: line.level,
+                quantity: line.quantity,
+              },
+              tx,
+            );
           }
 
           const realtimeEvent = {
@@ -757,7 +788,7 @@ export class InventoryService {
             },
             tx,
           );
-          for (const line of baseItems) {
+          for (const line of bucketDeltas) {
             await this.inventoryEvents.stockBucketUpdated(
               {
                 id: `${transaction.id}:${line.inventoryItemId}:${line.zoneId ?? 'no-zone'}:${line.slotId ?? 'no-slot'}:${line.level ?? 'no-level'}`,
@@ -809,9 +840,9 @@ export class InventoryService {
           return transaction;
         });
       } catch (error) {
-        if (this.isUniqueInventoryNumberError(error) && attempt < maxAttempts) {
+        if (this.isRetryableInventoryTransactionError(error) && attempt < maxAttempts) {
           console.warn(
-            '[inventory.transaction-numbering] duplicate generated number, retrying',
+            '[inventory.transaction] retrying serializable transaction',
             {
               transactionType: type,
               attempt,
@@ -853,6 +884,14 @@ export class InventoryService {
       : [String(error.meta?.target ?? '')];
 
     return target.some((field) => ['code', 'transactionNo'].includes(field));
+  }
+
+  private isRetryableInventoryTransactionError(error: unknown) {
+    return (
+      this.isUniqueInventoryNumberError(error) ||
+      (error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034')
+    );
   }
 
   private normalizeItems(
@@ -950,6 +989,21 @@ export class InventoryService {
     if (hasMissingLocation) {
       throw new BadRequestException(
         'Vui lòng chọn vị trí lưu kho cho tất cả vật tư nhập.',
+      );
+    }
+  }
+
+  private validateAndOrderTransactionLines(
+    lines: NormalizedInventoryLine[],
+    type: TransactionType,
+  ) {
+    if (type !== TransactionType.TRANSFER) return lines;
+
+    try {
+      return orderAndValidateTransferLines(lines);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid transfer lines',
       );
     }
   }

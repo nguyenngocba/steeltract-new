@@ -104,6 +104,20 @@ function lineLocationLabel(line: any) {
   ].filter(Boolean).join('/') || 'Không rõ vị trí'
 }
 
+function transactionActivityRows(tx: any, absoluteQuantity: boolean) {
+  const items = transactionItems(tx)
+  const activityItems = items.length ? items : [undefined]
+
+  return activityItems.map((line: any) => ({
+    date: tx.transactionDate ?? tx.createdAt,
+    code: line?.inventoryItem?.code ?? 'N/A',
+    name: line?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
+    quantity: absoluteQuantity ? Math.abs(n(line?.quantity)) : n(line?.quantity),
+    slot: line?.slot?.code ?? line?.slotId ?? '-',
+    level: line?.level ?? '-',
+  }))
+}
+
 function materialCodeFromAudit(row: any) {
   return String(row?.materialCode ?? row?.code ?? row?.inventoryItem?.code ?? '').trim()
 }
@@ -349,17 +363,7 @@ export function InventoryLocationsPage() {
         const dateB = b.transactionDate ?? b.createdAt ?? 0
         return new Date(dateB).getTime() - new Date(dateA).getTime()
       })
-      .map((tx: any) => {
-        const firstItem = tx.items?.[0]
-        return {
-          date: tx.transactionDate ?? tx.createdAt,
-          code: firstItem?.inventoryItem?.code ?? 'N/A',
-          name: firstItem?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
-          quantity: n(firstItem?.quantity),
-          slot: firstItem?.slot?.code ?? firstItem?.slotId ?? '-',
-          level: firstItem?.level ?? '-',
-        }
-      })
+      .flatMap((tx: any) => transactionActivityRows(tx, false))
   }, [transactionsData])
 
   const recentOutboundData = useMemo(() => {
@@ -371,17 +375,7 @@ export function InventoryLocationsPage() {
         const dateB = b.transactionDate ?? b.createdAt ?? 0
         return new Date(dateB).getTime() - new Date(dateA).getTime()
       })
-      .map((tx: any) => {
-        const firstItem = tx.items?.[0]
-        return {
-          date: tx.transactionDate ?? tx.createdAt,
-          code: firstItem?.inventoryItem?.code ?? 'N/A',
-          name: firstItem?.inventoryItem?.name ?? tx.itemName ?? 'Vật tư',
-          quantity: Math.abs(n(firstItem?.quantity)),
-          slot: firstItem?.slot?.code ?? firstItem?.slotId ?? '-',
-          level: firstItem?.level ?? '-',
-        }
-      })
+      .flatMap((tx: any) => transactionActivityRows(tx, true))
   }, [transactionsData])
 
   const refresh = async () => {

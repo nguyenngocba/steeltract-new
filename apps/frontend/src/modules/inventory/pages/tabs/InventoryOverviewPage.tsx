@@ -203,14 +203,30 @@ function transactionDate(tx: any) {
   return raw ? new Date(raw) : null
 }
 
-function firstLine(tx: any) {
-  return Array.isArray(tx.items) ? tx.items[0] : undefined
+function transactionItems(tx: any) {
+  return Array.isArray(tx?.items) ? tx.items : []
+}
+
+function transactionMaterialText(tx: any, field: 'code' | 'name') {
+  const values = Array.from(
+    new Set(
+      transactionItems(tx)
+        .map((line: any) => String(line?.inventoryItem?.[field] ?? '').trim())
+        .filter(Boolean),
+    ),
+  )
+  return values.join(', ')
 }
 
 function transactionQuantity(tx: any) {
   const items = Array.isArray(tx.items) ? tx.items : []
   if (items.length) {
-    return items.reduce((sum: number, line: any) => sum + Math.abs(num(line.quantity)), 0)
+    const transfer = String(tx?.type ?? '').toUpperCase() === 'TRANSFER'
+    return items.reduce(
+      (sum: number, line: any) =>
+        sum + (transfer ? Math.max(0, num(line.quantity)) : Math.abs(num(line.quantity))),
+      0,
+    )
   }
   return Math.abs(num(tx.totalQuantity ?? tx.quantity))
 }
@@ -218,7 +234,11 @@ function transactionQuantity(tx: any) {
 function transactionAmount(tx: any) {
   const items = Array.isArray(tx.items) ? tx.items : []
   if (items.length) {
-    return items.reduce((sum: number, line: any) => sum + Math.abs(num(line.totalAmount ?? num(line.quantity) * num(line.unitPrice))), 0)
+    const transfer = String(tx?.type ?? '').toUpperCase() === 'TRANSFER'
+    return items.reduce((sum: number, line: any) => {
+      if (transfer && num(line?.quantity) <= 0) return sum
+      return sum + Math.abs(num(line.totalAmount ?? num(line.quantity) * num(line.unitPrice)))
+    }, 0)
   }
   return Math.abs(num(tx.totalAmount))
 }
@@ -1219,7 +1239,8 @@ function RecentTransactionCard({ title, rows, tone, onViewAll }: { title: string
     <InventoryChartCard title={title} action={<button onClick={onViewAll} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}>
       <div className="space-y-0.5">
         {rows.map((row: any) => {
-          const line = firstLine(row)
+          const materialName = transactionMaterialText(row, 'name')
+          const materialCode = transactionMaterialText(row, 'code')
           const date = transactionDate(row)
           return (
             <div key={row.id} className="grid grid-cols-[80px_180px_1fr_80px_80px] items-center gap-2 border-b border-white/8 px-1.5 py-1.5 text-xs last:border-b-0">
@@ -1230,8 +1251,8 @@ function RecentTransactionCard({ title, rows, tone, onViewAll }: { title: string
                 {row.transactionNo ?? row.code}
               </div>
               {/* Tên vật tư */}
-              <div className="truncate text-slate-300" title={line?.inventoryItem?.name ?? row.projectName ?? row.supplierName ?? line?.inventoryItem?.code ?? '-'}>
-                {line?.inventoryItem?.name ?? row.projectName ?? row.supplierName ?? line?.inventoryItem?.code ?? '-'}
+              <div className="truncate text-slate-300" title={materialName || row.projectName || row.supplierName || materialCode || '-'}>
+                {materialName || row.projectName || row.supplierName || materialCode || '-'}
               </div>
               {/* Số lượng */}
               <div className="text-right text-white">{formatQty(transactionQuantity(row))}</div>
@@ -1435,14 +1456,13 @@ function OverviewModal({
                 <tbody>
                   {pagedTxRows.length > 0 ? (
                     pagedTxRows.map((row: any) => {
-                      const line = firstLine(row)
                       const date = transactionDate(row)
                       return (
                         <tr key={row.id} className={inventoryTableRow}>
                           <td className="px-3 py-2">{date ? formatDateTime(date) : '-'}</td>
                           <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? row.code}</td>
-                          <td className="px-3 py-2">{line?.inventoryItem?.code ?? row.itemCode ?? '-'}</td>
-                          <td className="px-3 py-2">{line?.inventoryItem?.name ?? '-'}</td>
+                          <td className="px-3 py-2">{transactionMaterialText(row, 'code') || row.itemCode || '-'}</td>
+                          <td className="px-3 py-2">{transactionMaterialText(row, 'name') || '-'}</td>
                           <td className="px-3 py-2 text-right">{formatQty(transactionQuantity(row))}</td>
                           <td className="px-3 py-2 text-right text-cyan-300">{money(transactionAmount(row))}</td>
                         </tr>

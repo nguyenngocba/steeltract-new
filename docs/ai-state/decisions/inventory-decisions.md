@@ -255,3 +255,34 @@ Implications:
   Inventory business rules.
 - A posting error rolls back the entire caller transaction; compensating deletes
   are prohibited.
+
+## INV-016: Multi-material Pending Items Is A Local Atomic Command Buffer
+
+Decision:
+
+- Multi-material operator workflows retain the existing Drawer and 2D location
+  selector.
+- Pending Items exists only in local drawer state until one final Confirm.
+- Exact duplicate entries automatically merge when material, complete location
+  bucket, unit, price basis and workflow attributes match.
+- The final mutation submits one `items[]` command and either commits every line
+  or rolls back the complete document.
+- No automatic draft persistence, partial posting, or mutation auto-retry is
+  permitted in Phase 1.
+
+Rationale:
+
+- Operators need a fast repeated material/location workflow without an
+  Odoo-style editable grid.
+- Automatic exact-duplicate merge reduces accidental repeated lines while the
+  backend remains defensive against duplicate bucket demand.
+- Local Pending state must not become a second stock reservation or ledger.
+
+Phase 1 constraints:
+
+- Maximum 50 Pending business entries per document.
+- Quantity summaries are grouped by unit; unlike units are never combined.
+- Transfer supports many distinct materials but only one source/destination
+  route per material.
+- Lot/batch/serial, persistent drafts, multiple same-material transfer routes
+  and durable public request idempotency require separate approval.

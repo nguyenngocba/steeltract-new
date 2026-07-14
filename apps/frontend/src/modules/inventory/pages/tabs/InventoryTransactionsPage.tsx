@@ -110,6 +110,53 @@ function formatCurrency(v: any) {
   return formatCurrencyVnd(num(v))
 }
 
+function transactionItems(transaction: any) {
+  return Array.isArray(transaction?.items) ? transaction.items : []
+}
+
+function uniqueLineText(items: any[], select: (line: any) => unknown) {
+  const values = Array.from(
+    new Set(items.map((line) => String(select(line) ?? '').trim()).filter(Boolean)),
+  )
+  return values.join(', ') || '-'
+}
+
+function summarizeTransactionLines(transaction: any) {
+  const items = transactionItems(transaction)
+  const type = String(transaction?.type ?? '').toUpperCase()
+  const positiveQuantity = items.reduce(
+    (sum: number, line: any) => sum + Math.max(0, num(line?.quantity)),
+    0,
+  )
+  const quantity = type === 'TRANSFER' && positiveQuantity > 0
+    ? positiveQuantity
+    : items.reduce((sum: number, line: any) => sum + Math.abs(num(line?.quantity)), 0)
+  const prices = Array.from(
+    new Set(
+      items
+        .map((line: any) => line?.unitPrice)
+        .filter((value: unknown) => value != null)
+        .map((value: unknown) => num(value)),
+    ),
+  )
+  const totalAmount = items.reduce((sum: number, line: any) => {
+    if (type === 'TRANSFER' && num(line?.quantity) <= 0) return sum
+    const amount = line?.totalAmount != null
+      ? Math.abs(num(line.totalAmount))
+      : Math.abs(num(line?.quantity)) * num(line?.unitPrice)
+    return sum + amount
+  }, 0)
+
+  return {
+    materialCodes: uniqueLineText(items, (line) => line?.inventoryItem?.code),
+    materialNames: uniqueLineText(items, (line) => line?.inventoryItem?.name),
+    zones: uniqueLineText(items, (line) => line?.zone?.code),
+    quantity,
+    unitPrice: prices.length === 1 ? prices[0] : null,
+    totalAmount,
+  }
+}
+
 function transactionMetadata(transaction: any) {
   if (!transaction?.note || typeof transaction.note !== 'string') return null
   try {
@@ -288,20 +335,21 @@ export function InventoryTransactionsPage() {
 
   function exportCsv() {
     const headers = ['transactionNo', 'type', 'material', 'zone', 'quantity', 'unitPrice', 'totalAmount', 'supplier', 'project', 'date']
-    const lines = rows.map((x: any) => {
-      const line = x.items?.[0]
-      return [
-        x.transactionNo ?? '',
-        x.type ?? '',
-        `${line?.inventoryItem?.code ?? ''} ${line?.inventoryItem?.name ?? ''}`.trim(),
-        line?.zone?.code ?? '',
-        String(num(line?.quantity)),
-        String(num(line?.unitPrice)),
-        String(num(line?.totalAmount)),
-        x.supplierName ?? '',
-        x.projectName ?? '',
-        new Date(x.transactionDate ?? x.createdAt).toISOString(),
-      ]
+    const lines = rows.flatMap((x: any) => {
+      const items = transactionItems(x)
+      const exportItems = items.length ? items : [undefined]
+      return exportItems.map((line: any) => [
+          x.transactionNo ?? '',
+          x.type ?? '',
+          `${line?.inventoryItem?.code ?? ''} ${line?.inventoryItem?.name ?? ''}`.trim(),
+          line?.zone?.code ?? '',
+          String(num(line?.quantity)),
+          String(num(line?.unitPrice)),
+          String(num(line?.totalAmount)),
+          x.supplierName ?? '',
+          x.projectName ?? '',
+          new Date(x.transactionDate ?? x.createdAt).toISOString(),
+        ])
     })
     const csv = [headers.join(','), ...lines.map((line) => line.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -461,7 +509,7 @@ export function InventoryTransactionsPage() {
                 <tbody>
                   {!isLoading &&
                     paged.map((x: any) => {
-                      const line = x.items?.[0]
+                      const lineSummary = summarizeTransactionLines(x)
                       const attachmentCount = attachmentCountForTransaction(x.id)
                       return (
                         <tr key={x.id} className={inventoryTableRow}>
@@ -492,12 +540,12 @@ export function InventoryTransactionsPage() {
                               {formatQuantity(attachmentCount, 0)}
                             </button>
                           </td>
-                          <td className="px-3 py-1.5">{line?.inventoryItem?.code ?? '-'}</td>
-                          <td className="px-3 py-1.5">{line?.inventoryItem?.name ?? '-'}</td>
-                          <td className="px-3 py-1.5">{line?.zone?.code ?? '-'}</td>
-                          <td className="px-3 py-1.5">{`${isProjectReturnTransaction(x) ? '+' : ''}${formatQuantity(Math.abs(num(line?.quantity)), 0)}`}</td>
-                          <td className="px-3 py-1.5">{formatCurrency(line?.unitPrice)}</td>
-                          <td className="px-3 py-1.5">{formatCurrency(Math.abs(num(line?.totalAmount)))}</td>
+                          <td className="px-3 py-1.5">{lineSummary.materialCodes}</td>
+                          <td className="px-3 py-1.5">{lineSummary.materialNames}</td>
+                          <td className="px-3 py-1.5">{lineSummary.zones}</td>
+                          <td className="px-3 py-1.5">{`${isProjectReturnTransaction(x) ? '+' : ''}${formatQuantity(lineSummary.quantity, 0)}`}</td>
+                          <td className="px-3 py-1.5">{lineSummary.unitPrice == null ? '-' : formatCurrency(lineSummary.unitPrice)}</td>
+                          <td className="px-3 py-1.5">{formatCurrency(lineSummary.totalAmount)}</td>
                           <td className="px-3 py-1.5">{transactionObjectLabel(x)}</td>
                           <td className="px-3 py-1.5">{x.createdBy ?? 'Admin'}</td>
                           <td className="px-3 py-1.5">

@@ -103,6 +103,24 @@ function lineUnit(line: any) {
   return line?.unit?.symbol ?? line?.unit?.code ?? line?.inventoryItem?.unit ?? '-'
 }
 
+function transactionUnits(tx: any) {
+  return Array.from(
+    new Set(transactionItems(tx).map((line: any) => lineUnit(line)).filter((unit) => unit !== '-')),
+  ).join(', ') || '-'
+}
+
+function transactionUnitPrice(tx: any) {
+  const prices = Array.from(
+    new Set(
+      transactionItems(tx)
+        .map((line: any) => line?.unitPrice)
+        .filter((value: unknown) => value != null)
+        .map((value: unknown) => num(value)),
+    ),
+  )
+  return prices.length === 1 ? prices.at(0) : null
+}
+
 function lineWarehouse(line: any) {
   return line?.warehouse?.name ?? line?.warehouse?.code ?? line?.zone?.warehouse?.name ?? line?.zone?.warehouse?.code ?? '-'
 }
@@ -678,7 +696,7 @@ export function InventoryInboundPage() {
                   </thead>
                   <tbody>
                     {paged.map((x: any) => {
-                      const line = transactionItems(x)[0]
+                      const unitPrice = transactionUnitPrice(x)
                       return (
                         <tr
                           key={x.id}
@@ -690,8 +708,8 @@ export function InventoryInboundPage() {
                           <td className="px-4 py-2.5 truncate">{supplierName(x)}</td>
                           <td className="px-4 py-2.5 truncate">{transactionZones(x).join(', ') || '-'}</td>
                           <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 3)}</td>
-                          <td className="px-4 py-2.5">{lineUnit(line)}</td>
-                          <td className="px-4 py-2.5">{formatCurrency(line?.unitPrice)}</td>
+                          <td className="px-4 py-2.5">{transactionUnits(x)}</td>
+                          <td className="px-4 py-2.5">{unitPrice == null ? '-' : formatCurrency(unitPrice)}</td>
                           <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
                           <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
