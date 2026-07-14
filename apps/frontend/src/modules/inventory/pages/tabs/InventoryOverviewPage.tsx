@@ -967,9 +967,9 @@ export function InventoryOverviewPage() {
                           <td className="truncate px-1.5 py-0.5 text-white" title={item.name}>{item.name}</td>
                           <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
                           <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
-                          <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-medium tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-medium tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
+                          <td className="truncate px-1.5 py-0.5 text-right font-medium tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
                           <td className="truncate px-1.5 py-0.5 text-right text-slate-300" title={money(item.averageCost)}>{money(item.averageCost)}</td>
                           <td className="truncate px-1.5 py-0.5 text-right font-medium text-cyan-300" title={money(item.inventoryValue)}>{money(item.inventoryValue)}</td>
                           <td className="truncate px-1.5 py-0.5">
@@ -1532,9 +1532,9 @@ function OverviewModal({
                         <td className="truncate px-3 py-2 text-slate-300" title={item.category}>{item.category ?? '-'}</td>
                         <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? item.specification ?? '-'}>{item.materialType ?? item.specification ?? '-'}</td>
                         <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium tabular-nums text-slate-200" title={formatQty(mainWarehouseStock(item))}>{formatQty(mainWarehouseStock(item))}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium tabular-nums text-amber-300" title={formatQty(productionWarehouseStock(item))}>{formatQty(productionWarehouseStock(item))}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium tabular-nums text-cyan-300" title={formatQty(totalWarehouseStock(item))}>{formatQty(totalWarehouseStock(item))}</td>
                         <td className="truncate px-3 py-1.5 text-right text-slate-300" title={money(item.averageCost)}>{money(item.averageCost)}</td>
                         <td className="truncate px-3 py-1.5 text-right font-medium text-cyan-300" title={money(item.inventoryValue)}>{money(item.inventoryValue)}</td>
                         <td className="truncate px-3 py-1.5">

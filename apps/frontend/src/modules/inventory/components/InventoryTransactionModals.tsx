@@ -454,9 +454,9 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
 
   return (
     <ModalShell open={open} onClose={onClose} title="Nhập kho vật tư" wide>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_420px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_520px]">
       <div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
         <select value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
           <option value="">Nhà cung cấp</option>
@@ -509,7 +509,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         </select>
         <input value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
+      <div className="mt-2 grid grid-cols-1 gap-2 text-sm md:grid-cols-4">
         <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
         <MetricBox title="Sau nhập" value={formatQuantity(currentStock + quantity)} />
         <MetricBox title="Ô/Tầng" value={form.slotId ? `${form.slotId} / ${form.level || 'L1'}` : 'Chưa chọn'} />

@@ -321,7 +321,7 @@ export function InventoryOutboundPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
-  const pageSize = 10
+  const pageSize = 12
   const attachmentMap = useInventoryTransactionAttachmentMap()
   const applySearch = () => {
     setSearch(searchDraft)
@@ -595,9 +595,9 @@ export function InventoryOutboundPage() {
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
 
-      <div className="space-y-3 -mt-2 text-xs">
+      <div className="space-y-1 -mt-2 text-xs">
         {/* KPI Section */}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <CockpitKpiCard
             title="Phiếu xuất hôm nay"
             value={formatQuantity(kpis.docsToday, 0)}
@@ -786,14 +786,14 @@ export function InventoryOutboundPage() {
               className="xl:col-span-9"
             >
               <div className="rounded-lg border border-white/10 overflow-hidden">
-              <CockpitTableShell>
+              <CockpitTableShell className="h-[420px]">
                 <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
                   <colgroup>
                     <col className="w-[100px]" /> {/* Ngày */}
-                    <col className="w-[160px]" /> {/* Mã phiếu */}
-                    <col className="w-[100px]" /> {/* Loại */}
-                    <col className="w-[120px]" /> {/* Đơn vị nhận */}
-                    <col className="w-[100px]" /> {/* Kho xuất */}
+                    <col className="w-[120px]" /> {/* Mã phiếu */}
+                    <col className="w-[90px]" /> {/* Loại */}
+                    <col className="w-[130px]" /> {/* Đơn vị nhận */}
+                    <col className="w-[120px]" /> {/* Kho xuất */}
                     <col className="w-[120px]" /> {/* Khối lượng */}
                     <col className="w-[140px]" /> {/* Giá trị */}
                     <col className="w-[80px]" /> {/* Hồ sơ */}
@@ -807,7 +807,7 @@ export function InventoryOutboundPage() {
                     style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                   >
                     <tr>
-                      {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                      {['NGÀY XUẤT', 'MÃ PHIẾU XUẤT', 'LOẠI XUẤT', 'ĐƠN VỊ NHẬN', 'KHO XUẤT', 'KHỐI LƯỢNG', 'GIÁ TRỊ', 'HỒ SƠ', 'TRẠNG THÁI', 'NGƯỜI TẠO'].map((h) => (
                         <th key={h} className="px-4 py-2 text-left font-medium">
                           {h}
                         </th>
@@ -824,27 +824,27 @@ export function InventoryOutboundPage() {
                           className="border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-500/5 hover:text-cyan-300 cursor-pointer"
                           onClick={() => setSelectedTransaction(x)}
                         >
-                          <td className="px-4 py-2.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-4 py-2.5 text-cyan-300 font-semibold">{x.transactionNo}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-2.5 py-1">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-2.5 py-1 text-cyan-300 font-semibold">{x.transactionNo}</td>
+                          <td className="px-2.5 py-1">
                             {x.type === 'TRANSFER' ? (
                               <span className="text-blue-400 font-medium">Điều chuyển</span>
                             ) : (
                               <span className="text-slate-300">Xuất kho</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 truncate">{transactionProjectName(x)}</td>
-                          <td className="px-4 py-2.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
-                          <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 0)} tấn</td>
-                          <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
-                          <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
+                          <td className="px-2.5 py-1 truncate">{transactionProjectName(x)}</td>
+                          <td className="px-2.5 py-1 truncate">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
+                          <td className="px-2.5 py-1 font-medium">{formatQuantity(transactionQuantity(x), 0)} tấn</td>
+                          <td className="px-2.5 py-1 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
+                          <td className="px-2.5 py-1" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-2.5 py-1">
                             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold border ${
                               isPending
                                 ? 'border-amber-700/60 bg-amber-500/10 text-amber-300'
@@ -853,7 +853,7 @@ export function InventoryOutboundPage() {
                               {String(x.status ?? 'COMPLETED')}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-slate-400">{transactionActor(x)}</td>
+                          <td className="px-2.5 py-1 text-slate-400">{transactionActor(x)}</td>
                         </tr>
                       )
                     })}
