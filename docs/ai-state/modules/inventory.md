@@ -1,5 +1,43 @@
 # Inventory Module
 
+## Core Platform v1.0 Certification
+
+Status: **PASS** (EPIC174, 2026-07-13)
+
+Inventory Return and material/transaction durable events now commit through
+InventoryRepository with their owning mutation. Runtime exposes the standard
+Inventory hit/miss/read-model/fallback/age/lag family; Operations Center uses
+those module-specific counters. ADR011 and snapshot-first Overview remain PASS.
+
+## EPIC171 ADR011 Certification
+
+- Materials Workspace: Repository Live Read Model PASS.
+- Material Detail: Repository Live Read Model PASS.
+- Material History: paginated live transaction read PASS.
+- Locations: live zone/location-stock read PASS.
+- Transactions: repository live read PASS.
+- Overview Dashboard: snapshot-backed analytics PASS, unchanged.
+- API/UI/React Query/business/schema changes: NONE outside backend read source.
+- Inventory ADR011 status: **APPROVED**.
+
+## Frontend Presentation Foundation
+
+EPIC136 completed on 2026-07-11.
+
+Status: **STANDARDIZED WITHOUT REDESIGN**
+
+- Canonical primitives are documented under `docs/ui/DESIGN_SYSTEM.md` and
+  `docs/ui/COMPONENT_GUIDELINES.md`.
+- Six active local pagination implementations now use the existing shared
+  `InventoryPagination` component.
+- Three unused pagination copies and two unused Inbound/Outbound KPI wrappers
+  were removed.
+- Approved page-specific density is preserved through explicit wrapper classes.
+- Domain-specific KPI/chart/status/drawer compositions remain local when they
+  have distinct semantics or presentation.
+- No Inventory API, React Query, business workflow, backend, or visual design
+  behavior changed.
+
 ## Cross-Module Posting Boundary
 
 EPIC135A added an internal Inventory-owned posting boundary for Production

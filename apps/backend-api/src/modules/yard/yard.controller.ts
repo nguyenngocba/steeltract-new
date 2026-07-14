@@ -32,6 +32,7 @@ import {
   updateCraneSchema,
   updateYardZoneSchema,
   yardSearchSchema,
+  yardWorkspaceReadSchema,
 } from './dto/yard.dto';
 import { YardService } from './services/yard.service';
 
@@ -51,7 +52,10 @@ import type {
   UpdateCraneDto,
   UpdateYardZoneDto,
   YardSearchDto,
+  YardWorkspaceReadDto,
 } from './dto/yard.dto';
+import { YardReadModelService } from './services/yard-read-model.service';
+import { YardSnapshotReadService } from './services/yard-snapshot-read.service';
 
 type AuthenticatedRequest = Request & {
   user?: AuthUser;
@@ -60,7 +64,24 @@ type AuthenticatedRequest = Request & {
 @UseGuards(JwtAuthGuard)
 @Controller('yard')
 export class YardController {
-  constructor(private readonly yardService: YardService) {}
+  constructor(
+    private readonly yardService: YardService,
+    private readonly readModelService: YardReadModelService,
+    private readonly snapshotReadService: YardSnapshotReadService,
+  ) {}
+
+  @Get('dashboard')
+  dashboard() {
+    return this.snapshotReadService.dashboard();
+  }
+
+  @Get('read-model/workspace')
+  workspace(
+    @Query(new ZodValidationPipe(yardWorkspaceReadSchema))
+    query: YardWorkspaceReadDto,
+  ) {
+    return this.readModelService.workspace(query);
+  }
 
   @Get('zones')
   listZones(

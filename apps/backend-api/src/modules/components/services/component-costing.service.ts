@@ -6,7 +6,10 @@ import {
 
 import { Prisma } from '@prisma/client';
 
-import { PrismaService } from '../../../core/prisma/prisma.service';
+import {
+  ComponentCostingRepository,
+  ComponentForCosting,
+} from '../repositories/component-costing.repository';
 
 type RecalculateCostingOptions = {
   activityAction?: string;
@@ -17,15 +20,12 @@ const defaultQuantityVarianceThresholdPercent = 10;
 
 @Injectable()
 export class ComponentCostingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: ComponentCostingRepository) {}
 
   async findByComponent(componentId: string) {
     await this.assertComponent(componentId);
 
-    const costing = await this.prisma.componentCosting.findUnique({
-      where: { componentId },
-      include: this.costingInclude(),
-    });
+    const costing = await this.repository.findByComponent(componentId);
 
     if (costing) return costing;
 
@@ -36,12 +36,7 @@ export class ComponentCostingService {
     const component = await this.getComponentWithProduction(componentId);
     const order = this.pickProductionOrder(component);
     const bomItems = order.bom?.items ?? [];
-    const consumptions = await this.prisma.productionMaterialConsumption.findMany({
-      where: { productionOrderId: order.id },
-      include: {
-        inventoryItem: true,
-      },
-    });
+    const consumptions = await this.repository.findConsumptions(order.id);
 
     const materialIds = [
       ...new Set([
@@ -106,10 +101,7 @@ export class ComponentCostingService {
       },
     );
 
-    const warnings = this.costingWarnings(
-      estimatedMaterials,
-      actualMaterials,
-    );
+    const warnings = this.costingWarnings(estimatedMaterials, actualMaterials);
     const estimatedMaterialCost = estimatedMaterials.reduce(
       (sum, row) => sum + row.estimatedAmount,
       0,
@@ -140,12 +132,7 @@ export class ComponentCostingService {
   ) {
     const component = await this.getComponentWithProduction(componentId);
     const order = this.pickProductionOrder(component);
-    const consumptions = await this.prisma.productionMaterialConsumption.findMany({
-      where: { productionOrderId: order.id },
-      include: {
-        inventoryItem: true,
-      },
-    });
+    const consumptions = await this.repository.findConsumptions(order.id);
 
     if (!consumptions.length) {
       throw new BadRequestException(
@@ -171,10 +158,9 @@ export class ComponentCostingService {
       actualMaterialCost + laborCost + machineCost + overheadCost;
     const varianceCost = actualCost - estimatedCost;
 
-    return this.prisma.$transaction(async (tx) => {
-      const costing = await tx.componentCosting.upsert({
-        where: { componentId },
-        create: {
+    return this.repository.transaction(async (tx) => {
+      const costing = await this.repository.upsertCosting(
+        {
           componentId,
           productionOrderId: order.id,
           estimatedMaterialCost,
@@ -186,30 +172,18 @@ export class ComponentCostingService {
           actualCost,
           varianceCost,
         },
-        update: {
-          productionOrderId: order.id,
-          estimatedMaterialCost,
-          actualMaterialCost,
-          laborCost,
-          machineCost,
-          overheadCost,
-          estimatedCost,
-          actualCost,
-          varianceCost,
-        },
-        include: this.costingInclude(),
-      });
+        tx,
+      );
 
-      await tx.component.update({
-        where: { id: componentId },
-        data: {
-          estimatedCost,
-          actualCost,
-        },
-      });
+      await this.repository.updateComponentCosts(
+        componentId,
+        estimatedCost,
+        actualCost,
+        tx,
+      );
 
-      await tx.activityLog.create({
-        data: {
+      await this.repository.createActivityLog(
+        {
           action: options.activityAction ?? 'RECALCULATE_COSTING',
           entity: 'Component',
           entityId: componentId,
@@ -223,7 +197,8 @@ export class ComponentCostingService {
             varianceCost,
           },
         },
-      });
+        tx,
+      );
 
       return costing;
     });
@@ -245,7 +220,8 @@ export class ComponentCostingService {
       estimatedCost: Number(component.estimatedCost ?? 0),
       actualCost: Number(component.actualCost ?? 0),
       varianceCost:
-        Number(component.actualCost ?? 0) - Number(component.estimatedCost ?? 0),
+        Number(component.actualCost ?? 0) -
+        Number(component.estimatedCost ?? 0),
       createdAt: null,
       updatedAt: null,
       component,
@@ -254,10 +230,7 @@ export class ComponentCostingService {
   }
 
   private async assertComponent(componentId: string) {
-    const exists = await this.prisma.component.findUnique({
-      where: { id: componentId },
-      select: { id: true },
-    });
+    const exists = await this.repository.findComponent(componentId);
 
     if (!exists) {
       throw new NotFoundException('Component not found');
@@ -265,58 +238,23 @@ export class ComponentCostingService {
   }
 
   private async getComponentWithProduction(componentId: string) {
-    const component = await this.prisma.component.findUnique({
-      where: { id: componentId },
-      include: {
-        project: true,
-        productionOrders: {
-          include: {
-            bom: {
-              include: {
-                items: {
-                  include: {
-                    material: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { updatedAt: 'desc' },
-        },
-      },
-    });
+    const component =
+      await this.repository.findComponentWithProduction(componentId);
 
     if (!component) {
       throw new NotFoundException('Component not found');
     }
 
     if (!component.productionOrders.length) {
-      throw new BadRequestException('Component must have a production order before costing');
+      throw new BadRequestException(
+        'Component must have a production order before costing',
+      );
     }
 
     return component;
   }
 
-  private pickProductionOrder(
-    component: Prisma.ComponentGetPayload<{
-      include: {
-        project: true;
-        productionOrders: {
-          include: {
-            bom: {
-              include: {
-                items: {
-                  include: {
-                    material: true;
-                  };
-                };
-              };
-            };
-          };
-        };
-      };
-    }>,
-  ) {
+  private pickProductionOrder(component: ComponentForCosting) {
     return component.productionOrders[0];
   }
 
@@ -324,22 +262,7 @@ export class ComponentCostingService {
     const costs = new Map<string, number>();
     if (!materialIds.length) return costs;
 
-    const lines = await this.prisma.inventoryTransactionItem.findMany({
-      where: {
-        inventoryItemId: { in: materialIds },
-        quantity: { gt: 0 },
-        OR: [
-          { unitPrice: { gt: 0 } },
-          { totalAmount: { gt: 0 } },
-        ],
-      },
-      select: {
-        inventoryItemId: true,
-        quantity: true,
-        unitPrice: true,
-        totalAmount: true,
-      },
-    });
+    const lines = await this.repository.findInboundCostLines(materialIds);
 
     const aggregates = new Map<string, { quantity: number; value: number }>();
     for (const line of lines) {
@@ -453,18 +376,16 @@ export class ComponentCostingService {
     return warnings;
   }
 
-  private async estimatedMaterialCost(
-    order: {
-      quantity: number;
-      bom?: {
-        items: Array<{
-          materialId: string;
-          quantity: number;
-          wastePercent: number;
-        }>;
-      } | null;
-    },
-  ) {
+  private async estimatedMaterialCost(order: {
+    quantity: number;
+    bom?: {
+      items: Array<{
+        materialId: string;
+        quantity: number;
+        wastePercent: number;
+      }>;
+    } | null;
+  }) {
     const items = order.bom?.items ?? [];
     const materialIds = [...new Set(items.map((item) => item.materialId))];
     const averageCosts = await this.averageCostsByMaterial(materialIds);
@@ -476,16 +397,5 @@ export class ComponentCostingService {
         Number(order.quantity ?? 1);
       return sum + requiredQty * (averageCosts.get(item.materialId) ?? 0);
     }, 0);
-  }
-
-  private costingInclude() {
-    return {
-      component: {
-        select: { id: true, code: true, name: true, status: true },
-      },
-      productionOrder: {
-        select: { id: true, orderNo: true, title: true, status: true },
-      },
-    } satisfies Prisma.ComponentCostingInclude;
   }
 }

@@ -1,9 +1,71 @@
 # Project Status
 
+EPIC174 on 2026-07-13 completed the final Core Platform certification rerun.
+**CORE PLATFORM v1.0 is CERTIFIED** for Inventory, Components, Production, QC
+and Yard. Atomic business/audit/domain Outbox persistence, ADR011 boundaries,
+snapshot-first dashboards, module Runtime naming, shared background routing,
+feature flags and Operations Center health all pass. Production operator smoke
+and business certification remain separate follow-up work.
+
+EPIC173 on 2026-07-13 completed Dashboard Snapshot Cutover Certification for
+Components, QC and Yard. Additive dashboard endpoints now exercise the existing
+Snapshot Reader, freshness/parity checks, repository fallback and Background
+Dispatcher. Operator workspaces remain live, and UI/API compatibility was
+preserved. Core Platform v1.0 remains blocked only on EPIC174 and the final
+certification rerun.
+
+EPIC172 on 2026-07-13 closed the Production Cockpit ADR011 blocker. Overview,
+Orders and Planning now consume a bounded repository live read model; backend
+repository code owns filtering, sorting, pagination, KPI, material readiness,
+progress, queue and Work Center aggregation. The existing dashboard metrics
+endpoint remains snapshot-first. UI, workflow, schema, runtime and Operations
+Center were unchanged. Core Platform v1.0 remains blocked pending EPIC173-174.
+
+EPIC171 on 2026-07-13 closed the Inventory ADR011 certification blocker.
+Inventory operator workspaces now read canonical repository live models, while
+Overview remains snapshot-backed. API, UI, workflow, schema and business rules
+were unchanged. EPIC172 has since closed the Production Cockpit follow-up.
+
+EPIC170 on 2026-07-13 completed the five-module Core Platform certification
+audit. **CORE PLATFORM v1.0 remains BLOCKED.** Repository ownership, shared
+feature flags, dispatcher infrastructure and Operations Center coverage pass.
+ADR011 active-path parity, dashboard snapshot cutover and atomic Outbox parity
+must be remediated before certification. No application code changed.
+
+EPIC164 on 2026-07-13 completed Yard Runtime Metrics and Operations Center
+integration. Yard now follows the shared Repository -> ADR011 Live Read Model ->
+Snapshot -> Runtime -> Operations Center platform path. Integration is approved;
+event freshness remains partial until reservation, hold, loading and dispatch
+business workflows exist. No UI or business behavior changed.
+
+EPIC153 on 2026-07-13 completed QC Snapshot Foundation. Additive Dashboard and
+Inspection snapshot tables are deployed, with shared repository, reader,
+writer, validator, rebuild, event routing and feature flag integration. No fake
+rows were backfilled. Event freshness remains partial because QC
+create/approve/reject/update canonical events do not yet exist.
+
+EPIC152 on 2026-07-13 completed QC Workspace Live Read Model cutover. The active
+QC workspace now uses bounded server filtering/sorting/pagination and
+repository-owned KPI/trend aggregation. Hardcoded QC trend points were removed.
+Existing API, UI presentation, workflow, schema, Snapshot and Runtime behavior
+remain compatible.
+
+EPIC151 on 2026-07-13 completed the QC Repository Foundation. Repository
+coverage inside QC services is 100%; direct Prisma access has been removed and
+existing QC domain/audit/notification Outbox rows are atomic with QC mutations.
+QC remains below Core Platform compliance pending ADR011 live read models,
+snapshots, runtime metrics and Operations Center integration.
+
+EPIC150 on 2026-07-13 completed the QC Core Platform audit. QC feature maturity
+remains approximately 55%, while Core Platform compliance is approximately 31%.
+Repository, ADR011 read-model, atomic event, snapshot, runtime and Operations
+Center gaps are documented. No application code, schema, API, UI, workflow or
+business behavior was changed.
+
 Inventory       100%
 Components       90%
 Production       85%
-Yard             72%
+Yard             90%
 Projects        100%
 Suppliers        55%
 Organizations     0%
@@ -13,6 +75,61 @@ Settings         55%
 Dashboard        60%
 Operations Center 20%
 Documentation   100%
+
+EPIC143 on 2026-07-12 completed Components Snapshot Foundation. Additive
+dashboard and reusable component-summary snapshot tables are deployed; repository,
+reader, writer, validator, rebuild, feature flag and fallback paths are wired into
+the shared Core Platform. No fake snapshot rows were backfilled. Existing
+`component.updated` events schedule background updates; complete persistent
+create/delete event coverage remains deferred. Workspaces remain ADR011 live reads.
+
+EPIC142 on 2026-07-12 completed Components Workspace Live Read Model cutover.
+List, Overview and History now use additive, paginated repository read models;
+normal workspace reads no longer download the complete Components table or
+aggregate business metrics in React. History now uses real ComponentTimeline
+data. Existing routes, UI presentation, mutations, legacy APIs, schema,
+Inventory, Production, snapshots and runtime infrastructure were unchanged.
+
+EPIC141 on 2026-07-12 completed the Components repository foundation.
+ComponentsService and ComponentCostingService now access persistence only through
+focused repositories. Costing recalculation owns one repository transaction for
+the costing upsert, Component summary, and ActivityLog. Repository coverage is
+100% inside the Components module; API, schema, workflow, UI, Inventory and
+Production were unchanged. Overall Components Core Platform compliance remains
+below freeze because read models, snapshots, events, runtime, and Operations
+Center integration are intentionally deferred.
+
+EPIC140 on 2026-07-12 completed the Components Core Platform audit. Feature
+maturity remains 90%, but Core Platform compliance is 28%. ComponentsService is
+repository-backed; ComponentCostingService is a direct-Prisma blocker. ADR011
+workspace reads are live but currently unbounded/client-aggregated; dashboard
+snapshots, persistent events, Component runtime counters/jobs and Operations
+Center health are absent. QC/History/Reports also use hardcoded data. No code,
+schema, API, workflow or UI was changed.
+
+EPIC137 on 2026-07-12 completed Production certification documentation and
+read-only validation. Repository, lifecycle, material-flow code, canonical event
+routing, snapshot/runtime foundation and Operations Center integration are
+present; focused tests pass. Runtime data has no Production snapshots, canonical
+Outbox rows or Production snapshot jobs, so Production remains CODE COMPLETE but
+BUSINESS CERTIFICATION BLOCKED at 65% pending one designated operator smoke run.
+
+EPIC136 on 2026-07-11 standardized the Inventory frontend presentation
+foundation without redesign. Active pagination window/markup logic now has one
+Inventory shared implementation, while callers preserve their existing density
+classes. Canonical cockpit/module component ownership and safe extraction rules
+are documented. Domain-specific status/KPI/chart compositions and unverified
+legacy placeholder trees remain intentionally deferred to avoid visual and
+lazy-route regressions.
+
+EPIC135B on 2026-07-11 completed the code path for canonical Production
+material events and Background snapshot routing. Reservation/Release,
+Issue/Return, and Consumption now persist Production ledger and Outbox changes
+atomically; Inventory stock remains exclusively owned by InventoryPostingService.
+Automated coverage passes 7 suites/24 tests. Production Material Flow remains
+BLOCKED only at the real-data E2E gate because no disposable Production Order,
+Reservation, or Consumption fixture exists and existing business data was not
+mutated.
 
 EPIC135A on 2026-07-11 completed Production-Inventory Transaction Boundary
 Alignment. Inventory is the only writer of Inventory transactions, item quantity
@@ -405,3 +522,65 @@ EPIC112 INV.CORE.1 on 2026-07-08 does not change user-facing module percentages.
 EPIC116.1 on 2026-07-08 approves Projects Architecture Freeze v1.0 and fixes backend startup hardening. Project Detail snapshot reads are snapshot-first for summary tabs and repository-fallback for unsupported or stale tabs, while `documents` and `logs` remain read-model paths to avoid one snapshot per screen. Backend startup root cause was a TypeScript build layout mismatch caused by inherited `prisma/**/*.ts` build inputs; `tsconfig.build.json` now emits `dist/main.js`, and `start`, `start:dev`, and `start:prod` all bootstrap successfully.
 
 EPIC117 on 2026-07-08 does not change module percentages or user-facing behavior. It completes Inventory Business Freeze Phase 1 audit. Ledger/location/item compatibility data is clean in the current database, but Inventory Business Freeze is BLOCKED by 3 material snapshot parity mismatches, non-formal controller-level transaction DTO validation, and an unresolved Stock Take lifecycle decision. No UI, API contract, Core Platform, Repository, Snapshot, Event, or Background Engine code was changed.
+# EPIC144 Components Runtime Platform
+
+Status: **APPROVED, EVENT FRESHNESS PARTIAL**
+
+Components now has Repository, ADR011 live read models, persisted snapshots,
+module runtime metrics and Operations Center Platform Health. Event-domain
+coverage remains partial because only the existing `component.updated` route is
+available; EPIC144 did not invent missing workflows.
+# EPIC154 QC Runtime Platform
+
+- Status: **APPROVED, EVENT FRESHNESS PARTIAL**.
+- Runtime Metrics: PASS.
+- Operations Center: PASS.
+- Snapshot Runtime: PASS.
+- Repository Fallback Monitoring: PASS.
+- ADR011 Workspace Boundary: PASS.
+- Business/UI/API/schema changes: NONE.
+# EPIC160 Yard Audit
+
+- Status: **AUDIT COMPLETE, FOUNDATION BLOCKED**.
+- Estimated Core Platform compliance: 36%.
+- Estimated YMS business completeness: 45%.
+- Repository Boundary: PARTIAL.
+- Live Read Model / ADR011: FAIL.
+- Snapshot Platform: NOT READY.
+- Runtime Metrics: NOT READY.
+- Operations Center: NOT READY.
+- Business Architecture: placement/movement operational; complete YMS BLOCKED.
+- Application code changes: NONE.
+# EPIC161 Yard Repository Foundation
+
+- Status: **APPROVED**.
+- Repository Coverage: 100% for registered Yard module.
+- Repository Boundary: PASS.
+- Transaction Boundary: PASS.
+- Atomic Outbox: PASS for existing Yard domain events.
+- Cross-module direct Prisma access from Yard services: NONE.
+- UI/API/schema/workflow changes: NONE.
+- Yard overall Core Platform remains incomplete pending EPIC162-164.
+# EPIC162 Yard Live Read Model
+
+- Status: **APPROVED**.
+- ADR011 Workspace: PASS.
+- Repository Live Read Model: PASS.
+- Server KPI/Aggregation: PASS.
+- Movement History Pagination: PASS.
+- Real/empty 3D Map Data: PASS.
+- Actual QC Queue: PASS.
+- Backward-compatible APIs: PASS.
+- Snapshot/Runtime/Operations Center: pending.
+# EPIC163 Yard Snapshot Foundation
+
+- Status: **APPROVED, DEPLOYED**.
+- Snapshot Schema: PASS (additive migration deployed).
+- Snapshot Repository: PASS.
+- Snapshot Reader/Fallback: PASS.
+- Snapshot Writer/Background Routing: PASS.
+- Snapshot Validator: PASS, warning-only.
+- Feature Flag: PASS.
+- ADR011 Workspace: PASS, unchanged.
+- Fake data/backfill: NONE.
+- Runtime/Operations Center: PASS via EPIC164 (event coverage partial).

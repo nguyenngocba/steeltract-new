@@ -59,13 +59,40 @@ export class ComponentsRepository {
     });
   }
 
-  timeline(componentId: string) {
+  timeline(
+    componentId: string,
+    options: { search?: string; skip?: number; take?: number } = {},
+  ) {
     return this.prisma.componentTimeline.findMany({
       where: {
         componentId,
+        OR: options.search
+          ? [
+              {
+                action: { contains: options.search, mode: 'insensitive' },
+              },
+              { note: { contains: options.search, mode: 'insensitive' } },
+            ]
+          : undefined,
       },
       orderBy: {
         createdAt: 'desc',
+      },
+      skip: options.skip,
+      take: options.take,
+    });
+  }
+
+  countTimeline(componentId: string, search?: string) {
+    return this.prisma.componentTimeline.count({
+      where: {
+        componentId,
+        OR: search
+          ? [
+              { action: { contains: search, mode: 'insensitive' } },
+              { note: { contains: search, mode: 'insensitive' } },
+            ]
+          : undefined,
       },
     });
   }
@@ -183,6 +210,22 @@ export class ComponentsRepository {
   ) {
     return db.activityLog.create({
       data,
+    });
+  }
+
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    db: DbClient = this.prisma,
+  ) {
+    return db.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
     });
   }
 

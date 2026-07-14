@@ -3,6 +3,9 @@ import { Module } from '@nestjs/common';
 import { PerformanceModule } from '../performance/performance.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
+import { ComponentSnapshotRepository } from './component-snapshot.repository';
+import { QcSnapshotRepository } from './qc-snapshot.repository';
+import { YardSnapshotRepository } from './yard-snapshot.repository';
 import { DashboardReaderService } from './dashboard-reader.service';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
 import { ProductionSnapshotRepository } from './production-snapshot.repository';
@@ -15,12 +18,12 @@ import { SnapshotValidatorService } from './snapshot-validator.service';
 import { SnapshotWriterService } from './snapshot-writer.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-    PerformanceModule,
-  ],
+  imports: [PrismaModule, PerformanceModule],
   providers: [
     DispatchSnapshotRepository,
+    ComponentSnapshotRepository,
+    QcSnapshotRepository,
+    YardSnapshotRepository,
     DashboardReaderService,
     InventorySnapshotRepository,
     ProductionSnapshotRepository,
@@ -34,6 +37,9 @@ import { SnapshotWriterService } from './snapshot-writer.service';
   ],
   exports: [
     DispatchSnapshotRepository,
+    ComponentSnapshotRepository,
+    QcSnapshotRepository,
+    YardSnapshotRepository,
     DashboardReaderService,
     InventorySnapshotRepository,
     ProductionSnapshotRepository,

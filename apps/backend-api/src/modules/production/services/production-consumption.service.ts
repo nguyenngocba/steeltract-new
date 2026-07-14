@@ -12,6 +12,7 @@ import {
   CreateProductionConsumptionDto,
   ListProductionConsumptionsDto,
 } from '../dto/production.dto';
+import { productionMaterialEvents } from '../domain/production-material-contracts';
 import { ProductionConsumptionRepository } from '../repositories/production-consumption.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
@@ -163,6 +164,19 @@ export class ProductionConsumptionService {
               dto.remark ??
               `Consume material ${material.code}: consumed ${consumedQty}`,
             createdBy: actorId,
+          },
+          tx,
+        );
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.consumed,
+            productionOrderId,
+            consumptionId: consumption.id,
+            inventoryItemId: dto.inventoryItemId,
+            quantity: consumedQty,
+            actorId,
+            occurredAt: consumption.createdAt,
+            sourceVersion: consumption.createdAt.toISOString(),
           },
           tx,
         );

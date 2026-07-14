@@ -78,6 +78,13 @@ Bản thiết kế chi tiết (Blueprints) cho các phân hệ doanh nghiệp c�
 
 Tất cả các tài liệu chuẩn hóa quy trình, thiết kế mã nguồn, cấu trúc dữ liệu và chính sách vận hành của doanh nghiệp. Nằm trong thư mục [architecture/](file:///opt/projects/steeltrack/docs/architecture) với tiền tố `enterprise-*`.
 
+### Frontend Presentation Standards
+
+* [DESIGN_SYSTEM.md](file:///opt/projects/steeltrack/docs/ui/DESIGN_SYSTEM.md): Canonical cockpit/module presentation layers and component ownership.
+* [COMPONENT_GUIDELINES.md](file:///opt/projects/steeltrack/docs/ui/COMPONENT_GUIDELINES.md): Selection, composition, and review rules for shared frontend components.
+* [inventory-component-audit.md](file:///opt/projects/steeltrack/docs/ui/inventory-component-audit.md): Active Inventory component coverage and duplicate analysis.
+* [inventory-shared-component-roadmap.md](file:///opt/projects/steeltrack/docs/ui/inventory-shared-component-roadmap.md): Safe consolidation and dead-code roadmap.
+
 * [enterprise-governance.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-governance.md): Khung quản trị kiến trúc, vai trò của Architecture Guardian và quy trình phê duyệt của ARB.
 * [enterprise-architecture-decision-records.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-architecture-decision-records.md): Hồ sơ Quyết định Kiến trúc (gồm 10 ADR từ ADR001 đến ADR010).
 * [enterprise-development-standards.md](file:///opt/projects/steeltrack/docs/architecture/enterprise-development-standards.md): Bộ quy tắc phát triển phần mềm chuẩn mực cho lập trình viên.
@@ -110,6 +117,17 @@ Các tài liệu báo cáo đo lường thực tế tại runtime, kết quả �
 
 ### Báo cáo Runtime (Runtime Telemetry & Performance Reports)
 Các tệp nằm tại thư mục [runtime/](file:///opt/projects/steeltrack/docs/runtime) ghi nhận tình trạng tải thực tế của hệ thống.
+* [components-core-foundation-report.md](file:///opt/projects/steeltrack/docs/runtime/components-core-foundation-report.md): Components Core Platform compliance audit and score.
+* [components-repository-boundary-report.md](file:///opt/projects/steeltrack/docs/runtime/components-repository-boundary-report.md): Components persistence and cross-module boundary audit.
+* [components-read-model-report.md](file:///opt/projects/steeltrack/docs/runtime/components-read-model-report.md): ADR011 classification and live read-model readiness.
+* [components-runtime-readiness.md](file:///opt/projects/steeltrack/docs/runtime/components-runtime-readiness.md): Snapshot, metrics, jobs and Operations Center readiness.
+* [components-event-audit.md](file:///opt/projects/steeltrack/docs/runtime/components-event-audit.md): Existing and proposed Component event foundation.
+* [production-operator-checklist.md](file:///opt/projects/steeltrack/docs/runtime/production-operator-checklist.md): Checklist vận hành Production Order và Material Flow.
+* [production-smoke-test-guide.md](file:///opt/projects/steeltrack/docs/runtime/production-smoke-test-guide.md): Hướng dẫn thu thập bằng chứng smoke test Production.
+* [production-runtime-certification.md](file:///opt/projects/steeltrack/docs/runtime/production-runtime-certification.md): Chứng nhận Runtime Production.
+* [production-platform-certification.md](file:///opt/projects/steeltrack/docs/runtime/production-platform-certification.md): Scorecard và kết luận chứng nhận nền tảng Production.
+* [production-event-certification.md](file:///opt/projects/steeltrack/docs/runtime/production-event-certification.md): Chứng nhận canonical/legacy event routing.
+* [production-snapshot-certification.md](file:///opt/projects/steeltrack/docs/runtime/production-snapshot-certification.md): Chứng nhận persisted Production snapshots.
 * [performance-baseline.md](file:///opt/projects/steeltrack/docs/runtime/performance-baseline.md): Điểm chuẩn hiệu năng cơ sở của hệ thống SteelTrack.
 * [runtime-health-report.md](file:///opt/projects/steeltrack/docs/runtime/runtime-health-report.md): Báo cáo tổng quan sức khỏe hệ thống khi chạy thực tế.
 * [runtime-metrics-report.md](file:///opt/projects/steeltrack/docs/runtime/runtime-metrics-report.md): Chi tiết các chỉ số đo lường hiệu năng HTTP/Database.

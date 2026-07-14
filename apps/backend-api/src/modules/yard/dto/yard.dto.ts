@@ -3,11 +3,28 @@ import { z } from 'zod';
 import {
   CraneStatus,
   YardItemType,
+  YardMovementType,
   YardSlotStatus,
   YardZoneStatus,
 } from '@prisma/client';
 
 const metadataSchema = z.record(z.string(), z.unknown()).optional();
+
+export const yardWorkspaceReadSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(200).default(100),
+  movementPage: z.coerce.number().int().positive().default(1),
+  movementLimit: z.coerce.number().int().positive().max(100).default(30),
+  search: z.string().trim().optional(),
+  zoneId: z.string().optional(),
+  slotStatus: z.nativeEnum(YardSlotStatus).optional(),
+  movementType: z.nativeEnum(YardMovementType).optional(),
+  movementItem: z.string().trim().optional(),
+  movementLocation: z.string().trim().optional(),
+  movementDate: z.coerce.date().optional(),
+  sortBy: z.enum(['code', 'status', 'updatedAt']).default('code'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+});
 
 export const listYardZonesSchema = z.object({
   search: z.string().optional(),
@@ -142,6 +159,7 @@ export const listYardSnapshotsSchema = z.object({
 });
 
 export type ListYardZonesDto = z.infer<typeof listYardZonesSchema>;
+export type YardWorkspaceReadDto = z.infer<typeof yardWorkspaceReadSchema>;
 export type CreateYardZoneDto = z.infer<typeof createYardZoneSchema>;
 export type UpdateYardZoneDto = z.infer<typeof updateYardZoneSchema>;
 export type CreateYardRowDto = z.infer<typeof createYardRowSchema>;

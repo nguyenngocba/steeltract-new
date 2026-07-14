@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import { EventPublisherService } from '../../core/events/event-publisher.service';
-import { SnapshotUpdateDispatcher } from '../../core/jobs/snapshot-update-dispatcher.service';
+import { Prisma } from '@prisma/client';
+
+import { InventoryRepository } from './inventory.repository';
 
 type InventoryEventPayload = {
   id: string;
@@ -18,75 +19,80 @@ type InventoryEventPayload = {
 
 @Injectable()
 export class InventoryEventService {
-  constructor(
-    private readonly events: EventPublisherService,
-    private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
-  ) {}
+  constructor(private readonly repository: InventoryRepository) {}
 
-  transactionCreated(payload: InventoryEventPayload) {
-    return this.publish('inventory.transaction.created', payload);
+  transactionCreated(
+    payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.publish('inventory.transaction.created', payload, tx);
   }
 
-  stockBucketUpdated(payload: InventoryEventPayload) {
-    return this.publish('inventory.stock_bucket.updated', payload);
+  stockBucketUpdated(
+    payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.publish('inventory.stock_bucket.updated', payload, tx);
   }
 
-  returnRequested(payload: InventoryEventPayload) {
-    return this.publish('inventory.return.requested', payload);
+  returnRequested(
+    payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.publish('inventory.return.requested', payload, tx);
   }
 
-  returnReceived(payload: InventoryEventPayload) {
-    return this.publish('inventory.return.received', payload);
+  returnReceived(payload: InventoryEventPayload, tx: Prisma.TransactionClient) {
+    return this.publish('inventory.return.received', payload, tx);
   }
 
-  returnRejected(payload: InventoryEventPayload) {
-    return this.publish('inventory.return.rejected', payload);
+  returnRejected(payload: InventoryEventPayload, tx: Prisma.TransactionClient) {
+    return this.publish('inventory.return.rejected', payload, tx);
   }
 
-  returnAccepted(payload: InventoryEventPayload) {
-    return this.publish('inventory.return.accepted', payload);
+  returnAccepted(payload: InventoryEventPayload, tx: Prisma.TransactionClient) {
+    return this.publish('inventory.return.accepted', payload, tx);
   }
 
-  stocktakeCompleted(payload: InventoryEventPayload) {
-    return this.publish('inventory.stocktake.completed', payload);
+  stocktakeCompleted(
+    payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.publish('inventory.stocktake.completed', payload, tx);
   }
 
-  adjustmentPosted(payload: InventoryEventPayload) {
-    return this.publish('inventory.adjustment.posted', payload);
+  adjustmentPosted(
+    payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.publish('inventory.adjustment.posted', payload, tx);
   }
 
-  materialUpdated(payload: InventoryEventPayload) {
-    return this.publish('inventory.material.updated', payload);
+  materialUpdated(
+    payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.publish('inventory.material.updated', payload, tx);
   }
 
-  private async publish(eventName: string, payload: InventoryEventPayload) {
-    const event = await this.events.publishPersistent(eventName, payload, {
-      module: 'inventory',
-      idempotencyKey: `${eventName}:${payload.id}:${payload.status ?? payload.type ?? 'default'}`,
-    });
-
-    await this.scheduleSnapshotUpdate(eventName, payload);
-
-    return event;
-  }
-
-  private async scheduleSnapshotUpdate(
+  private publish(
     eventName: string,
     payload: InventoryEventPayload,
+    tx: Prisma.TransactionClient,
   ) {
-    const sourceWatermark = `${eventName}:${payload.id}:${Date.now()}`;
-
-    await this.snapshotDispatcher.requestUpdate({
-      scope: {
-        module: 'inventory',
-        snapshotType: 'inventory-domain',
-        scopeId: payload.inventoryItemId ?? payload.id,
-        inventoryItemId: payload.inventoryItemId ?? undefined,
-        warehouseId: payload.warehouseId ?? undefined,
+    const idempotencyKey = `${eventName}:${payload.id}:${payload.status ?? payload.type ?? 'default'}`;
+    return this.repository.createOutboxEvent(
+      {
+        eventName,
+        payload: payload as Prisma.InputJsonObject,
+        metadata: {
+          module: 'inventory',
+          persistToOutbox: true,
+          idempotencyKey,
+        },
+        idempotencyKey,
       },
-      reason: 'domain-event',
-      sourceWatermark,
-      priority: 30,
-    });
+      tx,
+    );
   }
 }

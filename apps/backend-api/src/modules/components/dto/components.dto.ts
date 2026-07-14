@@ -12,6 +12,23 @@ export const listComponentsSchema = baseQuerySchema.extend({
   zone: optionalTextFilter,
 });
 
+const componentWorkspaceFilters = baseQuerySchema.extend({
+  project: optionalTextFilter,
+  status: optionalTextFilter,
+  type: optionalTextFilter,
+  location: optionalTextFilter,
+  sortBy: z.enum(['createdAt', 'code', 'name', 'status']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+});
+
+export const componentWorkspaceListSchema = componentWorkspaceFilters;
+export const componentOverviewSchema = componentWorkspaceFilters;
+export const componentHistorySchema = baseQuerySchema.extend({
+  action: optionalTextFilter,
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+});
+export const componentTimelineSchema = baseQuerySchema;
+
 export const createComponentSchema = z.object({
   code: z.string().trim().min(1),
   name: z.string().trim().min(1),
@@ -50,6 +67,12 @@ export const installComponentSchema = z.object({
 });
 
 export type ListComponentsDto = z.infer<typeof listComponentsSchema>;
+export type ComponentWorkspaceListDto = z.infer<
+  typeof componentWorkspaceListSchema
+>;
+export type ComponentOverviewDto = z.infer<typeof componentOverviewSchema>;
+export type ComponentHistoryDto = z.infer<typeof componentHistorySchema>;
+export type ComponentTimelineDto = z.infer<typeof componentTimelineSchema>;
 
 export type CreateComponentDto = z.infer<typeof createComponentSchema>;
 

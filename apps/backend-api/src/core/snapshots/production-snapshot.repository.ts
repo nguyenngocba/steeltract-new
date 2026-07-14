@@ -240,9 +240,7 @@ export class ProductionSnapshotRepository {
         order.materialIssues.map((issue) => Number(issue.returnedQty ?? 0)),
       );
       const materialConsumedQty = this.sum(
-        order.materialConsumptions.map((row) =>
-          Number(row.consumedQty ?? 0) + Number(row.scrapQty ?? 0),
-        ),
+        order.materialConsumptions.map((row) => Number(row.consumedQty ?? 0)),
       );
       const actualCost = this.sum(
         order.componentCostings.map((row) => Number(row.actualCost ?? 0)),

@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common';
 import { TransactionType } from '@prisma/client';
 
 import { SnapshotReaderService } from '../../core/snapshots/snapshot-reader.service';
-import { SnapshotUpdateDispatcher } from '../../core/jobs/snapshot-update-dispatcher.service';
 import { PerformanceMetricsService } from '../../core/performance/performance-metrics.service';
 import { InventoryRepository } from './inventory.repository';
 import type {
@@ -17,23 +16,18 @@ export class InventoryReadModelService {
     private readonly repository: InventoryRepository,
     private readonly metrics: PerformanceMetricsService,
     private readonly snapshots: SnapshotReaderService,
-    private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
   ) {}
 
   async materialList(query: InventoryMaterialListQueryDto) {
     const [page, summary, facets] = await Promise.all([
-      this.repository.listMaterialSnapshotPage(query),
-      this.repository.materialSnapshotSummary(query),
-      this.repository.materialSnapshotFacets(query),
+      this.repository.listMaterialLivePage(query),
+      this.repository.materialLiveSummary(query),
+      this.repository.materialLiveFacets(query),
     ]);
     const items = page.items.map((item: any) => this.toMaterialListRow(item));
     const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
 
-    if (items.some((item: any) => item.readSource !== 'snapshot')) {
-      this.metrics.recordSnapshotFallback();
-    } else {
-      this.metrics.recordReadModelHit();
-    }
+    this.metrics.recordInventoryReadModelHit();
 
     return {
       items,
@@ -104,7 +98,7 @@ export class InventoryReadModelService {
           : { consumableStock: row.consumableStock }),
       }));
 
-    this.metrics.recordReadModelHit();
+    this.metrics.recordInventoryReadModelHit();
     return {
       summary: normalizedSummary,
       facets: {
@@ -125,56 +119,17 @@ export class InventoryReadModelService {
   }
 
   async materialDetail(id: string) {
-    const snapshot = await this.snapshots.inventoryMaterial(id);
-    if (snapshot?.detailPayload && this.isFresh(snapshot.updatedAt)) {
-      this.metrics.recordSnapshotAge(this.ageSeconds(snapshot.updatedAt));
-      this.metrics.recordSnapshotConfidence(
-        this.snapshotConfidence(snapshot.updatedAt),
-      );
-      return snapshot.detailPayload;
-    }
-
-    if (snapshot?.updatedAt) {
-      this.metrics.recordSnapshotStale();
-    }
-    this.metrics.recordSnapshotFallback();
-    await this.requestMaterialSnapshotRebuild(
-      id,
-      snapshot?.updatedAt ? 'stale-snapshot' : 'fallback-miss',
-    );
-
     return this.materialDetailFromRepository(id);
   }
 
   async locations() {
-    const snapshots = await this.snapshots.inventoryLocations();
-    const fresh = snapshots.length > 0 && snapshots.every((row) => this.isFresh(row.updatedAt));
-    if (fresh) {
-      const oldest = snapshots.reduce((min, row) =>
-        row.updatedAt.getTime() < min.getTime() ? row.updatedAt : min,
-      snapshots[0].updatedAt);
-      this.metrics.recordSnapshotAge(this.ageSeconds(oldest));
-      this.metrics.recordSnapshotConfidence(this.snapshotConfidence(oldest));
-      return this.locationsFromSnapshots(snapshots);
-    }
-
-    if (snapshots.length > 0) {
-      this.metrics.recordSnapshotStale();
-    }
-    this.metrics.recordSnapshotFallback();
-    await this.requestLocationSnapshotRebuild(
-      snapshots.length > 0 ? 'stale-snapshot' : 'fallback-miss',
-    );
-    return this.locationsFromRepository();
+    const result = await this.locationsFromRepository();
+    this.metrics.recordInventoryReadModelHit();
+    return result;
   }
 
   private toMaterialListRow(item: any) {
-    const allSnapshot = item.materialSnapshots.find(
-      (snapshot: any) => snapshot.scopeKey === 'ALL',
-    );
-    const snapshotFresh = Boolean(
-      allSnapshot?.updatedAt && this.isFresh(allSnapshot.updatedAt),
-    );
+    const liveMetrics = item.liveMetrics ?? {};
     const locations = item.locationStocks.map((row: any) => ({
       zoneId: row.zoneId,
       zoneCode: row.zone?.code ?? null,
@@ -191,11 +146,7 @@ export class InventoryReadModelService {
       (sum: number, row: any) => sum + Number(row.quantity ?? 0),
       0,
     );
-    const averageCost =
-      Number(allSnapshot?.currentStock ?? 0) > 0
-        ? Number(allSnapshot?.inventoryValue ?? 0) /
-          Number(allSnapshot.currentStock)
-        : 0;
+    const averageCost = Number(liveMetrics.averageCost ?? 0);
 
     return {
       materialId: item.id,
@@ -222,14 +173,9 @@ export class InventoryReadModelService {
       currentStock,
       averageCost,
       inventoryValue: currentStock * averageCost,
-      lastMovementDate:
-        allSnapshot?.lastInboundAt && allSnapshot?.lastOutboundAt
-          ? new Date(allSnapshot.lastInboundAt) > new Date(allSnapshot.lastOutboundAt)
-            ? allSnapshot.lastInboundAt
-            : allSnapshot.lastOutboundAt
-          : allSnapshot?.lastInboundAt ?? allSnapshot?.lastOutboundAt ?? null,
-      readSource: snapshotFresh ? 'repository-live-stock' : 'repository-fallback',
-      snapshotUpdatedAt: allSnapshot?.updatedAt ?? null,
+      lastMovementDate: liveMetrics.lastMovementDate ?? null,
+      readSource: 'repository-live',
+      snapshotUpdatedAt: null,
     };
   }
 
@@ -272,13 +218,8 @@ export class InventoryReadModelService {
       suppliers.map((supplier) => [supplier.id, supplier]),
     );
 
-    const currentStock = transactions.reduce(
-      (acc, tx) =>
-        acc +
-        tx.items.reduce(
-          (lineAcc, line) => lineAcc + Number(line.quantity ?? 0),
-          0,
-        ),
+    const currentStock = locationStocks.reduce(
+      (acc, row) => acc + Number(row.quantity ?? 0),
       0,
     );
 
@@ -381,7 +322,7 @@ export class InventoryReadModelService {
     );
     const averageCost = inboundQuantity > 0 ? inboundCost / inboundQuantity : 0;
 
-    this.metrics.recordReadModelHit();
+    this.metrics.recordInventoryReadModelHit();
 
     return {
       item: {
@@ -443,60 +384,6 @@ export class InventoryReadModelService {
     });
   }
 
-  private async locationsFromSnapshots(
-    snapshots: Awaited<ReturnType<SnapshotReaderService['inventoryLocations']>>,
-  ) {
-    const zones = await this.repository.listZones();
-    const snapshotByZone = new Map<string, typeof snapshots>();
-    for (const row of snapshots) {
-      if (!row.zoneId) {
-        continue;
-      }
-      snapshotByZone.set(row.zoneId, [...(snapshotByZone.get(row.zoneId) ?? []), row]);
-    }
-
-    return zones.map((zone) => {
-      const zoneSnapshots = snapshotByZone.get(zone.id) ?? [];
-      const totalStockQuantity = zoneSnapshots.reduce(
-        (sum, row) => sum + Number(row.quantity ?? 0),
-        0,
-      );
-      const materialIds = new Set<string>();
-      for (const row of zoneSnapshots) {
-        const payload = Array.isArray(row.materialPayload)
-          ? row.materialPayload
-          : [];
-        for (const material of payload) {
-          if (
-            material &&
-            typeof material === 'object' &&
-            'id' in material &&
-            typeof material.id === 'string'
-          ) {
-            materialIds.add(material.id);
-          }
-        }
-      }
-
-      return {
-        ...zone,
-        materialCount: materialIds.size || zone.inventoryItems.length,
-        totalStockQuantity,
-        cellOccupancy: zoneSnapshots
-          .filter((row) => Number(row.quantity) > 0)
-          .map((row) => ({
-            key: `${row.slotId ?? ''}:${row.level ?? ''}`,
-            slotId: row.slotId ?? '',
-            level: row.level ?? '',
-            materialCount: row.materialCount,
-            totalQuantity: Number(row.quantity ?? 0),
-            materialIds: this.snapshotMaterialIds(row.materialPayload),
-            materials: this.snapshotMaterials(row.materialPayload),
-          }))
-          .sort((a, b) => a.key.localeCompare(b.key)),
-      };
-    });
-  }
 
   async inboundSuggestions(id: string) {
     const since = new Date();
@@ -543,7 +430,7 @@ export class InventoryReadModelService {
     const freePercent =
       capacity > 0 ? Math.max(0, Math.min(100, 100 - (occupied / capacity) * 100)) : null;
 
-    this.metrics.recordReadModelHit();
+    this.metrics.recordInventoryReadModelHit();
 
     return {
       materialId: item.id,
@@ -586,58 +473,6 @@ export class InventoryReadModelService {
     if (upper === 'RETURN') return 'RETURN';
     if (upper === 'ADJUSTMENT') return 'ADJUSTMENT';
     return upper || 'UNKNOWN';
-  }
-
-  private isFresh(updatedAt: Date) {
-    return this.ageSeconds(updatedAt) <= this.snapshotMaxAgeSeconds();
-  }
-
-  private ageSeconds(updatedAt: Date) {
-    return Math.max(0, Math.round((Date.now() - updatedAt.getTime()) / 1000));
-  }
-
-  private snapshotMaxAgeSeconds() {
-    return Number(process.env.INVENTORY_SNAPSHOT_MAX_AGE_SECONDS ?? 3600);
-  }
-
-  private snapshotConfidence(updatedAt: Date) {
-    const age = this.ageSeconds(updatedAt);
-    const maxAge = this.snapshotMaxAgeSeconds();
-    if (age <= Math.max(30, maxAge * 0.1)) return 100;
-    if (age <= maxAge) return 90;
-    return 0;
-  }
-
-  private requestMaterialSnapshotRebuild(
-    inventoryItemId: string,
-    reason: 'fallback-miss' | 'stale-snapshot',
-  ) {
-    return this.snapshotDispatcher.requestUpdate({
-      scope: {
-        module: 'inventory',
-        snapshotType: 'inventory-material',
-        inventoryItemId,
-        scopeId: inventoryItemId,
-      },
-      reason,
-      sourceWatermark: new Date().toISOString(),
-      priority: 40,
-    });
-  }
-
-  private requestLocationSnapshotRebuild(
-    reason: 'fallback-miss' | 'stale-snapshot',
-  ) {
-    return this.snapshotDispatcher.requestUpdate({
-      scope: {
-        module: 'inventory',
-        snapshotType: 'inventory-location',
-        scopeId: 'locations',
-      },
-      reason,
-      sourceWatermark: new Date().toISOString(),
-      priority: 40,
-    });
   }
 
   private buildCellOccupancy(
@@ -721,26 +556,4 @@ export class InventoryReadModelService {
     };
   }
 
-  private snapshotMaterials(payload: unknown) {
-    return Array.isArray(payload)
-      ? payload
-          .filter((item) => item && typeof item === 'object')
-          .map((item) => {
-            const row = item as Record<string, unknown>;
-            return {
-              id: String(row.id ?? ''),
-              code: String(row.code ?? ''),
-              name: String(row.name ?? ''),
-              quantity: Number(row.quantity ?? 0),
-              unit: row.unit != null ? String(row.unit) : null,
-            };
-          })
-      : [];
-  }
-
-  private snapshotMaterialIds(payload: unknown) {
-    return this.snapshotMaterials(payload)
-      .map((item) => item.id)
-      .filter(Boolean);
-  }
 }

@@ -1,5 +1,67 @@
 # Production Module
 
+## Core Platform v1.0 Certification
+
+Status: **PASS** (EPIC174, 2026-07-13)
+
+Legacy `production.stage.completed` and `production.staged.to-yard` durable
+events now commit inside their Production-side repository transactions, and
+Production Activity Logs have atomic audit Outbox rows. Canonical lifecycle and
+material events remain unchanged. Operator/business certification is still a
+separate pending gate.
+
+## EPIC172 Cockpit ADR011 Remediation
+
+Completed on 2026-07-13.
+
+Status: **APPROVED**
+
+- Production Overview, Orders and Planning use
+  `GET /production/read-model/cockpit`.
+- `ProductionRepository` owns search, status/planning filters, sorting,
+  pagination, KPI, progress, readiness, delayed-order, queue and Work Center
+  composition.
+- React renders the returned read model and no longer calculates the Cockpit
+  order KPI/analytics from full order, issue and reservation arrays.
+- The existing `GET /production` API remains compatible.
+- `GET /production/metrics` remains snapshot-first; operator workspace data does
+  not read persisted snapshots.
+- No UI, workflow, business, schema, runtime or Operations Center change was
+  made.
+
+## Platform Certification
+
+EPIC137 audit completed on 2026-07-12.
+
+Status: **CODE COMPLETE, BUSINESS CERTIFICATION BLOCKED (65%)**
+
+- Repository and lifecycle boundaries: PASS.
+- Material-flow automated verification: PASS.
+- Canonical/legacy routing contract: PASS; runtime delivery unverified.
+- Snapshot/runtime/Operations Center foundation: CODE VERIFIED.
+- Runtime Production snapshots, Outbox and jobs: no persisted evidence.
+- Historical Issue `1.1` matches Inventory `EXPORT -1.1` at the same exact
+  warehouse/zone/slot/level; Return and full lifecycle remain unverified.
+- A designated test order is required for operator certification. Existing
+  business data was not modified.
+
+## Production Material Flow
+
+EPIC135B implementation completed on 2026-07-11.
+
+Status: **IMPLEMENTATION PASS, REAL-DATA E2E BLOCKED**
+
+Canonical events `production.material.reserved`, `released`, `issued`,
+`consumed`, and `returned` are persisted atomically with Production domain and
+ledger changes. Draft reservations have no ledger/event side effects. Manual
+and reservation Issues share the same Inventory posting and Production ledger
+semantics. Consumption excludes Scrap from consumed ledger/event/snapshot
+quantities. Background routing updates Production snapshots; Inventory Issue
+and Return snapshot updates remain driven by Inventory-owned Outbox events.
+
+Focused verification passes 7 suites/24 tests. A complete real operator flow is
+pending a designated disposable Production Order.
+
 ## Production-Inventory Transaction Boundary
 
 EPIC135A completed on 2026-07-11.

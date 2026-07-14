@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { BackgroundJobManager } from './background-job-manager.service';
 
@@ -10,6 +7,9 @@ export type SnapshotModule =
   | 'projects'
   | 'logistics'
   | 'production'
+  | 'components'
+  | 'qc'
+  | 'yard'
   | 'dashboard';
 
 export interface SnapshotScope {
@@ -21,6 +21,9 @@ export interface SnapshotScope {
   warehouseId?: string;
   dispatchOrderId?: string;
   productionOrderId?: string;
+  componentId?: string;
+  inspectionId?: string;
+  yardZoneId?: string;
   workCenterId?: string;
   fromDate?: string;
   toDate?: string;
@@ -87,11 +90,17 @@ export class SnapshotUpdateDispatcher {
       scope.inventoryItemId ??
       scope.dispatchOrderId ??
       scope.productionOrderId ??
+      scope.componentId ??
+      scope.inspectionId ??
+      scope.yardZoneId ??
       scope.workCenterId ??
       scope.warehouseId ??
       'global';
     const watermark =
-      request.sourceWatermark ?? request.sourceEventId ?? scope.toDate ?? 'latest';
+      request.sourceWatermark ??
+      request.sourceEventId ??
+      scope.toDate ??
+      'latest';
 
     return `snapshot:${type}:${scope.module}:${scope.snapshotType}:${scopeKey}:${watermark}`;
   }

@@ -20,6 +20,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 import type {
   CreateComponentDto,
+  ComponentHistoryDto,
+  ComponentOverviewDto,
+  ComponentWorkspaceListDto,
+  ComponentTimelineDto,
   InstallComponentDto,
   ListComponentsDto,
   UpdateComponentDto,
@@ -27,6 +31,10 @@ import type {
 
 import {
   createComponentSchema,
+  componentHistorySchema,
+  componentOverviewSchema,
+  componentWorkspaceListSchema,
+  componentTimelineSchema,
   installComponentSchema,
   listComponentsSchema,
   updateComponentSchema,
@@ -35,13 +43,50 @@ import {
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ComponentCostingService } from './services/component-costing.service';
 import { ComponentsService } from './services/components.service';
+import { ComponentsReadModelService } from './services/components-read-model.service';
+import { ComponentsSnapshotReadService } from './services/components-snapshot-read.service';
 
 @Controller('components')
 export class ComponentsController {
   constructor(
     private readonly componentsService: ComponentsService,
     private readonly componentCostingService: ComponentCostingService,
+    private readonly componentsReadModelService: ComponentsReadModelService,
+    private readonly componentsSnapshotReadService: ComponentsSnapshotReadService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('dashboard')
+  dashboard() {
+    return this.componentsSnapshotReadService.dashboard();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('read-model/list')
+  workspaceList(
+    @Query(new ZodValidationPipe(componentWorkspaceListSchema))
+    query: ComponentWorkspaceListDto,
+  ) {
+    return this.componentsReadModelService.list(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('read-model/overview')
+  overview(
+    @Query(new ZodValidationPipe(componentOverviewSchema))
+    query: ComponentOverviewDto,
+  ) {
+    return this.componentsReadModelService.overview(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('read-model/history')
+  history(
+    @Query(new ZodValidationPipe(componentHistorySchema))
+    query: ComponentHistoryDto,
+  ) {
+    return this.componentsReadModelService.history(query);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -103,8 +148,12 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/timeline')
-  timeline(@Param('id') id: string) {
-    return this.componentsService.timeline(id);
+  timeline(
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(componentTimelineSchema))
+    query: ComponentTimelineDto,
+  ) {
+    return this.componentsService.timeline(id, query);
   }
 
   @UseGuards(JwtAuthGuard)

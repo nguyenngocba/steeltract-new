@@ -2,7 +2,8 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
-} from '@tanstack/react-query'
+  keepPreviousData,
+} from "@tanstack/react-query";
 
 import {
   createComponent,
@@ -11,102 +12,154 @@ import {
   getComponentCostingBreakdown,
   getComponentCosting,
   getComponents,
+  getComponentsHistory,
+  getComponentsOverview,
+  getComponentsDashboard,
+  getComponentsWorkspace,
   getProductionOrders,
   recalculateComponentCosting,
-} from '../../services/api/components.api'
+} from "../../services/api/components.api";
+import type { ComponentsReadModelParams } from "../../api/contracts/components.contract";
+import { productionApi } from "../../../production/api/production.api";
 
-export function useComponents() {
+export function useComponents(enabled = true) {
   return useQuery({
-    queryKey: ['components'],
+    queryKey: ["components"],
     queryFn: getComponents,
     refetchInterval: 5000,
-  })
+    enabled,
+  });
+}
+
+export function useComponentsWorkspace(params: ComponentsReadModelParams) {
+  return useQuery({
+    queryKey: ["components", "workspace", params],
+    queryFn: () => getComponentsWorkspace(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useComponentsOverview(params: ComponentsReadModelParams) {
+  return useQuery({
+    queryKey: ["components", "overview", params],
+    queryFn: () => getComponentsOverview(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useComponentsDashboard() {
+  return useQuery({
+    queryKey: ["components", "dashboard"],
+    queryFn: getComponentsDashboard,
+  });
+}
+
+export function useComponentsHistory(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  action?: string;
+}) {
+  return useQuery({
+    queryKey: ["components", "history", params],
+    queryFn: () => getComponentsHistory(params),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useCreateComponent() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: createComponent,
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['components'],
-      })
+        queryKey: ["components"],
+      });
     },
-  })
+  });
 }
 
 export function useDeleteComponent() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: deleteComponent,
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['components'],
-      })
+        queryKey: ["components"],
+      });
       queryClient.invalidateQueries({
-        queryKey: ['production', 'components'],
-      })
+        queryKey: ["production", "components"],
+      });
     },
-  })
+  });
 }
 
 export function useComponentCosting(componentId?: string) {
   return useQuery({
-    queryKey: ['components', 'costing', componentId],
+    queryKey: ["components", "costing", componentId],
     queryFn: () => getComponentCosting(componentId!),
     enabled: Boolean(componentId),
-  })
+  });
 }
 
 export function useComponentCostingBreakdown(componentId?: string) {
   return useQuery({
-    queryKey: ['components', 'costing-breakdown', componentId],
+    queryKey: ["components", "costing-breakdown", componentId],
     queryFn: () => getComponentCostingBreakdown(componentId!),
     enabled: Boolean(componentId),
-  })
+  });
 }
 
 export function useRecalculateComponentCosting() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: recalculateComponentCosting,
     onSuccess: (_data, componentId) => {
       queryClient.invalidateQueries({
-        queryKey: ['components'],
-      })
+        queryKey: ["components"],
+      });
       queryClient.invalidateQueries({
-        queryKey: ['components', 'costing', componentId],
-      })
+        queryKey: ["components", "costing", componentId],
+      });
       queryClient.invalidateQueries({
-        queryKey: ['components', 'costing-breakdown', componentId],
-      })
+        queryKey: ["components", "costing-breakdown", componentId],
+      });
       queryClient.invalidateQueries({
-        queryKey: ['projects'],
-      })
+        queryKey: ["projects"],
+      });
     },
-  })
+  });
 }
 
-export function useProductionOrders() {
+export function useProductionOrders(enabled = true) {
   return useQuery({
-    queryKey: ['component-production-orders'],
+    queryKey: ["component-production-orders"],
     queryFn: getProductionOrders,
     refetchInterval: 5000,
-  })
+    enabled,
+  });
+}
+
+export function useComponentProductionBoms(enabled = true) {
+  return useQuery({
+    queryKey: ["production", "boms"],
+    queryFn: productionApi.boms,
+    enabled,
+  });
 }
 
 export function useCreateProductionOrder() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: createProductionOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['component-production-orders'],
-      })
+        queryKey: ["component-production-orders"],
+      });
     },
-  })
+  });
 }

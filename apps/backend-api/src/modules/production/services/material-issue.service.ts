@@ -19,7 +19,11 @@ import {
   ReturnMaterialIssueDto,
   UpdateMaterialIssueDto,
 } from '../dto/production.dto';
-import { MaterialIssueRepository } from '../repositories/material-issue.repository';
+import { productionMaterialEvents } from '../domain/production-material-contracts';
+import {
+  MaterialIssueRepository,
+  MaterialIssueTx,
+} from '../repositories/material-issue.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
 @Injectable()
@@ -62,6 +66,21 @@ export class MaterialIssueService {
           this.issuePostingCommand(issue, actorId),
           tx,
         );
+        await this.createIssueLedgerEntry(issue, actorId, tx);
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.issued,
+            productionOrderId: issue.productionOrderId,
+            reservationId: issue.reservationId ?? undefined,
+            materialIssueId: issue.id,
+            inventoryItemId: issue.inventoryItemId,
+            quantity: Math.abs(issue.issuedQty),
+            actorId,
+            occurredAt: issue.issuedDate,
+            sourceVersion: issue.issuedDate.toISOString(),
+          },
+          tx,
+        );
       }
 
       return issue;
@@ -89,9 +108,27 @@ export class MaterialIssueService {
           this.issuePostingCommand(current),
           tx,
         );
+        await this.createIssueLedgerEntry(current, undefined, tx);
       }
 
-      return this.repository.updateIssue(id, body, tx);
+      const updated = await this.repository.updateIssue(id, body, tx);
+      if (current.status !== 'ISSUED' && body.status === 'ISSUED') {
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.issued,
+            productionOrderId: current.productionOrderId,
+            reservationId: current.reservationId ?? undefined,
+            materialIssueId: current.id,
+            inventoryItemId: current.inventoryItemId,
+            quantity: Math.abs(current.issuedQty),
+            occurredAt: current.issuedDate,
+            sourceVersion: current.issuedDate.toISOString(),
+          },
+          tx,
+        );
+      }
+
+      return updated;
     });
   }
 
@@ -214,6 +251,20 @@ export class MaterialIssueService {
             ],
             remark: issue.remarks ?? undefined,
             createdBy: actorId,
+          },
+          tx,
+        );
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.issued,
+            productionOrderId: reservation.productionOrderId,
+            reservationId: reservation.id,
+            materialIssueId: issue.id,
+            inventoryItemId: item.line.inventoryItemId,
+            quantity: item.quantity,
+            actorId,
+            occurredAt: issue.issuedDate,
+            sourceVersion: issue.issuedDate.toISOString(),
           },
           tx,
         );
@@ -346,6 +397,19 @@ export class MaterialIssueService {
         },
         tx,
       );
+      await this.materialLedgerService.createMaterialEvent(
+        {
+          eventName: productionMaterialEvents.returned,
+          productionOrderId: issue.productionOrderId,
+          reservationId: issue.reservationId ?? undefined,
+          materialIssueId: issue.id,
+          inventoryItemId: issue.inventoryItemId,
+          quantity,
+          actorId,
+          sourceVersion: `returned:${updatedIssue.returnedQty}`,
+        },
+        tx,
+      );
       if (issue.reservationId) {
         await this.refreshReservationStatus(tx, issue.reservationId);
       }
@@ -385,6 +449,43 @@ export class MaterialIssueService {
         },
       ],
     };
+  }
+
+  private createIssueLedgerEntry(
+    issue: {
+      productionOrderId: string;
+      reservationId: string | null;
+      inventoryItemId: string;
+      warehouseId: string | null;
+      zoneId: string | null;
+      slotId?: string | null;
+      level?: string | null;
+      issuedQty: number;
+      remarks: string | null;
+    },
+    actorId: string | undefined,
+    tx: MaterialIssueTx,
+  ) {
+    return this.materialLedgerService.createReservationEntries(
+      {
+        productionOrderId: issue.productionOrderId,
+        reservationId: issue.reservationId ?? undefined,
+        eventType: ProductionMaterialLedgerEventType.ISSUE,
+        lines: [
+          {
+            inventoryItemId: issue.inventoryItemId,
+            warehouseId: issue.warehouseId,
+            zoneId: issue.zoneId,
+            slotId: issue.slotId,
+            level: issue.level,
+            quantity: Math.abs(issue.issuedQty),
+          },
+        ],
+        remark: issue.remarks ?? undefined,
+        createdBy: actorId,
+      },
+      tx,
+    );
   }
 
   private async resolveMainWarehouseReturnDestination(issue: {

@@ -185,6 +185,10 @@ export const queryKeys = {
 
   qc: {
     all: ['qc'] as const,
+    workspaces: () =>
+      [...queryKeys.qc.all, 'workspace'] as const,
+    workspace: (filters?: Record<string, unknown>) =>
+      [...queryKeys.qc.workspaces(), filters ?? {}] as const,
     checklists: () =>
       [...queryKeys.qc.all, 'checklists'] as const,
     checklistList: (filters?: Record<string, unknown>) =>
@@ -214,6 +218,8 @@ export const queryKeys = {
 
   yard: {
     all: ['yard'] as const,
+    workspace: (filters?: Record<string, unknown>) =>
+      [...queryKeys.yard.all, 'workspace', filters ?? {}] as const,
     zones: () =>
       [...queryKeys.yard.all, 'zones'] as const,
     zoneList: (filters?: Record<string, unknown>) =>

@@ -37,6 +37,22 @@ export class ProductionMaterialLedgerRepository {
     return tx.productionMaterialLedger.createMany({ data });
   }
 
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    tx: ProductionLedgerTx,
+  ) {
+    return tx.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
+
   include() {
     return {
       productionOrder: {
@@ -59,4 +75,3 @@ export class ProductionMaterialLedgerRepository {
     } satisfies Prisma.ProductionMaterialLedgerInclude;
   }
 }
-

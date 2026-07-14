@@ -1,5 +1,108 @@
 # Components Module
 
+## Core Platform v1.0 Certification
+
+Status: **PASS** (EPIC174, 2026-07-13)
+
+Component update/status, timeline, Activity Log, audit Outbox and
+`component.updated` domain Outbox now share one repository transaction. The
+post-commit EventBus path is removed; ADR011, dashboard snapshots, Runtime and
+Operations Center remain PASS.
+
+## EPIC173 Dashboard Certification
+
+Status: **APPROVED** (2026-07-13)
+
+`GET /components/dashboard` now calls `ComponentsSnapshotReadService`. KPI,
+status distribution and activity aggregates are snapshot-first; missing/stale
+reads use repository calculation and enqueue rebuild. The Overview table,
+filters, pagination, Detail and History remain repository live workspaces.
+No UI, business, schema, Runtime or Operations Center behavior changed.
+
+## Runtime Platform
+
+EPIC144 completed on 2026-07-13.
+
+Status: **APPROVED, EVENT FRESHNESS PARTIAL**
+
+- Module counters: snapshot hit/miss/age/lag, fallback and read-model hit.
+- Snapshot reader and repository fallback instrumentation: PASS.
+- Operations Center Components Platform Health: PASS.
+- `USE_COMPONENTS_SNAPSHOT` visibility: PASS.
+- Background job and Outbox telemetry: PASS.
+- Snapshot parity readiness: PASS (warning-only, no auto-repair).
+- Existing `component.updated` event coverage: PASS; broader domain-event
+  freshness remains deferred.
+- Workspace remains Repository Live Read Model under ADR011.
+
+## Snapshot Foundation
+
+EPIC143 completed on 2026-07-12.
+
+Status: **APPROVED, EVENT FRESHNESS PARTIAL**
+
+- `ComponentDashboardSnapshot`: persisted daily dashboard domain summary.
+- `ComponentSummarySnapshot`: reusable per-Component domain summary.
+- `ComponentSnapshotRepository`: calculate/read/upsert boundary.
+- Shared Snapshot Reader/Writer/Validator/Rebuilder/Dispatcher integration: PASS.
+- `USE_COMPONENTS_SNAPSHOT`: registered with standard max-age behavior.
+- Missing/stale snapshot: repository fallback plus background update request.
+- Existing `component.updated`: routed to Components snapshot jobs.
+- Create/delete/revision/release/archive event coverage: not invented; deferred.
+- List/Overview/History workspaces remain repository live read models under ADR011.
+
+## Workspace Live Read Model
+
+EPIC142 completed on 2026-07-12.
+
+Status: **APPROVED FOR LIST, OVERVIEW, HISTORY, DETAIL AND COSTING**
+
+- `GET /components/read-model/list`: paginated rows, material readiness, KPI and analytics.
+- `GET /components/read-model/overview`: paginated rows, status summary, facets and distributions.
+- `GET /components/read-model/history`: real ComponentTimeline rows, summary and pagination.
+- `GET /components/:id/timeline`: optional pagination; no-query legacy array remains compatible.
+- Components target pages no longer filter, paginate or aggregate business values from full arrays in React.
+- Detail and Costing remain repository live reads.
+- Stock, Material Stock, Production and Transfers remain follow-up read-model scopes.
+
+## Repository Completion
+
+EPIC141 completed on 2026-07-12.
+
+Status: **APPROVED, 100% MODULE SERVICE COVERAGE**
+
+- `ComponentsService -> ComponentsRepository -> Prisma`: PASS.
+- `ComponentCostingService -> ComponentCostingRepository -> Prisma`: PASS.
+- Components services contain no `PrismaService`, `this.prisma`, or direct
+  transaction-client model access.
+- Costing recalculation persists `ComponentCosting`, Component cost summary, and
+  ActivityLog in one repository-owned transaction.
+- Cost formulas, warnings, API, workflow, UI, schema, Inventory, and Production
+  behavior are unchanged.
+- Components still requires separate read-model, event/snapshot, runtime, and
+  Operations Center sprints before Core Platform freeze.
+
+## Core Platform Foundation Audit
+
+EPIC140 completed on 2026-07-12.
+
+Status: **FOUNDATION BLOCKED (28% COMPLIANCE)**
+
+- `ComponentsService -> ComponentsRepository -> Prisma`: PASS.
+- `ComponentCostingService -> Prisma`: repository boundary violation.
+- Component List API has server pagination capability, but active frontend hooks
+  request all rows and poll every five seconds.
+- Overview aggregates Components, Production and Yard live arrays in React rather
+  than reading a persisted dashboard snapshot.
+- QC Internal and History/Reports use hardcoded rows/KPIs.
+- `component.updated` is ephemeral and post-commit; no Component Outbox/routing.
+- No Component snapshot models, feature flag, metrics, jobs or Operations Center
+  Platform Health exist.
+- Proposed revision/release/archive events remain blocked because corresponding
+  domain entities/states/workflows do not exist.
+
+EPIC140 changed documentation only. See `docs/runtime/components-*.md`.
+
 ## Scope
 
 Components covers steel component master records, production linkage, component timeline, stock/yard visibility, and handoff from Production.

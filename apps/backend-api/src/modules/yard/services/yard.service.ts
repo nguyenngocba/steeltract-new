@@ -12,7 +12,6 @@ import {
   YardSlotStatus,
 } from '@prisma/client';
 
-import { EventBusService } from '../../../core/events/event-bus.service';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
 import {
   CreateCraneDto,
@@ -44,7 +43,6 @@ type YardEventName =
 export class YardService {
   constructor(
     private readonly repository: YardRepository,
-    private readonly eventBus: EventBusService,
     private readonly attachmentsService: AttachmentsService,
   ) {}
 
@@ -76,7 +74,7 @@ export class YardService {
   }
 
   async createZone(dto: CreateYardZoneDto, actorId?: string) {
-    const zone = await this.repository.transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       const created = await this.repository.createZone(
         {
           code: dto.code,
@@ -98,16 +96,19 @@ export class YardService {
         metadata: { code: created.code },
       });
 
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.zone.updated',
+        created,
+        actorId,
+      );
+
       return created;
     });
-
-    await this.emitYardEvent('yard.zone.updated', zone, actorId);
-
-    return zone;
   }
 
   async updateZone(id: string, dto: UpdateYardZoneDto, actorId?: string) {
-    const zone = await this.repository.transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       await this.getZoneOrThrow(id, tx);
 
       const updated = await this.repository.updateZone(
@@ -132,16 +133,19 @@ export class YardService {
         metadata: { code: updated.code, status: updated.status },
       });
 
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.zone.updated',
+        updated,
+        actorId,
+      );
+
       return updated;
     });
-
-    await this.emitYardEvent('yard.zone.updated', zone, actorId);
-
-    return zone;
   }
 
   async deleteZone(id: string, actorId?: string) {
-    const zone = await this.repository.transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       const existing = await this.getZoneOrThrow(id, tx);
 
       if (existing.slots.length > 0) {
@@ -157,12 +161,15 @@ export class YardService {
         metadata: { code: existing.code },
       });
 
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.zone.updated',
+        deleted,
+        actorId,
+      );
+
       return deleted;
     });
-
-    await this.emitYardEvent('yard.zone.updated', zone, actorId);
-
-    return zone;
   }
 
   async createRow(zoneId: string, dto: CreateYardRowDto, actorId?: string) {
@@ -315,7 +322,18 @@ export class YardService {
         },
       );
 
-      return this.repository.findPlacementById(created.id, tx);
+      const placement = await this.repository.findPlacementById(created.id, tx);
+      if (!placement) {
+        throw new NotFoundException('Yard placement not found');
+      }
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.item.placed',
+        placement,
+        actorId,
+      );
+
+      return placement;
     });
 
     if (!placement) {
@@ -323,8 +341,6 @@ export class YardService {
     }
 
     await this.linkAttachments(placement.id, dto.attachmentIds, actorId);
-    await this.emitYardEvent('yard.item.placed', placement, actorId);
-
     return placement;
   }
 
@@ -391,14 +407,23 @@ export class YardService {
         },
       });
 
-      return this.repository.findPlacementById(id, tx);
+      const placement = await this.repository.findPlacementById(id, tx);
+      if (!placement) {
+        throw new NotFoundException('Yard placement not found');
+      }
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.item.moved',
+        placement,
+        actorId,
+      );
+
+      return placement;
     });
 
     if (!placement) {
       throw new NotFoundException('Yard placement not found');
     }
-
-    await this.emitYardEvent('yard.item.moved', placement, actorId);
 
     return placement;
   }
@@ -429,13 +454,10 @@ export class YardService {
       );
 
       if (existing.itemType === YardItemType.COMPONENT) {
-        const component = await tx.component.findUnique({
-          where: { id: existing.itemId },
-          select: {
-            id: true,
-            projectId: true,
-          },
-        });
+        const component = await this.repository.findComponentForOutbound(
+          existing.itemId,
+          tx,
+        );
 
         if (!component) {
           throw new NotFoundException('Component not found for yard placement');
@@ -446,35 +468,19 @@ export class YardService {
             ? existingMetadata.productionOrderId
             : undefined;
         const productionOrder = productionOrderId
-          ? await tx.productionOrder.findUnique({
-              where: { id: productionOrderId },
-              select: { projectId: true },
-            })
+          ? await this.repository.findProductionOrderProject(
+              productionOrderId,
+              tx,
+            )
           : null;
         const projectId = component.projectId ?? productionOrder?.projectId;
 
-        await tx.component.update({
-          where: { id: component.id },
-          data: {
-            status: ComponentStatus.SHIPPED,
-            projectId,
-            floor: null,
-            zone: null,
-            position: null,
-            x: 0,
-            y: 0,
-          },
-        });
-
-        await tx.componentTimeline.create({
-          data: {
-            componentId: component.id,
-            action: ComponentStatus.SHIPPED,
-            note:
-              dto.reason ??
-              `Outbound from yard placement ${existing.itemCode}`,
-          },
-        });
+        await this.repository.markComponentShipped(component.id, projectId, tx);
+        await this.repository.createComponentShippedTimeline(
+          component.id,
+          dto.reason ?? `Outbound from yard placement ${existing.itemCode}`,
+          tx,
+        );
       }
 
       await this.repository.createMovement(
@@ -506,14 +512,23 @@ export class YardService {
         },
       });
 
-      return this.repository.findPlacementById(id, tx);
+      const placement = await this.repository.findPlacementById(id, tx);
+      if (!placement) {
+        throw new NotFoundException('Yard placement not found');
+      }
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.item.removed',
+        placement,
+        actorId,
+      );
+
+      return placement;
     });
 
     if (!placement) {
       throw new NotFoundException('Yard placement not found');
     }
-
-    await this.emitYardEvent('yard.item.removed', placement, actorId);
 
     return placement;
   }
@@ -590,7 +605,7 @@ export class YardService {
   }
 
   async generateSnapshot(dto: GenerateYardSnapshotDto, actorId?: string) {
-    const snapshot = await this.repository.transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       const zones = await this.repository.snapshotSource(dto.zoneId, tx);
 
       if (dto.zoneId && zones.length === 0) {
@@ -669,12 +684,15 @@ export class YardService {
         },
       );
 
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.snapshot.generated',
+        created,
+        actorId,
+      );
+
       return created;
     });
-
-    await this.emitYardEvent('yard.snapshot.generated', snapshot, actorId);
-
-    return snapshot;
   }
 
   async listSnapshots(query: ListYardSnapshotsDto) {
@@ -803,23 +821,29 @@ export class YardService {
       tx,
     );
 
-    await this.eventBus.emitAudit(
+    await this.repository.createOutboxEvent(
       {
-        action,
-        entity,
-        entityId,
-        module: 'yard',
-        metadata: options.metadata,
-      },
-      {
-        module: 'yard',
-        persistToOutbox: true,
+        eventName: 'audit.activity.created',
+        payload: this.toJsonValue({
+          action,
+          entity,
+          entityId,
+          module: 'yard',
+          metadata: options.metadata,
+        }),
+        metadata: this.toJsonValue({
+          module: 'yard',
+          persistToOutbox: true,
+          idempotencyKey: `audit:yard:${action}:${entityId}`,
+        }),
         idempotencyKey: `audit:yard:${action}:${entityId}`,
       },
+      tx,
     );
   }
 
-  private emitYardEvent(
+  private createYardOutboxEvent(
+    tx: YardTx,
     eventName: YardEventName,
     payload: unknown,
     actorId?: string,
@@ -829,16 +853,29 @@ export class YardService {
         ? String(payload.id)
         : new Date().getTime().toString();
 
-    return this.eventBus.emit(eventName, payload, {
-      module: 'yard',
-      correlationId: actorId,
-      persistToOutbox: true,
-      idempotencyKey: `${eventName}:${entityId}`,
-    });
+    const idempotencyKey = `${eventName}:${entityId}`;
+    return this.repository.createOutboxEvent(
+      {
+        eventName,
+        payload: this.toJsonValue(payload),
+        metadata: this.toJsonValue({
+          module: 'yard',
+          correlationId: actorId,
+          persistToOutbox: true,
+          idempotencyKey,
+        }),
+        idempotencyKey,
+      },
+      tx,
+    );
   }
 
   private toJson(value: unknown) {
     return value === undefined ? undefined : (value as Prisma.InputJsonValue);
+  }
+
+  private toJsonValue(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
   }
 
   private objectMetadata(value: unknown): Record<string, unknown> {

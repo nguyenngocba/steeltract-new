@@ -16,7 +16,6 @@ import {
   YardItemType,
 } from '@prisma/client';
 
-import { EventBusService } from '../../../core/events/event-bus.service';
 import { SnapshotUpdateDispatcher } from '../../../core/jobs/snapshot-update-dispatcher.service';
 import { PerformanceMetricsService } from '../../../core/performance/performance-metrics.service';
 import { DashboardReaderService } from '../../../core/snapshots/dashboard-reader.service';
@@ -36,6 +35,7 @@ import {
   CreateProductionTaskDto,
   CreateWorkCenterDto,
   ListProductionOrdersDto,
+  ProductionCockpitReadModelDto,
   StageProductionToYardDto,
   StartProductionDto,
   UpdateProductionOrderDto,
@@ -115,7 +115,6 @@ export class ProductionService {
     private readonly repository: ProductionRepository,
     private readonly orderRepository: ProductionOrderRepository,
     private readonly inventoryRepository: InventoryRepository,
-    private readonly eventBus: EventBusService,
     private readonly dashboardReader: DashboardReaderService,
     private readonly snapshotReader: SnapshotReaderService,
     private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
@@ -160,6 +159,10 @@ export class ProductionService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  cockpitReadModel(query: ProductionCockpitReadModelDto) {
+    return this.repository.cockpitReadModel(query);
   }
 
   async findOne(id: string) {
@@ -551,12 +554,12 @@ export class ProductionService {
         );
       }
 
+      await this.createStageCompletedOutboxEvent(tx, updatedOrder);
+
       return updatedOrder;
     });
 
     await this.linkAttachments(order.id, dto.attachmentIds);
-    await this.emitProductionEvent('production.stage.completed', order);
-
     if (order.status === ProductionOrderStatus.COMPLETED) {
       await this.autoRecalculateComponentCosting(order);
     }
@@ -645,6 +648,7 @@ export class ProductionService {
 
     await this.repository.markComponentStagedFromProduction({
       componentId: order.component.id,
+      componentCode: order.component.code,
       orderId: order.id,
       orderNo: order.orderNo,
       status: ComponentStatus.STOCK,
@@ -658,25 +662,6 @@ export class ProductionService {
       slotId: slot.id,
       actorId,
     });
-    await this.eventBus.emit(
-      'production.staged.to-yard',
-      {
-        productionOrderId: order.id,
-        productionOrderNo: order.orderNo,
-        componentId: order.component.id,
-        componentCode: order.component.code,
-        placementId: placement.id,
-        slotId: slot.id,
-        slotCode: slot.code,
-        zoneCode: slot.zone.code,
-      },
-      {
-        module: 'production',
-        persistToOutbox: true,
-        idempotencyKey: `production.staged.to-yard:${placement.id}`,
-      },
-    );
-
     return placement;
   }
 
@@ -1509,48 +1494,72 @@ export class ProductionService {
     return fields[eventName];
   }
 
-  private logActivity(
+  private async logActivity(
     tx: ProductionTx,
     action: string,
     order: ProductionOrderWithDetails,
     userId?: string,
   ) {
-    return this.repository.createActivityLog(
+    const activity = {
+      action,
+      entity: 'ProductionOrder',
+      entityId: order.id,
+      module: 'production',
+      userId,
+      metadata: {
+        orderNo: order.orderNo,
+        status: order.status,
+        currentStageCode: order.currentStageCode,
+      },
+    } satisfies Prisma.ActivityLogCreateInput;
+    await this.repository.createActivityLog(activity, tx);
+    const idempotencyKey = `audit:production:${action}:${order.id}:${order.updatedAt.toISOString()}`;
+    return this.repository.createOutboxEvent(
       {
-        action,
-        entity: 'ProductionOrder',
-        entityId: order.id,
-        module: 'production',
-        userId,
-        metadata: {
-          orderNo: order.orderNo,
-          status: order.status,
-          currentStageCode: order.currentStageCode,
+        eventName: 'audit.activity.created',
+        payload: {
+          action,
+          entity: activity.entity,
+          entityId: order.id,
+          module: activity.module,
+          metadata: activity.metadata as Prisma.InputJsonValue,
         },
+        metadata: {
+          module: 'production',
+          persistToOutbox: true,
+          idempotencyKey,
+        },
+        idempotencyKey,
       },
       tx,
     );
   }
 
-  private emitProductionEvent(
-    eventName: 'production.stage.completed',
+  private createStageCompletedOutboxEvent(
+    tx: ProductionTx,
     order: ProductionOrderWithDetails,
   ) {
-    return this.eventBus.emit(
-      eventName,
+    const eventName = 'production.stage.completed';
+    const idempotencyKey = `${eventName}:${order.id}:${order.updatedAt.toISOString()}`;
+    return this.repository.createOutboxEvent(
       {
-        id: order.id,
-        orderNo: order.orderNo,
-        status: order.status,
-        currentStageCode: order.currentStageCode,
-        projectId: order.projectId,
-        componentId: order.componentId,
+        eventName,
+        payload: {
+          id: order.id,
+          orderNo: order.orderNo,
+          status: order.status,
+          currentStageCode: order.currentStageCode,
+          projectId: order.projectId,
+          componentId: order.componentId,
+        },
+        metadata: {
+          module: 'production',
+          persistToOutbox: true,
+          idempotencyKey,
+        },
+        idempotencyKey,
       },
-      {
-        module: 'production',
-        persistToOutbox: true,
-        idempotencyKey: `${eventName}:${order.id}:${order.updatedAt.toISOString()}`,
-      },
+      tx,
     );
   }
 

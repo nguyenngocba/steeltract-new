@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import toast from 'react-hot-toast'
 import { Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
@@ -17,7 +17,7 @@ import {
   inventoryTableRow,
 } from '@/modules/inventory/components/InventoryVisuals'
 
-import type { ProductionBom, ProductionComponent, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
+import type { ProductionBom, ProductionCockpitReadModel, ProductionComponent, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
 import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
   Meter,
@@ -44,6 +44,7 @@ import {
   useExpireProductionReservation,
   useIssueProductionReservation,
   useProductionBoms,
+  useProductionCockpitReadModel,
   useProductionComponents,
   useProductionConsumptions,
   useProductionIssues,
@@ -100,25 +101,6 @@ function orderStatusTone(order: ProductionOrder) {
   return 'bg-amber-500'
 }
 
-function orderMaterialReadiness(order: ProductionOrder) {
-  const readiness = workOrderReadiness(order)
-  if (!readiness.hasBom) return { label: 'Thiếu BOM', className: 'border-red-500/40 bg-red-500/10 text-red-300', readiness }
-  if (readiness.readinessPercent >= 100) return { label: 'READY TO RELEASE', className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', readiness }
-  if (readiness.readinessPercent >= 80) return { label: 'Gần đủ vật tư', className: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300', readiness }
-  if (readiness.readinessPercent >= 50) return { label: 'Thiếu một phần', className: 'border-amber-500/40 bg-amber-500/10 text-amber-300', readiness }
-  return { label: 'Thiếu vật tư', className: 'border-red-500/40 bg-red-500/10 text-red-300', readiness }
-}
-
-function stageFamily(value?: string) {
-  const raw = String(value ?? '').toLowerCase()
-  if (raw.includes('cut') || raw.includes('cắt')) return 'Cutting'
-  if (raw.includes('assembl') || raw.includes('lắp')) return 'Assembly'
-  if (raw.includes('weld') || raw.includes('hàn')) return 'Welding'
-  if (raw.includes('paint') || raw.includes('sơn')) return 'Painting'
-  if (raw.includes('finish') || raw.includes('hoàn')) return 'Finished'
-  return 'Waiting'
-}
-
 function workOrderReadiness(order: ProductionOrder, issues: ProductionMaterialIssue[] = []) {
   return calculateComponentMaterialReadiness({
     componentCode: order.component?.code ?? order.bom?.productCode ?? order.orderNo,
@@ -156,16 +138,32 @@ export function ProductionCockpitPage() {
   const location = useLocation()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [cockpitPage, setCockpitPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder>()
   const [selectedBom, setSelectedBom] = useState<ProductionBom>()
   const [createOrderOpen, setCreateOrderOpen] = useState(false)
   const [createBomOpen, setCreateBomOpen] = useState(false)
   const [ledgerFilters, setLedgerFilters] = useState<ProductionMaterialLedgerParams>({})
-  const { data: orders = [] } = useProductionOrders()
-  const { data: boms = [] } = useProductionBoms()
-  const { data: issues = [] } = useProductionIssues()
-  const { data: consumptions = [] } = useProductionConsumptions()
-  const { data: reservations = [] } = useProductionReservations()
+  const view = location.pathname.split('/').at(-1) ?? 'production'
+  const mode = view === 'production' ? 'overview' : view
+  const isOrderWorkspace = ['overview', 'orders', 'planning'].includes(mode)
+  const deferredSearch = useDeferredValue(search)
+  const cockpitParams = useMemo(() => ({
+    page: cockpitPage,
+    limit: 14,
+    search: isOrderWorkspace ? deferredSearch || undefined : undefined,
+    status: statusFilter || undefined,
+    scope: mode === 'planning' ? 'planning' as const : 'all' as const,
+    sortBy: 'updatedAt' as const,
+    sortOrder: 'desc' as const,
+  }), [cockpitPage, deferredSearch, isOrderWorkspace, mode, statusFilter])
+  const { data: cockpit } = useProductionCockpitReadModel(cockpitParams)
+  const { data: legacyOrders = [] } = useProductionOrders(!isOrderWorkspace)
+  const orders = isOrderWorkspace ? cockpit?.data ?? [] : legacyOrders
+  const { data: boms = [] } = useProductionBoms(mode === 'boms' || createOrderOpen || createBomOpen)
+  const { data: issues = [] } = useProductionIssues(['execution', 'material-issues', 'consumptions'].includes(mode))
+  const { data: consumptions = [] } = useProductionConsumptions(undefined, ['warehouse', 'material-issues', 'consumptions'].includes(mode))
+  const { data: reservations = [] } = useProductionReservations(undefined, ['execution', 'reservations', 'warehouse'].includes(mode))
   const ledgerQueryParams = useMemo(() => ({
     productionOrderId: ledgerFilters.productionOrderId || undefined,
     inventoryItemId: ledgerFilters.inventoryItemId || undefined,
@@ -173,31 +171,35 @@ export function ProductionCockpitPage() {
     fromDate: ledgerFilters.fromDate || undefined,
     toDate: ledgerFilters.toDate || undefined,
   }), [ledgerFilters])
-  const { data: ledger = [] } = useProductionMaterialLedger(ledgerQueryParams)
-  const { data: logs = [] } = useProductionLogs()
-  const { data: components = [] } = useProductionComponents()
+  const { data: ledger = [] } = useProductionMaterialLedger(ledgerQueryParams, mode === 'material-ledger')
+  const { data: logs = [] } = useProductionLogs(mode === 'overview' || mode === 'logs')
+  const { data: components = [] } = useProductionComponents(createOrderOpen || createBomOpen)
   const { data: inventoryItems = [] } = useInventoryItems()
   const { data: inventoryAudit = [] } = useInventoryAudit()
 
-  const view = location.pathname.split('/').at(-1) ?? 'production'
-  const mode = view === 'production' ? 'overview' : view
   const filteredOrders = useMemo(() => orders.filter((row) => {
+    if (isOrderWorkspace) return true
     if (statusFilter && row.status !== statusFilter) return false
     return `${row.orderNo} ${row.title} ${row.status}`.toLowerCase().includes(search.toLowerCase())
-  }), [orders, search, statusFilter])
+  }), [isOrderWorkspace, orders, search, statusFilter])
   const filteredBoms = useMemo(() => boms.filter((row) =>
     `${row.bomNo} ${row.productCode} ${row.productName}`.toLowerCase().includes(search.toLowerCase())), [boms, search])
 
-  const completed = orders.filter((item) => item.status === 'COMPLETED').length
-  const inProgress = orders.filter((item) => item.status === 'IN_PROGRESS').length
-  const planned = orders.filter((item) => item.status === 'PLANNED').length
-  const released = orders.filter((item) => item.status === 'RELEASED').length
-  const completedToday = orders.filter((item) => item.status === 'COMPLETED' && sameDay(item.plannedEndAt)).length
-  const waitingMaterial = orders.filter((item) => item.bom && !(item.materialIssues ?? []).length && item.status !== 'COMPLETED').length
-  const delayed = orders.filter(isDelayedOrder).length
-  const runningComponents = orders.filter((item) => item.status === 'IN_PROGRESS' && item.component).length
-  const productionWeight = orders.reduce((sum, item) => sum + Number(item.quantity ?? 0) * Number(item.bom?.estimatedWeight ?? 0), 0)
+  const summary = cockpit?.summary
+  const completed = summary?.completed ?? 0
+  const inProgress = summary?.inProgress ?? 0
+  const planned = summary?.planned ?? 0
+  const released = summary?.released ?? 0
+  const completedToday = summary?.completedToday ?? 0
+  const waitingMaterial = summary?.waitingMaterial ?? 0
+  const delayed = summary?.delayed ?? 0
+  const runningComponents = summary?.runningComponents ?? 0
+  const productionWeight = summary?.productionWeight ?? 0
   const isWorkOrderMode = mode === 'orders'
+
+  useEffect(() => {
+    setCockpitPage(1)
+  }, [deferredSearch, mode, statusFilter])
 
   return <OperationalShell>
     <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
@@ -220,7 +222,7 @@ export function ProductionCockpitPage() {
       <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
         {isWorkOrderMode ? (
           <>
-            <CockpitKpiCard title="Total Work Orders" value={number(orders.length)} note="REAL · Tất cả WO/MO" tone="blue" state="normal" />
+            <CockpitKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} note="REAL · Tất cả WO/MO" tone="blue" state="normal" />
             <CockpitKpiCard title="Planned" value={number(planned)} note="REAL · Đã lập kế hoạch" tone="purple" state="normal" />
             <CockpitKpiCard title="Released" value={number(released)} note="REAL · Sẵn sàng phát hành" tone="cyan" state="normal" />
             <CockpitKpiCard title="In Progress" value={number(inProgress)} note="REAL · Đang sản xuất" tone="emerald" state="normal" />
@@ -250,10 +252,10 @@ export function ProductionCockpitPage() {
           <button key={text} className={`${inventoryMutedButton} xl:col-span-1`}>{text}</button>)}
       </ModuleFilterBar>
 
-      {mode === 'overview' && <Overview orders={filteredOrders} logs={logs} reservations={reservations} issues={issues} components={components} onOpen={setSelectedOrder} />}
+      {mode === 'overview' && cockpit && <Overview readModel={cockpit} logs={logs} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
-      {mode === 'orders' && <Orders rows={filteredOrders} onOpen={setSelectedOrder} />}
-      {mode === 'planning' && <Orders rows={filteredOrders.filter((row) => ['PLANNED', 'RELEASED'].includes(row.status))} onOpen={setSelectedOrder} />}
+      {mode === 'orders' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
+      {mode === 'planning' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'execution' && <ProductionExecutionBoard orders={orders} issues={issues} reservations={reservations} />}
       {mode === 'reservations' && <Reservations rows={reservations} orders={orders} onOpen={setSelectedOrder} />}
       {mode === 'warehouse' && <ProductionWarehouseCockpit inventoryItems={inventoryItems as InventoryItemLike[]} auditRows={inventoryAudit as InventoryAuditLike[]} orders={orders} reservations={reservations} consumptions={consumptions} />}
@@ -298,40 +300,26 @@ function ProductionNavigationPlaceholder({
 }
 
 function Overview({
-  orders,
+  readModel,
   logs,
-  reservations,
-  issues,
-  components,
   onOpen,
+  onPageChange,
 }: {
-  orders: ProductionOrder[]
+  readModel: ProductionCockpitReadModel
   logs: ReturnType<typeof useProductionLogs>['data']
-  reservations: ProductionReservation[]
-  issues: ProductionMaterialIssue[]
-  components: ProductionComponent[]
   onOpen: (row: ProductionOrder) => void
+  onPageChange: (page: number) => void
 }) {
-  const running = orders.filter((row) => row.status === 'IN_PROGRESS').length
-  const pending = orders.filter((row) => !['IN_PROGRESS', 'COMPLETED'].includes(row.status) && !isDelayedOrder(row)).length
-  const completed = orders.filter((row) => row.status === 'COMPLETED').length
-  const stageRows = ['Cutting', 'Assembly', 'Welding', 'Painting', 'Finished'].map((label) => [
-    label,
-    orders.filter((row) => stageFamily(row.currentStageCode ?? row.stages?.find((stage) => stage.status === 'IN_PROGRESS' || stage.status === 'READY')?.name) === label).length,
-  ] as [string, number])
-  const issuedOrders = new Set(issues.map((issue) => issue.productionOrderId))
-  const reservedOrders = new Set(reservations.filter((row) => ['RESERVED', 'PARTIALLY_ISSUED'].includes(row.status)).map((row) => row.productionOrderId))
-  const issued = orders.filter((row) => issuedOrders.has(row.id)).length
-  const waiting = orders.filter((row) => !issuedOrders.has(row.id) && reservedOrders.has(row.id)).length
-  const shortage = orders.filter((row) => row.bom && !issuedOrders.has(row.id) && !reservedOrders.has(row.id) && row.status !== 'COMPLETED').length
-  const activeComponents = components
-    .filter((component) => orders.some((order) => order.component?.id === component.id && order.status !== 'COMPLETED'))
-    .slice(0, 5)
+  const orders = readModel.data
+  const { running, pending, completed } = readModel.overview.progress
+  const { issued, waiting, shortage } = readModel.overview.material
+  const stageRows = readModel.overview.stages.map(({ label, value }) => [label, value] as [string, number])
+  const activeComponents = readModel.overview.activeComponents
 
   return <div className="w-full min-w-0 flex-1 space-y-1">
     <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
       <div className="xl:col-span-9">
-        <Orders rows={orders} onOpen={onOpen} embedded />
+        <Orders readModel={readModel} onOpen={onOpen} onPageChange={onPageChange} embedded />
       </div>
       <aside className="space-y-1 xl:col-span-3">
         <CockpitChartCard title="Tiến độ sản xuất" subtitle="REAL · Running / Pending / Completed" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
@@ -390,54 +378,39 @@ function Overview({
   </div>
 }
 
-function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; onOpen: (row: ProductionOrder) => void; embedded?: boolean }) {
+function Orders({ readModel, onOpen, onPageChange, embedded = false }: { readModel: ProductionCockpitReadModel; onOpen: (row: ProductionOrder) => void; onPageChange: (page: number) => void; embedded?: boolean }) {
+  const rows = readModel.data
   const enriched = rows.map((row) => {
-    const readiness = orderMaterialReadiness(row)
-    const progress = orderProgress(row)
+    const materialReadiness = row.cockpit?.materialReadiness ?? {
+      hasBom: false,
+      requiredQty: 0,
+      issuedQty: 0,
+      remainingQty: 0,
+      readinessPercent: 0,
+      label: 'Thiếu BOM',
+    }
+    const readiness = { readiness: materialReadiness, label: materialReadiness.label }
+    const progress = row.cockpit?.progress ?? 0
     return {
       row,
       readiness,
       progress,
-      materialValueProxy: readiness.readiness.requiredQty,
     }
   })
-  const topValue = [...enriched].sort((a, b) => b.materialValueProxy - a.materialValueProxy).slice(0, 5)
-  const topShortage = enriched
-    .filter((item) => item.readiness.readiness.hasBom && item.readiness.readiness.remainingQty > 0)
-    .sort((a, b) => b.readiness.readiness.remainingQty - a.readiness.readiness.remainingQty)
-    .slice(0, 5)
-  const upcomingDelayed = enriched
-    .filter((item) => !['COMPLETED', 'CANCELLED'].includes(item.row.status) && item.row.plannedEndAt)
-    .sort((a, b) => new Date(a.row.plannedEndAt ?? '').getTime() - new Date(b.row.plannedEndAt ?? '').getTime())
-    .slice(0, 5)
-  const progressSegments = [
-    { label: 'Planning', value: enriched.filter((item) => item.progress < 25).length, color: '#64748b' },
-    { label: 'Cutting', value: enriched.filter((item) => item.progress >= 25 && item.progress < 50).length, color: '#06b6d4' },
-    { label: 'Welding', value: enriched.filter((item) => item.progress >= 50 && item.progress < 75).length, color: '#f59e0b' },
-    { label: 'Painting', value: enriched.filter((item) => item.progress >= 75 && item.progress < 100).length, color: '#7c3aed' },
-    { label: 'Finished', value: enriched.filter((item) => item.progress >= 100).length, color: '#14c987' },
-  ]
-  const readinessSegments = [
-    { label: '0-49%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent < 50).length, color: '#ef4444' },
-    { label: '50-79%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent >= 50 && item.readiness.readiness.readinessPercent < 80).length, color: '#f59e0b' },
-    { label: '80-99%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent >= 80 && item.readiness.readiness.readinessPercent < 100).length, color: '#06b6d4' },
-    { label: '100%', value: enriched.filter((item) => item.readiness.readiness.readinessPercent >= 100).length, color: '#14c987' },
-  ]
-  const [page, setPage] = useState(1)
-  const pageSize = 14
-  const pagedRows = enriched.slice((page - 1) * pageSize, page * pageSize)
-  const pageStart = rows.length ? (page - 1) * pageSize + 1 : 0
-  const pageEnd = Math.min(page * pageSize, rows.length)
-
-  useEffect(() => {
-    setPage(1)
-  }, [rows.length, embedded])
+  const colors = ['#64748b', '#06b6d4', '#f59e0b', '#7c3aed', '#14c987']
+  const progressSegments = readModel.orderAnalytics.progressSegments.map((segment, index) => ({ ...segment, color: colors[index] }))
+  const readinessColors = ['#ef4444', '#f59e0b', '#06b6d4', '#14c987']
+  const readinessSegments = readModel.orderAnalytics.readinessSegments.map((segment, index) => ({ ...segment, color: readinessColors[index] }))
+  const pagedRows = enriched
+  const { page, limit: pageSize, total } = readModel.meta
+  const pageStart = total ? (page - 1) * pageSize + 1 : 0
+  const pageEnd = Math.min(page * pageSize, total)
 
   const grid = (
     <CockpitChartCard
       title={embedded ? 'Danh sách lệnh sản xuất' : 'Work Order Cockpit'}
       subtitle="REAL · WO No, Component, Project, Material Ready, Progress, Due Date"
-      action={<span className="text-[11px] text-cyan-300">{pageStart}-{pageEnd} / {rows.length}</span>}
+      action={<span className="text-[11px] text-cyan-300">{pageStart}-{pageEnd} / {total}</span>}
       heightClass={COCKPIT_HEIGHTS.TABLE_MD}
     >
       <div className="flex h-full min-h-0 flex-col">
@@ -460,7 +433,7 @@ function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; o
                   <Meter value={progress} tone={orderStatusTone(row)} />
                   <div className="mt-1 text-[10px] text-slate-500">{progress}%</div>
                 </td>
-                <td className="px-2 py-2 text-slate-300">{date(row.plannedEndAt)}{isDelayedOrder(row) ? <div className="mt-1 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
+                <td className="px-2 py-2 text-slate-300">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-1 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
                 <td className="px-2 py-2"><StatusChip status={row.status} /></td>
               </tr>
             ))}</tbody>
@@ -469,7 +442,7 @@ function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; o
             <ModuleEmptyState icon={<span>⚙️</span>} title="Chưa có lệnh sản xuất" description="Tạo lệnh sản xuất để theo dõi tiến độ, vật tư và hoàn thành." />
           ) : null}
         </CockpitTableShell>
-        <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+        <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
       </div>
     </CockpitChartCard>
   )
@@ -482,22 +455,22 @@ function Orders({ rows, onOpen, embedded = false }: { rows: ProductionOrder[]; o
         <div className="xl:col-span-9">{grid}</div>
         <aside className="space-y-1 xl:col-span-3">
           <CockpitChartCard title="Tiến độ sản xuất" subtitle="REAL · Planning → Finished" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-            <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="WO" segments={progressSegments} />
+            <ProductionDonut centerValue={formatQuantity(total, 0)} centerLabel="WO" segments={progressSegments} />
           </CockpitChartCard>
           <CockpitChartCard title="Material readiness" subtitle="REAL · Net issued / required" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-            <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="WO" segments={readinessSegments} />
+            <ProductionDonut centerValue={formatQuantity(total, 0)} centerLabel="WO" segments={readinessSegments} />
           </CockpitChartCard>
           <CockpitChartCard title="WO sắp trễ" subtitle="REAL · Sắp xếp theo Due Date" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-            <RankList rows={upcomingDelayed.map((item) => ({ id: item.row.id, title: item.row.orderNo, subtitle: item.row.title, value: date(item.row.plannedEndAt) }))} empty="Chưa có WO có hạn" />
+            <RankList rows={readModel.orderAnalytics.upcomingDelayed.map((item) => ({ id: item.id, title: item.orderNo, subtitle: item.title, value: date(item.plannedEndAt) }))} empty="Chưa có WO có hạn" />
           </CockpitChartCard>
         </aside>
       </div>
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-3">
         <CockpitChartCard title="Top WO theo giá trị vật tư" subtitle="TODO · API chưa có unit cost, đang dùng required qty proxy" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-          <RankList rows={topValue.map((item) => ({ id: item.row.id, title: item.row.orderNo, subtitle: item.row.title, value: number(item.materialValueProxy) }))} />
+          <RankList rows={readModel.orderAnalytics.topMaterial.map((item) => ({ id: item.id, title: item.orderNo, subtitle: item.title, value: number(item.value) }))} />
         </CockpitChartCard>
         <CockpitChartCard title="Top WO thiếu vật tư" subtitle="REAL · Remaining required qty" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-          <RankList rows={topShortage.map((item) => ({ id: item.row.id, title: item.row.orderNo, subtitle: item.row.title, value: number(item.readiness.readiness.remainingQty) }))} empty="Không có WO thiếu vật tư" />
+          <RankList rows={readModel.orderAnalytics.topShortage.map((item) => ({ id: item.id, title: item.orderNo, subtitle: item.title, value: number(item.value) }))} empty="Không có WO thiếu vật tư" />
         </CockpitChartCard>
         <CockpitChartCard title="READY TO RELEASE" subtitle="REAL · Chỉ hiển thị cảnh báo UI" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
           <ModuleEmptyState icon={<span>🏭</span>} title="Chưa khóa workflow" description="READY TO RELEASE hiện chỉ là cảnh báo UI khi Material Readiness >= 100%." />

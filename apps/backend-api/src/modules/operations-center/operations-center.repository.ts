@@ -137,6 +137,44 @@ export class OperationsCenterRepository {
           updatedAt: true,
         },
       }),
+      this.prisma.componentDashboardSnapshot.count(),
+      this.prisma.componentDashboardSnapshot.findFirst({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          updatedAt: true,
+        },
+      }),
+      this.prisma.componentSummarySnapshot.count(),
+      this.prisma.componentSummarySnapshot.findFirst({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          updatedAt: true,
+        },
+      }),
+      this.prisma.qcDashboardSnapshot.count(),
+      this.prisma.qcDashboardSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.qcInspectionSnapshot.count(),
+      this.prisma.qcInspectionSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.yardDashboardSnapshot.count(),
+      this.prisma.yardDashboardSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.yardWorkspaceSnapshot.count(),
+      this.prisma.yardWorkspaceSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
     ]);
   }
 
@@ -319,6 +357,213 @@ export class OperationsCenterRepository {
       latestOrderSnapshotAt: latestOrderSnapshot?.updatedAt ?? null,
       workCenterSnapshotCount,
       latestWorkCenterSnapshotAt: latestWorkCenterSnapshot?.updatedAt ?? null,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    };
+  }
+
+  async componentsPlatformHealth() {
+    const [
+      componentCount,
+      timelineCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshot,
+      summarySnapshotCount,
+      latestSummarySnapshot,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    ] = await Promise.all([
+      this.prisma.component.count(),
+      this.prisma.componentTimeline.count(),
+      this.prisma.componentDashboardSnapshot.count(),
+      this.prisma.componentDashboardSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.componentSummarySnapshot.count(),
+      this.prisma.componentSummarySnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'component.' },
+          status: { in: ['PENDING', 'DISPATCHING'] },
+        },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'component.' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.components' },
+          status: { in: ['QUEUED', 'RUNNING', 'RETRYING'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.components' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+    ]);
+
+    return {
+      componentCount,
+      timelineCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshotAt: latestDashboardSnapshot?.updatedAt ?? null,
+      summarySnapshotCount,
+      latestSummarySnapshotAt: latestSummarySnapshot?.updatedAt ?? null,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    };
+  }
+
+  async qcPlatformHealth() {
+    const [
+      inspectionCount,
+      resultCount,
+      issueCount,
+      ncrCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshot,
+      inspectionSnapshotCount,
+      latestInspectionSnapshot,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    ] = await Promise.all([
+      this.prisma.qcInspection.count(),
+      this.prisma.qcResult.count(),
+      this.prisma.qcIssue.count(),
+      this.prisma.nonConformanceReport.count(),
+      this.prisma.qcDashboardSnapshot.count(),
+      this.prisma.qcDashboardSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.qcInspectionSnapshot.count(),
+      this.prisma.qcInspectionSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'qc.' },
+          status: { in: ['PENDING', 'DISPATCHING'] },
+        },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'qc.' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.qc' },
+          status: { in: ['QUEUED', 'RUNNING', 'RETRYING'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.qc' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+    ]);
+
+    return {
+      inspectionCount,
+      resultCount,
+      issueCount,
+      ncrCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshotAt: latestDashboardSnapshot?.updatedAt ?? null,
+      inspectionSnapshotCount,
+      latestInspectionSnapshotAt: latestInspectionSnapshot?.updatedAt ?? null,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    };
+  }
+
+  async yardPlatformHealth() {
+    const [
+      zoneCount,
+      slotCount,
+      activePlacementCount,
+      movementCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshot,
+      workspaceSnapshotCount,
+      latestWorkspaceSnapshot,
+      pendingOutbox,
+      failedOutbox,
+      activeJobs,
+      failedJobs,
+    ] = await Promise.all([
+      this.prisma.yardZone.count(),
+      this.prisma.yardSlot.count(),
+      this.prisma.yardItemPlacement.count({ where: { removedAt: null } }),
+      this.prisma.yardMovement.count(),
+      this.prisma.yardDashboardSnapshot.count(),
+      this.prisma.yardDashboardSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.yardWorkspaceSnapshot.count(),
+      this.prisma.yardWorkspaceSnapshot.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'yard.' },
+          status: { in: ['PENDING', 'DISPATCHING'] },
+        },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          eventName: { startsWith: 'yard.' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.yard' },
+          status: { in: ['QUEUED', 'RUNNING', 'RETRYING'] },
+        },
+      }),
+      this.prisma.backgroundJob.count({
+        where: {
+          name: { startsWith: 'snapshot.yard' },
+          status: { in: ['FAILED', 'DEAD_LETTER'] },
+        },
+      }),
+    ]);
+
+    return {
+      zoneCount,
+      slotCount,
+      activePlacementCount,
+      movementCount,
+      dashboardSnapshotCount,
+      latestDashboardSnapshotAt: latestDashboardSnapshot?.updatedAt ?? null,
+      workspaceSnapshotCount,
+      latestWorkspaceSnapshotAt: latestWorkspaceSnapshot?.updatedAt ?? null,
       pendingOutbox,
       failedOutbox,
       activeJobs,

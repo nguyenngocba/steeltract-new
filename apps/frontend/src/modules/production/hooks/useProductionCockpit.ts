@@ -1,23 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { productionApi, type ProductionBomInput, type ProductionConsumptionParams, type ProductionMaterialIssue, type ProductionMaterialLedgerParams } from '../api/production.api'
+import { productionApi, type ProductionBomInput, type ProductionCockpitParams, type ProductionConsumptionParams, type ProductionMaterialIssue, type ProductionMaterialLedgerParams } from '../api/production.api'
 
-export const useProductionOrders = () =>
-  useQuery({ queryKey: ['production', 'orders'], queryFn: productionApi.orders, refetchInterval: 5000 })
+export const useProductionOrders = (enabled = true) =>
+  useQuery({ queryKey: ['production', 'orders'], queryFn: productionApi.orders, refetchInterval: 5000, enabled })
+
+export const useProductionCockpitReadModel = (params: ProductionCockpitParams, enabled = true) =>
+  useQuery({
+    queryKey: ['production', 'read-model', 'cockpit', params],
+    queryFn: () => productionApi.cockpit(params),
+    placeholderData: (previous) => previous,
+    enabled,
+  })
 
 export const useProductionOrder = (id?: string) =>
   useQuery({ queryKey: ['production', 'order', id], queryFn: () => productionApi.order(id!), enabled: Boolean(id) })
 
-export const useProductionBoms = () =>
-  useQuery({ queryKey: ['production', 'boms'], queryFn: productionApi.boms })
+export const useProductionBoms = (enabled = true) =>
+  useQuery({ queryKey: ['production', 'boms'], queryFn: productionApi.boms, enabled })
 
-export const useProductionIssues = () =>
-  useQuery({ queryKey: ['production', 'issues'], queryFn: productionApi.issues })
+export const useProductionIssues = (enabled = true) =>
+  useQuery({ queryKey: ['production', 'issues'], queryFn: productionApi.issues, enabled })
 
-export const useProductionConsumptions = (params?: ProductionConsumptionParams) =>
+export const useProductionConsumptions = (params?: ProductionConsumptionParams, enabled = true) =>
   useQuery({
     queryKey: ['production', 'consumptions', params],
     queryFn: () => productionApi.consumptions(params),
+    enabled,
   })
 
 export const useProductionOrderConsumptions = (id?: string) =>
@@ -27,16 +36,18 @@ export const useProductionOrderConsumptions = (id?: string) =>
     enabled: Boolean(id),
   })
 
-export const useProductionReservations = (productionOrderId?: string) =>
+export const useProductionReservations = (productionOrderId?: string, enabled = true) =>
   useQuery({
     queryKey: ['production', 'reservations', productionOrderId],
     queryFn: () => productionApi.reservations(productionOrderId),
+    enabled,
   })
 
-export const useProductionMaterialLedger = (params?: ProductionMaterialLedgerParams) =>
+export const useProductionMaterialLedger = (params?: ProductionMaterialLedgerParams, enabled = true) =>
   useQuery({
     queryKey: ['production', 'material-ledger', params],
     queryFn: () => productionApi.materialLedger(params),
+    enabled,
   })
 
 export const useReservationPreview = (id?: string) =>
@@ -46,8 +57,8 @@ export const useReservationPreview = (id?: string) =>
     enabled: Boolean(id),
   })
 
-export const useProductionLogs = () =>
-  useQuery({ queryKey: ['production', 'logs'], queryFn: productionApi.logs })
+export const useProductionLogs = (enabled = true) =>
+  useQuery({ queryKey: ['production', 'logs'], queryFn: productionApi.logs, enabled })
 
 export const useProductionMachines = () =>
   useQuery({ queryKey: ['production', 'machines'], queryFn: productionApi.machines, refetchInterval: 5000 })
@@ -59,8 +70,8 @@ export const useMaterialRequirements = (id?: string) =>
     enabled: Boolean(id),
   })
 
-export const useProductionComponents = () =>
-  useQuery({ queryKey: ['production', 'components'], queryFn: productionApi.components })
+export const useProductionComponents = (enabled = true) =>
+  useQuery({ queryKey: ['production', 'components'], queryFn: productionApi.components, enabled })
 
 export const useYardSlots = () =>
   useQuery({ queryKey: ['yard', 'slots'], queryFn: productionApi.yardSlots, refetchInterval: 5000 })

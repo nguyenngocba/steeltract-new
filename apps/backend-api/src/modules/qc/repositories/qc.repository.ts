@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../../common/utils/code-generator';
 
 export type QcTx = Prisma.TransactionClient;
 
@@ -227,6 +228,35 @@ export class QcRepository {
 
   createActivityLog(data: Prisma.ActivityLogCreateInput, tx: QcTx) {
     return tx.activityLog.create({ data });
+  }
+
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    tx: QcTx,
+  ) {
+    return tx.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
+
+  nextInspectionNo(tx: QcTx = this.prisma) {
+    return nextOperationalCode(tx, 'qcInspection', 'inspectionNo', 'QC');
+  }
+
+  nextNcrNo(tx: QcTx = this.prisma) {
+    return nextOperationalCode(
+      tx,
+      'nonConformanceReport',
+      'ncrNo',
+      'NCR',
+    );
   }
 
   checklistInclude() {

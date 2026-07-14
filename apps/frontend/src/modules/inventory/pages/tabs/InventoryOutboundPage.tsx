@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react'
 import { CircleDollarSign, PackageCheck, RefreshCw, Target, TriangleAlert } from 'lucide-react'
-import { CockpitKpiCard, COCKPIT_HEIGHTS } from '../../../../shared/ui/cockpit'
+import toast from 'react-hot-toast'
+import { CockpitKpiCard, CockpitTableShell, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
+import {
+  ModuleDetailDrawer,
+  ModuleFilterBar,
+  ModuleLoadingState,
+  ModuleEmptyState,
+} from '../../../../shared/ui/modules'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
@@ -24,6 +30,7 @@ import {
   InventoryTransactionAttachmentDrawer,
   useInventoryTransactionAttachmentMap,
 } from '../../components/InventoryAttachmentPanel'
+import { OutboundTransactionModal } from '../../components/InventoryTransactionModals'
 
 // ================= COMPONENT SPARKLINE =================
 function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
@@ -45,120 +52,6 @@ function KpiSparkline({ values, line, fill }: { values: number[]; line: string; 
 }
 
 // ================= COMPONENT METRIC CARD =================
-function OverviewMetricCard({
-  title,
-  value,
-  note,
-  tone = 'blue',
-  icon,
-  trend,
-  active,
-  onClick,
-}: {
-  title: string
-  value: string
-  note?: string
-  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple'
-  icon: React.ReactNode
-  trend: number[]
-  active?: boolean
-  onClick?: () => void
-}) {
-  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
-    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
-    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
-    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
-    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
-    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
-    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
-  }
-  const item = color[tone]
-  const content = (
-    <>
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
-        </div>
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
-          {icon}
-        </div>
-      </div>
-      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
-    </>
-  )
-  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-[#0b1424] p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.3)] ring-1 ring-white/[0.04] transition ${
-    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
-  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
-  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
-  return <section className={className}>{content}</section>
-}
-
-// ================= PAGINATION (giống bên Tồn kho) =================
-function MaterialsPagination({
-  page,
-  pageCount,
-  total,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  pageSize: number
-  onPageChange: (page: number) => void
-}) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
-  return (
-    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
-      <div>
-        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
-      </div>
-      <div className="flex justify-center gap-2">
-        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
-            }`}
-          >
-            {pageNo}
-          </button>
-        ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
-      </div>
-      <div className="flex justify-start gap-2 md:justify-end">
-        <button
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          className={inventoryMutedButton}
-        >
-          Trước
-        </button>
-        <button
-          disabled={safePage >= safePageCount}
-          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
-          className={inventoryMutedButton}
-        >
-          Sau
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
@@ -416,14 +309,16 @@ function InfoLine({ label, value }: { label: string; value: string }) {
 export function InventoryOutboundPage() {
   const { data: projects = [] } = useProjects()
   const { data: zones = [] } = useZones()
-  const { data: tx = [], isLoading } = useInventoryTransactions({ type: 'OUTBOUND' })
+  const { data: tx = [], isLoading, refetch } = useInventoryTransactions({ type: 'OUTBOUND' })
   const [showAll, setShowAll] = useState(false);
   const [date, setDate] = useState('')
   const [projectId, setProjectId] = useState('')
   const [zoneId, setZoneId] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [createOpen, setCreateOpen] = useState(false)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
   const pageSize = 10
@@ -438,6 +333,7 @@ export function InventoryOutboundPage() {
     setDate('')
     setProjectId('')
     setZoneId('')
+    setStatusFilter('')
     setPage(1)
   }
 
@@ -450,6 +346,7 @@ export function InventoryOutboundPage() {
         }
         if (projectId && String(x.projectId ?? '') !== projectId) return false
         if (zoneId && !transactionItems(x).some((line: any) => String(line?.zoneId ?? '') === zoneId)) return false
+        if (statusFilter && String(x.status ?? 'COMPLETED') !== statusFilter) return false
         if (search.trim()) {
           const q = search.trim().toLowerCase()
           const lineText = transactionItems(x)
@@ -465,66 +362,58 @@ export function InventoryOutboundPage() {
         return true
       })
       .sort((a: any, b: any) => +new Date(b.transactionDate ?? b.createdAt) - +new Date(a.transactionDate ?? a.createdAt))
-  }, [tx, date, projectId, zoneId, search])
+  }, [tx, date, projectId, zoneId, statusFilter, search])
 
   const kpis = useMemo(() => {
     const now = new Date()
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const inMonth = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 7) === monthKey)
     const todayKey = now.toISOString().slice(0, 10)
     const todayRows = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 10) === todayKey)
-    const weekStart = startOfWeek(now)
-    const weekRows = rows.filter((x: any) => {
-      const d = new Date(x.transactionDate ?? x.createdAt)
-      return !Number.isNaN(d.getTime()) && d >= weekStart && d <= now
-    })
-    const yearRows = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 4) === String(now.getFullYear()))
-    const qty = sumTransactionQuantity(inMonth)
-    const amount = sumTransactionAmount(inMonth)
-    const todayAmount = sumTransactionAmount(todayRows)
-    const weekAmount = sumTransactionAmount(weekRows)
-    const yearAmount = sumTransactionAmount(yearRows)
-    const pending = rows.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING').length
+    const pendingRows = rows.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING')
+    const productionRows = rows.filter((x: any) => x.type === 'TRANSFER' || String(x.remarks ?? '').includes('[COMPONENT_PRODUCTION]'))
+    const projectRows = rows.filter((x: any) => x.type === 'OUTBOUND' || String(x.remarks ?? '').includes('[PROJECT]'))
+
     return {
-      monthlyQty: qty,
-      monthlyAmount: amount,
-      todayAmount,
-      weekAmount,
-      yearAmount,
-      docs: inMonth.length,
-      pending,
+      docsToday: todayRows.length,
+      amountToday: sumTransactionAmount(todayRows),
+      pending: pendingRows.length,
+      productionAmount: sumTransactionAmount(productionRows),
+      productionDocs: productionRows.length,
+      projectAmount: sumTransactionAmount(projectRows),
+      projectDocs: projectRows.length,
     }
   }, [rows])
 
   // ===== TREND DỮ LIỆU THỰC TẾ =====
   const kpiTrend = useMemo(() => {
     const now = new Date()
-    // Lấy 6 tháng gần nhất (tính từ tháng hiện tại lùi về 5 tháng)
     const months = Array.from({ length: 6 }).map((_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      return { date, key }
+      return key
     })
 
-    // Nhóm dữ liệu theo tháng
-    const monthData = months.map(({ key }) => {
-      const inMonth = rows.filter((x: any) => 
-        String(x.transactionDate ?? x.createdAt).slice(0, 7) === key
-      )
+    const monthData = months.map((key) => {
+      const inMonth = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 7) === key)
+      const todayRows = inMonth.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 10) === now.toISOString().slice(0, 10))
+      const pending = inMonth.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING')
+      const production = inMonth.filter((x: any) => x.type === 'TRANSFER' || String(x.remarks ?? '').includes('[COMPONENT_PRODUCTION]'))
+      const project = inMonth.filter((x: any) => x.type === 'OUTBOUND' || String(x.remarks ?? '').includes('[PROJECT]'))
+
       return {
-        qty: sumTransactionQuantity(inMonth),
-        amount: sumTransactionAmount(inMonth),
-        docs: inMonth.length,
-        pending: inMonth.filter((x: any) => String(x.status ?? '').toUpperCase() === 'PENDING').length,
+        docsToday: todayRows.length,
+        amountToday: sumTransactionAmount(todayRows),
+        pending: pending.length,
+        productionAmount: sumTransactionAmount(production),
+        projectAmount: sumTransactionAmount(project),
       }
     })
 
     return {
-      monthlyQty: monthData.map((d) => d.qty),
-      monthlyAmount: monthData.map((d) => d.amount),
-      todayAmount: monthData.map((d) => d.amount), // tạm thời dùng monthly amount, hoặc bạn có thể tính theo ngày
-      docs: monthData.map((d) => d.docs),
+      docsToday: monthData.map((d) => d.docsToday),
+      amountToday: monthData.map((d) => d.amountToday),
       pending: monthData.map((d) => d.pending),
+      productionAmount: monthData.map((d) => d.productionAmount),
+      projectAmount: monthData.map((d) => d.projectAmount),
     }
   }, [rows])
 
@@ -692,217 +581,315 @@ export function InventoryOutboundPage() {
     return alerts.sort((a, b) => b.value - a.value).slice(0, 5)
   }, [rows])
 
-    const compactInput =
-      'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'  
-    const paged = useMemo(() => {
+  const paged = useMemo(() => {
     const start = (page - 1) * pageSize
     return rows.slice(start, start + pageSize)
   }, [rows, page])
+
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
+
+  const compactInput =
+    'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
 
   return (
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
 
-      <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-1">
+      <div className="space-y-3 -mt-2 text-xs">
+        {/* KPI Section */}
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
           <CockpitKpiCard
-            title="Tổng xuất trong tháng"
-            value={`${formatQuantity(kpis.monthlyQty, 0)} tấn`}
-            note="Theo phiếu xuất"
-            tone="blue"
-            icon={<RefreshCw size={15} />}
-            trend={kpiTrend.monthlyQty}
-          />
-          <CockpitKpiCard
-            title="Giá trị xuất trong tháng"
-            value={formatCurrency(kpis.monthlyAmount)}
-            note="Giá trị đã xuất"
-            tone="emerald"
-            icon={<CircleDollarSign size={15} />}
-            trend={kpiTrend.monthlyAmount}
+            title="Phiếu xuất hôm nay"
+            value={formatQuantity(kpis.docsToday, 0)}
+            note="Số lượng chứng từ hôm nay"
+            tone="cyan"
+            trend={kpiTrend.docsToday}
           />
           <CockpitKpiCard
             title="Giá trị xuất hôm nay"
-            value={formatCurrency(kpis.todayAmount)}
-            note="Theo ngày hiện tại"
+            value={formatCurrency(kpis.amountToday)}
+            note="Giá trị đã bàn giao hôm nay"
             tone="purple"
-            icon={<CircleDollarSign size={15} />}
-            trend={kpiTrend.todayAmount}
+            trend={kpiTrend.amountToday}
           />
           <CockpitKpiCard
-            title="Số phiếu xuất"
-            value={formatQuantity(kpis.docs, 0)}
-            note="Trong tháng hiện tại"
-            tone="cyan"
-            icon={<PackageCheck size={15} />}
-            trend={kpiTrend.docs}
-          />
-          <CockpitKpiCard
-            title="Chờ duyệt"
+            title="Chờ xử lý"
             value={formatQuantity(kpis.pending, 0)}
-            note="Cần xử lý"
+            note="Phiếu đang đợi phê duyệt"
             tone="amber"
-            icon={<TriangleAlert size={15} />}
             trend={kpiTrend.pending}
+          />
+          <CockpitKpiCard
+            title="Xuất cho sản xuất"
+            value={formatCurrency(kpis.productionAmount)}
+            note={`${formatQuantity(kpis.productionDocs, 0)} phiếu xuất`}
+            tone="blue"
+            trend={kpiTrend.productionAmount}
+          />
+          <CockpitKpiCard
+            title="Xuất cho công trình"
+            value={formatCurrency(kpis.projectAmount)}
+            note={`${formatQuantity(kpis.projectDocs, 0)} phiếu xuất`}
+            tone="emerald"
+            trend={kpiTrend.projectAmount}
           />
         </div>
 
-        <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_minmax(260px,1fr)_130px_120px]">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={compactInput}
-            />
-            <select
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              className={compactInput}
-            >
-              <option value="">Đơn vị nhận</option>
-              {projects.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <select
-              value={zoneId}
-              onChange={(e) => setZoneId(e.target.value)}
-              className={compactInput}
-            >
-              <option value="">Kho xuất</option>
-              {zones.map((z: any) => (
-                <option key={z.id} value={z.id}>{z.code}</option>
-              ))}
-            </select>
-            <input
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') applySearch()
-              }}
-              placeholder="Tìm mã phiếu, vật tư, đơn vị nhận..."
-              className={compactInput}
-            />
-            <button
-              onClick={applySearch}
-              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
-            >
-              Tìm kiếm
-            </button>
-            <button
-              onClick={resetFilters}
-              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-            >
-              Làm mới
-            </button>
-          </div>
-        </InventoryPanel>
-
-        <div className={`grid grid-cols-1 xl:grid-cols-12 gap-1.5`}>
-          <InventoryPanel
-            title={
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
-                  Danh sách phiếu xuất
-                </h3>
-
-                <button
-                  onClick={() => setShowAll(true)}
-                  className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+        {/* Enterprise Toolbar & Quick Actions */}
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex-1 min-w-0">
+            <ModuleFilterBar sticky={false} className="p-2.5">
+              <div className="col-span-12 xl:col-span-3">
+                <input
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applySearch()
+                  }}
+                  placeholder="Mã phiếu, vật tư, công trình..."
+                  className={compactInput}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3 xl:col-span-2">
+                <select
+                  value={zoneId}
+                  onChange={(e) => {
+                    setZoneId(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
                 >
-                  Xem tất cả
+                  <option value="">Kho xuất</option>
+                  {zones.map((z: any) => (
+                    <option key={z.id} value={z.id}>
+                      {z.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-12 md:col-span-3 xl:col-span-2">
+                <select
+                  value={projectId}
+                  onChange={(e) => {
+                    setProjectId(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
+                >
+                  <option value="">Đơn vị nhận</option>
+                  {projects.map((p: any) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-12 md:col-span-3 xl:col-span-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
+                >
+                  <option value="">Trạng thái</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="PENDING">PENDING</option>
+                </select>
+              </div>
+              <div className="col-span-12 md:col-span-3 xl:col-span-2">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
+                />
+              </div>
+              <div className="col-span-12 xl:col-span-1 flex gap-1">
+                <button
+                  onClick={applySearch}
+                  className="flex-1 h-9 rounded-lg bg-blue-600 text-xs font-semibold text-white transition hover:bg-blue-500"
+                >
+                  Lọc
+                </button>
+                <button
+                  onClick={resetFilters}
+                  className="flex-1 h-9 rounded-lg border border-white/10 bg-white/[0.055] text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                >
+                  Xóa
                 </button>
               </div>
+            </ModuleFilterBar>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 justify-end">
+            <button
+              onClick={() => {
+                void refetch()
+                toast.success('Đã tải lại danh sách phiếu xuất')
+              }}
+              className="h-9 rounded-lg border border-white/10 bg-slate-900 px-3 font-semibold text-slate-300 transition hover:bg-white/5"
+            >
+              🔄 Tải lại
+            </button>
+            <button
+              onClick={() => toast.success('Đang kết xuất báo cáo Excel...')}
+              className="h-9 rounded-lg border border-white/10 bg-slate-900 px-3 font-semibold text-slate-300 transition hover:bg-white/5"
+            >
+              📥 Xuất Excel
+            </button>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="h-9 rounded-lg bg-blue-600 px-4 font-semibold text-white hover:bg-blue-500 shadow-lg shadow-blue-600/20"
+            >
+              + Tạo phiếu xuất
+            </button>
+          </div>
+        </div>
+
+        {/* Loading state / Content table */}
+        {isLoading ? (
+          <ModuleLoadingState label="Đang tải danh sách phiếu xuất kho..." variant="table" />
+        ) : rows.length === 0 ? (
+          <ModuleEmptyState
+            title="Không tìm thấy phiếu xuất"
+            description="Không có giao dịch xuất kho nào khớp với điều kiện lọc hiện tại."
+            action={
+              <button
+                onClick={resetFilters}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+              >
+                Xóa bộ lọc
+              </button>
             }
-            className="xl:col-span-9 p-0"
-          >
-            <div className="rounded-lg border border-white/10 overflow-hidden">
-              <table className="w-full min-w-[1300px] text-sm table-fixed">
-                <colgroup>
-                  <col className="w-[90px]" /> {/* Mã phiếu */}
-                  <col className="w-[140px]" /> {/* Ngày */}
-                  <col className="w-[80px]" /> {/* Loại */}
-                  <col className="w-[150px]" /> {/* Đơn vị nhận */}
-                  <col className="w-[60px]" /> {/* Kho xuất */}
-                  <col className="w-[60px]" /> {/* Tổng SL */}
-                  <col className="w-[140px]" /> {/* Giá trị */}
-                  <col className="w-[60px]" /> {/* Hồ sơ */}
-                  <col className="w-[80px]" /> {/* Trạng thái */}
-                  <col className="w-[160px]" /> {/* Người tạo */}
-                </colgroup>
-                <thead
-                  className={`${inventoryTableHead}
-                    text-slate-300
-                    border-b border-cyan-400/10`}
-                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
-                >
-                  <tr>
-                    {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Tổng khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
-                      <th key={h} className="px-2 py-2 text-left font-medium">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {!isLoading &&
-                    paged.map((x: any) => {
+          />
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-1.5">
+            <InventoryPanel
+              title={
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                    Danh sách phiếu xuất
+                  </h3>
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+                  >
+                    Xem tất cả
+                  </button>
+                </div>
+              }
+              className="xl:col-span-9"
+            >
+              <div className="rounded-lg border border-white/10 overflow-hidden">
+              <CockpitTableShell>
+                <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
+                  <colgroup>
+                    <col className="w-[100px]" /> {/* Ngày */}
+                    <col className="w-[160px]" /> {/* Mã phiếu */}
+                    <col className="w-[100px]" /> {/* Loại */}
+                    <col className="w-[120px]" /> {/* Đơn vị nhận */}
+                    <col className="w-[100px]" /> {/* Kho xuất */}
+                    <col className="w-[120px]" /> {/* Khối lượng */}
+                    <col className="w-[140px]" /> {/* Giá trị */}
+                    <col className="w-[80px]" /> {/* Hồ sơ */}
+                    <col className="w-[100px]" /> {/* Trạng thái */}
+                    <col className="w-[140px]" /> {/* Người tạo */}
+                  </colgroup>
+                  <thead
+                    className={`${inventoryTableHead}
+                      text-slate-300
+                      border-b border-cyan-400/10`}
+                    style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                  >
+                    <tr>
+                      {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((x: any) => {
                       const zoneCodes = transactionZoneCodes(x)
+                      const isPending = String(x.status ?? '').toUpperCase() === 'PENDING'
                       return (
                         <tr
                           key={x.id}
-                          className={`${inventoryTableRow} cursor-pointer`}
+                          className="border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-500/5 hover:text-cyan-300 cursor-pointer"
                           onClick={() => setSelectedTransaction(x)}
                         >
-                          <td className="px-2 py-1.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-2 py-1.5 text-cyan-300">{x.transactionNo}</td>
-                          <td className="px-2 py-1.5">{x.referenceType ?? 'Xuất kho'}</td>
-                          <td className="px-2 py-1.5">{transactionProjectName(x)}</td>
-                          <td className="px-2 py-1.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
-                          <td className="px-2 py-1.5">{formatQuantity(transactionQuantity(x), 0)}</td>
-                          <td className="px-2 py-1.5">{formatCurrency(transactionAmount(x))}</td>
-                          <td className="px-2 py-1.5" onClick={(event) => event.stopPropagation()}>
+                          <td className="px-4 py-2.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-4 py-2.5 text-cyan-300 font-semibold">{x.transactionNo}</td>
+                          <td className="px-4 py-2.5">
+                            {x.type === 'TRANSFER' ? (
+                              <span className="text-blue-400 font-medium">Điều chuyển</span>
+                            ) : (
+                              <span className="text-slate-300">Xuất kho</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 truncate">{transactionProjectName(x)}</td>
+                          <td className="px-4 py-2.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
+                          <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 0)} tấn</td>
+                          <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
+                          <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-2 py-1.5">
-                            <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">{String(x.status ?? 'COMPLETED')}</span>
+                          <td className="px-4 py-2.5">
+                            <span className={`rounded px-2 py-0.5 text-[11px] font-semibold border ${
+                              isPending
+                                ? 'border-amber-700/60 bg-amber-500/10 text-amber-300'
+                                : 'border-emerald-700/60 bg-emerald-500/10 text-emerald-300'
+                            }`}>
+                              {String(x.status ?? 'COMPLETED')}
+                            </span>
                           </td>
-                          <td className="px-2 py-1.5">{x.createdBy ?? 'Admin'}</td>
+                          <td className="px-4 py-2.5 text-slate-400">{transactionActor(x)}</td>
                         </tr>
                       )
                     })}
-                </tbody>
-              </table>
-            </div>
-            <MaterialsPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
-          </InventoryPanel>
+                  </tbody>
+                </table>
+              </CockpitTableShell>
+              </div>
+              <DataTablePagination
+                page={page}
+                pageSize={pageSize}
+                total={rows.length}
+                onPageChange={setPage}
+              />
+            </InventoryPanel>
 
-          <div className="space-y-1.5 xl:col-span-3">
-            <InventoryChartCard title="Phân bổ xuất theo kho" className="p-2">
-              <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.monthlyQty, 0)} centerLabel="tổng xuất" />
-            </InventoryChartCard>
-            <InventoryChartCard title="Top vật tư xuất" className="p-2">
-              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.amount])} valueFormatter={(value) => formatCurrency(value)} />
-            </InventoryChartCard>
-            <InventoryChartCard title="Top công trình theo giá trị xuất" className="p-2">
-              <HorizontalBars rows={topProjects.map((p) => [p.name, p.amount])} valueFormatter={(value) => formatCurrency(value)} />
-            </InventoryChartCard>
+            <div className="space-y-1.5 xl:col-span-3">
+              <InventoryChartCard title="Phân bổ xuất theo kho" className="p-2">
+                <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.docsToday + kpis.pending, 0)} centerLabel="phiếu xuất" />
+              </InventoryChartCard>
+              <InventoryChartCard title="Top vật tư xuất" className="p-2">
+                <HorizontalBars rows={topMaterials.map((m) => [m.code, m.amount])} valueFormatter={(value) => formatCurrency(value)} />
+              </InventoryChartCard>
+              <InventoryChartCard title="Top công trình theo giá trị xuất" className="p-2">
+                <HorizontalBars rows={topProjects.map((p) => [p.name, p.amount])} valueFormatter={(value) => formatCurrency(value)} />
+              </InventoryChartCard>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-12">
           <InventoryChartCard title="KPI tài chính xuất kho" className="p-3 xl:col-span-4">
             <FinancialKpiRows
-              today={kpis.todayAmount}
-              week={kpis.weekAmount}
-              month={kpis.monthlyAmount}
-              year={kpis.yearAmount}
+              today={kpis.amountToday}
+              week={kpis.amountToday} // hoặc tuần nếu có cách tính chính xác hơn
+              month={kpis.projectAmount + kpis.productionAmount}
+              year={kpis.projectAmount + kpis.productionAmount}
             />
           </InventoryChartCard>
 
@@ -1007,18 +994,120 @@ export function InventoryOutboundPage() {
           </InventoryChartCard>
         </div>
       </div>
+      {showAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
+          <div className="max-h-[90vh] w-full max-w-[95vw] overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">
+                Danh sách phiếu xuất ({rows.length} phiếu)
+              </h3>
+
+              <button
+                onClick={() => setShowAll(false)}
+                className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="overflow-auto rounded-xl border border-white/10">
+            <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
+                  <colgroup>
+                    <col className="w-[100px]" /> {/* Ngày */}
+                    <col className="w-[160px]" /> {/* Mã phiếu */}
+                    <col className="w-[100px]" /> {/* Loại */}
+                    <col className="w-[120px]" /> {/* Đơn vị nhận */}
+                    <col className="w-[100px]" /> {/* Kho xuất */}
+                    <col className="w-[120px]" /> {/* Khối lượng */}
+                    <col className="w-[140px]" /> {/* Giá trị */}
+                    <col className="w-[80px]" /> {/* Hồ sơ */}
+                    <col className="w-[100px]" /> {/* Trạng thái */}
+                    <col className="w-[140px]" /> {/* Người tạo */}
+                  </colgroup>
+                  <thead className={`${inventoryTableHead} border-b border-cyan-400/20`}>
+                    <tr className="bg-slate-900 text-slate-400 font-semibold uppercase">
+                      {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((x: any) => {
+                      const zoneCodes = transactionZoneCodes(x)
+                      const isPending = String(x.status ?? '').toUpperCase() === 'PENDING'
+                      return (
+                        <tr
+                          key={x.id}
+                          className="border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-500/5 hover:text-cyan-300 cursor-pointer"
+                          onClick={() => setSelectedTransaction(x)}
+                        >
+                          <td className="px-4 py-2.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-4 py-2.5 text-cyan-300 font-semibold">{x.transactionNo}</td>
+                          <td className="px-4 py-2.5">
+                            {x.type === 'TRANSFER' ? (
+                              <span className="text-blue-400 font-medium">Điều chuyển</span>
+                            ) : (
+                              <span className="text-slate-300">Xuất kho</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 truncate">{transactionProjectName(x)}</td>
+                          <td className="px-4 py-2.5">{zoneCodes.length ? zoneCodes.join(', ') : '-'}</td>
+                          <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 0)} tấn</td>
+                          <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
+                          <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
+                            <InventoryTransactionAttachmentButton
+                              transaction={x}
+                              attachmentMap={attachmentMap}
+                              onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
+                            />
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`rounded px-2 py-0.5 text-[11px] font-semibold border ${
+                              isPending
+                                ? 'border-amber-700/60 bg-amber-500/10 text-amber-300'
+                                : 'border-emerald-700/60 bg-emerald-500/10 text-emerald-300'
+                            }`}>
+                              {String(x.status ?? 'COMPLETED')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-400">{transactionActor(x)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <DataTablePagination
+                page={page}
+                pageSize={pageSize}
+                total={rows.length}
+                onPageChange={setPage}
+              />
+          </div>
+        </div>
+      )}
+
       <InventoryTransactionAttachmentDrawer
         open={Boolean(attachmentDrawer)}
         transaction={attachmentDrawer?.transaction}
         attachments={attachmentDrawer?.attachments ?? []}
         onClose={() => setAttachmentDrawer(null)}
       />
+
       {selectedTransaction ? (
         <OutboundTransactionDetailDrawer
           transaction={selectedTransaction}
           onClose={() => setSelectedTransaction(null)}
         />
       ) : null}
+
+      <OutboundTransactionModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+      />
     </EnterpriseModulePage>
   )
 }

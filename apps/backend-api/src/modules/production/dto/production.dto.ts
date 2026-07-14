@@ -90,6 +90,18 @@ export const listProductionOrdersSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
+export const productionCockpitReadModelSchema = z.object({
+  search: z.string().trim().optional(),
+  status: z.nativeEnum(ProductionOrderStatus).optional(),
+  scope: z.enum(['all', 'planning']).default('all'),
+  sortBy: z
+    .enum(['updatedAt', 'orderNo', 'plannedEndAt', 'status'])
+    .default('updatedAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(14),
+});
+
 export const startProductionSchema = z.object({
   message: z.string().optional(),
 });
@@ -321,6 +333,9 @@ export type UpdateProductionOrderDto = z.infer<
 >;
 export type ListProductionOrdersDto = z.infer<
   typeof listProductionOrdersSchema
+>;
+export type ProductionCockpitReadModelDto = z.infer<
+  typeof productionCockpitReadModelSchema
 >;
 export type StartProductionDto = z.infer<typeof startProductionSchema>;
 export type ProductionOrderTransitionDto = z.infer<

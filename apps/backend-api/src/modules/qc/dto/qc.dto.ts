@@ -182,6 +182,22 @@ export const listNcrSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
+export const qcWorkspaceReadSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  search: z.string().trim().optional(),
+  status: z.nativeEnum(QcInspectionStatus).optional(),
+  sortBy: z
+    .enum(['updatedAt', 'createdAt', 'inspectionNo', 'status'])
+    .default('updatedAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const qcInspectionHistorySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
 export type CreateQcChecklistDto = z.infer<typeof createQcChecklistSchema>;
 export type UpdateQcChecklistDto = z.infer<typeof updateQcChecklistSchema>;
 export type ListQcChecklistsDto = z.infer<typeof listQcChecklistsSchema>;
@@ -199,3 +215,7 @@ export type CreateQcIssueDto = z.infer<typeof createQcIssueSchema>;
 export type UpdateQcIssueDto = z.infer<typeof updateQcIssueSchema>;
 export type CreateNcrDto = z.infer<typeof createNcrSchema>;
 export type ListNcrDto = z.infer<typeof listNcrSchema>;
+export type QcWorkspaceReadDto = z.infer<typeof qcWorkspaceReadSchema>;
+export type QcInspectionHistoryDto = z.infer<
+  typeof qcInspectionHistorySchema
+>;

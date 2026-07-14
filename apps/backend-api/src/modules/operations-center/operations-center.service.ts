@@ -1,6 +1,4 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { statfsSync } from 'fs';
 import { cpus, freemem, loadavg, totalmem } from 'os';
 
@@ -34,6 +32,9 @@ export class OperationsCenterService {
       inventoryHealth,
       projectHealth,
       productionHealth,
+      componentsHealth,
+      qcHealth,
+      yardHealth,
     ] = await Promise.all([
       this.repository.countBackgroundJobsByStatus(),
       this.repository.recentBackgroundJobs(),
@@ -45,6 +46,9 @@ export class OperationsCenterService {
       this.inventoryRepository.inventoryPlatformHealth(),
       this.repository.projectPlatformHealth(),
       this.repository.productionPlatformHealth(),
+      this.repository.componentsPlatformHealth(),
+      this.repository.qcPlatformHealth(),
+      this.repository.yardPlatformHealth(),
     ]);
     const runtime = this.metrics.snapshot();
     const analytics = this.asRecord(runtime.analytics);
@@ -66,7 +70,9 @@ export class OperationsCenterService {
     const cacheRuntime = this.asRecord(runtime.cache);
     const cacheStats = this.cache.stats();
     const systemMemory = this.systemMemory();
-    const disk = this.diskUsage(process.env.STORAGE_ROOT ?? '/data/steeltrack-storage');
+    const disk = this.diskUsage(
+      process.env.STORAGE_ROOT ?? '/data/steeltrack-storage',
+    );
     const databaseBytes = Number(databaseSize[0]?.sizeBytes ?? 0);
     const snapshotHealth = this.snapshotHealth(snapshotRows);
     const jobs = this.statusMap(jobCounts);
@@ -117,14 +123,21 @@ export class OperationsCenterService {
         {
           id: 'worker',
           label: 'Worker',
-          status: Number(jobs.FAILED ?? 0) + Number(jobs.DEAD_LETTER ?? 0) > 0 ? 'warning' : 'healthy',
+          status:
+            Number(jobs.FAILED ?? 0) + Number(jobs.DEAD_LETTER ?? 0) > 0
+              ? 'warning'
+              : 'healthy',
           value: `${Number(jobs.RUNNING ?? 0)} running`,
           detail: `${Number(jobs.QUEUED ?? 0)} waiting · ${Number(jobs.RETRYING ?? 0)} retry`,
         },
         {
           id: 'snapshot',
           label: 'Snapshot',
-          status: snapshotHealth.some((row) => row.status === 'critical') ? 'critical' : snapshotHealth.some((row) => row.status === 'warning') ? 'warning' : 'healthy',
+          status: snapshotHealth.some((row) => row.status === 'critical')
+            ? 'critical'
+            : snapshotHealth.some((row) => row.status === 'warning')
+              ? 'warning'
+              : 'healthy',
           value: `${Number(snapshots.hits ?? 0)} hit`,
           detail: `${Number(snapshots.misses ?? 0)} miss · ${Number(snapshots.fallbacks ?? 0)} fallback`,
         },
@@ -138,7 +151,10 @@ export class OperationsCenterService {
         {
           id: 'event',
           label: 'Event',
-          status: Number(events.FAILED ?? 0) + Number(events.DEAD_LETTER ?? 0) > 0 ? 'warning' : 'healthy',
+          status:
+            Number(events.FAILED ?? 0) + Number(events.DEAD_LETTER ?? 0) > 0
+              ? 'warning'
+              : 'healthy',
           value: `${Number(events.PENDING ?? 0)} pending`,
           detail: `${Number(events.DISPATCHED ?? 0)} dispatched`,
         },
@@ -161,11 +177,17 @@ export class OperationsCenterService {
       apiRanking: {
         byAverage: this.asArray(endpointRanking.byAverage).slice(0, 8),
         byP95: this.asArray(endpointRanking.byP95).slice(0, 8),
-        byRequestCount: this.asArray(endpointRanking.byRequestCount).slice(0, 8),
+        byRequestCount: this.asArray(endpointRanking.byRequestCount).slice(
+          0,
+          8,
+        ),
       },
       queryRanking: {
         byAverage: this.asArray(queryRanking.byAverage).slice(0, 8),
-        byExecutionCount: this.asArray(queryRanking.byExecutionCount).slice(0, 8),
+        byExecutionCount: this.asArray(queryRanking.byExecutionCount).slice(
+          0,
+          8,
+        ),
       },
       jobs: {
         counts: jobs,
@@ -198,9 +220,36 @@ export class OperationsCenterService {
         counts: events,
         recent: recentEvents,
       },
-      inventory: this.inventoryHealth(inventoryHealth, snapshots, readModel, events, jobs),
-      projects: this.projectHealth(projectHealth, snapshots, readModel, events, jobs),
-      production: this.productionHealth(productionHealth, snapshots, readModel, events, jobs),
+      inventory: this.inventoryHealth(
+        inventoryHealth,
+        snapshots,
+        readModel,
+        events,
+        jobs,
+      ),
+      projects: this.projectHealth(
+        projectHealth,
+        snapshots,
+        readModel,
+        events,
+        jobs,
+      ),
+      production: this.productionHealth(
+        productionHealth,
+        snapshots,
+        readModel,
+        events,
+        jobs,
+      ),
+      components: this.componentsHealth(
+        componentsHealth,
+        snapshots,
+        readModel,
+        events,
+        jobs,
+      ),
+      qc: this.qcHealth(qcHealth, snapshots, readModel, events, jobs),
+      yard: this.yardHealth(yardHealth, snapshots, readModel, events, jobs),
       alerts,
     };
   }
@@ -216,10 +265,14 @@ export class OperationsCenterService {
       ? Math.round((Date.now() - health.latestSnapshotAt.getTime()) / 1000)
       : null;
     const materialSnapshotAgeSeconds = health.latestMaterialSnapshotAt
-      ? Math.round((Date.now() - health.latestMaterialSnapshotAt.getTime()) / 1000)
+      ? Math.round(
+          (Date.now() - health.latestMaterialSnapshotAt.getTime()) / 1000,
+        )
       : null;
     const locationSnapshotAgeSeconds = health.latestLocationSnapshotAt
-      ? Math.round((Date.now() - health.latestLocationSnapshotAt.getTime()) / 1000)
+      ? Math.round(
+          (Date.now() - health.latestLocationSnapshotAt.getTime()) / 1000,
+        )
       : null;
     const snapshotStatus =
       health.snapshotCount === 0
@@ -230,17 +283,19 @@ export class OperationsCenterService {
     const materialSnapshotStatus =
       health.materialSnapshotCount === 0
         ? 'critical'
-        : materialSnapshotAgeSeconds !== null && materialSnapshotAgeSeconds > 3600
+        : materialSnapshotAgeSeconds !== null &&
+            materialSnapshotAgeSeconds > 3600
           ? 'warning'
           : 'healthy';
     const locationSnapshotStatus =
       health.locationSnapshotCount === 0
         ? 'critical'
-        : locationSnapshotAgeSeconds !== null && locationSnapshotAgeSeconds > 3600
+        : locationSnapshotAgeSeconds !== null &&
+            locationSnapshotAgeSeconds > 3600
           ? 'warning'
           : 'healthy';
-    const snapshotHits = Number(snapshots.hits ?? 0);
-    const snapshotMisses = Number(snapshots.misses ?? 0);
+    const snapshotHits = Number(snapshots.inventorySnapshotHit ?? 0);
+    const snapshotMisses = Number(snapshots.inventorySnapshotMiss ?? 0);
     const snapshotTotal = snapshotHits + snapshotMisses;
 
     return {
@@ -252,7 +307,8 @@ export class OperationsCenterService {
       readModel: {
         status: Number(readModel.hitRate ?? 0) > 0 ? 'healthy' : 'unknown',
         hitRate: Number(readModel.hitRate ?? 0),
-        detail: 'Material Detail and Inventory Audit use repository-backed read-model services.',
+        detail:
+          'Material Detail and Inventory Audit use repository-backed read-model services.',
       },
       snapshot: {
         status: snapshotStatus,
@@ -261,10 +317,12 @@ export class OperationsCenterService {
         ageSeconds: snapshotAgeSeconds,
         runtimeHits: snapshotHits,
         runtimeMisses: snapshotMisses,
-        runtimeFallbacks: Number(snapshots.fallbacks ?? 0),
+        runtimeFallbacks: Number(snapshots.inventoryFallbackCount ?? 0),
         hitRatio:
-          snapshotTotal > 0 ? Math.round((snapshotHits / snapshotTotal) * 100) : 0,
-        averageLagMs: Number(snapshots.averageLagMs ?? 0),
+          snapshotTotal > 0
+            ? Math.round((snapshotHits / snapshotTotal) * 100)
+            : 0,
+        averageLagMs: Number(snapshots.inventoryAverageLagMs ?? 0),
         maxLagMs: Number(snapshots.maxLagMs ?? 0),
         material: {
           status: materialSnapshotStatus,
@@ -315,7 +373,9 @@ export class OperationsCenterService {
   }
 
   private projectHealth(
-    health: Awaited<ReturnType<OperationsCenterRepository['projectPlatformHealth']>>,
+    health: Awaited<
+      ReturnType<OperationsCenterRepository['projectPlatformHealth']>
+    >,
     snapshots: Record<string, unknown>,
     readModel: Record<string, unknown>,
     events: Record<string, number>,
@@ -334,7 +394,9 @@ export class OperationsCenterService {
     const projectSnapshotMisses = Number(snapshots.projectSnapshotMiss ?? 0);
     const projectSnapshotTotal = projectSnapshotHits + projectSnapshotMisses;
     const detailSnapshotAgeSeconds = health.latestDetailSnapshotAt
-      ? Math.round((Date.now() - health.latestDetailSnapshotAt.getTime()) / 1000)
+      ? Math.round(
+          (Date.now() - health.latestDetailSnapshotAt.getTime()) / 1000,
+        )
       : null;
     const detailSnapshotStatus =
       health.detailSnapshotCount === 0
@@ -349,10 +411,14 @@ export class OperationsCenterService {
       repository: {
         status: 'healthy',
         coverage: 95,
-        detail: 'Project commands and reads are routed through ProjectsRepository, with remaining external reads isolated in OperationsCenterRepository.',
+        detail:
+          'Project commands and reads are routed through ProjectsRepository, with remaining external reads isolated in OperationsCenterRepository.',
       },
       readModel: {
-        status: Number(snapshots.projectReadModelHit ?? 0) > 0 ? 'healthy' : 'unknown',
+        status:
+          Number(snapshots.projectReadModelHit ?? 0) > 0
+            ? 'healthy'
+            : 'unknown',
         hits: Number(snapshots.projectReadModelHit ?? 0),
         fallbackCount: Number(snapshots.projectFallbackCount ?? 0),
         globalHitRate: Number(readModel.hitRate ?? 0),
@@ -373,7 +439,8 @@ export class OperationsCenterService {
         detail: {
           status: detailSnapshotStatus,
           count: health.detailSnapshotCount,
-          latestSnapshotAt: health.latestDetailSnapshotAt?.toISOString() ?? null,
+          latestSnapshotAt:
+            health.latestDetailSnapshotAt?.toISOString() ?? null,
           ageSeconds: detailSnapshotAgeSeconds,
           staleCount: health.staleDetailSnapshots,
           parityWarnings: health.detailSnapshotWarnings,
@@ -382,7 +449,9 @@ export class OperationsCenterService {
           planningHits: Number(snapshots.planningSnapshotHit ?? 0),
           timelineHits: Number(snapshots.timelineSnapshotHit ?? 0),
           allocationHits: Number(snapshots.allocationSnapshotHit ?? 0),
-          averageAgeSeconds: Number(snapshots.projectDetailAverageAgeSeconds ?? 0),
+          averageAgeSeconds: Number(
+            snapshots.projectDetailAverageAgeSeconds ?? 0,
+          ),
           averageLagMs: Number(snapshots.projectDetailAverageLagMs ?? 0),
         },
       },
@@ -411,23 +480,31 @@ export class OperationsCenterService {
   }
 
   private productionHealth(
-    health: Awaited<ReturnType<OperationsCenterRepository['productionPlatformHealth']>>,
+    health: Awaited<
+      ReturnType<OperationsCenterRepository['productionPlatformHealth']>
+    >,
     snapshots: Record<string, unknown>,
     readModel: Record<string, unknown>,
     events: Record<string, number>,
     jobs: Record<string, number>,
   ) {
     const dashboardAgeSeconds = health.latestDashboardSnapshotAt
-      ? Math.round((Date.now() - health.latestDashboardSnapshotAt.getTime()) / 1000)
+      ? Math.round(
+          (Date.now() - health.latestDashboardSnapshotAt.getTime()) / 1000,
+        )
       : null;
     const orderAgeSeconds = health.latestOrderSnapshotAt
       ? Math.round((Date.now() - health.latestOrderSnapshotAt.getTime()) / 1000)
       : null;
     const workCenterAgeSeconds = health.latestWorkCenterSnapshotAt
-      ? Math.round((Date.now() - health.latestWorkCenterSnapshotAt.getTime()) / 1000)
+      ? Math.round(
+          (Date.now() - health.latestWorkCenterSnapshotAt.getTime()) / 1000,
+        )
       : null;
     const productionSnapshotHits = Number(snapshots.productionSnapshotHit ?? 0);
-    const productionSnapshotMisses = Number(snapshots.productionSnapshotMiss ?? 0);
+    const productionSnapshotMisses = Number(
+      snapshots.productionSnapshotMiss ?? 0,
+    );
     const productionSnapshotTotal =
       productionSnapshotHits + productionSnapshotMisses;
     const dashboardSnapshotStatus =
@@ -453,12 +530,14 @@ export class OperationsCenterService {
       repository: {
         status: 'healthy',
         coverage: 100,
-        detail: 'Production persistence is routed through Production repositories.',
+        detail:
+          'Production persistence is routed through Production repositories.',
       },
       readModel: {
-        status: Number(snapshots.productionReadModelHit ?? 0) > 0
-          ? 'healthy'
-          : 'unknown',
+        status:
+          Number(snapshots.productionReadModelHit ?? 0) > 0
+            ? 'healthy'
+            : 'unknown',
         hits: Number(snapshots.productionReadModelHit ?? 0),
         fallbackCount: Number(snapshots.productionFallbackCount ?? 0),
         globalHitRate: Number(readModel.hitRate ?? 0),
@@ -499,7 +578,9 @@ export class OperationsCenterService {
         misses: productionSnapshotMisses,
         hitRatio:
           productionSnapshotTotal > 0
-            ? Math.round((productionSnapshotHits / productionSnapshotTotal) * 100)
+            ? Math.round(
+                (productionSnapshotHits / productionSnapshotTotal) * 100,
+              )
             : 0,
         averageAgeSeconds: Number(snapshots.productionAverageAgeSeconds ?? 0),
         averageLagMs: Number(snapshots.productionAverageLagMs ?? 0),
@@ -522,7 +603,8 @@ export class OperationsCenterService {
       },
       parity: {
         status: 'prepared',
-        detail: 'SnapshotValidatorService exposes Production parity checks; full parity execution is deferred.',
+        detail:
+          'SnapshotValidatorService exposes Production parity checks; full parity execution is deferred.',
       },
       runtime: {
         status: 'healthy',
@@ -537,27 +619,432 @@ export class OperationsCenterService {
     };
   }
 
-  private snapshotHealth(rows: Awaited<ReturnType<OperationsCenterRepository['snapshotStats']>>) {
+  private componentsHealth(
+    health: Awaited<
+      ReturnType<OperationsCenterRepository['componentsPlatformHealth']>
+    >,
+    snapshots: Record<string, unknown>,
+    readModel: Record<string, unknown>,
+    events: Record<string, number>,
+    jobs: Record<string, number>,
+  ) {
+    const dashboardAgeSeconds = health.latestDashboardSnapshotAt
+      ? Math.round(
+          (Date.now() - health.latestDashboardSnapshotAt.getTime()) / 1000,
+        )
+      : null;
+    const summaryAgeSeconds = health.latestSummarySnapshotAt
+      ? Math.round(
+          (Date.now() - health.latestSummarySnapshotAt.getTime()) / 1000,
+        )
+      : null;
+    const hits = Number(snapshots.componentSnapshotHit ?? 0);
+    const misses = Number(snapshots.componentSnapshotMiss ?? 0);
+    const total = hits + misses;
+    const status = (count: number, ageSeconds: number | null): HealthTone =>
+      count === 0
+        ? 'critical'
+        : ageSeconds !== null && ageSeconds > 3600
+          ? 'warning'
+          : 'healthy';
+    const dashboardStatus = status(
+      health.dashboardSnapshotCount,
+      dashboardAgeSeconds,
+    );
+    const summaryStatus = status(
+      health.summarySnapshotCount,
+      summaryAgeSeconds,
+    );
+
+    return {
+      repository: {
+        status: 'healthy',
+        coverage: 100,
+        detail:
+          'Components persistence is routed through Components repositories.',
+      },
+      readModel: {
+        status:
+          Number(snapshots.componentReadModelHit ?? 0) > 0
+            ? 'healthy'
+            : 'unknown',
+        hits: Number(snapshots.componentReadModelHit ?? 0),
+        fallbackCount: Number(snapshots.componentFallbackCount ?? 0),
+        globalHitRate: Number(readModel.hitRate ?? 0),
+      },
+      snapshot: {
+        status:
+          dashboardStatus === 'critical' || summaryStatus === 'critical'
+            ? 'critical'
+            : dashboardStatus === 'warning' || summaryStatus === 'warning'
+              ? 'warning'
+              : 'healthy',
+        featureFlagEnabled: this.snapshotFlags.isEnabled('components'),
+        dashboard: {
+          status: dashboardStatus,
+          count: health.dashboardSnapshotCount,
+          latestSnapshotAt:
+            health.latestDashboardSnapshotAt?.toISOString() ?? null,
+          ageSeconds: dashboardAgeSeconds,
+        },
+        summaries: {
+          status: summaryStatus,
+          count: health.summarySnapshotCount,
+          latestSnapshotAt:
+            health.latestSummarySnapshotAt?.toISOString() ?? null,
+          ageSeconds: summaryAgeSeconds,
+        },
+        hits,
+        misses,
+        hitRatio: total > 0 ? Math.round((hits / total) * 100) : 0,
+        averageAgeSeconds: Number(snapshots.componentAverageAgeSeconds ?? 0),
+        averageLagMs: Number(snapshots.componentAverageLagMs ?? 0),
+      },
+      event: {
+        status: health.failedOutbox > 0 ? 'warning' : 'healthy',
+        pendingOutbox: health.pendingOutbox,
+        failedOutbox: health.failedOutbox,
+        globalPending: Number(events.PENDING ?? 0),
+      },
+      jobs: {
+        status: health.failedJobs > 0 ? 'warning' : 'healthy',
+        activeJobs: health.activeJobs,
+        failedJobs: health.failedJobs,
+        globalRunning: Number(jobs.RUNNING ?? 0),
+      },
+      parity: {
+        status: 'prepared',
+        detail:
+          'SnapshotValidatorService exposes Components parity checks without automatic repair.',
+      },
+      runtime: {
+        status: 'healthy',
+        trackedByRuntimeMetrics: true,
+      },
+      counts: {
+        componentCount: health.componentCount,
+        timelineCount: health.timelineCount,
+      },
+    };
+  }
+
+  private qcHealth(
+    health: Awaited<ReturnType<OperationsCenterRepository['qcPlatformHealth']>>,
+    snapshots: Record<string, unknown>,
+    readModel: Record<string, unknown>,
+    events: Record<string, number>,
+    jobs: Record<string, number>,
+  ) {
+    const dashboardAgeSeconds = health.latestDashboardSnapshotAt
+      ? Math.round(
+          (Date.now() - health.latestDashboardSnapshotAt.getTime()) / 1000,
+        )
+      : null;
+    const inspectionAgeSeconds = health.latestInspectionSnapshotAt
+      ? Math.round(
+          (Date.now() - health.latestInspectionSnapshotAt.getTime()) / 1000,
+        )
+      : null;
+    const hits = Number(snapshots.qcSnapshotHit ?? 0);
+    const misses = Number(snapshots.qcSnapshotMiss ?? 0);
+    const total = hits + misses;
+    const status = (count: number, ageSeconds: number | null): HealthTone =>
+      count === 0
+        ? 'critical'
+        : ageSeconds !== null && ageSeconds > 3600
+          ? 'warning'
+          : 'healthy';
+    const dashboardStatus = status(
+      health.dashboardSnapshotCount,
+      dashboardAgeSeconds,
+    );
+    const inspectionStatus = status(
+      health.inspectionSnapshotCount,
+      inspectionAgeSeconds,
+    );
+
+    return {
+      repository: {
+        status: 'healthy',
+        coverage: 100,
+        detail: 'QC persistence is routed through QC repositories.',
+      },
+      readModel: {
+        status:
+          Number(snapshots.qcReadModelHit ?? 0) > 0 ? 'healthy' : 'unknown',
+        hits: Number(snapshots.qcReadModelHit ?? 0),
+        fallbackCount: Number(snapshots.qcFallbackCount ?? 0),
+        globalHitRate: Number(readModel.hitRate ?? 0),
+      },
+      snapshot: {
+        status:
+          dashboardStatus === 'critical' || inspectionStatus === 'critical'
+            ? 'critical'
+            : dashboardStatus === 'warning' || inspectionStatus === 'warning'
+              ? 'warning'
+              : 'healthy',
+        featureFlagEnabled: this.snapshotFlags.isEnabled('qc'),
+        dashboard: {
+          status: dashboardStatus,
+          count: health.dashboardSnapshotCount,
+          latestSnapshotAt:
+            health.latestDashboardSnapshotAt?.toISOString() ?? null,
+          ageSeconds: dashboardAgeSeconds,
+        },
+        inspections: {
+          status: inspectionStatus,
+          count: health.inspectionSnapshotCount,
+          latestSnapshotAt:
+            health.latestInspectionSnapshotAt?.toISOString() ?? null,
+          ageSeconds: inspectionAgeSeconds,
+        },
+        hits,
+        misses,
+        hitRatio: total > 0 ? Math.round((hits / total) * 100) : 0,
+        averageAgeSeconds: Number(snapshots.qcAverageAgeSeconds ?? 0),
+        averageLagMs: Number(snapshots.qcAverageLagMs ?? 0),
+      },
+      event: {
+        status: health.failedOutbox > 0 ? 'warning' : 'healthy',
+        pendingOutbox: health.pendingOutbox,
+        failedOutbox: health.failedOutbox,
+        globalPending: Number(events.PENDING ?? 0),
+        coverage: 'partial',
+      },
+      jobs: {
+        status: health.failedJobs > 0 ? 'warning' : 'healthy',
+        activeJobs: health.activeJobs,
+        failedJobs: health.failedJobs,
+        globalRunning: Number(jobs.RUNNING ?? 0),
+      },
+      parity: {
+        status: 'prepared',
+        detail:
+          'SnapshotValidatorService exposes warning-only QC parity checks.',
+      },
+      runtime: {
+        status: 'healthy',
+        trackedByRuntimeMetrics: true,
+      },
+      counts: {
+        inspectionCount: health.inspectionCount,
+        resultCount: health.resultCount,
+        issueCount: health.issueCount,
+        ncrCount: health.ncrCount,
+      },
+    };
+  }
+
+  private yardHealth(
+    health: Awaited<
+      ReturnType<OperationsCenterRepository['yardPlatformHealth']>
+    >,
+    snapshots: Record<string, unknown>,
+    readModel: Record<string, unknown>,
+    events: Record<string, number>,
+    jobs: Record<string, number>,
+  ) {
+    const dashboardAgeSeconds = health.latestDashboardSnapshotAt
+      ? Math.round(
+          (Date.now() - health.latestDashboardSnapshotAt.getTime()) / 1000,
+        )
+      : null;
+    const workspaceAgeSeconds = health.latestWorkspaceSnapshotAt
+      ? Math.round(
+          (Date.now() - health.latestWorkspaceSnapshotAt.getTime()) / 1000,
+        )
+      : null;
+    const hits = Number(snapshots.yardSnapshotHit ?? 0);
+    const misses = Number(snapshots.yardSnapshotMiss ?? 0);
+    const total = hits + misses;
+    const status = (count: number, ageSeconds: number | null): HealthTone =>
+      count === 0
+        ? 'critical'
+        : ageSeconds !== null && ageSeconds > 3600
+          ? 'warning'
+          : 'healthy';
+    const dashboardStatus = status(
+      health.dashboardSnapshotCount,
+      dashboardAgeSeconds,
+    );
+    const workspaceStatus = status(
+      health.workspaceSnapshotCount,
+      workspaceAgeSeconds,
+    );
+
+    return {
+      repository: {
+        status: 'healthy',
+        coverage: 100,
+        detail: 'Yard persistence is routed through Yard repositories.',
+      },
+      readModel: {
+        status:
+          Number(snapshots.yardReadModelHit ?? 0) > 0 ? 'healthy' : 'unknown',
+        hits: Number(snapshots.yardReadModelHit ?? 0),
+        fallbackCount: Number(snapshots.yardFallbackCount ?? 0),
+        globalHitRate: Number(readModel.hitRate ?? 0),
+      },
+      snapshot: {
+        status:
+          dashboardStatus === 'critical' || workspaceStatus === 'critical'
+            ? 'critical'
+            : dashboardStatus === 'warning' || workspaceStatus === 'warning'
+              ? 'warning'
+              : 'healthy',
+        featureFlagEnabled: this.snapshotFlags.isEnabled('yard'),
+        dashboard: {
+          status: dashboardStatus,
+          count: health.dashboardSnapshotCount,
+          latestSnapshotAt:
+            health.latestDashboardSnapshotAt?.toISOString() ?? null,
+          ageSeconds: dashboardAgeSeconds,
+        },
+        workspaces: {
+          status: workspaceStatus,
+          count: health.workspaceSnapshotCount,
+          latestSnapshotAt:
+            health.latestWorkspaceSnapshotAt?.toISOString() ?? null,
+          ageSeconds: workspaceAgeSeconds,
+        },
+        hits,
+        misses,
+        hitRatio: total > 0 ? Math.round((hits / total) * 100) : 0,
+        averageAgeSeconds: Number(snapshots.yardAverageAgeSeconds ?? 0),
+        averageLagMs: Number(snapshots.yardAverageLagMs ?? 0),
+      },
+      event: {
+        status: health.failedOutbox > 0 ? 'warning' : 'healthy',
+        pendingOutbox: health.pendingOutbox,
+        failedOutbox: health.failedOutbox,
+        globalPending: Number(events.PENDING ?? 0),
+        coverage: 'partial',
+      },
+      jobs: {
+        status: health.failedJobs > 0 ? 'warning' : 'healthy',
+        activeJobs: health.activeJobs,
+        failedJobs: health.failedJobs,
+        globalRunning: Number(jobs.RUNNING ?? 0),
+      },
+      parity: {
+        status: 'prepared',
+        detail:
+          'SnapshotValidatorService exposes warning-only Yard parity checks.',
+      },
+      runtime: {
+        status: 'healthy',
+        trackedByRuntimeMetrics: true,
+      },
+      counts: {
+        zoneCount: health.zoneCount,
+        slotCount: health.slotCount,
+        activePlacementCount: health.activePlacementCount,
+        movementCount: health.movementCount,
+      },
+    };
+  }
+
+  private snapshotHealth(
+    rows: Awaited<ReturnType<OperationsCenterRepository['snapshotStats']>>,
+  ) {
     const now = Date.now();
     return [
-      this.snapshotModule('Inventory', Number(rows[0] ?? 0), rows[1]?.updatedAt, now),
-      this.snapshotModule('Projects', Number(rows[2] ?? 0), rows[3]?.updatedAt, now),
-      this.snapshotModule('Dispatch', Number(rows[4] ?? 0), rows[5]?.updatedAt, now),
-      this.snapshotModule('Production', Number(rows[6] ?? 0), rows[7]?.updatedAt, now),
-      this.snapshotModule('Production Orders', Number(rows[8] ?? 0), rows[9]?.updatedAt, now),
-      this.snapshotModule('Work Centers', Number(rows[10] ?? 0), rows[11]?.updatedAt, now),
+      this.snapshotModule(
+        'Inventory',
+        Number(rows[0] ?? 0),
+        rows[1]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Projects',
+        Number(rows[2] ?? 0),
+        rows[3]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Dispatch',
+        Number(rows[4] ?? 0),
+        rows[5]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Production',
+        Number(rows[6] ?? 0),
+        rows[7]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Production Orders',
+        Number(rows[8] ?? 0),
+        rows[9]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Work Centers',
+        Number(rows[10] ?? 0),
+        rows[11]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Components',
+        Number(rows[12] ?? 0),
+        rows[13]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Component Summaries',
+        Number(rows[14] ?? 0),
+        rows[15]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'QC',
+        Number(rows[16] ?? 0),
+        rows[17]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'QC Inspections',
+        Number(rows[18] ?? 0),
+        rows[19]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Yard',
+        Number(rows[20] ?? 0),
+        rows[21]?.updatedAt,
+        now,
+      ),
+      this.snapshotModule(
+        'Yard Workspaces',
+        Number(rows[22] ?? 0),
+        rows[23]?.updatedAt,
+        now,
+      ),
     ];
   }
 
-  private snapshotModule(label: string, count: number, updatedAt: Date | undefined, now: number) {
-    const ageSeconds = updatedAt ? Math.round((now - updatedAt.getTime()) / 1000) : null;
+  private snapshotModule(
+    label: string,
+    count: number,
+    updatedAt: Date | undefined,
+    now: number,
+  ) {
+    const ageSeconds = updatedAt
+      ? Math.round((now - updatedAt.getTime()) / 1000)
+      : null;
     return {
       id: label.toLowerCase(),
       label,
       count,
       updatedAt: updatedAt?.toISOString() ?? null,
       ageSeconds,
-      status: count === 0 ? 'critical' : ageSeconds !== null && ageSeconds > 3600 ? 'warning' : 'healthy',
+      status:
+        count === 0
+          ? 'critical'
+          : ageSeconds !== null && ageSeconds > 3600
+            ? 'warning'
+            : 'healthy',
     };
   }
 
@@ -585,7 +1072,12 @@ export class OperationsCenterService {
   private alerts(input: {
     jobs: Record<string, number>;
     events: Record<string, number>;
-    snapshotHealth: Array<{ id: string; label: string; status: string; ageSeconds: number | null }>;
+    snapshotHealth: Array<{
+      id: string;
+      label: string;
+      status: string;
+      ageSeconds: number | null;
+    }>;
     readModel: Record<string, unknown>;
     queries: Record<string, unknown>;
     disk: ReturnType<OperationsCenterService['diskUsage']>;
@@ -702,13 +1194,19 @@ export class OperationsCenterService {
     const totalBytes = totalmem();
     const freeBytes = freemem();
     const usedBytes = Math.max(0, totalBytes - freeBytes);
-    const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+    const usedPercent =
+      totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
     return {
       totalBytes,
       freeBytes,
       usedBytes,
       usedPercent,
-      status: usedPercent >= 95 ? 'critical' : usedPercent >= 85 ? 'warning' : 'healthy',
+      status:
+        usedPercent >= 95
+          ? 'critical'
+          : usedPercent >= 85
+            ? 'warning'
+            : 'healthy',
     };
   }
 
@@ -718,7 +1216,8 @@ export class OperationsCenterService {
       const totalBytes = Number(stat.blocks) * Number(stat.bsize);
       const freeBytes = Number(stat.bavail) * Number(stat.bsize);
       const usedBytes = Math.max(0, totalBytes - freeBytes);
-      const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+      const usedPercent =
+        totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
       return {
         available: true as const,
         path,
@@ -726,7 +1225,12 @@ export class OperationsCenterService {
         freeBytes,
         usedBytes,
         usedPercent,
-        status: usedPercent >= 95 ? 'critical' as const : usedPercent >= 85 ? 'warning' as const : 'healthy' as const,
+        status:
+          usedPercent >= 95
+            ? ('critical' as const)
+            : usedPercent >= 85
+              ? ('warning' as const)
+              : ('healthy' as const),
       };
     } catch (error) {
       return {
@@ -737,7 +1241,8 @@ export class OperationsCenterService {
         usedBytes: 0,
         usedPercent: 0,
         status: 'unknown' as const,
-        error: error instanceof Error ? error.message : 'Storage path unavailable',
+        error:
+          error instanceof Error ? error.message : 'Storage path unavailable',
       };
     }
   }

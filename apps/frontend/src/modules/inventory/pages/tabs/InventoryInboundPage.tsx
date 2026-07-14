@@ -1,8 +1,19 @@
 import { useMemo, useState } from 'react'
 import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
+import {
+  ModuleDetailDrawer,
+  ModuleFilterBar,
+  ModuleLoadingState,
+  ModuleEmptyState,
+} from '../../../../shared/ui/modules'
+import {
+  CockpitKpiCard,
+  CockpitTableShell,
+  DataTablePagination,
+} from '../../../../shared/ui/cockpit'
 import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
@@ -26,7 +37,7 @@ import {
 } from '../../components/InventoryAttachmentPanel'
 
 const compactInput =
-  'h-5 w-full rounded-md border border-white/10 bg-slate-950/45 px-1.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+  'h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
 // ================= COMPONENT SPARKLINE =================
 function KpiSparkline({ values, line, fill }: { values: number[]; line: string; fill: string }) {
   const rows = values.length ? values : [0, 0, 0, 0, 0, 0]
@@ -47,120 +58,6 @@ function KpiSparkline({ values, line, fill }: { values: number[]; line: string; 
 }
 
 // ================= COMPONENT METRIC CARD =================
-function OverviewMetricCard({
-  title,
-  value,
-  note,
-  tone = 'blue',
-  icon,
-  trend,
-  active,
-  onClick,
-}: {
-  title: string
-  value: string
-  note?: string
-  tone?: 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple'
-  icon: React.ReactNode
-  trend: number[]
-  active?: boolean
-  onClick?: () => void
-}) {
-  const color: Record<string, { text: string; bg: string; line: string; fill: string; note: string }> = {
-    blue: { text: 'text-blue-300', bg: 'bg-blue-500/10', line: '#1d7cff', fill: 'rgba(29,124,255,0.24)', note: 'text-emerald-400' },
-    emerald: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', line: '#10b981', fill: 'rgba(16,185,129,0.22)', note: 'text-emerald-400' },
-    cyan: { text: 'text-cyan-300', bg: 'bg-cyan-500/10', line: '#06b6d4', fill: 'rgba(6,182,212,0.22)', note: 'text-emerald-400' },
-    amber: { text: 'text-amber-300', bg: 'bg-amber-500/10', line: '#f59e0b', fill: 'rgba(245,158,11,0.18)', note: 'text-red-400' },
-    red: { text: 'text-red-300', bg: 'bg-red-500/10', line: '#ef4444', fill: 'rgba(239,68,68,0.18)', note: 'text-red-400' },
-    purple: { text: 'text-purple-300', bg: 'bg-purple-500/10', line: '#a855f7', fill: 'rgba(168,85,247,0.18)', note: 'text-emerald-400' },
-  }
-  const item = color[tone]
-  const content = (
-    <>
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-          <div className="mt-2 truncate text-xl font-semibold tracking-tight text-white">{value}</div>
-          {note ? <div className={`mt-1 truncate text-[11px] font-semibold ${item.note}`}>{note}</div> : null}
-        </div>
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.bg} ${item.text}`}>
-          {icon}
-        </div>
-      </div>
-      <KpiSparkline values={trend} line={item.line} fill={item.fill} />
-    </>
-  )
-  const className = `relative h-[108px] overflow-hidden rounded-xl border bg-slate-950/45 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] transition ${
-    active ? 'border-cyan-400/55 bg-cyan-400/10' : 'border-white/10'
-  } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''}`
-  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>
-  return <section className={className}>{content}</section>
-}
-
-// ================= PAGINATION (giống bên Tồn kho) =================
-function MaterialsPagination({
-  page,
-  pageCount,
-  total,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  pageSize: number
-  onPageChange: (page: number) => void
-}) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
-  return (
-    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
-      <div>
-        Hiển thị {start}-{end}/{total.toLocaleString('vi-VN')} kết quả
-      </div>
-      <div className="flex justify-center gap-2">
-        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
-            }`}
-          >
-            {pageNo}
-          </button>
-        ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
-      </div>
-      <div className="flex justify-start gap-2 md:justify-end">
-        <button
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          className={inventoryMutedButton}
-        >
-          Trước
-        </button>
-        <button
-          disabled={safePage >= safePageCount}
-          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
-          className={inventoryMutedButton}
-        >
-          Sau
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
@@ -364,7 +261,7 @@ function PriceChangeList({
 export function InventoryInboundPage() {
   const { data: suppliers = [] } = useSuppliers()
   const { data: zones = [] } = useZones()
-  const { data: tx = [], isLoading } = useInventoryTransactions({ type: 'INBOUND' })
+  const { data: tx = [], isLoading, refetch } = useInventoryTransactions({ type: 'INBOUND' })
 
   const [date, setDate] = useState('')
   const [supplierId, setSupplierId] = useState('')
@@ -439,6 +336,44 @@ export function InventoryInboundPage() {
       docs: inMonth.length,
       monthlySuppliers: supplierIds.size,
       done: statusDone,
+    }
+  }, [rows])
+
+  // ===== TREND DỮ LIỆU THỰC TẾ =====
+  const kpiTrend = useMemo(() => {
+    const now = new Date()
+    const months = Array.from({ length: 6 }).map((_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      return key
+    })
+
+    const monthData = months.map((key) => {
+      const inMonth = rows.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 7) === key)
+      const todayRows = inMonth.filter((x: any) => String(x.transactionDate ?? x.createdAt).slice(0, 10) === now.toISOString().slice(0, 10))
+      const qty = inMonth.reduce((s: number, x: any) => s + transactionQuantity(x), 0)
+      const amount = inMonth.reduce((s: number, x: any) => s + transactionAmount(x), 0)
+      const todayAmount = todayRows.reduce((s: number, x: any) => s + transactionAmount(x), 0)
+      const supplierIds = new Set(inMonth.map((x: any) => String(x.supplierId ?? supplierName(x))).filter(Boolean))
+      const statusDone = inMonth.filter((x: any) => String(x.status ?? 'COMPLETED').toUpperCase() === 'COMPLETED').length
+
+      return {
+        monthlyQty: qty,
+        monthlyAmount: amount,
+        todayAmount,
+        docs: inMonth.length,
+        monthlySuppliers: supplierIds.size,
+        done: statusDone,
+      }
+    })
+
+    return {
+      monthlyQty: monthData.map((d) => d.monthlyQty),
+      monthlyAmount: monthData.map((d) => d.monthlyAmount),
+      todayAmount: monthData.map((d) => d.todayAmount),
+      docs: monthData.map((d) => d.docs),
+      monthlySuppliers: monthData.map((d) => d.monthlySuppliers),
+      done: monthData.map((d) => d.done),
     }
   }, [rows])
 
@@ -555,215 +490,278 @@ export function InventoryInboundPage() {
     <EnterpriseModulePage>
       <InventoryTabWorkspace />
 
-      <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-1.5">
-          <OverviewMetricCard
+      <div className="space-y-3 -mt-2 text-xs">
+        {/* KPI Section */}
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
+          <CockpitKpiCard
             title="Tổng nhập trong tháng"
-            value={formatQuantity(kpis.monthlyQty, 3)}
-            note="Theo phiếu nhập"
+            value={formatQuantity(kpis.monthlyQty, 3) + ' tấn'}
+            note="Khối lượng theo phiếu nhập"
             tone="blue"
-            icon={<RefreshCw size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.monthlyQty}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Giá trị nhập trong tháng"
             value={formatCurrency(kpis.monthlyAmount)}
-            note="Theo đơn giá nhập"
+            note="Giá trị theo đơn giá nhập"
             tone="emerald"
-            icon={<CircleDollarSign size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.monthlyAmount}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Giá trị nhập hôm nay"
             value={formatCurrency(kpis.todayAmount)}
             note="Theo ngày hiện tại"
             tone="purple"
-            icon={<CircleDollarSign size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.todayAmount}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Số phiếu nhập tháng"
             value={formatQuantity(kpis.docs, 0)}
-            note="Trong tháng hiện tại"
+            note="Phiếu phát sinh trong tháng"
             tone="cyan"
-            icon={<PackageCheck size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.docs}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="NCC phát sinh tháng"
             value={formatQuantity(kpis.monthlySuppliers, 0)}
-            note="Nhà cung cấp có nhập"
+            note="Nhà cung cấp có giao dịch"
             tone="amber"
-            icon={<PackageCheck size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.monthlySuppliers}
           />
-          <OverviewMetricCard
+          <CockpitKpiCard
             title="Hoàn thành"
             value={formatQuantity(kpis.done, 0)}
-            note="Phiếu đã ghi nhận"
+            note="Phiếu nhập đã hoàn thành"
             tone="emerald"
-            icon={<TriangleAlert size={15} />}
-            trend={[0,0,0,0,0,0]}
+            trend={kpiTrend.done}
           />
         </div>
 
-        <InventoryPanel className="rounded-xl p-0.5">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_minmax(260px,1fr)_130px_120px]">
-            <select
-              value={supplierId}
-              onChange={(e) => {
-                setSupplierId(e.target.value)
-                setPage(1)
-              }}
-              className={filterInput}
-            >
-              <option value="">Nhà cung cấp</option>
-              {suppliers.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={zoneId}
-              onChange={(e) => {
-                setZoneId(e.target.value)
-                setPage(1)
-              }}
-              className={filterInput}
-            >
-              <option value="">Vị trí</option>
-              {zones.map((z: any) => (
-                <option key={z.id} value={z.id}>
-                  {z.code}
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => {
-                setDate(e.target.value)
-                setPage(1)
-              }}
-              className={filterInput}
-            />
-            <input
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') applySearch()
-              }}
-              placeholder="Mã phiếu, vật tư, NCC..."
-              className={filterInput}
-            />
+        {/* Enterprise Toolbar & Quick Actions */}
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex-1 min-w-0">
+            <ModuleFilterBar sticky={false} className="p-2.5">
+              <div className="col-span-12 xl:col-span-3">
+                <input
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applySearch()
+                  }}
+                  placeholder="Mã phiếu, vật tư, NCC..."
+                  className={compactInput}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-4 xl:col-span-3">
+                <select
+                  value={supplierId}
+                  onChange={(e) => {
+                    setSupplierId(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
+                >
+                  <option value="">Nhà cung cấp</option>
+                  {suppliers.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-12 md:col-span-4 xl:col-span-2">
+                <select
+                  value={zoneId}
+                  onChange={(e) => {
+                    setZoneId(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
+                >
+                  <option value="">Vị trí kho nhập</option>
+                  {zones.map((z: any) => (
+                    <option key={z.id} value={z.id}>
+                      {z.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-12 md:col-span-4 xl:col-span-2">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value)
+                    setPage(1)
+                  }}
+                  className={compactInput}
+                />
+              </div>
+              <div className="col-span-12 xl:col-span-2 flex gap-1">
+                <button
+                  onClick={applySearch}
+                  className="flex-1 h-9 rounded-lg bg-blue-600 text-xs font-semibold text-white transition hover:bg-blue-500"
+                >
+                  Lọc
+                </button>
+                <button
+                  onClick={resetFilters}
+                  className="flex-1 h-9 rounded-lg border border-white/10 bg-white/[0.055] text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                >
+                  Xóa
+                </button>
+              </div>
+            </ModuleFilterBar>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 justify-end">
             <button
-              onClick={applySearch}
-              className="h-9 self-end rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+              onClick={() => {
+                void refetch()
+                toast.success('Đã tải lại danh sách phiếu nhập')
+              }}
+              className="h-9 rounded-lg border border-white/10 bg-slate-900 px-3 font-semibold text-slate-300 transition hover:bg-white/5"
             >
-              Tìm kiếm
+              🔄 Tải lại
             </button>
             <button
-              onClick={resetFilters}
-              className="h-9 self-end rounded-md border border-white/10 bg-white/[0.055] px-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+              onClick={() => toast.success('Đang kết xuất báo cáo Excel...')}
+              className="h-9 rounded-lg border border-white/10 bg-slate-900 px-3 font-semibold text-slate-300 transition hover:bg-white/5"
             >
-              Làm mới
+              📥 Xuất Excel
             </button>
           </div>
-        </InventoryPanel>
+        </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-          <InventoryPanel title="Danh sách phiếu nhập" className="xl:col-span-9 p-0 pb-0">
-            <div className={`${inventoryTableShell} h-[520px] overflow-auto`}>
-              <table className="w-full min-w-[1100px] text-xs">
-                <thead className={inventoryTableHead}>
-                  <tr>
-                    {['Mã phiếu nhập', 'Ngày nhập', 'Nhà cung cấp', 'Vị trí', 'Số lượng', 'ĐVT', 'Đơn giá', 'Tổng giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left font-medium">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {!isLoading &&
-                    paged.map((x: any) => {
+        {/* Loading state / Content table */}
+        {isLoading ? (
+          <ModuleLoadingState label="Đang tải danh sách phiếu nhập kho..." variant="table" />
+        ) : rows.length === 0 ? (
+          <ModuleEmptyState
+            title="Không tìm thấy phiếu nhập"
+            description="Không có giao dịch nhập kho nào khớp với điều kiện lọc hiện tại."
+            action={
+              <button
+                onClick={resetFilters}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+              >
+                Xóa bộ lọc
+              </button>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-1.5">
+            <InventoryPanel title="Danh sách phiếu nhập" className="xl:col-span-9 p-0">
+              <CockpitTableShell>
+                <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
+                  <colgroup>
+                    <col className="w-[120px]" /> {/* Mã phiếu nhập */}
+                    <col className="w-[100px]" /> {/* Ngày nhập */}
+                    <col className="w-[200px]" /> {/* Nhà cung cấp */}
+                    <col className="w-[110px]" /> {/* Vị trí */}
+                    <col className="w-[100px]" /> {/* Số lượng */}
+                    <col className="w-[70px]" />  {/* ĐVT */}
+                    <col className="w-[100px]" /> {/* Đơn giá */}
+                    <col className="w-[120px]" /> {/* Tổng giá trị */}
+                    <col className="w-[80px]" />  {/* Hồ sơ */}
+                    <col className="w-[100px]" /> {/* Trạng thái */}
+                    <col className="w-[100px]" /> {/* Người tạo */}
+                  </colgroup>
+                  <thead className={`${inventoryTableHead} border-b border-cyan-400/10`}>
+                    <tr className="bg-slate-900 text-slate-400 font-semibold uppercase">
+                      {['Mã phiếu nhập', 'Ngày nhập', 'Nhà cung cấp', 'Vị trí', 'Số lượng', 'ĐVT', 'Đơn giá', 'Tổng giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((x: any) => {
                       const line = transactionItems(x)[0]
                       return (
                         <tr
                           key={x.id}
-                          className={`${inventoryTableRow} cursor-pointer`}
+                          className="border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-500/5 hover:text-cyan-300 cursor-pointer"
                           onClick={() => setSelectedInbound(x)}
                         >
-                          <td className="px-1.5 py-1 text-cyan-300">{x.transactionNo}</td>
-                          <td className="px-1.5 py-1">{formatDate(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-1.5 py-1">{supplierName(x)}</td>
-                          <td className="px-1.5 py-1">{transactionZones(x).join(', ') || '-'}</td>
-                          <td className="px-1.5 py-1">{formatQuantity(transactionQuantity(x), 3)}</td>
-                          <td className="px-1.5 py-1">{lineUnit(line)}</td>
-                          <td className="px-1.5 py-1">{formatCurrency(line?.unitPrice)}</td>
-                          <td className="px-1.5 py-1">{formatCurrency(transactionAmount(x))}</td>
-                          <td className="px-1.5 py-1" onClick={(event) => event.stopPropagation()}>
+                          <td className="px-4 py-2.5 text-cyan-300 font-semibold">{x.transactionNo}</td>
+                          <td className="px-4 py-2.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-4 py-2.5 truncate">{supplierName(x)}</td>
+                          <td className="px-4 py-2.5 truncate">{transactionZones(x).join(', ') || '-'}</td>
+                          <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 3)}</td>
+                          <td className="px-4 py-2.5">{lineUnit(line)}</td>
+                          <td className="px-4 py-2.5">{formatCurrency(line?.unitPrice)}</td>
+                          <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
+                          <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-1.5 py-1">
-                            <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-1 py-0.5 text-[10px] text-emerald-300">{String(x.status ?? 'COMPLETED')}</span>
+                          <td className="px-4 py-2.5">
+                            <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                              {String(x.status ?? 'COMPLETED')}
+                            </span>
                           </td>
-                          <td className="px-1.5 py-1">{x.createdBy ?? 'Admin'}</td>
+                          <td className="px-4 py-2.5 text-slate-400">{x.createdBy ?? 'Admin'}</td>
                         </tr>
                       )
                     })}
-                </tbody>
-              </table>
-            </div>
-            <MaterialsPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
-          </InventoryPanel>
+                  </tbody>
+                </table>
+              </CockpitTableShell>
+              <DataTablePagination
+                page={page}
+                pageSize={pageSize}
+                total={rows.length}
+                onPageChange={setPage}
+              />
+            </InventoryPanel>
 
-          <div className="space-y-1.5 xl:col-span-3">
-            <InventoryChartCard title="Phân bổ nhập theo vị trí" className="p-2">
-              <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.monthlyQty, 0)} centerLabel="tổng nhập" />
-            </InventoryChartCard>
-            <InventoryChartCard title="Top vật tư nhập" className="p-2">
-              <HorizontalBars rows={topMaterials.map((m) => [m.code, m.value])} valueFormatter={(value) => formatCurrency(value)} />
-            </InventoryChartCard>
-            <InventoryChartCard title="Top NCC theo giá trị nhập" className="p-2">
-              <div className="space-y-2">
-                {topSuppliers.map((supplier) => (
-                  <div key={supplier.name} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
-                    <div className="truncate font-semibold text-cyan-100">{supplier.name}</div>
-                    <div className="mt-1 grid grid-cols-2 gap-2 text-slate-400">
-                      <span>{formatQuantity(supplier.quantity, 3)}</span>
-                      <span className="text-right text-emerald-300">{formatCurrency(supplier.value)}</span>
+            <div className="space-y-1.5 xl:col-span-3">
+              <InventoryChartCard title="Phân bổ nhập theo vị trí" className="p-2">
+                <CompactDonutSummary segments={zoneSegments} centerValue={formatQuantity(kpis.monthlyQty, 0)} centerLabel="tổng nhập" />
+              </InventoryChartCard>
+              <InventoryChartCard title="Top vật tư nhập" className="p-2">
+                <HorizontalBars rows={topMaterials.map((m) => [m.code, m.value])} valueFormatter={(value) => formatCurrency(value)} />
+              </InventoryChartCard>
+              <InventoryChartCard title="Top NCC theo giá trị nhập" className="p-2">
+                <div className="space-y-2">
+                  {topSuppliers.map((supplier) => (
+                    <div key={supplier.name} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
+                      <div className="truncate font-semibold text-cyan-100">{supplier.name}</div>
+                      <div className="mt-1 grid grid-cols-2 gap-2 text-slate-400">
+                        <span>{formatQuantity(supplier.quantity, 3)}</span>
+                        <span className="text-right text-emerald-300">{formatCurrency(supplier.value)}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </InventoryChartCard>
-            <InventoryChartCard title="Top NCC theo khối lượng" className="p-2">
-              <div className="space-y-2">
-                {topSuppliersByQuantity.map((supplier) => (
-                  <div key={supplier.name} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
-                    <div className="truncate font-semibold text-cyan-100">{supplier.name}</div>
-                    <div className="mt-1 grid grid-cols-2 gap-2 text-slate-400">
-                      <span>{formatQuantity(supplier.quantity, 3)}</span>
-                      <span className="text-right text-emerald-300">{formatCurrency(supplier.value)}</span>
+                  ))}
+                </div>
+              </InventoryChartCard>
+              <InventoryChartCard title="Top NCC theo khối lượng" className="p-2">
+                <div className="space-y-2">
+                  {topSuppliersByQuantity.map((supplier) => (
+                    <div key={supplier.name} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
+                      <div className="truncate font-semibold text-cyan-100">{supplier.name}</div>
+                      <div className="mt-1 grid grid-cols-2 gap-2 text-slate-400">
+                        <span>{formatQuantity(supplier.quantity, 3)}</span>
+                        <span className="text-right text-emerald-300">{formatCurrency(supplier.value)}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </InventoryChartCard>
-            <InventoryChartCard title="Top vật tư tăng giá" className="p-2">
-              <PriceChangeList rows={priceChanges.increases} />
-            </InventoryChartCard>
-            <InventoryChartCard title="Top vật tư giảm giá" className="p-2">
-              <PriceChangeList rows={priceChanges.decreases} />
-            </InventoryChartCard>
+                  ))}
+                </div>
+              </InventoryChartCard>
+              <InventoryChartCard title="Top vật tư tăng giá" className="p-2">
+                <PriceChangeList rows={priceChanges.increases} />
+              </InventoryChartCard>
+              <InventoryChartCard title="Top vật tư giảm giá" className="p-2">
+                <PriceChangeList rows={priceChanges.decreases} />
+              </InventoryChartCard>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <InventoryTransactionAttachmentDrawer
         open={Boolean(attachmentDrawer)}

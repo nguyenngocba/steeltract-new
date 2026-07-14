@@ -16,6 +16,68 @@ export type ProductionOrder = {
   stages?: Array<{ id: string; name: string; status: string; sequence: number }>
   materialIssues?: ProductionMaterialIssue[]
   materialConsumptions?: ProductionMaterialConsumption[]
+  cockpit?: {
+    progress: number
+    delayed: boolean
+    materialReadiness: ProductionCockpitMaterialReadiness
+  }
+}
+
+export type ProductionCockpitMaterialReadiness = {
+  hasBom: boolean
+  requiredQty: number
+  issuedQty: number
+  remainingQty: number
+  readinessPercent: number
+  label: string
+}
+
+export type ProductionCockpitParams = {
+  search?: string
+  status?: string
+  scope?: 'all' | 'planning'
+  sortBy?: 'updatedAt' | 'orderNo' | 'plannedEndAt' | 'status'
+  sortOrder?: 'asc' | 'desc'
+  page?: number
+  limit?: number
+}
+
+export type ProductionCockpitReadModel = {
+  data: ProductionOrder[]
+  meta: { page: number; limit: number; total: number; totalPages: number }
+  summary: {
+    total: number
+    planned: number
+    released: number
+    inProgress: number
+    completed: number
+    completedToday: number
+    waitingMaterial: number
+    delayed: number
+    runningComponents: number
+    productionWeight: number
+  }
+  overview: {
+    progress: { running: number; pending: number; completed: number }
+    material: { issued: number; waiting: number; shortage: number }
+    stages: Array<{ label: string; value: number }>
+    activeComponents: ProductionComponent[]
+  }
+  orderAnalytics: {
+    progressSegments: Array<{ label: string; value: number }>
+    readinessSegments: Array<{ label: string; value: number }>
+    topMaterial: Array<{ id: string; orderNo: string; title: string; value: number }>
+    topShortage: Array<{ id: string; orderNo: string; title: string; value: number }>
+    upcomingDelayed: Array<{ id: string; orderNo: string; title: string; plannedEndAt?: string }>
+  }
+  queue: { ready: number; inProgress: number; paused: number; total: number }
+  workCenters: Array<{
+    id: string
+    code: string
+    name: string
+    status: string
+    _count: { stages: number; machines: number; tasks: number }
+  }>
 }
 
 export type ProductionComponent = {
@@ -273,6 +335,8 @@ export type MaterialRequirement = {
 
 export const productionApi = {
   orders: () => api.get<ProductionOrder[]>('/production').then((res) => res.data),
+  cockpit: (params: ProductionCockpitParams) =>
+    api.get<ProductionCockpitReadModel>('/production/read-model/cockpit', { params }).then((res) => res.data),
   order: (id: string) => api.get<ProductionOrder>(`/production/${id}`).then((res) => res.data),
   boms: () => api.get<ProductionBom[]>('/production/boms').then((res) => res.data),
   createBom: (payload: ProductionBomInput) =>

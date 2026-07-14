@@ -1,14 +1,14 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 
 import { PerformanceMetricsService } from '../performance/performance-metrics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
+import { ComponentSnapshotRepository } from './component-snapshot.repository';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
 import { ProductionSnapshotRepository } from './production-snapshot.repository';
 import { ProjectSnapshotRepository } from './project-snapshot.repository';
+import { QcSnapshotRepository } from './qc-snapshot.repository';
+import { YardSnapshotRepository } from './yard-snapshot.repository';
 
 import type { SnapshotUpdateRequest } from '../jobs/snapshot-update-dispatcher.service';
 
@@ -38,6 +38,13 @@ export class SnapshotWriterService {
     private readonly dispatchSnapshots: DispatchSnapshotRepository,
     @Inject(ProductionSnapshotRepository)
     private readonly productionSnapshots: ProductionSnapshotRepository,
+    @Inject(ComponentSnapshotRepository)
+    private readonly componentSnapshots: ComponentSnapshotRepository,
+    @Inject(QcSnapshotRepository)
+    private readonly qcSnapshots: QcSnapshotRepository,
+    @Optional()
+    @Inject(YardSnapshotRepository)
+    private readonly yardSnapshots?: YardSnapshotRepository,
   ) {}
 
   async rebuild(request: SnapshotUpdateRequest): Promise<SnapshotWriteResult> {
@@ -148,6 +155,67 @@ export class SnapshotWriterService {
       return this.result(request, count, count, startedAt);
     }
 
+    if (request.scope.module === 'components') {
+      const [dashboardRows, summaryRows] = await Promise.all([
+        this.componentSnapshots.calculateDashboard(new Date()),
+        this.componentSnapshots.calculateSummarySnapshots(
+          request.scope.componentId,
+        ),
+      ]);
+      await this.prisma.$transaction(async (tx) => {
+        for (const row of dashboardRows) {
+          await this.componentSnapshots.upsertDashboard(row, tx);
+        }
+        for (const row of summaryRows) {
+          await this.componentSnapshots.upsertSummary(row, tx);
+        }
+      });
+
+      const count = dashboardRows.length + summaryRows.length;
+      return this.result(request, count, count, startedAt);
+    }
+
+    if (request.scope.module === 'qc') {
+      const [dashboardRows, inspectionRows] = await Promise.all([
+        this.qcSnapshots.calculateDashboard(new Date()),
+        this.qcSnapshots.calculateInspectionSnapshots(
+          request.scope.inspectionId,
+        ),
+      ]);
+      await this.prisma.$transaction(async (tx) => {
+        for (const row of dashboardRows) {
+          await this.qcSnapshots.upsertDashboard(row, tx);
+        }
+        for (const row of inspectionRows) {
+          await this.qcSnapshots.upsertInspection(row, tx);
+        }
+      });
+
+      const count = dashboardRows.length + inspectionRows.length;
+      return this.result(request, count, count, startedAt);
+    }
+
+    if (request.scope.module === 'yard') {
+      if (!this.yardSnapshots) {
+        throw new Error('YardSnapshotRepository is not registered');
+      }
+      const [dashboardRows, workspaceRows] = await Promise.all([
+        this.yardSnapshots.calculateDashboard(new Date()),
+        this.yardSnapshots.calculateWorkspaceSnapshots(request.scope.yardZoneId),
+      ]);
+      await this.prisma.$transaction(async (tx) => {
+        for (const row of dashboardRows) {
+          await this.yardSnapshots.upsertDashboard(row, tx);
+        }
+        for (const row of workspaceRows) {
+          await this.yardSnapshots.upsertWorkspace(row, tx);
+        }
+      });
+
+      const count = dashboardRows.length + workspaceRows.length;
+      return this.result(request, count, count, startedAt);
+    }
+
     const result = this.result(request, 0, 0, startedAt);
     this.metrics.recordSnapshotRebuild(result.durationMs);
     return result;
@@ -186,7 +254,10 @@ export class SnapshotWriterService {
         request.scope.inventoryItemId ??
         request.scope.dispatchOrderId ??
         request.scope.productionOrderId ??
-        request.scope.workCenterId,
+        request.scope.workCenterId ??
+        request.scope.componentId ??
+        request.scope.inspectionId ??
+        request.scope.yardZoneId,
       generatedAt: new Date().toISOString(),
       rowsRead,
       rowsWritten,

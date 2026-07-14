@@ -1,5 +1,161 @@
 # SteelTrack AI Changelog
 
+## 2026-07-13 EPIC174 Core Platform Final Certification
+
+Completed:
+
+* Moved Inventory Return, Components update/status and Production legacy stage
+  events into their owning repository transactions.
+* Removed remaining post-commit persistent EventBus paths in the five certified
+  modules and added atomic audit Outbox parity where Activity Logs are written.
+* Routed Inventory material/transaction events through repository-owned Outbox
+  persistence and the shared Event Consumer.
+* Standardized Inventory Runtime keys to the same module-level
+  hit/miss/read-model/fallback/age/lag contract as Components, Production, QC
+  and Yard while retaining granular compatibility counters.
+* Updated Operations Center to consume Inventory-specific runtime counters.
+* Reran focused atomicity/routing/metric tests: 8 suites and 19 tests passed.
+* Certified SteelTrack Core Platform v1.0 across Inventory, Components,
+  Production, QC and Yard.
+
+## 2026-07-13 EPIC173 Dashboard Snapshot Cutover Certification
+
+Completed:
+
+* Added additive Components, QC and Yard dashboard endpoints backed by their
+  existing Snapshot Read Services.
+* Cut Components KPI/status/activity, QC Dashboard KPI/defect/trend and Yard
+  KPI/capacity/movement dashboard bindings to persisted snapshots.
+* Preserved repository fallback, stale/missing background enqueue and parity
+  warnings through the shared Dashboard Reader.
+* Kept component tables, QC inspections/queues and Yard maps/operator workspaces
+  on repository live read models under ADR011.
+* Preserved UI layout, workflow, business logic, schema, feature flags, Runtime,
+  Operations Center, Inventory and Production.
+* Added controller-boundary tests and reran existing snapshot-reader tests: 6
+  suites and 8 tests passed.
+
+## 2026-07-13 EPIC172 Production Cockpit ADR011 Remediation
+
+Completed:
+
+* Added an additive, validated Production Cockpit live read-model endpoint.
+* Moved order KPI, progress, material readiness, delayed ranking, queue and Work
+  Center composition from React into `ProductionRepository`.
+* Added bounded server pagination/filtering/sorting for Overview, Orders and
+  Planning while preserving the existing Production API.
+* Updated Production React Query keys and bindings; unrelated Production arrays
+  are no longer fetched on the primary Cockpit routes.
+* Preserved the snapshot-first Production dashboard metrics path and all UI,
+  workflow, schema, runtime and Operations Center behavior.
+* Added focused repository read-model verification and four EPIC172 reports.
+
+## 2026-07-12 EPIC143 Components Snapshot Foundation
+
+Completed:
+
+* Added additive `ComponentDashboardSnapshot` and reusable `ComponentSummarySnapshot` models plus migration.
+* Implemented `ComponentSnapshotRepository` for live calculation, persisted reads and atomic upserts.
+* Integrated Components with the shared Snapshot Reader, Writer, Validator, Rebuilder, Dispatcher and Feature Flag layers.
+* Routed the existing `component.updated` event to asynchronous Components snapshot jobs without creating new workflows/events.
+* Added snapshot-first dashboard/summary reader services with repository fallback and background update enqueue.
+* Deployed the additive migration and confirmed no fake/backfill snapshot rows were inserted.
+* Preserved Components workspace live read models, frontend, APIs, UI, business logic, Inventory, Production and QC.
+
+## 2026-07-12 EPIC142 Components Workspace Live Read Model
+
+Completed:
+
+* Added additive live read-model endpoints for Components List, Overview, and History.
+* Moved Components filtering, sorting, pagination, KPI, material-readiness, distribution, and timeline aggregation from React to repository/database queries.
+* Cut Overview and List normal reads to bounded page payloads and replaced hardcoded History rows with real ComponentTimeline data.
+* Added optional backward-compatible pagination to `GET /components/:id/timeline`; the legacy array response remains when pagination is omitted.
+* Preserved all Components routes, layout, styling, workflow, permissions, mutations, Detail, Costing, schema, Snapshot and Runtime behavior.
+* Added focused read-model coverage and validated additive SQL/read shapes against current real data.
+
+## 2026-07-12 EPIC141 Components Repository Completion
+
+Completed:
+
+* Added a focused `ComponentCostingRepository` for all costing, consumption, BOM, valuation, and atomic costing persistence queries.
+* Removed `PrismaService`, direct Prisma queries, and direct transaction model writes from `ComponentCostingService`.
+* Preserved costing formulas, validation, warnings, API responses, and workflow behavior.
+* Registered the repository in `ComponentsModule` and added a focused transaction-boundary test.
+* Confirmed Components services contain no direct Prisma persistence access; repository coverage is 100% within the module boundary.
+* No frontend, schema, migration, API, Inventory, Production, Snapshot, Runtime, Background, or Operations Center change was made.
+
+## 2026-07-12 EPIC140 Components Core Platform Foundation Audit
+
+Completed:
+
+* Audited Components Controller, services, repository, DTO/API boundaries, entities, frontend workspaces, events, snapshots, runtime and Operations Center readiness.
+* Confirmed ComponentsService uses ComponentsRepository, but ComponentCostingService still accesses Prisma directly.
+* Classified every Components route under ADR011 and found unbounded client-side list aggregation plus hardcoded QC/History/Reports data.
+* Proposed domain-level ComponentDashboardSnapshot/ComponentSnapshot foundations without changing schema.
+* Audited canonical event candidates and blocked revision/release/archive events until their domain models/workflows are approved.
+* Rated Components Core Platform compliance at 28% and produced five implementation-readiness reports.
+* No application code, UI, API, workflow, database or business logic was changed.
+
+## 2026-07-12 EPIC137 Production Operator Validation & Platform Certification
+
+Completed:
+
+* Created the Production operator checklist and complete smoke-test evidence guide.
+* Audited lifecycle/material endpoints, repository boundary, canonical/legacy event routing, snapshot foundation, runtime metrics, jobs and Operations Center integration.
+* Re-ran 7 focused suites/24 tests successfully.
+* Collected read-only runtime evidence: one completed order and one matching Issue/Inventory EXPORT exist, but Production snapshot tables, Production Outbox rows and Production snapshot jobs are empty.
+* Rated Production Platform 65% certified: code foundation is complete, while business/runtime certification remains blocked pending one designated operator test order.
+* No application code, database, API, UI, workflow or architecture was changed.
+
+## 2026-07-11 EPIC136 Inventory Frontend Foundation Standardization
+
+Completed:
+
+* Audited active Inventory tabs against cockpit/module shared primitives.
+* Centralized six active pagination implementations in `InventoryPagination` and removed three unused pagination copies.
+* Removed unused Inbound/Outbound KPI wrappers without changing rendered UI.
+* Preserved each page's approved pagination density through `containerClassName`.
+* Added the frontend design system, component guidelines, Inventory component audit, and shared-component roadmap.
+* No API, React Query, backend, business workflow, or presentation redesign was introduced.
+
+## 2026-07-11 EPIC135B Production Material Flow
+
+Completed:
+
+* Activated canonical `production.material.*` Outbox publication for Reservation, Release, Issue, Consumption, and Return.
+* Kept each Production event in the same repository transaction as its domain mutation and material ledger row.
+* Completed manual Issue ledger parity and kept Consumption separate from Scrap in ledger/events/snapshots.
+* Routed canonical material events to Production Order snapshots; Inventory Issue/Return snapshots remain driven by Inventory-owned Outbox events.
+* Added focused tests: 7 suites and 24 tests PASS.
+* Real operator E2E remains blocked because the database has no disposable Reservation/Consumption fixture and existing business data was not mutated.
+
+## 2026-07-11 EPIC-UI002 Inventory Inbound Workspace Redesign
+
+Completed:
+
+* Redesigned the Inbound ("Nhập kho") tab workspace page layout to inherit the Industrial Cockpit design language (from Dashboard and Outbound).
+* Migrated local custom card components to the shared `<CockpitKpiCard />` component, computing actual rolling 6-month historical trends dynamically.
+* Wrapped the Inbound table inside `<CockpitTableShell />`, and updated cell paddings (`px-4 py-2.5 text-xs`) and hover-neon cyan styles (`hover:bg-cyan-500/5 hover:text-cyan-300`).
+* Replaced the page's search filter panel with standard `<ModuleFilterBar />`, and integrated Quick Actions (Tải lại/refetch, and Export Excel mock toast).
+* Replaced custom pagination with standard `<DataTablePagination />`.
+* Integrated standard `<ModuleLoadingState variant="table" />` and `<ModuleEmptyState />` for feedback consistency.
+* Strictly followed the "Presentation First - UX Later" rule: made zero modifications to the inbound process, creation forms, validation warnings, or backend APIs.
+* Created 3 Inbound UI documentation files under `docs/ui/`.
+
+## 2026-07-11 EPIC-UI001 Inventory Outbound Workspace Redesign
+
+Completed:
+
+* Redesigned the Outbound ("Xuất kho") page header, KPI cards, table grid, and pagination to align with the Golden Design Reference.
+* Migrated local custom card components to the shared `<CockpitKpiCard />` component, with actual rolling 6-month historical calculations.
+* Replaced the page's search inputs with standard `<ModuleFilterBar />` sticky filters, and integrated Quick Actions (Refresh, Export Excel, and Local Drawer launcher).
+* Wrapped the Outbound table inside `<CockpitTableShell />`, and updated cell paddings (`px-4 py-2.5 text-xs`) and hover-neon cyan styles (`hover:bg-cyan-500/5 hover:text-cyan-300`).
+* Migrated the Outbound creation form from center modal `ModalShell` to standard split-column `<ModuleDetailDrawer size="lg" />`.
+* Implemented fuzzy real-time search combobox `<SearchableMaterialSelector />` with full keyboard friendly navigation (Arrow keys, Enter, Escape).
+* Resolved P1 layout horizontally-overflowing mini-map issue by stacking maps vertically inside the drawer's secondary column.
+* Integrated unsaved warning confirmation prompt on drawer dismissal.
+* Created 3 Outbound UI documentation files under `docs/ui/`.
+
 ## 2026-07-11 EPIC135A Production-Inventory Transaction Boundary Alignment
 
 Completed:
@@ -3717,3 +3873,116 @@ Notes:
 * Components is approximately 70% complete.
 * Production is approximately 65% complete.
 * Yard is approximately 60% complete with configured demo zones, working operator workflows, zone drill-down, and enlarged 3D spatial viewer.
+# 2026-07-13 - EPIC144 Components Runtime Platform
+
+* Added Components-specific snapshot hit/miss/age/lag, fallback, and live
+  read-model counters to the shared Runtime Metrics service.
+* Instrumented Components snapshot reads and repository fallback without
+  changing read semantics, API contracts, or business logic.
+* Added additive Components Platform Health to Operations Center for repository,
+  read model, snapshots, feature flag, jobs, Outbox, parity, and runtime status.
+* Kept event freshness scoped to the existing `component.updated` route; no
+  missing workflow or canonical event was invented.
+# 2026-07-13 - EPIC150 QC Core Platform Audit
+
+* Audited QC repository ownership, transaction boundaries, ADR011 read paths,
+  snapshots, runtime metrics, Operations Center, events and workflows.
+* Identified direct Prisma access, capped/unbounded Cockpit aggregation,
+  client-side business filtering, synthetic trends, non-atomic Outbox events and
+  incomplete inspection/NCR transition controls.
+* Assessed QC at approximately 31% Core Platform compliance and documented the
+  EPIC151-154 remediation sequence.
+* Made no application, UI, API, workflow, business, schema or migration change.
+# 2026-07-13 - EPIC151 QC Repository Foundation
+
+* Removed direct Prisma access from `QcService`; QC service repository coverage
+  is now 100%.
+* Moved operational code generation and existing Cockpit source queries behind
+  QC repositories without changing query or response semantics.
+* Made QC mutation, ActivityLog and existing audit/domain/notification Outbox
+  records atomic through the same repository transaction client.
+* Added focused transaction-boundary coverage and changed no UI, API, workflow,
+  business rule, schema, snapshot, runtime or Operations Center behavior.
+# 2026-07-13 - EPIC152 QC Workspace Live Read Model
+
+* Added additive QC repository live read-model endpoints for workspace, detail,
+  paginated history and NCR summary.
+* Moved QC filtering, sorting, pagination, KPI/NCR/queue aggregation and trend
+  calculation from React/runtime arrays to `QcReadModelRepository`.
+* Cut the active QC workspace over to a parameterized TanStack Query family
+  without changing layout, styling, actions or mutation contracts.
+* Removed synthetic QC trend dates/values; empty history now renders an explicit
+  no-data state.
+# 2026-07-13 - EPIC153 QC Snapshot Foundation
+
+* Added additive `QcDashboardSnapshot` and `QcInspectionSnapshot` persisted
+  domain models and deployed their migration without backfill.
+* Added QC snapshot repository, reader, writer, validator, rebuilder, dispatcher
+  and `USE_QC_SNAPSHOT` integration using the shared Core Platform.
+* Routed the five existing QC domain events to background snapshot updates and
+  added safe repository fallback for missing/stale snapshots.
+* Added focused snapshot tests and changed no UI, workspace read model,
+  workflow, business logic, Runtime Metrics or Operations Center UI.
+# 2026-07-13 - EPIC154 QC Runtime Metrics and Operations Center
+
+- Added QC snapshot hit/miss/age/lag, repository fallback, and live read-model counters to the shared `PerformanceMetricsService`.
+- Instrumented QC snapshot and live read paths without changing read behavior or API contracts.
+- Added additive QC Platform Health data to Operations Center for repository, read model, snapshot, feature flag, jobs, outbox, parity, and runtime state.
+- Added focused QC runtime tests and five EPIC154 runtime reports.
+- Preserved ADR011: QC workspace remains live read model; dashboard remains snapshot-first with repository fallback.
+# 2026-07-13 - EPIC160 Yard Core Platform and Business Audit
+
+- Audited Yard business architecture, repository boundary, ADR011 read paths, snapshot/runtime/Operations Center readiness, event flow, workflow, and active UI data sources.
+- Confirmed real zone/slot/placement/movement foundations but identified missing reservation, QC receipt, hold/release, loading-task, and dispatch handoff workflows.
+- Identified non-atomic domain Outbox, service-level cross-module Prisma access, unbounded workspace reads, partial 12-row history aggregation, active 3D demo fallback, and synthetic QC statuses.
+- Added ten Yard audit reports and an EPIC161-164 remediation roadmap.
+- No application code, API, schema, migration, workflow, or data changed.
+# 2026-07-13 - EPIC161 Yard Repository Foundation and Atomic Outbox
+
+- Removed EventBus post-commit persistence and all direct transaction-client Prisma model access from `YardService`.
+- Added repository-owned Component/Production compatibility persistence and atomic Outbox upsert methods.
+- Moved existing Yard audit and domain Outbox rows into the same transaction as business mutations and ActivityLog.
+- Preserved existing event names, payloads, idempotency semantics, API contracts and business behavior.
+- Added focused atomic transaction tests and four EPIC161 reports.
+- No frontend, schema, migration, Inventory, Components, Production or QC source changes.
+# 2026-07-13 - EPIC162 Yard Workspace Live Read Model
+
+- Added bounded `YardReadModelRepository` and additive `/yard/read-model/workspace` API.
+- Moved Yard KPI, movement totals/trend/history, component distribution, crane availability, zone utilization and QC queue classification to repository reads.
+- Cut active Yard page from five runtime queries to one live workspace query while preserving mutation invalidation and presentation.
+- Added server-side movement item/location/date/type filtering and independent pagination.
+- Removed active 3D demo data and synthetic row-index QC statuses.
+- Preserved legacy endpoints, API workflows, styling, schema, Snapshot and Runtime layers.
+# 2026-07-13 - EPIC163 Yard Snapshot Foundation
+
+- Added additive `YardDashboardSnapshot` and `YardWorkspaceSnapshot` Prisma models and migration without deploying or backfilling data.
+- Added `YardSnapshotRepository` with calculation, persisted read and atomic upsert paths.
+- Integrated Yard with shared Snapshot Reader, Writer, Validator, Rebuilder, Dispatcher scope, feature flag and module registration.
+- Routed all existing Yard domain events to background snapshot updates without creating new workflows/events.
+- Added `YardSnapshotReadService` with repository live fallback and missing/stale background enqueue; operator workspace remains ADR011 live.
+- Added repository/writer/reader tests and verified existing Components/QC writer regression suites.
+# 2026-07-13 - EPIC164 Yard Runtime Metrics and Operations Center
+
+- Added Yard snapshot hit/miss/age/lag, fallback and live-read counters to the shared Runtime Platform.
+- Instrumented Yard snapshot-first and ADR011 live read paths without changing read semantics.
+- Added additive Yard Platform Health and Yard snapshot rows to the existing Operations Center response.
+- Added focused Yard runtime tests and five EPIC164 runtime reports.
+- Changed no frontend, UI, workflow, repository, read model, snapshot schema or business logic.
+# 2026-07-13 - EPIC170 Core Platform Certification Audit
+
+- Audited Inventory, Components, Production, QC and Yard against Repository,
+  ADR011, Snapshot, Runtime, Operations Center, Feature Flag, Background,
+  Outbox and Audit standards.
+- Confirmed repository ownership, shared feature flags, dispatcher reuse and
+  Operations Center coverage across all five modules.
+- Blocked Core Platform v1.0 certification on active ADR011 violations,
+  incomplete dashboard snapshot cutovers and non-atomic event paths.
+- Added five certification/gap/roadmap reports; changed no application code.
+# 2026-07-13 - EPIC171 Inventory ADR011 Remediation
+
+- Replaced Inventory Materials snapshot-first list reads with bounded repository
+  live queries while preserving API and UI contracts.
+- Cut Material Detail and Locations to canonical live location/transaction read
+  models; Material History and Transactions remain paginated live reads.
+- Kept Inventory Overview snapshot-backed and changed no dashboard code.
+- Added focused ADR011 regression tests and four certification reports.

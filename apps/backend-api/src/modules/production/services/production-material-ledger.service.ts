@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ProductionMaterialLedgerEventType } from '@prisma/client';
 
 import { ListProductionMaterialLedgerDto } from '../dto/production.dto';
+import { ProductionMaterialEventName } from '../domain/production-material-contracts';
 import {
   ProductionLedgerTx,
   ProductionMaterialLedgerRepository,
@@ -79,6 +80,51 @@ export class ProductionMaterialLedgerService {
     }
 
     return this.repository.createMany(data, tx);
+  }
+
+  createMaterialEvent(
+    params: {
+      eventName: ProductionMaterialEventName;
+      productionOrderId: string;
+      reservationId?: string;
+      materialIssueId?: string;
+      consumptionId?: string;
+      inventoryItemId?: string;
+      quantity: number;
+      actorId?: string;
+      occurredAt?: Date;
+      sourceVersion: string;
+    },
+    tx: ProductionTx,
+  ) {
+    const occurredAt = params.occurredAt ?? new Date();
+    const aggregateId =
+      params.consumptionId ??
+      params.materialIssueId ??
+      params.reservationId ??
+      params.productionOrderId;
+
+    return this.repository.createOutboxEvent(
+      {
+        eventName: params.eventName,
+        payload: {
+          id: aggregateId,
+          aggregateId,
+          productionOrderId: params.productionOrderId,
+          reservationId: params.reservationId ?? null,
+          materialIssueId: params.materialIssueId ?? null,
+          consumptionId: params.consumptionId ?? null,
+          inventoryItemId: params.inventoryItemId ?? null,
+          quantity: params.quantity,
+          actorId: params.actorId ?? null,
+          occurredAt: occurredAt.toISOString(),
+          sourceVersion: params.sourceVersion,
+        },
+        metadata: { module: 'production' },
+        idempotencyKey: `${params.eventName}:${aggregateId}:${params.sourceVersion}`,
+      },
+      tx,
+    );
   }
 
   private buildWhere(query: ListProductionMaterialLedgerDto) {

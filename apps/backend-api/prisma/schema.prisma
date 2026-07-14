@@ -1178,6 +1178,7 @@ model Component {
   productionOrders ProductionOrder[]
 
   costing ComponentCosting?
+  summarySnapshot ComponentSummarySnapshot?
 
   projectTaskComponentAllocations ProjectTaskComponentAllocation[]
   dispatchItems                   DispatchItem[]
@@ -1876,6 +1877,149 @@ model WorkCenterSnapshot {
   @@index([status])
   @@index([updatedAt])
   @@map("work_center_snapshots")
+}
+
+model ComponentDashboardSnapshot {
+  id                 String   @id @default(cuid())
+  scopeKey           String
+  snapshotDate       DateTime @db.Date
+  totalComponents    Int      @default(0)
+  stockCount         Int      @default(0)
+  producingCount     Int      @default(0)
+  readyCount         Int      @default(0)
+  shippedCount       Int      @default(0)
+  deliveredCount     Int      @default(0)
+  installedCount     Int      @default(0)
+  totalEstimatedCost Float    @default(0)
+  totalActualCost    Float    @default(0)
+  payload            Json?
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  @@unique([scopeKey, snapshotDate])
+  @@index([snapshotDate])
+  @@index([scopeKey, snapshotDate])
+  @@index([updatedAt])
+  @@map("component_dashboard_snapshots")
+}
+
+model ComponentSummarySnapshot {
+  id                   String   @id @default(cuid())
+  componentId          String   @unique
+  code                 String
+  status               String
+  projectId            String?
+  productionOrderCount Int      @default(0)
+  timelineCount        Int      @default(0)
+  estimatedCost        Float    @default(0)
+  actualCost           Float    @default(0)
+  currentLocation      String?
+  payload              Json?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([projectId])
+  @@index([updatedAt])
+  @@map("component_summary_snapshots")
+}
+
+model QcDashboardSnapshot {
+  id                     String   @id @default(cuid())
+  scopeKey               String
+  snapshotDate           DateTime @db.Date
+  totalInspections       Int      @default(0)
+  pendingCount           Int      @default(0)
+  inProgressCount        Int      @default(0)
+  passedCount            Int      @default(0)
+  failedCount            Int      @default(0)
+  reworkCount            Int      @default(0)
+  openIssueCount         Int      @default(0)
+  openNcrCount           Int      @default(0)
+  waitingProductionCount Int      @default(0)
+  passRate               Float    @default(0)
+  payload                Json?
+  updatedAt              DateTime @updatedAt
+  createdAt              DateTime @default(now())
+
+  @@unique([scopeKey, snapshotDate])
+  @@index([snapshotDate])
+  @@index([scopeKey, snapshotDate])
+  @@index([updatedAt])
+  @@map("qc_dashboard_snapshots")
+}
+
+model QcInspectionSnapshot {
+  id                String   @id @default(cuid())
+  inspectionId      String   @unique
+  inspectionNo      String
+  status            String
+  checklistId       String?
+  productionOrderId String?
+  componentId       String?
+  projectId         String?
+  resultCount       Int      @default(0)
+  issueCount        Int      @default(0)
+  ncrCount          Int      @default(0)
+  passRate          Float    @default(0)
+  payload           Json?
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  inspection QcInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([productionOrderId])
+  @@index([componentId])
+  @@index([projectId])
+  @@index([updatedAt])
+  @@map("qc_inspection_snapshots")
+}
+
+model YardDashboardSnapshot {
+  id                   String   @id @default(cuid())
+  scopeKey             String
+  snapshotDate         DateTime @db.Date
+  totalZones           Int      @default(0)
+  totalSlots           Int      @default(0)
+  occupiedSlots        Int      @default(0)
+  availableSlots       Int      @default(0)
+  activePlacementCount Int      @default(0)
+  totalWeight          Float    @default(0)
+  movementToday        Int      @default(0)
+  movementMonth        Int      @default(0)
+  overloadedZoneCount  Int      @default(0)
+  craneCount           Int      @default(0)
+  availableCraneCount  Int      @default(0)
+  payload              Json?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@unique([scopeKey, snapshotDate])
+  @@index([snapshotDate])
+  @@index([scopeKey, snapshotDate])
+  @@index([updatedAt])
+  @@map("yard_dashboard_snapshots")
+}
+
+model YardWorkspaceSnapshot {
+  id             String   @id @default(cuid())
+  scopeKey       String   @unique
+  zoneId         String?
+  totalSlots     Int      @default(0)
+  occupiedSlots  Int      @default(0)
+  availableSlots Int      @default(0)
+  placementCount Int      @default(0)
+  totalWeight    Float    @default(0)
+  payload        Json?
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@index([zoneId])
+  @@index([updatedAt])
+  @@map("yard_workspace_snapshots")
 }
 
 //
@@ -2863,6 +3007,7 @@ model QcInspection {
   issues      QcIssue[]
   attachments QcAttachment[]
   ncrs        NonConformanceReport[]
+  snapshot    QcInspectionSnapshot?
 
   @@index([status])
   @@index([productionOrderId])

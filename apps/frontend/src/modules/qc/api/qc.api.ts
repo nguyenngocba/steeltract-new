@@ -40,12 +40,15 @@ export type QcProductionQueueRow = {
 export type QcCockpit = {
   metrics: {
     total: number
+    pending: number
     inProgress: number
     passed: number
     failed: number
     rework: number
+    overdue: number
     openIssues: number
     openNcrs: number
+    waitingProductionOrders: number
     passRate: number
     defects: Array<{ severity: string; status: string; _count: number }>
   }
@@ -55,11 +58,61 @@ export type QcCockpit = {
   ncrs: Array<{ id: string; ncrNo: string; title: string; status: string; severity: string; productionOrderId?: string; componentId?: string; updatedAt: string }>
   byCategory: Array<{ category: string; count: number }>
   byProject: Array<{ projectName: string; total: number; passed: number; passRate: number }>
+  trend: Array<{ date: string; total: number; passed: number; failed: number }>
+  meta: { page: number; limit: number; total: number; totalPages: number }
+}
+
+export type QcWorkspaceParams = {
+  page?: number
+  limit?: number
+  search?: string
+  status?: string
+  sortBy?: 'updatedAt' | 'createdAt' | 'inspectionNo' | 'status'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export type QcDashboardRead = {
+  data: {
+    scopeKey: string
+    snapshotDate: string
+    totalInspections: number
+    pendingCount: number
+    inProgressCount: number
+    passedCount: number
+    failedCount: number
+    reworkCount: number
+    openIssueCount: number
+    openNcrCount: number
+    waitingProductionCount: number
+    passRate: number
+    payload?: {
+      defects?: QcCockpit['metrics']['defects']
+      trend?: QcCockpit['trend']
+    } | null
+  }
+  source: 'snapshot' | 'runtime'
+  meta: {
+    ageSeconds: number
+    confidence: number
+    isStale: boolean
+    snapshotType: string
+    fallbackReason?: 'disabled' | 'missing' | 'stale' | 'mismatch'
+  }
 }
 
 export async function getQcCockpit() {
   const response = await http.get('/qc/cockpit')
   return response.data as QcCockpit
+}
+
+export async function getQcWorkspace(params: QcWorkspaceParams = {}) {
+  const response = await http.get('/qc/read-model/workspace', { params })
+  return response.data as QcCockpit
+}
+
+export async function getQcDashboard() {
+  const response = await http.get('/qc/dashboard')
+  return response.data as QcDashboardRead
 }
 
 export async function createInspection(payload: Record<string, unknown>) {

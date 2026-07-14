@@ -22,10 +22,13 @@ interface SnapshotEventPayload {
   dispatchOrderId?: string;
   productionOrderId?: string;
   workCenterId?: string;
+  componentId?: string;
+  inspectionId?: string;
+  yardZoneId?: string;
   sourceVersion?: string;
 }
 
-const snapshotEventMap: Record<
+export const snapshotEventMap: Record<
   string,
   {
     module: SnapshotModule;
@@ -37,6 +40,14 @@ const snapshotEventMap: Record<
     snapshotType: 'InventoryDashboardSnapshot',
   },
   'inventory.stock.changed': {
+    module: 'inventory',
+    snapshotType: 'MaterialLocationBalanceSnapshot',
+  },
+  'inventory.stock_bucket.updated': {
+    module: 'inventory',
+    snapshotType: 'MaterialLocationBalanceSnapshot',
+  },
+  'inventory.material.updated': {
     module: 'inventory',
     snapshotType: 'MaterialLocationBalanceSnapshot',
   },
@@ -156,6 +167,70 @@ const snapshotEventMap: Record<
     module: 'production',
     snapshotType: 'ProductionOrderSnapshot',
   },
+  'production.material.reserved': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.material.released': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.material.issued': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.material.consumed': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'production.material.returned': {
+    module: 'production',
+    snapshotType: 'ProductionOrderSnapshot',
+  },
+  'component.updated': {
+    module: 'components',
+    snapshotType: 'ComponentSummarySnapshot',
+  },
+  'qc.inspection.started': {
+    module: 'qc',
+    snapshotType: 'QcInspectionSnapshot',
+  },
+  'qc.inspection.completed': {
+    module: 'qc',
+    snapshotType: 'QcInspectionSnapshot',
+  },
+  'qc.issue.created': {
+    module: 'qc',
+    snapshotType: 'QcInspectionSnapshot',
+  },
+  'qc.ncr.created': {
+    module: 'qc',
+    snapshotType: 'QcInspectionSnapshot',
+  },
+  'qc.rework.required': {
+    module: 'qc',
+    snapshotType: 'QcInspectionSnapshot',
+  },
+  'yard.item.placed': {
+    module: 'yard',
+    snapshotType: 'YardWorkspaceSnapshot',
+  },
+  'yard.item.moved': {
+    module: 'yard',
+    snapshotType: 'YardWorkspaceSnapshot',
+  },
+  'yard.item.removed': {
+    module: 'yard',
+    snapshotType: 'YardWorkspaceSnapshot',
+  },
+  'yard.zone.updated': {
+    module: 'yard',
+    snapshotType: 'YardWorkspaceSnapshot',
+  },
+  'yard.snapshot.generated': {
+    module: 'yard',
+    snapshotType: 'YardDashboardSnapshot',
+  },
 };
 
 @Injectable()
@@ -207,6 +282,15 @@ export class EventConsumerService implements OnModuleInit, OnModuleDestroy {
           event.payload.aggregateId ??
           event.payload.id,
         workCenterId: event.payload.workCenterId,
+        componentId:
+          event.payload.componentId ??
+          event.payload.aggregateId ??
+          event.payload.id,
+        inspectionId:
+          event.payload.inspectionId ??
+          event.payload.aggregateId ??
+          event.payload.id,
+        yardZoneId: event.payload.yardZoneId,
       },
       reason: 'domain-event',
       sourceEventId: event.metadata?.eventId,

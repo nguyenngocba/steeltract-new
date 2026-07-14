@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useDeferredValue, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
-import { approveInspection, completeInspection, createInspection, getQcCockpit, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
+import { approveInspection, completeInspection, createInspection, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
+import { queryKeys } from '@/lib/query/query-keys'
+import { useQcDashboard, useQcWorkspace } from '../hooks/useQcWorkspace'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 type QcTab = 'overview' | 'inbound' | 'production' | 'final' | 'plan' | 'standards' | 'ncr' | 'capa' | 'calibration' | 'logs' | 'dashboard' | 'reports'
@@ -40,16 +42,42 @@ export function QcPage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ['qc-cockpit'], queryFn: getQcCockpit, refetchInterval: 5000 })
-  const runtime = data ?? emptyRuntime()
+  const deferredQuery = useDeferredValue(query)
   const segment = location.pathname.split('/').at(-1)
   const legacyTab = ['plan', 'standards', 'calibration'].includes(segment ?? '') ? segment as QcTab : undefined
   const tab = legacyTab ?? tabs.find((item) => item.path === location.pathname)?.id ?? 'overview'
-  const filteredInspections = useMemo(() => runtime.inspections.filter((row) => {
-    if (status !== 'all' && row.status !== status) return false
-    return `${row.inspectionNo} ${row.projectName} ${row.componentCode} ${row.productionOrderNo}`.toLowerCase().includes(query.toLowerCase())
-  }), [query, runtime.inspections, status])
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['qc-cockpit'] })
+  const { data, isLoading } = useQcWorkspace({
+    page: 1,
+    limit: 100,
+    search: deferredQuery || undefined,
+    status: status === 'all' ? undefined : status,
+    sortBy: 'updatedAt',
+    sortOrder: 'desc',
+  })
+  const { data: dashboard } = useQcDashboard(tab === 'dashboard')
+  const runtime = data ?? emptyRuntime()
+  const dashboardRuntime = dashboard ? {
+    ...runtime,
+    metrics: {
+      ...runtime.metrics,
+      total: dashboard.data.totalInspections,
+      pending: dashboard.data.pendingCount,
+      inProgress: dashboard.data.inProgressCount,
+      passed: dashboard.data.passedCount,
+      failed: dashboard.data.failedCount,
+      rework: dashboard.data.reworkCount,
+      openIssues: dashboard.data.openIssueCount,
+      openNcrs: dashboard.data.openNcrCount,
+      waitingProductionOrders: dashboard.data.waitingProductionCount,
+      passRate: dashboard.data.passRate,
+      defects: dashboard.data.payload?.defects ?? [],
+    },
+    trend: dashboard.data.payload?.trend ?? [],
+    byCategory: [],
+    byProject: [],
+  } : runtime
+  const filteredInspections = runtime.inspections
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.qc.workspaces() })
   const inspectionPayload = (row: QcProductionQueueRow) => ({
     productionOrderId: row.id,
     componentId: row.componentId,
@@ -150,7 +178,7 @@ export function QcPage() {
       {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
       {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
       {isLoading ? <div className={`${panel} mt-3 p-6 text-center text-sm text-slate-500`}>Đang tải QC cockpit...</div> : null}
-      {(tab === 'overview' || tab === 'dashboard') && <Overview runtime={runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
+      {(tab === 'overview' || tab === 'dashboard') && <Overview runtime={tab === 'dashboard' ? dashboardRuntime : runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {['inbound', 'production', 'final'].includes(tab) && <Inspections rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
       {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'standards' && <Standards runtime={runtime} />}
@@ -254,14 +282,14 @@ function Overview({ runtime, rows, queue, onOpen, onQueue, onCreate, onQuickAppr
   return <div className="mt-3 space-y-4">
     <KpiStrip runtime={runtime} />
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows.slice(0, 10)} onOpen={onOpen} /><aside className="space-y-4"><Latest rows={rows} onOpen={onOpen} /><Donut title="Thống kê theo loại kiểm tra" center={fmt(m.total)} rows={runtime.byCategory.map((r, i) => [r.category, r.count, ['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500'][i % 4]]) as any} /><NcrSummary runtime={runtime} /></aside></div>
-    <div className="grid gap-4 xl:grid-cols-2"><Trend rows={rows} /><ByProject rows={runtime.byProject} /></div>
+    <div className="grid gap-4 xl:grid-cols-2"><Trend rows={runtime.trend} /><ByProject rows={runtime.byProject} /></div>
     <ProductionQueue rows={queue.slice(0, 8)} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} />
   </div>
 }
 
 function KpiStrip({ runtime }: { runtime: QcCockpit }) {
   const m = runtime.metrics
-  return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Tổng phiếu kiểm tra" value={fmt(m.total)} note="Trong hệ thống" /><Kpi icon={CheckCircle2} title="Đạt" value={fmt(m.passed)} note={`${fmt(m.passRate)}%`} tone="emerald" /><Kpi icon={XCircle} title="Không đạt" value={fmt(m.failed + m.rework)} note="Rework/Failed" tone="red" /><Kpi icon={CalendarClock} title="Chờ xử lý" value={fmt(runtime.inspections.filter((i) => ['READY', 'DRAFT'].includes(i.status)).length)} note="Phiếu" tone="amber" /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note="Trong tổng số" tone="purple" /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(runtime.productionQueue.filter((q) => q.qcStatus !== 'APPROVED').length)} note="Chặn xuất bãi" tone="cyan" /></div>
+  return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Tổng phiếu kiểm tra" value={fmt(m.total)} note="Trong hệ thống" /><Kpi icon={CheckCircle2} title="Đạt" value={fmt(m.passed)} note={`${fmt(m.passRate)}%`} tone="emerald" /><Kpi icon={XCircle} title="Không đạt" value={fmt(m.failed + m.rework)} note="Rework/Failed" tone="red" /><Kpi icon={CalendarClock} title="Chờ xử lý" value={fmt(m.pending)} note="Phiếu" tone="amber" /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note="Trong tổng số" tone="purple" /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(m.waitingProductionOrders)} note="Chặn xuất bãi" tone="cyan" /></div>
 }
 
 function Inspections({ rows, queue, onOpen, onQueue, onCreate, onQuickApprove, onPass, onFail }: { rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; onPass: (row: QcInspectionRow) => void; onFail: (row: QcInspectionRow) => void }) {
@@ -293,7 +321,7 @@ function Calibration() {
 }
 
 function Reports({ runtime }: { runtime: QcCockpit }) {
-  return <div className="mt-3 space-y-4"><KpiStrip runtime={runtime} /><div className="grid gap-4 xl:grid-cols-3"><Trend rows={runtime.inspections} /><ByProject rows={runtime.byProject} /><Donut title="Cơ cấu lỗi theo mức độ" center={fmt(runtime.metrics.openIssues)} rows={runtime.metrics.defects.map((d, i) => [d.severity, d._count, ['bg-red-500', 'bg-amber-400', 'bg-blue-500'][i % 3]]) as any} /></div></div>
+  return <div className="mt-3 space-y-4"><KpiStrip runtime={runtime} /><div className="grid gap-4 xl:grid-cols-3"><Trend rows={runtime.trend} /><ByProject rows={runtime.byProject} /><Donut title="Cơ cấu lỗi theo mức độ" center={fmt(runtime.metrics.openIssues)} rows={runtime.metrics.defects.map((d, i) => [d.severity, d._count, ['bg-red-500', 'bg-amber-400', 'bg-blue-500'][i % 3]]) as any} /></div></div>
 }
 
 function Latest({ rows, onOpen }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void }) {
@@ -305,10 +333,9 @@ function NcrSummary({ runtime }: { runtime: QcCockpit }) {
   return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">NCR (Không phù hợp)</h3><div className="mt-3 space-y-2 text-xs"><Info k="NCR mở" v={fmt(runtime.metrics.openNcrs)} /><Info k="Issue mở" v={fmt(runtime.metrics.openIssues)} /><Info k="Không đạt/Rework" v={fmt(runtime.metrics.failed + runtime.metrics.rework)} /></div><div className="mt-4 rounded bg-red-950/30 p-4 text-center text-red-300"><AlertTriangle className="mx-auto" /></div></div>
 }
 
-function Trend({ rows }: { rows: QcInspectionRow[] }) {
-  const pass = rows.filter((r) => r.result === 'PASS').length
-  const fail = rows.filter((r) => r.result === 'FAIL').length
-  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">Xu hướng kết quả QC</h3><div className="mt-4 grid h-48 grid-cols-6 items-end gap-3 border-b border-l border-slate-800 px-3 pb-3">{Array.from({ length: 6 }, (_, i) => <div key={i} className="flex flex-col items-center gap-2"><div className="w-6 rounded-t bg-emerald-500" style={{ height: `${Math.max(8, pass * 8 + i * 5)}px` }} /><div className="w-6 rounded-t bg-red-500" style={{ height: `${Math.max(6, fail * 8 + i * 2)}px` }} /><span className="text-[10px] text-slate-500">0{i + 1}/06</span></div>)}</div></div>
+function Trend({ rows }: { rows: QcCockpit['trend'] }) {
+  const max = Math.max(1, ...rows.flatMap((row) => [row.passed, row.failed]))
+  return <div className={`${panel} p-4`}><h3 className="text-sm font-semibold">Xu hướng kết quả QC</h3>{rows.length ? <div className="mt-4 grid h-48 items-end gap-3 border-b border-l border-slate-800 px-3 pb-3" style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(24px, 1fr))` }}>{rows.map((row) => <div key={row.date} className="flex flex-col items-center gap-2"><div className="w-6 rounded-t bg-emerald-500" style={{ height: `${Math.max(4, (row.passed / max) * 120)}px` }} /><div className="w-6 rounded-t bg-red-500" style={{ height: `${Math.max(4, (row.failed / max) * 120)}px` }} /><span className="text-[10px] text-slate-500">{row.date.slice(8, 10)}/{row.date.slice(5, 7)}</span></div>)}</div> : <Empty title="Chưa có dữ liệu lịch sử" />}</div>
 }
 
 function ByProject({ rows }: { rows: QcCockpit['byProject'] }) {
@@ -357,5 +384,5 @@ function Empty({ title }: { title: string }) {
 }
 
 function emptyRuntime(): QcCockpit {
-  return { metrics: { total: 0, inProgress: 0, passed: 0, failed: 0, rework: 0, openIssues: 0, openNcrs: 0, passRate: 0, defects: [] }, inspections: [], productionQueue: [], checklists: [], ncrs: [], byCategory: [], byProject: [] }
+  return { metrics: { total: 0, pending: 0, inProgress: 0, passed: 0, failed: 0, rework: 0, overdue: 0, openIssues: 0, openNcrs: 0, waitingProductionOrders: 0, passRate: 0, defects: [] }, inspections: [], productionQueue: [], checklists: [], ncrs: [], byCategory: [], byProject: [], trend: [], meta: { page: 1, limit: 100, total: 0, totalPages: 1 } }
 }

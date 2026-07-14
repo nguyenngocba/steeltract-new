@@ -1,0 +1,16 @@
+import { YardController } from './yard.controller';
+
+describe('Yard dashboard controller boundary', () => {
+  it('delegates dashboard reads to the snapshot reader service', async () => {
+    const expected = { data: { totalZones: 2 }, source: 'snapshot' };
+    const snapshotRead = { dashboard: jest.fn().mockResolvedValue(expected) };
+    const controller = new YardController(
+      {} as never,
+      {} as never,
+      snapshotRead as never,
+    );
+
+    await expect(controller.dashboard()).resolves.toBe(expected);
+    expect(snapshotRead.dashboard).toHaveBeenCalledTimes(1);
+  });
+});

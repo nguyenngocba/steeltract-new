@@ -385,6 +385,72 @@ export class YardRepository {
     return tx.activityLog.create({ data });
   }
 
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    tx: YardTx,
+  ) {
+    return tx.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
+
+  findComponentForOutbound(id: string, tx: YardTx) {
+    return tx.component.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        projectId: true,
+      },
+    });
+  }
+
+  findProductionOrderProject(id: string, tx: YardTx) {
+    return tx.productionOrder.findUnique({
+      where: { id },
+      select: { projectId: true },
+    });
+  }
+
+  markComponentShipped(
+    id: string,
+    projectId: string | null | undefined,
+    tx: YardTx,
+  ) {
+    return tx.component.update({
+      where: { id },
+      data: {
+        status: 'SHIPPED',
+        projectId,
+        floor: null,
+        zone: null,
+        position: null,
+        x: 0,
+        y: 0,
+      },
+    });
+  }
+
+  createComponentShippedTimeline(
+    componentId: string,
+    note: string,
+    tx: YardTx,
+  ) {
+    return tx.componentTimeline.create({
+      data: {
+        componentId,
+        action: 'SHIPPED',
+        note,
+      },
+    });
+  }
+
   zoneInclude() {
     return {
       rows: {

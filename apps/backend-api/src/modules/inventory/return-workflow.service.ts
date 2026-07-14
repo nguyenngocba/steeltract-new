@@ -4,13 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  Prisma,
   ReturnDisposition,
   ReturnFlowType,
   ReturnRequestStatus,
   TransactionType,
 } from '@prisma/client';
 
-import { EventBusService } from '../../core/events/event-bus.service';
 import type {
   ApproveReturnRequestDto,
   CreateReturnRequestDto,
@@ -22,15 +22,12 @@ import type {
 } from './dto/return-workflow.dto';
 import { InventoryService } from './inventory.service';
 import { InventoryRepository } from './inventory.repository';
-import { InventoryEventService } from './inventory-event.service';
 
 @Injectable()
 export class ReturnWorkflowService {
   constructor(
     private readonly inventoryRepository: InventoryRepository,
     private readonly inventoryService: InventoryService,
-    private readonly inventoryEvents: InventoryEventService,
-    private readonly eventBus: EventBusService,
   ) {}
 
   async findAll(query: ListReturnRequestsDto) {
@@ -44,7 +41,10 @@ export class ReturnWorkflowService {
 
     const ids = requests.map((request) => request.id);
     const logs = ids.length
-      ? await this.inventoryRepository.findActivityLogsByEntity('ReturnRequest', ids)
+      ? await this.inventoryRepository.findActivityLogsByEntity(
+          'ReturnRequest',
+          ids,
+        )
       : [];
     const logsByRequest = logs.reduce((map, log) => {
       const list = map.get(log.entityId ?? '') ?? [];
@@ -64,27 +64,37 @@ export class ReturnWorkflowService {
       await this.validateSiteReturnAvailability(dto);
     }
 
-    const request = await this.inventoryRepository.createReturnRequest({
-        returnNo: dto.returnNo ?? await this.generateReturnNo(dto.flowType),
-        flowType: dto.flowType,
-        projectId: dto.projectId,
-        supplierId: dto.supplierId,
-        warehouseId: dto.warehouseId,
-        requestedBy: dto.requestedBy,
-        remarks: dto.remarks,
-        items: {
-          create: dto.items.map((item) => ({
-            inventoryItemId: item.inventoryItemId,
-            requestedQuantity: item.requestedQuantity,
-            unitId: item.unitId,
-            zoneId: item.zoneId,
-            remarks: item.remarks,
-          })),
+    return this.inventoryRepository.transaction(async (tx) => {
+      const request = await this.inventoryRepository.createReturnRequest(
+        {
+          returnNo:
+            dto.returnNo ??
+            (await this.inventoryRepository.nextOperationalCode(
+              'returnRequest',
+              'returnNo',
+              this.returnPrefix(dto.flowType),
+              tx,
+            )),
+          flowType: dto.flowType,
+          projectId: dto.projectId,
+          supplierId: dto.supplierId,
+          warehouseId: dto.warehouseId,
+          requestedBy: dto.requestedBy,
+          remarks: dto.remarks,
+          items: {
+            create: dto.items.map((item) => ({
+              inventoryItemId: item.inventoryItemId,
+              requestedQuantity: item.requestedQuantity,
+              unitId: item.unitId,
+              zoneId: item.zoneId,
+              remarks: item.remarks,
+            })),
+          },
         },
-    });
+        tx,
+      );
 
-    await this.emit('requested', request.id, request.returnNo);
-    await this.inventoryRepository.createActivityLog({
+      const activity = {
         action: 'PROJECT_MATERIAL_RETURN_REQUESTED',
         entity: 'ReturnRequest',
         entityId: request.id,
@@ -96,85 +106,146 @@ export class ReturnWorkflowService {
           itemCount: request.items.length,
           remarks: request.remarks,
         },
-    });
-    await this.inventoryEvents.returnRequested({
-      id: request.id,
-      returnNo: request.returnNo,
-      status: request.status,
-      itemCount: request.items.length,
-      projectId: request.projectId,
-    });
+      } satisfies Prisma.ActivityLogCreateInput;
+      await this.inventoryRepository.createActivityLog(activity, tx);
+      await this.createAuditOutbox(activity, tx);
+      await this.createReturnOutbox(
+        'inventory.return.requested',
+        this.returnPayload(request),
+        request,
+        tx,
+      );
 
-    return request;
+      return request;
+    });
   }
 
   async approve(id: string, dto: ApproveReturnRequestDto) {
-    const request = await this.requireRequest(id);
+    return this.inventoryRepository.transaction(async (tx) => {
+      const request = await this.requireRequest(id, tx);
 
-    if (request.status !== ReturnRequestStatus.REQUESTED) {
-      throw new BadRequestException('Only requested returns can be approved.');
-    }
+      if (request.status !== ReturnRequestStatus.REQUESTED) {
+        throw new BadRequestException(
+          'Only requested returns can be approved.',
+        );
+      }
 
-    const updated = await this.inventoryRepository.updateReturnRequest(id, {
-        status: ReturnRequestStatus.APPROVED,
-        approvedBy: dto.approvedBy,
-        approvedAt: new Date(),
-        remarks: dto.remarks ?? request.remarks,
+      const updated = await this.inventoryRepository.updateReturnRequest(
+        id,
+        {
+          status: ReturnRequestStatus.APPROVED,
+          approvedBy: dto.approvedBy,
+          approvedAt: new Date(),
+          remarks: dto.remarks ?? request.remarks,
+        },
+        tx,
+      );
+      await this.createReturnOutbox(
+        'inventory.return.approved',
+        { id: updated.id, returnNo: updated.returnNo },
+        updated,
+        tx,
+      );
+
+      return updated;
     });
-
-    await this.emit('approved', updated.id, updated.returnNo);
-
-    return updated;
   }
 
   async receive(id: string, dto: ReceiveReturnRequestDto) {
-    const request = await this.requireRequest(id);
+    const updated = await this.inventoryRepository.transaction(async (tx) => {
+      const request = await this.requireRequest(id, tx);
 
-    if (
-      ![
-        ReturnRequestStatus.APPROVED as ReturnRequestStatus,
-        ReturnRequestStatus.REQUESTED as ReturnRequestStatus,
-      ].includes(request.status)
-    ) {
-      throw new BadRequestException('Return is not ready for receiving.');
-    }
+      if (
+        ![
+          ReturnRequestStatus.APPROVED as ReturnRequestStatus,
+          ReturnRequestStatus.REQUESTED as ReturnRequestStatus,
+        ].includes(request.status)
+      ) {
+        throw new BadRequestException('Return is not ready for receiving.');
+      }
 
-    for (const item of dto.items) {
-      await this.inventoryRepository.updateReturnRequestItem(item.id, {
-          receivedQuantity: item.receivedQuantity,
-          zone: item.zoneId
+      for (const item of dto.items) {
+        await this.inventoryRepository.updateReturnRequestItem(
+          item.id,
+          {
+            receivedQuantity: item.receivedQuantity,
+            zone: item.zoneId
+              ? {
+                  connect: {
+                    id: item.zoneId,
+                  },
+                }
+              : undefined,
+          },
+          tx,
+        );
+      }
+
+      const result = await this.inventoryRepository.updateReturnRequest(
+        id,
+        {
+          status: ReturnRequestStatus.RECEIVED,
+          warehouse: dto.warehouseId
             ? {
                 connect: {
-                  id: item.zoneId,
+                  id: dto.warehouseId,
                 },
-            }
+              }
             : undefined,
-      });
-    }
+          receivedBy: dto.receivedBy,
+          receivedAt: new Date(),
+          remarks: dto.remarks ?? request.remarks,
+        },
+        tx,
+      );
 
-    const updated = await this.inventoryRepository.updateReturnRequest(id, {
-        status: ReturnRequestStatus.RECEIVED,
-        warehouse: dto.warehouseId
-          ? {
-              connect: {
-                id: dto.warehouseId,
-              },
-            }
-          : undefined,
-        receivedBy: dto.receivedBy,
-        receivedAt: new Date(),
-        remarks: dto.remarks ?? request.remarks,
+      if (result.flowType === ReturnFlowType.SITE_RETURN) {
+        const firstItem = result.items[0];
+        const firstMaterialName =
+          firstItem?.inventoryItem?.name ??
+          firstItem?.inventoryItem?.code ??
+          'vật tư';
+        const receivedQuantity = result.items.reduce(
+          (sum, item) =>
+            sum + Number(item.receivedQuantity ?? item.requestedQuantity ?? 0),
+          0,
+        );
+        const activity = {
+          action: 'PROJECT_MATERIAL_RETURN_RECEIVED',
+          entity: 'ReturnRequest',
+          entityId: result.id,
+          module: 'inventory',
+          metadata: {
+            returnNo: result.returnNo,
+            flowType: result.flowType,
+            projectId: result.projectId,
+            projectCode: result.project?.code,
+            projectName: result.project?.name,
+            itemCount: result.items.length,
+            quantity: receivedQuantity,
+            materialName: firstMaterialName,
+            message: `Kho đã nhận lại ${receivedQuantity} ${firstMaterialName} từ công trình ${result.project?.code ?? result.projectId ?? ''}.`,
+            remarks: result.remarks,
+          },
+        } satisfies Prisma.ActivityLogCreateInput;
+        await this.inventoryRepository.createActivityLog(activity, tx);
+        await this.createAuditOutbox(activity, tx);
+      }
+      await this.createReturnOutbox(
+        'inventory.return.received',
+        this.returnPayload(result),
+        result,
+        tx,
+      );
+
+      return result;
     });
 
     if (updated.flowType === ReturnFlowType.SITE_RETURN) {
       const firstItem = updated.items[0];
       const projectLabel = updated.project
         ? `${updated.project.code} - ${updated.project.name}`
-        : updated.projectId ?? 'công trình';
-      const firstMaterialName =
-        firstItem?.inventoryItem?.name ??
-        firstItem?.inventoryItem?.code ??
-        'vật tư';
+        : (updated.projectId ?? 'công trình');
       const receivedQuantity = updated.items.reduce(
         (sum, item) =>
           sum + Number(item.receivedQuantity ?? item.requestedQuantity ?? 0),
@@ -213,70 +284,61 @@ export class ReturnWorkflowService {
         })),
       });
       await this.applyProjectReturnReceived(updated);
-      await this.inventoryRepository.createActivityLog({
-          action: 'PROJECT_MATERIAL_RETURN_RECEIVED',
-          entity: 'ReturnRequest',
-          entityId: updated.id,
-          module: 'inventory',
-          metadata: {
-            returnNo: updated.returnNo,
-            flowType: updated.flowType,
-            projectId: updated.projectId,
-            projectCode: updated.project?.code,
-            projectName: updated.project?.name,
-            itemCount: updated.items.length,
-            quantity: receivedQuantity,
-            materialName: firstMaterialName,
-            message: `Kho đã nhận lại ${receivedQuantity} ${firstMaterialName} từ công trình ${updated.project?.code ?? updated.projectId ?? ''}.`,
-            remarks: updated.remarks,
-          },
-      });
     }
-
-    await this.emit('received', updated.id, updated.returnNo);
-    await this.inventoryEvents.returnReceived({
-      id: updated.id,
-      returnNo: updated.returnNo,
-      status: updated.status,
-      itemCount: updated.items.length,
-      projectId: updated.projectId,
-    });
 
     return updated;
   }
 
   async inspect(id: string, dto: InspectReturnRequestDto) {
-    const request = await this.requireRequest(id);
+    return this.inventoryRepository.transaction(async (tx) => {
+      const request = await this.requireRequest(id, tx);
 
-    if (request.status !== ReturnRequestStatus.RECEIVED) {
-      throw new BadRequestException('Return must be received before inspection.');
-    }
+      if (request.status !== ReturnRequestStatus.RECEIVED) {
+        throw new BadRequestException(
+          'Return must be received before inspection.',
+        );
+      }
 
-    for (const item of dto.items) {
-      await this.inventoryRepository.updateReturnRequestItem(item.id, {
-          inspectedQuantity: item.inspectedQuantity,
-          disposition: item.disposition,
-          remarks: item.remarks,
-      });
-    }
+      for (const item of dto.items) {
+        await this.inventoryRepository.updateReturnRequestItem(
+          item.id,
+          {
+            inspectedQuantity: item.inspectedQuantity,
+            disposition: item.disposition,
+            remarks: item.remarks,
+          },
+          tx,
+        );
+      }
 
-    const updated = await this.inventoryRepository.updateReturnRequest(id, {
-        status: ReturnRequestStatus.INSPECTED,
-        inspectedBy: dto.inspectedBy,
-        inspectedAt: new Date(),
-        remarks: dto.remarks ?? request.remarks,
+      const updated = await this.inventoryRepository.updateReturnRequest(
+        id,
+        {
+          status: ReturnRequestStatus.INSPECTED,
+          inspectedBy: dto.inspectedBy,
+          inspectedAt: new Date(),
+          remarks: dto.remarks ?? request.remarks,
+        },
+        tx,
+      );
+      await this.createReturnOutbox(
+        'inventory.return.inspected',
+        { id: updated.id, returnNo: updated.returnNo },
+        updated,
+        tx,
+      );
+
+      return updated;
     });
-
-    await this.emit('inspected', updated.id, updated.returnNo);
-
-    return updated;
   }
 
   async dispose(id: string, dto: DisposeReturnRequestDto) {
     const request = await this.requireRequest(id);
 
     if (request.status !== ReturnRequestStatus.INSPECTED) {
-      throw new BadRequestException('Return must be inspected before disposition.');
+      throw new BadRequestException(
+        'Return must be inspected before disposition.',
+      );
     }
 
     const stockItems = request.items.filter(
@@ -286,7 +348,10 @@ export class ReturnWorkflowService {
       (item) => item.disposition === ReturnDisposition.SCRAP,
     );
 
-    if (stockItems.length > 0 && request.flowType !== ReturnFlowType.SITE_RETURN) {
+    if (
+      stockItems.length > 0 &&
+      request.flowType !== ReturnFlowType.SITE_RETURN
+    ) {
       await this.inventoryService.createTransaction({
         type: TransactionType.RETURN,
         transactionTypeCode: 'SITE_RETURN',
@@ -298,7 +363,10 @@ export class ReturnWorkflowService {
         remarks: dto.remarks,
         items: stockItems.map((item) => ({
           inventoryItemId: item.inventoryItemId,
-          quantity: item.inspectedQuantity ?? item.receivedQuantity ?? item.requestedQuantity,
+          quantity:
+            item.inspectedQuantity ??
+            item.receivedQuantity ??
+            item.requestedQuantity,
           unitId: item.unitId ?? undefined,
           zoneId: item.zoneId ?? undefined,
         })),
@@ -317,69 +385,98 @@ export class ReturnWorkflowService {
         remarks: dto.remarks,
         items: scrapItems.map((item) => ({
           inventoryItemId: item.inventoryItemId,
-          quantity: -Math.abs(item.inspectedQuantity ?? item.receivedQuantity ?? item.requestedQuantity),
+          quantity: -Math.abs(
+            item.inspectedQuantity ??
+              item.receivedQuantity ??
+              item.requestedQuantity,
+          ),
           unitId: item.unitId ?? undefined,
           zoneId: item.zoneId ?? undefined,
         })),
       });
     }
 
-    const updated = await this.inventoryRepository.updateReturnRequest(id, {
-        status: ReturnRequestStatus.DISPOSED,
-        disposedAt: new Date(),
-        remarks: dto.remarks ?? request.remarks,
-    });
+    const updated = await this.inventoryRepository.transaction(async (tx) => {
+      const result = await this.inventoryRepository.updateReturnRequest(
+        id,
+        {
+          status: ReturnRequestStatus.DISPOSED,
+          disposedAt: new Date(),
+          remarks: dto.remarks ?? request.remarks,
+        },
+        tx,
+      );
 
-    if (updated.flowType === ReturnFlowType.SITE_RETURN) {
-      await this.inventoryRepository.createActivityLog({
+      if (result.flowType === ReturnFlowType.SITE_RETURN) {
+        const activity = {
           action: 'PROJECT_MATERIAL_RETURN_ACCEPTED',
           entity: 'ReturnRequest',
-          entityId: updated.id,
+          entityId: result.id,
           module: 'inventory',
           metadata: {
-            returnNo: updated.returnNo,
-            flowType: updated.flowType,
-            projectId: updated.projectId,
-            acceptedItems: updated.items
-              .filter((item) => item.disposition === ReturnDisposition.USABLE_STOCK)
+            returnNo: result.returnNo,
+            flowType: result.flowType,
+            projectId: result.projectId,
+            acceptedItems: result.items
+              .filter(
+                (item) => item.disposition === ReturnDisposition.USABLE_STOCK,
+              )
               .map((item) => ({
                 inventoryItemId: item.inventoryItemId,
-                quantity: item.inspectedQuantity ?? item.receivedQuantity ?? item.requestedQuantity,
+                quantity:
+                  item.inspectedQuantity ??
+                  item.receivedQuantity ??
+                  item.requestedQuantity,
               })),
           },
-      });
-    }
+        } satisfies Prisma.ActivityLogCreateInput;
+        await this.inventoryRepository.createActivityLog(activity, tx);
+        await this.createAuditOutbox(activity, tx);
+      }
+      await this.createReturnOutbox(
+        'inventory.return.disposed',
+        { id: result.id, returnNo: result.returnNo },
+        result,
+        tx,
+      );
+      await this.createReturnOutbox(
+        'inventory.return.accepted',
+        this.returnPayload(result),
+        result,
+        tx,
+      );
 
-    await this.emit('disposed', updated.id, updated.returnNo);
-    await this.inventoryEvents.returnAccepted({
-      id: updated.id,
-      returnNo: updated.returnNo,
-      status: updated.status,
-      itemCount: updated.items.length,
-      projectId: updated.projectId,
+      return result;
     });
 
     return updated;
   }
 
   async reject(id: string, dto: RejectReturnRequestDto) {
-    const request = await this.requireRequest(id);
+    return this.inventoryRepository.transaction(async (tx) => {
+      const request = await this.requireRequest(id, tx);
 
-    if (
-      ![
-        ReturnRequestStatus.REQUESTED as ReturnRequestStatus,
-        ReturnRequestStatus.APPROVED as ReturnRequestStatus,
-      ].includes(request.status)
-    ) {
-      throw new BadRequestException('Only requested returns can be rejected.');
-    }
+      if (
+        ![
+          ReturnRequestStatus.REQUESTED as ReturnRequestStatus,
+          ReturnRequestStatus.APPROVED as ReturnRequestStatus,
+        ].includes(request.status)
+      ) {
+        throw new BadRequestException(
+          'Only requested returns can be rejected.',
+        );
+      }
 
-    const updated = await this.inventoryRepository.updateReturnRequest(id, {
-        status: ReturnRequestStatus.CANCELLED,
-        remarks: dto.remarks ?? request.remarks,
-    });
+      const updated = await this.inventoryRepository.updateReturnRequest(
+        id,
+        {
+          status: ReturnRequestStatus.CANCELLED,
+          remarks: dto.remarks ?? request.remarks,
+        },
+        tx,
+      );
 
-    await this.inventoryRepository.createActivityLog({
+      const activity = {
         action: 'PROJECT_MATERIAL_RETURN_REJECTED',
         entity: 'ReturnRequest',
         entityId: updated.id,
@@ -391,17 +488,18 @@ export class ReturnWorkflowService {
           rejectedBy: dto.rejectedBy,
           remarks: updated.remarks,
         },
-    });
-    await this.emit('rejected', updated.id, updated.returnNo);
-    await this.inventoryEvents.returnRejected({
-      id: updated.id,
-      returnNo: updated.returnNo,
-      status: updated.status,
-      itemCount: updated.items.length,
-      projectId: updated.projectId,
-    });
+      } satisfies Prisma.ActivityLogCreateInput;
+      await this.inventoryRepository.createActivityLog(activity, tx);
+      await this.createAuditOutbox(activity, tx);
+      await this.createReturnOutbox(
+        'inventory.return.rejected',
+        this.returnPayload(updated),
+        updated,
+        tx,
+      );
 
-    return updated;
+      return updated;
+    });
   }
 
   private async validateSiteReturnAvailability(dto: CreateReturnRequestDto) {
@@ -455,26 +553,18 @@ export class ReturnWorkflowService {
       .flatMap((transaction) => transaction.items)
       .filter((line) => line.inventoryItemId === inventoryItemId)
       .reduce((sum, line) => sum + Math.abs(Number(line.quantity ?? 0)), 0);
-    const allocated = allocatedFromTasks > 0
-      ? allocatedFromTasks
-      : allocatedFromTransactions;
+    const allocated =
+      allocatedFromTasks > 0 ? allocatedFromTasks : allocatedFromTransactions;
     const pending = openReturns
       .filter((request) =>
-        [
-          'REQUESTED',
-          'APPROVED',
-        ].includes(String(request.status)),
+        ['REQUESTED', 'APPROVED'].includes(String(request.status)),
       )
       .flatMap((request) => request.items)
       .filter((line) => line.inventoryItemId === inventoryItemId)
       .reduce((sum, line) => sum + Number(line.requestedQuantity ?? 0), 0);
     const returned = openReturns
       .filter((request) =>
-        [
-          'RECEIVED',
-          'INSPECTED',
-          'DISPOSED',
-        ].includes(String(request.status)),
+        ['RECEIVED', 'INSPECTED', 'DISPOSED'].includes(String(request.status)),
       )
       .flatMap((request) => request.items)
       .filter((line) => line.inventoryItemId === inventoryItemId)
@@ -497,18 +587,24 @@ export class ReturnWorkflowService {
     return Math.max(0, allocated - pending - returned - returnedFromTasks);
   }
 
-  private async applyProjectReturnReceived(request: Awaited<ReturnType<ReturnWorkflowService['requireRequest']>>) {
+  private async applyProjectReturnReceived(
+    request: Awaited<ReturnType<ReturnWorkflowService['requireRequest']>>,
+  ) {
     if (!request.projectId) return;
 
     for (const item of request.items) {
-      let remaining = Number(item.receivedQuantity ?? item.requestedQuantity ?? 0);
+      let remaining = Number(
+        item.receivedQuantity ?? item.requestedQuantity ?? 0,
+      );
       if (remaining <= 0) continue;
 
       const allocations =
-        await this.inventoryRepository.findProjectTaskMaterialAllocationsForReturn({
-          inventoryItemId: item.inventoryItemId,
-          projectId: request.projectId,
-        });
+        await this.inventoryRepository.findProjectTaskMaterialAllocationsForReturn(
+          {
+            inventoryItemId: item.inventoryItemId,
+            projectId: request.projectId,
+          },
+        );
 
       for (const allocation of allocations) {
         if (remaining <= 0) break;
@@ -523,7 +619,10 @@ export class ReturnWorkflowService {
           {
             issuedQty: Math.max(0, allocatedQty - applied),
             returnedQty: Number(allocation.returnedQty ?? 0) + applied,
-            remainingQty: Math.max(0, Number(allocation.remainingQty ?? 0) - applied),
+            remainingQty: Math.max(
+              0,
+              Number(allocation.remainingQty ?? 0) - applied,
+            ),
           },
         );
         remaining -= applied;
@@ -531,8 +630,11 @@ export class ReturnWorkflowService {
     }
   }
 
-  private async requireRequest(id: string) {
-    const request = await this.inventoryRepository.findReturnRequestById(id);
+  private async requireRequest(id: string, tx?: Prisma.TransactionClient) {
+    const request = await this.inventoryRepository.findReturnRequestById(
+      id,
+      tx,
+    );
 
     if (!request) {
       throw new NotFoundException('Return request not found');
@@ -541,17 +643,74 @@ export class ReturnWorkflowService {
     return request;
   }
 
-  private generateReturnNo(flowType: string) {
-    const prefix = flowType === 'PRODUCTION_RETURN' ? 'HT-SX' : flowType === 'SUPPLIER_RETURN' ? 'HT-NCC' : 'HT-CT';
-    return this.inventoryRepository.nextOperationalCode('returnRequest', 'returnNo', prefix);
+  private returnPrefix(flowType: string) {
+    return flowType === 'PRODUCTION_RETURN'
+      ? 'HT-SX'
+      : flowType === 'SUPPLIER_RETURN'
+        ? 'HT-NCC'
+        : 'HT-CT';
   }
 
-  private emit(action: string, id: string, returnNo: string) {
-    return this.eventBus.emit(`inventory.return.${action}`, {
-      id,
-      returnNo,
-    }, {
-      module: 'inventory',
-    });
+  private returnPayload(request: {
+    id: string;
+    returnNo: string;
+    status: ReturnRequestStatus;
+    projectId: string | null;
+    items: unknown[];
+  }) {
+    return {
+      id: request.id,
+      returnNo: request.returnNo,
+      status: request.status,
+      itemCount: request.items.length,
+      projectId: request.projectId,
+    };
+  }
+
+  private createReturnOutbox(
+    eventName: string,
+    payload: Prisma.InputJsonObject,
+    request: { id: string; updatedAt: Date },
+    tx: Prisma.TransactionClient,
+  ) {
+    return this.inventoryRepository.createOutboxEvent(
+      {
+        eventName,
+        payload,
+        metadata: {
+          module: 'inventory',
+          persistToOutbox: true,
+          idempotencyKey: `${eventName}:${request.id}:${request.updatedAt.toISOString()}`,
+        },
+        idempotencyKey: `${eventName}:${request.id}:${request.updatedAt.toISOString()}`,
+      },
+      tx,
+    );
+  }
+
+  private createAuditOutbox(
+    activity: Prisma.ActivityLogCreateInput,
+    tx: Prisma.TransactionClient,
+  ) {
+    const idempotencyKey = `audit:inventory:${activity.action}:${activity.entityId ?? 'unknown'}`;
+    return this.inventoryRepository.createOutboxEvent(
+      {
+        eventName: 'audit.activity.created',
+        payload: {
+          action: activity.action,
+          entity: activity.entity,
+          entityId: activity.entityId ?? null,
+          module: activity.module ?? 'inventory',
+          metadata: (activity.metadata ?? null) as Prisma.InputJsonValue,
+        },
+        metadata: {
+          module: 'inventory',
+          persistToOutbox: true,
+          idempotencyKey,
+        },
+        idempotencyKey,
+      },
+      tx,
+    );
   }
 }

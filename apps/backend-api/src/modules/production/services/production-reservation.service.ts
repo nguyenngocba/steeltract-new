@@ -19,6 +19,7 @@ import {
   ReserveProductionReservationDto,
   ReleaseProductionReservationDto,
 } from '../dto/production.dto';
+import { productionMaterialEvents } from '../domain/production-material-contracts';
 import { ProductionReservationRepository } from '../repositories/production-reservation.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
@@ -217,7 +218,7 @@ export class ProductionReservationService {
         }
       }
 
-      await this.repository.updateReservation(
+      const updatedReservation = await this.repository.updateReservation(
         id,
         {
           status: ProductionMaterialReservationStatus.RESERVED,
@@ -239,6 +240,17 @@ export class ProductionReservationService {
         },
         tx,
       );
+      await this.materialLedgerService.createMaterialEvent(
+        {
+          eventName: productionMaterialEvents.reserved,
+          productionOrderId: existing.productionOrderId,
+          reservationId: existing.id,
+          quantity: this.sum(ledgerLines.map((line) => line.quantity)),
+          actorId,
+          sourceVersion: updatedReservation.updatedAt.toISOString(),
+        },
+        tx,
+      );
     });
 
     return this.findOne(id);
@@ -255,6 +267,14 @@ export class ProductionReservationService {
     }
 
     await this.repository.transaction(async (tx) => {
+      const releasedQuantity = this.sum(
+        reservation.lines.map((line) =>
+          Math.max(
+            Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+            0,
+          ),
+        ),
+      );
       await this.materialLedgerService.createReservationEntries(
         {
           productionOrderId: reservation.productionOrderId,
@@ -278,7 +298,7 @@ export class ProductionReservationService {
         tx,
       );
 
-      await this.repository.updateReservation(
+      const updatedReservation = await this.repository.updateReservation(
         id,
         {
           status: ProductionMaterialReservationStatus.CANCELLED,
@@ -296,6 +316,19 @@ export class ProductionReservationService {
         },
         tx,
       );
+      if (releasedQuantity > epsilon) {
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.released,
+            productionOrderId: reservation.productionOrderId,
+            reservationId: reservation.id,
+            quantity: releasedQuantity,
+            actorId,
+            sourceVersion: updatedReservation.updatedAt.toISOString(),
+          },
+          tx,
+        );
+      }
     });
 
     return this.findOne(id);
@@ -317,6 +350,14 @@ export class ProductionReservationService {
     }
 
     await this.repository.transaction(async (tx) => {
+      const releasedQuantity = this.sum(
+        reservation.lines.map((line) =>
+          Math.max(
+            Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+            0,
+          ),
+        ),
+      );
       await this.materialLedgerService.createReservationEntries(
         {
           productionOrderId: reservation.productionOrderId,
@@ -340,7 +381,7 @@ export class ProductionReservationService {
         tx,
       );
 
-      await this.repository.updateReservation(
+      const updatedReservation = await this.repository.updateReservation(
         id,
         {
           status: ProductionMaterialReservationStatus.EXPIRED,
@@ -358,6 +399,19 @@ export class ProductionReservationService {
         },
         tx,
       );
+      if (releasedQuantity > epsilon) {
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.released,
+            productionOrderId: reservation.productionOrderId,
+            reservationId: reservation.id,
+            quantity: releasedQuantity,
+            actorId,
+            sourceVersion: updatedReservation.updatedAt.toISOString(),
+          },
+          tx,
+        );
+      }
     });
 
     return this.findOne(id);

@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { Prisma } from '@prisma/client';
 
@@ -65,14 +62,14 @@ export class InventoryRepository {
     return db.inventoryItem.findMany({
       where: { id: { in: ids } },
       select: { id: true, code: true, name: true },
-    })
+    });
   }
 
   findWarehouseByCode(code: string, db: DbClient = this.prisma) {
     return db.masterWarehouse.findUnique({
       where: { code },
       select: { id: true, code: true, name: true },
-    })
+    });
   }
 
   findPositiveLocationStocks(
@@ -85,10 +82,7 @@ export class InventoryRepository {
       where: {
         inventoryItemId: { in: materialIds },
         quantity: { gt: 0.000001 },
-        OR: [
-          { warehouseId },
-          { zone: { warehouse: { code: warehouseCode } } },
-        ],
+        OR: [{ warehouseId }, { zone: { warehouse: { code: warehouseCode } } }],
       },
       include: { zone: { include: { warehouse: true } } },
       orderBy: [
@@ -97,7 +91,7 @@ export class InventoryRepository {
         { slotId: 'asc' },
         { level: 'asc' },
       ],
-    })
+    });
   }
 
   findPositiveLocationStock(
@@ -107,7 +101,7 @@ export class InventoryRepository {
   ) {
     return db.inventoryLocationStock.findFirst({
       where: { inventoryItemId, warehouseId, quantity: { gt: 0 } },
-    })
+    });
   }
 
   findActiveWarehouseZone(code: string, db: DbClient = this.prisma) {
@@ -115,7 +109,7 @@ export class InventoryRepository {
       where: { active: true, warehouse: { code } },
       include: { warehouse: true },
       orderBy: { code: 'asc' },
-    })
+    });
   }
 
   findProductionInventoryTransactions(
@@ -136,7 +130,7 @@ export class InventoryRepository {
         warehouse: true,
         items: { include: { warehouse: true } },
       },
-    })
+    });
   }
 
   countItems(search?: string) {
@@ -208,23 +202,258 @@ export class InventoryRepository {
     };
   }
 
+  async listMaterialLivePage(params: InventoryMaterialQuery) {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 16;
+    const offset = (page - 1) * pageSize;
+    const where = this.materialLiveWhere(params);
+    const orderBy = this.materialLiveOrder(params);
+    const sources = this.materialLiveSources();
+
+    const [rows, countRows] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{
+          id: string;
+          currentStock: number;
+          mainStock: number;
+          productionStock: number;
+          averageCost: number;
+          lastMovementDate: Date | null;
+        }>
+      >(Prisma.sql`
+        ${sources}
+        SELECT i.id,
+          COALESCE(stock."currentStock", 0)::float8 AS "currentStock",
+          COALESCE(stock."mainStock", 0)::float8 AS "mainStock",
+          COALESCE(stock."productionStock", 0)::float8 AS "productionStock",
+          COALESCE(valuation."averageCost", 0)::float8 AS "averageCost",
+          valuation."lastMovementDate"
+        FROM inventory_items i
+        LEFT JOIN stock ON stock."materialId" = i.id
+        LEFT JOIN valuation ON valuation."materialId" = i.id
+        WHERE ${where}
+        ORDER BY ${orderBy}
+        LIMIT ${pageSize} OFFSET ${offset}
+      `),
+      this.prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+        ${sources}
+        SELECT COUNT(*)::bigint AS total
+        FROM inventory_items i
+        LEFT JOIN stock ON stock."materialId" = i.id
+        LEFT JOIN valuation ON valuation."materialId" = i.id
+        WHERE ${where}
+      `),
+    ]);
+
+    const ids = rows.map((row) => row.id);
+    const items = ids.length
+      ? await this.prisma.inventoryItem.findMany({
+          where: { id: { in: ids } },
+          include: {
+            category: true,
+            materialType: true,
+            unitMaster: true,
+            zone: { include: { warehouse: true } },
+            locationStocks: {
+              where: { quantity: { gt: 0 } },
+              include: { zone: { include: { warehouse: true } } },
+            },
+          },
+        })
+      : [];
+    const itemMap = new Map(items.map((item) => [item.id, item]));
+    const metricMap = new Map(rows.map((row) => [row.id, row]));
+
+    return {
+      items: ids
+        .map((id) => {
+          const item = itemMap.get(id);
+          return item ? { ...item, liveMetrics: metricMap.get(id) } : null;
+        })
+        .filter(Boolean),
+      total: Number(countRows[0]?.total ?? 0),
+      page,
+      pageSize,
+    };
+  }
+
+  async materialLiveSummary(params: InventoryMaterialQuery) {
+    const sources = this.materialLiveSources();
+    const where = this.materialLiveWhere(params);
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        totalItems: bigint;
+        totalStock: number;
+        mainStock: number;
+        productionStock: number;
+        totalValue: number;
+        lowStock: bigint;
+        outOfStock: bigint;
+        primaryCount: bigint;
+        primaryStock: number;
+        secondaryCount: bigint;
+        secondaryStock: number;
+        consumableCount: bigint;
+        consumableStock: number;
+      }>
+    >(Prisma.sql`
+      ${sources}
+      SELECT COUNT(*)::bigint AS "totalItems",
+        COALESCE(SUM(COALESCE(stock."currentStock", 0)), 0)::float8 AS "totalStock",
+        COALESCE(SUM(COALESCE(stock."mainStock", 0)), 0)::float8 AS "mainStock",
+        COALESCE(SUM(COALESCE(stock."productionStock", 0)), 0)::float8 AS "productionStock",
+        COALESCE(SUM(COALESCE(stock."currentStock", 0) * COALESCE(valuation."averageCost", 0)), 0)::float8 AS "totalValue",
+        COUNT(*) FILTER (WHERE COALESCE(stock."mainStock", 0) > 0 AND COALESCE(stock."mainStock", 0) <= i."minimumStock")::bigint AS "lowStock",
+        COUNT(*) FILTER (WHERE COALESCE(stock."mainStock", 0) <= 0)::bigint AS "outOfStock",
+        COUNT(*) FILTER (WHERE i."materialUsageType"::text = 'PRIMARY')::bigint AS "primaryCount",
+        COALESCE(SUM(COALESCE(stock."currentStock", 0)) FILTER (WHERE i."materialUsageType"::text = 'PRIMARY'), 0)::float8 AS "primaryStock",
+        COUNT(*) FILTER (WHERE i."materialUsageType"::text = 'SECONDARY')::bigint AS "secondaryCount",
+        COALESCE(SUM(COALESCE(stock."currentStock", 0)) FILTER (WHERE i."materialUsageType"::text = 'SECONDARY'), 0)::float8 AS "secondaryStock",
+        COUNT(*) FILTER (WHERE i."materialUsageType"::text = 'CONSUMABLE')::bigint AS "consumableCount",
+        COALESCE(SUM(COALESCE(stock."currentStock", 0)) FILTER (WHERE i."materialUsageType"::text = 'CONSUMABLE'), 0)::float8 AS "consumableStock"
+      FROM inventory_items i
+      LEFT JOIN stock ON stock."materialId" = i.id
+      LEFT JOIN valuation ON valuation."materialId" = i.id
+      WHERE ${where}
+    `);
+    return rows[0];
+  }
+
+  materialLiveFacets(params: InventoryMaterialQuery) {
+    const sources = this.materialLiveSources();
+    const where = this.materialLiveWhere(params);
+    return Promise.all([
+      this.prisma.$queryRaw<Array<{ label: string; value: number }>>(Prisma.sql`
+        ${sources}
+        SELECT COALESCE(c.name, 'Khác') AS label,
+          COALESCE(SUM(COALESCE(stock."currentStock", 0)), 0)::float8 AS value
+        FROM inventory_items i
+        LEFT JOIN inventory_categories c ON c.id = i."categoryId"
+        LEFT JOIN stock ON stock."materialId" = i.id
+        LEFT JOIN valuation ON valuation."materialId" = i.id
+        WHERE ${where}
+        GROUP BY c.name
+        ORDER BY value DESC
+        LIMIT 12
+      `),
+      this.prisma.$queryRaw<Array<{ label: string; value: number }>>(Prisma.sql`
+        SELECT COALESCE(w.code, zw.code, 'Chưa rõ') AS label,
+          COALESCE(SUM(ls.quantity), 0)::float8 AS value
+        FROM inventory_location_stocks ls
+        JOIN inventory_items i ON i.id = ls."inventoryItemId"
+        LEFT JOIN warehouse_zones z ON z.id = ls."zoneId"
+        LEFT JOIN master_warehouses w ON w.id = ls."warehouseId"
+        LEFT JOIN master_warehouses zw ON zw.id = z."warehouseId"
+        WHERE i."deletedAt" IS NULL AND ls.quantity > 0
+          ${params.search ? Prisma.sql`AND (i.code ILIKE ${`%${params.search}%`} OR i.name ILIKE ${`%${params.search}%`})` : Prisma.empty}
+          ${params.categoryId ? Prisma.sql`AND i."categoryId" = ${params.categoryId}` : Prisma.empty}
+          ${params.materialTypeId ? Prisma.sql`AND i."materialTypeId" = ${params.materialTypeId}` : Prisma.empty}
+          ${params.materialUsageType ? Prisma.sql`AND i."materialUsageType"::text = ${params.materialUsageType}` : Prisma.empty}
+          ${params.warehouse ? Prisma.sql`AND (COALESCE(ls."warehouseId", z."warehouseId") = ${params.warehouse} OR UPPER(COALESCE(w.code, zw.code, '')) = UPPER(${params.warehouse}))` : Prisma.empty}
+        GROUP BY COALESCE(w.code, zw.code, 'Chưa rõ')
+        ORDER BY value DESC
+        LIMIT 12
+      `),
+    ]);
+  }
+
+  private materialLiveSources() {
+    return Prisma.sql`
+      WITH stock AS (
+        SELECT ls."inventoryItemId" AS "materialId",
+          COALESCE(SUM(ls.quantity), 0)::float8 AS "currentStock",
+          COALESCE(SUM(ls.quantity) FILTER (WHERE UPPER(COALESCE(w.code, zw.code, '')) = 'MAIN'), 0)::float8 AS "mainStock",
+          COALESCE(SUM(ls.quantity) FILTER (WHERE UPPER(COALESCE(w.code, zw.code, '')) = 'PRODUCTION'), 0)::float8 AS "productionStock"
+        FROM inventory_location_stocks ls
+        LEFT JOIN warehouse_zones z ON z.id = ls."zoneId"
+        LEFT JOIN master_warehouses w ON w.id = ls."warehouseId"
+        LEFT JOIN master_warehouses zw ON zw.id = z."warehouseId"
+        GROUP BY ls."inventoryItemId"
+      ), valuation AS (
+        SELECT ti."inventoryItemId" AS "materialId",
+          CASE WHEN SUM(ti.quantity) FILTER (WHERE ti.quantity > 0) > 0
+            THEN COALESCE(SUM(COALESCE(ti."totalAmount", ti.quantity * ti."unitPrice", 0)) FILTER (WHERE ti.quantity > 0), 0)
+              / SUM(ti.quantity) FILTER (WHERE ti.quantity > 0)
+            ELSE 0 END::float8 AS "averageCost",
+          MAX(t."transactionDate") AS "lastMovementDate"
+        FROM inventory_transaction_items ti
+        JOIN inventory_transactions t ON t.id = ti."transactionId"
+        GROUP BY ti."inventoryItemId"
+      )
+    `;
+  }
+
+  private materialLiveWhere(params: InventoryMaterialQuery) {
+    const clauses: Prisma.Sql[] = [Prisma.sql`i."deletedAt" IS NULL`];
+    if (params.search) {
+      clauses.push(
+        Prisma.sql`(i.code ILIKE ${`%${params.search}%`} OR i.name ILIKE ${`%${params.search}%`})`,
+      );
+    }
+    if (params.categoryId)
+      clauses.push(Prisma.sql`i."categoryId" = ${params.categoryId}`);
+    if (params.materialTypeId)
+      clauses.push(Prisma.sql`i."materialTypeId" = ${params.materialTypeId}`);
+    if (params.materialUsageType)
+      clauses.push(
+        Prisma.sql`i."materialUsageType"::text = ${params.materialUsageType}`,
+      );
+    if (params.warehouse) {
+      clauses.push(Prisma.sql`EXISTS (
+        SELECT 1 FROM inventory_location_stocks filter_stock
+        LEFT JOIN warehouse_zones filter_zone ON filter_zone.id = filter_stock."zoneId"
+        LEFT JOIN master_warehouses filter_warehouse ON filter_warehouse.id = filter_stock."warehouseId"
+        LEFT JOIN master_warehouses filter_zone_warehouse ON filter_zone_warehouse.id = filter_zone."warehouseId"
+        WHERE filter_stock."inventoryItemId" = i.id AND filter_stock.quantity > 0
+          AND (COALESCE(filter_stock."warehouseId", filter_zone."warehouseId") = ${params.warehouse}
+            OR UPPER(COALESCE(filter_warehouse.code, filter_zone_warehouse.code, '')) = UPPER(${params.warehouse}))
+      )`);
+    }
+    if (params.stockStatus === 'OUT')
+      clauses.push(Prisma.sql`COALESCE(stock."mainStock", 0) <= 0`);
+    if (params.stockStatus === 'LOW')
+      clauses.push(
+        Prisma.sql`COALESCE(stock."mainStock", 0) > 0 AND COALESCE(stock."mainStock", 0) <= i."minimumStock"`,
+      );
+    if (params.stockStatus === 'NORMAL')
+      clauses.push(
+        Prisma.sql`COALESCE(stock."mainStock", 0) > i."minimumStock"`,
+      );
+    return Prisma.join(clauses, ' AND ');
+  }
+
+  private materialLiveOrder(params: InventoryMaterialQuery) {
+    const direction =
+      params.sortOrder === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    const field = {
+      code: Prisma.sql`i.code`,
+      name: Prisma.sql`i.name`,
+      currentStock: Prisma.sql`COALESCE(stock."currentStock", 0)`,
+      inventoryValue: Prisma.sql`COALESCE(stock."currentStock", 0) * COALESCE(valuation."averageCost", 0)`,
+      updatedAt: Prisma.sql`i."updatedAt"`,
+    }[params.sortBy ?? 'code'];
+    return Prisma.sql`${field} ${direction}, i.id ASC`;
+  }
+
   async materialSnapshotSummary(params: InventoryMaterialQuery) {
     const where = this.materialSnapshotWhere(params);
-    const rows = await this.prisma.$queryRaw<Array<{
-      totalItems: bigint;
-      totalStock: number | null;
-      mainStock: number | null;
-      productionStock: number | null;
-      totalValue: number | null;
-      lowStock: bigint;
-      outOfStock: bigint;
-      primaryCount: bigint;
-      primaryStock: number | null;
-      secondaryCount: bigint;
-      secondaryStock: number | null;
-      consumableCount: bigint;
-      consumableStock: number | null;
-    }>>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        totalItems: bigint;
+        totalStock: number | null;
+        mainStock: number | null;
+        productionStock: number | null;
+        totalValue: number | null;
+        lowStock: bigint;
+        outOfStock: bigint;
+        primaryCount: bigint;
+        primaryStock: number | null;
+        secondaryCount: bigint;
+        secondaryStock: number | null;
+        consumableCount: bigint;
+        consumableStock: number | null;
+      }>
+    >(Prisma.sql`
       SELECT
         COUNT(*)::bigint AS "totalItems",
         COALESCE(SUM(COALESCE(all_snapshot."currentStock", i.quantity, 0)), 0)::float8 AS "totalStock",
@@ -304,13 +533,18 @@ export class InventoryRepository {
     const trendStart = new Date(today.getFullYear(), today.getMonth() - 11, 1);
 
     const [todayRows, monthRows, trendRows, snapshotTrend] = await Promise.all([
-      this.transactionMetricsBetween(today, new Date(today.getTime() + 86_400_000)),
+      this.transactionMetricsBetween(
+        today,
+        new Date(today.getTime() + 86_400_000),
+      ),
       this.transactionMetricsBetween(monthStart, new Date()),
-      this.prisma.$queryRaw<Array<{
-        month: Date;
-        inboundValue: number;
-        outboundValue: number;
-      }>>(Prisma.sql`
+      this.prisma.$queryRaw<
+        Array<{
+          month: Date;
+          inboundValue: number;
+          outboundValue: number;
+        }>
+      >(Prisma.sql`
         SELECT date_trunc('month', t."transactionDate") AS month,
           COALESCE(SUM(ABS(COALESCE(ti."totalAmount", ti.quantity * ti."unitPrice", 0)))
             FILTER (WHERE t.type::text IN ('IMPORT', 'RETURN')), 0)::float8 AS "inboundValue",
@@ -339,12 +573,14 @@ export class InventoryRepository {
   }
 
   private transactionMetricsBetween(from: Date, to: Date) {
-    return this.prisma.$queryRaw<Array<{
-      type: string;
-      documentCount: bigint;
-      quantity: number;
-      value: number;
-    }>>(Prisma.sql`
+    return this.prisma.$queryRaw<
+      Array<{
+        type: string;
+        documentCount: bigint;
+        quantity: number;
+        value: number;
+      }>
+    >(Prisma.sql`
       SELECT t.type::text AS type,
         COUNT(DISTINCT t.id)::bigint AS "documentCount",
         COALESCE(SUM(ABS(ti.quantity)), 0)::float8 AS quantity,
@@ -363,7 +599,9 @@ export class InventoryRepository {
     const clauses: Prisma.Sql[] = [Prisma.sql`i."deletedAt" IS NULL`];
     if (params.search) {
       const search = `%${params.search}%`;
-      clauses.push(Prisma.sql`(i.code ILIKE ${search} OR i.name ILIKE ${search})`);
+      clauses.push(
+        Prisma.sql`(i.code ILIKE ${search} OR i.name ILIKE ${search})`,
+      );
     }
     if (params.categoryId) {
       clauses.push(Prisma.sql`(
@@ -375,9 +613,12 @@ export class InventoryRepository {
         )
       )`);
     }
-    if (params.materialTypeId) clauses.push(Prisma.sql`i."materialTypeId" = ${params.materialTypeId}`);
+    if (params.materialTypeId)
+      clauses.push(Prisma.sql`i."materialTypeId" = ${params.materialTypeId}`);
     if (params.materialUsageType) {
-      clauses.push(Prisma.sql`i."materialUsageType"::text = ${params.materialUsageType}`);
+      clauses.push(
+        Prisma.sql`i."materialUsageType"::text = ${params.materialUsageType}`,
+      );
     }
     if (params.warehouse) {
       clauses.push(Prisma.sql`EXISTS (
@@ -398,13 +639,16 @@ export class InventoryRepository {
       clauses.push(Prisma.sql`COALESCE(main_snapshot."currentStock", 0) > 0
         AND COALESCE(main_snapshot."currentStock", 0) <= i."minimumStock"`);
     } else if (params.stockStatus === 'NORMAL') {
-      clauses.push(Prisma.sql`COALESCE(main_snapshot."currentStock", 0) > i."minimumStock"`);
+      clauses.push(
+        Prisma.sql`COALESCE(main_snapshot."currentStock", 0) > i."minimumStock"`,
+      );
     }
     return Prisma.join(clauses, ' AND ');
   }
 
   private materialSnapshotOrder(params: InventoryMaterialQuery) {
-    const direction = params.sortOrder === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    const direction =
+      params.sortOrder === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
     const field = {
       code: Prisma.sql`i.code`,
       name: Prisma.sql`i.name`,
@@ -679,16 +923,18 @@ export class InventoryRepository {
   }
 
   listTransactions(params: {
-    skip?: number
-    take?: number
-    fromDate?: Date
-    toDate?: Date
-    supplierId?: string
-    projectId?: string
-    materialId?: string
-    transactionTypes?: Array<'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'>
+    skip?: number;
+    take?: number;
+    fromDate?: Date;
+    toDate?: Date;
+    supplierId?: string;
+    projectId?: string;
+    materialId?: string;
+    transactionTypes?: Array<
+      'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'
+    >;
   }) {
-    const where: Prisma.InventoryTransactionWhereInput = {}
+    const where: Prisma.InventoryTransactionWhereInput = {};
 
     if (params.fromDate || params.toDate) {
       where.transactionDate = {
@@ -698,15 +944,15 @@ export class InventoryRepository {
         ...(params.toDate && {
           lte: params.toDate,
         }),
-      }
+      };
     }
 
     if (params.supplierId) {
-      where.supplierId = params.supplierId
+      where.supplierId = params.supplierId;
     }
 
     if (params.projectId) {
-      where.projectId = params.projectId
+      where.projectId = params.projectId;
     }
 
     if (params.materialId) {
@@ -714,13 +960,13 @@ export class InventoryRepository {
         some: {
           inventoryItemId: params.materialId,
         },
-      }
+      };
     }
 
     if (params.transactionTypes?.length) {
       where.type = {
         in: params.transactionTypes,
-      }
+      };
     }
 
     return this.prisma.inventoryTransaction.findMany({
@@ -730,7 +976,7 @@ export class InventoryRepository {
         warehouse: true,
         zone: true,
         project: true,
-      items: {
+        items: {
           where: params.materialId
             ? { inventoryItemId: params.materialId }
             : undefined,
@@ -751,12 +997,14 @@ export class InventoryRepository {
   }
 
   countTransactions(params: {
-    fromDate?: Date
-    toDate?: Date
-    supplierId?: string
-    projectId?: string
-    materialId?: string
-    transactionTypes?: Array<'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'>
+    fromDate?: Date;
+    toDate?: Date;
+    supplierId?: string;
+    projectId?: string;
+    materialId?: string;
+    transactionTypes?: Array<
+      'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'
+    >;
   }) {
     const where: Prisma.InventoryTransactionWhereInput = {
       supplierId: params.supplierId,
@@ -812,37 +1060,34 @@ export class InventoryRepository {
   }
   async upsertLocationStock(
     data: {
-      inventoryItemId: string
-      warehouseId?: string | null
-      zoneId?: string | null
-      slotId?: string | null
-      level?: string | null
-      quantity: number
+      inventoryItemId: string;
+      warehouseId?: string | null;
+      zoneId?: string | null;
+      slotId?: string | null;
+      level?: string | null;
+      quantity: number;
     },
     db: DbClient = this.prisma,
   ) {
-    const existing =
-      await db.inventoryLocationStock.findFirst({
-        where: {
-          inventoryItemId: data.inventoryItemId,
-          warehouseId: data.warehouseId ?? null,
-          zoneId: data.zoneId ?? null,
-          slotId: data.slotId ?? null,
-          level: data.level ?? null,
-        },
-      })
+    const existing = await db.inventoryLocationStock.findFirst({
+      where: {
+        inventoryItemId: data.inventoryItemId,
+        warehouseId: data.warehouseId ?? null,
+        zoneId: data.zoneId ?? null,
+        slotId: data.slotId ?? null,
+        level: data.level ?? null,
+      },
+    });
 
     if (existing) {
-      const nextQuantity =
-        Number(existing.quantity) +
-        Number(data.quantity)
+      const nextQuantity = Number(existing.quantity) + Number(data.quantity);
 
       if (nextQuantity <= 0) {
         return db.inventoryLocationStock.delete({
           where: {
             id: existing.id,
           },
-        })
+        });
       }
 
       return db.inventoryLocationStock.update({
@@ -852,46 +1097,42 @@ export class InventoryRepository {
         data: {
           quantity: nextQuantity,
         },
-      })
+      });
     }
 
     if (data.quantity <= 0) {
-      return null
+      return null;
     }
-    if (data.quantity > 0 &&
-        data.zoneId &&
-        data.slotId &&
-        data.level) {
-      const occupied =
-        await db.inventoryLocationStock.findFirst({
-          where: {
-            warehouseId: data.warehouseId ?? null,
-            zoneId: data.zoneId ?? null,
-            slotId: data.slotId ?? null,
-            level: data.level ?? null,
-            quantity: {
-              gt: 0,
-            },
-            inventoryItemId: {
-              not: data.inventoryItemId,
+    if (data.quantity > 0 && data.zoneId && data.slotId && data.level) {
+      const occupied = await db.inventoryLocationStock.findFirst({
+        where: {
+          warehouseId: data.warehouseId ?? null,
+          zoneId: data.zoneId ?? null,
+          slotId: data.slotId ?? null,
+          level: data.level ?? null,
+          quantity: {
+            gt: 0,
+          },
+          inventoryItemId: {
+            not: data.inventoryItemId,
+          },
+        },
+        include: {
+          inventoryItem: {
+            select: {
+              code: true,
+              name: true,
             },
           },
-          include: {
-            inventoryItem: {
-              select: {
-                code: true,
-                name: true,
-              },
-            },
-          },
-        })
+        },
+      });
 
       if (occupied) {
         throw new BadRequestException(
           `Vị trí ${data.slotId ?? ''}/${data.level ?? ''} đang chứa vật tư ${
             occupied.inventoryItem?.code ?? ''
           }`,
-        )
+        );
       }
     }
 
@@ -904,7 +1145,7 @@ export class InventoryRepository {
         level: data.level,
         quantity: data.quantity,
       },
-    })
+    });
   }
 
   createActivityLog(
@@ -927,10 +1168,10 @@ export class InventoryRepository {
 
   createOutboxEvent(
     data: {
-      eventName: string
-      payload: Prisma.InputJsonValue
-      metadata: Prisma.InputJsonValue
-      idempotencyKey: string
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
     },
     db: DbClient = this.prisma,
   ) {
@@ -938,7 +1179,7 @@ export class InventoryRepository {
       where: { idempotencyKey: data.idempotencyKey },
       create: data,
       update: {},
-    })
+    });
   }
 
   findTransactionById(id: string) {
@@ -1140,7 +1381,10 @@ export class InventoryRepository {
     });
   }
 
-  aggregateTransactionItemQuantity(inventoryItemId: string, db: DbClient = this.prisma) {
+  aggregateTransactionItemQuantity(
+    inventoryItemId: string,
+    db: DbClient = this.prisma,
+  ) {
     return db.inventoryTransactionItem.aggregate({
       where: { inventoryItemId },
       _sum: { quantity: true },
@@ -1182,11 +1426,7 @@ export class InventoryRepository {
     });
   }
 
-  listReturnRequests(query: {
-    status?: any;
-    flowType?: any;
-    search?: string;
-  }) {
+  listReturnRequests(query: { status?: any; flowType?: any; search?: string }) {
     return this.prisma.returnRequest.findMany({
       where: {
         status: query.status,
@@ -1229,8 +1469,8 @@ export class InventoryRepository {
     });
   }
 
-  createReturnRequest(data: any) {
-    return this.prisma.returnRequest.create({
+  createReturnRequest(data: any, db: DbClient = this.prisma) {
+    return db.returnRequest.create({
       data,
       include: this.returnRequestInclude(),
     });
@@ -1239,8 +1479,9 @@ export class InventoryRepository {
   updateReturnRequest(
     id: string,
     data: Prisma.ReturnRequestUpdateInput,
+    db: DbClient = this.prisma,
   ) {
-    return this.prisma.returnRequest.update({
+    return db.returnRequest.update({
       where: { id },
       data,
       include: this.returnRequestInclude(),
@@ -1250,15 +1491,16 @@ export class InventoryRepository {
   updateReturnRequestItem(
     id: string,
     data: Prisma.ReturnRequestItemUpdateInput,
+    db: DbClient = this.prisma,
   ) {
-    return this.prisma.returnRequestItem.update({
+    return db.returnRequestItem.update({
       where: { id },
       data,
     });
   }
 
-  findReturnRequestById(id: string) {
-    return this.prisma.returnRequest.findUnique({
+  findReturnRequestById(id: string, db: DbClient = this.prisma) {
+    return db.returnRequest.findUnique({
       where: { id },
       include: this.returnRequestInclude(),
     });
@@ -1302,11 +1544,14 @@ export class InventoryRepository {
     ] as const);
   }
 
-  findProjectTaskMaterialAllocationsForReturn(params: {
-    projectId: string;
-    inventoryItemId: string;
-  }) {
-    return this.prisma.projectTaskMaterialAllocation.findMany({
+  findProjectTaskMaterialAllocationsForReturn(
+    params: {
+      projectId: string;
+      inventoryItemId: string;
+    },
+    db: DbClient = this.prisma,
+  ) {
+    return db.projectTaskMaterialAllocation.findMany({
       where: {
         inventoryItemId: params.inventoryItemId,
         projectTask: {
@@ -1322,8 +1567,9 @@ export class InventoryRepository {
   updateProjectTaskMaterialAllocation(
     id: string,
     data: Prisma.ProjectTaskMaterialAllocationUpdateInput,
+    db: DbClient = this.prisma,
   ) {
-    return this.prisma.projectTaskMaterialAllocation.update({
+    return db.projectTaskMaterialAllocation.update({
       where: { id },
       data,
     });
@@ -1331,10 +1577,7 @@ export class InventoryRepository {
 
   listZones() {
     return this.prisma.warehouseZone.findMany({
-      orderBy: [
-        { active: 'desc' },
-        { code: 'asc' },
-      ],
+      orderBy: [{ active: 'desc' }, { code: 'asc' }],
       include: this.zoneInclude(),
     });
   }

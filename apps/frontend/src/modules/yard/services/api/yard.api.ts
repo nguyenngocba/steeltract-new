@@ -42,6 +42,13 @@ export type YardMetrics = {
   placements: number
   occupancyRate: number
   zoneUtilization: Array<{ id: string; code: string; name: string; totalSlots: number; occupiedSlots: number; occupancyRate: number }>
+  totalWeight?: number
+  availableSlots?: number
+  movementsToday?: number
+  movementCounts?: { place: number; move: number; remove: number; adjust: number }
+  movementTodayCounts?: { place: number; move: number; remove: number; adjust: number }
+  craneAvailableCount?: number
+  componentDistribution?: Array<{ label: string; value: number }>
 }
 
 export type YardMovement = {
@@ -60,6 +67,69 @@ export type YardCrane = {
   name: string
   status: string
   utilization?: number
+}
+
+export type YardWorkspaceRead = {
+  zones: YardZoneRuntime[]
+  slots: YardSlotRuntime[]
+  movements: YardMovement[]
+  cranes: YardCrane[]
+  qcQueue: Array<{ id: string; itemCode: string; status: string; inspectionId: string }>
+  meta: {
+    slots: { page: number; limit: number; total: number; totalPages: number }
+    movements: { page: number; limit: number; total: number; totalPages: number }
+    zones: { total: number; returned: number }
+  }
+  summary: {
+    zones: number
+    totalSlots: number
+    occupiedSlots: number
+    availableSlots: number
+    placements: number
+    totalWeight: number
+    movementsToday: number
+    overloadedZones: number
+  }
+  analytics: {
+    movementCounts: { place: number; move: number; remove: number; adjust: number }
+    movementMonth: number
+    movementTodayCounts: { place: number; move: number; remove: number; adjust: number }
+    craneAvailableCount: number
+    componentDistribution: Array<{ label: string; value: number }>
+    movementTrend: Array<{ date: string; count: number }>
+    zoneUtilization: YardMetrics['zoneUtilization']
+    warningZoneCount: number
+  }
+}
+
+export type YardDashboardRead = {
+  data: {
+    scopeKey: string
+    snapshotDate: string
+    totalZones: number
+    totalSlots: number
+    occupiedSlots: number
+    availableSlots: number
+    activePlacementCount: number
+    totalWeight: number
+    movementToday: number
+    movementMonth: number
+    overloadedZoneCount: number
+    craneCount: number
+    availableCraneCount: number
+    payload?: {
+      movementCounts?: YardMetrics['movementCounts'] | Array<{ type: string; count: number }>
+      zoneUtilization?: YardMetrics['zoneUtilization']
+    } | null
+  }
+  source: 'snapshot' | 'runtime'
+  meta: {
+    ageSeconds: number
+    confidence: number
+    isStale: boolean
+    snapshotType: string
+    fallbackReason?: 'disabled' | 'missing' | 'stale' | 'mismatch'
+  }
 }
 
 export type YardPlacePayload = {
@@ -120,6 +190,8 @@ export type YardCreateSlotPayload = {
 const unwrap = <T,>(value: T[] | { data: T[] }) => Array.isArray(value) ? value : value.data
 
 export const yardApi = {
+  workspace: (params?: Record<string, unknown>) => api.get<YardWorkspaceRead>('/yard/read-model/workspace', { params }).then((res) => res.data),
+  dashboard: () => api.get<YardDashboardRead>('/yard/dashboard').then((res) => res.data),
   zones: () => api.get<YardZoneRuntime[] | { data: YardZoneRuntime[] }>('/yard/zones').then((res) => unwrap(res.data)),
   slots: () => api.get<YardSlotRuntime[] | { data: YardSlotRuntime[] }>('/yard/slots').then((res) => unwrap(res.data)),
   metrics: () => api.get<YardMetrics>('/yard/metrics').then((res) => res.data),

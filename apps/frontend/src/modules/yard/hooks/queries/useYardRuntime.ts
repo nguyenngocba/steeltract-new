@@ -1,6 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { yardApi } from '../../services/api/yard.api'
+import { queryKeys } from '@/lib/query/query-keys'
+
+export const useYardWorkspace = (params?: Record<string, unknown>) => useQuery({
+  queryKey: queryKeys.yard.workspace(params),
+  queryFn: () => yardApi.workspace(params),
+  refetchInterval: 5000,
+})
+
+export const useYardDashboard = () => useQuery({
+  queryKey: ['yard', 'dashboard'],
+  queryFn: yardApi.dashboard,
+})
 
 export const useYardSlotsRuntime = () => useQuery({ queryKey: ['yard', 'slots'], queryFn: yardApi.slots, refetchInterval: 5000 })
 export const useYardZonesRuntime = () => useQuery({ queryKey: ['yard', 'zones'], queryFn: yardApi.zones, refetchInterval: 5000 })

@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { SnapshotValidatorService } from '../snapshots/snapshot-validator.service';
 import {
@@ -34,7 +30,9 @@ export class SnapshotRebuilder {
     private readonly validator: SnapshotValidatorService,
   ) {}
 
-  async rebuild(request: SnapshotUpdateRequest): Promise<SnapshotRebuildResult> {
+  async rebuild(
+    request: SnapshotUpdateRequest,
+  ): Promise<SnapshotRebuildResult> {
     this.logger.debug(
       `Snapshot rebuild requested for ${request.scope.module}/${request.scope.snapshotType}`,
     );
@@ -63,6 +61,18 @@ export class SnapshotRebuilder {
 
     if (request.scope.module === 'production') {
       return this.validator.validateProduction(request.scope.productionOrderId);
+    }
+
+    if (request.scope.module === 'components') {
+      return this.validator.validateComponents(request.scope.componentId);
+    }
+
+    if (request.scope.module === 'qc') {
+      return this.validator.validateQc(request.scope.inspectionId);
+    }
+
+    if (request.scope.module === 'yard') {
+      return this.validator.validateYard(request.scope.yardZoneId);
     }
 
     return Promise.resolve(undefined);

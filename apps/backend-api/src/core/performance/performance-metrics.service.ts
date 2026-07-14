@@ -1,19 +1,10 @@
 import { AsyncLocalStorage } from 'async_hooks';
-import {
-  appendFileSync,
-  mkdirSync,
-} from 'fs';
+import { appendFileSync, mkdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
-import {
-  QueryBudgetClass,
-  QUERY_BUDGET_MS,
-} from './query-budget';
+import { QueryBudgetClass, QUERY_BUDGET_MS } from './query-budget';
 
 export interface SlowQueryRecord {
   label: string;
@@ -68,7 +59,9 @@ interface RuntimeRequestRecord {
   budgetClass: QueryBudgetClass;
   budgetMs: number;
   budgetExceeded: boolean;
-  duplicateWarnings: ReturnType<PerformanceMetricsService['collectDuplicateWarnings']>;
+  duplicateWarnings: ReturnType<
+    PerformanceMetricsService['collectDuplicateWarnings']
+  >;
   timestamp: string;
   timestampMs: number;
 }
@@ -126,6 +119,18 @@ export class PerformanceMetricsService {
   private readonly materialSnapshotMissSamples: number[] = [];
   private readonly locationSnapshotHitSamples: number[] = [];
   private readonly locationSnapshotMissSamples: number[] = [];
+  private readonly inventorySnapshotHitSamples: number[] = [];
+  private readonly inventorySnapshotMissSamples: number[] = [];
+  private readonly inventoryReadModelHitSamples: number[] = [];
+  private readonly inventoryFallbackSamples: number[] = [];
+  private readonly inventorySnapshotAgeSamples: Array<{
+    timestampMs: number;
+    ageSeconds: number;
+  }> = [];
+  private readonly inventorySnapshotLagSamples: Array<{
+    timestampMs: number;
+    lagMs: number;
+  }> = [];
   private readonly projectSnapshotHitSamples: number[] = [];
   private readonly projectSnapshotMissSamples: number[] = [];
   private readonly projectReadModelHitSamples: number[] = [];
@@ -139,6 +144,42 @@ export class PerformanceMetricsService {
     ageSeconds: number;
   }> = [];
   private readonly productionSnapshotLagSamples: Array<{
+    timestampMs: number;
+    lagMs: number;
+  }> = [];
+  private readonly componentSnapshotHitSamples: number[] = [];
+  private readonly componentSnapshotMissSamples: number[] = [];
+  private readonly componentReadModelHitSamples: number[] = [];
+  private readonly componentFallbackSamples: number[] = [];
+  private readonly componentSnapshotAgeSamples: Array<{
+    timestampMs: number;
+    ageSeconds: number;
+  }> = [];
+  private readonly componentSnapshotLagSamples: Array<{
+    timestampMs: number;
+    lagMs: number;
+  }> = [];
+  private readonly qcSnapshotHitSamples: number[] = [];
+  private readonly qcSnapshotMissSamples: number[] = [];
+  private readonly qcReadModelHitSamples: number[] = [];
+  private readonly qcFallbackSamples: number[] = [];
+  private readonly qcSnapshotAgeSamples: Array<{
+    timestampMs: number;
+    ageSeconds: number;
+  }> = [];
+  private readonly qcSnapshotLagSamples: Array<{
+    timestampMs: number;
+    lagMs: number;
+  }> = [];
+  private readonly yardSnapshotHitSamples: number[] = [];
+  private readonly yardSnapshotMissSamples: number[] = [];
+  private readonly yardReadModelHitSamples: number[] = [];
+  private readonly yardFallbackSamples: number[] = [];
+  private readonly yardSnapshotAgeSamples: Array<{
+    timestampMs: number;
+    ageSeconds: number;
+  }> = [];
+  private readonly yardSnapshotLagSamples: Array<{
     timestampMs: number;
     lagMs: number;
   }> = [];
@@ -209,17 +250,11 @@ export class PerformanceMetricsService {
     };
   }
 
-  runWithRequest<T>(
-    context: RuntimeRequestContext,
-    callback: () => T,
-  ): T {
+  runWithRequest<T>(context: RuntimeRequestContext, callback: () => T): T {
     return this.requestStorage.run(context, callback);
   }
 
-  finishRequest(
-    context: RuntimeRequestContext,
-    input: RequestFinishInput,
-  ) {
+  finishRequest(context: RuntimeRequestContext, input: RequestFinishInput) {
     const endedAt = Date.now();
     const memory = process.memoryUsage();
     const durationMs = endedAt - context.startedAt;
@@ -330,10 +365,7 @@ export class PerformanceMetricsService {
       }
 
       const key = `${normalized.model}.${normalized.action}`;
-      context.duplicateKeys.set(
-        key,
-        (context.duplicateKeys.get(key) ?? 0) + 1,
-      );
+      context.duplicateKeys.set(key, (context.duplicateKeys.get(key) ?? 0) + 1);
     }
 
     this.querySamples.push({
@@ -370,9 +402,7 @@ export class PerformanceMetricsService {
       });
     }
 
-    const budget =
-      context?.budgetMs ??
-      QUERY_BUDGET_MS.default;
+    const budget = context?.budgetMs ?? QUERY_BUDGET_MS.default;
     if (normalized.durationMs > budget) {
       const warning = {
         endpoint: context?.endpoint ?? 'background',
@@ -420,27 +450,69 @@ export class PerformanceMetricsService {
   }
 
   recordMaterialSnapshotHit() {
-    this.snapshotHitSamples.push(Date.now());
-    this.materialSnapshotHitSamples.push(Date.now());
-    this.pruneRuntimeSamples(Date.now());
+    const now = Date.now();
+    this.recordInventorySnapshotHit(now);
+    this.materialSnapshotHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
   }
 
   recordMaterialSnapshotMiss() {
-    this.snapshotMissSamples.push(Date.now());
-    this.materialSnapshotMissSamples.push(Date.now());
-    this.pruneRuntimeSamples(Date.now());
+    const now = Date.now();
+    this.recordInventorySnapshotMiss(now);
+    this.materialSnapshotMissSamples.push(now);
+    this.pruneRuntimeSamples(now);
   }
 
   recordLocationSnapshotHit() {
-    this.snapshotHitSamples.push(Date.now());
-    this.locationSnapshotHitSamples.push(Date.now());
-    this.pruneRuntimeSamples(Date.now());
+    const now = Date.now();
+    this.recordInventorySnapshotHit(now);
+    this.locationSnapshotHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
   }
 
   recordLocationSnapshotMiss() {
-    this.snapshotMissSamples.push(Date.now());
-    this.locationSnapshotMissSamples.push(Date.now());
-    this.pruneRuntimeSamples(Date.now());
+    const now = Date.now();
+    this.recordInventorySnapshotMiss(now);
+    this.locationSnapshotMissSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordInventorySnapshotHit(timestamp = Date.now()) {
+    this.snapshotHitSamples.push(timestamp);
+    this.inventorySnapshotHitSamples.push(timestamp);
+    this.pruneRuntimeSamples(timestamp);
+  }
+
+  recordInventorySnapshotMiss(timestamp = Date.now()) {
+    this.snapshotMissSamples.push(timestamp);
+    this.inventorySnapshotMissSamples.push(timestamp);
+    this.pruneRuntimeSamples(timestamp);
+  }
+
+  recordInventoryReadModelHit() {
+    const now = Date.now();
+    this.recordReadModelHit();
+    this.inventoryReadModelHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordInventoryFallback() {
+    const now = Date.now();
+    this.recordReadModelFallback();
+    this.inventoryFallbackSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordInventorySnapshotAge(ageSeconds: number) {
+    const now = Date.now();
+    this.inventorySnapshotAgeSamples.push({ timestampMs: now, ageSeconds });
+    this.recordSnapshotAge(ageSeconds);
+  }
+
+  recordInventorySnapshotLag(lagMs: number) {
+    const now = Date.now();
+    this.inventorySnapshotLagSamples.push({ timestampMs: now, lagMs });
+    this.recordSnapshotLag(lagMs);
   }
 
   recordProjectSnapshotHit() {
@@ -500,6 +572,124 @@ export class PerformanceMetricsService {
   recordProductionSnapshotLag(lagMs: number) {
     const now = Date.now();
     this.productionSnapshotLagSamples.push({ timestampMs: now, lagMs });
+    this.recordSnapshotLag(lagMs);
+  }
+
+  recordComponentSnapshotHit() {
+    const now = Date.now();
+    this.snapshotHitSamples.push(now);
+    this.componentSnapshotHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordComponentSnapshotMiss() {
+    const now = Date.now();
+    this.snapshotMissSamples.push(now);
+    this.componentSnapshotMissSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordComponentReadModelHit() {
+    this.recordReadModelHit();
+    this.componentReadModelHitSamples.push(Date.now());
+    this.pruneRuntimeSamples(Date.now());
+  }
+
+  recordComponentFallback() {
+    this.recordReadModelFallback();
+    this.componentFallbackSamples.push(Date.now());
+    this.pruneRuntimeSamples(Date.now());
+  }
+
+  recordComponentSnapshotAge(ageSeconds: number) {
+    const now = Date.now();
+    this.componentSnapshotAgeSamples.push({ timestampMs: now, ageSeconds });
+    this.recordSnapshotAge(ageSeconds);
+  }
+
+  recordComponentSnapshotLag(lagMs: number) {
+    const now = Date.now();
+    this.componentSnapshotLagSamples.push({ timestampMs: now, lagMs });
+    this.recordSnapshotLag(lagMs);
+  }
+
+  recordQcSnapshotHit() {
+    const now = Date.now();
+    this.snapshotHitSamples.push(now);
+    this.qcSnapshotHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordQcSnapshotMiss() {
+    const now = Date.now();
+    this.snapshotMissSamples.push(now);
+    this.qcSnapshotMissSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordQcReadModelHit() {
+    const now = Date.now();
+    this.recordReadModelHit();
+    this.qcReadModelHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordQcFallback() {
+    const now = Date.now();
+    this.recordReadModelFallback();
+    this.qcFallbackSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordQcSnapshotAge(ageSeconds: number) {
+    const now = Date.now();
+    this.qcSnapshotAgeSamples.push({ timestampMs: now, ageSeconds });
+    this.recordSnapshotAge(ageSeconds);
+  }
+
+  recordQcSnapshotLag(lagMs: number) {
+    const now = Date.now();
+    this.qcSnapshotLagSamples.push({ timestampMs: now, lagMs });
+    this.recordSnapshotLag(lagMs);
+  }
+
+  recordYardSnapshotHit() {
+    const now = Date.now();
+    this.snapshotHitSamples.push(now);
+    this.yardSnapshotHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordYardSnapshotMiss() {
+    const now = Date.now();
+    this.snapshotMissSamples.push(now);
+    this.yardSnapshotMissSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordYardReadModelHit() {
+    const now = Date.now();
+    this.recordReadModelHit();
+    this.yardReadModelHitSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordYardFallback() {
+    const now = Date.now();
+    this.recordReadModelFallback();
+    this.yardFallbackSamples.push(now);
+    this.pruneRuntimeSamples(now);
+  }
+
+  recordYardSnapshotAge(ageSeconds: number) {
+    const now = Date.now();
+    this.yardSnapshotAgeSamples.push({ timestampMs: now, ageSeconds });
+    this.recordSnapshotAge(ageSeconds);
+  }
+
+  recordYardSnapshotLag(lagMs: number) {
+    const now = Date.now();
+    this.yardSnapshotLagSamples.push({ timestampMs: now, lagMs });
     this.recordSnapshotLag(lagMs);
   }
 
@@ -646,7 +836,10 @@ export class PerformanceMetricsService {
         );
         const readModelHits = this.countSince(this.readModelHitSamples, since);
         const cacheHits = this.countSince(this.cacheHitSamples, since);
-        const fallbackQueries = this.countSince(this.fallbackQuerySamples, since);
+        const fallbackQueries = this.countSince(
+          this.fallbackQuerySamples,
+          since,
+        );
         const snapshotMisses = this.countSince(this.snapshotMissSamples, since);
         const snapshotHits = this.countSince(this.snapshotHitSamples, since);
 
@@ -689,8 +882,10 @@ export class PerformanceMetricsService {
 
     return {
       windows,
-      topSlowEndpoints: this.rankEndpoints(this.requestSamples, this.querySamples)
-        .byP95.slice(0, 10),
+      topSlowEndpoints: this.rankEndpoints(
+        this.requestSamples,
+        this.querySamples,
+      ).byP95.slice(0, 10),
       topQueries: this.rankQueries(this.querySamples).byAverage.slice(0, 10),
       runtimeTrend: {
         current24h: this.rankEndpoints(this.requestSamples, this.querySamples)
@@ -764,6 +959,12 @@ export class PerformanceMetricsService {
     this.pruneNumberSamples(this.fallbackQuerySamples, minTimestamp);
     this.pruneNumberSamples(this.snapshotMissSamples, minTimestamp);
     this.pruneNumberSamples(this.snapshotHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.inventorySnapshotHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.inventorySnapshotMissSamples, minTimestamp);
+    this.pruneNumberSamples(this.inventoryReadModelHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.inventoryFallbackSamples, minTimestamp);
+    this.pruneByTimestamp(this.inventorySnapshotAgeSamples, minTimestamp);
+    this.pruneByTimestamp(this.inventorySnapshotLagSamples, minTimestamp);
     this.pruneNumberSamples(this.materialSnapshotHitSamples, minTimestamp);
     this.pruneNumberSamples(this.materialSnapshotMissSamples, minTimestamp);
     this.pruneNumberSamples(this.locationSnapshotHitSamples, minTimestamp);
@@ -778,6 +979,24 @@ export class PerformanceMetricsService {
     this.pruneNumberSamples(this.productionFallbackSamples, minTimestamp);
     this.pruneByTimestamp(this.productionSnapshotAgeSamples, minTimestamp);
     this.pruneByTimestamp(this.productionSnapshotLagSamples, minTimestamp);
+    this.pruneNumberSamples(this.componentSnapshotHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.componentSnapshotMissSamples, minTimestamp);
+    this.pruneNumberSamples(this.componentReadModelHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.componentFallbackSamples, minTimestamp);
+    this.pruneByTimestamp(this.componentSnapshotAgeSamples, minTimestamp);
+    this.pruneByTimestamp(this.componentSnapshotLagSamples, minTimestamp);
+    this.pruneNumberSamples(this.qcSnapshotHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.qcSnapshotMissSamples, minTimestamp);
+    this.pruneNumberSamples(this.qcReadModelHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.qcFallbackSamples, minTimestamp);
+    this.pruneByTimestamp(this.qcSnapshotAgeSamples, minTimestamp);
+    this.pruneByTimestamp(this.qcSnapshotLagSamples, minTimestamp);
+    this.pruneNumberSamples(this.yardSnapshotHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.yardSnapshotMissSamples, minTimestamp);
+    this.pruneNumberSamples(this.yardReadModelHitSamples, minTimestamp);
+    this.pruneNumberSamples(this.yardFallbackSamples, minTimestamp);
+    this.pruneByTimestamp(this.yardSnapshotAgeSamples, minTimestamp);
+    this.pruneByTimestamp(this.yardSnapshotLagSamples, minTimestamp);
     this.pruneNumberSamples(this.projectDetailSnapshotHitSamples, minTimestamp);
     this.pruneNumberSamples(this.planningSnapshotHitSamples, minTimestamp);
     this.pruneNumberSamples(this.timelineSnapshotHitSamples, minTimestamp);
@@ -823,18 +1042,77 @@ export class PerformanceMetricsService {
     return {
       hits: this.countSince(this.snapshotHitSamples, since),
       misses: this.countSince(this.snapshotMissSamples, since),
-      materialSnapshotHit: this.countSince(this.materialSnapshotHitSamples, since),
-      materialSnapshotMiss: this.countSince(this.materialSnapshotMissSamples, since),
-      locationSnapshotHit: this.countSince(this.locationSnapshotHitSamples, since),
-      locationSnapshotMiss: this.countSince(this.locationSnapshotMissSamples, since),
-      projectSnapshotHit: this.countSince(this.projectSnapshotHitSamples, since),
-      projectSnapshotMiss: this.countSince(this.projectSnapshotMissSamples, since),
-      projectReadModelHit: this.countSince(this.projectReadModelHitSamples, since),
+      materialSnapshotHit: this.countSince(
+        this.materialSnapshotHitSamples,
+        since,
+      ),
+      materialSnapshotMiss: this.countSince(
+        this.materialSnapshotMissSamples,
+        since,
+      ),
+      locationSnapshotHit: this.countSince(
+        this.locationSnapshotHitSamples,
+        since,
+      ),
+      locationSnapshotMiss: this.countSince(
+        this.locationSnapshotMissSamples,
+        since,
+      ),
+      inventorySnapshotHit: this.countSince(
+        this.inventorySnapshotHitSamples,
+        since,
+      ),
+      inventorySnapshotMiss: this.countSince(
+        this.inventorySnapshotMissSamples,
+        since,
+      ),
+      inventoryReadModelHit: this.countSince(
+        this.inventoryReadModelHitSamples,
+        since,
+      ),
+      inventoryFallbackCount: this.countSince(
+        this.inventoryFallbackSamples,
+        since,
+      ),
+      inventoryAverageAgeSeconds: this.average(
+        this.inventorySnapshotAgeSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.ageSeconds),
+      ),
+      inventoryAverageLagMs: this.average(
+        this.inventorySnapshotLagSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.lagMs),
+      ),
+      projectSnapshotHit: this.countSince(
+        this.projectSnapshotHitSamples,
+        since,
+      ),
+      projectSnapshotMiss: this.countSince(
+        this.projectSnapshotMissSamples,
+        since,
+      ),
+      projectReadModelHit: this.countSince(
+        this.projectReadModelHitSamples,
+        since,
+      ),
       projectFallbackCount: this.countSince(this.projectFallbackSamples, since),
-      productionSnapshotHit: this.countSince(this.productionSnapshotHitSamples, since),
-      productionSnapshotMiss: this.countSince(this.productionSnapshotMissSamples, since),
-      productionReadModelHit: this.countSince(this.productionReadModelHitSamples, since),
-      productionFallbackCount: this.countSince(this.productionFallbackSamples, since),
+      productionSnapshotHit: this.countSince(
+        this.productionSnapshotHitSamples,
+        since,
+      ),
+      productionSnapshotMiss: this.countSince(
+        this.productionSnapshotMissSamples,
+        since,
+      ),
+      productionReadModelHit: this.countSince(
+        this.productionReadModelHitSamples,
+        since,
+      ),
+      productionFallbackCount: this.countSince(
+        this.productionFallbackSamples,
+        since,
+      ),
       productionAverageAgeSeconds: this.average(
         this.productionSnapshotAgeSamples
           .filter((row) => row.timestampMs >= since)
@@ -845,11 +1123,80 @@ export class PerformanceMetricsService {
           .filter((row) => row.timestampMs >= since)
           .map((row) => row.lagMs),
       ),
-      projectDetailSnapshotHit: this.countSince(this.projectDetailSnapshotHitSamples, since),
-      planningSnapshotHit: this.countSince(this.planningSnapshotHitSamples, since),
-      timelineSnapshotHit: this.countSince(this.timelineSnapshotHitSamples, since),
-      allocationSnapshotHit: this.countSince(this.allocationSnapshotHitSamples, since),
-      projectDetailFallback: this.countSince(this.projectDetailFallbackSamples, since),
+      componentSnapshotHit: this.countSince(
+        this.componentSnapshotHitSamples,
+        since,
+      ),
+      componentSnapshotMiss: this.countSince(
+        this.componentSnapshotMissSamples,
+        since,
+      ),
+      componentReadModelHit: this.countSince(
+        this.componentReadModelHitSamples,
+        since,
+      ),
+      componentFallbackCount: this.countSince(
+        this.componentFallbackSamples,
+        since,
+      ),
+      componentAverageAgeSeconds: this.average(
+        this.componentSnapshotAgeSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.ageSeconds),
+      ),
+      componentAverageLagMs: this.average(
+        this.componentSnapshotLagSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.lagMs),
+      ),
+      qcSnapshotHit: this.countSince(this.qcSnapshotHitSamples, since),
+      qcSnapshotMiss: this.countSince(this.qcSnapshotMissSamples, since),
+      qcReadModelHit: this.countSince(this.qcReadModelHitSamples, since),
+      qcFallbackCount: this.countSince(this.qcFallbackSamples, since),
+      qcAverageAgeSeconds: this.average(
+        this.qcSnapshotAgeSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.ageSeconds),
+      ),
+      qcAverageLagMs: this.average(
+        this.qcSnapshotLagSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.lagMs),
+      ),
+      yardSnapshotHit: this.countSince(this.yardSnapshotHitSamples, since),
+      yardSnapshotMiss: this.countSince(this.yardSnapshotMissSamples, since),
+      yardReadModelHit: this.countSince(this.yardReadModelHitSamples, since),
+      yardFallbackCount: this.countSince(this.yardFallbackSamples, since),
+      yardAverageAgeSeconds: this.average(
+        this.yardSnapshotAgeSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.ageSeconds),
+      ),
+      yardAverageLagMs: this.average(
+        this.yardSnapshotLagSamples
+          .filter((row) => row.timestampMs >= since)
+          .map((row) => row.lagMs),
+      ),
+      projectDetailSnapshotHit: this.countSince(
+        this.projectDetailSnapshotHitSamples,
+        since,
+      ),
+      planningSnapshotHit: this.countSince(
+        this.planningSnapshotHitSamples,
+        since,
+      ),
+      timelineSnapshotHit: this.countSince(
+        this.timelineSnapshotHitSamples,
+        since,
+      ),
+      allocationSnapshotHit: this.countSince(
+        this.allocationSnapshotHitSamples,
+        since,
+      ),
+      projectDetailFallback: this.countSince(
+        this.projectDetailFallbackSamples,
+        since,
+      ),
       projectDetailAverageAgeSeconds: this.average(
         this.projectDetailSnapshotAgeSamples
           .filter((row) => row.timestampMs >= since)
@@ -898,17 +1245,15 @@ export class PerformanceMetricsService {
 
     for (const request of requests) {
       const key = `${request.method} ${request.endpoint}`;
-      const row =
-        grouped.get(key) ??
-        {
-          endpoint: request.endpoint,
-          method: request.method,
-          durations: [],
-          sqlCounts: [],
-          sqlTimes: [],
-          slowQueryCount: 0,
-          memoryDeltas: [],
-        };
+      const row = grouped.get(key) ?? {
+        endpoint: request.endpoint,
+        method: request.method,
+        durations: [],
+        sqlCounts: [],
+        sqlTimes: [],
+        slowQueryCount: 0,
+        memoryDeltas: [],
+      };
       row.durations.push(request.durationMs);
       row.sqlCounts.push(request.prismaQueryCount);
       row.sqlTimes.push(request.sqlTotalMs);
@@ -980,13 +1325,11 @@ export class PerformanceMetricsService {
 
     for (const query of queries) {
       const key = `${query.model}.${query.action}`;
-      const row =
-        grouped.get(key) ??
-        {
-          model: query.model,
-          action: query.action,
-          durations: [],
-        };
+      const row = grouped.get(key) ?? {
+        model: query.model,
+        action: query.action,
+        durations: [],
+      };
       row.durations.push(query.durationMs);
       grouped.set(key, row);
     }
@@ -1007,9 +1350,7 @@ export class PerformanceMetricsService {
       byAverage: [...rows]
         .sort((a, b) => b.averageTimeMs - a.averageTimeMs)
         .slice(0, 10),
-      byMax: [...rows]
-        .sort((a, b) => b.maxTimeMs - a.maxTimeMs)
-        .slice(0, 10),
+      byMax: [...rows].sort((a, b) => b.maxTimeMs - a.maxTimeMs).slice(0, 10),
     };
   }
 
@@ -1079,7 +1420,10 @@ export class PerformanceMetricsService {
         });
       }
 
-      if (row.p95LatencyMs > row.averageLatencyMs * 2 && row.requestCount >= 5) {
+      if (
+        row.p95LatencyMs > row.averageLatencyMs * 2 &&
+        row.requestCount >= 5
+      ) {
         recommendations.push({
           type: 'LATENCY_SPIKE',
           severity: 'MEDIUM',
@@ -1088,7 +1432,8 @@ export class PerformanceMetricsService {
             averageLatencyMs: row.averageLatencyMs,
             p95LatencyMs: row.p95LatencyMs,
           },
-          recommendation: 'Inspect slow queries and payload size for this endpoint.',
+          recommendation:
+            'Inspect slow queries and payload size for this endpoint.',
         });
       }
     }
@@ -1103,7 +1448,8 @@ export class PerformanceMetricsService {
             executionCount: row.executionCount,
             averageTimeMs: row.averageTimeMs,
           },
-          recommendation: 'Add request-level caching, batching, or repository preloading.',
+          recommendation:
+            'Add request-level caching, batching, or repository preloading.',
         });
       }
     }
@@ -1196,7 +1542,8 @@ export class PerformanceMetricsService {
         score,
         repositoryCoverage: 'not runtime-measured',
         readModelCoverage: readModelScore > 0 ? 'observed' : 'not observed',
-        queryBudget: row.budgetExceeded > 0 ? 'exceeded' : 'within observed window',
+        queryBudget:
+          row.budgetExceeded > 0 ? 'exceeded' : 'within observed window',
         nPlusOneStatus:
           row.averageSqlCount >= 20 ? 'risk observed' : 'no runtime signal',
       };

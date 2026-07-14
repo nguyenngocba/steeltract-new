@@ -8,6 +8,7 @@ import {
   CompactDonutSummary,
   HorizontalBars,
   InventoryChartCard,
+  InventoryPagination,
   InventoryPanel,
   inventoryInput,
   inventoryTableHead,
@@ -95,69 +96,6 @@ function OverviewMetricCard({
 }
 
 // ================= PAGINATION (giống bên Tồn kho) =================
-function MaterialsPagination({
-  page,
-  pageCount,
-  total,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  pageSize: number
-  onPageChange: (page: number) => void
-}) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
-  return (
-    <div className="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3">
-      <div>
-        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
-      </div>
-      <div className="flex justify-center gap-2">
-        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
-            }`}
-          >
-            {pageNo}
-          </button>
-        ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
-      </div>
-      <div className="flex justify-start gap-2 md:justify-end">
-        <button
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          className={inventoryMutedButton}
-        >
-          Trước
-        </button>
-        <button
-          disabled={safePage >= safePageCount}
-          onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))}
-          className={inventoryMutedButton}
-        >
-          Sau
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function num(v: any) {
   const n = Number(v ?? 0)
   return Number.isFinite(n) ? n : 0
@@ -633,7 +571,7 @@ export function InventoryStockTakePage() {
                 </tbody>
               </table>
             </div>
-            <MaterialsPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} />
+            <InventoryPagination page={page} pageCount={pageCount} total={rows.length} pageSize={pageSize} onPageChange={setPage} containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-2 text-xs text-slate-400 md:grid-cols-3" />
           </InventoryPanel>
 
           <div className="space-y-1.5 xl:col-span-3">

@@ -4,7 +4,10 @@ export type SnapshotDashboardModule =
   | 'inventory'
   | 'projects'
   | 'logistics'
-  | 'production';
+  | 'production'
+  | 'components'
+  | 'qc'
+  | 'yard';
 
 @Injectable()
 export class SnapshotFeatureFlagService {
@@ -23,7 +26,10 @@ export class SnapshotFeatureFlagService {
   }
 
   parityCheckEnabled() {
-    return String(process.env.SNAPSHOT_PARITY_CHECK ?? 'true').toLowerCase() !== 'false';
+    return (
+      String(process.env.SNAPSHOT_PARITY_CHECK ?? 'true').toLowerCase() !==
+      'false'
+    );
   }
 
   private flagKey(module: SnapshotDashboardModule) {
@@ -37,6 +43,18 @@ export class SnapshotFeatureFlagService {
 
     if (module === 'production') {
       return 'USE_PRODUCTION_SNAPSHOT';
+    }
+
+    if (module === 'components') {
+      return 'USE_COMPONENTS_SNAPSHOT';
+    }
+
+    if (module === 'qc') {
+      return 'USE_QC_SNAPSHOT';
+    }
+
+    if (module === 'yard') {
+      return 'USE_YARD_SNAPSHOT';
     }
 
     return 'USE_DISPATCH_SNAPSHOT';

@@ -23,6 +23,8 @@ import {
   listNcrSchema,
   listQcChecklistsSchema,
   listQcInspectionsSchema,
+  qcInspectionHistorySchema,
+  qcWorkspaceReadSchema,
   recordQcResultSchema,
   rejectQcInspectionSchema,
   startQcInspectionSchema,
@@ -30,7 +32,9 @@ import {
   updateQcInspectionSchema,
   updateQcIssueSchema,
 } from './dto/qc.dto';
+import { QcReadModelService } from './services/qc-read-model.service';
 import { QcService } from './services/qc.service';
+import { QcSnapshotReadService } from './services/qc-snapshot-read.service';
 
 import type {
   ApproveQcInspectionDto,
@@ -42,6 +46,8 @@ import type {
   ListNcrDto,
   ListQcChecklistsDto,
   ListQcInspectionsDto,
+  QcInspectionHistoryDto,
+  QcWorkspaceReadDto,
   RecordQcResultDto,
   RejectQcInspectionDto,
   StartQcInspectionDto,
@@ -56,7 +62,43 @@ type AuthenticatedRequest = Request & {
 
 @Controller('qc')
 export class QcController {
-  constructor(private readonly qcService: QcService) {}
+  constructor(
+    private readonly qcService: QcService,
+    private readonly qcReadModelService: QcReadModelService,
+    private readonly qcSnapshotReadService: QcSnapshotReadService,
+  ) {}
+
+  @Get('dashboard')
+  dashboard() {
+    return this.qcSnapshotReadService.dashboard();
+  }
+
+  @Get('read-model/workspace')
+  workspace(
+    @Query(new ZodValidationPipe(qcWorkspaceReadSchema))
+    query: QcWorkspaceReadDto,
+  ) {
+    return this.qcReadModelService.workspace(query);
+  }
+
+  @Get('read-model/inspections/:id')
+  inspectionDetail(@Param('id') id: string) {
+    return this.qcReadModelService.inspectionDetail(id);
+  }
+
+  @Get('read-model/inspections/:id/history')
+  inspectionHistory(
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(qcInspectionHistorySchema))
+    query: QcInspectionHistoryDto,
+  ) {
+    return this.qcReadModelService.inspectionHistory(id, query);
+  }
+
+  @Get('read-model/ncr/summary')
+  ncrSummary() {
+    return this.qcReadModelService.ncrSummary();
+  }
 
   @Get('checklists')
   listChecklists(

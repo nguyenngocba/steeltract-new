@@ -100,6 +100,7 @@ export class ProductionRepository {
 
   markComponentStagedFromProduction(input: {
     componentId: string;
+    componentCode: string;
     orderId: string;
     orderNo: string;
     status: Prisma.EnumComponentStatusFieldUpdateOperationsInput['set'];
@@ -144,7 +145,48 @@ export class ProductionRepository {
           },
         },
       }),
+      this.prisma.outboxEvent.upsert({
+        where: {
+          idempotencyKey: `production.staged.to-yard:${input.placementId}`,
+        },
+        create: {
+          eventName: 'production.staged.to-yard',
+          payload: {
+            productionOrderId: input.orderId,
+            productionOrderNo: input.orderNo,
+            componentId: input.componentId,
+            componentCode: input.componentCode,
+            placementId: input.placementId,
+            slotId: input.slotId,
+            slotCode: input.slotCode,
+            zoneCode: input.zoneCode,
+          },
+          metadata: {
+            module: 'production',
+            persistToOutbox: true,
+            idempotencyKey: `production.staged.to-yard:${input.placementId}`,
+          },
+          idempotencyKey: `production.staged.to-yard:${input.placementId}`,
+        },
+        update: {},
+      }),
     ]);
+  }
+
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    tx: ProductionTx,
+  ) {
+    return tx.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
   }
 
   updateComponentStatus(
@@ -403,6 +445,276 @@ export class ProductionRepository {
     return tx.activityLog.create({ data });
   }
 
+  async cockpitReadModel(input: {
+    search?: string;
+    status?: Prisma.EnumProductionOrderStatusFilter['equals'];
+    scope: 'all' | 'planning';
+    sortBy: 'updatedAt' | 'orderNo' | 'plannedEndAt' | 'status';
+    sortOrder: 'asc' | 'desc';
+    page: number;
+    limit: number;
+  }) {
+    const where: Prisma.ProductionOrderWhereInput = {
+      status: input.status
+        ? input.status
+        : input.scope === 'planning'
+          ? { in: ['PLANNED', 'RELEASED'] }
+          : undefined,
+      OR: input.search
+        ? [
+            { orderNo: { contains: input.search, mode: 'insensitive' } },
+            { title: { contains: input.search, mode: 'insensitive' } },
+          ]
+        : undefined,
+    };
+    const orderBy: Prisma.ProductionOrderOrderByWithRelationInput = {
+      [input.sortBy]: input.sortOrder,
+    };
+    const skip = (input.page - 1) * input.limit;
+
+    const [rows, aggregateRows, total, workCenters] = await Promise.all([
+      this.prisma.productionOrder.findMany({
+        where,
+        include: this.orderInclude(),
+        orderBy,
+        skip,
+        take: input.limit,
+      }),
+      this.prisma.productionOrder.findMany({
+        where,
+        select: {
+          id: true,
+          orderNo: true,
+          title: true,
+          quantity: true,
+          status: true,
+          currentStageCode: true,
+          plannedEndAt: true,
+          component: {
+            select: { id: true, code: true, name: true },
+          },
+          bom: {
+            select: {
+              estimatedWeight: true,
+              items: {
+                select: {
+                  materialId: true,
+                  quantity: true,
+                  wastePercent: true,
+                },
+              },
+            },
+          },
+          stages: {
+            select: { name: true, status: true },
+          },
+          materialIssues: {
+            select: {
+              inventoryItemId: true,
+              issuedQty: true,
+              returnedQty: true,
+              status: true,
+            },
+          },
+          materialReservations: {
+            select: { status: true },
+          },
+        },
+      }),
+      this.prisma.productionOrder.count({ where }),
+      this.prisma.workCenter.findMany({
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          status: true,
+          _count: { select: { stages: true, machines: true, tasks: true } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
+    const aggregates = aggregateRows.map((row) => {
+      const readiness = productionOrderReadiness(row);
+      const progress = productionOrderProgress(row);
+      return {
+        row,
+        progress,
+        readiness,
+        delayed: productionOrderDelayed(row),
+      };
+    });
+    const data = rows.map((row) => ({
+      ...row,
+      cockpit: {
+        progress: productionOrderProgress(row),
+        delayed: productionOrderDelayed(row),
+        materialReadiness: productionOrderReadiness(row),
+      },
+    }));
+    const countStatus = (status: string) =>
+      aggregates.filter(({ row }) => row.status === status).length;
+    const issuedOrders = aggregates.filter(
+      ({ row }) => row.materialIssues.length > 0,
+    ).length;
+    const shortageOrders = aggregates.filter(
+      ({ row }) =>
+        row.bom &&
+        row.materialIssues.length === 0 &&
+        !row.materialReservations.some((reservation) =>
+          ['RESERVED', 'PARTIALLY_ISSUED'].includes(reservation.status),
+        ) &&
+        row.status !== 'COMPLETED',
+    ).length;
+
+    return {
+      data,
+      meta: {
+        page: input.page,
+        limit: input.limit,
+        total,
+        totalPages: Math.ceil(total / input.limit),
+      },
+      summary: {
+        total,
+        planned: countStatus('PLANNED'),
+        released: countStatus('RELEASED'),
+        inProgress: countStatus('IN_PROGRESS'),
+        completed: countStatus('COMPLETED'),
+        completedToday: aggregates.filter(
+          ({ row }) =>
+            row.status === 'COMPLETED' && sameLocalDay(row.plannedEndAt),
+        ).length,
+        waitingMaterial: aggregates.filter(
+          ({ row }) =>
+            Boolean(row.bom) &&
+            row.materialIssues.length === 0 &&
+            row.status !== 'COMPLETED',
+        ).length,
+        delayed: aggregates.filter(({ delayed }) => delayed).length,
+        runningComponents: aggregates.filter(
+          ({ row }) => row.status === 'IN_PROGRESS' && Boolean(row.component),
+        ).length,
+        productionWeight: aggregates.reduce(
+          (sum, { row }) =>
+            sum +
+            Number(row.quantity ?? 0) * Number(row.bom?.estimatedWeight ?? 0),
+          0,
+        ),
+      },
+      overview: {
+        progress: {
+          running: countStatus('IN_PROGRESS'),
+          pending: aggregates.filter(
+            ({ row, delayed }) =>
+              !['IN_PROGRESS', 'COMPLETED'].includes(row.status) && !delayed,
+          ).length,
+          completed: countStatus('COMPLETED'),
+        },
+        material: {
+          issued: issuedOrders,
+          waiting: aggregates.filter(
+            ({ row }) =>
+              row.materialIssues.length === 0 &&
+              row.materialReservations.some((reservation) =>
+                ['RESERVED', 'PARTIALLY_ISSUED'].includes(reservation.status),
+              ),
+          ).length,
+          shortage: shortageOrders,
+        },
+        stages: ['Cutting', 'Assembly', 'Welding', 'Painting', 'Finished'].map(
+          (label) => ({
+            label,
+            value: aggregates.filter(
+              ({ row }) =>
+                productionStageFamily(
+                  row.currentStageCode ??
+                    row.stages.find((stage) =>
+                      ['IN_PROGRESS', 'READY'].includes(stage.status),
+                    )?.name,
+                ) === label,
+            ).length,
+          }),
+        ),
+        activeComponents: aggregates
+          .filter(({ row }) => row.component && row.status !== 'COMPLETED')
+          .slice(0, 5)
+          .map(({ row }) => row.component),
+      },
+      orderAnalytics: {
+        progressSegments: [
+          { label: 'Planning', min: 0, max: 25 },
+          { label: 'Cutting', min: 25, max: 50 },
+          { label: 'Welding', min: 50, max: 75 },
+          { label: 'Painting', min: 75, max: 100 },
+          { label: 'Finished', min: 100, max: 101 },
+        ].map(({ label, min, max }) => ({
+          label,
+          value: aggregates.filter(
+            ({ progress }) => progress >= min && progress < max,
+          ).length,
+        })),
+        readinessSegments: [
+          { label: '0-49%', min: 0, max: 50 },
+          { label: '50-79%', min: 50, max: 80 },
+          { label: '80-99%', min: 80, max: 100 },
+          { label: '100%', min: 100, max: 101 },
+        ].map(({ label, min, max }) => ({
+          label,
+          value: aggregates.filter(
+            ({ readiness }) =>
+              readiness.readinessPercent >= min &&
+              readiness.readinessPercent < max,
+          ).length,
+        })),
+        topMaterial: [...aggregates]
+          .sort((a, b) => b.readiness.requiredQty - a.readiness.requiredQty)
+          .slice(0, 5)
+          .map(({ row, readiness }) => ({
+            id: row.id,
+            orderNo: row.orderNo,
+            title: row.title,
+            value: readiness.requiredQty,
+          })),
+        topShortage: aggregates
+          .filter(
+            ({ readiness }) => readiness.hasBom && readiness.remainingQty > 0,
+          )
+          .sort((a, b) => b.readiness.remainingQty - a.readiness.remainingQty)
+          .slice(0, 5)
+          .map(({ row, readiness }) => ({
+            id: row.id,
+            orderNo: row.orderNo,
+            title: row.title,
+            value: readiness.remainingQty,
+          })),
+        upcomingDelayed: aggregates
+          .filter(
+            ({ row }) =>
+              !['COMPLETED', 'CANCELLED'].includes(row.status) &&
+              Boolean(row.plannedEndAt),
+          )
+          .sort(
+            (a, b) => Number(a.row.plannedEndAt) - Number(b.row.plannedEndAt),
+          )
+          .slice(0, 5)
+          .map(({ row }) => ({
+            id: row.id,
+            orderNo: row.orderNo,
+            title: row.title,
+            plannedEndAt: row.plannedEndAt,
+          })),
+      },
+      queue: {
+        ready: countStatus('READY'),
+        inProgress: countStatus('IN_PROGRESS'),
+        paused: countStatus('PAUSED'),
+        total,
+      },
+      workCenters,
+    };
+  }
+
   metrics() {
     return this.prisma.$transaction(async (tx) => {
       const [total, inProgress, delayed, completed, stages, machines] =
@@ -537,4 +849,126 @@ export class ProductionRepository {
         : undefined,
     };
   }
+}
+
+type CockpitOrder = {
+  status: string;
+  quantity: number;
+  plannedEndAt: Date | null;
+  stages: Array<{ status: string; name: string }>;
+  bom: {
+    items: Array<{
+      materialId: string;
+      quantity: number;
+      wastePercent: number;
+    }>;
+  } | null;
+  materialIssues: Array<{
+    inventoryItemId: string;
+    issuedQty: number;
+    returnedQty: number;
+    status: string;
+  }>;
+};
+
+function productionOrderDelayed(order: CockpitOrder) {
+  if (['COMPLETED', 'CANCELLED'].includes(order.status)) return false;
+  if (order.status === 'DELAYED') return true;
+  return Boolean(order.plannedEndAt && order.plannedEndAt < new Date());
+}
+
+function productionOrderProgress(order: CockpitOrder) {
+  if (order.status === 'COMPLETED') return 100;
+  if (order.stages.length) {
+    const completed = order.stages.filter(
+      (stage) => stage.status === 'COMPLETED',
+    ).length;
+    const running = order.stages.some((stage) =>
+      ['IN_PROGRESS', 'READY'].includes(stage.status),
+    )
+      ? 0.5
+      : 0;
+    return Math.min(
+      99,
+      Math.round(((completed + running) / order.stages.length) * 100),
+    );
+  }
+  if (order.status === 'IN_PROGRESS') return 58;
+  if (productionOrderDelayed(order)) return 22;
+  return 12;
+}
+
+function productionOrderReadiness(order: CockpitOrder) {
+  const requiredByMaterial = new Map<string, number>();
+  for (const item of order.bom?.items ?? []) {
+    const required =
+      Number(item.quantity ?? 0) *
+      (1 + Number(item.wastePercent ?? 0) / 100) *
+      Number(order.quantity ?? 1);
+    requiredByMaterial.set(
+      item.materialId,
+      (requiredByMaterial.get(item.materialId) ?? 0) + required,
+    );
+  }
+  const issuedByMaterial = new Map<string, number>();
+  for (const issue of order.materialIssues) {
+    if (!['ISSUED', 'RETURNED'].includes(issue.status.toUpperCase())) continue;
+    const netIssued = Math.max(
+      0,
+      Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0),
+    );
+    issuedByMaterial.set(
+      issue.inventoryItemId,
+      (issuedByMaterial.get(issue.inventoryItemId) ?? 0) + netIssued,
+    );
+  }
+  const requiredQty = [...requiredByMaterial.values()].reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+  const issuedQty = [...requiredByMaterial.entries()].reduce(
+    (sum, [materialId, required]) =>
+      sum + Math.min(required, issuedByMaterial.get(materialId) ?? 0),
+    0,
+  );
+  const remainingQty = Math.max(0, requiredQty - issuedQty);
+  const readinessPercent =
+    requiredQty > 0 ? Math.min(100, (issuedQty / requiredQty) * 100) : 0;
+
+  return {
+    hasBom: Boolean(order.bom),
+    requiredQty,
+    issuedQty,
+    remainingQty,
+    readinessPercent,
+    label: !order.bom
+      ? 'Thiếu BOM'
+      : readinessPercent >= 100
+        ? 'READY TO RELEASE'
+        : readinessPercent >= 80
+          ? 'Gần đủ vật tư'
+          : readinessPercent >= 50
+            ? 'Thiếu một phần'
+            : 'Thiếu vật tư',
+  };
+}
+
+function productionStageFamily(value?: string | null) {
+  const raw = String(value ?? '').toLowerCase();
+  if (raw.includes('cut') || raw.includes('cắt')) return 'Cutting';
+  if (raw.includes('assembl') || raw.includes('lắp')) return 'Assembly';
+  if (raw.includes('weld') || raw.includes('hàn')) return 'Welding';
+  if (raw.includes('paint') || raw.includes('sơn')) return 'Painting';
+  if (raw.includes('finish') || raw.includes('hoàn')) return 'Finished';
+  return 'Waiting';
+}
+
+function sameLocalDay(value: Date | null) {
+  if (!value) return false;
+  const now = new Date();
+  return (
+    value.getFullYear() === now.getFullYear() &&
+    value.getMonth() === now.getMonth() &&
+    value.getDate() === now.getDate()
+  );
 }

@@ -39,6 +39,7 @@ import {
   stageProductionToYardSchema,
   startProductionSchema,
   productionOrderTransitionSchema,
+  productionCockpitReadModelSchema,
   updateProductionOrderSchema,
   updateProductionTaskSchema,
   updateBomSchema,
@@ -75,6 +76,7 @@ import type {
   StageProductionToYardDto,
   StartProductionDto,
   ProductionOrderTransitionDto,
+  ProductionCockpitReadModelDto,
   UpdateProductionOrderDto,
   UpdateProductionTaskDto,
   UpdateBomDto,
@@ -108,6 +110,14 @@ export class ProductionController {
   @Get('metrics')
   metrics() {
     return this.productionService.metrics();
+  }
+
+  @Get('read-model/cockpit')
+  cockpitReadModel(
+    @Query(new ZodValidationPipe(productionCockpitReadModelSchema))
+    query: ProductionCockpitReadModelDto,
+  ) {
+    return this.productionService.cockpitReadModel(query);
   }
 
   @Get('work-centers')

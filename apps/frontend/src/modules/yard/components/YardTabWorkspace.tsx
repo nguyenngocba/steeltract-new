@@ -4,6 +4,7 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import type { YardTab } from '../config/yard-tabs'
 import type { YardOperationMode } from '../dialogs/YardOperationDialog'
 import type { YardCrane, YardMetrics, YardMovement, YardSlotRuntime, YardZoneRuntime } from '../services/api/yard.api'
+import { useYardWorkspace } from '../hooks/queries/useYardRuntime'
 import { ModuleEmptyState, ModuleLoadingState } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import {
@@ -68,13 +69,14 @@ function MiniStat({
   )
 }
 
-function MovementTable({ movements, title }: { movements: YardMovement[]; title: string }) {
-  const [page, setPage] = useState(1)
+function MovementTable({ movements, title, page: controlledPage, total: controlledTotal, onPageChange }: { movements: YardMovement[]; title: string; page?: number; total?: number; onPageChange?: (page: number) => void }) {
+  const [localPage, setLocalPage] = useState(1)
+  const page = controlledPage ?? localPage
   const pageSize = 10
-  const total = movements.length
+  const total = controlledTotal ?? movements.length
   const paginatedMovements = useMemo(() => {
-    return movements.slice((page - 1) * pageSize, page * pageSize)
-  }, [movements, page])
+    return controlledPage ? movements : movements.slice((page - 1) * pageSize, page * pageSize)
+  }, [controlledPage, movements, page])
 
   return (
     <CockpitTableShell>
@@ -109,7 +111,7 @@ function MovementTable({ movements, title }: { movements: YardMovement[]; title:
         </table>
       </div>
       {total > pageSize && (
-        <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
+        <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange ?? setLocalPage} />
       )}
     </CockpitTableShell>
   )
@@ -432,27 +434,17 @@ function YardOverviewTab({
   onCreateZone?: () => void
   onCreateSlot?: (zoneId?: string) => void
 }) {
-  const placements = slots.flatMap((slot) => slot.placements)
   const inbound = movements.filter((movement) => movement.type === 'PLACE')
   const outbound = movements.filter((movement) => movement.type === 'REMOVE')
-  const transfers = movements.filter((movement) => movement.type === 'MOVE')
-  const distribution = placements.reduce<Record<string, number>>((acc, placement) => {
-    const key = placement.itemName?.split(' ')[0] || placement.itemCode.split('-')[0] || 'Khác'
-    acc[key] = (acc[key] ?? 0) + Number(placement.weight ?? placement.quantity ?? 1)
-    return acc
-  }, {})
-  const distributionRows = Object.entries(distribution)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-  const maxDistribution = Math.max(...distributionRows.map(([, value]) => value), 1)
-  const totalWeight = placements.reduce((sum, placement) => sum + Number(placement.weight ?? 0), 0)
+  const distributionRows = metrics?.componentDistribution ?? []
+  const maxDistribution = Math.max(...distributionRows.map((row) => row.value), 1)
 
   return <div className="space-y-1">
     <div className="grid gap-1 md:grid-cols-4">
-      <MiniStat icon={Boxes} label="Cấu kiện trong bãi" value={formatQuantity(placements.length, 0)} note="thành phẩm" tone="blue" />
-      <MiniStat icon={Activity} label="Tổng trọng lượng" value={`${formatQuantity(totalWeight, 1)} tấn`} note="runtime" tone="cyan" />
-      <MiniStat icon={MoveRight} label="Di chuyển nội bộ" value={transfers.length} note="30 ngày" tone="emerald" />
-      <MiniStat icon={Construction} label="Cầu trục hoạt động" value={cranes.filter((crane) => crane.status !== 'MAINTENANCE').length} note={`${cranes.length} thiết bị`} tone="purple" />
+      <MiniStat icon={Boxes} label="Cấu kiện trong bãi" value={formatQuantity(metrics?.placements ?? 0, 0)} note="thành phẩm" tone="blue" />
+      <MiniStat icon={Activity} label="Tổng trọng lượng" value={`${formatQuantity(metrics?.totalWeight ?? 0, 1)} tấn`} note="runtime" tone="cyan" />
+      <MiniStat icon={MoveRight} label="Di chuyển nội bộ" value={metrics?.movementCounts?.move ?? 0} note="toàn bộ" tone="emerald" />
+      <MiniStat icon={Construction} label="Cầu trục hoạt động" value={metrics?.craneAvailableCount ?? 0} note={`${cranes.length} thiết bị`} tone="purple" />
     </div>
 
     <div className="grid gap-1 xl:grid-cols-[1fr_340px]">
@@ -477,11 +469,11 @@ function YardOverviewTab({
         <div className={`${panel} p-3 flex flex-col gap-y-1`}>
           <h2 className="text-sm font-semibold text-slate-250">Phân bổ loại cấu kiện</h2>
           <div className="mt-1 space-y-1.5">
-            {distributionRows.map(([label, value], index) => (
-              <div key={label} className="grid grid-cols-[74px_1fr_62px] items-center gap-1.5 text-xs">
-                <span className="text-slate-350 truncate">{label}</span>
-                <ProgressBar value={(value / maxDistribution) * 100} tone={['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500', 'bg-red-500'][index] ?? 'bg-cyan-500'} />
-                <span className="text-right text-slate-300 font-mono tabular-nums">{formatQuantity(value, 1)}</span>
+            {distributionRows.map((row, index) => (
+              <div key={row.label} className="grid grid-cols-[74px_1fr_62px] items-center gap-1.5 text-xs">
+                <span className="text-slate-350 truncate">{row.label}</span>
+                <ProgressBar value={(row.value / maxDistribution) * 100} tone={['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500', 'bg-red-500'][index] ?? 'bg-cyan-500'} />
+                <span className="text-right text-slate-300 font-mono tabular-nums">{formatQuantity(row.value, 1)}</span>
               </div>
             ))}
             {!distributionRows.length && <p className="text-xs text-slate-500 py-1">Chưa có cấu kiện trong bãi.</p>}
@@ -533,15 +525,14 @@ function OperationTab({
   const rows = movements.filter((movement) => movement.type === type)
   const title = mode === 'inbound' ? 'Danh sách nhập bãi' : mode === 'outbound' ? 'Danh sách xuất bãi' : 'Danh sách di chuyển nội bộ'
   const actionTitle = mode === 'inbound' ? 'Tạo phiếu nhập bãi' : mode === 'outbound' ? 'Tạo phiếu xuất bãi' : 'Tạo lệnh chuyển nội bộ'
-  const occupiedSlots = slots.filter((slot) => slot.placements.length)
-  const availableSlots = slots.filter((slot) => !slot.placements.length)
+  const movementKey = mode === 'inbound' ? 'place' : mode === 'outbound' ? 'remove' : 'move'
 
   return <div className="space-y-1">
     <div className="grid gap-1 md:grid-cols-4">
-      <MiniStat icon={Boxes} label="Tổng chứng từ" value={rows.length} note="lọc theo tab" tone="blue" />
-      <MiniStat icon={Truck} label="Hôm nay" value={rows.slice(0, 5).length} note="hoạt động mới" tone="cyan" />
-      <MiniStat icon={Construction} label="Cầu trục khả dụng" value={cranes.filter((crane) => crane.status !== 'MAINTENANCE').length} note={`${cranes.length} thiết bị`} tone="emerald" />
-      <MiniStat icon={PackageCheck} label="Slot trống" value={availableSlots.length} note={`${occupiedSlots.length} đang dùng`} tone="amber" />
+      <MiniStat icon={Boxes} label="Tổng chứng từ" value={metrics?.movementCounts?.[movementKey] ?? 0} note="lọc theo tab" tone="blue" />
+      <MiniStat icon={Truck} label="Hôm nay" value={metrics?.movementTodayCounts?.[movementKey] ?? 0} note="hoạt động mới" tone="cyan" />
+      <MiniStat icon={Construction} label="Cầu trục khả dụng" value={metrics?.craneAvailableCount ?? 0} note={`${cranes.length} thiết bị`} tone="emerald" />
+      <MiniStat icon={PackageCheck} label="Slot trống" value={metrics?.availableSlots ?? 0} note={`${metrics?.occupiedSlots ?? 0} đang dùng`} tone="amber" />
     </div>
     <div className={`${panel} flex flex-wrap items-center gap-1 p-2`}>
       <button type="button" onClick={() => onOpenOperation(mode)} className="rounded bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700">{actionTitle}</button>
@@ -561,14 +552,14 @@ function OperationTab({
 
 function QCTab({ slots, movements }: { slots: YardSlotRuntime[]; movements: YardMovement[] }) {
   const placements = slots.flatMap((slot) => slot.placements.map((placement) => ({ ...placement, slotCode: slot.code, zoneName: slot.zone.name })))
-  const waiting = placements.filter((_, index) => index % 4 === 0)
-  const passed = placements.length - waiting.length
+  const waiting: typeof placements = []
+  const passed = 0
 
   const [page, setPage] = useState(1)
   const pageSize = 10
-  const total = placements.length
+  const total = 0
   const paginatedPlacements = useMemo(() => {
-    return placements.slice((page - 1) * pageSize, page * pageSize)
+    return placements.slice(0, 0)
   }, [placements, page])
 
   return <div className="space-y-1">
@@ -593,8 +584,7 @@ function QCTab({ slots, movements }: { slots: YardSlotRuntime[]; movements: Yard
               </tr>
             </thead>
             <tbody>
-              {paginatedPlacements.map((item, index) => {
-                const globalIndex = (page - 1) * pageSize + index
+              {paginatedPlacements.map((item) => {
                 return (
                   <tr key={item.id} className="hover:bg-cyan-400/[0.04] border-b border-white/[0.04] cursor-pointer">
                     <td className="px-4 py-2.5 text-xs text-cyan-300 font-mono">{item.itemCode}</td>
@@ -602,14 +592,14 @@ function QCTab({ slots, movements }: { slots: YardSlotRuntime[]; movements: Yard
                     <td className="px-4 py-2.5 text-xs">{item.zoneName}</td>
                     <td className="px-4 py-2.5 text-xs font-mono">L{item.stackLevel}</td>
                     <td className="px-4 py-2.5 text-xs">
-                      <span className={`rounded px-2 py-0.5 text-[10px] ${globalIndex % 4 === 0 ? 'bg-amber-950 text-amber-300' : 'bg-emerald-950 text-emerald-300'}`}>
-                        {globalIndex % 4 === 0 ? 'Chờ QC' : 'Đạt'}
+                      <span className="rounded bg-slate-900 px-2 py-0.5 text-[10px] text-slate-400">
+                        Chưa có dữ liệu
                       </span>
                     </td>
                   </tr>
                 )
               })}
-              {!placements.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Chưa có cấu kiện.</td></tr>}
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Chưa có dữ liệu QC.</td></tr>
             </tbody>
           </table>
         </div>
@@ -636,21 +626,24 @@ function HistoryTab({ movements, metrics }: { movements: YardMovement[]; metrics
   const [locationQuery, setLocationQuery] = useState('')
   const [dateQuery, setDateQuery] = useState('')
   const [typeQuery, setTypeQuery] = useState('')
-  const filteredMovements = movements.filter((item) => {
-    const componentOk = !componentQuery || item.itemCode.toLowerCase().includes(componentQuery.toLowerCase())
-    const locationText = `${item.fromSlot?.code ?? ''} ${item.toSlot?.code ?? ''} ${item.fromSlot?.zone?.code ?? ''} ${item.toSlot?.zone?.code ?? ''}`.toLowerCase()
-    const locationOk = !locationQuery || locationText.includes(locationQuery.toLowerCase())
-    const dateOk = !dateQuery || String(item.createdAt ?? '').startsWith(dateQuery)
-    const typeOk = !typeQuery || item.type === typeQuery
-    return componentOk && locationOk && dateOk && typeOk
+  const [page, setPage] = useState(1)
+  const { data: history } = useYardWorkspace({
+    movementPage: page,
+    movementLimit: 10,
+    movementItem: componentQuery || undefined,
+    movementLocation: locationQuery || undefined,
+    movementDate: dateQuery || undefined,
+    movementType: typeQuery || undefined,
   })
-  const place = movements.filter((item) => item.type === 'PLACE').length
-  const move = movements.filter((item) => item.type === 'MOVE').length
-  const remove = movements.filter((item) => item.type === 'REMOVE').length
+  const historyMovements = history?.movements ?? movements
+  const place = history?.analytics.movementCounts.place ?? 0
+  const move = history?.analytics.movementCounts.move ?? 0
+  const remove = history?.analytics.movementCounts.remove ?? 0
+  const historyTotal = history?.meta.movements.total ?? historyMovements.length
 
   return <div className="space-y-1">
     <div className="grid gap-1 md:grid-cols-4">
-      <MiniStat icon={Activity} label="Tổng sự kiện" value={movements.length} note="runtime log" tone="blue" />
+      <MiniStat icon={Activity} label="Tổng sự kiện" value={historyTotal} note="runtime log" tone="blue" />
       <MiniStat icon={PackageCheck} label="Nhập bãi" value={place} note="PLACE" tone="emerald" />
       <MiniStat icon={MoveRight} label="Di chuyển" value={move} note="MOVE" tone="cyan" />
       <MiniStat icon={Truck} label="Xuất bãi" value={remove} note="REMOVE" tone="amber" />
@@ -667,14 +660,14 @@ function HistoryTab({ movements, metrics }: { movements: YardMovement[]; metrics
       <input value={dateQuery} onChange={(event) => setDateQuery(event.target.value)} type="date" className="h-9 rounded-lg border border-white/10 bg-slate-950/45 px-3 text-xs text-slate-100 outline-none" />
     </div>
     <div className="grid gap-1 xl:grid-cols-[1fr_320px]">
-      <MovementTable movements={filteredMovements} title="Lịch sử bãi" />
+      <MovementTable movements={historyMovements} title="Lịch sử bãi" page={page} total={historyTotal} onPageChange={setPage} />
       <div className="space-y-1">
         <div className={`${panel} p-4`}>
           <h2 className="text-sm font-semibold">Phân bổ sự kiện</h2>
           <div className="mt-4 space-y-3 text-xs">
-            <div><div className="mb-2 flex justify-between"><span>Nhập bãi</span><b>{place}</b></div><ProgressBar value={movements.length ? place / movements.length * 100 : 0} tone="bg-emerald-500" /></div>
-            <div><div className="mb-2 flex justify-between"><span>Di chuyển</span><b>{move}</b></div><ProgressBar value={movements.length ? move / movements.length * 100 : 0} tone="bg-cyan-500" /></div>
-            <div><div className="mb-2 flex justify-between"><span>Xuất bãi</span><b>{remove}</b></div><ProgressBar value={movements.length ? remove / movements.length * 100 : 0} tone="bg-amber-400" /></div>
+            <div><div className="mb-2 flex justify-between"><span>Nhập bãi</span><b>{place}</b></div><ProgressBar value={historyTotal ? place / historyTotal * 100 : 0} tone="bg-emerald-500" /></div>
+            <div><div className="mb-2 flex justify-between"><span>Di chuyển</span><b>{move}</b></div><ProgressBar value={historyTotal ? move / historyTotal * 100 : 0} tone="bg-cyan-500" /></div>
+            <div><div className="mb-2 flex justify-between"><span>Xuất bãi</span><b>{remove}</b></div><ProgressBar value={historyTotal ? remove / historyTotal * 100 : 0} tone="bg-amber-400" /></div>
           </div>
         </div>
         <ZoneUtilization metrics={metrics} />
@@ -760,9 +753,11 @@ export function YardTabWorkspace({
         </div>
         <span className="text-xs text-cyan-300 font-mono">{formatQuantity(slots.length, 0)} runtime slots</span>
       </div>
-      <Suspense fallback={<ModuleLoadingState label="Đang tải bản đồ 3D..." variant="analytics" />}>
-        <YardOperationalMap3D slots={slots} selectedSlotId={selectedSlotId} />
-      </Suspense>
+      {slots.length ? (
+        <Suspense fallback={<ModuleLoadingState label="Đang tải bản đồ 3D..." variant="analytics" />}>
+          <YardOperationalMap3D slots={slots} selectedSlotId={selectedSlotId} />
+        </Suspense>
+      ) : <ModuleEmptyState title="Chưa có dữ liệu bãi 3D" description="Dữ liệu sẽ xuất hiện khi có zone và slot thực tế." />}
     </div>
   }
 

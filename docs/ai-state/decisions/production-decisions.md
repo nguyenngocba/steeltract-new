@@ -301,3 +301,23 @@ Semantics:
   command/event/ledger semantic.
 - Canonical material events use `production.material.*` and must be persisted to
   Outbox atomically when EPIC135B activates publishing.
+
+## PROD-016: Production Material Events Follow The Domain Transaction
+
+Decision:
+
+- Reservation, Release, Issue, Consumption, and Return write their canonical
+  `production.material.*` Outbox row in the same Production repository
+  transaction as the domain mutation and Production material ledger.
+- Draft Reservation is demand-only and publishes no material event.
+- Issue and Return additionally use InventoryPostingService in that same
+  transaction; Inventory-owned Outbox events remain the only trigger for
+  Inventory stock snapshots.
+
+Implications:
+
+- Canonical Production material events rebuild Production Order snapshots.
+- Reservation/Consumption do not trigger Inventory stock rebuilds because they
+  do not mutate stock.
+- `CONSUME` events and snapshot consumed quantity exclude Scrap. Scrap remains a
+  separate future command/event semantic.

@@ -1,5 +1,27 @@
 # Next Tasks
-- **EPIC135B Production Material Flow Implementation**: Publish canonical `production.material.reserved/released/issued/consumed/returned` Outbox events atomically with Production ledger/status changes, route them through Background Engine snapshots, and verify Reservation/Issue/Consumption/Return end to end using real test data.
+- **Core Platform v1.0**: CERTIFIED on 2026-07-13 for Inventory, Components,
+  Production, QC and Yard. New platform modules must inherit ADR011, shared
+  Snapshot/Runtime/Background infrastructure and repository-atomic Outbox.
+- **EPIC180 Logistics Audit**: May begin as an audit against the certified v1.0
+  template. Do not implement Logistics foundation until audit gaps are ranked.
+- **EPIC173 Dashboard Snapshot Cutover**: Completed. Components, QC and Yard
+  dashboard widgets now use their existing snapshot readers with repository
+  fallback; operator workspaces remain live.
+- **EPIC174 Certification Parity**: Completed. Atomic Outbox and Runtime naming
+  parity pass; Core Platform v1.0 is certified.
+- **EPIC144 Components Runtime Metrics**: Add Components-specific snapshot hit/miss/age/lag, read-model hit/fallback and background queue telemetry by reusing the existing Performance Metrics framework.
+- **EPIC145 Components Operations Center**: Expose Components repository/read-model/snapshot/event/background/feature-flag health in the existing Operations Center without creating a new UI language.
+- **Components persistent event completion**: Atomically persist approved `component.created`, `component.updated` and delete/archive-policy events before claiming full automatic snapshot freshness. Revision/release/archive events remain blocked until their domains exist.
+- **Components CORE.1 cross-module boundary follow-up**: Components repository completion is approved. In a separately authorized sprint, define a transaction-aware internal Component command boundary for Production, Projects, Yard, and QC; do not move those writes blindly or break atomic workflows.
+- **Components CORE.2 remaining workspace read models**: List, Overview and History are complete. In a separate scope, cut Stock, Material Stock, Production and Transfers to bounded live read models; remove Inventory audit aggregation and client pagination without changing those UIs.
+- **Components CORE.3 Snapshot/Event/Runtime**: After event/domain alignment, add atomic Component Outbox events, domain-level ComponentDashboardSnapshot/ComponentSnapshot, background routing, metrics, feature flag, parity and Operations Center health.
+- **Components business data remediation**: Replace hardcoded QC and History/Reports arrays/KPIs with real backend data or honest empty states in a separate approved business/UI sprint.
+- **EPIC137 Production certification gate**: Designate a disposable real Production Order/material/location, execute the full operator checklist, drain Outbox/jobs, compare Production and Inventory ledgers/snapshots, and capture Operations Center runtime evidence. No feature work is required.
+- **EPIC137 Inventory dead-component validation**: Build a TypeScript/lazy-route import graph, add golden screenshot coverage for active Inventory tabs, then remove only confirmed orphan `features/`, `tabs/`, `tables/`, analytics, and map components in small batches.
+- **Inventory typed status mapping**: Evaluate shared typed mappings for stock, transaction, aging, and return statuses; do not merge domain badges until semantics and rendered classes are identical.
+- **EPIC-UI002 Inventory Inbound Workspace Redesign**: Redesign the Inbound ("Nhập kho") tab workspace to inherit Cockpit colors and layout styles. (Status: `COMPLETED`).
+- **EPIC-UI003 WMS Tab UX Harmonization**: Implement slide-out creation drawers, searchable selectors, and keyboard shortcuts across Inbound, Transfer, and Adjustment workspaces in a dedicated UX sprint. (Status: `NOT STARTED`).
+- **EPIC135B operator E2E gate**: Create or designate a real non-production test Production Order, run Create -> Close with Reserve/Issue/Consume/Return, drain Outbox/background jobs, and verify Inventory/Production ledgers, snapshots, Runtime Metrics, and Operations Center. Implementation and automated tests are complete; do not reuse the existing business record.
 - **Inventory posting boundary tests**: Add transaction rollback integration coverage for Production issue and return with insufficient stock, occupied return destination, duplicate idempotency keys, and Inventory transaction numbering contention.
 - **EPIC134 operator smoke validation**: On a real test Production Order, execute the complete canonical lifecycle, run the background worker, and verify canonical Outbox dispatch, Production snapshot refresh, runtime counters, and Operations Center health. Do not repurpose the existing completed production record.
 - **Production legacy status policy**: Inventory real Production data currently contains no `PLANNED` or `DELAYED` row. Define a separate migration policy only if such rows appear in another environment; never silently map them to canonical states.
@@ -287,3 +309,83 @@ Backlog after the locked order:
 - Add a non-destructive historical data-quality task for the one pre-validation
   IMPORT line without slot/level metadata; do not rewrite the immutable
   transaction without an approved reconciliation procedure.
+# EPIC144 Follow-up
+
+- Run operator traffic against Components Overview and Detail to establish a
+  non-zero snapshot hit/fallback baseline in Operations Center.
+- Complete Components create/delete and revision/release/archive event contracts
+  only when those domain workflows are formally approved.
+- Move to QC Core Foundation; do not expand Components platform architecture
+  unless runtime evidence identifies a defect.
+# QC Core Platform Roadmap
+
+1. EPIC154: add QC-specific Snapshot hit/miss/age/lag, fallback and live
+   read-model metrics, then expose QC Platform Health in Operations Center.
+2. Approve a QC lifecycle/event decision covering status transitions, NCR
+   disposition and linked reinspection before workflow changes.
+3. Add canonical create/approve/reject/NCR-update events atomically only after
+   that decision; route them to the existing QC Snapshot writer.
+4. Add UI pagination controls only in an approved presentation sprint; the
+   workspace API already supports server-side pages.
+# EPIC154 Follow-up
+
+1. Run real QC operator traffic to establish snapshot hit ratio, age, lag, fallback, outbox, and background-job baselines.
+2. Approve the QC lifecycle/event contract before adding missing create/approve/reject/NCR-update events.
+3. Validate QC snapshot parity against populated inspection data; keep validation warning-only.
+4. Do not extend QC Core Platform architecture unless runtime evidence identifies a defect.
+# Yard Core Platform Roadmap
+
+1. EPIC161 - complete Yard repository ownership and atomic Outbox; approve cross-module command and canonical event boundaries first.
+2. EPIC162 - implement bounded repository live read models for layout, placements, movements and workspace summaries; cut active UI data binding without redesign.
+3. EPIC163 - implement shared Yard domain snapshot foundation with background writer, safe fallback and warning-only parity.
+4. EPIC164 - add Yard runtime metrics and Operations Center Platform Health.
+5. Run a separate Yard business-completion sprint for QC receipt, reservation, hold/release, load tasks/plans and Logistics dispatch handoff.
+6. Remove active 3D demo fallback and synthetic QC classification in an explicitly approved UI/data remediation sprint.
+# Yard Roadmap After EPIC161
+
+1. EPIC162 - bounded Yard Repository Live Read Models and ADR011 workspace cutover.
+2. EPIC163 - Yard domain Snapshot Foundation with background writer, fallback and parity.
+3. EPIC164 - Yard runtime metrics and Operations Center Platform Health.
+4. Approve canonical Yard event naming before replacing existing `yard.item.*` compatibility events.
+5. Complete QC receipt, reservation, hold/release, load task and Dispatch handoff only in a separate approved business sprint.
+# Yard Roadmap After EPIC162
+
+1. EPIC163 - Yard domain Snapshot Foundation for dashboard/analytics only; workspace remains live read model.
+2. EPIC164 - Yard runtime metrics and Operations Center Platform Health.
+3. Operator-test zone/viewport scoping for maps larger than the default 100-slot page before changing limits.
+4. Approve canonical Yard event names and business workflows separately; do not mix them into Snapshot work.
+5. Keep QC receipt, reservation, hold/release, loading and dispatch completion in a dedicated business sprint.
+# Yard Roadmap After EPIC163
+
+1. Deploy `20260713180000_yard_snapshot_foundation` through the approved migration process before runtime/operator validation.
+2. Process real Yard events and worker ticks; verify Dashboard/Workspace snapshot rows and warning-only parity.
+3. EPIC164 - add Yard-specific hit/miss/age/lag/fallback/read-model metrics and Operations Center Platform Health.
+4. Do not switch Yard operator workspace to snapshots; ADR011 live read model remains authoritative.
+5. Add reservation/loading/dispatch event routing only after those business workflows are approved.
+# EPIC164 Follow-up
+
+- Run real Yard placement/movement/removal traffic and verify snapshot hit ratio,
+  age, lag, Outbox state and `snapshot.yard*` jobs in Operations Center.
+- Complete Yard reservation, hold/release, truck loading and dispatch handoff as
+  separate approved business sprints before claiming full event freshness.
+- Keep Yard operator workspaces on the ADR011 repository live read model; use
+  snapshots only for dashboard and analytics reads.
+# EPIC170 Certification Gates
+
+- P0: make Inventory Return, Components update/status and Production persistent
+  legacy events atomic with their owning repository transactions.
+- P0: move Inventory Materials to a repository live workspace read and replace
+  Production Cockpit client business aggregation with bounded live read models.
+- P1: cut active Components, QC and Yard dashboards over to their existing
+  snapshot readers with repository fallback and dispatcher rebuild.
+- P1: normalize Inventory module runtime metric naming while retaining granular
+  material/location metrics.
+- Rerun EPIC170 certification before implementing Logistics beyond audit scope.
+# After EPIC171
+
+- EPIC172: completed. Production Overview/Orders/Planning now use the bounded
+  repository live Cockpit read model.
+- EPIC173: cut active Components, QC and Yard dashboards over to their existing
+  snapshot readers.
+- EPIC174: complete atomic Outbox parity and normalize Inventory runtime metric
+  naming, then rerun Core Platform v1.0 certification.

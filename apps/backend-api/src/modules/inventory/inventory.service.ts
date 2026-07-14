@@ -1,13 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
-import { Prisma, TransactionType } from '@prisma/client'
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma, TransactionType } from '@prisma/client';
 
-import { RuntimeGateway } from '../../core/ws/runtime.gateway'
-import { EventStoreService } from '../../core/events/event-store.service'
-import { TelemetryService } from '../../core/telemetry/telemetry.service'
-import { InventoryRepository } from './inventory.repository'
-import { InventoryEventService } from './inventory-event.service'
-import { InventoryReadModelService } from './inventory-read-model.service'
-import { inventoryCodePrefix } from './inventory-transaction-code'
+import { RuntimeGateway } from '../../core/ws/runtime.gateway';
+import { EventStoreService } from '../../core/events/event-store.service';
+import { TelemetryService } from '../../core/telemetry/telemetry.service';
+import { InventoryRepository } from './inventory.repository';
+import { InventoryEventService } from './inventory-event.service';
+import { InventoryReadModelService } from './inventory-read-model.service';
+import { inventoryCodePrefix } from './inventory-transaction-code';
 
 import type {
   CreateInventoryItemDto,
@@ -16,51 +16,42 @@ import type {
   InventoryOverviewQueryDto,
   InventoryTransactionListQueryDto,
   UpdateInventoryItemDto,
-} from './dto/inventory.dto'
+} from './dto/inventory.dto';
 
 type NormalizedInventoryLine = {
-  inventoryItemId: string
-  quantity: number
-  unitId?: string
-  warehouseId?: string
-  zoneId?: string
-  slotId?: string
-  level?: string
-  unitPrice: number | null
-  totalAmount: number | null
-}
+  inventoryItemId: string;
+  quantity: number;
+  unitId?: string;
+  warehouseId?: string;
+  zoneId?: string;
+  slotId?: string;
+  level?: string;
+  unitPrice: number | null;
+  totalAmount: number | null;
+};
 
 @Injectable()
 export class InventoryService {
   constructor(
-    private readonly inventoryRepository:
-      InventoryRepository,
-    private readonly readModel:
-      InventoryReadModelService,
-    private readonly inventoryEvents:
-      InventoryEventService,
+    private readonly inventoryRepository: InventoryRepository,
+    private readonly readModel: InventoryReadModelService,
+    private readonly inventoryEvents: InventoryEventService,
 
-    private readonly gateway:
-      RuntimeGateway,
+    private readonly gateway: RuntimeGateway,
 
-    private readonly eventStore:
-      EventStoreService,
+    private readonly eventStore: EventStoreService,
 
-    private readonly telemetry:
-      TelemetryService,
+    private readonly telemetry: TelemetryService,
   ) {}
 
   async getItems() {
     const items = await this.inventoryRepository.findItems({
       take: 100,
-    })
-    const stockByItemId = await this.getStockMap(
-      items.map((item) => item.id),
-    )
+    });
+    const stockByItemId = await this.getStockMap(items.map((item) => item.id));
 
     return items.map((item) => {
-      const quantity =
-        stockByItemId[item.id] ?? item.quantity ?? 0
+      const quantity = stockByItemId[item.id] ?? item.quantity ?? 0;
 
       return {
         id: item.id,
@@ -69,18 +60,14 @@ export class InventoryService {
         description: item.description,
         quantity,
         minimumStock: item.minimumStock ?? 0,
-        unit:
-          item.unit ?? item.unitMaster?.code ?? 'PCS',
+        unit: item.unit ?? item.unitMaster?.code ?? 'PCS',
         categoryId: item.categoryId,
         category: item.category?.name ?? '',
         materialTypeId: item.materialTypeId,
-        materialType:
-          item.materialType?.name ?? '',
+        materialType: item.materialType?.name ?? '',
         materialUsageType: item.materialUsageType,
         zoneId: item.zoneId,
-        zone: item.zone
-          ? `${item.zone.code} - ${item.zone.name}`
-          : '',
+        zone: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
         zoneCode: item.zone?.code ?? '',
         zoneName: item.zone?.name ?? '',
         status:
@@ -89,164 +76,146 @@ export class InventoryService {
             : quantity <= 25
               ? 'LOW_STOCK'
               : 'IN_STOCK',
-      }
-    })
+      };
+    });
   }
 
   async getItem(id: string) {
-    return this.inventoryRepository.findItemById(
-      id,
-    )
+    return this.inventoryRepository.findItemById(id);
   }
 
   async getItemDetail(id: string) {
-    return this.readModel.materialDetail(id)
+    return this.readModel.materialDetail(id);
   }
 
   async getInboundSuggestions(id: string) {
-    return this.readModel.inboundSuggestions(id)
+    return this.readModel.inboundSuggestions(id);
   }
 
   async getInventoryAudit() {
     const items = await this.inventoryRepository.findItems({
       take: 1000,
-    })
+    });
 
     if (items.length === 0) {
-      return []
+      return [];
     }
 
-    const itemIds = items.map((item) => item.id)
+    const itemIds = items.map((item) => item.id);
 
     const transactionLines =
-      await this.inventoryRepository.findInventoryAuditTransactionLines(itemIds)
+      await this.inventoryRepository.findInventoryAuditTransactionLines(
+        itemIds,
+      );
 
     const metricsByItem = new Map<
       string,
       {
-        stock: number
-        inboundQty: number
-        inboundValue: number
-        lastMovementDate: Date | null
+        stock: number;
+        inboundQty: number;
+        inboundValue: number;
+        lastMovementDate: Date | null;
       }
-    >()
+    >();
     const locationBalancesByItem = new Map<
       string,
       Map<
         string,
         {
-          zoneId: string | null
-          zoneCode: string | null
-          zoneName: string
+          zoneId: string | null;
+          zoneCode: string | null;
+          zoneName: string;
 
-          warehouseCode: string | null
-          warehouseName: string | null
+          warehouseCode: string | null;
+          warehouseName: string | null;
 
-          row: string | null
-          column: string | null
+          row: string | null;
+          column: string | null;
 
-          slotId: string | null
-          level: string | null
+          slotId: string | null;
+          level: string | null;
 
-          quantity: number
+          quantity: number;
         }
       >
-    >()
+    >();
 
     for (const line of transactionLines) {
-      const state =
-        metricsByItem.get(line.inventoryItemId) ?? {
-          stock: 0,
-          inboundQty: 0,
-          inboundValue: 0,
-          lastMovementDate: null,
-        }
+      const state = metricsByItem.get(line.inventoryItemId) ?? {
+        stock: 0,
+        inboundQty: 0,
+        inboundValue: 0,
+        lastMovementDate: null,
+      };
 
-      const qty = Number(line.quantity ?? 0)
-      state.stock += qty
+      const qty = Number(line.quantity ?? 0);
+      state.stock += qty;
 
       if (qty > 0) {
-        state.inboundQty += qty
+        state.inboundQty += qty;
         const amount =
           line.totalAmount != null
             ? Number(line.totalAmount)
             : line.unitPrice != null
               ? Number(line.unitPrice) * qty
-              : 0
-        state.inboundValue += amount
+              : 0;
+        state.inboundValue += amount;
       }
 
-      const movementDate =
-        line.transaction?.transactionDate ?? null
+      const movementDate = line.transaction?.transactionDate ?? null;
       if (
         movementDate &&
-        (!state.lastMovementDate ||
-          movementDate > state.lastMovementDate)
+        (!state.lastMovementDate || movementDate > state.lastMovementDate)
       ) {
-        state.lastMovementDate = movementDate
+        state.lastMovementDate = movementDate;
       }
 
-      metricsByItem.set(line.inventoryItemId, state)
+      metricsByItem.set(line.inventoryItemId, state);
 
-      const zone =
-        line.zone ??
-        line.transaction?.zone ??
-        null
-      const zoneId =
-        line.zoneId ??
-        line.transaction?.zoneId ??
-        null
+      const zone = line.zone ?? line.transaction?.zone ?? null;
+      const zoneId = line.zoneId ?? line.transaction?.zoneId ?? null;
       const fallbackKey = [
         zoneId ?? 'UNASSIGNED',
         line.slotId ?? 'NOSLOT',
         line.level ?? 'L1',
-      ].join('|')
+      ].join('|');
       const byLocation =
-        locationBalancesByItem.get(line.inventoryItemId) ??
-        new Map()
-      const current =
-        byLocation.get(fallbackKey) ?? {
-          zoneId,
-          zoneCode: zone?.code ?? null,
-          zoneName: zone
-            ? `${zone.code} - ${zone.name}`
-            : 'KHU MẶC ĐỊNH',
+        locationBalancesByItem.get(line.inventoryItemId) ?? new Map();
+      const current = byLocation.get(fallbackKey) ?? {
+        zoneId,
+        zoneCode: zone?.code ?? null,
+        zoneName: zone ? `${zone.code} - ${zone.name}` : 'KHU MẶC ĐỊNH',
 
-          warehouseCode: zone?.warehouse?.code ?? null,
-          warehouseName: zone?.warehouse?.name ?? null,
+        warehouseCode: zone?.warehouse?.code ?? null,
+        warehouseName: zone?.warehouse?.name ?? null,
 
-          row: zone?.row ?? null,
-          column: zone?.column ?? null,
+        row: zone?.row ?? null,
+        column: zone?.column ?? null,
 
-          slotId: line.slotId ?? null,
-          level: line.level ?? null,
+        slotId: line.slotId ?? null,
+        level: line.level ?? null,
 
-          quantity: 0,
-        }
-      current.quantity += qty
-      byLocation.set(fallbackKey, current)
-      locationBalancesByItem.set(
-        line.inventoryItemId,
-        byLocation,
-      )
+        quantity: 0,
+      };
+      current.quantity += qty;
+      byLocation.set(fallbackKey, current);
+      locationBalancesByItem.set(line.inventoryItemId, byLocation);
     }
 
     return items.map((item) => {
-      const metrics = metricsByItem.get(item.id)
-      const currentStock = Number(
-        metrics?.stock ?? item.quantity ?? 0,
-      )
+      const metrics = metricsByItem.get(item.id);
+      const currentStock = Number(metrics?.stock ?? item.quantity ?? 0);
       const averageCost =
         (metrics?.inboundQty ?? 0) > 0
           ? Number(metrics?.inboundValue ?? 0) /
             Number(metrics?.inboundQty ?? 1)
-          : 0
-      const inventoryValue = currentStock * averageCost
+          : 0;
+      const inventoryValue = currentStock * averageCost;
       const locationBalances = Array.from(
         locationBalancesByItem.get(item.id)?.values() ?? [],
       )
         .filter((location) => location.quantity > 0)
-        .sort((a, b) => b.quantity - a.quantity)
+        .sort((a, b) => b.quantity - a.quantity);
       const fallbackLocation = item.zone
         ? {
             zoneId: item.zoneId,
@@ -259,13 +228,13 @@ export class InventoryService {
             level: item.zone.level ?? null,
             quantity: currentStock,
           }
-        : null
+        : null;
       const displayLocations =
         locationBalances.length > 0
           ? locationBalances
           : fallbackLocation
             ? [fallbackLocation]
-            : []
+            : [];
 
       return {
         materialId: item.id,
@@ -274,12 +243,10 @@ export class InventoryService {
         categoryId: item.categoryId,
         category: item.category?.name ?? '',
         materialTypeId: item.materialTypeId,
-        materialType:
-          item.materialType?.name ?? '',
+        materialType: item.materialType?.name ?? '',
         materialUsageType: item.materialUsageType,
         minimumStock: item.minimumStock ?? 0,
-        unit:
-          item.unit ?? item.unitMaster?.code ?? 'PCS',
+        unit: item.unit ?? item.unitMaster?.code ?? 'PCS',
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
         zoneId: item.zoneId,
@@ -287,67 +254,100 @@ export class InventoryService {
         level: item.level,
         zoneCode: item.zone?.code ?? '',
         zoneName: item.zone?.name ?? '',
-        zone: item.zone
-          ? `${item.zone.code} - ${item.zone.name}`
-          : '',
-        position: item.zone
-          ? `${item.zone.code} - ${item.zone.name}`
-          : '',
+        zone: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
+        position: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
         locationBalances: displayLocations,
         currentStock,
         averageCost,
         inventoryValue,
-        lastMovementDate:
-          metrics?.lastMovementDate?.toISOString() ??
-          null,
-      }
-    })
+        lastMovementDate: metrics?.lastMovementDate?.toISOString() ?? null,
+      };
+    });
   }
 
   getOverview(query: InventoryOverviewQueryDto) {
-    return this.readModel.overview(query)
+    return this.readModel.overview(query);
   }
 
   getMaterialList(query: InventoryMaterialListQueryDto) {
-    return this.readModel.materialList(query)
+    return this.readModel.materialList(query);
   }
 
   async createItem(payload: CreateInventoryItemDto) {
     const defaultCategory =
-      await this.inventoryRepository.findDefaultCategory()
+      await this.inventoryRepository.findDefaultCategory();
 
     if (!defaultCategory) {
-      throw new Error(
-        'No inventory category found',
-      )
+      throw new Error('No inventory category found');
     }
 
-    const item = await this.inventoryRepository.createItem({
-      code: payload.code,
-      name: payload.name,
-      description: payload.description,
-      createdAt: new Date(),
-      minimumStock:
-        payload.minimumStock ?? 0,
-      materialUsageType:
-        payload.materialUsageType ?? 'PRIMARY',
-      unit: payload.unit ?? 'PCS',
-      category: {
-        connect: {
-          id:
-            payload.categoryId ??
-            defaultCategory.id,
+    return this.inventoryRepository.transaction(async (tx) => {
+      const item = await this.inventoryRepository.createItem(
+        {
+          code: payload.code,
+          name: payload.name,
+          description: payload.description,
+          createdAt: new Date(),
+          minimumStock: payload.minimumStock ?? 0,
+          materialUsageType: payload.materialUsageType ?? 'PRIMARY',
+          unit: payload.unit ?? 'PCS',
+          category: {
+            connect: {
+              id: payload.categoryId ?? defaultCategory.id,
+            },
+          },
+          ...(payload.zoneId && {
+            zone: {
+              connect: {
+                id: payload.zoneId,
+              },
+            },
+          }),
+          slotId: payload.slotId ?? null,
+          level: payload.level ?? null,
+          ...(payload.materialTypeId && {
+            materialType: {
+              connect: {
+                id: payload.materialTypeId,
+              },
+            },
+          }),
         },
-      },
-      ...(payload.zoneId && {
-        zone: {
+        tx,
+      );
+      await this.inventoryEvents.materialUpdated(
+        {
+          id: item.id,
+          inventoryItemId: item.id,
+          type: 'created',
+        },
+        tx,
+      );
+      return item;
+    });
+  }
+  async updateItem(id: string, payload: UpdateInventoryItemDto) {
+    const data: Prisma.InventoryItemUpdateInput = {
+      code: payload.code,
+
+      name: payload.name,
+
+      description: payload.description,
+
+      minimumStock: payload.minimumStock,
+
+      materialUsageType: payload.materialUsageType,
+
+      unit: payload.unit,
+
+      ...(payload.categoryId && {
+        category: {
           connect: {
-            id: payload.zoneId,
+            id: payload.categoryId,
           },
         },
       }),
-      slotId: payload.slotId ?? null,
-      level: payload.level ?? null,
+
       ...(payload.materialTypeId && {
         materialType: {
           connect: {
@@ -355,118 +355,70 @@ export class InventoryService {
           },
         },
       }),
-    })
-    await this.inventoryEvents.materialUpdated({
-      id: item.id,
-      inventoryItemId: item.id,
-      type: 'created',
-    })
-    return item
-  }
-  async updateItem(
-    id: string,
-    payload: UpdateInventoryItemDto,
-  ) {
-    const data: Prisma.InventoryItemUpdateInput = {
-      code:
-        payload.code,
-
-      name:
-        payload.name,
-
-      description:
-        payload.description,
-
-      minimumStock:
-        payload.minimumStock,
-
-      materialUsageType:
-        payload.materialUsageType,
-
-      unit:
-        payload.unit,
-
-      ...(payload.categoryId && {
-        category: {
-          connect: {
-            id:
-              payload.categoryId,
-          },
-        },
-      }),
-
-      ...(payload.materialTypeId && {
-        materialType: {
-          connect: {
-            id:
-              payload.materialTypeId,
-          },
-        },
-      }),
-    }
+    };
 
     if (Object.prototype.hasOwnProperty.call(payload, 'zoneId')) {
       data.zone = payload.zoneId
         ? {
             connect: {
-              id:
-                payload.zoneId,
+              id: payload.zoneId,
             },
           }
         : {
             disconnect: true,
-          }
+          };
     }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'slotId')) {
-      data.slotId = payload.slotId ?? null
+      data.slotId = payload.slotId ?? null;
     }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'level')) {
-      data.level = payload.level ?? null
+      data.level = payload.level ?? null;
     }
 
-    const item = await this.inventoryRepository.updateItemInfo(
-      id,
-      data,
-    )
-    await this.inventoryEvents.materialUpdated({
-      id,
-      inventoryItemId: id,
-      type: 'updated',
-    })
-    return item
+    return this.inventoryRepository.transaction(async (tx) => {
+      const item = await this.inventoryRepository.updateItemInfo(id, data, tx);
+      await this.inventoryEvents.materialUpdated(
+        {
+          id,
+          inventoryItemId: id,
+          type: 'updated',
+        },
+        tx,
+      );
+      return item;
+    });
   }
 
   async deleteItem(id: string) {
-    const item = await this.inventoryRepository.deleteItem(
-      id,
-    )
-    await this.inventoryEvents.materialUpdated({
-      id,
-      inventoryItemId: id,
-      type: 'deleted',
-    })
-    return item
+    return this.inventoryRepository.transaction(async (tx) => {
+      const item = await this.inventoryRepository.deleteItem(id, tx);
+      await this.inventoryEvents.materialUpdated(
+        {
+          id,
+          inventoryItemId: id,
+          type: 'deleted',
+        },
+        tx,
+      );
+      return item;
+    });
   }
 
   async listTransactions(filters: InventoryTransactionListQueryDto = {}) {
-    const dbTypes = this.mapBusinessTypeToDbTypes(
-      filters?.type,
-    )
+    const dbTypes = this.mapBusinessTypeToDbTypes(filters?.type);
     const toDate =
-      filters?.toDate != null
-        ? new Date(filters.toDate)
-        : undefined
+      filters?.toDate != null ? new Date(filters.toDate) : undefined;
     if (toDate) {
-      toDate.setHours(23, 59, 59, 999)
+      toDate.setHours(23, 59, 59, 999);
     }
     const paginated =
       filters.page != null ||
       filters.pageSize != null ||
-      filters.materialId != null
-    const page = filters.page ?? 1
-    const pageSize = filters.pageSize ?? 50
+      filters.materialId != null;
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 50;
     const repositoryFilters = {
       ...(paginated
         ? {
@@ -486,21 +438,17 @@ export class InventoryService {
       ...(dbTypes.length && {
         transactionTypes: dbTypes,
       }),
-    }
+    };
     const [rows, total] = await Promise.all([
       this.inventoryRepository.listTransactions(repositoryFilters),
       paginated
         ? this.inventoryRepository.countTransactions(repositoryFilters)
         : Promise.resolve(0),
-    ])
+    ]);
 
     const supplierIds = Array.from(
-      new Set(
-        rows
-          .map((row) => row.supplierId)
-          .filter(Boolean),
-      ),
-    ) as string[]
+      new Set(rows.map((row) => row.supplierId).filter(Boolean)),
+    ) as string[];
     const [suppliers, attachmentCounts] = await Promise.all([
       supplierIds.length
         ? this.inventoryRepository.findSuppliersByIds(supplierIds)
@@ -508,62 +456,45 @@ export class InventoryService {
       this.inventoryRepository.findTransactionAttachmentCounts(
         rows.map((row) => row.id),
       ),
-    ])
+    ]);
     const supplierMap = new Map(
-      suppliers.map((supplier) => [
-        supplier.id,
-        supplier.name,
-      ]),
-    )
+      suppliers.map((supplier) => [supplier.id, supplier.name]),
+    );
     const attachmentCountMap = new Map(
       attachmentCounts.map((row) => [
         String(row.entityId ?? ''),
         row._count._all,
       ]),
-    )
-    const averageCosts =
-      await this.averageCostsByMaterial(
-        Array.from(
-          new Set(
-            rows.flatMap((row) =>
-              row.items.map(
-                (line) => line.inventoryItemId,
-              ),
-            ),
-          ),
+    );
+    const averageCosts = await this.averageCostsByMaterial(
+      Array.from(
+        new Set(
+          rows.flatMap((row) => row.items.map((line) => line.inventoryItemId)),
         ),
-      )
+      ),
+    );
 
     const data = rows.map((row) => {
-      const businessType =
-        this.toBusinessType(row.type)
+      const businessType = this.toBusinessType(row.type);
       const items = row.items.map((line) =>
-        this.withComputedLineAmount(
-          line,
-          averageCosts,
-        ),
-      )
+        this.withComputedLineAmount(line, averageCosts),
+      );
       return {
         ...row,
         items,
         rawType: row.type,
         type: businessType,
         businessType,
-        direction:
-          this.toBusinessDirection(
-            businessType,
-            row.direction,
-          ),
+        direction: this.toBusinessDirection(businessType, row.direction),
         supplierName: row.supplierId
-          ? supplierMap.get(row.supplierId) ??
-            row.supplierId
+          ? (supplierMap.get(row.supplierId) ?? row.supplierId)
           : null,
         projectName: row.project?.name ?? null,
         attachmentCount: attachmentCountMap.get(row.id) ?? 0,
-      }
-    })
+      };
+    });
     if (!paginated) {
-      return data
+      return data;
     }
     return {
       data,
@@ -571,183 +502,141 @@ export class InventoryService {
       pageSize,
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    }
+    };
   }
 
   async getTransactionDetail(id: string) {
-    const transaction =
-      await this.inventoryRepository.findTransactionById(id)
+    const transaction = await this.inventoryRepository.findTransactionById(id);
 
     if (!transaction) {
-      throw new Error('Transaction not found')
+      throw new Error('Transaction not found');
     }
 
     const supplier = transaction.supplierId
       ? await this.inventoryRepository.findSupplierById(transaction.supplierId)
-      : null
+      : null;
 
-    const businessType =
-      this.toBusinessType(transaction.type)
-    const averageCosts =
-      await this.averageCostsByMaterial(
-        transaction.items.map(
-          (line) => line.inventoryItemId,
-        ),
-      )
+    const businessType = this.toBusinessType(transaction.type);
+    const averageCosts = await this.averageCostsByMaterial(
+      transaction.items.map((line) => line.inventoryItemId),
+    );
 
     return {
       ...transaction,
       items: transaction.items.map((line) =>
-        this.withComputedLineAmount(
-          line,
-          averageCosts,
-        ),
+        this.withComputedLineAmount(line, averageCosts),
       ),
       rawType: transaction.type,
       type: businessType,
       businessType,
-      direction: this.toBusinessDirection(
-        businessType,
-        transaction.direction,
-      ),
+      direction: this.toBusinessDirection(businessType, transaction.direction),
       supplier,
       supplierName: supplier?.name ?? null,
       projectName: transaction.project?.name ?? null,
-    }
+    };
   }
 
-  async createTransaction(
-    payload: CreateTransactionDto,
-  ) {
-    const typeMap: Record<string, TransactionType> =
-      {
-        INBOUND: 'IMPORT',
-        OUTBOUND: 'EXPORT',
-        IMPORT: 'IMPORT',
-        EXPORT: 'EXPORT',
-        TRANSFER: 'TRANSFER',
-        RETURN: 'RETURN',
-        ADJUSTMENT: 'ADJUSTMENT',
-      }
+  async createTransaction(payload: CreateTransactionDto) {
+    const typeMap: Record<string, TransactionType> = {
+      INBOUND: 'IMPORT',
+      OUTBOUND: 'EXPORT',
+      IMPORT: 'IMPORT',
+      EXPORT: 'EXPORT',
+      TRANSFER: 'TRANSFER',
+      RETURN: 'RETURN',
+      ADJUSTMENT: 'ADJUSTMENT',
+    };
 
-    const type =
-      typeMap[String(payload.type ?? '').toUpperCase()] ??
-      'IMPORT'
-    const businessType =
-      this.toBusinessType(type)
-    const direction =
-      this.toBusinessDirection(businessType)
+    const type = typeMap[String(payload.type ?? '').toUpperCase()] ?? 'IMPORT';
+    const businessType = this.toBusinessType(type);
+    const direction = this.toBusinessDirection(businessType);
 
-    const resolvedItems =
-      await this.resolveLineWarehouses(
-        this.normalizeItems(
-          payload,
-          type,
-        ),
-      )
+    const resolvedItems = await this.resolveLineWarehouses(
+      this.normalizeItems(payload, type),
+    );
     const baseItems = this.applyValuationToLines(
       resolvedItems,
       await this.averageCostsByMaterial(
         resolvedItems.map((line) => line.inventoryItemId),
       ),
-    )
+    );
     if (!baseItems.length) {
-      throw new Error(
-        'Transaction requires at least one item',
-      )
+      throw new Error('Transaction requires at least one item');
     }
-    this.assertInboundStorageLocations(baseItems, type)
+    this.assertInboundStorageLocations(baseItems, type);
 
-    const maxAttempts = 3
+    const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        return await this.inventoryRepository.transaction(
-          async (tx) => {
-        for (const line of baseItems) {
-          const item =
-            await this.inventoryRepository.findItemById(
+        return await this.inventoryRepository.transaction(async (tx) => {
+          for (const line of baseItems) {
+            const item = await this.inventoryRepository.findItemById(
               line.inventoryItemId,
               tx,
-            )
-          if (!item) {
-            throw new Error(
-              `Material not found: ${line.inventoryItemId}`,
-            )
-          }
+            );
+            if (!item) {
+              throw new Error(`Material not found: ${line.inventoryItemId}`);
+            }
 
-          if (line.quantity < 0) {
-            const hasLocation =
-              Boolean(line.warehouseId) ||
-              Boolean(line.zoneId) ||
-              Boolean(line.slotId) ||
-              Boolean(line.level)
-            const locationLookup = hasLocation
-              ? await this.getLocationStockLookup(line, tx)
-              : null
-            const currentStock = locationLookup
-              ? locationLookup.quantity
-              : await this.getCurrentStock(line.inventoryItemId, tx)
-            if (currentStock + line.quantity < 0) {
-              console.warn(
-                '[inventory.stock-check] insufficient stock',
-                {
+            if (line.quantity < 0) {
+              const hasLocation =
+                Boolean(line.warehouseId) ||
+                Boolean(line.zoneId) ||
+                Boolean(line.slotId) ||
+                Boolean(line.level);
+              const locationLookup = hasLocation
+                ? await this.getLocationStockLookup(line, tx)
+                : null;
+              const currentStock = locationLookup
+                ? locationLookup.quantity
+                : await this.getCurrentStock(line.inventoryItemId, tx);
+              if (currentStock + line.quantity < 0) {
+                console.warn('[inventory.stock-check] insufficient stock', {
                   requestPayload: payload,
                   normalizedLine: line,
                   bucketQuery: locationLookup?.where ?? null,
                   bucketFound: locationLookup?.stock ?? null,
                   currentStock,
                   requestedDelta: line.quantity,
-                },
-              )
-              throw new Error(
-                hasLocation
-                  ? `Insufficient stock for ${item.code} at selected location`
-                  : `Insufficient stock for ${item.code}`,
-              )
+                });
+                throw new Error(
+                  hasLocation
+                    ? `Insufficient stock for ${item.code} at selected location`
+                    : `Insufficient stock for ${item.code}`,
+                );
+              }
             }
           }
-        }
 
-        const generatedNo = await this.inventoryRepository.nextOperationalCode(
-          'inventoryTransaction',
-          'transactionNo',
-          inventoryCodePrefix(type),
-        )
-        console.log('[inventory.transaction-numbering]', {
-          generatedNo,
-          finalCode: generatedNo,
-          finalTransactionNo: generatedNo,
-          transactionType: type,
-          attempt,
-        })
-        const transaction =
-          await this.inventoryRepository.createTransaction(
+          const generatedNo =
+            await this.inventoryRepository.nextOperationalCode(
+              'inventoryTransaction',
+              'transactionNo',
+              inventoryCodePrefix(type),
+            );
+          console.log('[inventory.transaction-numbering]', {
+            generatedNo,
+            finalCode: generatedNo,
+            finalTransactionNo: generatedNo,
+            transactionType: type,
+            attempt,
+          });
+          const transaction = await this.inventoryRepository.createTransaction(
             {
               code: generatedNo,
               transactionNo: generatedNo,
               type,
               direction,
               note: payload.note,
-              performedBy:
-                payload.performedBy,
-              approvedBy:
-                payload.approvedBy,
-              referenceModule:
-                payload.referenceModule,
-              referenceId:
-                payload.referenceId,
-              supplierId:
-                payload.supplierId,
-              remarks:
-                payload.remarks ??
-                payload.invoiceNo ??
-                '',
-              transactionDate:
-                payload.transactionDate
-                  ? new Date(
-                      payload.transactionDate,
-                    )
-                  : new Date(),
+              performedBy: payload.performedBy,
+              approvedBy: payload.approvedBy,
+              referenceModule: payload.referenceModule,
+              referenceId: payload.referenceId,
+              supplierId: payload.supplierId,
+              remarks: payload.remarks ?? payload.invoiceNo ?? '',
+              transactionDate: payload.transactionDate
+                ? new Date(payload.transactionDate)
+                : new Date(),
               ...(payload.transactionTypeId && {
                 transactionType: {
                   connect: {
@@ -784,10 +673,8 @@ export class InventoryService {
                     },
                   },
                   quantity: line.quantity,
-                  unitPrice:
-                    line.unitPrice ?? null,
-                  totalAmount:
-                    line.totalAmount ?? null,
+                  unitPrice: line.unitPrice ?? null,
+                  totalAmount: line.totalAmount ?? null,
                   ...(line.unitId && {
                     unit: {
                       connect: {
@@ -815,123 +702,114 @@ export class InventoryService {
               },
             },
             tx,
-          )
+          );
 
-        // Keep backward compatibility for modules still reading snapshot quantity.
-        for (const line of baseItems) {
-          await this.inventoryRepository.updateItemQuantitySnapshot(
-            line.inventoryItemId,
-            line.quantity,
+          // Keep backward compatibility for modules still reading snapshot quantity.
+          for (const line of baseItems) {
+            await this.inventoryRepository.updateItemQuantitySnapshot(
+              line.inventoryItemId,
+              line.quantity,
+              tx,
+            );
+
+            if (line.warehouseId || line.zoneId || line.slotId || line.level) {
+              await this.inventoryRepository.upsertLocationStock(
+                {
+                  inventoryItemId: line.inventoryItemId,
+                  warehouseId: line.warehouseId,
+                  zoneId: line.zoneId,
+                  slotId: line.slotId,
+                  level: line.level,
+                  quantity: line.quantity,
+                },
+                tx,
+              );
+            }
+          }
+
+          const realtimeEvent = {
+            id: transaction.id,
+            type: this.toBusinessType(transaction.type),
+            rawType: transaction.type,
+            direction: transaction.direction,
+            transactionNo: transaction.transactionNo ?? transaction.code,
+            createdAt: transaction.createdAt.toISOString(),
+          };
+
+          this.eventStore.append({
+            id: transaction.id,
+            type: 'inventory.transaction.created',
+            payload: realtimeEvent,
+            createdAt: new Date().toISOString(),
+          });
+
+          this.gateway.emit('inventory.transaction.created', realtimeEvent);
+          this.telemetry.track('inventory.transactions', 1);
+
+          await this.inventoryEvents.transactionCreated(
+            {
+              id: transaction.id,
+              transactionNo: transaction.transactionNo ?? transaction.code,
+              type: transaction.type,
+              itemCount: transaction.items.length,
+              projectId: transaction.projectId,
+              referenceId: transaction.referenceId,
+            },
             tx,
-          )
-
-          if (
-            line.warehouseId ||
-            line.zoneId ||
-            line.slotId ||
-            line.level
-          ) {
-            await this.inventoryRepository.upsertLocationStock(
+          );
+          for (const line of baseItems) {
+            await this.inventoryEvents.stockBucketUpdated(
               {
+                id: `${transaction.id}:${line.inventoryItemId}:${line.zoneId ?? 'no-zone'}:${line.slotId ?? 'no-slot'}:${line.level ?? 'no-level'}`,
                 inventoryItemId: line.inventoryItemId,
-                warehouseId: line.warehouseId,
-                zoneId: line.zoneId,
-                slotId: line.slotId,
-                level: line.level,
-                quantity: line.quantity,
+                warehouseId: line.warehouseId ?? payload.warehouseId ?? null,
+                transactionNo: transaction.transactionNo ?? transaction.code,
+                type: transaction.type,
+                referenceId: transaction.id,
               },
               tx,
-            )
+            );
           }
-        }
+          if (type === TransactionType.ADJUSTMENT) {
+            await this.inventoryEvents.adjustmentPosted(
+              {
+                id: transaction.id,
+                transactionNo: transaction.transactionNo ?? transaction.code,
+                type: transaction.type,
+              },
+              tx,
+            );
+          }
+          if (
+            String(payload.transactionTypeCode ?? payload.type ?? '')
+              .toUpperCase()
+              .includes('STOCK')
+          ) {
+            await this.inventoryEvents.stocktakeCompleted(
+              {
+                id: transaction.id,
+                transactionNo: transaction.transactionNo ?? transaction.code,
+                type: transaction.type,
+              },
+              tx,
+            );
+          }
+          if (type === TransactionType.RETURN) {
+            await this.inventoryEvents.returnReceived(
+              {
+                id: transaction.id,
+                transactionNo: transaction.transactionNo ?? transaction.code,
+                type: transaction.type,
+                referenceId: transaction.referenceId,
+              },
+              tx,
+            );
+          }
 
-        const realtimeEvent = {
-          id: transaction.id,
-          type:
-            this.toBusinessType(
-              transaction.type,
-            ),
-          rawType:
-            transaction.type,
-          direction: transaction.direction,
-          transactionNo:
-            transaction.transactionNo ??
-            transaction.code,
-          createdAt:
-            transaction.createdAt.toISOString(),
-        }
-
-        this.eventStore.append({
-          id: transaction.id,
-          type:
-            'inventory.transaction.created',
-          payload: realtimeEvent,
-          createdAt:
-            new Date().toISOString(),
-        })
-
-        this.gateway.emit(
-          'inventory.transaction.created',
-          realtimeEvent,
-        )
-        this.telemetry.track(
-          'inventory.transactions',
-          1,
-        )
-
-        await this.inventoryEvents.transactionCreated({
-          id: transaction.id,
-          transactionNo: transaction.transactionNo ?? transaction.code,
-          type: transaction.type,
-          itemCount: transaction.items.length,
-          projectId: transaction.projectId,
-          referenceId: transaction.referenceId,
-        })
-        for (const line of baseItems) {
-          await this.inventoryEvents.stockBucketUpdated({
-            id: `${transaction.id}:${line.inventoryItemId}:${line.zoneId ?? 'no-zone'}:${line.slotId ?? 'no-slot'}:${line.level ?? 'no-level'}`,
-            inventoryItemId: line.inventoryItemId,
-            warehouseId: line.warehouseId ?? payload.warehouseId ?? null,
-            transactionNo: transaction.transactionNo ?? transaction.code,
-            type: transaction.type,
-            referenceId: transaction.id,
-          })
-        }
-        if (type === TransactionType.ADJUSTMENT) {
-          await this.inventoryEvents.adjustmentPosted({
-            id: transaction.id,
-            transactionNo: transaction.transactionNo ?? transaction.code,
-            type: transaction.type,
-          })
-        }
-        if (
-          String(payload.transactionTypeCode ?? payload.type ?? '')
-            .toUpperCase()
-            .includes('STOCK')
-        ) {
-          await this.inventoryEvents.stocktakeCompleted({
-            id: transaction.id,
-            transactionNo: transaction.transactionNo ?? transaction.code,
-            type: transaction.type,
-          })
-        }
-        if (type === TransactionType.RETURN) {
-          await this.inventoryEvents.returnReceived({
-            id: transaction.id,
-            transactionNo: transaction.transactionNo ?? transaction.code,
-            type: transaction.type,
-            referenceId: transaction.referenceId,
-          })
-        }
-
-        return transaction
-          },
-        )
+          return transaction;
+        });
       } catch (error) {
-        if (
-          this.isUniqueInventoryNumberError(error) &&
-          attempt < maxAttempts
-        ) {
+        if (this.isUniqueInventoryNumberError(error) && attempt < maxAttempts) {
           console.warn(
             '[inventory.transaction-numbering] duplicate generated number, retrying',
             {
@@ -939,35 +817,27 @@ export class InventoryService {
               attempt,
               target: (error as any)?.meta?.target,
             },
-          )
-          continue
+          );
+          continue;
         }
-        throw error
+        throw error;
       }
     }
 
     throw new Error(
       'Unable to create inventory transaction number after retries',
-    )
+    );
   }
 
-  async importStock(
-    payload: any,
-  ) {
+  async importStock(payload: any) {
     return this.createTransaction({
-      type:
-        'INBOUND',
-      materialId:
-        payload.materialId,
-      quantity:
-        payload.quantity ?? 0,
-      supplierId:
-        payload.supplierId,
-      invoiceNo:
-        payload.invoiceNo,
-      unitPrice:
-        payload.unitPrice,
-    })
+      type: 'INBOUND',
+      materialId: payload.materialId,
+      quantity: payload.quantity ?? 0,
+      supplierId: payload.supplierId,
+      invoiceNo: payload.invoiceNo,
+      unitPrice: payload.unitPrice,
+    });
   }
 
   private isUniqueInventoryNumberError(error: unknown) {
@@ -975,16 +845,14 @@ export class InventoryService {
       !(error instanceof Prisma.PrismaClientKnownRequestError) ||
       error.code !== 'P2002'
     ) {
-      return false
+      return false;
     }
 
     const target = Array.isArray(error.meta?.target)
       ? error.meta.target.map(String)
-      : [String(error.meta?.target ?? '')]
+      : [String(error.meta?.target ?? '')];
 
-    return target.some((field) =>
-      ['code', 'transactionNo'].includes(field),
-    )
+    return target.some((field) => ['code', 'transactionNo'].includes(field));
   }
 
   private normalizeItems(
@@ -992,39 +860,32 @@ export class InventoryService {
     type: TransactionType,
   ): NormalizedInventoryLine[] {
     const rawItems: Array<any> =
-      Array.isArray(payload.items) &&
-      payload.items.length > 0
+      Array.isArray(payload.items) && payload.items.length > 0
         ? payload.items
         : payload.materialId
           ? [
               {
-                inventoryItemId:
-                  payload.materialId,
+                inventoryItemId: payload.materialId,
                 quantity: payload.quantity,
                 unitId: payload.unitId,
-                warehouseId:
-                  payload.warehouseId,
+                warehouseId: payload.warehouseId,
                 zoneId: payload.zoneId,
                 slotId: payload.slotId,
                 level: payload.level,
-                unitPrice:
-                  payload.unitPrice,
-                totalAmount:
-                  payload.totalAmount,
+                unitPrice: payload.unitPrice,
+                totalAmount: payload.totalAmount,
               },
             ]
-          : []
+          : [];
 
     return rawItems.map((item) => {
-      const parsedQuantity = Number(
-        item.quantity ?? 0,
-      )
+      const parsedQuantity = Number(item.quantity ?? 0);
       if (
         !item.inventoryItemId ||
         !Number.isFinite(parsedQuantity) ||
         parsedQuantity === 0
       ) {
-        throw new Error('Invalid transaction item')
+        throw new Error('Invalid transaction item');
       }
 
       const signedQuantity =
@@ -1032,71 +893,64 @@ export class InventoryService {
           ? -Math.abs(parsedQuantity)
           : type === 'IMPORT'
             ? Math.abs(parsedQuantity)
-            : parsedQuantity
+            : parsedQuantity;
 
       const parsedUnitPrice =
         item.unitPrice != null
           ? Number(item.unitPrice)
           : payload.unitPrice != null
             ? Number(payload.unitPrice)
-            : null
+            : null;
       const safeUnitPrice =
-        parsedUnitPrice != null &&
-        Number.isFinite(parsedUnitPrice)
+        parsedUnitPrice != null && Number.isFinite(parsedUnitPrice)
           ? parsedUnitPrice
-          : null
+          : null;
       const parsedTotalAmount =
         item.totalAmount != null
           ? Number(item.totalAmount)
           : payload.totalAmount != null
             ? Number(payload.totalAmount)
-            : null
+            : null;
       const totalAmount =
-        parsedTotalAmount != null &&
-        Number.isFinite(parsedTotalAmount)
+        parsedTotalAmount != null && Number.isFinite(parsedTotalAmount)
           ? Math.abs(parsedTotalAmount)
           : safeUnitPrice != null
-            ? Math.abs(signedQuantity) *
-              Math.abs(safeUnitPrice)
-            : null
+            ? Math.abs(signedQuantity) * Math.abs(safeUnitPrice)
+            : null;
 
       return {
         inventoryItemId: item.inventoryItemId,
         quantity: signedQuantity,
-        unitId:
-          item.unitId ?? payload.unitId ?? undefined,
+        unitId: item.unitId ?? payload.unitId ?? undefined,
         warehouseId:
           item.warehouseId ??
           (item.zoneId ? undefined : payload.warehouseId) ??
           undefined,
-        zoneId:
-          item.zoneId ?? payload.zoneId ?? undefined,
-        slotId:
-          item.slotId ?? payload.slotId ?? undefined,
-        level:
-          item.level ?? payload.level ?? undefined,
+        zoneId: item.zoneId ?? payload.zoneId ?? undefined,
+        slotId: item.slotId ?? payload.slotId ?? undefined,
+        level: item.level ?? payload.level ?? undefined,
         unitPrice: safeUnitPrice,
         totalAmount,
-      }
-    })
+      };
+    });
   }
 
   private assertInboundStorageLocations(
     lines: NormalizedInventoryLine[],
     type: TransactionType,
   ) {
-    if (type !== TransactionType.IMPORT) return
+    if (type !== TransactionType.IMPORT) return;
 
     const hasMissingLocation = lines.some(
       (line) =>
         Number(line.quantity ?? 0) > 0 &&
         (!line.zoneId || !line.slotId || !line.level),
-    )
+    );
 
     if (hasMissingLocation) {
       throw new BadRequestException(
         'Vui lòng chọn vị trí lưu kho cho tất cả vật tư nhập.',
-      )
+      );
     }
   }
 
@@ -1109,25 +963,26 @@ export class InventoryService {
           .filter((line) => !line.warehouseId && line.zoneId)
           .map((line) => line.zoneId as string),
       ),
-    )
+    );
 
     if (!zoneIds.length) {
-      return lines
+      return lines;
     }
 
-    const zones = await this.inventoryRepository.findWarehouseZonesByIds(zoneIds)
+    const zones =
+      await this.inventoryRepository.findWarehouseZonesByIds(zoneIds);
     const warehouseByZoneId = new Map(
       zones.map((zone) => [zone.id, zone.warehouseId]),
-    )
+    );
 
     return lines.map((line) => ({
       ...line,
       warehouseId:
         line.warehouseId ??
         (line.zoneId
-          ? warehouseByZoneId.get(line.zoneId) ?? undefined
+          ? (warehouseByZoneId.get(line.zoneId) ?? undefined)
           : undefined),
-    }))
+    }));
   }
 
   private applyValuationToLines(
@@ -1135,167 +990,138 @@ export class InventoryService {
     averageCosts: Map<string, number>,
   ): NormalizedInventoryLine[] {
     return lines.map((line) => {
-      const quantity = Math.abs(
-        Number(line.quantity ?? 0),
-      )
+      const quantity = Math.abs(Number(line.quantity ?? 0));
       const parsedUnitPrice =
-        line.unitPrice != null
-          ? Number(line.unitPrice)
-          : null
+        line.unitPrice != null ? Number(line.unitPrice) : null;
       const parsedTotalAmount =
-        line.totalAmount != null
-          ? Math.abs(Number(line.totalAmount))
-          : null
+        line.totalAmount != null ? Math.abs(Number(line.totalAmount)) : null;
       const derivedUnitPrice =
         parsedTotalAmount != null &&
         Number.isFinite(parsedTotalAmount) &&
         quantity > 0
           ? parsedTotalAmount / quantity
-          : null
-      const fallbackUnitPrice =
-        averageCosts.get(line.inventoryItemId) ?? 0
+          : null;
+      const fallbackUnitPrice = averageCosts.get(line.inventoryItemId) ?? 0;
       const unitPrice =
-        parsedUnitPrice != null &&
-        Number.isFinite(parsedUnitPrice)
+        parsedUnitPrice != null && Number.isFinite(parsedUnitPrice)
           ? Math.abs(parsedUnitPrice)
-          : derivedUnitPrice != null &&
-              Number.isFinite(derivedUnitPrice)
+          : derivedUnitPrice != null && Number.isFinite(derivedUnitPrice)
             ? derivedUnitPrice
             : fallbackUnitPrice > 0
               ? fallbackUnitPrice
-              : 0
+              : 0;
       const totalAmount =
-        parsedTotalAmount != null &&
-        Number.isFinite(parsedTotalAmount)
+        parsedTotalAmount != null && Number.isFinite(parsedTotalAmount)
           ? parsedTotalAmount
-          : quantity * unitPrice
+          : quantity * unitPrice;
 
       return {
         ...line,
         unitPrice,
         totalAmount,
-      }
-    })
+      };
+    });
   }
 
   private withComputedLineAmount<
     T extends {
-      inventoryItemId: string
-      quantity: number | null
-      unitPrice: number | null
-      totalAmount: number | null
+      inventoryItemId: string;
+      quantity: number | null;
+      unitPrice: number | null;
+      totalAmount: number | null;
     },
-  >(
-    line: T,
-    averageCosts: Map<string, number>,
-  ): T {
-    const quantity = Math.abs(
-      Number(line.quantity ?? 0),
-    )
-    const fallbackUnitPrice =
-      averageCosts.get(line.inventoryItemId) ?? 0
+  >(line: T, averageCosts: Map<string, number>): T {
+    const quantity = Math.abs(Number(line.quantity ?? 0));
+    const fallbackUnitPrice = averageCosts.get(line.inventoryItemId) ?? 0;
     const unitPrice =
       line.unitPrice != null
         ? Number(line.unitPrice)
         : fallbackUnitPrice > 0
           ? fallbackUnitPrice
-          : null
+          : null;
     const totalAmount =
       line.totalAmount != null
         ? Math.abs(Number(line.totalAmount))
         : unitPrice != null
           ? quantity * unitPrice
-          : null
+          : null;
 
     return {
       ...line,
       unitPrice,
       totalAmount,
-    }
+    };
   }
 
-  private async averageCostsByMaterial(
-    materialIds: string[],
-  ) {
-    const costs = new Map<string, number>()
-    const ids = Array.from(new Set(materialIds.filter(Boolean)))
-    if (!ids.length) return costs
+  private async averageCostsByMaterial(materialIds: string[]) {
+    const costs = new Map<string, number>();
+    const ids = Array.from(new Set(materialIds.filter(Boolean)));
+    if (!ids.length) return costs;
 
     const inboundLines =
-      await this.inventoryRepository.findInboundCostLines(ids)
+      await this.inventoryRepository.findInboundCostLines(ids);
 
     const totals = new Map<
       string,
       {
-        quantity: number
-        value: number
+        quantity: number;
+        value: number;
       }
-    >()
+    >();
 
     inboundLines.forEach((line) => {
-      const quantity = Math.abs(
-        Number(line.quantity ?? 0),
-      )
-      if (quantity <= 0) return
+      const quantity = Math.abs(Number(line.quantity ?? 0));
+      if (quantity <= 0) return;
       const value =
         line.totalAmount != null
           ? Math.abs(Number(line.totalAmount))
           : line.unitPrice != null
-            ? Math.abs(Number(line.unitPrice)) *
-              quantity
-            : 0
-      if (value <= 0) return
-      const current =
-        totals.get(line.inventoryItemId) ?? {
-          quantity: 0,
-          value: 0,
-        }
-      current.quantity += quantity
-      current.value += value
-      totals.set(line.inventoryItemId, current)
-    })
+            ? Math.abs(Number(line.unitPrice)) * quantity
+            : 0;
+      if (value <= 0) return;
+      const current = totals.get(line.inventoryItemId) ?? {
+        quantity: 0,
+        value: 0,
+      };
+      current.quantity += quantity;
+      current.value += value;
+      totals.set(line.inventoryItemId, current);
+    });
 
     totals.forEach((total, materialId) => {
       if (total.quantity > 0) {
-        costs.set(
-          materialId,
-          total.value / total.quantity,
-        )
+        costs.set(materialId, total.value / total.quantity);
       }
-    })
+    });
 
-    return costs
+    return costs;
   }
 
-  private async getCurrentStock(
-    inventoryItemId: string,
-    tx?: any,
-  ) {
+  private async getCurrentStock(inventoryItemId: string, tx?: any) {
     const aggregate =
       await this.inventoryRepository.aggregateTransactionItemQuantity(
         inventoryItemId,
         tx,
-      )
+      );
 
     if (aggregate._sum.quantity != null) {
-      return Number(aggregate._sum.quantity)
+      return Number(aggregate._sum.quantity);
     }
 
-    const item =
-      await this.inventoryRepository.findItemById(
-        inventoryItemId,
-        tx,
-      )
-    return Number(item?.quantity ?? 0)
+    const item = await this.inventoryRepository.findItemById(
+      inventoryItemId,
+      tx,
+    );
+    return Number(item?.quantity ?? 0);
   }
 
   private async getLocationStockLookup(
     line: {
-      inventoryItemId: string
-      warehouseId?: string | null
-      zoneId?: string | null
-      slotId?: string | null
-      level?: string | null
+      inventoryItemId: string;
+      warehouseId?: string | null;
+      zoneId?: string | null;
+      slotId?: string | null;
+      level?: string | null;
     },
     tx?: any,
   ) {
@@ -1305,61 +1131,53 @@ export class InventoryService {
       zoneId: line.zoneId ?? null,
       slotId: line.slotId ?? null,
       level: line.level ?? null,
-    }
-    const stock = await this.inventoryRepository.findLocationStockBucket(where, tx)
+    };
+    const stock = await this.inventoryRepository.findLocationStockBucket(
+      where,
+      tx,
+    );
 
     return {
       where,
       stock,
       quantity: Number(stock?.quantity ?? 0),
-    }
+    };
   }
 
   private async getStockMap(itemIds: string[]) {
     if (itemIds.length === 0) {
-      return {}
+      return {};
     }
 
     const grouped =
-      await this.inventoryRepository.groupTransactionItemStockByItems(itemIds)
+      await this.inventoryRepository.groupTransactionItemStockByItems(itemIds);
 
-    return grouped.reduce<Record<string, number>>(
-      (acc, row) => {
-        acc[row.inventoryItemId] = Number(
-          row._sum.quantity ?? 0,
-        )
-        return acc
-      },
-      {},
-    )
+    return grouped.reduce<Record<string, number>>((acc, row) => {
+      acc[row.inventoryItemId] = Number(row._sum.quantity ?? 0);
+      return acc;
+    }, {});
   }
 
-  private toBusinessType(
-    value:
-      | TransactionType
-      | string
-      | null
-      | undefined,
-  ) {
+  private toBusinessType(value: TransactionType | string | null | undefined) {
     const upper = String(value ?? '')
       .trim()
-      .toUpperCase()
+      .toUpperCase();
     if (upper === 'IMPORT' || upper === 'INBOUND') {
-      return 'INBOUND'
+      return 'INBOUND';
     }
     if (upper === 'EXPORT' || upper === 'OUTBOUND') {
-      return 'OUTBOUND'
+      return 'OUTBOUND';
     }
     if (upper === 'TRANSFER') {
-      return 'TRANSFER'
+      return 'TRANSFER';
     }
     if (upper === 'RETURN') {
-      return 'RETURN'
+      return 'RETURN';
     }
     if (upper === 'ADJUSTMENT') {
-      return 'ADJUSTMENT'
+      return 'ADJUSTMENT';
     }
-    return 'INBOUND'
+    return 'INBOUND';
   }
 
   private toBusinessDirection(
@@ -1367,76 +1185,48 @@ export class InventoryService {
     legacyDirection?: string | null,
   ) {
     if (businessType === 'OUTBOUND') {
-      return 'OUTBOUND'
+      return 'OUTBOUND';
     }
     if (businessType === 'TRANSFER') {
-      return 'INTERNAL'
+      return 'INTERNAL';
     }
     if (businessType === 'RETURN') {
-      return 'INBOUND'
+      return 'INBOUND';
     }
     if (businessType === 'ADJUSTMENT') {
-      const legacy = String(
-        legacyDirection ?? '',
-      )
+      const legacy = String(legacyDirection ?? '')
         .trim()
-        .toUpperCase()
-      return legacy === 'OUT' ||
-        legacy === 'OUTBOUND'
-        ? 'OUTBOUND'
-        : 'INBOUND'
+        .toUpperCase();
+      return legacy === 'OUT' || legacy === 'OUTBOUND' ? 'OUTBOUND' : 'INBOUND';
     }
-    return 'INBOUND'
+    return 'INBOUND';
   }
 
   private mapBusinessTypeToDbTypes(
     type?: string,
-  ): Array<
-    | 'IMPORT'
-    | 'EXPORT'
-    | 'TRANSFER'
-    | 'RETURN'
-    | 'ADJUSTMENT'
-  > {
+  ): Array<'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'> {
     const upper = String(type ?? '')
       .trim()
-      .toUpperCase()
+      .toUpperCase();
     if (!upper) {
       return [] as Array<
-        | 'IMPORT'
-        | 'EXPORT'
-        | 'TRANSFER'
-        | 'RETURN'
-        | 'ADJUSTMENT'
-      >
+        'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'
+      >;
     }
     if (upper === 'INBOUND') {
-      return ['IMPORT']
+      return ['IMPORT'];
     }
     if (upper === 'OUTBOUND') {
-      return ['EXPORT']
+      return ['EXPORT'];
     }
-    if (
-      upper === 'TRANSFER' ||
-      upper === 'RETURN' ||
-      upper === 'ADJUSTMENT'
-    ) {
-      return [
-        upper as
-          | 'TRANSFER'
-          | 'RETURN'
-          | 'ADJUSTMENT',
-      ]
+    if (upper === 'TRANSFER' || upper === 'RETURN' || upper === 'ADJUSTMENT') {
+      return [upper as 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'];
     }
     if (upper === 'IMPORT' || upper === 'EXPORT') {
-      return [upper]
+      return [upper];
     }
     return [] as Array<
-      | 'IMPORT'
-      | 'EXPORT'
-      | 'TRANSFER'
-      | 'RETURN'
-      | 'ADJUSTMENT'
-    >
+      'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'
+    >;
   }
 }

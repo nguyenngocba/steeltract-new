@@ -11,9 +11,6 @@ import {
   QcResultStatus,
 } from '@prisma/client';
 
-import { EventBusService } from '../../../core/events/event-bus.service';
-import { PrismaService } from '../../../core/prisma/prisma.service';
-import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { AttachmentsService } from '../../attachments/services/attachments.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import {
@@ -34,6 +31,7 @@ import {
   UpdateQcIssueDto,
 } from '../dto/qc.dto';
 import { QcRepository, QcTx } from '../repositories/qc.repository';
+import { QcCockpitRepository } from '../repositories/qc-cockpit.repository';
 
 type QcEventName =
   | 'qc.inspection.started'
@@ -46,10 +44,9 @@ type QcEventName =
 export class QcService {
   constructor(
     private readonly repository: QcRepository,
-    private readonly eventBus: EventBusService,
+    private readonly cockpitRepository: QcCockpitRepository,
     private readonly attachmentsService: AttachmentsService,
     private readonly workflowService: WorkflowService,
-    private readonly prisma: PrismaService,
   ) {}
 
   async listChecklists(query: ListQcChecklistsDto) {
@@ -210,7 +207,8 @@ export class QcService {
 
       const created = await this.repository.createInspection(
         {
-          inspectionNo: dto.inspectionNo ?? await this.nextInspectionNo(),
+          inspectionNo:
+            dto.inspectionNo ?? (await this.repository.nextInspectionNo(tx)),
           checklist: dto.checklistId
             ? { connect: { id: dto.checklistId } }
             : undefined,
@@ -342,11 +340,15 @@ export class QcService {
         updated.id,
         { actorId, metadata: { inspectionNo: updated.inspectionNo } },
       );
+      await this.createQcOutboxEvent(
+        tx,
+        'qc.inspection.started',
+        updated,
+        actorId,
+      );
 
       return updated;
     });
-
-    await this.emitQcEvent('qc.inspection.started', inspection, actorId);
 
     return inspection;
   }
@@ -401,13 +403,22 @@ export class QcService {
         metadata: { inspectionId, status: created.status },
       });
 
+      if (created.status === QcResultStatus.FAIL) {
+        await this.createQcOutboxEvent(
+          tx,
+          'qc.rework.required',
+          created,
+          actorId,
+        );
+        await this.createNotificationOutboxEvent(
+          tx,
+          'qc.rework.required',
+          created,
+        );
+      }
+
       return created;
     });
-
-    if (result.status === QcResultStatus.FAIL) {
-      await this.emitQcEvent('qc.rework.required', result, actorId);
-      await this.emitNotification('qc.rework.required', result);
-    }
 
     return result;
   }
@@ -462,15 +473,28 @@ export class QcService {
         },
       });
 
+      await this.createQcOutboxEvent(
+        tx,
+        'qc.issue.created',
+        created,
+        actorId,
+      );
+      if (this.requiresRework(created.severity)) {
+        await this.createQcOutboxEvent(
+          tx,
+          'qc.rework.required',
+          created,
+          actorId,
+        );
+        await this.createNotificationOutboxEvent(
+          tx,
+          'qc.issue.created',
+          created,
+        );
+      }
+
       return created;
     });
-
-    await this.emitQcEvent('qc.issue.created', issue, actorId);
-
-    if (this.requiresRework(issue.severity)) {
-      await this.emitQcEvent('qc.rework.required', issue, actorId);
-      await this.emitNotification('qc.issue.created', issue);
-    }
 
     return issue;
   }
@@ -533,16 +557,28 @@ export class QcService {
         updated.id,
         { actorId, metadata: { status: updated.status } },
       );
+      await this.createQcOutboxEvent(
+        tx,
+        'qc.inspection.completed',
+        updated,
+        actorId,
+      );
+      if (updated.status === QcInspectionStatus.REWORK_REQUIRED) {
+        await this.createQcOutboxEvent(
+          tx,
+          'qc.rework.required',
+          updated,
+          actorId,
+        );
+        await this.createNotificationOutboxEvent(
+          tx,
+          'qc.rework.required',
+          updated,
+        );
+      }
 
       return updated;
     });
-
-    await this.emitQcEvent('qc.inspection.completed', inspection, actorId);
-
-    if (inspection.status === QcInspectionStatus.REWORK_REQUIRED) {
-      await this.emitQcEvent('qc.rework.required', inspection, actorId);
-      await this.emitNotification('qc.rework.required', inspection);
-    }
 
     return inspection;
   }
@@ -606,7 +642,7 @@ export class QcService {
 
       const created = await this.repository.createNcr(
         {
-          ncrNo: dto.ncrNo ?? await this.nextNcrNo(),
+          ncrNo: dto.ncrNo ?? (await this.repository.nextNcrNo(tx)),
           inspection: { connect: { id: inspectionId } },
           issue: dto.issueId ? { connect: { id: dto.issueId } } : undefined,
           productionOrderId:
@@ -650,13 +686,26 @@ export class QcService {
           },
         },
       );
+      await this.createQcOutboxEvent(
+        tx,
+        'qc.ncr.created',
+        created,
+        actorId,
+      );
+      await this.createQcOutboxEvent(
+        tx,
+        'qc.rework.required',
+        created,
+        actorId,
+      );
+      await this.createNotificationOutboxEvent(
+        tx,
+        'qc.ncr.created',
+        created,
+      );
 
       return created;
     });
-
-    await this.emitQcEvent('qc.ncr.created', ncr, actorId);
-    await this.emitQcEvent('qc.rework.required', ncr, actorId);
-    await this.emitNotification('qc.ncr.created', ncr);
 
     return ncr;
   }
@@ -692,25 +741,9 @@ export class QcService {
         this.repository.findInspections({ take: 200 }),
         this.repository.findChecklists({ take: 100 }),
         this.repository.findNcrs({ take: 100 }),
-        this.prisma.productionOrder.findMany({
-          where: {
-            status: 'COMPLETED',
-          },
-          include: {
-            component: true,
-            stages: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 200,
-        }),
-        this.prisma.component.findMany({
-          include: {
-            project: true,
-          },
-        }),
-        this.prisma.project.findMany(),
+        this.cockpitRepository.findCompletedProductionOrders(),
+        this.cockpitRepository.findComponents(),
+        this.cockpitRepository.findProjects(),
       ]);
 
     const componentMap = new Map(components.map((component) => [component.id, component]));
@@ -954,62 +987,77 @@ export class QcService {
       tx,
     );
 
-    await this.eventBus.emitAudit(
+    await this.repository.createOutboxEvent(
       {
-        action,
-        entity,
-        entityId,
-        module: 'qc',
-        metadata: options.metadata,
-      },
-      {
-        module: 'qc',
-        persistToOutbox: true,
+        eventName: 'audit.activity.created',
+        payload: this.toJsonValue({
+          action,
+          entity,
+          entityId,
+          module: 'qc',
+          metadata: options.metadata,
+        }),
+        metadata: this.toJsonValue({
+          module: 'qc',
+          persistToOutbox: true,
+          idempotencyKey: `audit:qc:${action}:${entityId}`,
+        }),
         idempotencyKey: `audit:qc:${action}:${entityId}`,
       },
+      tx,
     );
   }
 
-  private emitQcEvent(
+  private createQcOutboxEvent(
+    tx: QcTx,
     eventName: QcEventName,
     payload: unknown,
     actorId?: string,
   ) {
-    const entityId =
-      payload && typeof payload === 'object' && 'id' in payload
-        ? String(payload.id)
-        : new Date().getTime().toString();
+    const entityId = this.eventEntityId(payload);
+    const idempotencyKey = `${eventName}:${entityId}`;
 
-    return this.eventBus.emit(eventName, payload, {
-      module: 'qc',
-      correlationId: actorId,
-      persistToOutbox: true,
-      idempotencyKey: `${eventName}:${entityId}`,
-    });
-  }
-
-  private emitNotification(eventName: string, payload: unknown) {
-    return this.eventBus.emit(
-      'notification.requested',
+    return this.repository.createOutboxEvent(
       {
-        source: 'qc',
         eventName,
-        payload,
+        payload: this.toJsonValue(payload),
+        metadata: this.toJsonValue({
+          module: 'qc',
+          correlationId: actorId,
+          persistToOutbox: true,
+          idempotencyKey,
+        }),
+        idempotencyKey,
       },
-      {
-        module: 'qc',
-        persistToOutbox: true,
-        idempotencyKey: `notification:${eventName}:${Date.now()}`,
-      },
+      tx,
     );
   }
 
-  private nextInspectionNo() {
-    return nextOperationalCode(this.prisma, 'qcInspection', 'inspectionNo', 'QC');
+  private createNotificationOutboxEvent(
+    tx: QcTx,
+    eventName: string,
+    payload: unknown,
+  ) {
+    const idempotencyKey = `notification:${eventName}:${Date.now()}`;
+    return this.repository.createOutboxEvent(
+      {
+        eventName: 'notification.requested',
+        payload: this.toJsonValue({ source: 'qc', eventName, payload }),
+        metadata: this.toJsonValue({
+          module: 'qc',
+          persistToOutbox: true,
+          idempotencyKey,
+        }),
+        idempotencyKey,
+      },
+      tx,
+    );
   }
 
-  private nextNcrNo() {
-    return nextOperationalCode(this.prisma, 'ncr', 'ncrNo', 'NCR');
+  private eventEntityId(payload: unknown) {
+    return payload && typeof payload === 'object' && 'id' in payload
+      ? String(payload.id)
+      : new Date().getTime().toString();
   }
 
   private asRecord(value: unknown) {
@@ -1020,6 +1068,10 @@ export class QcService {
 
   private toJson(value: unknown) {
     return value === undefined ? undefined : (value as Prisma.InputJsonValue);
+  }
+
+  private toJsonValue(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
   }
 
   private paginated<T>(data: T[], page: number, limit: number, total: number) {

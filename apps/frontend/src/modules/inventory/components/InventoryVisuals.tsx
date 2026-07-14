@@ -95,12 +95,14 @@ export function InventoryPagination({
   total,
   pageSize,
   onPageChange,
+  containerClassName,
 }: {
   page: number
   pageCount: number
   total: number
   pageSize: number
   onPageChange: (page: number) => void
+  containerClassName?: string
 }) {
   const safePageCount = Math.max(1, pageCount)
   const safePage = Math.min(Math.max(1, page), safePageCount)
@@ -111,7 +113,7 @@ export function InventoryPagination({
   const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
 
   return (
-    <div className="grid grid-cols-1 items-center gap-3 border-t border-white/10 px-5 py-4 text-xs text-slate-400 md:grid-cols-3">
+    <div className={containerClassName ?? 'grid grid-cols-1 items-center gap-3 border-t border-white/10 px-5 py-4 text-xs text-slate-400 md:grid-cols-3'}>
       <div>
         Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
       </div>

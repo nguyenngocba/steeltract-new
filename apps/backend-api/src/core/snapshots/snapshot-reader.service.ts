@@ -1,13 +1,13 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { PerformanceMetricsService } from '../performance/performance-metrics.service';
 import { DispatchSnapshotRepository } from './dispatch-snapshot.repository';
+import { ComponentSnapshotRepository } from './component-snapshot.repository';
 import { InventorySnapshotRepository } from './inventory-snapshot.repository';
 import { ProductionSnapshotRepository } from './production-snapshot.repository';
 import { ProjectSnapshotRepository } from './project-snapshot.repository';
+import { QcSnapshotRepository } from './qc-snapshot.repository';
+import { YardSnapshotRepository } from './yard-snapshot.repository';
 
 @Injectable()
 export class SnapshotReaderService {
@@ -22,6 +22,12 @@ export class SnapshotReaderService {
     private readonly dispatchSnapshots: DispatchSnapshotRepository,
     @Inject(ProductionSnapshotRepository)
     private readonly productionSnapshots: ProductionSnapshotRepository,
+    @Inject(ComponentSnapshotRepository)
+    private readonly componentSnapshots: ComponentSnapshotRepository,
+    @Inject(QcSnapshotRepository)
+    private readonly qcSnapshots: QcSnapshotRepository,
+    @Inject(YardSnapshotRepository)
+    private readonly yardSnapshots: YardSnapshotRepository,
   ) {}
 
   async inventory(warehouseId: string, snapshotDate: Date) {
@@ -29,26 +35,25 @@ export class SnapshotReaderService {
       warehouseId,
       snapshotDate,
     );
-    this.record(row?.updatedAt);
+    this.recordInventory(row?.updatedAt);
     return row;
   }
 
   async inventoryDashboard(snapshotDate: Date) {
     const rows = await this.inventorySnapshots.findByDate(snapshotDate);
-    this.recordMany(rows.map((row) => row.updatedAt));
+    this.recordInventories(rows.map((row) => row.updatedAt));
     return rows;
   }
 
   async inventoryOverviewHistory(take = 12) {
     const rows = await this.inventorySnapshots.findOverviewHistory(take);
-    this.recordMany(rows.map((row) => row.updatedAt));
+    this.recordInventories(rows.map((row) => row.updatedAt));
     return rows;
   }
 
   async inventoryMaterial(materialId: string) {
-    const row = await this.inventorySnapshots.findMaterialDetailSnapshot(
-      materialId,
-    );
+    const row =
+      await this.inventorySnapshots.findMaterialDetailSnapshot(materialId);
     this.recordMaterial(row?.updatedAt);
     return row;
   }
@@ -90,9 +95,8 @@ export class SnapshotReaderService {
   }
 
   async productionDashboard(snapshotDate: Date) {
-    const row = await this.productionSnapshots.findDashboardSnapshot(
-      snapshotDate,
-    );
+    const row =
+      await this.productionSnapshots.findDashboardSnapshot(snapshotDate);
     this.recordProduction(row?.updatedAt);
     return row;
   }
@@ -104,35 +108,99 @@ export class SnapshotReaderService {
   }
 
   async productionOrder(productionOrderId: string) {
-    const row = await this.productionSnapshots.findOrderSnapshot(
-      productionOrderId,
-    );
+    const row =
+      await this.productionSnapshots.findOrderSnapshot(productionOrderId);
     this.recordProduction(row?.updatedAt);
     return row;
   }
 
   async productionOrders(productionOrderId?: string) {
-    const rows = await this.productionSnapshots.findOrderSnapshots(
-      productionOrderId,
-    );
+    const rows =
+      await this.productionSnapshots.findOrderSnapshots(productionOrderId);
     this.recordProductionMany(rows.map((row) => row.updatedAt));
     return rows;
   }
 
   async productionWorkCenter(workCenterId: string) {
-    const row = await this.productionSnapshots.findWorkCenterSnapshot(
-      workCenterId,
-    );
+    const row =
+      await this.productionSnapshots.findWorkCenterSnapshot(workCenterId);
     this.recordProduction(row?.updatedAt);
     return row;
   }
 
   async productionWorkCenters(workCenterId?: string) {
-    const rows = await this.productionSnapshots.findWorkCenterSnapshots(
-      workCenterId,
-    );
+    const rows =
+      await this.productionSnapshots.findWorkCenterSnapshots(workCenterId);
     this.recordProductionMany(rows.map((row) => row.updatedAt));
     return rows;
+  }
+
+  async componentsDashboard(snapshotDate: Date) {
+    const row =
+      await this.componentSnapshots.findDashboardSnapshot(snapshotDate);
+    this.recordComponent(row?.updatedAt);
+    return row;
+  }
+
+  async componentsDashboardHistory(take = 12) {
+    const rows = await this.componentSnapshots.findDashboardHistory(take);
+    this.recordComponents(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async componentSummary(componentId: string) {
+    const row = await this.componentSnapshots.findSummarySnapshot(componentId);
+    this.recordComponent(row?.updatedAt);
+    return row;
+  }
+
+  async componentSummaries(componentId?: string) {
+    const rows =
+      await this.componentSnapshots.findSummarySnapshots(componentId);
+    this.recordComponents(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async qcDashboard(snapshotDate: Date) {
+    const row = await this.qcSnapshots.findDashboardSnapshot(snapshotDate);
+    this.recordQc(row?.updatedAt);
+    return row;
+  }
+
+  async qcDashboardHistory(take = 12) {
+    const rows = await this.qcSnapshots.findDashboardHistory(take);
+    this.recordQcs(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async qcInspection(inspectionId: string) {
+    const row = await this.qcSnapshots.findInspectionSnapshot(inspectionId);
+    this.recordQc(row?.updatedAt);
+    return row;
+  }
+
+  async qcInspections(inspectionId?: string) {
+    const rows = await this.qcSnapshots.findInspectionSnapshots(inspectionId);
+    this.recordQcs(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async yardDashboard(snapshotDate: Date) {
+    const row = await this.yardSnapshots.findDashboardSnapshot(snapshotDate);
+    this.recordYard(row?.updatedAt);
+    return row;
+  }
+
+  async yardDashboardHistory(take = 12) {
+    const rows = await this.yardSnapshots.findDashboardHistory(take);
+    this.recordYards(rows.map((row) => row.updatedAt));
+    return rows;
+  }
+
+  async yardWorkspace(scopeKey = 'ALL') {
+    const row = await this.yardSnapshots.findWorkspaceSnapshot(scopeKey);
+    this.recordYard(row?.updatedAt);
+    return row;
   }
 
   private record(updatedAt?: Date) {
@@ -164,8 +232,12 @@ export class SnapshotReaderService {
       return;
     }
 
+    const now = Date.now();
     this.metrics.recordMaterialSnapshotHit();
-    this.metrics.recordSnapshotLag(Date.now() - updatedAt.getTime());
+    this.metrics.recordInventorySnapshotAge(
+      Math.max(0, Math.round((now - updatedAt.getTime()) / 1000)),
+    );
+    this.metrics.recordInventorySnapshotLag(now - updatedAt.getTime());
   }
 
   private recordLocations(updatedRows: Date[]) {
@@ -178,7 +250,37 @@ export class SnapshotReaderService {
     const oldest = updatedRows.reduce((min, row) =>
       row.getTime() < min.getTime() ? row : min,
     );
-    this.metrics.recordSnapshotLag(Date.now() - oldest.getTime());
+    const now = Date.now();
+    this.metrics.recordInventorySnapshotAge(
+      Math.max(0, Math.round((now - oldest.getTime()) / 1000)),
+    );
+    this.metrics.recordInventorySnapshotLag(now - oldest.getTime());
+  }
+
+  private recordInventory(updatedAt?: Date) {
+    if (!updatedAt) {
+      this.metrics.recordInventorySnapshotMiss();
+      return;
+    }
+
+    const now = Date.now();
+    this.metrics.recordInventorySnapshotHit();
+    this.metrics.recordInventorySnapshotAge(
+      Math.max(0, Math.round((now - updatedAt.getTime()) / 1000)),
+    );
+    this.metrics.recordInventorySnapshotLag(now - updatedAt.getTime());
+  }
+
+  private recordInventories(updatedRows: Date[]) {
+    if (updatedRows.length === 0) {
+      this.metrics.recordInventorySnapshotMiss();
+      return;
+    }
+
+    const oldest = updatedRows.reduce((min, row) =>
+      row.getTime() < min.getTime() ? row : min,
+    );
+    this.recordInventory(oldest);
   }
 
   private recordProject(updatedAt?: Date) {
@@ -245,5 +347,83 @@ export class SnapshotReaderService {
       row.getTime() < min.getTime() ? row : min,
     );
     this.recordProduction(oldest);
+  }
+
+  private recordComponent(updatedAt?: Date) {
+    if (!updatedAt) {
+      this.metrics.recordComponentSnapshotMiss();
+      return;
+    }
+
+    const now = Date.now();
+    this.metrics.recordComponentSnapshotHit();
+    this.metrics.recordComponentSnapshotLag(now - updatedAt.getTime());
+    this.metrics.recordComponentSnapshotAge(
+      Math.max(0, Math.round((now - updatedAt.getTime()) / 1000)),
+    );
+  }
+
+  private recordComponents(updatedRows: Date[]) {
+    if (updatedRows.length === 0) {
+      this.metrics.recordComponentSnapshotMiss();
+      return;
+    }
+
+    const oldest = updatedRows.reduce((min, row) =>
+      row.getTime() < min.getTime() ? row : min,
+    );
+    this.recordComponent(oldest);
+  }
+
+  private recordQc(updatedAt?: Date) {
+    if (!updatedAt) {
+      this.metrics.recordQcSnapshotMiss();
+      return;
+    }
+
+    const now = Date.now();
+    this.metrics.recordQcSnapshotHit();
+    this.metrics.recordQcSnapshotLag(now - updatedAt.getTime());
+    this.metrics.recordQcSnapshotAge(
+      Math.max(0, Math.round((now - updatedAt.getTime()) / 1000)),
+    );
+  }
+
+  private recordQcs(updatedRows: Date[]) {
+    if (updatedRows.length === 0) {
+      this.metrics.recordQcSnapshotMiss();
+      return;
+    }
+
+    const oldest = updatedRows.reduce((min, row) =>
+      row.getTime() < min.getTime() ? row : min,
+    );
+    this.recordQc(oldest);
+  }
+
+  private recordYard(updatedAt?: Date) {
+    if (!updatedAt) {
+      this.metrics.recordYardSnapshotMiss();
+      return;
+    }
+
+    const now = Date.now();
+    this.metrics.recordYardSnapshotHit();
+    this.metrics.recordYardSnapshotLag(now - updatedAt.getTime());
+    this.metrics.recordYardSnapshotAge(
+      Math.max(0, Math.round((now - updatedAt.getTime()) / 1000)),
+    );
+  }
+
+  private recordYards(updatedRows: Date[]) {
+    if (updatedRows.length === 0) {
+      this.metrics.recordYardSnapshotMiss();
+      return;
+    }
+
+    const oldest = updatedRows.reduce((min, row) =>
+      row.getTime() < min.getTime() ? row : min,
+    );
+    this.recordYard(oldest);
   }
 }
