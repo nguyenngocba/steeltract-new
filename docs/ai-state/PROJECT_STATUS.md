@@ -1,5 +1,7 @@
 # Project Status
 
+EPIC184 on 2026-07-14 completed the Outbound Multi-material Pending Items UX pilot. The Xuất kho (Outbound) transaction creation modal now supports local batching of draft material movements with exact-duplicate location merging, edit/remove controls, non-destructive API error recovery, and atomic batch posting. It features outbound-specific local available stock calculations, visual warning on stock exceedance, and automatic 2D visual layout focus/highlighting back on the edited item coordinates. All layout styles, themes, and 2D visual layouts were preserved.
+
 EPIC183 on 2026-07-14 completed the Inbound Multi-material Pending Items UX pilot. The Nhập kho (Inbound) transaction creation modal now supports local batching of draft material movements with exact-duplicate location merging, edit/remove controls, non-destructive API error recovery, and atomic batch posting. All layout styles, themes, and 2D visual layouts were preserved.
 
 EPIC182 on 2026-07-14 approved the Multi-material Business Specification and

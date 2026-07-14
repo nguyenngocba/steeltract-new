@@ -871,3 +871,24 @@ Approved: 2026-07-09
   reconciliation.
 - Stock Take v1.0 remains adjustment-backed. A formal session and approval
   lifecycle is documented for Phase 2.
+
+## Multi-material Pending Items (Pilots)
+
+### Inbound Pending Pilot (EPIC183)
+- **Mục tiêu**: Cho phép nhân viên gom nhiều vật tư nhập kho vào danh sách chờ cục bộ (local pending state) trên giao diện trước khi gửi một yêu cầu API duy nhất chứa `items[]`.
+- **Cơ chế**:
+  - Tích hợp giao diện hiển thị danh sách chờ với tổng số lượng, tổng khối lượng phân loại theo đơn vị và tổng giá trị ước tính.
+  - Hỗ trợ thêm/sửa/xóa dòng chờ trực tiếp.
+  - Gộp dòng trùng (Merging Rule): Nếu trùng vật tư, vị trí (Zone/Slot/Level) và UOM thì tự động cộng dồn số lượng.
+  - Giao dịch nguyên tử: Gửi payload qua phương thức `items[]`. Khôi phục an toàn (non-destructive) giữ nguyên danh sách chờ nếu API trả về lỗi.
+
+### Outbound Pending Pilot (EPIC184)
+- **Mục tiêu**: Mở rộng mô hình danh sách chờ cục bộ sang quy trình xuất kho (Outbound), tối ưu trải nghiệm nhập liệu nhiều vật tư cùng lúc.
+- **Tính năng đặc thù**:
+  - **Tồn khả dụng cục bộ**: Tính toán tồn khả dụng tại từng ô/tầng bằng cách trừ đi số lượng đã nằm trong danh sách chờ xuất (`availableLocationQty = sourceLocationQty - pendingQtyAtLoc`).
+  - **Cảnh báo vượt tồn**: Hiển thị cảnh báo màu vàng nổi bật nếu số lượng xuất của dòng hiện tại vượt quá tồn khả dụng tại ô/tầng đó, giúp Operator kiểm soát tốt hơn trước khi thêm vào danh sách chờ.
+  - **Phục hồi tiêu điểm 2D**: Khi nhấn Sửa (✏️) một dòng chờ xuất, thông tin dòng đó được nạp lại vào form chính và bản đồ `WarehouseMiniMap` tự động quay lại tiêu điểm (focus) highlight đúng vị trí ô/tầng nguồn của dòng đó.
+  - **Payload ánh xạ API**:
+    - Dự án (`PROJECT`): 1 dòng xuất âm số lượng.
+    - Sản xuất cấu kiện (`COMPONENT_PRODUCTION`): 2 dòng (1 dòng xuất âm tại vị trí xuất chính, 1 dòng nhập dương tại vị trí kho sản xuất nhận).
+

@@ -891,6 +891,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   const productionZones = useMemo(() => zones.filter(isProductionWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
   const queryClient = useQueryClient()
+
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
     target: 'PROJECT',
@@ -906,6 +907,11 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     remark: '',
   })
   const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
+
+  // Local state for pending items list
+  const [pendingItems, setPendingItems] = useState<any[]>([])
+  const [showPendingList, setShowPendingList] = useState(false)
+
   const { data: selectedMaterialDetail } = useMaterialDetail(form.inventoryItemId || undefined)
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const currentStock = num(selectedMaterial?.quantity)
@@ -915,6 +921,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       selectedMaterial?.averageCost ??
       selectedMaterial?.unitPrice,
   )
+
   const locationBalances = useMemo(() => {
     return Array.isArray(
       (selectedMaterialDetail as any)?.locationBalances,
@@ -945,6 +952,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     if (!form.zoneId) return null
     return zones.find((zone: any) => String(zone.id) === String(form.zoneId) && isRealStorageZone(zone)) || null
   }, [form.zoneId, zones])
+
   const qtyByZoneId = useMemo(() => {
     const map = new Map<string, number>()
 
@@ -962,13 +970,13 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
     return map
   }, [locationBalances])
+
   const availableZones = useMemo(() => {
     const zoneMap = new Map<string, any>()
 
     locationBalances.forEach((balance: any) => {
       if (!balance.zoneId) return
 
-      // Loại kho sản xuất
       if (
         String(balance.warehouseCode) ===
         'PRODUCTION'
@@ -998,6 +1006,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
     return Array.from(zoneMap.values())
   }, [locationBalances, zones])
+
   useEffect(() => {
     if (!form.inventoryItemId) return
     if (form.zoneId && availableZones.some((zone) => zone.id === String(form.zoneId))) return
@@ -1005,9 +1014,9 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     if (!firstZone?.id) return
     setForm((prev) => ({ ...prev, zoneId: firstZone.id }))
   }, [form.inventoryItemId, form.zoneId, availableZones])
-  
+
   const selectedZoneStock = form.zoneId ? qtyByZoneId.get(String(form.zoneId)) ?? 0 : 0
-    const sourceLocations = useMemo(() => {
+  const sourceLocations = useMemo(() => {
     return locationBalances
       .filter(
         (x: any) =>
@@ -1029,28 +1038,28 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   }, [locationBalances, form.zoneId])
 
   useEffect(() => {
-  if (!sourceLocations.length) return
+    if (!sourceLocations.length) return
 
-  const currentExists = sourceLocations.some(
-    (x: any) =>
-      x.slotId === form.sourceSlotId &&
-      x.level === form.sourceLevel,
-  )
+    const currentExists = sourceLocations.some(
+      (x: any) =>
+        x.slotId === form.sourceSlotId &&
+        x.level === form.sourceLevel,
+    )
 
-  if (currentExists) return
+    if (currentExists) return
 
-  const first = sourceLocations[0]
+    const first = sourceLocations[0]
 
-  setForm((prev) => ({
-    ...prev,
-    sourceSlotId: first.slotId ?? '',
-    sourceLevel: first.level ?? '',
-  }))
-}, [
-  sourceLocations,
-  form.sourceSlotId,
-  form.sourceLevel,
-])
+    setForm((prev) => ({
+      ...prev,
+      sourceSlotId: first.slotId ?? '',
+      sourceLevel: first.level ?? '',
+    }))
+  }, [
+    sourceLocations,
+    form.sourceSlotId,
+    form.sourceLevel,
+  ])
 
   const selectedSourceLocation =
     sourceLocations.find(
@@ -1061,19 +1070,34 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
 
   const sourceLocationQty =
     num(selectedSourceLocation?.quantity)
-  const selectedZoneAfterStock = selectedZoneStock - quantity
   const selectedSourceFullZone = zones.find((zone: any) => String(zone.id) === String(form.zoneId))
   const selectedProductionZone = productionZones.find((zone: any) => String(zone.id) === String(form.productionZoneId))
+
   const productionCellOccupied = form.target === 'COMPONENT_PRODUCTION'
     ? isCellOccupied(selectedProductionZone, form.productionSlotId, form.productionLevel)
     : false
   const productionEmptyCell = findEmptyCell(selectedProductionZone)
   const needsProductionLocation = form.target === 'COMPONENT_PRODUCTION'
-  const canSubmit =
+
+  // --- Outbound visual warning & validation metrics ---
+  const pendingQtyAtLoc = useMemo(() => {
+    return pendingItems
+      .filter((item) =>
+        String(item.inventoryItemId) === String(form.inventoryItemId) &&
+        String(item.zoneId) === String(form.zoneId) &&
+        String(item.sourceSlotId) === String(form.sourceSlotId) &&
+        String(item.sourceLevel) === String(form.sourceLevel)
+      )
+      .reduce((sum, x) => sum + x.quantity, 0)
+  }, [pendingItems, form.inventoryItemId, form.zoneId, form.sourceSlotId, form.sourceLevel])
+
+  const availableLocationQty = Math.max(0, sourceLocationQty - pendingQtyAtLoc)
+  const isStockExceeded = form.zoneId && (quantity > availableLocationQty)
+
+  const canAddPending =
     Boolean(form.inventoryItemId) &&
     Boolean(form.zoneId) &&
     quantity > 0 &&
-    quantity <= sourceLocationQty &&
     (!needsProductionLocation || (Boolean(form.productionZoneId) && Boolean(form.productionSlotId) && !productionCellOccupied))
 
   function suggestProductionDestination() {
@@ -1089,62 +1113,62 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     }))
   }
 
-  async function submit() {
-    if (!canSubmit) return
-    const no = generateTransactionNo('XK')
-    const isProductionTarget = form.target === 'COMPONENT_PRODUCTION'
-    const targetTag = isProductionTarget ? '[COMPONENT_PRODUCTION]' : '[PROJECT]'
-    const transaction = await createTransaction.mutateAsync({
-      type: isProductionTarget ? 'TRANSFER' : 'OUTBOUND',
-      transactionNo: no,
-      transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
-      projectId: form.projectId || undefined,
-      projectName: projects.find((x: any) => x.id === form.projectId)?.name,
+  // --- Local pending handlers ---
+  function handleAddPending() {
+    if (!canAddPending) return
+
+    const newItem = {
+      id: Date.now() + Math.random().toString(),
+      inventoryItemId: form.inventoryItemId,
+      materialCode: selectedMaterial?.code || 'NA',
+      materialName: selectedMaterial?.name || '-',
+      unit: selectedMaterial?.unit || 'tấn',
+      quantity,
+      estimatedUnitPrice,
       zoneId: form.zoneId,
-      warehouseId: isProductionTarget ? selectedProductionZone?.warehouseId : undefined,
-      remarks: `${targetTag} ${form.remark}`.trim(),
-      items: isProductionTarget ? [
-        {
-          inventoryItemId: form.inventoryItemId,
-          quantity: -Math.abs(quantity),
-          warehouseId: selectedSourceLocation?.warehouseId || selectedSourceFullZone?.warehouseId || undefined,
-          zoneId: form.zoneId || undefined,
-          slotId: form.sourceSlotId,
-          level: form.sourceLevel,
-        },
-        {
-          inventoryItemId: form.inventoryItemId,
-          quantity: Math.abs(quantity),
-          warehouseId: selectedProductionZone?.warehouseId || undefined,
-          zoneId: form.productionZoneId || undefined,
-          slotId: form.productionSlotId,
-          level: form.productionLevel,
-          unitPrice: estimatedUnitPrice || undefined,
-        },
-      ] : [
-        {
-          inventoryItemId: form.inventoryItemId,
-          quantity: -Math.abs(quantity),
-          warehouseId: selectedSourceLocation?.warehouseId || selectedSourceFullZone?.warehouseId || undefined,
-          zoneId: form.zoneId || undefined,
-          slotId: form.sourceSlotId,
-          level: form.sourceLevel,
-        },
-      ],
-    })
-    await refreshInventoryCache(queryClient)
-    try {
-      await uploadInventoryTransactionAttachments({
-        transaction,
-        files: attachmentFiles,
-      })
-    } catch {
-      toast.error('Phiếu đã lưu nhưng upload tài liệu xuất kho thất bại')
+      zoneCode: selectedSourceFullZone?.code || 'ZONE',
+      warehouseId: selectedSourceLocation?.warehouseId || selectedSourceFullZone?.warehouseId,
+      warehouseName: selectedSourceFullZone?.name || '-',
+      sourceSlotId: form.sourceSlotId,
+      sourceLevel: form.sourceLevel,
+      // Target & Production details if target is COMPONENT_PRODUCTION
+      target: form.target,
+      productionZoneId: form.productionZoneId,
+      productionZoneCode: selectedProductionZone?.code || '',
+      productionWarehouseId: selectedProductionZone?.warehouseId,
+      productionSlotId: form.productionSlotId,
+      productionLevel: form.productionLevel,
+      sourceLocationQty,
     }
-    setForm({
-      transactionDate: formatLocalDateTimeInput(),
-      target: 'PROJECT',
-      projectId: '',
+
+    setPendingItems((prev) => {
+      // Merging Rule: Exact duplicate -> Merge. Khác location/UOM -> Không merge.
+      const idx = prev.findIndex(
+        (x) =>
+          String(x.inventoryItemId) === String(newItem.inventoryItemId) &&
+          String(x.zoneId) === String(newItem.zoneId) &&
+          String(x.sourceSlotId) === String(newItem.sourceSlotId) &&
+          String(x.sourceLevel) === String(newItem.sourceLevel) &&
+          x.unit === newItem.unit &&
+          x.target === newItem.target &&
+          String(x.productionZoneId) === String(newItem.productionZoneId) &&
+          String(x.productionSlotId) === String(newItem.productionSlotId) &&
+          String(x.productionLevel) === String(newItem.productionLevel)
+      )
+      if (idx > -1) {
+        const updated = [...prev]
+        updated[idx] = {
+          ...updated[idx],
+          quantity: updated[idx].quantity + newItem.quantity,
+        }
+        return updated
+      }
+      return [...prev, newItem]
+    })
+
+    // Reset line items in form
+    setForm((prev) => ({
+      ...prev,
       inventoryItemId: '',
       zoneId: '',
       sourceSlotId: '',
@@ -1153,198 +1177,448 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
       productionSlotId: '',
       productionLevel: '',
       quantity: '',
-      remark: '',
+    }))
+    toast.success('Đã thêm vật tư xuất vào danh sách chờ')
+  }
+
+  function handleRemovePending(id: string) {
+    setPendingItems((prev) => prev.filter((x) => x.id !== id))
+    toast.success('Đã xóa vật tư khỏi danh sách chờ')
+  }
+
+  function handleEditPending(item: any) {
+    const formIsDirty = form.inventoryItemId || form.quantity
+    if (formIsDirty) {
+      if (!window.confirm('Vật tư đang nhập trong form sẽ bị ghi đè. Bạn có muốn tiếp tục?')) {
+        return
+      }
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      inventoryItemId: item.inventoryItemId,
+      zoneId: item.zoneId,
+      sourceSlotId: item.sourceSlotId,
+      sourceLevel: item.sourceLevel,
+      target: item.target,
+      productionZoneId: item.productionZoneId || '',
+      productionSlotId: item.productionSlotId || '',
+      productionLevel: item.productionLevel || '',
+      quantity: formatQuantityInput(String(item.quantity)),
+    }))
+
+    setPendingItems((prev) => prev.filter((x) => x.id !== item.id))
+  }
+
+  function formatQuantitySummary(items: any[]) {
+    const uoms = new Map<string, number>()
+    items.forEach((item) => {
+      const unit = item.unit || 'tấn'
+      uoms.set(unit, (uoms.get(unit) || 0) + item.quantity)
     })
-    setAttachmentFiles([])
+    return Array.from(uoms.entries())
+      .map(([unit, qty]) => `${formatQuantity(qty)} ${unit}`)
+      .join(', ')
+  }
+
+  function calculatePendingTotal(items: any[]) {
+    return items.reduce((sum, item) => sum + item.quantity * item.estimatedUnitPrice, 0)
+  }
+
+  // --- Confirm batch submission ---
+  async function submit() {
+    if (pendingItems.length === 0) return
+
+    const no = generateTransactionNo('XK')
+    const payloadItems: any[] = []
+
+    pendingItems.forEach((item) => {
+      const isProductionTarget = item.target === 'COMPONENT_PRODUCTION'
+      if (isProductionTarget) {
+        // Negative source line
+        payloadItems.push({
+          inventoryItemId: item.inventoryItemId,
+          quantity: -Math.abs(item.quantity),
+          warehouseId: item.warehouseId || undefined,
+          zoneId: item.zoneId || undefined,
+          slotId: item.sourceSlotId,
+          level: item.sourceLevel,
+        })
+        // Positive destination line
+        payloadItems.push({
+          inventoryItemId: item.inventoryItemId,
+          quantity: Math.abs(item.quantity),
+          warehouseId: item.productionWarehouseId || undefined,
+          zoneId: item.productionZoneId || undefined,
+          slotId: item.productionSlotId,
+          level: item.productionLevel,
+          unitPrice: item.estimatedUnitPrice || undefined,
+        })
+      } else {
+        // Negative source line
+        payloadItems.push({
+          inventoryItemId: item.inventoryItemId,
+          quantity: -Math.abs(item.quantity),
+          warehouseId: item.warehouseId || undefined,
+          zoneId: item.zoneId || undefined,
+          slotId: item.sourceSlotId,
+          level: item.sourceLevel,
+        })
+      }
+    })
+
+    const firstItem = pendingItems[0]
+    const isProductionTarget = firstItem?.target === 'COMPONENT_PRODUCTION'
+    const targetTag = isProductionTarget ? '[COMPONENT_PRODUCTION]' : '[PROJECT]'
+
+    try {
+      const transaction = await createTransaction.mutateAsync({
+        type: isProductionTarget ? 'TRANSFER' : 'OUTBOUND',
+        transactionNo: no,
+        transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
+        projectId: form.projectId || undefined,
+        projectName: projects.find((x: any) => x.id === form.projectId)?.name,
+        zoneId: firstItem?.zoneId,
+        warehouseId: isProductionTarget ? firstItem?.productionWarehouseId : undefined,
+        remarks: `${targetTag} ${form.remark}`.trim(),
+        items: payloadItems,
+      })
+
+      await refreshInventoryCache(queryClient)
+
+      try {
+        await uploadInventoryTransactionAttachments({
+          transaction,
+          files: attachmentFiles,
+        })
+      } catch {
+        toast.error('Phiếu đã lưu nhưng upload tài liệu xuất kho thất bại')
+      }
+
+      toast.success('Xuất kho thành công!')
+
+      // Clear pending list and close modal only on SUCCESS
+      setPendingItems([])
+      setForm({
+        transactionDate: formatLocalDateTimeInput(),
+        target: 'PROJECT',
+        projectId: '',
+        inventoryItemId: '',
+        zoneId: '',
+        sourceSlotId: '',
+        sourceLevel: '',
+        productionZoneId: '',
+        productionSlotId: '',
+        productionLevel: '',
+        quantity: '',
+        remark: '',
+      })
+      setAttachmentFiles([])
+      onClose()
+    } catch {
+      // Non-destructive: API error -> keep pendingItems intact!
+      toast.error('Có lỗi xảy ra khi xác nhận xuất kho. Danh sách chờ được giữ nguyên.')
+    }
+  }
+
+  function handleClose() {
+    const isDirty = pendingItems.length > 0 || form.inventoryItemId || form.quantity || form.remark
+    if (isDirty) {
+      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn thoát?')) {
+        return
+      }
+    }
     onClose()
   }
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Xuất kho vật tư" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
+    <ModalShell open={open} onClose={handleClose} title="Xuất kho vật tư" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
-      <div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
-        <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className={fieldClass}>
-          <option value="PROJECT">Xuất cho công trình</option>
-          <option value="COMPONENT_PRODUCTION">Xuất cho sản xuất cấu kiện</option>
-        </select>
-        <select disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className={`${fieldClass} disabled:cursor-not-allowed disabled:opacity-50`}>
-          <option value="">Đơn vị nhận</option>
-          {projects.map((p: any) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className={fieldClass}>
-          <option value="">Vật tư</option>
-          {materials.map((m: any) => (
-            <option key={m.id} value={m.id}>
-              {m.code} - {m.name}
-            </option>
-          ))}
-        </select>
-        <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
-        <select
-          value={`${form.zoneId}|${form.sourceSlotId}|${form.sourceLevel}`}
-          onChange={(e) => {
-            const [zoneId, slotId, level] =
-              e.target.value.split('|')
+        <div>
+          {/* Pending Header */}
+          {pendingItems.length > 0 && (
+            <div className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-cyan-300 uppercase tracking-wider">Danh sách chờ xuất</span>
+                  <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+                    {pendingItems.length} loại vật tư
+                  </span>
+                </div>
+                <div className="text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+                  <span>
+                    Tổng khối lượng: <span className="font-semibold text-white">{formatQuantitySummary(pendingItems)}</span>
+                  </span>
+                  <span>
+                    Tổng giá trị dự kiến: <span className="font-semibold text-emerald-400">{formatCurrency(calculatePendingTotal(pendingItems))}</span>
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPendingList(!showPendingList)}
+                className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-500/10 px-3 py-1.5 font-semibold text-cyan-100 hover:bg-cyan-500/20 transition-colors"
+              >
+                {showPendingList ? 'Ẩn danh sách' : 'Xem danh sách'}
+              </button>
+            </div>
+          )}
 
-            setForm((prev) => ({
-              ...prev,
-              zoneId,
-              sourceSlotId: slotId,
-              sourceLevel: level,
-            }))
-          }}
-          className={fieldClass}
-        >
-          <option value="">
-            Chọn vị trí vật tư
-          </option>
+          {/* Pending Panel */}
+          {showPendingList && pendingItems.length > 0 && (
+            <div className="mb-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/45 text-xs">
+              <div className="bg-white/[0.04] px-3 py-2 font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
+                Chi tiết danh sách chờ xuất
+              </div>
+              <div className="max-h-48 overflow-y-auto divide-y divide-white/5">
+                {pendingItems.map((item) => (
+                  <div key={item.id} className="p-2.5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-cyan-300">{item.materialCode}</span>
+                        <span className="truncate text-slate-400">{item.materialName}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500 flex flex-wrap gap-x-3">
+                        <span>Vị trí xuất: <span className="text-slate-300">{item.zoneCode} / {item.sourceSlotId} / {item.sourceLevel}</span></span>
+                        <span>Đơn giá ước tính: <span className="text-slate-300">{formatCurrency(item.estimatedUnitPrice)}</span></span>
+                        {item.target === 'COMPONENT_PRODUCTION' && (
+                          <span className="text-cyan-200">
+                            → Kho SX: {item.productionZoneCode} / {item.productionSlotId} / {item.productionLevel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-4 text-right">
+                      <div>
+                        <div className="font-bold text-white">{formatQuantity(item.quantity)} {item.unit}</div>
+                        <div className="mt-0.5 text-[11px] text-emerald-400 font-medium">
+                          {formatCurrency(item.quantity * item.estimatedUnitPrice)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPending(item)}
+                          className="rounded p-1 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                          title="Sửa dòng này"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePending(item.id)}
+                          className="rounded p-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          title="Xóa dòng này"
+                        >
+                          ❌
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          {locationBalances.map((loc: any) => (
-            <option
-              key={`${loc.zoneId}-${loc.slotId}-${loc.level}`}
-              value={`${loc.zoneId}|${loc.slotId}|${loc.level}`}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+            <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className={fieldClass}>
+              <option value="PROJECT">Xuất cho công trình</option>
+              <option value="COMPONENT_PRODUCTION">Xuất cho sản xuất cấu kiện</option>
+            </select>
+            <select disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className={`${fieldClass} disabled:cursor-not-allowed disabled:opacity-50`}>
+              <option value="">Đơn vị nhận</option>
+              {projects.map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className={fieldClass}>
+              <option value="">Vật tư</option>
+              {materials.map((m: any) => (
+                <option key={m.id} value={m.id}>
+                  {m.code} - {m.name}
+                </option>
+              ))}
+            </select>
+            <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+            <select
+              value={`${form.zoneId}|${form.sourceSlotId}|${form.sourceLevel}`}
+              onChange={(e) => {
+                const [zoneId, slotId, level] =
+                  e.target.value.split('|')
+
+                setForm((prev) => ({
+                  ...prev,
+                  zoneId,
+                  sourceSlotId: slotId,
+                  sourceLevel: level,
+                }))
+              }}
+              className={fieldClass}
             >
-              {loc.zoneCode}
-              {' / '}
-              {loc.slotId}
-              {' / '}
-              {loc.level}
-              {' - '}
-              {formatQuantity(loc.quantity)}
-            </option>
-          ))}
-        </select>
-        
-        <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
-          Tồn ô/tầng đã chọn:
-          <span className="ml-1 text-cyan-300">
-            {formatQuantity(sourceLocationQty)}
-          </span>
-        </div>
-      </div>
-      {form.target === 'COMPONENT_PRODUCTION' ? <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
-        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">Vị trí nhận Kho vật tư SX</div>
-            <div className="mt-1 text-xs text-slate-400">Chọn nơi đặt vật tư sau khi xuất khỏi kho chính.</div>
+              <option value="">
+                Chọn vị trí vật tư
+              </option>
+
+              {locationBalances.map((loc: any) => (
+                <option
+                  key={`${loc.zoneId}-${loc.slotId}-${loc.level}`}
+                  value={`${loc.zoneId}|${loc.slotId}|${loc.level}`}
+                >
+                  {loc.zoneCode}
+                  {' / '}
+                  {loc.slotId}
+                  {' / '}
+                  {loc.level}
+                  {' - '}
+                  {formatQuantity(loc.quantity)}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
+              Tồn ô/tầng đã chọn:
+              <span className="ml-1 text-cyan-300">
+                {formatQuantity(sourceLocationQty)}
+              </span>
+            </div>
+            {form.zoneId ? (
+              <div className="flex items-center rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-3 text-sm text-slate-300">
+                Tồn khả dụng (trừ Pending):
+                <span className="ml-1 text-emerald-300 font-bold">
+                  {formatQuantity(availableLocationQty)}
+                </span>
+              </div>
+            ) : null}
           </div>
-          <button type="button" onClick={suggestProductionDestination} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
-            Gợi ý ô trống
+
+          {form.target === 'COMPONENT_PRODUCTION' ? (
+            <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">Vị trí nhận Kho vật tư SX</div>
+                  <div className="mt-1 text-xs text-slate-400">Chọn nơi đặt vật tư sau khi xuất khỏi kho chính.</div>
+                </div>
+                <button type="button" onClick={suggestProductionDestination} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+                  Gợi ý ô trống
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <select value={form.productionZoneId} onChange={(e) => setForm((f) => ({ ...f, productionZoneId: e.target.value, productionSlotId: '', productionLevel: '' }))} className={fieldClass}>
+                  <option value="">Vị trí kho SX nhận</option>
+                  {productionZones.map((zone: any) => <option key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
+                </select>
+                <select value={form.productionSlotId} onChange={(e) => setForm((f) => ({ ...f, productionSlotId: e.target.value }))} className={fieldClass}>
+                  <option value="">Ô nhận</option>
+                  {INTERNAL_CELLS.map((cell) => {
+                    const occupiedOnAnyLevel = selectedProductionZone && INTERNAL_LEVELS.every((level) => isCellOccupied(selectedProductionZone, cell, level))
+                    return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
+                  })}
+                </select>
+                <select value={form.productionLevel} onChange={(e) => setForm((f) => ({ ...f, productionLevel: e.target.value }))} className={fieldClass}>
+                  <option value="">Tầng nhận</option>
+                  {INTERNAL_LEVELS.map((level) => {
+                    const occupied = selectedProductionZone && form.productionSlotId && isCellOccupied(selectedProductionZone, form.productionSlotId, level)
+                    return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
+                  })}
+                </select>
+              </div>
+              <div className={`mt-3 rounded-lg border px-3 py-2 text-xs ${productionCellOccupied ? 'border-red-400/40 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'}`}>
+                {productionCellOccupied
+                  ? `Ô ${form.productionSlotId || '-'} / ${form.productionLevel || 'L1'} ở Kho vật tư SX đã có vật tư.`
+                  : productionEmptyCell
+                    ? `Ô trống gợi ý: ${productionEmptyCell.cell} / ${productionEmptyCell.level}.`
+                    : form.productionZoneId ? 'Vị trí này chưa còn ô/tầng trống khả dụng.' : 'Chọn vị trí kho SX hoặc dùng gợi ý ô trống.'}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-3 grid grid-cols-1 gap-3 text-xs md:grid-cols-4">
+            <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
+            <MetricBox title="Tồn sau xuất" value={formatQuantity(Math.max(0, currentStock - quantity))} />
+            <MetricBox title="Tồn ô/tầng" value={formatQuantity(sourceLocationQty)} />
+            <MetricBox title="Sau xuất ô/tầng" value={formatQuantity(Math.max(0, sourceLocationQty - quantity))} />
+          </div>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-xs">
+            <div className="text-slate-300">Giá trị xuất dự kiến: <span className="font-semibold text-cyan-300">{formatCurrency(quantity * estimatedUnitPrice)}</span></div>
+            <div className="mt-1 text-slate-300">Đối tượng xuất: <span className="font-semibold text-white">{form.target === 'COMPONENT_PRODUCTION' ? 'Sản xuất cấu kiện' : 'Công trình'}</span></div>
+            {form.target === 'COMPONENT_PRODUCTION' ? <div className="mt-1 text-slate-300">Vị trí nhận: <span className="font-semibold text-white">{selectedProductionZone ? `${selectedProductionZone.code} / ${form.productionSlotId || '-'} / ${form.productionLevel || 'L1'}` : 'Chưa chọn'}</span></div> : null}
+          </div>
+
+          {form.inventoryItemId && availableZones.length === 0 && (
+            <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+              Vật tư này chưa có vị trí tồn khả dụng. Hãy nhập kho hoặc gán vị trí tồn trước khi xuất.
+            </div>
+          )}
+
+          {isStockExceeded && (
+            <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              ⚠️ Cảnh báo: Tổng số lượng chờ xuất ({formatQuantity(quantity + pendingQtyAtLoc)} {selectedMaterial?.unit || 'tấn'}) vượt quá lượng tồn kho khả dụng tại ô/tầng này ({formatQuantity(sourceLocationQty)} {selectedMaterial?.unit || 'tấn'}).
+            </div>
+          )}
+
+          {/* Add to Pending Button */}
+          <button
+            type="button"
+            disabled={!canAddPending}
+            onClick={handleAddPending}
+            className="w-full mt-3 rounded-lg border border-cyan-400/30 bg-cyan-400/10 py-2.5 font-semibold text-cyan-200 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50 text-xs"
+          >
+            + Thêm vào danh sách chờ xuất
           </button>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <select value={form.productionZoneId} onChange={(e) => setForm((f) => ({ ...f, productionZoneId: e.target.value, productionSlotId: '', productionLevel: '' }))} className={fieldClass}>
-            <option value="">Vị trí kho SX nhận</option>
-            {productionZones.map((zone: any) => <option key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
-          </select>
-          <select value={form.productionSlotId} onChange={(e) => setForm((f) => ({ ...f, productionSlotId: e.target.value }))} className={fieldClass}>
-            <option value="">Ô nhận</option>
-            {INTERNAL_CELLS.map((cell) => {
-              const occupiedOnAnyLevel = selectedProductionZone && INTERNAL_LEVELS.every((level) => isCellOccupied(selectedProductionZone, cell, level))
-              return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
-            })}
-          </select>
-          <select value={form.productionLevel} onChange={(e) => setForm((f) => ({ ...f, productionLevel: e.target.value }))} className={fieldClass}>
-            <option value="">Tầng nhận</option>
-            {INTERNAL_LEVELS.map((level) => {
-              const occupied = selectedProductionZone && form.productionSlotId && isCellOccupied(selectedProductionZone, form.productionSlotId, level)
-              return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
-            })}
-          </select>
-        </div>
-        <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${productionCellOccupied ? 'border-red-400/40 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'}`}>
-          {productionCellOccupied
-            ? `Ô ${form.productionSlotId || '-'} / ${form.productionLevel || 'L1'} ở Kho vật tư SX đã có vật tư.`
-            : productionEmptyCell
-              ? `Ô trống gợi ý: ${productionEmptyCell.cell} / ${productionEmptyCell.level}.`
-              : form.productionZoneId ? 'Vị trí này chưa còn ô/tầng trống khả dụng.' : 'Chọn vị trí kho SX hoặc dùng gợi ý ô trống.'}
-        </div>
-      </div> : null}
-      <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
-        <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
-        <MetricBox title="Tồn sau xuất" value={formatQuantity(Math.max(0, currentStock - quantity))} />
-        <MetricBox
-            title="Tồn ô/tầng"
-            value={formatQuantity(sourceLocationQty)}
-          />
 
-        <MetricBox
-            title="Sau xuất ô/tầng"
-            value={formatQuantity(Math.max(
-              0,
-              sourceLocationQty - quantity,
-            ))}
-          />
-      </div>
-      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
-        <div className="text-slate-300">Giá trị xuất dự kiến: <span className="font-semibold text-cyan-300">{formatCurrency(quantity * estimatedUnitPrice)}</span></div>
-        <div className="mt-1 text-slate-300">Đối tượng xuất: <span className="font-semibold text-white">{form.target === 'COMPONENT_PRODUCTION' ? 'Sản xuất cấu kiện' : 'Công trình'}</span></div>
-        {form.target === 'COMPONENT_PRODUCTION' ? <div className="mt-1 text-slate-300">Vị trí nhận: <span className="font-semibold text-white">{selectedProductionZone ? `${selectedProductionZone.code} / ${form.productionSlotId || '-'} / ${form.productionLevel || 'L1'}` : 'Chưa chọn'}</span></div> : null}
-      </div>
-      {form.inventoryItemId && availableZones.length === 0 && (
-        <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
-          Vật tư này chưa có vị trí tồn khả dụng. Hãy nhập kho hoặc gán vị trí tồn trước khi xuất.
+          <div className="mt-3">
+            <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
+          </div>
+          <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú chung phiếu xuất" className={`${textareaClass} mt-3 w-full text-xs`} />
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={handleClose} className={secondaryButtonClass}>Hủy</button>
+            <button disabled={pendingItems.length === 0 || createTransaction.isPending} onClick={submit} className={primaryButtonClass}>
+              {createTransaction.isPending ? 'Đang thực hiện...' : `Xác nhận xuất kho (${pendingItems.length})`}
+            </button>
+          </div>
         </div>
-      )}
-      {form.zoneId && quantity > sourceLocationQty && (
-        <div className="mt-3 rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-100">
-          Số lượng xuất lớn hơn tồn của ô/tầng đã chọn.
-        </div>
-      )}
-      <div className="mt-3">
-        <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
-      </div>
-      <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className={`${textareaClass} mt-3 w-full`} />
-      <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className={secondaryButtonClass}>Hủy</button>
-        <button disabled={!canSubmit} onClick={submit} className={primaryButtonClass}>
-          Xác nhận xuất kho
-        </button>
-      </div>
-      </div>
-      <div
-        className={`grid gap-3 ${
-          form.target === 'COMPONENT_PRODUCTION'
-            ? 'grid-cols-2'
-            : 'grid-cols-1'
-        }`}
-      >
-        <WarehouseMiniMap
-          compact
-          zone={selectedSourceFullZone}
-          slotId={form.sourceSlotId}
-          level={form.sourceLevel}
-          onSelect={(cell: string, selectedLevel: string) =>
-            setForm((prev) => ({
-              ...prev,
-              sourceSlotId: cell,
-              sourceLevel: selectedLevel,
-            }))
-          }
-        />
 
-        {form.target === 'COMPONENT_PRODUCTION' ? (
+        <div
+          className={`grid gap-3 ${
+            form.target === 'COMPONENT_PRODUCTION'
+              ? 'grid-cols-2'
+              : 'grid-cols-1'
+          }`}
+        >
           <WarehouseMiniMap
             compact
-            zone={selectedProductionZone}
-            slotId={form.productionSlotId}
-            level={form.productionLevel}
+            zone={selectedSourceFullZone}
+            slotId={form.sourceSlotId}
+            level={form.sourceLevel}
             onSelect={(cell: string, selectedLevel: string) =>
               setForm((prev) => ({
                 ...prev,
-                productionSlotId: cell,
-                productionLevel: selectedLevel,
+                sourceSlotId: cell,
+                sourceLevel: selectedLevel,
               }))
             }
           />
-        ) : null}
-      </div>
+
+          {form.target === 'COMPONENT_PRODUCTION' ? (
+            <WarehouseMiniMap
+              compact
+              zone={selectedProductionZone}
+              slotId={form.productionSlotId}
+              level={form.productionLevel}
+              onSelect={(cell: string, selectedLevel: string) =>
+                setForm((prev) => ({
+                  ...prev,
+                  productionSlotId: cell,
+                  productionLevel: selectedLevel,
+                }))
+              }
+            />
+          ) : null}
+        </div>
       </div>
     </ModalShell>
   )

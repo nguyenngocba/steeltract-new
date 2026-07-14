@@ -1,4 +1,5 @@
 # Next Tasks
+- **EPIC184 Outbound Multi-material Pending Items UX**: Completed. Refactored the Outbound creation modal to support local pending items batching, location duplicate merging, list review/edit/remove, outbound-specific available stock calculations, and visual warning on stock exceedance.
 - **EPIC183 Inbound Multi-material Pending Items UX**: Completed. Refactored the creation modal to support local pending items batching, location duplicate merging, list review/edit/remove, and non-destructive API error recovery.
 - **EPIC182 Multi-material Business Specification**: Completed. Pending Items
   behavior, duplicate merge, validation order, cancel/rollback and rollout gates

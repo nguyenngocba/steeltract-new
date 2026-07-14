@@ -1,5 +1,11 @@
 # Current State
 
+## EPIC184 Outbound Multi-material Pending Items UX
+
+Status: **COMPLETED**
+
+Redesigned the Xuất kho (Outbound) creation modal to support local batching of draft material items. Operators can fill material details, check location available stock (subtracting already pending quantities), view visual warning if quantity exceeds available stock, add items to the pending list, edit or remove draft items, view aggregate quantities and values, and submit the entire batch in a single atomic request (generating positive/negative transaction lines depending on target). When editing a pending item, the 2D visual layout highlights and focuses back on the item's original slot and level automatically. All business rules (duplicate location merging, rollback preservation, and dirty cancellation) were strictly adhered to. No backend APIs, schemas, or databases were changed.
+
 ## EPIC183 Inbound Multi-material Pending Items UX
 
 Status: **COMPLETED**
