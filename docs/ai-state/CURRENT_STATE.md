@@ -1,5 +1,11 @@
 # Current State
 
+## EPIC183 Inbound Multi-material Pending Items UX
+
+Status: **COMPLETED**
+
+Redesigned the Nhập kho (Inbound) creation modal to support local batching of draft material items. Operators can fill material details, check locations on the 2D layout, add items to the pending list, edit or remove draft items, view aggregate quantities and values, and submit the entire batch in a single atomic request. All business rules (duplicate location merging, rollback preservation, and dirty cancellation) were strictly adhered to. No backend APIs, schemas, or databases were changed.
+
 ## EPIC182 Multi-material Business Specification
 
 Status: **SPECIFICATION APPROVED - UI CONDITIONALLY READY**

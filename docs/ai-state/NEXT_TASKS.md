@@ -1,10 +1,8 @@
 # Next Tasks
+- **EPIC183 Inbound Multi-material Pending Items UX**: Completed. Refactored the creation modal to support local pending items batching, location duplicate merging, list review/edit/remove, and non-destructive API error recovery.
 - **EPIC182 Multi-material Business Specification**: Completed. Pending Items
   behavior, duplicate merge, validation order, cancel/rollback and rollout gates
   are frozen in `docs/architecture/multi-material-*.md`.
-- **EPIC183 Pending Items + Inbound Pilot**: Gemini may implement the local
-  command buffer in the existing Drawer/2D workflow. Preserve presentation,
-  submit one `items[]` request only on Confirm, and keep Pending state on failure.
 - **Public idempotency decision**: Approve durable request-key storage before
   broad Outbound rollout or any mutation auto-retry. Do not use payload hashes
   or time-window deduplication as a substitute.

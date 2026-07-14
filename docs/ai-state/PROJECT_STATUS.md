@@ -1,5 +1,7 @@
 # Project Status
 
+EPIC183 on 2026-07-14 completed the Inbound Multi-material Pending Items UX pilot. The Nhập kho (Inbound) transaction creation modal now supports local batching of draft material movements with exact-duplicate location merging, edit/remove controls, non-destructive API error recovery, and atomic batch posting. All layout styles, themes, and 2D visual layouts were preserved.
+
 EPIC182 on 2026-07-14 approved the Multi-material Business Specification and
 Operator Workflow. Gemini now has fixed rules for Pending state, exact-duplicate
 merge, edit/remove, grouped totals, validation order, dirty cancellation,

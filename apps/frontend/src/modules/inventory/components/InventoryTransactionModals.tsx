@@ -237,6 +237,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const mainZones = useMemo(() => zones.filter(isMainWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
   const queryClient = useQueryClient()
+
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
     inventoryItemId: '',
@@ -252,6 +253,10 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
   const [unitPriceEdited, setUnitPriceEdited] = useState(false)
 
+  // Local state for pending items list
+  const [pendingItems, setPendingItems] = useState<any[]>([])
+  const [showPendingList, setShowPendingList] = useState(false)
+
   const selectedMaterial = materials.find((x: any) => x.id === form.inventoryItemId) as any
   const { data: inboundSuggestion } = useQuery({
     queryKey: ['inventory-inbound-suggestions', form.inventoryItemId],
@@ -265,6 +270,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const subTotal = quantity * unitPrice
   const vatAmount = (subTotal * vat) / 100
   const total = subTotal + vatAmount
+
   const defaultInboundZone = useMemo(() => {
     if (selectedMaterial?.zoneId) {
       const materialZone = mainZones.find((zone: any) => String(zone.id) === String(selectedMaterial.zoneId))
@@ -272,10 +278,12 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     }
     return mainZones.find((zone: any) => !isZoneFull(zone)) ?? mainZones[0]
   }, [selectedMaterial?.zoneId, mainZones])
+
   const selectedInboundZone = mainZones.find((zone: any) => String(zone.id) === String(form.zoneId))
   const selectedInboundZoneFull = isZoneFull(selectedInboundZone)
   const selectedInboundCellOccupied = isCellOccupied(selectedInboundZone, form.slotId, form.level)
   const inboundEmptyCell = findEmptyCell(selectedInboundZone)
+
   const validInboundLocations = useMemo(() => {
     return mainZones.flatMap((zone: any) =>
       INTERNAL_CELLS.flatMap((cell) =>
@@ -289,6 +297,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
       ),
     )
   }, [mainZones])
+
   const missingInboundLocation =
     quantity > 0 && (!form.zoneId || !form.slotId || !form.level)
   const missingInboundLocationCount = missingInboundLocation ? 1 : 0
@@ -298,14 +307,15 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         Number(inboundSuggestion.lastPrice.unitPrice)
       : 0
   const hasLargePriceDelta = priceDeltaPercent > 0.3
-  const canSubmitInbound =
+
+  // Verification helper for single line item adding to Pending
+  const canAddPending =
     Boolean(form.inventoryItemId) &&
     quantity > 0 &&
     unitPrice > 0 &&
     !missingInboundLocation &&
     !selectedInboundZoneFull &&
-    !selectedInboundCellOccupied &&
-    !createTransaction.isPending
+    !selectedInboundCellOccupied
 
   useEffect(() => {
     if (!open) return
@@ -359,7 +369,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     form.level,
     validInboundLocations,
   ])
-  
+
   useEffect(() => {
     if (!form.inventoryItemId) return
 
@@ -397,255 +407,478 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     }))
   }
 
-  async function submit() {
-    if (!form.inventoryItemId || quantity <= 0 || unitPrice <= 0) return
-    if (missingInboundLocation) {
-      toast.error('Vui lòng chọn vị trí lưu kho.')
-      return
+  // --- Multi-material local workflows ---
+  function handleAddPending() {
+    if (!canAddPending) return
+
+    const newItem = {
+      id: Date.now() + Math.random().toString(),
+      inventoryItemId: form.inventoryItemId,
+      materialCode: selectedMaterial?.code || 'NA',
+      materialName: selectedMaterial?.name || '-',
+      unit: selectedMaterial?.unit || 'tấn',
+      quantity,
+      unitPrice,
+      vat,
+      zoneId: form.zoneId,
+      zoneCode: selectedInboundZone?.code || 'ZONE',
+      warehouseId: selectedInboundZone?.warehouseId,
+      warehouseName: selectedInboundZone?.name || '-',
+      slotId: form.slotId,
+      level: form.level,
     }
-    if (selectedInboundZoneFull) return
-    if (selectedInboundCellOccupied) return
-    const no = generateTransactionNo('NK')
-    const transaction = await createTransaction.mutateAsync({
-      type: 'INBOUND',
-      transactionNo: no,
-      transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
-      supplierId: form.supplierId || undefined,
-      supplierName: suppliers.find((x: any) => x.id === form.supplierId)?.name,
-      warehouseId: selectedInboundZone?.warehouseId || undefined,
-      remarks: form.remark || undefined,
-      items: [
-        {
-          inventoryItemId: form.inventoryItemId,
-          quantity,
-          unitPrice,
-          warehouseId: selectedInboundZone?.warehouseId || undefined,
-          zoneId: form.zoneId || undefined,
-          slotId: form.slotId,
-          level: form.level,
-        },
-      ],
+
+    setPendingItems((prev) => {
+      // Merging Rule: Exact duplicate -> Merge. Khác location/UOM -> Không merge.
+      const idx = prev.findIndex(
+        (x) =>
+          String(x.inventoryItemId) === String(newItem.inventoryItemId) &&
+          String(x.zoneId) === String(newItem.zoneId) &&
+          String(x.slotId) === String(newItem.slotId) &&
+          String(x.level) === String(newItem.level) &&
+          x.unit === newItem.unit
+      )
+      if (idx > -1) {
+        const updated = [...prev]
+        updated[idx] = {
+          ...updated[idx],
+          quantity: updated[idx].quantity + newItem.quantity,
+        }
+        return updated
+      }
+      return [...prev, newItem]
     })
-    await refreshInventoryCache(queryClient)
-    try {
-      await uploadInventoryTransactionAttachments({
-        transaction,
-        files: attachmentFiles,
-      })
-    } catch {
-      toast.error('Phiếu đã lưu nhưng upload tài liệu nhập kho thất bại')
-    }
-    setForm({
-      transactionDate: formatLocalDateTimeInput(),
+
+    // Reset line items in form
+    setForm((prev) => ({
+      ...prev,
       inventoryItemId: '',
-      supplierId: '',
       zoneId: '',
       slotId: '',
       level: '',
       quantity: '',
       unitPrice: '',
       vat: '10',
-      remark: '',
-    })
-    setAttachmentFiles([])
+    }))
     setUnitPriceEdited(false)
+    toast.success('Đã thêm vật tư vào danh sách chờ')
+  }
+
+  function handleRemovePending(id: string) {
+    setPendingItems((prev) => prev.filter((x) => x.id !== id))
+    toast.success('Đã xóa vật tư khỏi danh sách chờ')
+  }
+
+  function handleEditPending(item: any) {
+    const formIsDirty = form.inventoryItemId || form.quantity || form.unitPrice
+    if (formIsDirty) {
+      if (!window.confirm('Vật tư đang nhập trong form sẽ bị ghi đè. Bạn có muốn tiếp tục?')) {
+        return
+      }
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      inventoryItemId: item.inventoryItemId,
+      zoneId: item.zoneId,
+      slotId: item.slotId,
+      level: item.level,
+      quantity: formatQuantityInput(String(item.quantity)),
+      unitPrice: formatCurrencyInput(String(item.unitPrice)),
+      vat: String(item.vat),
+    }))
+    setUnitPriceEdited(true)
+
+    setPendingItems((prev) => prev.filter((x) => x.id !== item.id))
+  }
+
+  function formatQuantitySummary(items: any[]) {
+    const uoms = new Map<string, number>()
+    items.forEach((item) => {
+      const unit = item.unit || 'tấn'
+      uoms.set(unit, (uoms.get(unit) || 0) + item.quantity)
+    })
+    return Array.from(uoms.entries())
+      .map(([unit, qty]) => `${formatQuantity(qty)} ${unit}`)
+      .join(', ')
+  }
+
+  function calculatePendingTotal(items: any[]) {
+    return items.reduce((sum, item) => {
+      const sub = item.quantity * item.unitPrice
+      const vatVal = (sub * item.vat) / 100
+      return sum + sub + vatVal
+    }, 0)
+  }
+
+  // --- Confirm submission ---
+  async function submit() {
+    if (pendingItems.length === 0) return
+
+    const no = generateTransactionNo('NK')
+    const payloadItems = pendingItems.map((item) => ({
+      inventoryItemId: item.inventoryItemId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      warehouseId: item.warehouseId || undefined,
+      zoneId: item.zoneId || undefined,
+      slotId: item.slotId,
+      level: item.level,
+    }))
+
+    try {
+      const transaction = await createTransaction.mutateAsync({
+        type: 'INBOUND',
+        transactionNo: no,
+        transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
+        supplierId: form.supplierId || undefined,
+        supplierName: suppliers.find((x: any) => x.id === form.supplierId)?.name,
+        warehouseId: pendingItems[0]?.warehouseId || undefined,
+        remarks: form.remark || undefined,
+        items: payloadItems,
+      })
+
+      await refreshInventoryCache(queryClient)
+
+      try {
+        await uploadInventoryTransactionAttachments({
+          transaction,
+          files: attachmentFiles,
+        })
+      } catch {
+        toast.error('Phiếu đã lưu nhưng upload tài liệu nhập kho thất bại')
+      }
+
+      toast.success('Nhập kho thành công!')
+
+      // Clear pending list and close modal only on SUCCESS
+      setPendingItems([])
+      setForm({
+        transactionDate: formatLocalDateTimeInput(),
+        inventoryItemId: '',
+        supplierId: '',
+        zoneId: '',
+        slotId: '',
+        level: '',
+        quantity: '',
+        unitPrice: '',
+        vat: '10',
+        remark: '',
+      })
+      setAttachmentFiles([])
+      setUnitPriceEdited(false)
+      onClose()
+    } catch {
+      // If one item fails, transaction rollbacks entirely, and we KEEP pending list intact
+      toast.error('Có lỗi xảy ra khi xác nhận nhập kho. Danh sách chờ được giữ nguyên.')
+    }
+  }
+
+  function handleClose() {
+    const isDirty = pendingItems.length > 0 || form.inventoryItemId || form.quantity || form.remark
+    if (isDirty) {
+      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn thoát?')) {
+        return
+      }
+    }
     onClose()
   }
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Nhập kho vật tư" wide>
+    <ModalShell open={open} onClose={handleClose} title="Nhập kho vật tư" wide>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_520px]">
-      <div>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
-        <select value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
-          <option value="">Nhà cung cấp</option>
-          {suppliers.map((s: any) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select value={form.inventoryItemId} onChange={(e) => {
-          setUnitPriceEdited(false)
-          setForm((f) => ({ ...f, inventoryItemId: e.target.value }))
-        }} className={fieldClass}>
-          <option value="">Vật tư</option>
-          {materials.map((m: any) => (
-            <option key={m.id} value={m.id}>
-              {m.code} - {m.name}
-            </option>
-          ))}
-        </select>
-        <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
-        <input value={form.unitPrice} onChange={(e) => {
-          setUnitPriceEdited(true)
-          setForm((f) => ({ ...f, unitPrice: formatCurrencyInput(e.target.value) }))
-        }} inputMode="numeric" placeholder="Đơn giá nhập" className={fieldClass} />
-        <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
-          Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
-        </div>
-        <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
-          <option value="">Vị trí nhận thuộc Kho chính</option>
-          {mainZones.map((z: any) => (
-            <option disabled={isZoneFull(z)} key={z.id} value={z.id}>
-              {zoneDisplay(z)}{isZoneFull(z) ? ' · FULL' : ''}
-            </option>
-          ))}
-        </select>
-        <select value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
-          <option value="">Chọn ô trong vị trí</option>
-          {INTERNAL_CELLS.map((cell) => {
-            const occupiedOnAnyLevel = selectedInboundZone && INTERNAL_LEVELS.every((item) => isCellOccupied(selectedInboundZone, cell, item))
-            return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
-          })}
-        </select>
-        <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
-          <option value="">Chọn tầng nhận</option>
-          {INTERNAL_LEVELS.map((level) => {
-            const occupied = selectedInboundZone && form.slotId && isCellOccupied(selectedInboundZone, form.slotId, level)
-            return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
-          })}
-        </select>
-        <input value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
-      </div>
-      <div className="mt-2 grid grid-cols-1 gap-2 text-sm md:grid-cols-4">
-        <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
-        <MetricBox title="Sau nhập" value={formatQuantity(currentStock + quantity)} />
-        <MetricBox title="Ô/Tầng" value={form.slotId ? `${form.slotId} / ${form.level || 'L1'}` : 'Chưa chọn'} />
-        <MetricBox title="Sức chứa" value={selectedInboundZone ? `${formatQuantity(selectedInboundZone.materialCount)} / ${formatQuantity(selectedInboundZone.capacity)}` : 'Chưa chọn'} />
-      </div>
-      {selectedInboundZoneFull ? <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
-        Slot/tầng này đã đầy. Vui lòng chọn vị trí hoặc tầng khác trước khi xác nhận nhập kho.
-      </div> : null}
-      {missingInboundLocation ? <div className="mt-3 rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">
-        <div className="font-semibold">Vui lòng chọn vị trí lưu kho.</div>
-        <div className="mt-1 text-red-100/90">{missingInboundLocationCount} vật tư chưa chọn vị trí lưu kho.</div>
-      </div> : null}
-      {form.zoneId ? <div className={`mt-2 flex flex-col gap-3 rounded-xl border p-2 text-sm md:flex-row md:items-center md:justify-between ${
-        selectedInboundCellOccupied
-          ? 'border-red-400/40 bg-red-500/10 text-red-200'
-          : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-      }`}>
-        <span>
-          {selectedInboundCellOccupied
-            ? `Ô ${form.slotId || '-'} / ${form.level || 'L1'} đã có vật tư, không thể nhập thêm vào ô/tầng này.`
-            : inboundEmptyCell
-              ? `Ô trống gợi ý: ${inboundEmptyCell.cell} / ${inboundEmptyCell.level}.`
-              : 'Vị trí này chưa còn ô/tầng trống khả dụng.'}
-        </span>
-        <button type="button" onClick={suggestInboundLocation} className="rounded-lg border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15">
-          Gợi ý ô trống
-        </button>
-      </div> : null}
-      {form.inventoryItemId ? <div className="mt-2 rounded-xl border border-cyan-300/20 bg-cyan-500/10 p-2 text-sm text-slate-200">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Vị trí gợi ý</div>
-            {inboundSuggestion?.lastLocation ? (
-              <div className="mt-1 text-white">
-                {[
-                  inboundSuggestion.lastLocation.zoneCode,
-                  inboundSuggestion.lastLocation.slotId,
-                  inboundSuggestion.lastLocation.level,
-                ].filter(Boolean).join('-')}
-                {formatPercent(inboundSuggestion.lastLocation.freePercent) ? (
-                  <span className="ml-2 text-cyan-200">
-                    (còn trống {formatPercent(inboundSuggestion.lastLocation.freePercent)})
+        <div>
+          {/* Pending Header */}
+          {pendingItems.length > 0 && (
+            <div className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-cyan-300 uppercase tracking-wider">Danh sách chờ nhập</span>
+                  <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+                    {pendingItems.length} loại vật tư
                   </span>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-1 text-slate-400">Chưa có lịch sử vị trí cho vật tư này.</div>
-            )}
-          </div>
-          {inboundSuggestion?.lastLocation ? (
-            <button
-              type="button"
-              onClick={() => setForm((prev) => ({
-                ...prev,
-                zoneId: inboundSuggestion.lastLocation.zoneId ?? prev.zoneId,
-                slotId: inboundSuggestion.lastLocation.slotId ?? prev.slotId,
-                level: inboundSuggestion.lastLocation.level ?? prev.level,
-              }))}
-              className="rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
-            >
-              Dùng vị trí gợi ý
-            </button>
-          ) : null}
-        </div>
-        <div className="mt-1 border-t border-cyan-300/10 pt-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Đơn giá gần nhất</div>
-          {inboundSuggestion?.lastPrice ? (
-            <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="text-white">
-                  {formatCurrency(inboundSuggestion.lastPrice.unitPrice)}
-                  {selectedMaterial?.unit ? <span className="text-slate-400">/{selectedMaterial.unit}</span> : null}
                 </div>
-                <div className="text-xs text-slate-400">
-                  {[
-                    formatShortDate(inboundSuggestion.lastPrice.transactionDate),
-                    inboundSuggestion.lastPrice.supplierName,
-                    inboundSuggestion.lastPrice.transactionNo,
-                  ].filter(Boolean).join(' · ')}
+                <div className="text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+                  <span>
+                    Tổng khối lượng: <span className="font-semibold text-white">{formatQuantitySummary(pendingItems)}</span>
+                  </span>
+                  <span>
+                    Tổng giá trị (sau thuế): <span className="font-semibold text-emerald-400">{formatCurrency(calculatePendingTotal(pendingItems))}</span>
+                  </span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setUnitPriceEdited(true)
-                  setForm((prev) => ({
-                    ...prev,
-                    unitPrice: formatCurrencyInput(String(inboundSuggestion.lastPrice.unitPrice)),
-                  }))
-                }}
-                className="rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20"
+                onClick={() => setShowPendingList(!showPendingList)}
+                className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-500/10 px-3 py-1.5 font-semibold text-cyan-100 hover:bg-cyan-500/20 transition-colors"
               >
-                Dùng đơn giá gần nhất
+                {showPendingList ? 'Ẩn danh sách' : 'Xem danh sách'}
               </button>
             </div>
-          ) : (
-            <div className="mt-1 text-slate-400">Chưa có lịch sử đơn giá nhập.</div>
           )}
-          <div className="mt-1 text-xs text-slate-300">
-            Giá trung bình 30 ngày:{' '}
-            <span className="font-semibold text-cyan-200">
-              {inboundSuggestion?.averagePrice30Days
-                ? formatCurrency(inboundSuggestion.averagePrice30Days)
-                : 'Chưa có dữ liệu'}
-            </span>
+
+          {/* Pending Panel */}
+          {showPendingList && pendingItems.length > 0 && (
+            <div className="mb-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/45 text-xs">
+              <div className="bg-white/[0.04] px-3 py-2 font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
+                Chi tiết danh sách chờ nhập
+              </div>
+              <div className="max-h-48 overflow-y-auto divide-y divide-white/5">
+                {pendingItems.map((item) => (
+                  <div key={item.id} className="p-2.5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-cyan-300">{item.materialCode}</span>
+                        <span className="truncate text-slate-400">{item.materialName}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500 flex flex-wrap gap-x-3">
+                        <span>Vị trí: <span className="text-slate-300">{item.zoneCode} / {item.slotId} / {item.level}</span></span>
+                        <span>Đơn giá: <span className="text-slate-300">{formatCurrency(item.unitPrice)}</span></span>
+                        <span>Thuế: <span className="text-slate-300">{item.vat}%</span></span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-4 text-right">
+                      <div>
+                        <div className="font-bold text-white">{formatQuantity(item.quantity)} {item.unit}</div>
+                        <div className="mt-0.5 text-[11px] text-emerald-400 font-medium">
+                          {formatCurrency(item.quantity * item.unitPrice * (1 + item.vat / 100))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPending(item)}
+                          className="rounded p-1 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                          title="Sửa dòng này"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePending(item.id)}
+                          className="rounded p-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          title="Xóa dòng này"
+                        >
+                          ❌
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+            <select value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
+              <option value="">Nhà cung cấp</option>
+              {suppliers.map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <select value={form.inventoryItemId} onChange={(e) => {
+              setUnitPriceEdited(false)
+              setForm((f) => ({ ...f, inventoryItemId: e.target.value }))
+            }} className={fieldClass}>
+              <option value="">Vật tư</option>
+              {materials.map((m: any) => (
+                <option key={m.id} value={m.id}>
+                  {m.code} - {m.name}
+                </option>
+              ))}
+            </select>
+            <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+            <input value={form.unitPrice} onChange={(e) => {
+              setUnitPriceEdited(true)
+              setForm((f) => ({ ...f, unitPrice: formatCurrencyInput(e.target.value) }))
+            }} inputMode="numeric" placeholder="Đơn giá nhập" className={fieldClass} />
+            <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
+              Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
+            </div>
+            <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
+              <option value="">Vị trí nhận thuộc Kho chính</option>
+              {mainZones.map((z: any) => (
+                <option disabled={isZoneFull(z)} key={z.id} value={z.id}>
+                  {zoneDisplay(z)}{isZoneFull(z) ? ' · FULL' : ''}
+                </option>
+              ))}
+            </select>
+            <select value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
+              <option value="">Chọn ô trong vị trí</option>
+              {INTERNAL_CELLS.map((cell) => {
+                const occupiedOnAnyLevel = selectedInboundZone && INTERNAL_LEVELS.every((item) => isCellOccupied(selectedInboundZone, cell, item))
+                return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
+              })}
+            </select>
+            <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
+              <option value="">Chọn tầng nhận</option>
+              {INTERNAL_LEVELS.map((level) => {
+                const occupied = selectedInboundZone && form.slotId && isCellOccupied(selectedInboundZone, form.slotId, level)
+                return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
+              })}
+            </select>
+            <input value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
           </div>
-          {hasLargePriceDelta ? (
-            <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              Đơn giá chênh lệch lớn so với lịch sử.
+          <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
+            <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
+            <MetricBox title="Sau nhập" value={formatQuantity(currentStock + quantity)} />
+            <MetricBox title="Ô/Tầng" value={form.slotId ? `${form.slotId} / ${form.level || 'L1'}` : 'Chưa chọn'} />
+            <MetricBox title="Sức chứa" value={selectedInboundZone ? `${formatQuantity(selectedInboundZone.materialCount)} / ${formatQuantity(selectedInboundZone.capacity)}` : 'Chưa chọn'} />
+          </div>
+          {selectedInboundZoneFull ? (
+            <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+              Slot/tầng này đã đầy. Vui lòng chọn vị trí hoặc tầng khác trước khi xác nhận nhập kho.
             </div>
           ) : null}
+          {missingInboundLocation ? (
+            <div className="mt-3 rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
+              <div className="font-semibold">Vui lòng chọn vị trí lưu kho.</div>
+              <div className="mt-1 text-red-100/90">{missingInboundLocationCount} vật tư chưa chọn vị trí lưu kho.</div>
+            </div>
+          ) : null}
+          {form.zoneId ? (
+            <div className={`mt-2 flex flex-col gap-3 rounded-xl border p-2 text-xs md:flex-row md:items-center md:justify-between ${
+              selectedInboundCellOccupied
+                ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+            }`}>
+              <span>
+                {selectedInboundCellOccupied
+                  ? `Ô ${form.slotId || '-'} / ${form.level || 'L1'} đã có vật tư, không thể nhập thêm vào ô/tầng này.`
+                  : inboundEmptyCell
+                    ? `Ô trống gợi ý: ${inboundEmptyCell.cell} / ${inboundEmptyCell.level}.`
+                    : 'Vị trí này chưa còn ô/tầng trống khả dụng.'}
+              </span>
+              <button type="button" onClick={suggestInboundLocation} className="rounded-lg border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15">
+                Gợi ý ô trống
+              </button>
+            </div>
+          ) : null}
+          {form.inventoryItemId ? (
+            <div className="mt-2 rounded-xl border border-cyan-300/20 bg-cyan-500/10 p-2 text-xs text-slate-200">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Vị trí gợi ý</div>
+                  {inboundSuggestion?.lastLocation ? (
+                    <div className="mt-1 text-white">
+                      {[
+                        inboundSuggestion.lastLocation.zoneCode,
+                        inboundSuggestion.lastLocation.slotId,
+                        inboundSuggestion.lastLocation.level,
+                      ].filter(Boolean).join('-')}
+                      {formatPercent(inboundSuggestion.lastLocation.freePercent) ? (
+                        <span className="ml-2 text-cyan-200">
+                          (còn trống {formatPercent(inboundSuggestion.lastLocation.freePercent)})
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-slate-400">Chưa có lịch sử vị trí cho vật tư này.</div>
+                  )}
+                </div>
+                {inboundSuggestion?.lastLocation ? (
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({
+                      ...prev,
+                      zoneId: inboundSuggestion.lastLocation.zoneId ?? prev.zoneId,
+                      slotId: inboundSuggestion.lastLocation.slotId ?? prev.slotId,
+                      level: inboundSuggestion.lastLocation.level ?? prev.level,
+                    }))}
+                    className="rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
+                  >
+                    Dùng vị trí gợi ý
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-1 border-t border-cyan-300/10 pt-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200">Đơn giá gần nhất</div>
+                {inboundSuggestion?.lastPrice ? (
+                  <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-white">
+                        {formatCurrency(inboundSuggestion.lastPrice.unitPrice)}
+                        {selectedMaterial?.unit ? <span className="text-slate-400">/{selectedMaterial.unit}</span> : null}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {[
+                          formatShortDate(inboundSuggestion.lastPrice.transactionDate),
+                          inboundSuggestion.lastPrice.supplierName,
+                          inboundSuggestion.lastPrice.transactionNo,
+                        ].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnitPriceEdited(true)
+                        setForm((prev) => ({
+                          ...prev,
+                          unitPrice: formatCurrencyInput(String(inboundSuggestion.lastPrice.unitPrice)),
+                        }))
+                      }}
+                      className="rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20"
+                    >
+                      Dùng đơn giá gần nhất
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-slate-400">Chưa có lịch sử đơn giá nhập.</div>
+                )}
+                <div className="mt-1 text-xs text-slate-300">
+                  Giá trung bình 30 ngày:{' '}
+                  <span className="font-semibold text-cyan-200">
+                    {inboundSuggestion?.averagePrice30Days
+                      ? formatCurrency(inboundSuggestion.averagePrice30Days)
+                      : 'Chưa có dữ liệu'}
+                  </span>
+                </div>
+                {hasLargePriceDelta ? (
+                  <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                    Đơn giá chênh lệch lớn so với lịch sử.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-xs">
+            <div className="text-slate-300">Thành tiền trước VAT: <span className="font-semibold text-cyan-300">{formatCurrency(subTotal)}</span></div>
+            <div className="mt-1 text-slate-300">Tiền VAT: <span className="font-semibold text-cyan-300">{formatCurrency(vatAmount)}</span></div>
+            <div className="mt-1 text-base font-semibold text-white">Tổng thanh toán vật tư hiện tại: <span className="text-cyan-300">{formatCurrency(total)}</span></div>
+          </div>
+
+          {/* Add to Pending Button */}
+          <button
+            type="button"
+            disabled={!canAddPending}
+            onClick={handleAddPending}
+            className="w-full mt-3 rounded-lg border border-cyan-400/30 bg-cyan-400/10 py-2.5 font-semibold text-cyan-200 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50 text-xs"
+          >
+            + Thêm vào danh sách chờ nhập
+          </button>
+
+          <div className="mt-3">
+            <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
+          </div>
+          <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú chung phiếu nhập" className={`${textareaClass} mt-3 w-full text-xs`} />
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={handleClose} className={secondaryButtonClass}>Hủy</button>
+            <button disabled={pendingItems.length === 0 || createTransaction.isPending} onClick={submit} className={primaryButtonClass}>
+              {createTransaction.isPending ? 'Đang thực hiện...' : `Xác nhận nhập kho (${pendingItems.length})`}
+            </button>
+          </div>
         </div>
-      </div> : null}
-      <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
-        <div className="text-slate-300">Thành tiền trước VAT: <span className="font-semibold text-cyan-300">{formatCurrency(subTotal)}</span></div>
-        <div className="mt-1 text-slate-300">Tiền VAT: <span className="font-semibold text-cyan-300">{formatCurrency(vatAmount)}</span></div>
-        <div className="mt-1 text-xl font-semibold text-white">Tổng thanh toán: <span className="text-cyan-300">{formatCurrency(total)}</span></div>
-      </div>
-      <div className="mt-3">
-        <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
-      </div>
-      <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú" className={`${textareaClass} mt-3 w-full`} />
-      <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className={secondaryButtonClass}>Hủy</button>
-        <button disabled={!canSubmitInbound} onClick={submit} className={primaryButtonClass}>
-          Xác nhận nhập kho
-        </button>
-      </div>
-      </div>
-      <WarehouseMiniMap
-        compact
-        zone={selectedInboundZone}
-        slotId={form.slotId}
-        level={form.level}
-        onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, slotId: cell, level: selectedLevel }))}
-      />
+        <WarehouseMiniMap
+          compact
+          zone={selectedInboundZone}
+          slotId={form.slotId}
+          level={form.level}
+          onSelect={(cell: string, selectedLevel: string) => setForm((prev) => ({ ...prev, slotId: cell, level: selectedLevel }))}
+        />
       </div>
     </ModalShell>
   )

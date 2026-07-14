@@ -1,5 +1,19 @@
 # SteelTrack AI Changelog
 
+## 2026-07-14 EPIC183 Inbound Multi-material Pending Items UX
+
+Completed:
+
+* Refactored `InboundTransactionModal` within `InventoryTransactionModals.tsx` to support the multi-material pending pilot.
+* Implemented local state batching with "Thêm vào danh sách chờ nhập" button.
+* Added exact duplicate location merging (merges quantities if material ID, zone ID, slot ID, level, and UOM match).
+* Designed the Pending Header displaying total unique materials, quantity summaries grouped by UOM, and aggregate VAT-inclusive values.
+* Added a detailed Pending Panel with Edit (loads line item back into form, warns if form is dirty) and Remove actions.
+* Configured atomic single-request submission (sends `items[]` array in one API payload).
+* Preserved local pending state on submission failures to prevent operator data loss (non-destructive API error handling).
+* Implemented dirty cancellation confirmation warning on closing/cancelling.
+* Created design and operator walkthrough documentation `docs/ui/inventory-inbound-pending-report.md`.
+
 ## 2026-07-14 EPIC182 Multi-material Business Specification
 
 Completed:
