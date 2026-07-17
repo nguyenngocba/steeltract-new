@@ -1,5 +1,167 @@
 # Current State
 
+## RFC003 Production Aggregate and Execution Implementation
+
+Status: **APPROVED - CANONICAL DOMAIN COMPLETE**
+
+The missing AD-017 Production Execution aggregate is now durable and
+independently versioned. Order start atomically starts the first Work Order and
+execution run; internal start/pause/resume/complete/abort commands persist
+timeline, ActivityLog, audit and canonical V1 Outbox together. Active-run
+uniqueness is database-enforced, completion paths reject active runs and the
+existing Enterprise Read Platform consumes `production.execution.*`. No route,
+UI, Inventory, Components or Architecture Decision changed.
+
+## RFC003 Components Aggregate Implementation
+
+Status: **APPROVED - ADDITIVE COMMAND API AVAILABLE**
+
+The AD-015/016/019 Component aggregate is now exposed through authenticated
+`/components/commands` routes for identity creation, Revision creation,
+Engineering BOM replace/validate, review, approval, release, deprecation and
+archive. Existing aggregate commands require optimistic versions and every
+mutation requires durable idempotency. The legacy `/components` API and
+frontend remain unchanged; legacy rows are not automatically adopted.
+
+## EPIC188 Production Command API Rollout
+
+Status: **APPROVED - ADDITIVE COMMAND API AVAILABLE**
+
+RFC002 commands are exposed under `/production/commands` with JWT, mandatory
+durable idempotency and explicit optimistic versions. Production Order, Work
+Order, Completion, Scrap and Rework endpoints delegate only to the canonical
+aggregate service. AD-019 correlation/causation and retry metadata remain
+unchanged; timeline, ActivityLog, audit and domain Outbox remain atomic. The
+legacy `/production` API and frontend are unchanged and continue as a
+compatibility surface pending controlled client migration.
+
+## RFC002 Production Aggregate Implementation
+
+Status: **IMPLEMENTED - CANONICAL INTERNAL BOUNDARY**
+
+Production now has additive AD-015/017/018/019 aggregate persistence for
+Production Order, `1:N` Work Orders, append-only Completion/Scrap and linked
+Rework orders. Versioned commands enforce state transitions, optimistic
+concurrency and idempotency; mutation, timeline, ActivityLog, audit Outbox and
+canonical V1 domain Outbox commit atomically. Issue/Return material facts now
+retain the Inventory posting receipt. No public API, frontend, Inventory or
+Components behavior changed. Public command cutover and operator certification
+remain pending.
+
+## Components Aggregate Implementation
+
+Status: **IMPLEMENTED - CANONICAL INTERNAL BOUNDARY**
+
+AD-015/016/019 now have an additive backend implementation for Component
+identity, Revision, Engineering BOM, release and archive. Canonical commands
+enforce state transitions, optimistic versions and idempotency; mutation,
+timeline, ActivityLog, audit Outbox and canonical V1 domain facts commit in one
+Components repository transaction. Existing `ComponentStatus`, records, API
+and frontend remain compatibility paths and were not reinterpreted. One
+additive migration introduces the canonical persistence models without data
+rewrite.
+
+## ADS004 Cross-module Event Contract
+
+Status: **APPROVED - FINAL ARCHITECTURE GATE COMPLETE**
+
+AD-019 now fixes canonical event names, envelope version 1, payload families,
+sole publishers, subscribers, aggregate ordering, idempotency, retries, replay
+and projection permissions across Inventory, Components, Production, QC,
+Projects, Yard and Logistics. Ambiguous aliases were rejected in favor of the
+AD-015/016/017/018 owner facts. Current legacy/internal events remain runtime
+compatibility signals and were not changed. No code, API, schema, migration,
+workflow or data changed.
+
+## ADS003.5 Production-Inventory Interaction Contract
+
+Status: **APPROVED - NORMATIVE APPLICATION CONTRACT**
+
+Production owns reservation/material intent, consumption, completion, Scrap and
+its ledger; Inventory owns physical stock and valuation. Reservation,
+Consumption, Completion and non-recoverable Scrap never mutate Inventory.
+Issue, Return and explicit recoverable Scrap receipt call Inventory-owned
+posting inside one shared local transaction and receive an idempotent bounded
+PostingReceipt. Owner Outboxes update projections only after commit and cannot
+repeat stock mutation. Public APIs, code, schema, state machines and data remain
+unchanged.
+
+## ADS003 Production State Machine
+
+Status: **APPROVED - NORMATIVE ARCHITECTURE DECISION**
+
+Production Order retains its canonical lifecycle and `READY` remains an
+admission state with Start-time revalidation. One Order coordinates `1:N` Work
+Orders and independently tracked Execution Runs. Partial Completion is
+append-only; final completion does not auto-close. Scrap is a separate
+Production disposition, while Rework creates a linked `REWORK` Order instead of
+rewinding the original. Inventory remains stock owner, Components owns released
+engineering definition, and QC owns rejection/NCR truth. Existing schema/API
+records remain compatibility-only; no code, API, schema, migration, workflow or
+data changed.
+
+## ADS002 Component State Machine
+
+Status: **APPROVED - NORMATIVE ARCHITECTURE DECISION**
+
+Components now has a final identity/engineering lifecycle decision. Component
+uses `DRAFT -> ACTIVE -> DEPRECATED -> ARCHIVED`; Component Revision uses
+`DRAFT -> IN_REVIEW -> APPROVED -> RELEASED -> SUPERSEDED -> ARCHIVED` with
+controlled review returns. Engineering BOM is versioned and released atomically
+with the Revision. Released content is immutable, release does not roll back,
+and at most one revision is current. Existing operational `ComponentStatus`
+values remain compatibility data owned as projections by Production, QC,
+Inventory/Yard, Logistics and Projects. No code, API, schema, migration,
+workflow or data changed.
+
+## ADS001 SteelTrack Domain Ownership Matrix
+
+Status: **APPROVED - NORMATIVE ARCHITECTURE DECISION**
+
+Ownership is now fixed across Inventory, Components, Production, QC, Projects,
+Yard, Suppliers and Logistics. Inventory alone owns stock posting; Production
+owns reservation/issue intent/consumption/return intent and execution;
+Components owns identity and future revision/released engineering definition;
+QC owns quality truth; Projects owns allocation/site acceptance; Yard owns
+physical placement/movement/loading execution; Logistics owns transport;
+Suppliers owns commercial source documents. Foreign table/repository writes are
+forbidden. Cross-context mutations must call an owner-exported command service;
+local transaction context may be shared only for required atomic invariants.
+No code, API, schema, migration, runtime behavior or data changed.
+
+## EPIC186 Components Domain Audit & Foundation
+
+Status: **AUDIT COMPLETE - DOMAIN FOUNDATION BLOCKED**
+
+Components retains PASS status for Repository, ADR011 core read paths,
+Snapshot, Runtime and Operations Center. Domain completion is blocked because
+`ComponentStatus` mixes Production stage, stock, QC and logistics concerns,
+generic updates bypass a complete transition matrix, cross-module repositories
+write Component directly, and revision/release/archive do not exist. The active
+Components Material Stock UI also reconstructs Production/Inventory balances
+and posts generic Inventory returns instead of using the Production material
+command boundary. No code, API, schema, migration, workflow or data changed.
+
+## EPIC186 Production Domain Completion Assessment
+
+Status: **AUDIT COMPLETE - IMPLEMENTATION BLOCKED ON DOMAIN ALIGNMENT**
+
+Production already has the approved canonical lifecycle, repository boundary,
+atomic `production.order.*`/`production.material.*` Outbox paths, material flow,
+snapshot/runtime foundation and ADR011 read paths. The audit found that Work
+Order remains a disconnected CRUD model, completion/rejected/remaining quantity
+semantics are not modeled, and canonical Scrap remains explicitly deferred.
+The requested legacy event names and Inventory-owned Consumption would conflict
+with PROD-011/014/015. No application code, API, schema, migration, workflow or
+data changed. A Production Domain Alignment sprint is required before bounded
+implementation.
+
+## EPIC185 Transfer Multi-material Pending Items UX
+
+Status: **COMPLETED**
+
+Redesigned the Điều chuyển (Transfer) creation modal to support local batching of draft material items. Operators can fill material details, check source available stock (subtracting already pending quantities), view visual warning and disable addition if quantity exceeds available source stock, add items to the pending list, edit or remove draft items, view aggregate quantities and transfer counts, and submit the entire batch in a single atomic request (generating positive destination and negative source transaction lines). When editing a pending item, both the source and destination 2D visual layouts highlight and focus back on the item's original slot and level automatically. All business rules (duplicate location merging, rollback preservation, and dirty cancellation) were strictly adhered to. No backend APIs, schemas, or databases were changed.
+
 ## EPIC184 Outbound Multi-material Pending Items UX
 
 Status: **COMPLETED**
@@ -1534,3 +1696,27 @@ background update. Existing operator-generated YardSnapshot remains a separate
 manual audit artifact. The additive migration is valid/generated but not
 deployed, and no snapshot data was backfilled. Yard workspace continues to use
 the EPIC162 repository live read model.
+
+# Enterprise Read Platform (2026-07-17)
+
+Status: **FOUNDATION IMPLEMENTED, MIGRATION AND UI CUTOVER PENDING**
+
+The shared background worker now projects retained Domain Outbox events into
+idempotent, replayable and resumable enterprise projection documents. Production,
+Components, Inventory and cross-module catalogs are available through an
+additive GET-only Query API with checkpoint, lag and failure health. Existing UI,
+aggregate APIs and snapshots are unchanged. Inventory availability/location
+projections are not authoritative until canonical events supply complete stock
+and location facts; no missing value is synthesized.
+
+# RFC002A Canonical Payload Certification (2026-07-17)
+
+Status: **IMPLEMENTED WITH EXPLICIT NON-AUTHORITATIVE GAPS**
+
+Canonical producers in Inventory, Production, Components, QC and Yard now emit
+bounded projection facts with AD-019 envelopes. The Enterprise projection
+migration is deployed. A real-Outbox rebuild scanned 90 rows per projection and
+produced 142 deterministic documents with no active failure. Historical
+Inventory compatibility events remain incomplete; Production Execution, QC
+Disposition, Yard Loading, Projects and Logistics canonical publishers are
+absent and were not invented.

@@ -10,10 +10,12 @@ import { ComponentsReadModelService } from './services/components-read-model.ser
 import { EventsModule } from '../../core/events/events.module';
 import { SnapshotsModule } from '../../core/snapshots/snapshots.module';
 import { ComponentsSnapshotReadService } from './services/components-snapshot-read.service';
+import { ComponentCommandService } from './services/component-command.service';
+import { ComponentCommandController } from './component-command.controller';
 
 @Module({
   imports: [PrismaModule, EventsModule, SnapshotsModule],
-  controllers: [ComponentsController],
+  controllers: [ComponentsController, ComponentCommandController],
   providers: [
     ComponentsRepository,
     ComponentCostingRepository,
@@ -22,11 +24,13 @@ import { ComponentsSnapshotReadService } from './services/components-snapshot-re
     ComponentCostingService,
     ComponentsReadModelService,
     ComponentsSnapshotReadService,
+    ComponentCommandService,
   ],
   exports: [
     ComponentsService,
     ComponentCostingService,
     ComponentsSnapshotReadService,
+    ComponentCommandService,
   ],
 })
 export class ComponentsModule {}

@@ -137,3 +137,12 @@ Warnings still expected:
 * ProductionOrder, BOM, and ProductionMaterialIssue for production workflow checks.
 * QcInspection for QC gate verification.
 * YardItemPlacement and YardMovement for staging/outbound/return checks.
+
+## Enterprise Read Platform
+
+The Core background worker now applies Domain Outbox events to a shared
+projection registry before marking an event dispatched. Durable receipts provide
+idempotency; checkpoints, failures and lag provide health; retained Outbox rows
+provide resume/rebuild replay. `/query-api/projections` is GET-only and additive.
+The new migration is not deployed by this sprint, and existing UI consumers have
+not been cut over.

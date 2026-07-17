@@ -1,5 +1,112 @@
 # Production Module
 
+## RFC003 Production Execution Aggregate
+
+Implemented on 2026-07-17.
+
+Status: **APPROVED - CANONICAL DOMAIN COMPLETE**
+
+- Added durable `ProductionExecution` state and optimistic aggregate version.
+- Implemented internal start, pause, resume, complete and abort commands.
+- Order start now starts the first Work Order and first execution in the same
+  transaction; active-run uniqueness is enforced in PostgreSQL.
+- Canonical V1 execution facts flow through the existing Outbox and Enterprise
+  Read Platform projection registry.
+- No controller, public route, frontend, Inventory or Components change was
+  made. Operator certification remains pending.
+
+## EPIC188 Command API Rollout
+
+Implemented on 2026-07-17.
+
+Status: **APPROVED - ADDITIVE API**
+
+- Added `/production/commands` endpoints for Production Order, Work Order,
+  Completion, Scrap and Rework command aggregates.
+- All command mutations require JWT and `Idempotency-Key`; existing aggregate
+  mutations require positive `expectedVersion`.
+- Exact duplicate commands replay the original result; conflicting key reuse or
+  stale versions return Conflict without side effects.
+- Correlation/causation, ordering, retry, timeline, ActivityLog, audit and
+  canonical Outbox remain aligned with AD-019 and repository-atomic.
+- Existing `/production` routes and frontend remain unchanged. No schema or
+  migration was needed.
+
+## RFC002 Production Aggregate Implementation
+
+Implemented on 2026-07-17.
+
+Status: **CANONICAL INTERNAL BOUNDARY APPROVED; PUBLIC CUTOVER PENDING**
+
+- Added Production Order and independently versioned `1:N` Work Order
+  aggregates aligned to AD-017.
+- Added append-only Completion, Scrap and linked Rework persistence/commands.
+- Added optimistic concurrency, durable command idempotency, timeline,
+  ActivityLog, audit Outbox and canonical AD-019 V1 events atomically.
+- Issue/Return material facts retain Inventory posting receipt ids;
+  recoverable Scrap calls `InventoryPostingService`; Consumption/Completion do
+  not post stock.
+- The additive migration is deployed without legacy row rewrite. Existing API
+  and UI remain compatibility paths pending a separately approved additive
+  version/idempotency contract and operator certification.
+
+## ADS003.5 Production-Inventory Interaction Contract
+
+Approved on 2026-07-17 as AD-018.
+
+Status: **APPLICATION BOUNDARY APPROVED - IMPLEMENTATION DEFERRED**
+
+- Production owns Reservation, Issue/Return intent, Consumption, Completion,
+  Scrap and material ledger.
+- Reservation/Release/Consumption/Completion/non-recoverable Scrap do not
+  mutate Inventory.
+- Issue, Return and recoverable Scrap receipt call Inventory-owned posting in
+  one shared local transaction and consume a bounded idempotent PostingReceipt.
+- Production records receipt identifiers before commit; owner Outboxes update
+  snapshots/projections after commit.
+- Event replay cannot execute stock posting again.
+- No code, API, schema, migration, workflow, state machine or data changed.
+
+## ADS003 Production State Machine
+
+Approved on 2026-07-17 as AD-017.
+
+Status: **DOMAIN LIFECYCLE APPROVED - IMPLEMENTATION DEFERRED**
+
+- Production Order retains `DRAFT -> RELEASED -> READY -> IN_PROGRESS <->
+  PAUSED -> COMPLETED -> CLOSED`, plus draft cancellation.
+- `READY` is an admission state; Start revalidates volatile gates and atomically
+  starts the first eligible Work Order/Execution Run.
+- One Production Order coordinates `1:N` independently versioned Work Orders.
+- Partial completion is append-only; final completion and close are separate.
+- Scrap is a separate disposition aggregate, not Consumption.
+- Rework creates a linked `REWORK` Production Order and never rewinds the
+  original Order.
+- Inventory owns stock, Components owns released Revision/BOM and QC owns
+  rejected quantity/NCR/re-inspection.
+- Existing schema/API/legacy records remain compatibility-only. No code, API,
+  schema, migration, workflow or data changed in ADS003.
+
+## EPIC186 Domain Completion Assessment
+
+Completed on 2026-07-17.
+
+Status: **AUDIT COMPLETE - IMPLEMENTATION BLOCKED**
+
+- Canonical Production Order lifecycle, repository boundary, atomic Outbox,
+  material flow, ADR011 read paths, snapshot and runtime foundations remain
+  approved.
+- `WorkOrder` is currently standalone and is not related to Production Order,
+  routing, stage or work center; its service is not active in the module/API.
+- Production has stage status/current-stage WIP, but no approved quantitative
+  completed/rejected/remaining model.
+- `production.order.*` remains canonical. Legacy `production.started` and
+  `production.completed` are compatibility inputs only.
+- Consumption records actual Production usage after Inventory Issue and must
+  not mutate Inventory stock again. Canonical Scrap remains a future aligned
+  command/event under PROD-015.
+- No code, API, schema, migration, workflow or data changed in this assessment.
+
 ## Core Platform v1.0 Certification
 
 Status: **PASS** (EPIC174, 2026-07-13)
@@ -386,3 +493,17 @@ Core Platform snapshot models:
 * **Sprint 6 (WMS & Costing Integration)**: Hardening material issue/return balance equations and average-cost ledger reconciliations.
 * **Sprint 7 (Shopfloor Dashboard & Cockpits)**: Build dynamic manager and operator interfaces, including OEE and downtime gauges.
 * **Sprint 8 (Operations Center & AI Optimizer)**: Integrate production alerts into the Operations Center and add AI-driven queue scheduling optimization.
+# Enterprise Read Platform
+
+Production registers order, work-order, timeline, execution, dashboard and
+operator-queue projections from AD-019 Outbox events. Existing Production
+aggregate commands and APIs are unchanged. UI/cockpit projection cutover remains
+a separate validation step.
+
+## RFC002A Canonical Payloads
+
+Order, work-order, completion, material, Scrap and Rework events now expose the
+resulting facts needed by projections while retaining AD-019 names/version and
+atomic Outbox behavior. Production Execution has no publisher. Some issue paths
+still lack a canonical cumulative material balance, so ProductionMaterialStatus
+is not yet fully authoritative.

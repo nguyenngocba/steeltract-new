@@ -62,7 +62,7 @@ export class MaterialIssueService {
       );
 
       if (body.status === 'ISSUED') {
-        await this.inventoryPosting.issueMaterial(
+        const postingReceipt = await this.inventoryPosting.issueMaterial(
           this.issuePostingCommand(issue, actorId),
           tx,
         );
@@ -74,7 +74,13 @@ export class MaterialIssueService {
             reservationId: issue.reservationId ?? undefined,
             materialIssueId: issue.id,
             inventoryItemId: issue.inventoryItemId,
+            inventoryTransactionId: postingReceipt.id,
             quantity: Math.abs(issue.issuedQty),
+            unit: this.materialUnit(issue.inventoryItem),
+            warehouseId: issue.warehouseId,
+            zoneId: issue.zoneId,
+            slotId: issue.slotId,
+            level: issue.level,
             actorId,
             occurredAt: issue.issuedDate,
             sourceVersion: issue.issuedDate.toISOString(),
@@ -103,11 +109,13 @@ export class MaterialIssueService {
       if (!current) {
         throw new NotFoundException('Material issue not found');
       }
+      let inventoryTransactionId: string | undefined;
       if (current.status !== 'ISSUED' && body.status === 'ISSUED') {
-        await this.inventoryPosting.issueMaterial(
+        const postingReceipt = await this.inventoryPosting.issueMaterial(
           this.issuePostingCommand(current),
           tx,
         );
+        inventoryTransactionId = postingReceipt.id;
         await this.createIssueLedgerEntry(current, undefined, tx);
       }
 
@@ -120,7 +128,13 @@ export class MaterialIssueService {
             reservationId: current.reservationId ?? undefined,
             materialIssueId: current.id,
             inventoryItemId: current.inventoryItemId,
+            inventoryTransactionId,
             quantity: Math.abs(current.issuedQty),
+            unit: this.materialUnit(current.inventoryItem),
+            warehouseId: current.warehouseId,
+            zoneId: current.zoneId,
+            slotId: current.slotId,
+            level: current.level,
             occurredAt: current.issuedDate,
             sourceVersion: current.issuedDate.toISOString(),
           },
@@ -216,7 +230,7 @@ export class MaterialIssueService {
           tx,
         );
 
-        await this.inventoryPosting.issueMaterial(
+        const postingReceipt = await this.inventoryPosting.issueMaterial(
           this.issuePostingCommand(issue, actorId),
           tx,
         );
@@ -261,7 +275,13 @@ export class MaterialIssueService {
             reservationId: reservation.id,
             materialIssueId: issue.id,
             inventoryItemId: item.line.inventoryItemId,
+            inventoryTransactionId: postingReceipt.id,
             quantity: item.quantity,
+            unit: this.materialUnit(item.line.inventoryItem),
+            warehouseId: item.line.warehouseId,
+            zoneId: item.line.zoneId,
+            slotId: item.line.slotId,
+            level: item.line.level,
             actorId,
             occurredAt: issue.issuedDate,
             sourceVersion: issue.issuedDate.toISOString(),
@@ -332,7 +352,7 @@ export class MaterialIssueService {
     const destination = await this.resolveMainWarehouseReturnDestination(issue);
 
     return this.repository.transaction(async (tx) => {
-      await this.inventoryPosting.returnMaterial(
+      const postingReceipt = await this.inventoryPosting.returnMaterial(
         {
           referenceModule: 'production_material_issue',
           referenceId: issue.id,
@@ -404,7 +424,13 @@ export class MaterialIssueService {
           reservationId: issue.reservationId ?? undefined,
           materialIssueId: issue.id,
           inventoryItemId: issue.inventoryItemId,
+          inventoryTransactionId: postingReceipt.id,
           quantity,
+          unit: this.materialUnit(issue.inventoryItem),
+          warehouseId: destination.warehouseId,
+          zoneId: destination.zoneId,
+          slotId: destination.slotId,
+          level: destination.level,
           actorId,
           sourceVersion: `returned:${updatedIssue.returnedQty}`,
         },
@@ -572,6 +598,17 @@ export class MaterialIssueService {
       (total, value) => total + (Number.isFinite(value) ? value : 0),
       0,
     );
+  }
+
+  private materialUnit(material: {
+    unit: string | null;
+    unitMaster?: { symbol: string } | null;
+  }) {
+    const unit = material.unitMaster?.symbol ?? material.unit;
+    if (!unit) {
+      throw new BadRequestException('Inventory material unit is required');
+    }
+    return unit;
   }
 
   private async refreshReservationStatus(

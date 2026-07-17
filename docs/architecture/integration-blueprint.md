@@ -1,5 +1,11 @@
 # EPIC209 – Enterprise Integration Blueprint
 
+> **ADS001 precedence (2026-07-17):** This blueprint describes intended value
+> flow. Aggregate, command, publisher, query and write ownership is governed by
+> `domain-ownership-matrix.md`. Any example that implies a consumer can mutate
+> another context's tables is non-normative. Exact event payloads and versions
+> remain subject to ADS004.
+
 Ngày: 2026-07-08
 Trạng thái: ĐÃ PHÊ DUYỆT (Giai đoạn Thiết kế)
 

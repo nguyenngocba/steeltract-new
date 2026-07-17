@@ -58,4 +58,54 @@ describe('QcService repository and Outbox boundary', () => {
       tx,
     );
   });
+
+  it('publishes the canonical inspection fact and AD-019 envelope', async () => {
+    const tx = { marker: 'qc-tx' };
+    const repository = {
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+    };
+    const service = new QcService(
+      repository as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const completedAt = new Date('2026-07-17T02:00:00.000Z');
+
+    await (service as any).createQcOutboxEvent(
+      tx,
+      'qc.inspection.completed',
+      {
+        id: 'inspection-1',
+        productionOrderId: 'order-1',
+        componentId: null,
+        projectId: null,
+        status: QcInspectionStatus.PASSED,
+        inspectorId: 'inspector-1',
+        completedAt,
+        updatedAt: completedAt,
+      },
+      'operator-1',
+    );
+
+    expect(repository.createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'qc.inspection.completed',
+        payload: expect.objectContaining({
+          inspectionId: 'inspection-1',
+          subjectType: 'PRODUCTION_ORDER',
+          subjectId: 'order-1',
+          result: QcInspectionStatus.PASSED,
+          completedAt: completedAt.toISOString(),
+        }),
+        metadata: expect.objectContaining({
+          eventVersion: 1,
+          producer: 'qc',
+          aggregateId: 'inspection-1',
+          orderingKey: 'qc-inspection:inspection-1',
+        }),
+      }),
+      tx,
+    );
+  });
 });

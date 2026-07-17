@@ -71,6 +71,10 @@ export class ProductionConsumptionService {
     if (!material) {
       throw new NotFoundException('Inventory material not found');
     }
+    const materialUnit = material.unitMaster?.symbol ?? material.unit;
+    if (!materialUnit) {
+      throw new BadRequestException('Inventory material unit is required');
+    }
 
     const [issues, previousConsumptions] = await Promise.all([
       this.repository.findIssuesForConsumption(
@@ -174,6 +178,8 @@ export class ProductionConsumptionService {
             consumptionId: consumption.id,
             inventoryItemId: dto.inventoryItemId,
             quantity: consumedQty,
+            unit: materialUnit,
+            resultingBalance: Math.max(remainingQty - consumedQty, 0),
             actorId,
             occurredAt: consumption.createdAt,
             sourceVersion: consumption.createdAt.toISOString(),

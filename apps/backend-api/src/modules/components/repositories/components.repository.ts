@@ -59,6 +59,34 @@ export class ComponentsRepository {
     });
   }
 
+  findAggregate(id: string, db: DbClient = this.prisma) {
+    return db.component.findUnique({
+      where: { id },
+      include: {
+        currentRevision: { include: { bomDefinition: true } },
+      },
+    });
+  }
+
+  findRevision(id: string, db: DbClient = this.prisma) {
+    return db.componentRevision.findUnique({
+      where: { id },
+      include: { bomDefinition: true },
+    });
+  }
+
+  findBomDefinition(id: string, db: DbClient = this.prisma) {
+    return db.componentBomDefinition.findUnique({ where: { id } });
+  }
+
+  findOutboxEvent(idempotencyKey: string, db: DbClient = this.prisma) {
+    return db.outboxEvent.findUnique({ where: { idempotencyKey } });
+  }
+
+  countReleaseEvidence(componentId: string, db: DbClient = this.prisma) {
+    return db.componentReleaseEvidence.count({ where: { componentId } });
+  }
+
   timeline(
     componentId: string,
     options: { search?: string; skip?: number; take?: number } = {},
@@ -171,6 +199,72 @@ export class ComponentsRepository {
     });
   }
 
+  createRevision(
+    data: Prisma.ComponentRevisionUncheckedCreateInput,
+    db: DbClient = this.prisma,
+  ) {
+    return db.componentRevision.create({
+      data,
+      include: { bomDefinition: true },
+    });
+  }
+
+  createBomDefinition(
+    data: Prisma.ComponentBomDefinitionUncheckedCreateInput,
+    db: DbClient = this.prisma,
+  ) {
+    return db.componentBomDefinition.create({ data });
+  }
+
+  createReleaseEvidence(
+    data: Prisma.ComponentReleaseEvidenceUncheckedCreateInput,
+    db: DbClient = this.prisma,
+  ) {
+    return db.componentReleaseEvidence.create({ data });
+  }
+
+  async updateAggregate(
+    id: string,
+    expectedVersion: number,
+    data: Prisma.ComponentUpdateManyMutationInput,
+    db: DbClient = this.prisma,
+  ) {
+    const result = await db.component.updateMany({
+      where: { id, aggregateVersion: expectedVersion },
+      data: { ...data, aggregateVersion: { increment: 1 } },
+    });
+    if (result.count !== 1) return null;
+    return this.findAggregate(id, db);
+  }
+
+  async updateRevision(
+    id: string,
+    expectedVersion: number,
+    data: Prisma.ComponentRevisionUpdateManyMutationInput,
+    db: DbClient = this.prisma,
+  ) {
+    const result = await db.componentRevision.updateMany({
+      where: { id, aggregateVersion: expectedVersion },
+      data: { ...data, aggregateVersion: { increment: 1 } },
+    });
+    if (result.count !== 1) return null;
+    return this.findRevision(id, db);
+  }
+
+  async updateBomDefinition(
+    id: string,
+    expectedVersion: number,
+    data: Prisma.ComponentBomDefinitionUpdateManyMutationInput,
+    db: DbClient = this.prisma,
+  ) {
+    const result = await db.componentBomDefinition.updateMany({
+      where: { id, aggregateVersion: expectedVersion },
+      data: { ...data, aggregateVersion: { increment: 1 } },
+    });
+    if (result.count !== 1) return null;
+    return db.componentBomDefinition.findUnique({ where: { id } });
+  }
+
   update(
     id: string,
     data: Prisma.ComponentUpdateInput,
@@ -219,6 +313,7 @@ export class ComponentsRepository {
       payload: Prisma.InputJsonValue;
       metadata: Prisma.InputJsonValue;
       idempotencyKey: string;
+      maxRetries?: number;
     },
     db: DbClient = this.prisma,
   ) {

@@ -21,6 +21,7 @@ describe('MaterialIssueService atomic material flow', () => {
       issuedDate: new Date('2026-07-11T01:00:00.000Z'),
       status: 'ISSUED',
       remarks: 'Issue material',
+      inventoryItem: { unit: 'kg', unitMaster: null },
     };
     const repository = {
       transaction: jest.fn((callback) => callback(tx)),
@@ -71,6 +72,8 @@ describe('MaterialIssueService atomic material flow', () => {
       expect.objectContaining({
         eventName: 'production.material.issued',
         materialIssueId: 'issue-1',
+        inventoryTransactionId: 'inventory-tx-1',
+        unit: 'kg',
       }),
       tx,
     );

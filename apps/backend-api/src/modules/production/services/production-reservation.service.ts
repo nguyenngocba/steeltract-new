@@ -240,17 +240,31 @@ export class ProductionReservationService {
         },
         tx,
       );
-      await this.materialLedgerService.createMaterialEvent(
-        {
-          eventName: productionMaterialEvents.reserved,
-          productionOrderId: existing.productionOrderId,
-          reservationId: existing.id,
-          quantity: this.sum(ledgerLines.map((line) => line.quantity)),
-          actorId,
-          sourceVersion: updatedReservation.updatedAt.toISOString(),
-        },
-        tx,
-      );
+      for (const preview of previewLines) {
+        const quantity = this.sum(
+          ledgerLines
+            .filter((line) => line.inventoryItemId === preview.materialId)
+            .map((line) => line.quantity),
+        );
+        if (quantity <= epsilon) continue;
+        if (!preview.unit) {
+          throw new BadRequestException('Inventory material unit is required');
+        }
+        await this.materialLedgerService.createMaterialEvent(
+          {
+            eventName: productionMaterialEvents.reserved,
+            productionOrderId: existing.productionOrderId,
+            reservationId: existing.id,
+            inventoryItemId: preview.materialId,
+            quantity,
+            unit: preview.unit,
+            resultingBalance: quantity,
+            actorId,
+            sourceVersion: updatedReservation.updatedAt.toISOString(),
+          },
+          tx,
+        );
+      }
     });
 
     return this.findOne(id);
@@ -317,17 +331,22 @@ export class ProductionReservationService {
         tx,
       );
       if (releasedQuantity > epsilon) {
-        await this.materialLedgerService.createMaterialEvent(
-          {
-            eventName: productionMaterialEvents.released,
-            productionOrderId: reservation.productionOrderId,
-            reservationId: reservation.id,
-            quantity: releasedQuantity,
-            actorId,
-            sourceVersion: updatedReservation.updatedAt.toISOString(),
-          },
-          tx,
-        );
+        for (const group of this.materialEventGroups(reservation.lines)) {
+          await this.materialLedgerService.createMaterialEvent(
+            {
+              eventName: productionMaterialEvents.released,
+              productionOrderId: reservation.productionOrderId,
+              reservationId: reservation.id,
+              inventoryItemId: group.inventoryItemId,
+              quantity: group.quantity,
+              unit: group.unit,
+              resultingBalance: 0,
+              actorId,
+              sourceVersion: updatedReservation.updatedAt.toISOString(),
+            },
+            tx,
+          );
+        }
       }
     });
 
@@ -400,17 +419,22 @@ export class ProductionReservationService {
         tx,
       );
       if (releasedQuantity > epsilon) {
-        await this.materialLedgerService.createMaterialEvent(
-          {
-            eventName: productionMaterialEvents.released,
-            productionOrderId: reservation.productionOrderId,
-            reservationId: reservation.id,
-            quantity: releasedQuantity,
-            actorId,
-            sourceVersion: updatedReservation.updatedAt.toISOString(),
-          },
-          tx,
-        );
+        for (const group of this.materialEventGroups(reservation.lines)) {
+          await this.materialLedgerService.createMaterialEvent(
+            {
+              eventName: productionMaterialEvents.released,
+              productionOrderId: reservation.productionOrderId,
+              reservationId: reservation.id,
+              inventoryItemId: group.inventoryItemId,
+              quantity: group.quantity,
+              unit: group.unit,
+              resultingBalance: 0,
+              actorId,
+              sourceVersion: updatedReservation.updatedAt.toISOString(),
+            },
+            tx,
+          );
+        }
       }
     });
 
@@ -619,6 +643,41 @@ export class ProductionReservationService {
 
   private async nextReservationNo(_orderNo: string) {
     return this.repository.nextReservationNo();
+  }
+
+  private materialEventGroups(
+    lines: Array<{
+      inventoryItemId: string;
+      reservedQty: number;
+      issuedQty: number;
+      inventoryItem: {
+        unit: string | null;
+        unitMaster?: { symbol: string } | null;
+      };
+    }>,
+  ) {
+    const groups = new Map<
+      string,
+      { inventoryItemId: string; quantity: number; unit: string }
+    >();
+    for (const line of lines) {
+      const quantity = Math.max(
+        Number(line.reservedQty ?? 0) - Number(line.issuedQty ?? 0),
+        0,
+      );
+      if (quantity <= epsilon) continue;
+      const unit = line.inventoryItem.unitMaster?.symbol ?? line.inventoryItem.unit;
+      if (!unit) {
+        throw new BadRequestException('Inventory material unit is required');
+      }
+      const current = groups.get(line.inventoryItemId);
+      groups.set(line.inventoryItemId, {
+        inventoryItemId: line.inventoryItemId,
+        quantity: (current?.quantity ?? 0) + quantity,
+        unit,
+      });
+    }
+    return [...groups.values()];
   }
 
   private sum(values: number[]) {

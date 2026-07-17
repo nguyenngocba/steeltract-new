@@ -1,5 +1,13 @@
 # Enterprise Module Dependency Map (SteelTrack Core Platform)
 
+> **ADS001 precedence (2026-07-17):**
+> `docs/architecture/domain-ownership-matrix.md` is the normative ownership
+> source. References below to direct cross-module Repository access as
+> `Allowed` are superseded. The supported mechanism is an application command
+> service exported by the owner context; only that owner writes its tables.
+> Same-database transaction context may be shared for a required atomic
+> invariant, but foreign repository/table writes remain forbidden.
+
 Tài liệu này định nghĩa bản đồ và ma trận ràng buộc phụ thuộc giữa các module cốt lõi trong hệ thống SteelTrack: **Inventory, Production, QC, Yard, Logistics, Projects, và Finance**.
 
 Các quy tắc ràng buộc này nhằm đảm bảo tính toàn vẹn dữ liệu, giảm thiểu liên kết trực tiếp (low coupling), ngăn ngừa lỗi giao dịch vòng (circular transaction blocking) và đảm bảo khả năng mở rộng của hệ thống.

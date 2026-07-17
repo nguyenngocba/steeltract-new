@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   BadRequestException,
   Injectable,
@@ -854,20 +856,90 @@ export class YardService {
         : new Date().getTime().toString();
 
     const idempotencyKey = `${eventName}:${entityId}`;
+    const canonicalPayload = this.yardEventPayload(eventName, payload);
+    const occurredAt = this.yardEventOccurredAt(eventName, payload);
+    const aggregateVersion = Math.max(1, Date.parse(occurredAt));
     return this.repository.createOutboxEvent(
       {
         eventName,
-        payload: this.toJsonValue(payload),
+        payload: this.toJsonValue(canonicalPayload),
         metadata: this.toJsonValue({
-          module: 'yard',
-          correlationId: actorId,
-          persistToOutbox: true,
+          eventId: randomUUID(),
+          eventName,
+          eventVersion: 1,
+          occurredAt,
+          producer: 'yard',
+          aggregateType: 'YardItemPlacement',
+          aggregateId: entityId,
+          aggregateVersion,
+          correlationId: actorId ?? idempotencyKey,
+          causationId: null,
           idempotencyKey,
+          actorId: actorId ?? null,
+          tenantId: null,
+          orderingKey: `yard-item:${entityId}`,
+          persistToOutbox: true,
         }),
         idempotencyKey,
       },
       tx,
     );
+  }
+
+  private yardEventPayload(eventName: YardEventName, payload: unknown) {
+    if (
+      eventName !== 'yard.item.placed' &&
+      eventName !== 'yard.item.moved'
+    ) {
+      return payload;
+    }
+    const row = this.objectMetadata(payload);
+    const slot = this.objectMetadata(row.slot);
+    const movements = Array.isArray(row.movements) ? row.movements : [];
+    const latestMovement = this.objectMetadata(movements[0]);
+    const destination = {
+      zoneId: slot.zoneId ?? null,
+      slotId: row.slotId ?? null,
+      level: row.stackLevel != null ? String(row.stackLevel) : null,
+    };
+    return {
+      yardItemId: row.itemId,
+      itemType: row.itemType,
+      sourceOwnerReference: {
+        module: String(row.itemType ?? '').toLowerCase(),
+        id: row.itemId,
+      },
+      placementId: row.id,
+      quantity: row.quantity,
+      zoneId: destination.zoneId,
+      slotId: destination.slotId,
+      level: destination.level,
+      source:
+        eventName === 'yard.item.moved'
+          ? {
+              zoneId: null,
+              slotId: latestMovement.fromSlotId ?? null,
+              level: null,
+            }
+          : null,
+      destination,
+      movementAt: this.yardEventOccurredAt(eventName, payload),
+    };
+  }
+
+  private yardEventOccurredAt(eventName: YardEventName, payload: unknown) {
+    const row = this.objectMetadata(payload);
+    const movements = Array.isArray(row.movements) ? row.movements : [];
+    const latestMovement = this.objectMetadata(movements[0]);
+    const value =
+      eventName === 'yard.item.moved'
+        ? latestMovement.createdAt ?? row.updatedAt
+        : row.placedAt ?? row.createdAt;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && !Number.isNaN(Date.parse(value))) {
+      return new Date(value).toISOString();
+    }
+    throw new Error(`Canonical Yard event ${eventName} requires a timestamp`);
   }
 
   private toJson(value: unknown) {

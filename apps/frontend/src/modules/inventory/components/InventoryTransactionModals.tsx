@@ -1630,6 +1630,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const realZones = useMemo(() => zones.filter((zone: any) => isRealStorageZone(zone) && isMainWarehouseZone(zone)), [zones])
   const createTx = useCreateTransaction()
   const queryClient = useQueryClient()
+
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
     materialId: '',
@@ -1643,6 +1644,10 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     reason: '',
   })
   const [attachmentFiles, setAttachmentFiles] = useState<InventoryAttachmentDraft[]>([])
+
+  // Local state for pending transfers list
+  const [pendingItems, setPendingItems] = useState<any[]>([])
+  const [showPendingList, setShowPendingList] = useState(false)
 
   const { data: selectedMaterialDetail } = useMaterialDetail(form.materialId || undefined)
   const selectedMaterial = materials.find((x: any) => x.id === form.materialId) as any
@@ -1720,6 +1725,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     const selected = sourceZoneOptions.find((s) => s.id === sourceLocationKey)
     return num(selected?.qty)
   }, [sourceZoneOptions, sourceLocationKey])
+
   const selectedSourceZone = sourceZoneOptions.find((zone) => zone.id === sourceLocationKey)
   const selectedDestinationZone = destinationZoneOptions.find((zone) => zone.id === form.toZoneId)
   const selectedSourceFullZone = realZones.find((zone: any) => String(zone.id) === String(form.fromZoneId))
@@ -1727,7 +1733,23 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const destinationCellOccupied = isCellOccupied(selectedDestinationFullZone, form.toSlotId, form.toLevel)
   const destinationEmptyCell = findEmptyCell(selectedDestinationFullZone)
   const transferQty = num(form.quantity)
-  const canTransfer =
+
+  // --- Transfer-specific Pending calculations & validation ---
+  const pendingQtyAtLoc = useMemo(() => {
+    return pendingItems
+      .filter((item) =>
+        String(item.materialId) === String(form.materialId) &&
+        String(item.fromZoneId) === String(form.fromZoneId) &&
+        String(item.fromSlotId) === String(form.fromSlotId) &&
+        String(item.fromLevel) === String(form.fromLevel)
+      )
+      .reduce((sum, x) => sum + x.quantity, 0)
+  }, [pendingItems, form.materialId, form.fromZoneId, form.fromSlotId, form.fromLevel])
+
+  const availableSourceQty = Math.max(0, sourceQty - pendingQtyAtLoc)
+  const isStockExceeded = form.materialId && form.fromZoneId && (transferQty > availableSourceQty)
+
+  const canAddPending =
     Boolean(form.materialId) &&
     Boolean(form.fromZoneId) &&
     Boolean(form.toZoneId) &&
@@ -1735,7 +1757,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     Boolean(form.toSlotId) &&
     Boolean(form.toLevel) &&
     transferQty > 0 &&
-    transferQty <= sourceQty &&
+    !isStockExceeded &&
     !destinationCellOccupied
 
   useEffect(() => {
@@ -1786,59 +1808,6 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     }))
   }, [form.materialId, form.fromZoneId, form.fromSlotId, form.fromLevel, form.toZoneId, form.toSlotId, form.toLevel, sourceZoneOptions, sourceLocationKey, destinationZoneOptions, realZones])
 
-  async function submitTransfer() {
-    const qty = num(form.quantity)
-    if (!canTransfer) return
-
-    const no = generateTransactionNo('DC')
-    const transaction = await createTx.mutateAsync({
-      type: 'TRANSFER',
-      transactionNo: no,
-      transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
-      remarks: form.reason || undefined,
-      items: [
-        {
-          inventoryItemId: form.materialId,
-          zoneId: form.fromZoneId,
-          slotId: form.fromSlotId,
-          level: form.fromLevel,
-          quantity: -Math.abs(qty),
-        },
-        {
-          inventoryItemId: form.materialId,
-          zoneId: form.toZoneId,
-          slotId: form.toSlotId,
-          level: form.toLevel,
-          quantity: Math.abs(qty),
-        },
-      ],
-    })
-    await refreshInventoryCache(queryClient)
-    try {
-      await uploadInventoryTransactionAttachments({
-        transaction,
-        files: attachmentFiles,
-      })
-    } catch {
-      toast.error('Phiếu đã lưu nhưng upload tài liệu điều chuyển thất bại')
-    }
-
-    setForm({
-      transactionDate: formatLocalDateTimeInput(),
-      materialId: '',
-      fromZoneId: '',
-      toZoneId: '',
-      fromSlotId: '',
-      fromLevel: '',
-      toSlotId: '',
-      toLevel: '',
-      quantity: '',
-      reason: '',
-    })
-    setAttachmentFiles([])
-    onClose()
-  }
-
   function suggestTransferDestination() {
     const zonesToScan = selectedDestinationFullZone
       ? [selectedDestinationFullZone]
@@ -1855,10 +1824,267 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     }))
   }
 
+  // --- Local pending handlers ---
+  function handleAddPending() {
+    if (!canAddPending) return
+
+    const newItem = {
+      id: Date.now() + Math.random().toString(),
+      materialId: form.materialId,
+      materialCode: selectedMaterial?.code || 'NA',
+      materialName: selectedMaterial?.name || '-',
+      unit: selectedMaterial?.unit || 'tấn',
+      quantity: transferQty,
+      fromZoneId: form.fromZoneId,
+      fromZoneCode: selectedSourceFullZone?.code || 'ZONE',
+      fromWarehouseName: selectedSourceFullZone?.name || '-',
+      fromSlotId: form.fromSlotId,
+      fromLevel: form.fromLevel,
+      toZoneId: form.toZoneId,
+      toZoneCode: selectedDestinationFullZone?.code || 'ZONE',
+      toWarehouseName: selectedDestinationFullZone?.name || '-',
+      toSlotId: form.toSlotId,
+      toLevel: form.toLevel,
+      sourceQty,
+    }
+
+    setPendingItems((prev) => {
+      // Merging Rule: Exact duplicate -> Merge. Khác source/destination -> Không merge.
+      const idx = prev.findIndex(
+        (x) =>
+          String(x.materialId) === String(newItem.materialId) &&
+          String(x.fromZoneId) === String(newItem.fromZoneId) &&
+          String(x.fromSlotId) === String(newItem.fromSlotId) &&
+          String(x.fromLevel) === String(newItem.fromLevel) &&
+          String(x.toZoneId) === String(newItem.toZoneId) &&
+          String(x.toSlotId) === String(newItem.toSlotId) &&
+          String(x.toLevel) === String(newItem.toLevel) &&
+          x.unit === newItem.unit
+      )
+      if (idx > -1) {
+        const updated = [...prev]
+        updated[idx] = {
+          ...updated[idx],
+          quantity: updated[idx].quantity + newItem.quantity,
+        }
+        return updated
+      }
+      return [...prev, newItem]
+    })
+
+    // Reset line items in form
+    setForm((prev) => ({
+      ...prev,
+      materialId: '',
+      fromZoneId: '',
+      fromSlotId: '',
+      fromLevel: '',
+      toZoneId: '',
+      toSlotId: '',
+      toLevel: '',
+      quantity: '',
+    }))
+    toast.success('Đã thêm điều chuyển vào danh sách chờ')
+  }
+
+  function handleRemovePending(id: string) {
+    setPendingItems((prev) => prev.filter((x) => x.id !== id))
+    toast.success('Đã xóa khỏi danh sách chờ')
+  }
+
+  function handleEditPending(item: any) {
+    const formIsDirty = form.materialId || form.quantity
+    if (formIsDirty) {
+      if (!window.confirm('Vật tư đang nhập trong form sẽ bị ghi đè. Bạn có muốn tiếp tục?')) {
+        return
+      }
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      materialId: item.materialId,
+      fromZoneId: item.fromZoneId,
+      fromSlotId: item.fromSlotId,
+      fromLevel: item.fromLevel,
+      toZoneId: item.toZoneId,
+      toSlotId: item.toSlotId,
+      toLevel: item.toLevel,
+      quantity: formatQuantityInput(String(item.quantity)),
+    }))
+
+    setPendingItems((prev) => prev.filter((x) => x.id !== item.id))
+  }
+
+  function formatQuantitySummary(items: any[]) {
+    const uoms = new Map<string, number>()
+    items.forEach((item) => {
+      const unit = item.unit || 'tấn'
+      uoms.set(unit, (uoms.get(unit) || 0) + item.quantity)
+    })
+    return Array.from(uoms.entries())
+      .map(([unit, qty]) => `${formatQuantity(qty)} ${unit}`)
+      .join(', ')
+  }
+
+  // --- Confirm batch submission ---
+  async function submitTransfer() {
+    if (pendingItems.length === 0) return
+
+    const no = generateTransactionNo('DC')
+    const payloadItems: any[] = []
+
+    pendingItems.forEach((item) => {
+      // Negative source line
+      payloadItems.push({
+        inventoryItemId: item.materialId,
+        zoneId: item.fromZoneId,
+        slotId: item.fromSlotId,
+        level: item.fromLevel,
+        quantity: -Math.abs(item.quantity),
+      })
+      // Positive destination line
+      payloadItems.push({
+        inventoryItemId: item.materialId,
+        zoneId: item.toZoneId,
+        slotId: item.toSlotId,
+        level: item.toLevel,
+        quantity: Math.abs(item.quantity),
+      })
+    })
+
+    try {
+      const transaction = await createTx.mutateAsync({
+        type: 'TRANSFER',
+        transactionNo: no,
+        transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
+        remarks: `[TRANSFER] ${form.reason}`.trim(),
+        items: payloadItems,
+      })
+
+      await refreshInventoryCache(queryClient)
+
+      try {
+        await uploadInventoryTransactionAttachments({
+          transaction,
+          files: attachmentFiles,
+        })
+      } catch {
+        toast.error('Phiếu đã lưu nhưng upload tài liệu điều chuyển thất bại')
+      }
+
+      toast.success('Điều chuyển thành công!')
+
+      // Clear pending list and close modal only on SUCCESS
+      setPendingItems([])
+      setForm({
+        transactionDate: formatLocalDateTimeInput(),
+        materialId: '',
+        fromZoneId: '',
+        toZoneId: '',
+        fromSlotId: '',
+        fromLevel: '',
+        toSlotId: '',
+        toLevel: '',
+        quantity: '',
+        reason: '',
+      })
+      setAttachmentFiles([])
+      onClose()
+    } catch {
+      // Non-destructive: API error -> keep pendingItems intact!
+      toast.error('Có lỗi xảy ra khi xác nhận điều chuyển. Danh sách chờ được giữ nguyên.')
+    }
+  }
+
+  function handleClose() {
+    const isDirty = pendingItems.length > 0 || form.materialId || form.quantity || form.reason
+    if (isDirty) {
+      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn thoát?')) {
+        return
+      }
+    }
+    onClose()
+  }
+
   return (
-    <ModalShell open={open} onClose={onClose} title="Tạo điều chuyển mới" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
+    <ModalShell open={open} onClose={handleClose} title="Tạo điều chuyển mới" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
         <div>
+          {/* Pending Header */}
+          {pendingItems.length > 0 && (
+            <div className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-cyan-300 uppercase tracking-wider">Danh sách chờ điều chuyển</span>
+                  <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+                    {pendingItems.length} dòng
+                  </span>
+                </div>
+                <div className="text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+                  <span>
+                    Tổng khối lượng: <span className="font-semibold text-white">{formatQuantitySummary(pendingItems)}</span>
+                  </span>
+                  <span>
+                    Số lần điều chuyển: <span className="font-semibold text-cyan-300">{pendingItems.length}</span>
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPendingList(!showPendingList)}
+                className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-500/10 px-3 py-1.5 font-semibold text-cyan-100 hover:bg-cyan-500/20 transition-colors"
+              >
+                {showPendingList ? 'Ẩn danh sách' : 'Xem danh sách'}
+              </button>
+            </div>
+          )}
+
+          {/* Pending Panel */}
+          {showPendingList && pendingItems.length > 0 && (
+            <div className="mb-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/45 text-xs">
+              <div className="bg-white/[0.04] px-3 py-2 font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
+                Chi tiết danh sách chờ điều chuyển
+              </div>
+              <div className="max-h-48 overflow-y-auto divide-y divide-white/5">
+                {pendingItems.map((item) => (
+                  <div key={item.id} className="p-2.5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-cyan-300">{item.materialCode}</span>
+                        <span className="truncate text-slate-400">{item.materialName}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500 flex flex-col gap-0.5">
+                        <div>Nguồn: <span className="text-slate-300">{item.fromZoneCode} / {item.fromSlotId} / {item.fromLevel}</span></div>
+                        <div>Đích: <span className="text-cyan-200">{item.toZoneCode} / {item.toSlotId} / {item.toLevel}</span></div>
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-4 text-right">
+                      <div className="font-bold text-white">{formatQuantity(item.quantity)} {item.unit}</div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPending(item)}
+                          className="rounded p-1 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                          title="Sửa dòng này"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePending(item.id)}
+                          className="rounded p-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          title="Xóa dòng này"
+                        >
+                          ❌
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
             <select value={form.materialId} onChange={(e) => setForm((f) => ({ ...f, materialId: e.target.value, fromZoneId: '', fromSlotId: '', fromLevel: '', toZoneId: '', toSlotId: '', toLevel: '' }))} className={fieldClass}>
@@ -1928,28 +2154,49 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
             <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
             <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Lý do điều chuyển" className={fieldClass} />
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 text-sm xl:grid-cols-2">
+
+          <div className="mt-3 grid grid-cols-1 gap-3 text-xs xl:grid-cols-2">
             <MetricBox title="Tồn tại nguồn" value={formatQuantity(sourceQty)} />
-            <MetricBox title="Sau điều chuyển" value={formatQuantity(Math.max(0, sourceQty - num(form.quantity)))} />
+            <MetricBox title="Tồn khả dụng nguồn" value={formatQuantity(availableSourceQty)} />
             <MetricBox title="Nguồn" value={selectedSourceZone ? `${selectedSourceZone.warehouseName || 'Kho'} / ${form.fromSlotId || '-'} / ${form.fromLevel || 'L1'}` : 'Chưa chọn'} />
             <MetricBox title="Đích" value={selectedDestinationZone ? `${selectedDestinationZone.warehouseName || 'Kho'} / ${form.toSlotId || '-'} / ${form.toLevel || 'L1'}` : 'Chưa chọn'} />
           </div>
-          {form.toZoneId ? <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-sm md:flex-row md:items-center md:justify-between ${
-            destinationCellOccupied
-              ? 'border-red-400/40 bg-red-500/10 text-red-200'
-              : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-          }`}>
-            <span>
-              {destinationCellOccupied
-                ? `Ô đích ${form.toSlotId || '-'} / ${form.toLevel || 'L1'} đã có vật tư.`
-                : destinationEmptyCell
-                  ? `Ô đích trống gợi ý: ${destinationEmptyCell.cell} / ${destinationEmptyCell.level}.`
-                  : 'Vị trí đích chưa còn ô/tầng trống khả dụng.'}
-            </span>
-            <button type="button" onClick={suggestTransferDestination} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
-              Gợi ý ô đích trống
-            </button>
-          </div> : null}
+
+          {form.toZoneId ? (
+            <div className={`mt-3 flex flex-col gap-3 rounded-xl border p-3 text-xs md:flex-row md:items-center md:justify-between ${
+              destinationCellOccupied
+                ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+            }`}>
+              <span>
+                {destinationCellOccupied
+                  ? `Ô đích ${form.toSlotId || '-'} / ${form.toLevel || 'L1'} đã có vật tư.`
+                  : destinationEmptyCell
+                    ? `Ô đích trống gợi ý: ${destinationEmptyCell.cell} / ${destinationEmptyCell.level}.`
+                    : 'Vị trí đích chưa còn ô/tầng trống khả dụng.'}
+              </span>
+              <button type="button" onClick={suggestTransferDestination} className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">
+                Gợi ý ô đích trống
+              </button>
+            </div>
+          ) : null}
+
+          {isStockExceeded && (
+            <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              ⚠️ Số lượng điều chuyển vượt quá tồn khả dụng tại vị trí nguồn.
+            </div>
+          )}
+
+          {/* Add to Pending Button */}
+          <button
+            type="button"
+            disabled={!canAddPending}
+            onClick={handleAddPending}
+            className="w-full mt-3 rounded-lg border border-cyan-400/30 bg-cyan-400/10 py-2.5 font-semibold text-cyan-200 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50 text-xs"
+          >
+            + Thêm vào danh sách chờ điều chuyển
+          </button>
+
           <div className="mt-3">
             <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
           </div>
@@ -1957,7 +2204,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
 
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
-            <div className="mb-3 text-sm font-semibold text-white">Vị trí nguồn</div>
+            <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">Vị trí nguồn</div>
             <WarehouseMiniMap
               compact
               zone={selectedSourceFullZone}
@@ -1967,7 +2214,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
             />
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
-            <div className="mb-3 text-sm font-semibold text-white">Vị trí đích</div>
+            <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">Vị trí đích</div>
             <WarehouseMiniMap
               compact
               zone={selectedDestinationFullZone}
@@ -1978,9 +2225,10 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           </div>
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
-        <button disabled={!canTransfer} onClick={submitTransfer} className={primaryButtonClass}>
-          Tạo phiếu điều chuyển
+      <div className="mt-4 flex justify-end gap-2">
+        <button onClick={handleClose} className={secondaryButtonClass}>Hủy</button>
+        <button disabled={pendingItems.length === 0 || createTx.isPending} onClick={submitTransfer} className={primaryButtonClass}>
+          {createTx.isPending ? 'Đang thực hiện...' : `Xác nhận điều chuyển (${pendingItems.length})`}
         </button>
       </div>
     </ModalShell>

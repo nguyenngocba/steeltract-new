@@ -45,6 +45,7 @@ import { SystemModule } from './modules/system/system.module'
 import { CostingModule } from './modules/costing/costing.module'
 import { LogisticsModule } from './modules/logistics/logistics.module'
 import { OperationsCenterModule } from './modules/operations-center/operations-center.module'
+import { ProjectionModule } from './core/projections/projection.module';
 @Module({
   imports: [
     EventsModule,
@@ -92,6 +93,7 @@ import { OperationsCenterModule } from './modules/operations-center/operations-c
     CostingModule,
     LogisticsModule,
     OperationsCenterModule,
+    ProjectionModule,
   ],
   controllers: [
   AppController,

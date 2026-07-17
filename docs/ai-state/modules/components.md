@@ -1,5 +1,80 @@
 # Components Module
 
+## RFC003 Aggregate Command API
+
+Implemented on 2026-07-17.
+
+Status: **APPROVED - ADDITIVE API**
+
+- Added `/components/commands` routes for Component identity, Revision,
+  Engineering BOM, review, approval, release, deprecation and archive.
+- Every mutation requires JWT and `Idempotency-Key`; existing aggregate writes
+  require positive optimistic versions.
+- Exact replay returns persisted results without duplicate timeline,
+  ActivityLog or Outbox; stale versions fail without side effects.
+- AD-019 `component.revision.review.submitted` and
+  `component.revision.released` remain the canonical facts.
+- Existing `/components` routes, frontend and legacy `ComponentStatus` behavior
+  remain unchanged. No new migration was required.
+
+## Canonical Aggregate Implementation
+
+Implemented on 2026-07-17.
+
+Status: **CANONICAL DOMAIN AND ADDITIVE COMMAND API IMPLEMENTED**
+
+- Added nullable canonical Component lifecycle and optimistic aggregate version.
+- Added versioned Component Revision, Engineering BOM Definition and immutable
+  Release Evidence persistence.
+- Added Components-owned commands for identity, revision, review, release,
+  archive and BOM validation.
+- Added AD-019 canonical V1 facts with command idempotency, aggregate ordering,
+  ActivityLog/audit/domain Outbox atomicity and one-current-release swap.
+- Preserved public API, frontend and legacy operational `ComponentStatus`.
+- Existing rows remain unadopted (`lifecycleState = null`) by design.
+- Operator-reviewed legacy adoption remains a follow-up decision; no inferred
+  state migration is permitted.
+
+## ADS002 Component State Machine
+
+Approved on 2026-07-17 as AD-016.
+
+Status: **DOMAIN LIFECYCLE APPROVED - INTERNAL IMPLEMENTATION COMPLETE**
+
+- Component identity states: `DRAFT`, `ACTIVE`, `DEPRECATED`, `ARCHIVED`.
+- Revision states: `DRAFT`, `IN_REVIEW`, `APPROVED`, `RELEASED`,
+  `SUPERSEDED`, `ARCHIVED`.
+- Engineering BOM belongs to and releases atomically with one Revision.
+- Released/superseded content is immutable; correction requires a new revision.
+- Only one Revision may be current; replacement release atomically supersedes
+  the prior current Revision.
+- Release has no rollback. Archive is terminal, non-destructive and gated by
+  downstream owner obligations.
+- Existing `STOCK/CUTTING/WELDING/PAINTING/READY/SHIPPED/DELIVERED/INSTALLED`
+  data remains compatibility-only and is not automatically migrated.
+- No code, API, schema, migration, workflow or data changed in ADS002.
+
+## EPIC186 Domain Audit & Foundation
+
+Completed on 2026-07-17.
+
+Status: **CORE PLATFORM PASS - DOMAIN FOUNDATION BLOCKED**
+
+- Repository, ADR011 List/Overview/History, dashboard snapshots, Runtime and
+  Operations Center remain PASS.
+- `ComponentStatus` currently combines fabrication, storage, QC and logistics
+  state without one canonical state machine.
+- Only `SHIPPED -> DELIVERED -> INSTALLED` is guarded; create/update and several
+  cross-module repository paths can write other statuses directly.
+- Reservation, Issue, Consumption and Return are Production material entities,
+  not Component entities. Inventory remains stock/ledger owner.
+- The active Material Stock workspace bypasses that boundary by reconstructing
+  balances in React and posting a generic Inventory return transaction.
+- `component.updated` is atomic, but create/delete/costing and cross-module
+  writes do not have complete Components domain-event coverage.
+- Revision, release and archive entities/workflows remain undefined.
+- No code, API, schema, migration, workflow or data changed during this audit.
+
 ## Core Platform v1.0 Certification
 
 Status: **PASS** (EPIC174, 2026-07-13)
@@ -204,3 +279,16 @@ Fix:
 * Evaluate whether long-term component costing should move from `Float` to database decimal types if accounting-grade precision is required.
 * Continue UI standardization for remaining Components tabs after Sprint 12A review.
 * Consider adding a backend `GET /components/:id/material-readiness` API if multiple modules need the same readiness aggregation and frontend duplication becomes too high.
+# Enterprise Read Platform
+
+Components registers summary, current released revision, revision history,
+engineering BOM and release timeline projections from AD-019 Outbox events.
+AD-016 aggregate behavior and existing APIs remain unchanged. Consumer cutover
+is pending migration deployment and parity validation.
+
+## RFC002A Canonical Payloads
+
+Component identity events now contain resulting identity/catalog facts.
+Revision events consistently carry revision, BOM and content-hash facts when
+present. New Component projections are authoritative by contract; the current
+retained Outbox contains no historical canonical Component commands.

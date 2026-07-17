@@ -17,7 +17,9 @@ describe('ProductionMaterialLedgerService material events', () => {
         reservationId: 'reservation-1',
         materialIssueId: 'issue-1',
         inventoryItemId: 'material-1',
+        inventoryTransactionId: 'inventory-transaction-1',
         quantity: 12,
+        unit: 'kg',
         actorId: 'operator-1',
         occurredAt: new Date('2026-07-11T01:00:00.000Z'),
         sourceVersion: '2026-07-11T01:00:00.000Z',
@@ -29,12 +31,25 @@ describe('ProductionMaterialLedgerService material events', () => {
       expect.objectContaining({
         eventName: productionMaterialEvents.issued,
         idempotencyKey:
-          'production.material.issued:issue-1:2026-07-11T01:00:00.000Z',
+          'production.material.issued:issue-1:material-1:2026-07-11T01:00:00.000Z',
+        maxRetries: 10,
         payload: expect.objectContaining({
           productionOrderId: 'order-1',
           materialIssueId: 'issue-1',
           inventoryItemId: 'material-1',
           quantity: 12,
+          unit: 'kg',
+          inventoryTransactionId: 'inventory-transaction-1',
+          state: 'ISSUED',
+          aggregateVersion: new Date('2026-07-11T01:00:00.000Z').getTime(),
+        }),
+        metadata: expect.objectContaining({
+          eventVersion: 1,
+          producer: 'production',
+          aggregateVersion: new Date(
+            '2026-07-11T01:00:00.000Z',
+          ).getTime(),
+          orderingKey: 'production-order:order-1:material:material-1',
         }),
       }),
       tx,

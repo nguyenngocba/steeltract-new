@@ -33,6 +33,7 @@ export class MaterialIssueRepository {
   findIssueById(id: string, tx: MaterialIssueTx = this.prisma) {
     return tx.productionMaterialIssue.findUnique({
       where: { id },
+      include: { inventoryItem: { include: { unitMaster: true } } },
     });
   }
 
@@ -49,6 +50,7 @@ export class MaterialIssueRepository {
         productionOrder: true,
         inventoryItem: {
           include: {
+            unitMaster: true,
             zone: {
               include: {
                 warehouse: true,

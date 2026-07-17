@@ -1,5 +1,15 @@
 # Enterprise Event Catalog & Outbox Payloads (EPIC210)
 
+> **ADS001 precedence (2026-07-17):** Publisher and subscriber ownership is
+> governed by `cross-module-event-matrix.md`. Payload examples in this catalog
+> are design samples, not authorization to write another context's aggregate.
+> ADS004 will freeze canonical names, payload versions and compatibility rules.
+
+> **ADS004 precedence (2026-07-17):** ADS004 is now approved. Canonical names,
+> schemas, publishers, subscribers, versions and delivery rules are defined by
+> `canonical-event-catalog.md` and its ADS004 companion documents. Names and
+> payload samples below are historical design examples only.
+
 Danh mục Sự kiện Hệ thống (Outbox Events) được điều phối thông qua [OutboxService](file:///opt/projects/steeltrack/apps/backend-api/src/core/outbox/outbox.service.ts) và phát hành thông qua [EventPublisherService]. Mọi sự kiện đều được ghi nhận transactional cùng lúc với dữ liệu nghiệp vụ chính vào bảng [OutboxEvent](file:///opt/projects/steeltrack/apps/backend-api/prisma/schema.prisma#L2406).
 
 ## 1. Nguyên tắc Đặt tên Sự kiện (Event Naming Convention)

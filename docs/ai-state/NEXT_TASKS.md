@@ -1,4 +1,99 @@
 # Next Tasks
+
+- **RFC003 operator execution certification**: On a designated disposable
+  Production Order, verify Order start creates one run, pause/resume preserves
+  versions and timestamps, completion blocks active runs, abort preserves its
+  reason and a replacement run can continue the same Work Order.
+- **Execution command API decision**: RFC003 intentionally exposes no route.
+  Add execution endpoints only through a separately approved additive API
+  rollout with `Idempotency-Key` and `expectedVersion`.
+- **Projection runtime evidence**: Produce real `production.execution.*` facts
+  through operator commands, then replay `ProductionExecution` and
+  `ProductionTimeline` and compare persisted documents to aggregate rows.
+
+- **EPIC188 operator API certification**: Exercise every
+  `/production/commands` route with real disposable aggregates, including exact
+  replay and stale-version Conflict; verify timeline, ActivityLog, Outbox,
+  snapshots and Operations Center.
+- **Production client migration**: In a separately approved frontend sprint,
+  add aggregate version reads and stable idempotency keys, then migrate one
+  operator workflow at a time without redesign.
+- **Legacy Production API retirement gate**: Collect route usage and response
+  parity before proposing deprecation. Do not silently redirect old requests
+  because they lack canonical engineering/version inputs.
+
+- **RFC002 operator certification**: On disposable data, run Create -> Release
+  -> Ready -> Start -> Work Order/Completion -> Complete -> Close plus
+  Issue/Consume/Return, Scrap and Rework; verify ledgers, receipts, Outbox,
+  timeline, snapshots and Operations Center.
+- **Canonical row adoption**: Approve an explicit policy before assigning
+  aggregate versions/lifecycle states to legacy Production Orders or standalone
+  Work Orders. Never infer canonical state from legacy strings.
+- **RFC003 Components operator certification**: Exercise Create Component ->
+  Create Revision -> replace/validate BOM -> submit review -> approve -> release
+  -> deprecate -> archive on disposable data. Verify exact replay, stale-version
+  Conflict, timeline, ActivityLog and Outbox before client adoption.
+- **Components client migration**: Adopt `/components/commands` one workflow at
+  a time after operators can read aggregate versions and generate stable
+  idempotency keys. Do not redirect legacy requests silently.
+- **Legacy Component adoption policy**: Define an operator-reviewed adoption
+  command and mapping evidence before any existing row receives canonical
+  `lifecycleState`; bulk automatic mapping is forbidden.
+- **Engineering BOM graph validation**: Approve a bounded Components-owned graph
+  query for cross-revision circular-reference validation before exposing BOM
+  validation to operators.
+- **ADS004 Cross-module Event Contract**: Completed as AD-019. Architecture
+  decision gates AD-015 through AD-019 are closed; new implementation must use
+  the canonical catalog and cannot add aliases without Architecture Review.
+- **Component Aggregate Implementation**: Completed additively using AD-016/019;
+  continue to treat legacy `ComponentStatus` as compatibility projection.
+- **Production Aggregate Implementation RFC**: Plan additive Work Order,
+  Execution, Completion, Scrap and linked Rework persistence using AD-017/019.
+  Preserve AD-018 Inventory PostingReceipt semantics.
+- **Canonical event rollout RFC**: Inventory current event publishers and
+  consumers, define time-bounded adapters for legacy/internal names, and prove
+  no dual business effect before retirement.
+- **ADS003.5 Production-Inventory Interaction Contract**: Completed as AD-018.
+  Preserve owner commands, PostingReceipt semantics and no-double-stock rules
+  when defining ADS004 event contracts.
+- **ADS002 Component State Machine**: Completed as AD-016. Do not implement or
+  reinterpret legacy `ComponentStatus` values before ADS003/ADS004 and a
+  dedicated additive Components implementation RFC.
+- **ADS003 Production State Machine**: Completed as AD-017. Do not implement or
+  reinterpret legacy WorkOrder/ProductionStage/Consumption Scrap records before
+  ADS004 and a dedicated additive Production implementation RFC.
+- **ADS004 Cross-module Event Contract (historical gate)**: Completed. Event
+  consumers must never repeat an Inventory posting already represented by an
+  AD-018 PostingReceipt.
+- **Ownership remediation rule**: Do not implement new module business paths
+  before ADS002-004. Existing direct foreign repository/table writes are
+  compatibility debt and must be replaced by owner-exported command boundaries
+  in focused sprints, not bulk refactors.
+- **EPIC187A Components Domain Alignment (P0)**: Decide whether Component owns
+  the full lifecycle or only identity/handoff state; separate Production stage,
+  stock, QC and logistics semantics; approve revision/archive policy,
+  cross-module command ownership and canonical events before implementation.
+- **Components material boundary remediation (P0 after alignment)**: Replace
+  the active Components Material Stock client-side Inventory/Production
+  reconstruction and generic Inventory return posting with Production-owned
+  bounded read and Return command contracts. Inventory remains stock owner.
+- **EPIC187B-C Components backend completion**: After alignment, implement a
+  state machine, transaction-aware internal Component command boundary,
+  idempotency/optimistic concurrency, atomic event coverage and secondary live
+  read models. Do not begin EPIC188 Cockpit UI before certification.
+- **Production Domain Alignment (P0)**: Before EPIC186 implementation, approve
+  `WorkOrder 1 -> N ProductionOrder`, typed Work Order lifecycle, quantity units
+  and formulas for completed/rejected/scrap/remaining, QC ownership of rejected
+  quantity, and the canonical Scrap command/event contract. Preserve
+  PROD-011/014/015 and do not emit new legacy `production.started`-style events.
+- **Production Work Order Foundation (after alignment)**: Implement the approved
+  additive relation, repository transaction, atomic Outbox, bounded live read
+  model and backward compatibility. Any schema migration requires explicit
+  authorization.
+- **Production Completion/WIP Foundation (after alignment)**: Add quantitative
+  completion and stage/WIP projections at the approved aggregate level without
+  replacing the canonical lifecycle or ADR011 read paths.
+- **EPIC185 Transfer Multi-material Pending Items UX**: Completed. Refactored the Transfer creation modal to support local pending items batching, location duplicate merging, list review/edit/remove, transfer-specific available stock calculations, visual warning and addition blocking on stock exceedance, and double-minimap autofocus.
 - **EPIC184 Outbound Multi-material Pending Items UX**: Completed. Refactored the Outbound creation modal to support local pending items batching, location duplicate merging, list review/edit/remove, outbound-specific available stock calculations, and visual warning on stock exceedance.
 - **EPIC183 Inbound Multi-material Pending Items UX**: Completed. Refactored the creation modal to support local pending items batching, location duplicate merging, list review/edit/remove, and non-destructive API error recovery.
 - **EPIC182 Multi-material Business Specification**: Completed. Pending Items
@@ -411,6 +506,25 @@ Backlog after the locked order:
 - P1: normalize Inventory module runtime metric naming while retaining granular
   material/location metrics.
 - Rerun EPIC170 certification before implementing Logistics beyond audit scope.
+
+# Enterprise Read Platform Follow-up
+
+1. Deploy `20260717170000_enterprise_read_platform` through the approved database process.
+2. Process retained Outbox events and verify projection checkpoint, lag, retry and dead-letter health with runtime data.
+3. Complete canonical Inventory event payloads for quantity and location facts before certifying availability/balance projections.
+4. Validate typed projection parity per module before any dashboard or cockpit cutover.
+5. Cut consumers over module by module in a separate UI/API sprint; do not claim current UI is projection-only yet.
+6. Define retention and archival policy for Outbox receipts before high-volume replay operations.
+
+# RFC002A Follow-up
+
+1. Add an explicit location-bucket projection identity in a separately approved Projection Engine version before certifying LocationBalance.
+2. Define an Inventory aggregate sequence/ordering contract; timestamp-derived legacy versions are not strict optimistic-concurrency versions.
+3. Add Production Execution publishers only with an approved execution workflow.
+4. Add canonical QC defect/reason codes through a domain decision before certifying NCR projections.
+5. Complete Yard movement source-location and loading workflows before Yard event certification.
+6. Define Project and Logistics canonical publishers in their owning-domain implementation sprints.
+7. Run new real operator commands to establish Production/Components canonical replay fixtures; current retained Outbox has none.
 # After EPIC171
 
 - EPIC172: completed. Production Overview/Orders/Planning now use the bounded

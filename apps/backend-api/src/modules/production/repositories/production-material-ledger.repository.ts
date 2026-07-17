@@ -43,6 +43,7 @@ export class ProductionMaterialLedgerRepository {
       payload: Prisma.InputJsonValue;
       metadata: Prisma.InputJsonValue;
       idempotencyKey: string;
+      maxRetries?: number;
     },
     tx: ProductionLedgerTx,
   ) {

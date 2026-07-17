@@ -21,6 +21,14 @@
 🚧 Operations Center
 
 - Projects is now a Core Platform Architecture Freeze Candidate after EPIC115: Project service persistence routes through `ProjectsRepository`, dashboard/runtime reads are snapshot-first with fallback, mutations publish persistent `project.*` events, and Operations Center exposes Project Platform Health. Final freeze remains pending persisted Project Detail tab snapshots.
+- Production now exposes its AD-017/019 aggregate through the additive
+  `/production/commands` API with durable idempotency and optimistic
+  concurrency. Legacy routes remain compatible while operator certification
+  and controlled client migration are pending.
+- Components now exposes its AD-016/019 aggregate through the additive
+  `/components/commands` API. Legacy Components routes and operational status
+  projections remain compatible pending operator certification and explicit
+  row adoption.
 
 ## Not Started
 
@@ -98,3 +106,16 @@
   architecture decisions, inventory decisions, workflow rules, roadmap, repo structure, event naming, and technical debt audit.
 - Legacy ARCHIVE documents are moved to `docs/archive/`.
 - Empty legacy module placeholder docs classified as DELETE have been removed.
+# Enterprise Read Platform
+
+- Shared Outbox projection engine: implemented.
+- Projection registry: Production, Components, Inventory and cross-module views.
+- Query API: additive, JWT-protected and GET-only.
+- Replay/health: implemented; migration deployment and consumer cutover pending.
+
+# RFC002A Event Payload Status
+
+- Enterprise projection migration: deployed.
+- Existing Inventory/Production/Components/QC/Yard canonical producers: payload reviewed and completed where source facts exist.
+- Real replay: 90 retained Outbox events, 142 deterministic documents, zero failures.
+- Historical Inventory and absent Project/Logistics/Execution/Disposition/Loading streams remain non-authoritative.

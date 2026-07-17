@@ -205,3 +205,9 @@ Related gate:
 - The shared runtime platform records QC snapshot hit/miss/age/lag, fallback, and read-model hits.
 - Operations Center reports QC repository, read-model, snapshot, feature-flag, background-job, outbox, parity, and runtime health.
 - No UI, API, business workflow, read-model semantics, snapshot schema, or feature semantics changed in EPIC154.
+# RFC002A Canonical Payloads
+
+QC inspection completion now emits a bounded AD-019 fact rather than a Prisma
+graph. NCR payloads expose real identifiers/severity but explicit null for
+defect/reason codes absent from the domain. `qc.disposition.completed` has no
+publisher, so NCR/disposition certification remains partial.

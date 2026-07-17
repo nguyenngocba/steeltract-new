@@ -11,6 +11,7 @@ import { inventoryCodePrefix } from './inventory-transaction-code';
 import {
   aggregateInventoryBuckets,
   aggregateInventoryMaterials,
+  inventoryBucketKey,
   orderAndValidateTransferLines,
 } from './inventory-transaction-lines';
 
@@ -588,7 +589,15 @@ export class InventoryService {
             }
           }
 
-          const itemsById = new Map<string, { id: string; code: string }>();
+          const itemsById = new Map<
+            string,
+            {
+              id: string;
+              code: string;
+              unit: string | null;
+              unitMaster: { code: string; symbol: string } | null;
+            }
+          >();
           for (const materialId of new Set(
             baseItems.map((line) => line.inventoryItemId),
           )) {
@@ -733,19 +742,29 @@ export class InventoryService {
           );
 
           // Keep backward compatibility for modules still reading snapshot quantity.
+          const materialBalances = new Map<
+            string,
+            { quantity: number; aggregateVersion: number }
+          >();
           for (const line of aggregateInventoryMaterials(baseItems)) {
-            await this.inventoryRepository.updateItemQuantitySnapshot(
+            const updated =
+              await this.inventoryRepository.updateItemQuantitySnapshot(
               line.inventoryItemId,
               line.quantity,
               tx,
             );
+            materialBalances.set(line.inventoryItemId, {
+              quantity: Number(updated.quantity),
+              aggregateVersion: updated.updatedAt.getTime(),
+            });
           }
 
+          const locationBalances = new Map<string, number>();
           for (const line of bucketDeltas) {
             if (!(line.warehouseId || line.zoneId || line.slotId || line.level)) {
               continue;
             }
-            await this.inventoryRepository.upsertLocationStock(
+            const updated = await this.inventoryRepository.upsertLocationStock(
               {
                 inventoryItemId: line.inventoryItemId,
                 warehouseId: line.warehouseId,
@@ -755,6 +774,10 @@ export class InventoryService {
                 quantity: line.quantity,
               },
               tx,
+            );
+            locationBalances.set(
+              inventoryBucketKey(line),
+              Number(updated?.quantity ?? 0),
             );
           }
 
@@ -801,6 +824,16 @@ export class InventoryService {
               tx,
             );
           }
+          await this.publishCanonicalInventoryFacts({
+            transaction,
+            type,
+            lines: baseItems,
+            bucketDeltas,
+            itemsById,
+            materialBalances,
+            locationBalances,
+            tx,
+          });
           if (type === TransactionType.ADJUSTMENT) {
             await this.inventoryEvents.adjustmentPosted(
               {
@@ -818,9 +851,15 @@ export class InventoryService {
           ) {
             await this.inventoryEvents.stocktakeCompleted(
               {
-                id: transaction.id,
-                transactionNo: transaction.transactionNo ?? transaction.code,
-                type: transaction.type,
+                stocktakeId: transaction.id,
+                warehouseId: transaction.warehouseId,
+                zoneId: transaction.zoneId,
+                countedLineCount: transaction.items.length,
+                varianceLineCount: bucketDeltas.filter(
+                  (line) => Math.abs(line.quantity) > 0.000001,
+                ).length,
+                completedAt: transaction.transactionDate.toISOString(),
+                aggregateVersion: transaction.createdAt.getTime(),
               },
               tx,
             );
@@ -1037,6 +1076,128 @@ export class InventoryService {
           ? (warehouseByZoneId.get(line.zoneId) ?? undefined)
           : undefined),
     }));
+  }
+
+  private async publishCanonicalInventoryFacts(params: {
+    transaction: {
+      id: string;
+      code: string;
+      transactionNo: string | null;
+      transactionDate: Date;
+      referenceModule: string | null;
+      referenceId: string | null;
+    };
+    type: TransactionType;
+    lines: NormalizedInventoryLine[];
+    bucketDeltas: NormalizedInventoryLine[];
+    itemsById: Map<
+      string,
+      {
+        unit: string | null;
+        unitMaster: { code: string; symbol: string } | null;
+      }
+    >;
+    materialBalances: Map<
+      string,
+      { quantity: number; aggregateVersion: number }
+    >;
+    locationBalances: Map<string, number>;
+    tx: Prisma.TransactionClient;
+  }) {
+    const transactionCode =
+      params.transaction.transactionNo ?? params.transaction.code;
+    const postedAt = params.transaction.transactionDate.toISOString();
+
+    if (params.type === TransactionType.TRANSFER) {
+      for (let index = 0; index < params.lines.length; index += 2) {
+        const source = params.lines[index];
+        const destination = params.lines[index + 1];
+        if (!source || !destination) continue;
+        const item = params.itemsById.get(source.inventoryItemId);
+        const unit = item?.unit ?? item?.unitMaster?.symbol ?? item?.unitMaster?.code;
+        const balance = params.materialBalances.get(source.inventoryItemId);
+        if (!unit || !balance || !source.warehouseId || !destination.warehouseId) {
+          continue;
+        }
+        await this.inventoryEvents.transferred(
+          {
+            inventoryTransactionId: params.transaction.id,
+            transactionCode,
+            materialId: source.inventoryItemId,
+            quantity: Math.abs(source.quantity),
+            unit,
+            source: {
+              warehouseId: source.warehouseId,
+              zoneId: source.zoneId ?? null,
+              slotId: source.slotId ?? null,
+              level: source.level ?? null,
+              resultingBalance:
+                params.locationBalances.get(inventoryBucketKey(source)) ?? 0,
+            },
+            destination: {
+              warehouseId: destination.warehouseId,
+              zoneId: destination.zoneId ?? null,
+              slotId: destination.slotId ?? null,
+              level: destination.level ?? null,
+              resultingBalance:
+                params.locationBalances.get(inventoryBucketKey(destination)) ?? 0,
+            },
+            referenceModule: params.transaction.referenceModule,
+            referenceId: params.transaction.referenceId,
+            postingKind: 'TRANSFER',
+            postedAt,
+            resultingStock: balance.quantity,
+            aggregateVersion: balance.aggregateVersion,
+          },
+          params.tx,
+        );
+      }
+      return;
+    }
+
+    const eventName = {
+      IMPORT: 'inventory.received',
+      EXPORT: 'inventory.issued',
+      RETURN: 'inventory.returned',
+      ADJUSTMENT: 'inventory.adjusted',
+    }[params.type] as
+      | 'inventory.received'
+      | 'inventory.issued'
+      | 'inventory.returned'
+      | 'inventory.adjusted';
+    for (const line of params.bucketDeltas) {
+      const item = params.itemsById.get(line.inventoryItemId);
+      const unit = item?.unit ?? item?.unitMaster?.symbol ?? item?.unitMaster?.code;
+      const balance = params.materialBalances.get(line.inventoryItemId);
+      const warehouseId = line.warehouseId;
+      if (!unit || !balance || !warehouseId) continue;
+      await this.inventoryEvents.stockPosted(
+        eventName,
+        {
+          inventoryTransactionId: params.transaction.id,
+          transactionCode,
+          materialId: line.inventoryItemId,
+          quantity:
+            params.type === TransactionType.ADJUSTMENT
+              ? line.quantity
+              : Math.abs(line.quantity),
+          unit,
+          warehouseId,
+          zoneId: line.zoneId ?? null,
+          slotId: line.slotId ?? null,
+          level: line.level ?? null,
+          referenceModule: params.transaction.referenceModule,
+          referenceId: params.transaction.referenceId,
+          postingKind: params.type,
+          postedAt,
+          resultingStock: balance.quantity,
+          resultingLocationBalance:
+            params.locationBalances.get(inventoryBucketKey(line)) ?? 0,
+          aggregateVersion: balance.aggregateVersion,
+        },
+        params.tx,
+      );
+    }
   }
 
   private applyValuationToLines(

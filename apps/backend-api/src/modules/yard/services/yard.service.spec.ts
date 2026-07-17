@@ -6,6 +6,8 @@ describe('YardService repository and Outbox boundary', () => {
     code: 'Y-A',
     name: 'Yard A',
     slots: [],
+    createdAt: new Date('2026-07-17T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-17T00:00:00.000Z'),
   };
 
   function setup(outboxError?: Error) {
@@ -81,5 +83,47 @@ describe('YardService repository and Outbox boundary', () => {
         color: '#06b6d4',
       }),
     ).rejects.toThrow('outbox unavailable');
+  });
+
+  it('publishes a lightweight canonical Yard placement fact', async () => {
+    const { repository, service, tx } = setup();
+    const placedAt = new Date('2026-07-17T03:00:00.000Z');
+
+    await (service as any).createYardOutboxEvent(
+      tx,
+      'yard.item.placed',
+      {
+        id: 'placement-1',
+        itemId: 'component-1',
+        itemType: 'COMPONENT',
+        quantity: 2,
+        slotId: 'slot-1',
+        stackLevel: 2,
+        placedAt,
+        slot: { zoneId: 'zone-1' },
+        movements: [],
+      },
+      'operator-1',
+    );
+
+    expect(repository.createOutboxEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        eventName: 'yard.item.placed',
+        payload: expect.objectContaining({
+          yardItemId: 'component-1',
+          placementId: 'placement-1',
+          zoneId: 'zone-1',
+          slotId: 'slot-1',
+          level: '2',
+          movementAt: placedAt.toISOString(),
+        }),
+        metadata: expect.objectContaining({
+          eventVersion: 1,
+          producer: 'yard',
+          aggregateId: 'placement-1',
+        }),
+      }),
+      tx,
+    );
   });
 });

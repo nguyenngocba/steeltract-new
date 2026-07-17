@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { OutboxModule } from '../outbox/outbox.module';
 import { EventsModule } from '../events/events.module';
 import { SnapshotsModule } from '../snapshots/snapshots.module';
+import { ProjectionModule } from '../projections/projection.module';
 
 import { JobsController } from './jobs.controller';
 import { BackgroundJobManager } from './background-job-manager.service';
@@ -23,6 +24,7 @@ import { SnapshotUpdateDispatcher } from './snapshot-update-dispatcher.service';
     EventsModule,
     OutboxModule,
     SnapshotsModule,
+    ProjectionModule,
     RbacModule,
   ],
   controllers: [JobsController],

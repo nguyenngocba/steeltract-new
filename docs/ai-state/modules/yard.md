@@ -209,3 +209,9 @@ analytics snapshots must not replace this strong read-after-write path.
 
 Only existing Yard placement, movement, removal, zone and manual-snapshot events
 are routed. No reservation, hold, loading or dispatch workflow/event was added.
+# RFC002A Canonical Payloads
+
+Yard placement/movement events now emit bounded placement/location facts with a
+complete AD-019 envelope. Placement is authoritative for new events. Prior move
+zone/stack facts and `yard.loading.completed` remain unavailable, so full Yard
+movement/loading projections are non-authoritative.

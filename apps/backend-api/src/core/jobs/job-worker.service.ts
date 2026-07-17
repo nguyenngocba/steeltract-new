@@ -21,6 +21,7 @@ import { JobRetryPolicyService } from './job-retry-policy.service';
 import { JobSchedulerService } from './job-scheduler.service';
 import { SnapshotRebuilder } from './snapshot-rebuilder.service';
 import { SnapshotUpdateRequest } from './snapshot-update-dispatcher.service';
+import { ProjectionEngineService } from '../projections/projection-engine.service';
 
 interface WorkflowEventPayload {
   id: string;
@@ -53,6 +54,8 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly scheduler: JobSchedulerService,
     @Inject(SnapshotRebuilder)
     private readonly snapshotRebuilder: SnapshotRebuilder,
+    @Inject(ProjectionEngineService)
+    private readonly projectionEngine: ProjectionEngineService,
   ) {}
 
   onModuleInit() {
@@ -374,6 +377,8 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
 
   private async dispatchOutboxEvent(event: OutboxEvent) {
     try {
+      await this.projectionEngine.process(event);
+
       const metadata =
         event.metadata && typeof event.metadata === 'object'
           ? (event.metadata as Record<string, unknown>)

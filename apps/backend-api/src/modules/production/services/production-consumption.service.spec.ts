@@ -38,7 +38,11 @@ describe('ProductionConsumptionService material flow', () => {
     } as unknown as ProductionMaterialLedgerService;
     const service = new ProductionConsumptionService(
       repository,
-      { findItemById: jest.fn().mockResolvedValue({ code: 'MAT-1' }) } as never,
+      {
+        findItemById: jest
+          .fn()
+          .mockResolvedValue({ code: 'MAT-1', unit: 'kg', unitMaster: null }),
+      } as never,
       ledger,
     );
 
@@ -62,6 +66,7 @@ describe('ProductionConsumptionService material flow', () => {
       expect.objectContaining({
         eventName: 'production.material.consumed',
         quantity: 6,
+        unit: 'kg',
         consumptionId: 'consumption-1',
       }),
       tx,

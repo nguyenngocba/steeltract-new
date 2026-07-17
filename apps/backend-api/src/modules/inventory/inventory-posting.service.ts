@@ -3,10 +3,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 
 import { inventoryCodePrefix } from './inventory-transaction-code';
+import { InventoryEventService } from './inventory-event.service';
 import { InventoryRepository } from './inventory.repository';
 import {
   aggregateInventoryBuckets,
   aggregateInventoryMaterials,
+  inventoryBucketKey,
   sharedLineValue,
 } from './inventory-transaction-lines';
 import {
@@ -18,7 +20,10 @@ type PostingKind = 'ISSUE' | 'RETURN';
 
 @Injectable()
 export class InventoryPostingService {
-  constructor(private readonly repository: InventoryRepository) {}
+  constructor(
+    private readonly repository: InventoryRepository,
+    private readonly inventoryEvents: InventoryEventService,
+  ) {}
 
   issueMaterial(
     command: InventoryMaterialPostingCommand,
@@ -53,6 +58,13 @@ export class InventoryPostingService {
     ];
     const costs = await this.averageCosts(materialIds, tx);
 
+    const materials = new Map<
+      string,
+      {
+        unit: string | null;
+        unitMaster: { code: string; symbol: string } | null;
+      }
+    >();
     for (const line of command.lines) {
       if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
         throw new BadRequestException(
@@ -66,7 +78,7 @@ export class InventoryPostingService {
           `Material not found: ${line.inventoryItemId}`,
         );
       }
-
+      materials.set(line.inventoryItemId, item);
     }
 
     if (kind === 'ISSUE') {
@@ -145,16 +157,25 @@ export class InventoryPostingService {
       tx,
     );
 
+    const materialBalances = new Map<
+      string,
+      { quantity: number; aggregateVersion: number }
+    >();
     for (const line of aggregateInventoryMaterials(signedLines)) {
-      await this.repository.updateItemQuantitySnapshot(
+      const updated = await this.repository.updateItemQuantitySnapshot(
         line.inventoryItemId,
         line.quantity,
         tx,
       );
+      materialBalances.set(line.inventoryItemId, {
+        quantity: Number(updated.quantity),
+        aggregateVersion: updated.updatedAt.getTime(),
+      });
     }
     const bucketDeltas = aggregateInventoryBuckets(signedLines);
+    const locationBalances = new Map<string, number>();
     for (const line of bucketDeltas) {
-      await this.repository.upsertLocationStock(
+      const updated = await this.repository.upsertLocationStock(
         {
           inventoryItemId: line.inventoryItemId,
           warehouseId: line.warehouseId,
@@ -164,6 +185,10 @@ export class InventoryPostingService {
           quantity: line.quantity,
         },
         tx,
+      );
+      locationBalances.set(
+        inventoryBucketKey(line),
+        Number(updated?.quantity ?? 0),
       );
     }
 
@@ -197,6 +222,39 @@ export class InventoryPostingService {
           },
           metadata: { module: 'inventory' },
           idempotencyKey: `inventory.stock.changed:${transaction.id}:${line.inventoryItemId}:${line.warehouseId ?? 'no-warehouse'}:${line.zoneId ?? 'no-zone'}:${line.slotId ?? 'no-slot'}:${line.level ?? 'no-level'}`,
+        },
+        tx,
+      );
+    }
+
+    for (const line of bucketDeltas) {
+      const material = materials.get(line.inventoryItemId);
+      const unit =
+        material?.unit ??
+        material?.unitMaster?.symbol ??
+        material?.unitMaster?.code;
+      const balance = materialBalances.get(line.inventoryItemId);
+      if (!unit || !balance || !line.warehouseId) continue;
+      await this.inventoryEvents.stockPosted(
+        kind === 'ISSUE' ? 'inventory.issued' : 'inventory.returned',
+        {
+          inventoryTransactionId: transaction.id,
+          transactionCode: transaction.transactionNo ?? transaction.code,
+          materialId: line.inventoryItemId,
+          quantity: Math.abs(line.quantity),
+          unit,
+          warehouseId: line.warehouseId,
+          zoneId: line.zoneId ?? null,
+          slotId: line.slotId ?? null,
+          level: line.level ?? null,
+          referenceModule: transaction.referenceModule,
+          referenceId: transaction.referenceId,
+          postingKind: kind,
+          postedAt: transaction.transactionDate.toISOString(),
+          resultingStock: balance.quantity,
+          resultingLocationBalance:
+            locationBalances.get(inventoryBucketKey(line)) ?? 0,
+          aggregateVersion: balance.aggregateVersion,
         },
         tx,
       );

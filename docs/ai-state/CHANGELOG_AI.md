@@ -1,5 +1,241 @@
 # SteelTrack AI Changelog
 
+## 2026-07-17 RFC003 Production Aggregate and Execution Implementation
+
+Completed:
+
+* Added the durable AD-017 Production Execution aggregate and internal
+  start/pause/resume/complete/abort command boundary.
+* Added optimistic concurrency, durable idempotent replay and a database guard
+  allowing at most one active run per Work Order.
+* Made Order start create its first execution atomically and made Work Order /
+  Order completion reject active runs.
+* Published canonical V1 `production.execution.*` facts with timeline,
+  ActivityLog and audit/domain Outbox in one transaction.
+* Reused existing projection routing and changed no controller, route,
+  frontend, Inventory, Components or Architecture Decision.
+
+## 2026-07-17 RFC002A Canonical Event Payload Completion
+
+Completed:
+
+* Completed projection-oriented canonical payloads and AD-019 envelopes for
+  existing Inventory, Production, Components, QC and Yard publishers.
+* Added resulting stock/location facts to canonical Inventory postings without
+  changing Inventory business rules or APIs.
+* Replaced canonical QC/Yard Prisma graph payloads with bounded event facts.
+* Deployed the additive Enterprise Read Platform migration and replayed 90 real
+  retained Outbox events across all 20 projections.
+* Verified 142 deterministic documents, unchanged counts on resume and zero
+  active projection failures.
+* Certified absent/incomplete publishers as non-authoritative instead of
+  inventing Project, Logistics, Execution, Disposition or Loading workflows.
+
+## 2026-07-17 Enterprise Read Platform Foundation
+
+Completed:
+
+* Added one shared, Outbox-driven projection engine with transactional receipts,
+  checkpoints, failures and versioned JSON documents.
+* Registered Production, Components, Inventory and cross-module projections and
+  exposed a JWT-protected, GET-only paginated Query API.
+* Added resumable/rebuild replay over retained Outbox history and integrated
+  projection failures with the existing Outbox retry/dead-letter lifecycle.
+* Added tests for projection idempotency, replay, failure propagation, GET-only
+  routes and projection-before-dispatch ordering.
+* Preserved existing aggregate, API, snapshot and UI behavior. UI cutover and
+  Inventory canonical payload completion remain follow-up gates.
+
+## 2026-07-17 RFC003 Components Aggregate API Rollout
+
+Completed:
+
+* Exposed the AD-016 Component/Revision/Engineering BOM aggregate through the
+  additive authenticated `/components/commands` namespace.
+* Added strict command DTOs, mandatory `Idempotency-Key`, optimistic version
+  validation and AD-019 correlation/causation propagation.
+* Preserved atomic Revision/BOM release, immutable release evidence, timeline,
+  ActivityLog, audit Outbox and canonical domain Outbox.
+* Added exact replay, conflicting-key, stale-version and legacy API
+  compatibility regression coverage.
+* Changed no frontend, Inventory, Production, legacy route or schema.
+
+## 2026-07-17 EPIC188 Production Command API Rollout
+
+Completed:
+
+* Added the authenticated additive `/production/commands` API for Production
+  Order, Work Order, Completion, Scrap and Rework commands.
+* Required durable `Idempotency-Key`, positive `expectedVersion` where
+  applicable, and optional correlation/causation propagation.
+* Added strict Zod command DTOs, stale-version conflict coverage, exact replay
+  deduplication and legacy route metadata compatibility tests.
+* Hardened Rework idempotency and completed Scrap Draft/Cancel timeline writes
+  without adding events outside AD-019.
+* Changed no legacy route, frontend, Inventory, schema or migration.
+
+## 2026-07-17 Components Aggregate Implementation
+
+Completed:
+
+* Implemented AD-016 Component, Revision and Engineering BOM state machines as
+  pure domain aggregates.
+* Added additive canonical persistence, optimistic aggregate versions,
+  one-current-release relation and immutable release evidence.
+* Added Components-owned command orchestration for metadata, deprecation,
+  reactivation, revision/review/approval/release/archive and BOM validation.
+* Added AD-019 canonical V1 events with idempotency, ordering metadata and
+  atomic Component timeline, ActivityLog, audit Outbox and domain Outbox.
+* Preserved API/frontend compatibility and left legacy `ComponentStatus` rows
+  outside the canonical lifecycle until an explicit adoption policy exists.
+
+Notes:
+
+* No Inventory, Production, QC or Yard code changed. No commit or stage was
+  created.
+
+## 2026-07-17 ADS004 Cross-module Event Contract
+
+Completed:
+
+* Approved AD-019 and the canonical event catalog for Inventory, Components,
+  Production, QC, Projects, Yard and Logistics.
+* Defined envelope/payload version 1, publisher-subscriber matrix, aggregate
+  ordering, idempotency, retry, dead-letter, replay and governance policies.
+* Resolved duplicate aliases for Component release, Production Issue/Return/
+  Scrap, Yard item movement and Logistics shipment lifecycle.
+* Classified current broad/legacy events as compatibility or internal signals;
+  no dual canonical publication was authorized.
+* Enforced AD-018: event replay/projection cannot repeat Inventory stock posting.
+* Changed no application code, API, schema, migration, workflow or data.
+
+Notes:
+
+* AD-015 through AD-019 architecture gates are complete. Implementation now
+  requires bounded additive RFCs and operator/replay validation.
+
+## 2026-07-17 ADS003.5 Production-Inventory Interaction Contract
+
+Completed:
+
+* Approved AD-018 for Production-to-Inventory application commands, bounded
+  posting receipts, transaction modes and projection consistency.
+* Fixed Reservation/Release/Consumption/Completion/non-recoverable Scrap as
+  Production-local operations with no Inventory stock mutation.
+* Fixed Issue, Return and recoverable Scrap receipt as Inventory-owned posting
+  inside the caller's shared local transaction.
+* Defined idempotency, typed posting failures, rollback behavior and the rule
+  that Outbox replay never repeats stock mutation.
+* Preserved Inventory, Production, Components and QC ownership decisions.
+* Changed no application code, API, schema, migration, workflow or data.
+
+Notes:
+
+* ADS004 is the final architecture decision gate before implementation RFCs.
+
+## 2026-07-17 ADS003 Production State Machine
+
+Completed:
+
+* Approved AD-017 for Production Order, Work Order, Execution Run, Completion,
+  Scrap and linked Rework lifecycle ownership.
+* Retained `READY` as an admission state with Start-time revalidation and fixed
+  Production Start at the atomic first execution commit.
+* Defined `ProductionOrder 1:N WorkOrder`, append-only partial completion,
+  separate final completion/close and immutable Scrap reversal semantics.
+* Fixed Rework as a linked `REWORK` Production Order initiated from a QC-owned
+  request; the original Order is never rewound.
+* Preserved Inventory stock ownership, Component engineering ownership and QC
+  rejection/NCR ownership.
+* Changed no application code, API, schema, migration, workflow or data.
+
+Notes:
+
+* ADS004 remains mandatory before a Production implementation RFC.
+
+## 2026-07-17 ADS002 Component State Machine
+
+Completed:
+
+* Approved AD-016 for Component identity, Component Revision, Engineering BOM,
+  immutable release/supersession and non-destructive archive.
+* Defined canonical states, transitions, commands, domain facts, invalid
+  transitions and invariants in seven architecture documents.
+* Fixed one-current-release cardinality, released-revision immutability and the
+  rule that post-release BOM changes require a new revision.
+* Classified current `ComponentStatus` values as compatibility projections of
+  foreign owner facts; no automatic mapping or migration was authorized.
+* Changed no application code, API, schema, migration, workflow or data.
+
+Notes:
+
+* ADS003 and ADS004 remain mandatory before a Components implementation RFC.
+
+## 2026-07-17 ADS001 SteelTrack Domain Ownership Matrix
+
+Completed:
+
+* Approved aggregate, command, event publisher, read-model/query and forbidden
+  write ownership for Inventory, Components, Production, QC, Projects, Yard,
+  Suppliers and Logistics.
+* Fixed Inventory as exclusive stock/valuation owner and Production as owner of
+  material intent/usage and manufacturing execution.
+* Fixed Components as identity/revision/handoff owner, with Production, QC,
+  Yard, Logistics and Project states represented as external facts/projections.
+* Replaced direct cross-module repository permission with owner-exported command
+  services; documented the constrained same-transaction modular-monolith case.
+* Added seven ADS001 decision documents and marked conflicting legacy dependency
+  and event guidance as superseded/non-normative.
+* Changed no backend, frontend, API, schema, migration, runtime behavior or data.
+
+## 2026-07-17 EPIC186 Components Domain Audit & Foundation
+
+Completed:
+
+* Audited Component aggregate, lifecycle, material flow ownership, history,
+  repositories, ADR011 reads, dashboard snapshots, events, runtime, APIs and
+  Production/Inventory integration.
+* Confirmed Components Core Platform infrastructure remains compliant while
+  domain ownership and lifecycle are not aligned.
+* Identified the active Components Material Stock path as a P0 boundary issue:
+  it reconstructs Production/Inventory data in React and posts generic
+  Inventory returns instead of using Production material commands.
+* Documented seven audit/foundation reports and an alignment-first roadmap.
+* Changed no backend, frontend, API, schema, migration, workflow or data.
+
+## 2026-07-17 EPIC186 Production Domain Completion Assessment
+
+Completed:
+
+* Audited Production Order lifecycle, Work Order foundation, material flow,
+  completion/WIP quantities, canonical events, ADR011 read paths, repository
+  boundaries and runtime certification evidence.
+* Confirmed the existing canonical lifecycle and atomic Outbox implementation
+  already pass and must not be replaced by the abbreviated EPIC186 sequence or
+  legacy event namespace.
+* Identified exact implementation blockers: disconnected Work Order model,
+  undefined completion/rejected/remaining quantities, deferred Scrap contract,
+  and Consumption ownership conflict with PROD-011/015.
+* Created seven audit/design/runtime reports and a bounded alignment-first
+  roadmap.
+* Changed no backend, frontend, API, Prisma schema, migration, workflow or data.
+
+## 2026-07-14 EPIC185 Transfer Multi-material Pending Items UX
+
+Completed:
+
+* Refactored `TransferTransactionModal` in `InventoryTransactionModals.tsx` to support the multi-material pending pilot.
+* Implemented local state batching with "Thêm vào danh sách chờ điều chuyển" button.
+* Added exact duplicate location merging (merges quantities if material ID, fromZoneId, fromSlotId, fromLevel, toZoneId, toSlotId, toLevel, and UOM match).
+* Designed the Pending Header displaying total unique materials, quantity summaries grouped by UOM, total transfer count, and a toggle button for the list.
+* Added a detailed Pending Panel with Edit (loads line item back into form, warns if form is dirty) and Remove actions.
+* Configured atomic single-request submission (sends `items[]` array in one API payload, mapping each pending item to positive destination and negative source lines).
+* Implemented local available source stock check (`availableSourceQty = sourceQty - pendingQtyAtLoc`) and displayed a visual red warning if transfer quantity exceeds available source stock, while disabling the add action.
+* Configured visual 2D focus/highlight on both source and destination `WarehouseMiniMap` instances when editing an item in the pending list.
+* Preserved local pending state on submission failures to prevent operator data loss (non-destructive API error handling).
+* Implemented dirty cancellation confirmation warning on closing/cancelling.
+* Created documentation: `docs/runtime/inventory-transfer-pending-report.md`, `docs/runtime/inventory-transfer-operator-walkthrough.md`, and `docs/runtime/inventory-transfer-ui-review.md`.
+
 ## 2026-07-14 EPIC184 Outbound Multi-material Pending Items UX
 
 Completed:
@@ -4053,3 +4289,15 @@ Notes:
   models; Material History and Transactions remain paginated live reads.
 - Kept Inventory Overview snapshot-backed and changed no dashboard code.
 - Added focused ADR011 regression tests and four certification reports.
+# 2026-07-17 - RFC002 Production Aggregate Implementation
+
+- Added canonical Production Order, Work Order, Completion, Scrap and Rework
+  aggregate persistence with an additive deployed migration.
+- Added AD-017 state validation, optimistic concurrency and durable command
+  idempotency in the internal Production command boundary.
+- Persisted timeline, ActivityLog, audit Outbox and AD-019 V1 domain facts in
+  the same Production repository transaction.
+- Preserved AD-018: Issue/Return/recoverable Scrap use Inventory-owned posting;
+  Consumption and Completion do not mutate stock.
+- Added focused aggregate, command atomicity and material event contract tests;
+  public API and UI remain unchanged.

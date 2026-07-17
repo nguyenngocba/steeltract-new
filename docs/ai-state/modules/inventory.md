@@ -1,5 +1,20 @@
 # Inventory Module
 
+## ADS003.5 Production-Inventory Interaction Contract
+
+Approved on 2026-07-17 as AD-018.
+
+- Inventory remains the only owner of physical stock, valuation, transaction
+  and exact location-bucket mutation.
+- Production Reservation, Release, Consumption and Completion never post
+  Inventory stock.
+- Production Issue, Return and explicit recoverable Scrap receipt use the
+  Inventory-owned application posting boundary in one local atomic transaction.
+- Inventory returns an idempotent bounded PostingReceipt; Outbox replay updates
+  projections only and never repeats stock mutation.
+- Scrap does not automatically become Inventory Adjustment.
+- No Inventory code, API, schema, migration, workflow or data changed.
+
 ## EPIC182 Multi-material Operator Specification
 
 Status: **SPECIFICATION APPROVED - UI CONDITIONALLY READY** (2026-07-14)
@@ -892,3 +907,24 @@ Approved: 2026-07-09
     - Dự án (`PROJECT`): 1 dòng xuất âm số lượng.
     - Sản xuất cấu kiện (`COMPONENT_PRODUCTION`): 2 dòng (1 dòng xuất âm tại vị trí xuất chính, 1 dòng nhập dương tại vị trí kho sản xuất nhận).
 
+### Transfer Pending Pilot (EPIC185)
+- **Mục tiêu**: Hỗ trợ cơ chế hàng chờ cục bộ cho quy trình điều chuyển nội bộ (Transfer), cho phép Operator lập danh sách điều chuyển nhiều vật tư trước khi gửi yêu cầu API.
+- **Tính năng đặc thù**:
+  - **Tồn khả dụng nguồn**: Tính toán tồn khả dụng tại ô nguồn (`availableSourceQty = sourceQty - pendingQtyAtLoc`). Nếu nhập số lượng vượt quá tồn khả dụng, hệ thống cảnh báo đỏ và chặn không cho thêm vào hàng chờ.
+  - **Phục hồi tiêu điểm 2D song song**: Khi nhấn Sửa (✏️), thông tin được nạp lại vào form chính và cả 2 bản đồ MiniMap (Source & Destination) tự động highlight, dịch chuyển tiêu điểm về đúng ô nguồn và ô đích tương ứng.
+  - **Payload ánh xạ API**: Mỗi dòng điều chuyển được gửi đi dưới dạng 2 transaction items (1 dòng âm tại vị trí nguồn và 1 dòng dương tại vị trí đích).
+# Enterprise Read Platform
+
+Inventory registers availability, reservation, location-balance and movement
+projections without changing certified stock business paths. Current compatibility
+events do not always contain complete quantity/location facts, so these
+projections must not replace authoritative workspace reads until payload parity
+is approved. No synthetic balance or backfill was added.
+
+## RFC002A Canonical Payloads
+
+New Inventory receive/issue/return/adjust/transfer facts carry transaction,
+material, unit, separate location fields and resulting material/location
+balances. Stocktake emits scope and count facts. Existing compatibility events
+remain for backward compatibility. Historical retained events and locationless
+legacy postings prevent full authoritative replay; missing facts are not guessed.

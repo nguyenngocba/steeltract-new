@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   BadRequestException,
   Injectable,
@@ -1016,21 +1018,110 @@ export class QcService {
   ) {
     const entityId = this.eventEntityId(payload);
     const idempotencyKey = `${eventName}:${entityId}`;
+    const occurredAt = this.eventOccurredAt(payload);
+    const canonicalPayload = this.qcEventPayload(eventName, payload, actorId);
+    const aggregateVersion = this.eventAggregateVersion(payload, occurredAt);
 
     return this.repository.createOutboxEvent(
       {
         eventName,
-        payload: this.toJsonValue(payload),
+        payload: this.toJsonValue(canonicalPayload),
         metadata: this.toJsonValue({
-          module: 'qc',
-          correlationId: actorId,
-          persistToOutbox: true,
+          eventId: randomUUID(),
+          eventName,
+          eventVersion: 1,
+          occurredAt,
+          producer: 'qc',
+          aggregateType:
+            eventName === 'qc.ncr.created' ? 'QcNcr' : 'QcInspection',
+          aggregateId: entityId,
+          aggregateVersion,
+          correlationId: actorId ?? idempotencyKey,
+          causationId: null,
           idempotencyKey,
+          actorId: actorId ?? null,
+          tenantId: null,
+          orderingKey:
+            eventName === 'qc.ncr.created'
+              ? `qc-ncr:${entityId}`
+              : `qc-inspection:${entityId}`,
+          persistToOutbox: true,
         }),
         idempotencyKey,
       },
       tx,
     );
+  }
+
+  private qcEventPayload(
+    eventName: QcEventName,
+    payload: unknown,
+    actorId?: string,
+  ) {
+    const row = this.asRecord(payload) ?? {};
+    if (eventName === 'qc.inspection.completed') {
+      const subject = row.productionOrderId
+        ? { subjectType: 'PRODUCTION_ORDER', subjectId: row.productionOrderId }
+        : row.componentId
+          ? { subjectType: 'COMPONENT', subjectId: row.componentId }
+          : row.projectId
+            ? { subjectType: 'PROJECT', subjectId: row.projectId }
+            : { subjectType: 'INSPECTION', subjectId: row.id };
+      return {
+        inspectionId: row.id,
+        ...subject,
+        result: row.status,
+        ncrId: null,
+        inspectorId: row.inspectorId ?? actorId ?? null,
+        completedAt: this.iso(row.completedAt ?? row.updatedAt),
+      };
+    }
+    if (eventName === 'qc.ncr.created') {
+      const eventMetadata = this.asRecord(row.metadata) ?? {};
+      const subject = row.productionOrderId
+        ? { subjectType: 'PRODUCTION_ORDER', subjectId: row.productionOrderId }
+        : row.componentId
+          ? { subjectType: 'COMPONENT', subjectId: row.componentId }
+          : { subjectType: 'INSPECTION', subjectId: row.inspectionId };
+      return {
+        ncrId: row.id,
+        ...subject,
+        inspectionId: row.inspectionId,
+        defectCode: eventMetadata.defectCode ?? null,
+        reasonCode: eventMetadata.reasonCode ?? null,
+        severity: row.severity,
+        createdAt: this.iso(row.createdAt),
+      };
+    }
+    return payload;
+  }
+
+  private eventOccurredAt(payload: unknown) {
+    const row = this.asRecord(payload) ?? {};
+    return this.iso(
+      row.completedAt ??
+        row.startedAt ??
+        row.approvedAt ??
+        row.rejectedAt ??
+        row.updatedAt ??
+        row.createdAt,
+    );
+  }
+
+  private eventAggregateVersion(payload: unknown, occurredAt: string) {
+    const row = this.asRecord(payload) ?? {};
+    const explicit = Number(row.aggregateVersion);
+    return Number.isInteger(explicit) && explicit > 0
+      ? explicit
+      : Math.max(1, Date.parse(occurredAt));
+  }
+
+  private iso(value: unknown) {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && !Number.isNaN(Date.parse(value))) {
+      return new Date(value).toISOString();
+    }
+    throw new Error('Canonical QC event requires a timestamp');
   }
 
   private createNotificationOutboxEvent(

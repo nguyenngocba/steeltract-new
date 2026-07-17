@@ -140,6 +140,30 @@ enum ComponentStatus {
   INSTALLED
 }
 
+enum ComponentLifecycleState {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum ComponentRevisionState {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  RELEASED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ComponentBomDefinitionState {
+  DRAFT
+  VALIDATED
+  RELEASED
+  SUPERSEDED
+  ARCHIVED
+}
+
 enum WorkerStatus {
   ACTIVE
   INACTIVE
@@ -282,6 +306,47 @@ enum ProductionOrderStatus {
   CANCELLED
 }
 
+enum ProductionOrderKind {
+  STANDARD
+  REWORK
+}
+
+enum ProductionWorkOrderState {
+  PLANNED
+  READY
+  IN_PROGRESS
+  PAUSED
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionExecutionState {
+  CREATED
+  RUNNING
+  PAUSED
+  COMPLETED
+  ABORTED
+}
+
+enum ProductionCompletionState {
+  RECORDED
+  REVERSED
+}
+
+enum ProductionScrapState {
+  DRAFT
+  POSTED
+  REVERSED
+  CANCELLED
+}
+
+enum ProductionReworkState {
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
 enum ProductionMaterialReservationStatus {
   DRAFT
   RESERVED
@@ -305,6 +370,8 @@ enum ProductionMaterialLedgerEventType {
   ISSUE
   RETURN
   CONSUME
+  SCRAP
+  SCRAP_REVERSAL
   ADJUST
 }
 
@@ -1165,6 +1232,12 @@ model Component {
 
   actualCost Float @default(0)
 
+  // Null keeps legacy operational Components outside the canonical aggregate
+  // until they are explicitly adopted through the Components application API.
+  lifecycleState    ComponentLifecycleState?
+  aggregateVersion  Int                      @default(0)
+  currentRevisionId String?                  @unique
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -1177,15 +1250,91 @@ model Component {
 
   productionOrders ProductionOrder[]
 
-  costing ComponentCosting?
+  currentRevision ComponentRevision?         @relation("ComponentCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  revisions       ComponentRevision[]        @relation("ComponentRevisions")
+  releaseEvidence ComponentReleaseEvidence[]
+
+  costing         ComponentCosting?
   summarySnapshot ComponentSummarySnapshot?
 
   projectTaskComponentAllocations ProjectTaskComponentAllocation[]
   dispatchItems                   DispatchItem[]
 
   @@index([status])
+  @@index([lifecycleState])
   @@index([projectId])
   @@map("components")
+}
+
+model ComponentRevision {
+  id               String                 @id @default(cuid())
+  componentId      String
+  revisionNo       String
+  state            ComponentRevisionState @default(DRAFT)
+  baseRevisionId   String?
+  aggregateVersion Int                    @default(1)
+  content          Json                   @default("{}")
+  contentHash      String?
+  createdBy        String?
+  approvedBy       String?
+  approvedAt       DateTime?
+  releasedBy       String?
+  releasedAt       DateTime?
+  supersededAt     DateTime?
+  archivedAt       DateTime?
+  archiveReason    String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  component            Component                  @relation("ComponentRevisions", fields: [componentId], references: [id], onDelete: Restrict)
+  currentForComponent  Component?                 @relation("ComponentCurrentRevision")
+  baseRevision         ComponentRevision?         @relation("ComponentRevisionLineage", fields: [baseRevisionId], references: [id], onDelete: SetNull)
+  derivedRevisions     ComponentRevision[]        @relation("ComponentRevisionLineage")
+  bomDefinition        ComponentBomDefinition?
+  releaseEvidence      ComponentReleaseEvidence?  @relation("ReleasedRevisionEvidence")
+  priorReleaseEvidence ComponentReleaseEvidence[] @relation("PreviousRevisionEvidence")
+
+  @@unique([componentId, revisionNo])
+  @@index([componentId, state])
+  @@index([baseRevisionId])
+  @@map("component_revisions")
+}
+
+model ComponentBomDefinition {
+  id                  String                      @id @default(cuid())
+  componentRevisionId String                      @unique
+  state               ComponentBomDefinitionState @default(DRAFT)
+  lines               Json                        @default("[]")
+  routing             Json                        @default("[]")
+  contentHash         String?
+  aggregateVersion    Int                         @default(1)
+  validatedBy         String?
+  validatedAt         DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  revision ComponentRevision @relation(fields: [componentRevisionId], references: [id], onDelete: Restrict)
+
+  @@index([state])
+  @@map("component_bom_definitions")
+}
+
+model ComponentReleaseEvidence {
+  id                 String   @id @default(cuid())
+  componentId        String
+  revisionId         String   @unique
+  previousRevisionId String?
+  contentHash        String
+  releasedBy         String?
+  releasedAt         DateTime @default(now())
+
+  component        Component          @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  revision         ComponentRevision  @relation("ReleasedRevisionEvidence", fields: [revisionId], references: [id], onDelete: Restrict)
+  previousRevision ComponentRevision? @relation("PreviousRevisionEvidence", fields: [previousRevisionId], references: [id], onDelete: SetNull)
+
+  @@index([componentId, releasedAt])
+  @@index([previousRevisionId])
+  @@map("component_release_evidence")
 }
 
 model ProjectTask {
@@ -2684,6 +2833,82 @@ model OutboxEvent {
   @@map("outbox_events")
 }
 
+model EnterpriseProjectionDocument {
+  id                     String   @id @default(cuid())
+  projectionName         String
+  entityKey              String
+  scopeKey               String?
+  schemaVersion          Int      @default(1)
+  data                   Json
+  sourceEventId          String
+  sourceEventName        String
+  sourceAggregateVersion Int?
+  sourceOccurredAt       DateTime
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([projectionName, entityKey])
+  @@index([projectionName, scopeKey])
+  @@index([projectionName, updatedAt])
+  @@index([sourceEventId])
+  @@map("enterprise_projection_documents")
+}
+
+model EnterpriseProjectionCheckpoint {
+  projectionName    String    @id
+  schemaVersion     Int       @default(1)
+  lastOutboxEventId String?
+  lastOccurredAt    DateTime?
+  lastProcessedAt   DateTime?
+  processedCount    Int       @default(0)
+  failedCount       Int       @default(0)
+  lagMs             Int       @default(0)
+  status            String    @default("HEALTHY")
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([updatedAt])
+  @@map("enterprise_projection_checkpoints")
+}
+
+model EnterpriseProjectionReceipt {
+  id               String   @id @default(cuid())
+  projectionName   String
+  outboxEventId    String
+  eventName        String
+  aggregateId      String?
+  aggregateVersion Int?
+  processedAt      DateTime @default(now())
+
+  @@unique([projectionName, outboxEventId])
+  @@index([projectionName, processedAt])
+  @@index([eventName])
+  @@map("enterprise_projection_receipts")
+}
+
+model EnterpriseProjectionFailure {
+  id             String    @id @default(cuid())
+  projectionName String
+  outboxEventId  String
+  eventName      String
+  payload        Json
+  metadata       Json?
+  error          String
+  retryCount     Int       @default(1)
+  status         String    @default("RETRYING")
+  lastAttemptAt  DateTime  @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([projectionName, outboxEventId])
+  @@index([status, lastAttemptAt])
+  @@index([projectionName, status])
+  @@map("enterprise_projection_failures")
+}
+
 model BackgroundJob {
   id             String              @id @default(cuid())
   name           String
@@ -2781,27 +3006,37 @@ model Machine {
 }
 
 model ProductionOrder {
-  id                 String                @id @default(cuid())
-  orderNo            String                @unique
-  title              String
-  description        String?
-  projectId          String?
-  componentId        String?
-  bomId              String?
-  quantity           Float                 @default(1)
-  priority           TaskPriority          @default(MEDIUM)
-  status             ProductionOrderStatus @default(DRAFT)
-  currentStageCode   ProductionStageCode?
-  plannedStartAt     DateTime?
-  plannedEndAt       DateTime?
-  startedAt          DateTime?
-  completedAt        DateTime?
-  delayedAt          DateTime?
-  delayReason        String?
-  workflowInstanceId String?
-  metadata           Json?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  id                        String                @id @default(cuid())
+  orderNo                   String                @unique
+  title                     String
+  description               String?
+  projectId                 String?
+  componentId               String?
+  bomId                     String?
+  quantity                  Float                 @default(1)
+  priority                  TaskPriority          @default(MEDIUM)
+  status                    ProductionOrderStatus @default(DRAFT)
+  orderKind                 ProductionOrderKind   @default(STANDARD)
+  aggregateVersion          Int                   @default(0)
+  componentRevisionId       String?
+  bomDefinitionId           String?
+  reworkOfProductionOrderId String?
+  currentStageCode          ProductionStageCode?
+  plannedStartAt            DateTime?
+  plannedEndAt              DateTime?
+  startedAt                 DateTime?
+  releasedAt                DateTime?
+  readyAt                   DateTime?
+  pausedAt                  DateTime?
+  completedAt               DateTime?
+  closedAt                  DateTime?
+  cancelledAt               DateTime?
+  delayedAt                 DateTime?
+  delayReason               String?
+  workflowInstanceId        String?
+  metadata                  Json?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
 
   stages               ProductionStage[]
   tasks                ProductionTask[]
@@ -2815,11 +3050,23 @@ model ProductionOrder {
   materialConsumptions ProductionMaterialConsumption[]
   componentCostings    ComponentCosting[]
   snapshot             ProductionOrderSnapshot?
+  workOrders           WorkOrder[]
+  executions           ProductionExecution[]
+  completions          ProductionCompletion[]
+  scraps               ProductionScrap[]
+  reworkOf             ProductionOrder?                @relation("ProductionOrderRework", fields: [reworkOfProductionOrderId], references: [id], onDelete: SetNull)
+  reworkOrders         ProductionOrder[]               @relation("ProductionOrderRework")
+  reworkRequests       ProductionRework[]              @relation("OriginalProductionRework")
+  acceptedRework       ProductionRework?               @relation("AcceptedProductionRework")
 
   @@index([status])
   @@index([projectId])
   @@index([componentId])
   @@index([bomId])
+  @@index([orderKind])
+  @@index([componentRevisionId])
+  @@index([bomDefinitionId])
+  @@index([reworkOfProductionOrderId])
   @@index([currentStageCode])
   @@map("production_orders")
 }
@@ -3633,5 +3880,140 @@ model WorkOrder {
 
   status String @default("PLANNED")
 
+  productionOrderId  String?
+  routingOperationId String?
+  sequence           Int?
+  lifecycleState     ProductionWorkOrderState?
+  aggregateVersion   Int                       @default(0)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  pausedAt           DateTime?
+  blockedReason      String?
+  metadata           Json?
+
   createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  productionOrder ProductionOrder?       @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  executions      ProductionExecution[]
+  completions     ProductionCompletion[]
+  scraps          ProductionScrap[]
+
+  @@unique([productionOrderId, sequence])
+  @@index([productionOrderId, lifecycleState])
+  @@index([routingOperationId])
+}
+
+model ProductionExecution {
+  id                String                   @id @default(uuid())
+  productionOrderId String
+  workOrderId       String
+  state             ProductionExecutionState @default(CREATED)
+  aggregateVersion  Int                      @default(1)
+  workCenterId      String?
+  machineId         String?
+  startedAt         DateTime?
+  pausedAt          DateTime?
+  resumedAt         DateTime?
+  completedAt       DateTime?
+  abortedAt         DateTime?
+  pauseReason       String?
+  abortReason       String?
+  createdBy         String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workOrder       WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([productionOrderId, state])
+  @@index([workOrderId, state])
+  @@index([workCenterId])
+  @@index([machineId])
+  @@map("production_executions")
+}
+
+model ProductionCompletion {
+  id                     String                    @id @default(uuid())
+  productionOrderId      String
+  workOrderId            String?
+  executionRunId         String?
+  state                  ProductionCompletionState @default(RECORDED)
+  quantity               Float
+  unit                   String
+  completedQty           Float
+  rejectedQty            Float                     @default(0)
+  scrapQty               Float                     @default(0)
+  remainingQty           Float
+  reversalOfCompletionId String?
+  evidence               Json?
+  aggregateVersion       Int                       @default(1)
+  recordedBy             String?
+  recordedAt             DateTime                  @default(now())
+
+  productionOrder ProductionOrder        @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workOrder       WorkOrder?             @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  reversalOf      ProductionCompletion?  @relation("ProductionCompletionReversal", fields: [reversalOfCompletionId], references: [id], onDelete: SetNull)
+  reversals       ProductionCompletion[] @relation("ProductionCompletionReversal")
+
+  @@index([productionOrderId, recordedAt])
+  @@index([workOrderId])
+  @@index([reversalOfCompletionId])
+}
+
+model ProductionScrap {
+  id                     String               @id @default(uuid())
+  productionOrderId      String
+  workOrderId            String?
+  executionRunId         String?
+  inventoryItemId        String?
+  state                  ProductionScrapState @default(DRAFT)
+  quantity               Float
+  unit                   String
+  reasonCode             String
+  disposition            String
+  recoverable            Boolean              @default(false)
+  inventoryTransactionId String?
+  reversalOfScrapId      String?
+  commandIdempotencyKey  String?              @unique
+  commandHash            String?
+  aggregateVersion       Int                  @default(1)
+  createdBy              String?
+  postedBy               String?
+  postedAt               DateTime?
+  reversedAt             DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  productionOrder ProductionOrder   @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workOrder       WorkOrder?        @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  reversalOf      ProductionScrap?  @relation("ProductionScrapReversal", fields: [reversalOfScrapId], references: [id], onDelete: SetNull)
+  reversals       ProductionScrap[] @relation("ProductionScrapReversal")
+
+  @@index([productionOrderId, state])
+  @@index([workOrderId])
+  @@index([inventoryItemId])
+  @@index([reversalOfScrapId])
+}
+
+model ProductionRework {
+  id                        String                @id @default(uuid())
+  reworkRequestId           String                @unique
+  qcNcrId                   String
+  originalProductionOrderId String
+  reworkProductionOrderId   String?               @unique
+  state                     ProductionReworkState
+  routingScope              Json?
+  reason                    String?
+  aggregateVersion          Int                   @default(1)
+  decidedBy                 String?
+  decidedAt                 DateTime              @default(now())
+  completedAt               DateTime?
+
+  originalProductionOrder ProductionOrder  @relation("OriginalProductionRework", fields: [originalProductionOrderId], references: [id], onDelete: Restrict)
+  reworkProductionOrder   ProductionOrder? @relation("AcceptedProductionRework", fields: [reworkProductionOrderId], references: [id], onDelete: SetNull)
+
+  @@index([qcNcrId])
+  @@index([originalProductionOrderId, state])
 }
