@@ -1,7 +1,7 @@
 import { useQuery }
   from '@tanstack/react-query'
 
-import axios from 'axios'
+import { api } from '../../../lib/api'
 
 export function RealtimeTelemetryPanel() {
   const {
@@ -13,8 +13,8 @@ export function RealtimeTelemetryPanel() {
 
     queryFn: async () => {
       const response =
-        await axios.get(
-          'http://172.168.53.116:3000/telemetry',
+        await api.get(
+          '/telemetry',
         )
 
       return response.data

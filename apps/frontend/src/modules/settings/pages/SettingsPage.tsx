@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Building2, CheckCircle2, DatabaseBackup, Edit3, FileDigit, Globe2, Link2, Plus, Save, Settings, ShieldCheck, SlidersHorizontal, Trash2, Workflow, XCircle } from 'lucide-react'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { api } from '@/lib/api'
 import { systemApi, type WorkflowCheck } from '@/modules/system/api/system.api'
-import { inventoryApi } from '@/modules/inventory/api/inventory.api'
 import { useCategories } from '@/modules/inventory/hooks/useCategories'
 import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
 import { useMaterialTypes } from '@/modules/inventory/hooks/useMaterialTypes'
@@ -130,8 +130,8 @@ function SettingsCatalogs() {
         name: payload.name.trim(),
         description: payload.description.trim() || undefined,
       }
-      if (payload.id) return inventoryApi.put(`/inventory/categories/${payload.id}`, body).then((res) => res.data)
-      return inventoryApi.post('/inventory/categories', body).then((res) => res.data)
+      if (payload.id) return api.put(`/inventory/categories/${payload.id}`, body).then((res) => res.data)
+      return api.post('/inventory/categories', body).then((res) => res.data)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['inventory-categories'] })
@@ -147,8 +147,8 @@ function SettingsCatalogs() {
         description: payload.description.trim() || undefined,
         categoryId: payload.categoryId,
       }
-      if (payload.id) return inventoryApi.put(`/inventory/material-types/${payload.id}`, body).then((res) => res.data)
-      return inventoryApi.post('/inventory/material-types', body).then((res) => res.data)
+      if (payload.id) return api.put(`/inventory/material-types/${payload.id}`, body).then((res) => res.data)
+      return api.post('/inventory/material-types', body).then((res) => res.data)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['inventory-material-types'] })
@@ -165,8 +165,8 @@ function SettingsCatalogs() {
         category: payload.category.trim().toUpperCase(),
         precision: Number(payload.precision || 0),
       }
-      if (payload.id) return inventoryApi.put(`/inventory/units/${payload.id}`, body).then((res) => res.data)
-      return inventoryApi.post('/inventory/units', body).then((res) => res.data)
+      if (payload.id) return api.put(`/inventory/units/${payload.id}`, body).then((res) => res.data)
+      return api.post('/inventory/units', body).then((res) => res.data)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['inventory-units'] })
@@ -181,7 +181,7 @@ function SettingsCatalogs() {
         : type === 'materialType'
           ? `/inventory/material-types/${id}`
           : `/inventory/units/${id}`
-      return inventoryApi.delete(path).then((res) => res.data)
+      return api.delete(path).then((res) => res.data)
     },
     onSuccess: async () => {
       await Promise.all([

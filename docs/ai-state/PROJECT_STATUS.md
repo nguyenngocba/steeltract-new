@@ -1,5 +1,35 @@
 # Project Status
 
+On 2026-07-18 EPIC UI005 standardized the Production operator workspace and
+forms against the Inventory Golden Reference. Production mutations now reuse a
+single Enterprise form/modal layer, browser prompts were removed, and primary
+read paths expose loading/error states. All active Production routes continue
+to use existing APIs and workflows; unavailable Incidents/Reports remain
+truthful empty states. Frontend compilation passes and authenticated visual QA
+remains pending due to the unavailable browser harness.
+
+On 2026-07-18 BUGFIX INV001 restored Inventory Overview and Materials table
+data. The exact regression was an unauthenticated frontend endpoint adapter
+calling globally protected routes and receiving HTTP 401; both pages then
+rendered `items ?? []`. The adapter now reuses the canonical JWT/refresh Axios
+client. Runtime data confirms 25 material records and the API/UI contracts are
+unchanged.
+
+On 2026-07-18 EPIC UI003A finalized the Inventory workspace density. The
+duplicated local hero was removed, compact KPI/form dimensions were applied in
+Inventory scope, Materials table visibility was stabilized against viewport
+height, and modal/drawer scroll ownership was clarified. Backend/frontend
+builds pass and no backend/API/query/business behavior changed. Authenticated
+browser screenshots remain pending because the current environment has no
+browser harness or executable.
+
+On 2026-07-18 EPIC UI003 refined Inventory as the Enterprise UI Golden
+Reference. All active Inventory routes now share operational rhythm;
+KPI, pagination, table-header, confirmation, modal and drawer behavior use the
+canonical primitives. Frontend compilation passes and no backend/API/business
+behavior changed. Runtime visual/accessibility certification remains pending
+until an authenticated browser harness is available.
+
 On 2026-07-18 RFC016 completed the Enterprise Production Certification review.
 Architecture, canonical Outbox, builds, regression and Docker artifact controls
 pass, but the product is **NOT READY** for production deployment. Release is
@@ -829,3 +859,12 @@ available; EPIC144 did not invent missing workflows.
 - Backend regression: PASS, 72/72 suites and 194/194 tests.
 - Overall status: CONDITIONALLY READY pending production-like operational
   certification.
+
+# EPIC UI003B Frontend API Client Consolidation
+
+- Single authenticated frontend client: PASS.
+- JWT injection and 401 refresh/retry ownership: PASS, centralized.
+- Active module-specific/legacy authenticated clients: NONE.
+- Direct authenticated Axios/fetch/XHR bypass: NONE.
+- API/UI/business/backend changes: NONE.
+- Authenticated module runtime smoke: PENDING, local PostgreSQL unavailable.

@@ -1,1 +1,1 @@
-export function FormGrid() { return null }
+export { EnterpriseFormGrid as FormGrid } from '../EnterpriseForm'

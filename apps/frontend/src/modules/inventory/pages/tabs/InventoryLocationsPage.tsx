@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Edit3, Eye, Layers3, MapPinned, Package, Power, PowerOff, Trash2, Warehouse, X } from 'lucide-react'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
 import { moduleMutedButton } from '@/shared/ui/modules'
 import {
@@ -310,6 +309,7 @@ function InventoryMetricCard({
       trend={trend}
       active={active}
       onClick={onClick}
+      className="!h-[92px] !p-3"
     />
   )
 }
@@ -977,8 +977,7 @@ export function InventoryLocationsPage() {
   }, [rows]);
 
   return <EnterpriseModulePage>
-    <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
-      <InventoryTabWorkspace />
+    <div className="w-full min-w-0 flex-1 space-y-2">
       <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
         <InventoryMetricCard
           title="Tổng vị trí"
@@ -1429,7 +1428,7 @@ export function InventoryLocationsPage() {
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
     {selectedSlot ? <SlotMaterialDrawer slot={selectedSlot} onClose={() => setSelectedSlot(null)} /> : null}
     {modalType && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
+      <div role="dialog" aria-modal="true" aria-label="Báo cáo vị trí kho" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
         <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between scrollbar-thin">
           <div className="flex items-center justify-between pb-3 mb-4 shrink-0">
             <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
@@ -1690,7 +1689,7 @@ export function InventoryLocationsPage() {
 function SlotMaterialDrawer({ slot, onClose }: { slot: SlotMaterialView; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-      <aside className="h-full w-full max-w-3xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
+      <aside role="dialog" aria-modal="true" aria-label={`Vật tư trong ô ${slot.label}`} className="h-full w-full max-w-3xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#071321]/95 px-6 py-5 backdrop-blur">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Vật tư trong ô chứa</p>
@@ -1766,7 +1765,7 @@ function AuditRow({ icon, label, value, note }: { icon: ReactNode; label: string
 
 function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, saving }: { form: LocationForm; warehouses: Array<{ id: string; code: string; name: string }>; setForm: (value: LocationForm) => void; onClose: () => void; onSubmit: () => void; saving: boolean }) {
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-    <div className="w-full max-w-3xl overflow-hidden rounded-xl border border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
+    <div role="dialog" aria-modal="true" aria-label={form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'} className="w-full max-w-3xl overflow-hidden rounded-xl border border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
       <header className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
         <div><h2 className="text-lg font-semibold">{form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'}</h2><p className="mt-1 text-xs text-slate-500">Sức chứa là tải trọng/tồn chứa vận hành; sơ đồ ô/tầng dùng cấu trúc A01-F06 và L1-L4.</p></div>
         <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
@@ -1813,7 +1812,7 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
   }`
 
   return <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-    <aside className="h-full w-full max-w-6xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
+    <aside role="dialog" aria-modal="true" aria-label="Chi tiết vị trí kho" className="h-full w-full max-w-6xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#071321]/95 px-6 py-5 backdrop-blur">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Chi tiết vị trí kho</p>

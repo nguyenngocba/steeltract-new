@@ -1,7 +1,7 @@
 import { useQuery }
   from '@tanstack/react-query'
 
-import axios from 'axios'
+import { api } from '../../../lib/api'
 
 export function EventStoreHistory() {
   const {
@@ -13,8 +13,8 @@ export function EventStoreHistory() {
 
     queryFn: async () => {
       const response =
-        await axios.get(
-          'http://172.168.53.116:3000/runtime-events',
+        await api.get(
+          '/runtime-events',
         )
 
       return response.data

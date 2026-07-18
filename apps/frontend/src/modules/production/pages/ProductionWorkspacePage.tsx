@@ -1,1 +1,1 @@
-export function ProductionWorkspacePage() { return null }
+export { ProductionCockpitPage as ProductionWorkspacePage } from './ProductionCockpitPage'

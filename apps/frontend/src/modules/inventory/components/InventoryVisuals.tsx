@@ -1,16 +1,13 @@
 import type { ReactNode } from 'react'
 import { formatQuantity } from '@/shared/utils/number-format'
+import { CockpitKpiCard, DataTablePagination } from '@/shared/ui/cockpit'
 import {
   ModuleAnalyticsPanel,
-  ModuleKpiCard,
   ModuleLoadingState,
   moduleGridGap,
   moduleInput,
   moduleMutedButton,
-  modulePageStack,
   modulePanel,
-  moduleTableHead,
-  moduleTableRow,
   moduleTableShell,
   type ModuleTone,
 } from '@/shared/ui/modules'
@@ -19,7 +16,9 @@ export const inventoryPanel = modulePanel
 
 export const inventoryInput = moduleInput
 
-export const inventoryPageStack = modulePageStack
+export const inventoryPageStack = 'space-y-2'
+
+export const inventoryKpiClass = '!h-[92px] !p-3'
 
 export const inventoryGridGap = moduleGridGap
 
@@ -28,7 +27,7 @@ export const inventoryTableShell = moduleTableShell
 export const inventoryTable =
   'w-full text-sm'
 
-export const inventoryTableHead = 'bg-transparent text-slate-350 border-b border-cyan-400/10 text-xs'
+export const inventoryTableHead = 'sticky top-0 z-10 bg-[#0a1728]/95 text-slate-350 border-b border-cyan-400/10 text-xs backdrop-blur-xl'
 
 export const inventoryTableRow = 'cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] text-slate-200 transition duration-150'
 
@@ -45,7 +44,7 @@ export function InventoryKpi({
   note?: string
   tone?: ModuleTone
 }) {
-  return <ModuleKpiCard title={title} value={value} note={note} tone={tone} />
+  return <CockpitKpiCard title={title} value={value} note={note} tone={tone} className={inventoryKpiClass} />
 }
 
 export function InventoryPanel({
@@ -104,45 +103,15 @@ export function InventoryPagination({
   onPageChange: (page: number) => void
   containerClassName?: string
 }) {
-  const safePageCount = Math.max(1, pageCount)
-  const safePage = Math.min(Math.max(1, page), safePageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
-  const windowSize = 5
-  const firstPage = Math.max(1, Math.min(safePage - 2, safePageCount - windowSize + 1))
-  const pages = Array.from({ length: Math.min(windowSize, safePageCount) }, (_, index) => firstPage + index)
-
+  void pageCount
   return (
-    <div className={containerClassName ?? 'grid grid-cols-1 items-center gap-3 border-t border-white/10 px-5 py-4 text-xs text-slate-400 md:grid-cols-3'}>
-      <div>
-        Hiển thị {start}-{end}/{formatQuantity(total, 0)} kết quả
-      </div>
-      <div className="flex justify-center gap-2">
-        {pages[0] > 1 && <span className="px-1 py-2 text-slate-500">...</span>}
-        {pages.map((pageNo) => (
-          <button
-            key={pageNo}
-            onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
-              safePage === pageNo
-                ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
-            }`}
-          >
-            {pageNo}
-          </button>
-        ))}
-        {pages[pages.length - 1] < safePageCount && <span className="px-1 py-2 text-slate-500">...</span>}
-      </div>
-      <div className="flex justify-start gap-2 md:justify-end">
-        <button disabled={safePage <= 1} onClick={() => onPageChange(Math.max(1, safePage - 1))} className={inventoryMutedButton}>
-          Trước
-        </button>
-        <button disabled={safePage >= safePageCount} onClick={() => onPageChange(Math.min(safePageCount, safePage + 1))} className={inventoryMutedButton}>
-          Sau
-        </button>
-      </div>
-    </div>
+    <DataTablePagination
+      page={page}
+      pageSize={pageSize}
+      total={total}
+      onPageChange={onPageChange}
+      className={containerClassName}
+    />
   )
 }
 
@@ -204,12 +173,10 @@ export function DonutSummary({
   centerLabel: string
 }) {
   const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
-  let cursor = 0
   const gradient = segments
-    .map((item) => {
-      const start = cursor
-      const end = cursor + (item.value / total) * 100
-      cursor = end
+    .map((item, index) => {
+      const start = segments.slice(0, index).reduce((sum, segment) => sum + (segment.value / total) * 100, 0)
+      const end = start + (item.value / total) * 100
       return `${item.color} ${start}% ${end}%`
     })
     .join(', ')
@@ -282,12 +249,10 @@ export function CompactDonutSummary({
   showPercent?: boolean
 }) {
   const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
-  let cursor = 0
   const gradient = segments
-    .map((item) => {
-      const start = cursor
-      const end = cursor + (item.value / total) * 100
-      cursor = end
+    .map((item, index) => {
+      const start = segments.slice(0, index).reduce((sum, segment) => sum + (segment.value / total) * 100, 0)
+      const end = start + (item.value / total) * 100
       return `${item.color} ${start}% ${end}%`
     })
     .join(', ')

@@ -14,7 +14,6 @@ import {
   CockpitTableShell,
   DataTablePagination,
 } from '../../../../shared/ui/cockpit'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
   HorizontalBars,
@@ -506,12 +505,11 @@ export function InventoryInboundPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-3 -mt-2 text-xs">
+      <div className="space-y-2 text-xs">
         {/* KPI Section */}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-6">
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Tổng nhập trong tháng"
             value={formatQuantity(kpis.monthlyQty, 3) + ' tấn'}
             note="Khối lượng theo phiếu nhập"
@@ -519,6 +517,7 @@ export function InventoryInboundPage() {
             trend={kpiTrend.monthlyQty}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Giá trị nhập trong tháng"
             value={formatCurrency(kpis.monthlyAmount)}
             note="Giá trị theo đơn giá nhập"
@@ -526,6 +525,7 @@ export function InventoryInboundPage() {
             trend={kpiTrend.monthlyAmount}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Giá trị nhập hôm nay"
             value={formatCurrency(kpis.todayAmount)}
             note="Theo ngày hiện tại"
@@ -533,6 +533,7 @@ export function InventoryInboundPage() {
             trend={kpiTrend.todayAmount}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Số phiếu nhập tháng"
             value={formatQuantity(kpis.docs, 0)}
             note="Phiếu phát sinh trong tháng"
@@ -540,6 +541,7 @@ export function InventoryInboundPage() {
             trend={kpiTrend.docs}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="NCC phát sinh tháng"
             value={formatQuantity(kpis.monthlySuppliers, 0)}
             note="Nhà cung cấp có giao dịch"
@@ -547,6 +549,7 @@ export function InventoryInboundPage() {
             trend={kpiTrend.monthlySuppliers}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Hoàn thành"
             value={formatQuantity(kpis.done, 0)}
             note="Phiếu nhập đã hoàn thành"

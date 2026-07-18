@@ -1,1 +1,1 @@
-export function TextField() { return null }
+export { EnterpriseInput as TextField } from '../EnterpriseForm'

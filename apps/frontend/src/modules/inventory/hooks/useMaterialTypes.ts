@@ -1,13 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 
-import {
-  inventoryApi,
-} from '../api/inventory.api'
+import { api } from '../../../lib/api'
 
 async function fetchMaterialTypes() {
 
   const response =
-    await inventoryApi.get(
+    await api.get(
       '/inventory/material-types',
     )
 

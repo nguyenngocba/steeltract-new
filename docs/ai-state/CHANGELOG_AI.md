@@ -1,5 +1,44 @@
 # SteelTrack AI Changelog
 
+## 2026-07-18 BUGFIX INV001 Inventory Table Visibility
+
+Completed:
+
+- Traced blank Overview/Materials table bodies to HTTP 401 responses from an
+  unauthenticated Inventory endpoint adapter after RFC017 JWT enforcement.
+- Switched the adapter to the existing authenticated application Axios client;
+  no endpoint, query key, mapping, pagination, layout or business rule changed.
+- Verified the live authenticated materials endpoint returns 25 records in the
+  expected paginated contract.
+
+## 2026-07-18 EPIC UI003A Inventory UX Polish
+
+Completed:
+
+- Removed the redundant Inventory breadcrumb/page hero so operational KPI
+  content starts immediately below the global application toolbar.
+- Reduced Inventory workspace rhythm and KPI height without changing shared
+  component behavior outside Inventory.
+- Made the Materials table viewport-responsive with a guaranteed visible
+  height and retained its sticky header/internal horizontal scrolling.
+- Reduced active transaction/material form controls to the approved compact
+  density and gave modal/drawer content one bounded scroll owner.
+- Preserved backend, API, routes, React Query, permissions and business logic.
+
+## 2026-07-18 EPIC UI003 Inventory Canon Refinement
+
+Completed:
+
+- Restored Inventory breadcrumb, page title and description across all 12
+  active routes and standardized page-level vertical rhythm.
+- Consolidated Inventory KPI and pagination wrappers onto shared cockpit
+  primitives and added sticky shared table headers.
+- Added accessible transaction modal/detail drawer focus behavior and replaced
+  active browser confirmations with an Enterprise alert dialog.
+- Preserved backend, API, routes, React Query, database and business behavior.
+- Frontend build and targeted new-primitive lint pass; authenticated browser
+  screenshot and screen-reader certification remain pending.
+
 ## 2026-07-18 RFC016 Enterprise Production Certification
 
 Completed:
@@ -4426,3 +4465,23 @@ Notes:
   bounded lock timeout and automated migration-safety validation.
 - Preserved business behavior, public response contracts, frontend and schema;
   the migration remains pending production-like clone measurement and deploy.
+
+# 2026-07-18 - EPIC UI003B Frontend API Client Consolidation
+
+- Consolidated all active authenticated frontend requests on `lib/api`.
+- Removed Inventory's module-specific Axios instance and direct global Axios
+  calls from runtime overview, telemetry and event-history reads.
+- Converted both legacy shared clients into compatibility re-exports with no
+  independent base URL, interceptor or authentication behavior.
+- Preserved API contracts, query keys, hooks, DTOs, routes and business logic.
+
+# 2026-07-18 - EPIC UI005 Production Workspace and Enterprise Forms
+
+- Standardized active Production routes on the Inventory-derived Enterprise
+  workspace with explicit primary loading, empty and error presentation.
+- Added one shared Enterprise form/control/action layer and migrated
+  Manufacturing Order, BOM, Material Return, Consumption and Yard staging.
+- Removed Production browser-prompt mutations and custom modal shells; shared
+  dialogs now own viewport scroll, focus containment, Escape and restoration.
+- Preserved backend, API contracts, query keys, DTOs, routes, permissions and
+  business behavior; no mock data was added.

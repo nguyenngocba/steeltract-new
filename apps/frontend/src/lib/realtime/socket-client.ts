@@ -3,6 +3,8 @@ import {
   Socket,
 } from 'socket.io-client'
 
+import { API_BASE_URL } from '../api'
+
 export interface RealtimeEventPayload {
   event: string
   entityId?: string
@@ -11,12 +13,8 @@ export interface RealtimeEventPayload {
   occurredAt?: string
 }
 
-const socketUrl =
-  import.meta.env.VITE_API_URL ||
-  'http://172.168.53.116:3000'
-
 export const socketClient: Socket =
-  io(socketUrl, {
+  io(API_BASE_URL, {
     autoConnect: false,
     reconnection: true,
     reconnectionAttempts: Infinity,

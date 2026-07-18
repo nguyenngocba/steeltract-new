@@ -3,16 +3,17 @@ import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } fro
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
+import { useInventoryConfirmDialog } from '../../hooks/useInventoryConfirmDialog'
 import { MaterialDrawer } from '../../components/material-table/MaterialDrawer'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   InventoryPanel,
   InventoryPagination,
+  inventoryKpiClass,
   inventoryTableHead,
   inventoryTableRow,
   inventoryMutedButton,
 } from '../../components/InventoryVisuals'
-import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS } from '../../../../shared/ui/cockpit'
+import { CockpitChartCard, CockpitKpiCard, CockpitTableShell } from '../../../../shared/ui/cockpit'
 import { useDeleteMaterial } from '../../hooks/useDeleteMaterial'
 import { useCategories } from '../../hooks/useCategories'
 import { useMaterialDetail } from '../../hooks/useMaterialDetail'
@@ -253,6 +254,7 @@ function InventoryMetricCard({
       trend={trend}
       active={active}
       onClick={onClick}
+      className={inventoryKpiClass}
     />
   )
 }
@@ -347,6 +349,7 @@ export function InventoryMaterialsPage() {
   const { data: zones = [] } = useZones()
   const { data: categories = [] } = useCategories()
   const deleteMaterialMutation = useDeleteMaterial()
+  const { confirm, confirmationDialog } = useInventoryConfirmDialog()
   const rows = materialsData?.items ?? []
   const transactions: any[] = []
 
@@ -364,7 +367,12 @@ export function InventoryMaterialsPage() {
 
   async function handleDelete(id: string) {
     setDeleteError('')
-    if (!window.confirm('Xóa vật tư này khỏi Material Master? Lịch sử giao dịch cũ vẫn được giữ lại.')) return
+    if (!await confirm({
+      title: 'Xóa vật tư khỏi Material Master?',
+      message: 'Vật tư sẽ bị xóa khỏi danh mục. Lịch sử giao dịch cũ vẫn được giữ lại.',
+      confirmLabel: 'Xóa vật tư',
+      destructive: true,
+    })) return
     try {
       await deleteMaterialMutation.mutateAsync(id)
     } catch (error: any) {
@@ -793,6 +801,7 @@ export function InventoryMaterialsPage() {
 
   return (
     <EnterpriseModulePage>
+      {confirmationDialog}
       <MaterialDrawer
         open={open}
         material={selectedMaterial}
@@ -802,9 +811,7 @@ export function InventoryMaterialsPage() {
         }}
       />
 
-      <InventoryTabWorkspace />
-
-      <div className="space-y-1 -mt-2">
+      <div className="space-y-2">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <InventoryMetricCard
             title="Tổng giá trị tồn kho"
@@ -948,7 +955,7 @@ export function InventoryMaterialsPage() {
                       </div>
                       {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
                       <div className="rounded-lg border border-white/10 overflow-hidden">
-                      <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_SM}>
+                      <CockpitTableShell className="h-[clamp(320px,52vh,520px)] min-h-[320px]">
                         <table className="w-full min-w-[1050px] text-sm table-fixed">
                           <colgroup>
                             <col className="w-[140px]" />   {/* Tên vật tư */}
@@ -1079,7 +1086,7 @@ export function InventoryMaterialsPage() {
               </div>
 
               {showAll && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
+                <div role="dialog" aria-modal="true" aria-label="Danh sách vật tư trang hiện tại" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
                   <div className="max-h-[90vh] w-full max-w-[95vw] overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-white">
@@ -1171,7 +1178,7 @@ export function InventoryMaterialsPage() {
         )}
 
       {showAllAlerts && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
+        <div role="dialog" aria-modal="true" aria-label="Tất cả cảnh báo tồn kho" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
           <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-xl border border-white/10 bg-[#0b1424]/95 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
             <div className="flex items-center justify-between px-6 py-4">
               <div>

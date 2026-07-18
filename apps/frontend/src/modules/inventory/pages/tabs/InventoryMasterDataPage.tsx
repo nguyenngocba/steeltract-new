@@ -4,9 +4,8 @@ import toast from 'react-hot-toast'
 import { Edit3, Plus, Save, Trash2, X } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
+import { api } from '../../../../lib/api'
 import { InventoryKpi, InventoryPanel, inventoryInput } from '../../components/InventoryVisuals'
-import { inventoryApi } from '../../api/inventory.api'
 import { useCategories } from '../../hooks/useCategories'
 import { useUnits } from '../../hooks/useUnits'
 import { useZones } from '../../hooks/useZones'
@@ -60,8 +59,8 @@ export function InventoryMasterDataPage() {
   const categoryMutation = useMutation({
     mutationFn: async (payload: CategoryForm) => {
       const body = { code: payload.code.trim().toUpperCase(), name: payload.name.trim(), description: payload.description.trim() || undefined }
-      if (payload.id) return inventoryApi.put(`/inventory/categories/${payload.id}`, body).then((res) => res.data)
-      return inventoryApi.post('/inventory/categories', body).then((res) => res.data)
+      if (payload.id) return api.put(`/inventory/categories/${payload.id}`, body).then((res) => res.data)
+      return api.post('/inventory/categories', body).then((res) => res.data)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['inventory-categories'] })
@@ -78,8 +77,8 @@ export function InventoryMasterDataPage() {
         description: payload.description.trim() || undefined,
         categoryId: payload.categoryId,
       }
-      if (payload.id) return inventoryApi.put(`/inventory/material-types/${payload.id}`, body).then((res) => res.data)
-      return inventoryApi.post('/inventory/material-types', body).then((res) => res.data)
+      if (payload.id) return api.put(`/inventory/material-types/${payload.id}`, body).then((res) => res.data)
+      return api.post('/inventory/material-types', body).then((res) => res.data)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['inventory-material-types'] })
@@ -97,8 +96,8 @@ export function InventoryMasterDataPage() {
         category: payload.category.trim().toUpperCase(),
         precision: Number(payload.precision || 0),
       }
-      if (payload.id) return inventoryApi.put(`/inventory/units/${payload.id}`, body).then((res) => res.data)
-      return inventoryApi.post('/inventory/units', body).then((res) => res.data)
+      if (payload.id) return api.put(`/inventory/units/${payload.id}`, body).then((res) => res.data)
+      return api.post('/inventory/units', body).then((res) => res.data)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['inventory-units'] })
@@ -114,7 +113,7 @@ export function InventoryMasterDataPage() {
         : type === 'materialType'
           ? `/inventory/material-types/${id}`
           : `/inventory/units/${id}`
-      return inventoryApi.delete(path).then((res) => res.data)
+      return api.delete(path).then((res) => res.data)
     },
     onSuccess: async () => {
       await Promise.all([
@@ -152,15 +151,15 @@ export function InventoryMasterDataPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-      <div className="grid gap-3 md:grid-cols-4">
-        <InventoryKpi title="Danh mục vật tư" value={formatQuantity(stats.categories, 0)} tone="cyan" note="nhóm quản trị" />
-        <InventoryKpi title="Loại / quy cách" value={formatQuantity(stats.materialTypes, 0)} tone="blue" note="gắn theo danh mục" />
-        <InventoryKpi title="Đơn vị tính" value={formatQuantity(stats.units, 0)} tone="emerald" note="Material Master dùng chung" />
-        <InventoryKpi title="Zone kho" value={formatQuantity(stats.zones, 0)} tone="amber" note="vị trí mặc định vật tư" />
-      </div>
+      <div className="space-y-2">
+        <div className="grid gap-1 md:grid-cols-4">
+          <InventoryKpi title="Danh mục vật tư" value={formatQuantity(stats.categories, 0)} tone="cyan" note="nhóm quản trị" />
+          <InventoryKpi title="Loại / quy cách" value={formatQuantity(stats.materialTypes, 0)} tone="blue" note="gắn theo danh mục" />
+          <InventoryKpi title="Đơn vị tính" value={formatQuantity(stats.units, 0)} tone="emerald" note="Material Master dùng chung" />
+          <InventoryKpi title="Zone kho" value={formatQuantity(stats.zones, 0)} tone="amber" note="vị trí mặc định vật tư" />
+        </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-2 xl:grid-cols-3">
         <InventoryPanel title="Danh mục vật tư">
           <MasterFormActions editing={Boolean(categoryForm.id)} onReset={() => setCategoryForm(emptyCategory)} onSave={saveCategory} loading={categoryMutation.isPending} />
           <div className="grid gap-2">
@@ -223,6 +222,7 @@ export function InventoryMasterDataPage() {
             onDelete={(row) => deleteMutation.mutate({ type: 'unit', id: row.id })}
           />
         </InventoryPanel>
+      </div>
       </div>
     </EnterpriseModulePage>
   )

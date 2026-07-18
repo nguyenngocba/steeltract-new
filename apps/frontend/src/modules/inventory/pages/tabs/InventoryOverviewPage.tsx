@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { InventoryMaterialDetailModal } from '../../components/InventoryMaterialDetailModal'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   AdjustmentTransactionModal,
   InboundTransactionModal,
@@ -740,9 +739,7 @@ export function InventoryOverviewPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-1 -mt-2">
+      <div className="space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-4 2xl:grid-cols-5 gap-1">
           <OverviewMetricCard
             title="Tổng giá trị tồn kho"
@@ -1428,7 +1425,7 @@ function OverviewModal({
   }, [rows, totalStockPages, pageStock])
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
       <div className="max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-2xl border border-white/10 bg-[#08111f]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">

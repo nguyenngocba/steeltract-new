@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 
 import { useInventoryItems } from '../../inventory/hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../inventory/hooks/useInventoryTransactions'
@@ -9,8 +9,17 @@ import type { ProductionComponent } from '../api/production.api'
 import { useCreateProductionBom, useProductionIssues } from '../hooks/useProductionCockpit'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import {
+  EnterpriseField,
+  EnterpriseFormGrid,
+  EnterpriseFormSection,
+  EnterpriseInput,
+  EnterpriseModalForm,
+  EnterpriseNumberField,
+  EnterpriseSelect,
+  enterpriseSecondaryButton,
+} from '@/shared/forms'
 
-const inputClass = 'mt-2 h-10 w-full rounded border border-slate-700 bg-slate-950 px-3 text-xs text-slate-100 outline-none focus:border-cyan-600'
 const defaultRouting = [
   ['Cutting', 'Workshop Cutting', false],
   ['Drilling', 'Workshop Drilling', true],
@@ -233,40 +242,42 @@ export function ProductionBomModal({
     }
   }
 
-  return <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/80 p-4">
-    <div className="mx-auto max-w-7xl rounded-lg border border-cyan-900 bg-[#061421] shadow-2xl">
-      <header className="flex items-start justify-between border-b border-slate-800 p-5">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Production BOM</p>
-          <h2 className="mt-1 text-xl font-semibold">Tạo định mức và routing cấu kiện</h2>
-          <p className="mt-1 text-xs text-slate-400">BOM xác định vật tư tiêu hao; routing xác định chuỗi công đoạn sản xuất.</p>
-        </div>
-        <button onClick={onClose} aria-label="Đóng"><X size={20} /></button>
-      </header>
-
-      <div className="grid gap-4 p-5 xl:grid-cols-[1fr_300px]">
+  return <EnterpriseModalForm
+    open
+    title="Tạo định mức và routing cấu kiện"
+    description="BOM xác định vật tư tiêu hao; routing xác định chuỗi công đoạn sản xuất."
+    onClose={onClose}
+    onSubmit={(event) => { event.preventDefault(); void submit() }}
+    submitLabel="Tạo Production BOM"
+    pendingLabel="Đang tạo BOM..."
+    pending={create.isPending}
+    maxWidthClass="max-w-7xl"
+  >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-4">
-          <section className="grid gap-3 rounded border border-slate-800 bg-[#04101d] p-4 md:grid-cols-3">
-            <label className="text-xs text-slate-400">Cấu kiện
-              <select value={componentId} onChange={(event) => setComponentId(event.target.value)} className={inputClass}>
+          <EnterpriseFormSection title="Thông tin BOM" description="Chọn cấu kiện và thông tin định mức áp dụng.">
+            <EnterpriseFormGrid columns={3}>
+            <EnterpriseField label="Cấu kiện" required htmlFor="bom-component">
+              <EnterpriseSelect id="bom-component" data-autofocus value={componentId} onChange={(event) => setComponentId(event.target.value)}>
                 <option value="">Chọn cấu kiện</option>
                 {components.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-slate-400">Loại cấu kiện<input value={structureType} onChange={(event) => setStructureType(event.target.value)} className={inputClass} placeholder="Dầm, cột, bản mã..." /></label>
-            <label className="text-xs text-slate-400">Khối lượng ước tính (kg)<input value={estimatedWeight} onFocus={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} onBlur={(event) => setEstimatedWeight(formatQuantity(event.target.value))} onChange={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} inputMode="decimal" className={inputClass} /></label>
-            <label className="text-xs text-slate-400">Đơn vị<input value={unit} onChange={(event) => setUnit(event.target.value)} className={inputClass} /></label>
-            <label className="text-xs text-slate-400">Phiên bản<input value={version} onChange={(event) => setVersion(event.target.value)} className={inputClass} /></label>
+              </EnterpriseSelect>
+            </EnterpriseField>
+            <EnterpriseField label="Loại cấu kiện" htmlFor="bom-structure-type"><EnterpriseInput id="bom-structure-type" value={structureType} onChange={(event) => setStructureType(event.target.value)} placeholder="Dầm, cột, bản mã..." /></EnterpriseField>
+            <EnterpriseField label="Khối lượng ước tính (kg)" htmlFor="bom-estimated-weight"><EnterpriseNumberField id="bom-estimated-weight" value={estimatedWeight} onFocus={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} onBlur={(event) => setEstimatedWeight(formatQuantity(event.target.value))} onChange={(event) => setEstimatedWeight(formatQuantityInput(event.target.value))} /></EnterpriseField>
+            <EnterpriseField label="Đơn vị" htmlFor="bom-unit"><EnterpriseInput id="bom-unit" value={unit} onChange={(event) => setUnit(event.target.value)} /></EnterpriseField>
+            <EnterpriseField label="Phiên bản" htmlFor="bom-version"><EnterpriseInput id="bom-version" value={version} onChange={(event) => setVersion(event.target.value)} /></EnterpriseField>
             <div className="rounded border border-slate-800 bg-slate-950 p-3 text-xs">
               <div className="text-slate-500">Dự án liên kết</div>
               <div className="mt-2 text-cyan-200">{project ? `${project.code ?? project.name} · ${project.name}` : 'Chưa gán dự án'}</div>
             </div>
-          </section>
+            </EnterpriseFormGrid>
+          </EnterpriseFormSection>
 
           <section className="rounded border border-slate-800 bg-[#04101d] p-4">
             <div className="mb-3 flex items-center justify-between">
               <div><h3 className="text-sm font-semibold">Materials Grid</h3><p className="mt-1 text-xs text-slate-500">Vật tư lấy từ kho vật tư sản xuất khi cấp phát cho MO.</p></div>
-              <button onClick={() => setMaterials((rows) => [...rows, { materialId: '', quantity: '1', wastePercent: '0', category: 'MAIN_MATERIAL' }])} className="flex items-center gap-1 rounded border border-cyan-800 px-3 py-2 text-xs text-cyan-200"><Plus size={14} /> Thêm vật tư</button>
+              <button type="button" onClick={() => setMaterials((rows) => [...rows, { materialId: '', quantity: '1', wastePercent: '0', category: 'MAIN_MATERIAL' }])} className={enterpriseSecondaryButton}><Plus size={14} /> Thêm vật tư</button>
             </div>
             <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs">
               <thead className="text-[10px] uppercase text-slate-500"><tr>{['Vật tư', 'Danh mục', 'Định mức', 'Hao hụt %', 'Tồn SX', 'ĐVT', ''].map((item) => <th key={item} className="pb-2 pr-2">{item}</th>)}</tr></thead>
@@ -278,30 +289,30 @@ export function ProductionBomModal({
                 const isOverStock = item.materialId && requiredTotal > available
                 return <tr key={index} className="border-t border-slate-800">
                   <td className="py-2 pr-2">
-                    <select value={item.materialId} onChange={(event) => selectMaterial(index, event.target.value)} className={inputClass}>
+                    <EnterpriseSelect aria-label={`Vật tư dòng ${index + 1}`} value={item.materialId} onChange={(event) => selectMaterial(index, event.target.value)}>
                       <option value="">Chọn {bomCategoryLabel(item.category).toLowerCase()} từ kho SX</option>
                       {groupOptions.length === 0 ? <option value="" disabled>Không có {bomCategoryLabel(item.category).toLowerCase()} trong kho SX</option> : null}
                       {groupOptions.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · tồn SX {formatQuantity(row.sxQty ?? 0)}</option>)}
-                    </select>
+                    </EnterpriseSelect>
                   </td>
                   <td className="pr-2">
-                    <select
+                    <EnterpriseSelect
+                      aria-label={`Danh mục dòng ${index + 1}`}
                       value={item.category}
                       onChange={(event) => updateMaterial(index, { category: event.target.value as MaterialDraft['category'], materialId: '' })}
-                      className={inputClass}
                     >
                       <option value="MAIN_MATERIAL">Vật tư chính ({productionMaterialsByCategory.MAIN_MATERIAL.length})</option>
                       <option value="SECONDARY_MATERIAL">Vật tư phụ ({productionMaterialsByCategory.SECONDARY_MATERIAL.length})</option>
                       <option value="CONSUMABLE">Tiêu hao ({productionMaterialsByCategory.CONSUMABLE.length})</option>
-                    </select>
+                    </EnterpriseSelect>
                   </td>
-                  <td className="pr-2"><input value={item.quantity} onFocus={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { quantity: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
-                  <td className="pr-2"><input value={item.wastePercent} onFocus={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { wastePercent: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} /></td>
+                  <td className="pr-2"><EnterpriseNumberField aria-label={`Định mức dòng ${index + 1}`} value={item.quantity} onFocus={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { quantity: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { quantity: formatQuantityInput(event.target.value) })} /></td>
+                  <td className="pr-2"><EnterpriseNumberField aria-label={`Hao hụt dòng ${index + 1}`} value={item.wastePercent} onFocus={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { wastePercent: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} /></td>
                   <td className={`pt-2 ${isOverStock ? 'text-red-300' : 'text-emerald-300'}`}>
                     {item.materialId ? `${formatQuantity(requiredTotal)} / ${formatQuantity(available)}` : '-'}
                   </td>
                   <td className="pt-2 text-slate-300">{material?.unitMaster?.symbol ?? material?.unit ?? '-'}</td>
-                  <td className="pt-2"><button onClick={() => setMaterials((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa vật tư" className="text-red-300"><Trash2 size={15} /></button></td>
+                  <td className="pt-2"><button type="button" onClick={() => setMaterials((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa vật tư" className="grid h-9 w-9 place-items-center rounded-lg text-red-300 hover:bg-red-500/10"><Trash2 size={15} /></button></td>
                 </tr>
               })}</tbody>
             </table></div>
@@ -310,15 +321,15 @@ export function ProductionBomModal({
           <section className="rounded border border-slate-800 bg-[#04101d] p-4">
             <div className="mb-3 flex items-center justify-between">
               <div><h3 className="text-sm font-semibold">Production Routing</h3><p className="mt-1 text-xs text-slate-500">MO sẽ tự sinh tiến độ công đoạn từ routing này.</p></div>
-              <button onClick={() => setRouting((rows) => [...rows, { stepName: '', workshop: '', expectedHours: '1', qcRequired: false }])} className="flex items-center gap-1 rounded border border-cyan-800 px-3 py-2 text-xs text-cyan-200"><Plus size={14} /> Thêm bước</button>
+              <button type="button" onClick={() => setRouting((rows) => [...rows, { stepName: '', workshop: '', expectedHours: '1', qcRequired: false }])} className={enterpriseSecondaryButton}><Plus size={14} /> Thêm bước</button>
             </div>
             <div className="space-y-2">{routing.map((item, index) => <div key={index} className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2 md:grid-cols-[36px_1fr_1fr_100px_90px_32px]">
               <div className="flex items-center justify-center text-xs text-cyan-300">{index + 1}</div>
-              <input value={item.stepName} onChange={(event) => updateRouting(index, { stepName: event.target.value })} className={inputClass} placeholder="Tên công đoạn" />
-              <input value={item.workshop} onChange={(event) => updateRouting(index, { workshop: event.target.value })} className={inputClass} placeholder="Xưởng" />
-              <input value={item.expectedHours} onFocus={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} onBlur={(event) => updateRouting(index, { expectedHours: formatQuantity(event.target.value) })} onChange={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} inputMode="decimal" className={inputClass} />
+              <EnterpriseInput aria-label={`Tên công đoạn ${index + 1}`} value={item.stepName} onChange={(event) => updateRouting(index, { stepName: event.target.value })} placeholder="Tên công đoạn" />
+              <EnterpriseInput aria-label={`Xưởng công đoạn ${index + 1}`} value={item.workshop} onChange={(event) => updateRouting(index, { workshop: event.target.value })} placeholder="Xưởng" />
+              <EnterpriseNumberField aria-label={`Số giờ công đoạn ${index + 1}`} value={item.expectedHours} onFocus={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} onBlur={(event) => updateRouting(index, { expectedHours: formatQuantity(event.target.value) })} onChange={(event) => updateRouting(index, { expectedHours: formatQuantityInput(event.target.value) })} />
               <label className="flex items-center gap-2 pt-2 text-xs text-slate-300"><input checked={item.qcRequired} onChange={(event) => updateRouting(index, { qcRequired: event.target.checked })} type="checkbox" /> QC</label>
-              <button onClick={() => setRouting((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa công đoạn" className="pt-2 text-red-300"><Trash2 size={15} /></button>
+              <button type="button" onClick={() => setRouting((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa công đoạn" className="grid h-9 w-9 place-items-center rounded-lg text-red-300 hover:bg-red-500/10"><Trash2 size={15} /></button>
             </div>)}</div>
           </section>
         </div>
@@ -352,10 +363,5 @@ export function ProductionBomModal({
         </aside>
       </div>
 
-      <footer className="flex justify-end gap-2 border-t border-slate-800 p-4">
-        <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-xs">Hủy</button>
-        <button disabled={create.isPending} onClick={submit} className="rounded bg-cyan-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">Tạo Production BOM</button>
-      </footer>
-    </div>
-  </div>
+  </EnterpriseModalForm>
 }

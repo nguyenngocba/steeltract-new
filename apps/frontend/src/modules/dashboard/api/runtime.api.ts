@@ -1,8 +1,8 @@
-import axios from 'axios'
+import { api } from '../../../lib/api'
 
 export async function getRuntimeOverview() {
-  const { data } = await axios.get(
-    'http://172.168.53.116:3000/runtime/overview'
+  const { data } = await api.get(
+    '/runtime/overview'
   )
 
   return data

@@ -1,6 +1,4 @@
-import {
-  inventoryApi,
-} from './inventory.api'
+import { api } from '../../../lib/api'
 
 export type WarehouseLocation = {
   id: string
@@ -71,7 +69,7 @@ export type WarehouseLocationDetail = WarehouseLocation & {
 export async function getZones() {
 
   const response =
-    await inventoryApi.get(
+    await api.get(
       '/inventory/zones',
     )
 
@@ -79,7 +77,7 @@ export async function getZones() {
 }
 
 export async function getWarehouses() {
-  const response = await inventoryApi.get('/master-data/warehouses', {
+  const response = await api.get('/master-data/warehouses', {
     params: {
       active: 'true',
     },
@@ -88,31 +86,31 @@ export async function getWarehouses() {
 }
 
 export async function getZoneDetail(id: string) {
-  const response = await inventoryApi.get(`/inventory/zones/${id}`)
+  const response = await api.get(`/inventory/zones/${id}`)
   return response.data as WarehouseLocationDetail | null
 }
 
 export async function createZone(payload: Partial<WarehouseLocation>) {
-  const response = await inventoryApi.post('/inventory/zones', payload)
+  const response = await api.post('/inventory/zones', payload)
   return response.data as WarehouseLocation
 }
 
 export async function updateZone(id: string, payload: Partial<WarehouseLocation>) {
-  const response = await inventoryApi.put(`/inventory/zones/${id}`, payload)
+  const response = await api.put(`/inventory/zones/${id}`, payload)
   return response.data as WarehouseLocation
 }
 
 export async function activateZone(id: string) {
-  const response = await inventoryApi.patch(`/inventory/zones/${id}/activate`, {})
+  const response = await api.patch(`/inventory/zones/${id}/activate`, {})
   return response.data as WarehouseLocation
 }
 
 export async function deactivateZone(id: string) {
-  const response = await inventoryApi.patch(`/inventory/zones/${id}/deactivate`, {})
+  const response = await api.patch(`/inventory/zones/${id}/deactivate`, {})
   return response.data as WarehouseLocation
 }
 
 export async function deleteZone(id: string) {
-  const response = await inventoryApi.delete(`/inventory/zones/${id}`)
+  const response = await api.delete(`/inventory/zones/${id}`)
   return response.data as WarehouseLocation
 }

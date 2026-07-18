@@ -17,9 +17,9 @@ type Props = {
 }
 
 const drawerInput =
-  'h-11 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-100 placeholder:text-slate-500'
+  'h-9 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-100 placeholder:text-slate-500'
 const drawerTextarea =
-  'min-h-24 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500'
+  'min-h-20 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500'
 
 const MATERIAL_USAGE_OPTIONS = [
   { value: 'PRIMARY', label: 'Vật tư chính' },
@@ -251,10 +251,10 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   }
 
   return createPortal(
-    <div className="inventory-material-drawer fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-950/75 p-4 py-8 backdrop-blur-md">
+    <div className="inventory-material-drawer fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/75 p-3 backdrop-blur-md sm:p-4">
       <style>{'.inventory-material-drawer select option{background:#0f172a;color:#e2e8f0}.inventory-material-drawer select:focus,.inventory-material-drawer input:focus,.inventory-material-drawer textarea:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
-      <section className="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
-        <header className="flex items-start justify-between border-b border-white/10 px-6 py-5">
+      <section className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl sm:max-h-[calc(100vh-2rem)]">
+        <header className="flex shrink-0 items-start justify-between border-b border-white/10 px-5 py-3">
           <div>
             <h2 className="text-xl font-semibold text-white">
               {isEditMode ? 'Sửa vật tư' : 'Thêm vật tư mới'}
@@ -264,8 +264,8 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
             <X size={18} />
           </button>
         </header>
-        <div className="grid grid-cols-12 gap-6 p-6">
-          <div className="col-span-7">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto overscroll-contain p-4 lg:grid-cols-12">
+          <div className="lg:col-span-7">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã vật tư" className={drawerInput} />
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên vật tư" className={drawerInput} />
@@ -345,7 +345,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
 
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ghi chú quy cách, tiêu chuẩn, nguồn cung..." className={`${drawerTextarea} mt-3 w-full`} />
       </div>
-      <div className="col-span-5">
+      <div className="lg:col-span-5">
         <div className="mb-3 rounded-xl border border-cyan-300/15 bg-slate-950/55 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
@@ -403,7 +403,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       </div>
         {error && <div className="mx-5 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</div>}
 
-        <footer className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
+        <footer className="flex shrink-0 justify-end gap-2 border-t border-white/10 px-5 py-3">
           <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10">Hủy</button>
           <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500">{isEditMode ? 'Lưu thay đổi' : 'Tạo vật tư'}</button>
         </footer>

@@ -4,6 +4,13 @@ import { Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench } fro
 import { useLocation } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import {
+  EnterpriseField,
+  EnterpriseFormGrid,
+  EnterpriseNumberField,
+  EnterpriseSelect,
+  enterprisePrimaryButton,
+} from '@/shared/forms'
 import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleKpiStrip } from '@/shared/ui/modules'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '@/shared/ui/cockpit'
 import {
@@ -29,6 +36,11 @@ import {
 import { ProductionExecutionBoard } from '../components/ProductionExecutionBoard'
 import { ManufacturingOrderModal } from '../components/ManufacturingOrderModal'
 import { ProductionBomModal } from '../components/ProductionBomModal'
+import {
+  ProductionConsumptionModal,
+  ProductionMaterialReturnModal,
+  type ProductionConsumptionTarget,
+} from '../components/ProductionMaterialCommandModals'
 import { productionTabs } from '../config/production-tabs'
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
@@ -38,7 +50,6 @@ import {
   useArchiveProductionBom,
   useCloneProductionBom,
   useCompleteProductionStage,
-  useConsumeProductionMaterial,
   useCreateComponentFromProductionOrder,
   useCreateProductionReservation,
   useExpireProductionReservation,
@@ -55,7 +66,6 @@ import {
   useProductionReservations,
   useReleaseProductionReservation,
   useReservationPreview,
-  useReturnProductionMaterialIssue,
   useReserveProductionReservation,
   useStageProductionToYard,
   useStartProductionOrder,
@@ -157,13 +167,19 @@ export function ProductionCockpitPage() {
     sortBy: 'updatedAt' as const,
     sortOrder: 'desc' as const,
   }), [cockpitPage, deferredSearch, isOrderWorkspace, mode, statusFilter])
-  const { data: cockpit } = useProductionCockpitReadModel(cockpitParams)
-  const { data: legacyOrders = [] } = useProductionOrders(!isOrderWorkspace)
+  const cockpitQuery = useProductionCockpitReadModel(cockpitParams)
+  const cockpit = cockpitQuery.data
+  const legacyOrdersQuery = useProductionOrders(!isOrderWorkspace)
+  const legacyOrders = legacyOrdersQuery.data ?? []
   const orders = isOrderWorkspace ? cockpit?.data ?? [] : legacyOrders
-  const { data: boms = [] } = useProductionBoms(mode === 'boms' || createOrderOpen || createBomOpen)
-  const { data: issues = [] } = useProductionIssues(['execution', 'material-issues', 'consumptions'].includes(mode))
-  const { data: consumptions = [] } = useProductionConsumptions(undefined, ['warehouse', 'material-issues', 'consumptions'].includes(mode))
-  const { data: reservations = [] } = useProductionReservations(undefined, ['execution', 'reservations', 'warehouse'].includes(mode))
+  const bomsQuery = useProductionBoms(mode === 'boms' || createOrderOpen || createBomOpen)
+  const boms = bomsQuery.data ?? []
+  const issuesQuery = useProductionIssues(['execution', 'material-issues', 'consumptions'].includes(mode))
+  const issues = issuesQuery.data ?? []
+  const consumptionsQuery = useProductionConsumptions(undefined, ['warehouse', 'material-issues', 'consumptions'].includes(mode))
+  const consumptions = consumptionsQuery.data ?? []
+  const reservationsQuery = useProductionReservations(undefined, ['execution', 'reservations', 'warehouse'].includes(mode))
+  const reservations = reservationsQuery.data ?? []
   const ledgerQueryParams = useMemo(() => ({
     productionOrderId: ledgerFilters.productionOrderId || undefined,
     inventoryItemId: ledgerFilters.inventoryItemId || undefined,
@@ -171,8 +187,10 @@ export function ProductionCockpitPage() {
     fromDate: ledgerFilters.fromDate || undefined,
     toDate: ledgerFilters.toDate || undefined,
   }), [ledgerFilters])
-  const { data: ledger = [] } = useProductionMaterialLedger(ledgerQueryParams, mode === 'material-ledger')
-  const { data: logs = [] } = useProductionLogs(mode === 'overview' || mode === 'logs')
+  const ledgerQuery = useProductionMaterialLedger(ledgerQueryParams, mode === 'material-ledger')
+  const ledger = ledgerQuery.data ?? []
+  const logsQuery = useProductionLogs(mode === 'overview' || mode === 'logs')
+  const logs = logsQuery.data ?? []
   const { data: components = [] } = useProductionComponents(createOrderOpen || createBomOpen)
   const { data: inventoryItems = [] } = useInventoryItems()
   const { data: inventoryAudit = [] } = useInventoryAudit()
@@ -196,6 +214,25 @@ export function ProductionCockpitPage() {
   const runningComponents = summary?.runningComponents ?? 0
   const productionWeight = summary?.productionWeight ?? 0
   const isWorkOrderMode = mode === 'orders'
+  const activeQueries = isOrderWorkspace
+    ? [cockpitQuery]
+    : mode === 'boms'
+      ? [bomsQuery]
+      : mode === 'execution'
+        ? [legacyOrdersQuery, issuesQuery, reservationsQuery]
+        : mode === 'reservations'
+          ? [legacyOrdersQuery, reservationsQuery]
+          : mode === 'material-ledger'
+            ? [ledgerQuery]
+            : mode === 'material-issues'
+              ? [legacyOrdersQuery, issuesQuery, consumptionsQuery]
+              : mode === 'consumptions'
+                ? [issuesQuery, consumptionsQuery]
+                : mode === 'logs'
+                  ? [logsQuery]
+                  : []
+  const workspacePending = activeQueries.some((query) => query.isPending)
+  const workspaceError = activeQueries.some((query) => query.isError)
 
   useEffect(() => {
     setCockpitPage(1)
@@ -249,6 +286,7 @@ export function ProductionCockpitPage() {
           <button key={text} className={`${inventoryMutedButton} xl:col-span-1`}>{text}</button>)}
       </ModuleFilterBar>
 
+      {workspacePending ? <ModuleEmptyState icon={<Factory size={20} />} title="Đang tải dữ liệu sản xuất" description="Workspace đang đồng bộ dữ liệu vận hành mới nhất." /> : workspaceError ? <ModuleEmptyState icon={<Wrench size={20} />} title="Không thể tải dữ liệu sản xuất" description="Kiểm tra kết nối rồi tải lại workspace." /> : <>
       {mode === 'overview' && cockpit && <Overview readModel={cockpit} logs={logs} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
       {mode === 'orders' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
@@ -262,6 +300,7 @@ export function ProductionCockpitPage() {
       {mode === 'incidents' && <ProductionNavigationPlaceholder title="Sự cố sản xuất" description="Tab đã được đồng bộ route/sidebar. Chưa có workflow sự cố riêng nên chưa hiển thị dữ liệu nghiệp vụ." icon={<Wrench size={18} />} />}
       {mode === 'logs' && <Logs rows={logs} />}
       {mode === 'reports' && <ProductionNavigationPlaceholder title="Báo cáo sản xuất" description="Tab đã được đồng bộ route/sidebar. Báo cáo quản trị sẽ dùng dữ liệu sản xuất hiện có ở phase sau." icon={<FileStack size={18} />} />}
+      </>}
 
       {selectedOrder && <OrderWorkspace order={selectedOrder} onClose={() => setSelectedOrder(undefined)} />}
       {selectedBom && <BomWorkspace bom={selectedBom} onClose={() => setSelectedBom(undefined)} />}
@@ -1063,8 +1102,8 @@ function Issues({
   consumptions: ProductionMaterialConsumption[]
   orders: ProductionOrder[]
 }) {
-  const returnIssue = useReturnProductionMaterialIssue()
   const [selectedIssue, setSelectedIssue] = useState<IssueControlRow | null>(null)
+  const [returnTarget, setReturnTarget] = useState<IssueControlRow | null>(null)
   const consumptionRows = useMemo(
     () => buildConsumptionRows(rows ?? [], consumptions),
     [rows, consumptions],
@@ -1080,42 +1119,6 @@ function Issues({
     () => buildIssueControlRows(rows ?? [], orders, remainingByMaterial),
     [rows, orders, remainingByMaterial],
   )
-
-  async function runReturn(row: NonNullable<ReturnType<typeof useProductionIssues>['data']>[number]) {
-    const returnable = getIssueReturnableQty(row, remainingByMaterial)
-    if (returnable <= 0) {
-      toast.error('Phiếu này không còn vật tư dư sau tiêu hao/scrap để hoàn trả')
-      return
-    }
-    const input = window.prompt(
-      `Nhập số lượng hoàn trả về Kho chính cho ${row.inventoryItem?.code ?? row.inventoryItemId}`,
-      String(returnable),
-    )
-    if (input === null) return
-    const quantity = parseLocaleNumber(input)
-    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > returnable) {
-      toast.error(`Số lượng hoàn trả phải lớn hơn 0 và không vượt quá ${number(returnable)}`)
-      return
-    }
-    try {
-      await returnIssue.mutateAsync({
-        id: row.id,
-        payload: {
-          quantity,
-          remarks: `Return unused production material to Main Warehouse from ${row.issueNo}`,
-        },
-      })
-      toast.success('Đã hoàn trả vật tư dư về Kho chính')
-    } catch (error) {
-      const raw = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
-      const message = Array.isArray(raw) ? raw.join(', ') : raw || ''
-      toast.error(
-        message.includes('Insufficient stock')
-          ? 'Không còn vật tư dư hợp lệ để hoàn trả. Vui lòng tải lại dữ liệu phiếu cấp.'
-          : message || 'Không thể hoàn trả vật tư',
-      )
-    }
-  }
 
   const issuedTotal = (rows ?? []).reduce((sum, row) => sum + Number(row.issuedQty ?? 0), 0)
   const returnedTotal = (rows ?? []).reduce((sum, row) => sum + Number(row.returnedQty ?? 0), 0)
@@ -1172,7 +1175,7 @@ function Issues({
               <div className={`mt-1 text-[10px] ${row.readinessPercent >= 100 ? 'text-emerald-300' : row.readinessPercent >= 80 ? 'text-cyan-300' : row.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>{formatQuantity(row.readinessPercent, 0)}%</div>
             </td>
             <td className="px-2 py-2"><StatusChip status={issue.status}/></td>
-            <td className="px-2 py-2">{row.returnableQty > 0 ? <button disabled={returnIssue.isPending} onClick={(event) => { event.stopPropagation(); void runReturn(issue) }} className="text-amber-300 disabled:opacity-50">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
+            <td className="px-2 py-2">{row.returnableQty > 0 ? <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row) }} className="text-amber-300">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
           </tr>
         })}</tbody>
       </table>
@@ -1223,6 +1226,7 @@ function Issues({
       </CockpitChartCard>
     </div>
     <IssueDetailDrawer row={selectedIssue} onClose={() => setSelectedIssue(null)} />
+    {returnTarget ? <ProductionMaterialReturnModal issue={returnTarget.issue} returnableQty={returnTarget.returnableQty} onClose={() => setReturnTarget(null)} /> : null}
   </div>
 }
 
@@ -1307,41 +1311,13 @@ type ConsumptionSummaryRow = {
 }
 
 function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssue[]; consumptions: ProductionMaterialConsumption[] }) {
-  const consume = useConsumeProductionMaterial()
+  const [consumeTarget, setConsumeTarget] = useState<ProductionConsumptionTarget | null>(null)
   const rows = useMemo(() => buildConsumptionRows(issues, consumptions), [issues, consumptions])
   const issued = rows.reduce((sum, row) => sum + row.issuedQty, 0)
   const returned = rows.reduce((sum, row) => sum + row.returnedQty, 0)
   const consumed = rows.reduce((sum, row) => sum + row.consumedQty, 0)
   const scrap = rows.reduce((sum, row) => sum + row.scrapQty, 0)
   const remaining = rows.reduce((sum, row) => sum + row.remainingQty, 0)
-
-  async function runConsume(row: ConsumptionSummaryRow) {
-    const consumedInput = window.prompt(`Nhập số lượng tiêu hao cho ${row.material}`, String(row.remainingQty))
-    if (consumedInput === null) return
-    const scrapInput = window.prompt('Nhập số lượng phế phẩm/scrap', '0')
-    if (scrapInput === null) return
-    const consumedQty = parseLocaleNumber(consumedInput)
-    const scrapQty = parseLocaleNumber(scrapInput)
-    if (!Number.isFinite(consumedQty) || !Number.isFinite(scrapQty) || consumedQty < 0 || scrapQty < 0 || consumedQty + scrapQty <= 0) {
-      toast.error('Số lượng tiêu hao hoặc scrap không hợp lệ')
-      return
-    }
-    try {
-      await consume.mutateAsync({
-        id: row.productionOrderId,
-        payload: {
-          inventoryItemId: row.inventoryItemId,
-          consumedQty,
-          scrapQty,
-          remark: `Consume from Production Cockpit for ${row.orderNo}`,
-        },
-      })
-      toast.success('Đã ghi nhận tiêu hao vật tư sản xuất')
-    } catch (error) {
-      const raw = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
-      toast.error(Array.isArray(raw) ? raw.join(', ') : raw || 'Không thể ghi nhận tiêu hao')
-    }
-  }
 
   return <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
     <div className="space-y-3">
@@ -1364,7 +1340,7 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
             <td className="text-red-300">{number(row.scrapQty)}</td>
             <td className={row.remainingQty > 0 ? 'text-amber-300' : 'text-slate-500'}>{number(row.remainingQty)}</td>
             <td>{row.unit ?? '-'}</td>
-            <td>{row.remainingQty > 0 && <button onClick={() => void runConsume(row)} className="text-cyan-300">Consume</button>}</td>
+            <td>{row.remainingQty > 0 && <button type="button" onClick={() => setConsumeTarget(row)} className="text-cyan-300">Consume</button>}</td>
           </tr>)}</tbody>
         </table></div></ModuleDataGrid>
       </InventoryChartCard>
@@ -1386,6 +1362,7 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
         ]} />
       </ProductionPanel>
     </aside>
+    {consumeTarget ? <ProductionConsumptionModal target={consumeTarget} onClose={() => setConsumeTarget(null)} /> : null}
   </div>
 }
 
@@ -1879,13 +1856,21 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
           </ProductionPanel>
           {canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi">
             <div className="space-y-2 text-xs">
-              <select value={slotId} onChange={(e)=>{ setSlotId(e.target.value); setActionError(''); setActionMessage('') }} className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2">
-                <option value="">Chọn slot còn tầng trống</option>
-                {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
-              </select>
+              <EnterpriseFormGrid columns={1}>
+                <EnterpriseField label="Vị trí bãi" required htmlFor="production-yard-slot">
+                  <EnterpriseSelect id="production-yard-slot" value={slotId} onChange={(e)=>{ setSlotId(e.target.value); setActionError(''); setActionMessage('') }}>
+                    <option value="">Chọn slot còn tầng trống</option>
+                    {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
+                  </EnterpriseSelect>
+                </EnterpriseField>
+                <EnterpriseField label="Số lượng nhập bãi" required htmlFor="production-yard-quantity">
+                  <EnterpriseNumberField id="production-yard-quantity" value={quantity} onFocus={(e)=>setQuantity(formatQuantityInput(e.target.value))} onBlur={(e)=>setQuantity(formatQuantity(e.target.value))} onChange={(e)=>{ setQuantity(formatQuantityInput(e.target.value)); setActionError(''); setActionMessage('') }} />
+                </EnterpriseField>
+                <EnterpriseField label="Khối lượng" htmlFor="production-yard-weight">
+                  <EnterpriseNumberField id="production-yard-weight" value={weight} onFocus={(e)=>setWeight(formatQuantityInput(e.target.value))} onBlur={(e)=>setWeight(formatQuantity(e.target.value))} onChange={(e)=>setWeight(formatQuantityInput(e.target.value))} />
+                </EnterpriseField>
+              </EnterpriseFormGrid>
               {!availableSlots.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">Bãi không còn slot có tầng trống.</p> : null}
-              <input value={quantity} onFocus={(e)=>setQuantity(formatQuantityInput(e.target.value))} onBlur={(e)=>setQuantity(formatQuantity(e.target.value))} onChange={(e)=>{ setQuantity(formatQuantityInput(e.target.value)); setActionError(''); setActionMessage('') }} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Số lượng nhập bãi"/>
-              <input value={weight} onFocus={(e)=>setWeight(formatQuantityInput(e.target.value))} onBlur={(e)=>setWeight(formatQuantity(e.target.value))} onChange={(e)=>setWeight(formatQuantityInput(e.target.value))} inputMode="decimal" className="h-10 w-full rounded border border-slate-700 bg-slate-950 px-2" placeholder="Khối lượng"/>
               <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
                 <div>Slot đích: <b className="text-cyan-300">{targetSlot ? `${targetSlot.zone.code}/${targetSlot.code}` : '--'}</b></div>
                 <div className="mt-1">Tầng xếp tự động: <b className="text-cyan-300">L{targetSlot ? targetSlot.currentStackLevel + 1 : '--'}</b></div>
@@ -1894,7 +1879,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
               {stageDisabledReason ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">{stageDisabledReason}</p> : null}
               {actionError ? <p className="rounded border border-red-900 bg-red-950/40 p-2 text-red-200">{actionError}</p> : null}
               {actionMessage ? <p className="rounded border border-emerald-900 bg-emerald-950/40 p-2 text-emerald-200">{actionMessage}</p> : null}
-              <button onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: parseLocaleNumber(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className="w-full rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-40">Xác nhận QC và chuyển bãi</button>
+              <button type="button" onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: parseLocaleNumber(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className={`${enterprisePrimaryButton} w-full bg-amber-600 hover:bg-amber-500`}>Xác nhận QC và chuyển bãi</button>
             </div>
           </ProductionPanel>}
         </aside>

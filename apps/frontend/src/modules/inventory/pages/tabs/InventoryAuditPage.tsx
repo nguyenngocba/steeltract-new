@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   HorizontalBars,
   InventoryKpi,
@@ -45,10 +44,8 @@ export function InventoryAuditPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
       <div className={inventoryPageStack}>
-        <div className={`grid md:grid-cols-4 ${inventoryGridGap}`}>
+        <div className="grid gap-1 md:grid-cols-4">
           <InventoryKpi title="Tổng tồn" value={formatQuantity(summary.stock, 0)} note="Theo audit transaction" tone="blue" />
           <InventoryKpi title="Giá trị tồn" value={money(summary.value)} note="Theo giá bình quân" tone="emerald" />
           <InventoryKpi title="Giá trị TB / mã" value={money(summary.avg)} note="Bình quân danh mục" tone="cyan" />

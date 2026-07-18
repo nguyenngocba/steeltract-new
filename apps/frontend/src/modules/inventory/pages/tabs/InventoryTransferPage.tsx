@@ -3,7 +3,6 @@ import { CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } fro
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
   HorizontalBars,
@@ -468,10 +467,8 @@ export function InventoryTransferPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-1.5">
+      <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-6">
           <OverviewMetricCard
             title="Phiếu điều chuyển tháng"
             value={formatQuantity(kpis.monthlyDocs, 0)}

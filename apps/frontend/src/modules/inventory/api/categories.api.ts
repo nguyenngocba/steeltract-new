@@ -1,11 +1,9 @@
-import {
-  inventoryApi,
-} from './inventory.api'
+import { api } from '../../../lib/api'
 
 export async function getCategories() {
 
   const response =
-    await inventoryApi.get(
+    await api.get(
       '/inventory/categories',
     )
 
@@ -17,7 +15,7 @@ export async function createCategory(
 ) {
 
   const response =
-    await inventoryApi.post(
+    await api.post(
       '/inventory/categories',
       payload,
     )

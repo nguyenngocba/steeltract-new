@@ -1,5 +1,50 @@
 # Inventory Module
 
+## BUGFIX INV001 Inventory Table Visibility
+
+Status: **IMPLEMENTED** (2026-07-18)
+
+- Root cause: `inventory.endpoint.ts` used an Axios client without auth
+  interceptors after RFC017 protected all business reads.
+- Impact: `/inventory/materials` returned HTTP 401; Overview and Materials both
+  rendered their fallback empty arrays.
+- Fix: reuse canonical `lib/api` JWT/refresh client in the endpoint adapter.
+- Runtime evidence: authenticated response contains 25 materials with expected
+  pagination and row fields.
+- No backend, API, query key, filter, pagination, layout or business change.
+
+## EPIC UI003A Inventory UX Polish
+
+Status: **IMPLEMENTED - AUTHENTICATED VISUAL QA PENDING** (2026-07-18)
+
+- Removed the duplicated Inventory-local breadcrumb/title/description hero;
+  pages begin with KPI or primary operational content below the global topbar.
+- Standard KPI height is 92px in Inventory scope; executive Return KPI cards
+  use 108px to retain their larger value layout without clipping.
+- Root workspace spacing is 8px and Materials table height is bounded with a
+  responsive 320-520px clamp.
+- Transaction/modal fields and Material drawer fields are 36px; each overlay
+  has one viewport-bounded internal scroll owner with overscroll containment.
+- No backend, API, React Query, route, permission or business change was made.
+- Backend/frontend builds pass. Real authenticated visual/responsive
+  certification is pending due to unavailable browser tooling.
+
+## EPIC UI003 Inventory Canon Refinement
+
+Status: **IMPLEMENTED - RUNTIME VISUAL QA PENDING** (2026-07-18)
+
+- All 12 active Inventory routes share the canonical operational page rhythm.
+- Inventory KPI and pagination compatibility wrappers now use shared cockpit
+  primitives; shared table headers are sticky.
+- Transaction modals and shared detail drawers implement dialog semantics,
+  focus containment, Escape, scroll lock and focus restoration.
+- Active delete/dirty/edit confirmations use the Inventory Enterprise alert
+  dialog instead of `window.confirm`.
+- Backend, API, routes, React Query, database and business workflows are
+  unchanged.
+- Frontend build and targeted primitive lint pass. Browser screenshot and
+  screen-reader certification remain pending.
+
 ## ADS003.5 Production-Inventory Interaction Contract
 
 Approved on 2026-07-17 as AD-018.

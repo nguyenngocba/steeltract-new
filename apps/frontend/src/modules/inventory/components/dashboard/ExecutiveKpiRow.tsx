@@ -17,6 +17,7 @@ export function ExecutiveKpiRow({ kpis }: { kpis: KpiItem[] }) {
     <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-5">
       {kpis.map((kpi) => (
         <CockpitKpiCard
+          className="!h-[92px] !p-3"
           key={kpi.id}
           title={kpi.title}
           value={kpi.value}

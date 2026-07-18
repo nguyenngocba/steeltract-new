@@ -1,1 +1,1 @@
-export function FormSection() { return null }
+export { EnterpriseFormSection as FormSection } from '../EnterpriseForm'

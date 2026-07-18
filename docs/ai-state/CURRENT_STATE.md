@@ -1,5 +1,57 @@
 # Current State
 
+## EPIC UI005 Production Workspace and Enterprise Form Standard
+
+Status: **IMPLEMENTED - AUTHENTICATED VISUAL QA PENDING**
+
+Production is the first post-Inventory module to adopt the shared Enterprise
+form layer. Manufacturing Order, BOM, Material Return, Consumption and Yard
+staging use 36px shared controls, common form sections/actions and the
+viewport-bounded accessible modal shell. Active Production routes use one
+Inventory-derived workspace; unused page stubs now delegate to it. No backend,
+API, route, query key, permission or business behavior changed. Frontend build
+passes; browser-based multi-viewport certification remains pending because no
+browser harness or executable is available.
+
+## BUGFIX INV001 Inventory Table Visibility
+
+Status: **IMPLEMENTED - AUTHENTICATED RUNTIME SMOKE PENDING DATABASE**
+
+Inventory Overview and Materials read-model calls now use the authenticated
+application HTTP client. The previous adapter omitted JWT headers, received
+HTTP 401 after RFC017 and caused both pages to fall back to empty row arrays.
+The authenticated runtime endpoint returns 25 records with the expected
+paginated shape. API contracts, React Query behavior, filters, pagination,
+layout and backend logic are unchanged.
+
+## EPIC UI003A Inventory UX Polish
+
+Status: **IMPLEMENTED - AUTHENTICATED VISUAL QA PENDING**
+
+Inventory now starts with operational content rather than a duplicated local
+hero. Standard KPI cards use a 92px Inventory-scoped density, workspace bands
+use an 8px vertical rhythm, and the Materials table has a 320-520px responsive
+viewport instead of relying on a fixed desktop height. Transaction modals and
+the Material drawer use viewport-bounded shells with one internal scroll owner;
+active form controls are 36px. Backend, API, React Query, routes, permissions
+and business behavior are unchanged. Backend/frontend builds pass; real
+multi-viewport visual certification remains pending because no browser harness
+or browser binary is available.
+
+## EPIC UI003 Inventory Canon Refinement
+
+Status: **IMPLEMENTED - RUNTIME VISUAL QA PENDING**
+
+All 12 active Inventory pages use consistent page rhythm. Inventory
+KPI/pagination wrappers delegate to the
+shared cockpit primitives; transaction modals and detail drawers implement
+dialog semantics, focus containment, Escape, body-scroll lock and focus
+restoration; active browser confirmations use an Enterprise alert dialog. No
+backend, API, route, React Query, database or business behavior changed.
+Frontend build and targeted primitive lint pass. Pixel, screen-reader and real
+multi-viewport certification remain pending because the repository/environment
+has no Playwright or browser binary.
+
 ## RFC016 Enterprise Production Certification
 
 Status: **NOT READY**
@@ -1837,3 +1889,15 @@ migration is additive and online (`CREATE INDEX CONCURRENTLY`) with a lock
 timeout and rollback procedure. Backend regression passes 72/72 suites and
 194/194 tests. Production certification still requires measured migration and
 multi-worker crash-recovery drills on a representative PostgreSQL environment.
+
+# EPIC UI003B Frontend API Standardization
+
+Status: **IMPLEMENTED**
+
+Active frontend backend traffic now uses one authenticated Axios instance from
+`lib/api`, including Inventory, Components, Production, QC, Yard, Logistics,
+Projects, Suppliers, Administration and runtime surfaces. Legacy shared import
+paths are compatibility re-exports only. Login delegates to the canonical auth
+API; the interceptor's private anonymous refresh client is the sole approved
+transport exception. Frontend/backend builds pass; local module smoke remains
+pending because PostgreSQL was unavailable at backend startup.

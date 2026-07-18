@@ -1,1 +1,1 @@
-export function SearchSelect() { return null }
+export { EnterpriseSelect as SearchSelect } from '../EnterpriseForm'

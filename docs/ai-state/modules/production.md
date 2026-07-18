@@ -1,5 +1,23 @@
 # Production Module
 
+## EPIC UI005 Enterprise Workspace
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- All active `/production/*` routes use the Inventory-derived
+  `EnterpriseWorkspace`, cockpit table/panel/pagination and shared drawer
+  language.
+- Manufacturing Order, Production BOM, Material Return, Consumption and Yard
+  staging use the shared Enterprise form primitives and 36px controls.
+- Production no longer owns custom modal shells or browser-prompt mutation
+  forms; modal focus, Escape, scroll and sticky actions are centralized.
+- Existing APIs, React Query hooks/keys, DTOs, permissions, routes and business
+  behavior are unchanged.
+- Incidents and Reports remain truthful no-data states pending approved domain
+  contracts; no mock data was introduced.
+
 ## RFC003 Production Execution Aggregate
 
 Implemented on 2026-07-17.

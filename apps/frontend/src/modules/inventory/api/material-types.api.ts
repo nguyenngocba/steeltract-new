@@ -1,11 +1,9 @@
-import {
-  inventoryApi,
-} from './inventory.api'
+import { api } from '../../../lib/api'
 
 export async function getMaterialTypes() {
 
   const response =
-    await inventoryApi.get(
+    await api.get(
       '/inventory/material-types',
     )
 
@@ -17,7 +15,7 @@ export async function createMaterialType(
 ) {
 
   const response =
-    await inventoryApi.post(
+    await api.post(
       '/inventory/material-types',
       payload,
     )
@@ -31,7 +29,7 @@ export async function updateMaterialType(
 ) {
 
   const response =
-    await inventoryApi.put(
+    await api.put(
       `/inventory/material-types/${id}`,
       payload,
     )
@@ -44,7 +42,7 @@ export async function deleteMaterialType(
 ) {
 
   const response =
-    await inventoryApi.delete(
+    await api.delete(
       `/inventory/material-types/${id}`,
     )
 

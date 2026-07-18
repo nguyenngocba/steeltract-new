@@ -1,5 +1,32 @@
 # Next Tasks
 
+- **UI005 authenticated visual certification**: validate Production at
+  360x800, 768x1024, 1366x768, 1440x900 and 1920x1080 with real authenticated
+  data. Exercise Manufacturing Order, BOM, Return, Consumption and Yard staging
+  focus, keyboard, overflow and error paths.
+- **Production table capability contracts**: add sorting or selection only when
+  the corresponding read-model/API and bulk operator command are approved. Do
+  not add inert table controls to satisfy visual parity.
+- **Production Incidents/Reports**: retain truthful empty states until approved
+  domain/query contracts exist; do not populate either route with mocks.
+
+- **INV001 authenticated browser smoke**: with an approved browser harness,
+  verify visible rows on Overview and Materials plus interactive search,
+  filters, pagination, sticky headers and detail drawer. Runtime API/data-flow
+  verification already passes; this is visual evidence only.
+
+- **UI003A authenticated visual certification**: add or provide an approved
+  browser harness, then capture Inventory at 360x800, 768x1024, 1366x768,
+  1440x900 and 1920x1080 with real data. Validate overflow, chart labels,
+  Materials table visibility, transaction split panes and all drawer/modal
+  focus/scroll paths.
+- **UI003 form markup follow-up**: replace placeholder-only labels in legacy
+  Location forms and move remaining page-local report overlays onto the shared
+  modal primitive without changing workflow or layout.
+- **Frontend ESLint baseline**: exclude or repair archived/backup trees and
+  address the existing 1,168 errors before treating project-wide lint as a
+  release gate. UI003 targeted new primitives already pass.
+
 - **RFC016 P0 authorization remediation**: establish deny-by-default route
   authentication/permission coverage, secure all Inventory, QC and Projects
   mutations, explicitly govern compatibility controllers and add anonymous plus
@@ -643,3 +670,13 @@ Backlog after the locked order:
    rejected without a valid access token.
 4. Run image startup, readiness and `SIGTERM` drain against stable staging
    PostgreSQL, then rerun RFC016 production certification.
+
+# EPIC UI003B Follow-up
+
+1. Add a CI static transport-boundary check that rejects new active
+   `axios.create`, direct Axios verbs and authenticated `fetch` outside the
+   approved client files.
+2. Define `VITE_API_URL` in each deployment environment; the centralized client
+   preserves the existing backend URL as its compatibility fallback.
+3. Exercise token expiry and concurrent 401 refresh against staging to validate
+   the existing single-flight refresh behavior under production latency.

@@ -1,1 +1,1 @@
-export function ProductionOverviewPage() { return <div /> }
+export { ProductionCockpitPage as ProductionOverviewPage } from './ProductionCockpitPage'

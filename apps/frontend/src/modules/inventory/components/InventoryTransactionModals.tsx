@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getInboundSuggestions } from '../api/inventory.api'
@@ -15,6 +16,7 @@ import {
   uploadInventoryTransactionAttachments,
   type InventoryAttachmentDraft,
 } from './InventoryAttachmentPanel'
+import { useInventoryConfirmDialog } from '../hooks/useInventoryConfirmDialog'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatCurrencyInput, formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
@@ -149,9 +151,9 @@ const primaryButtonClass =
 const secondaryButtonClass =
   'rounded-lg border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10'
 const fieldClass =
-  'h-11 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-100 placeholder:text-slate-500'
+  'h-9 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-100 placeholder:text-slate-500'
 const textareaClass =
-  'min-h-24 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500'
+  'min-h-20 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500'
 async function refreshInventoryCache(
   queryClient: any,
 ) {
@@ -198,23 +200,91 @@ function ModalShell({
   wide?: boolean
   maxWidthClass?: string
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  const titleId = useId()
+
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const frame = window.requestAnimationFrame(() => {
+      const firstControl = dialogRef.current?.querySelector<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )
+      ;(firstControl ?? dialogRef.current)?.focus()
+    })
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeRef.current()
+        return
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      const controls = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ))
+      if (!controls.length) {
+        event.preventDefault()
+        dialogRef.current.focus()
+        return
+      }
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus()
+    }
+  }, [open])
+
   if (!open) return null
   const modalWidthClass = maxWidthClass ?? (wide ? 'max-w-7xl' : 'max-w-4xl')
 
   return createPortal(
-    <div className="inventory-transaction-modal fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm">
+    <div className="inventory-transaction-modal fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden overscroll-none bg-black/60 p-3 backdrop-blur-sm sm:p-4">
       <style>{'.inventory-transaction-modal select option{background:#0f172a;color:#e2e8f0}.inventory-transaction-modal select:focus,.inventory-transaction-modal input:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
-      <div className={`w-full ${modalWidthClass} overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50`}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`flex max-h-[calc(100vh-1.5rem)] w-full ${modalWidthClass} flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 sm:max-h-[calc(100vh-2rem)]`}
+      >
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <div className="text-base font-semibold text-white">{title}</div>
+          <div id={titleId} className="text-base font-semibold text-white">{title}</div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white"
+            aria-label="Đóng hộp thoại"
+            title="Đóng"
+            className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-cyan-300/40 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
           >
-            Đóng
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">{children}</div>
       </div>
     </div>,
     document.body,
@@ -237,6 +307,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   const mainZones = useMemo(() => zones.filter(isMainWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
   const queryClient = useQueryClient()
+  const { confirm, confirmationDialog } = useInventoryConfirmDialog()
 
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
@@ -469,10 +540,14 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     toast.success('Đã xóa vật tư khỏi danh sách chờ')
   }
 
-  function handleEditPending(item: any) {
+  async function handleEditPending(item: any) {
     const formIsDirty = form.inventoryItemId || form.quantity || form.unitPrice
     if (formIsDirty) {
-      if (!window.confirm('Vật tư đang nhập trong form sẽ bị ghi đè. Bạn có muốn tiếp tục?')) {
+      if (!await confirm({
+        title: 'Ghi đè vật tư đang nhập?',
+        message: 'Thông tin đang nhập trong form sẽ được thay bằng dòng đã chọn.',
+        confirmLabel: 'Tiếp tục',
+      })) {
         return
       }
     }
@@ -574,10 +649,15 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
     }
   }
 
-  function handleClose() {
+  async function handleClose() {
     const isDirty = pendingItems.length > 0 || form.inventoryItemId || form.quantity || form.remark
     if (isDirty) {
-      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn thoát?')) {
+      if (!await confirm({
+        title: 'Hủy thay đổi chưa lưu?',
+        message: 'Danh sách vật tư chờ và thông tin đang nhập sẽ bị mất.',
+        confirmLabel: 'Thoát và hủy',
+        destructive: true,
+      })) {
         return
       }
     }
@@ -585,6 +665,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
+    <>
     <ModalShell open={open} onClose={handleClose} title="Nhập kho vật tư" wide>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_520px]">
         <div>
@@ -881,6 +962,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
         />
       </div>
     </ModalShell>
+    {confirmationDialog}
+    </>
   )
 }
 
@@ -891,6 +974,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   const productionZones = useMemo(() => zones.filter(isProductionWarehouseZone), [zones])
   const createTransaction = useCreateTransaction()
   const queryClient = useQueryClient()
+  const { confirm, confirmationDialog } = useInventoryConfirmDialog()
 
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
@@ -1186,10 +1270,14 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     toast.success('Đã xóa vật tư khỏi danh sách chờ')
   }
 
-  function handleEditPending(item: any) {
+  async function handleEditPending(item: any) {
     const formIsDirty = form.inventoryItemId || form.quantity
     if (formIsDirty) {
-      if (!window.confirm('Vật tư đang nhập trong form sẽ bị ghi đè. Bạn có muốn tiếp tục?')) {
+      if (!await confirm({
+        title: 'Ghi đè vật tư đang nhập?',
+        message: 'Thông tin đang nhập trong form sẽ được thay bằng dòng đã chọn.',
+        confirmLabel: 'Tiếp tục',
+      })) {
         return
       }
     }
@@ -1321,10 +1409,15 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     }
   }
 
-  function handleClose() {
+  async function handleClose() {
     const isDirty = pendingItems.length > 0 || form.inventoryItemId || form.quantity || form.remark
     if (isDirty) {
-      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn thoát?')) {
+      if (!await confirm({
+        title: 'Hủy thay đổi chưa lưu?',
+        message: 'Danh sách vật tư chờ và thông tin đang nhập sẽ bị mất.',
+        confirmLabel: 'Thoát và hủy',
+        destructive: true,
+      })) {
         return
       }
     }
@@ -1332,6 +1425,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
+    <>
     <ModalShell open={open} onClose={handleClose} title="Xuất kho vật tư" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
         <div>
@@ -1621,6 +1715,8 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
         </div>
       </div>
     </ModalShell>
+    {confirmationDialog}
+    </>
   )
 }
 
@@ -1630,6 +1726,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   const realZones = useMemo(() => zones.filter((zone: any) => isRealStorageZone(zone) && isMainWarehouseZone(zone)), [zones])
   const createTx = useCreateTransaction()
   const queryClient = useQueryClient()
+  const { confirm, confirmationDialog } = useInventoryConfirmDialog()
 
   const [form, setForm] = useState({
     transactionDate: formatLocalDateTimeInput(),
@@ -1892,10 +1989,14 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     toast.success('Đã xóa khỏi danh sách chờ')
   }
 
-  function handleEditPending(item: any) {
+  async function handleEditPending(item: any) {
     const formIsDirty = form.materialId || form.quantity
     if (formIsDirty) {
-      if (!window.confirm('Vật tư đang nhập trong form sẽ bị ghi đè. Bạn có muốn tiếp tục?')) {
+      if (!await confirm({
+        title: 'Ghi đè vật tư đang nhập?',
+        message: 'Thông tin đang nhập trong form sẽ được thay bằng dòng đã chọn.',
+        confirmLabel: 'Tiếp tục',
+      })) {
         return
       }
     }
@@ -1996,10 +2097,15 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
     }
   }
 
-  function handleClose() {
+  async function handleClose() {
     const isDirty = pendingItems.length > 0 || form.materialId || form.quantity || form.reason
     if (isDirty) {
-      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn thoát?')) {
+      if (!await confirm({
+        title: 'Hủy thay đổi chưa lưu?',
+        message: 'Danh sách điều chuyển chờ và thông tin đang nhập sẽ bị mất.',
+        confirmLabel: 'Thoát và hủy',
+        destructive: true,
+      })) {
         return
       }
     }
@@ -2007,6 +2113,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
   }
 
   return (
+    <>
     <ModalShell open={open} onClose={handleClose} title="Tạo điều chuyển mới" wide maxWidthClass="max-w-[96vw] 2xl:max-w-[1800px]">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(390px,0.8fr)_minmax(720px,1.2fr)]">
         <div>
@@ -2232,6 +2339,8 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
         </button>
       </div>
     </ModalShell>
+    {confirmationDialog}
+    </>
   )
 }
 

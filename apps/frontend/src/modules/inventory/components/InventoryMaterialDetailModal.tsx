@@ -379,9 +379,23 @@ function MaterialAttachmentSummary({
 }
 
 function ImagePreviewDialog({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   return createPortal(
-    <div className="fixed inset-0 z-[10000] grid place-items-center bg-slate-950/88 p-4 backdrop-blur-md" onClick={onClose}>
-      <button type="button" className="absolute right-5 top-5 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-slate-200 hover:bg-white/[0.1]" onClick={onClose}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Xem trước ảnh vật tư"
+      className="fixed inset-0 z-[10000] grid place-items-center bg-slate-950/88 p-4 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <button type="button" aria-label="Đóng xem trước ảnh" className="absolute right-5 top-5 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-slate-200 hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70" onClick={onClose}>
         Đóng
       </button>
       <img src={src} alt="Preview vật tư" className="max-h-[86vh] max-w-[92vw] rounded-2xl border border-cyan-300/20 object-contain shadow-[0_30px_120px_rgba(0,0,0,0.55)]" onClick={(event) => event.stopPropagation()} />
@@ -507,7 +521,7 @@ function InventoryMetricCard({
   );
   const className = `relative overflow-hidden rounded-xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(10,20,40,0.85),rgba(5,10,25,0.75)_55%,rgba(15,25,50,0.65))] text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-cyan-400/[0.055] transition ${
   active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
-} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''} ${compact ? 'h-[120px] p-3' : 'h-[108px] p-3'}`;
+} ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''} h-[92px] p-3`;
   if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>;
   return <section className={className}>{content}</section>;
 }

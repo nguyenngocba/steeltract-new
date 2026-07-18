@@ -1,4 +1,4 @@
-import { http } from '../../../shared/http/http-client'
+import { api as http } from '../../../lib/api'
 
 export type QcInspectionStatus = 'DRAFT' | 'READY' | 'IN_PROGRESS' | 'PASSED' | 'FAILED' | 'REWORK_REQUIRED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 

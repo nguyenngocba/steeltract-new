@@ -1,22 +1,8 @@
-import axios from 'axios'
-
-import { setupAuthInterceptor }
-  from '../../../lib/auth/auth-interceptor'
-
-export const inventoryApi =
-  axios.create({
-    baseURL:
-      'http://172.168.53.116:3000',
-  })
-
-setupAuthInterceptor(
-  inventoryApi,
-  'http://172.168.53.116:3000',
-)
+import { api } from '../../../lib/api'
 
 export async function getInventoryItems() {
   const { data } =
-    await inventoryApi.get(
+    await api.get(
       '/inventory/items',
     )
 
@@ -27,7 +13,7 @@ export async function getInboundSuggestions(
   id: string,
 ) {
   const { data } =
-    await inventoryApi.get(
+    await api.get(
       `/inventory/items/${id}/inbound-suggestions`,
     )
 

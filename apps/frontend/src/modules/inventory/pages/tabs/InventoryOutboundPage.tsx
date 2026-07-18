@@ -9,7 +9,6 @@ import {
   ModuleLoadingState,
   ModuleEmptyState,
 } from '../../../../shared/ui/modules'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
   HorizontalBars,
@@ -593,12 +592,11 @@ export function InventoryOutboundPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-1 -mt-2 text-xs">
+      <div className="space-y-2 text-xs">
         {/* KPI Section */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Phiếu xuất hôm nay"
             value={formatQuantity(kpis.docsToday, 0)}
             note="Số lượng chứng từ hôm nay"
@@ -606,6 +604,7 @@ export function InventoryOutboundPage() {
             trend={kpiTrend.docsToday}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Giá trị xuất hôm nay"
             value={formatCurrency(kpis.amountToday)}
             note="Giá trị đã bàn giao hôm nay"
@@ -613,6 +612,7 @@ export function InventoryOutboundPage() {
             trend={kpiTrend.amountToday}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Chờ xử lý"
             value={formatQuantity(kpis.pending, 0)}
             note="Phiếu đang đợi phê duyệt"
@@ -620,6 +620,7 @@ export function InventoryOutboundPage() {
             trend={kpiTrend.pending}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Xuất cho sản xuất"
             value={formatCurrency(kpis.productionAmount)}
             note={`${formatQuantity(kpis.productionDocs, 0)} phiếu xuất`}
@@ -627,6 +628,7 @@ export function InventoryOutboundPage() {
             trend={kpiTrend.productionAmount}
           />
           <CockpitKpiCard
+            className="!h-[92px] !p-3"
             title="Xuất cho công trình"
             value={formatCurrency(kpis.projectAmount)}
             note={`${formatQuantity(kpis.projectDocs, 0)} phiếu xuất`}
@@ -995,7 +997,7 @@ export function InventoryOutboundPage() {
         </div>
       </div>
       {showAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
+        <div role="dialog" aria-modal="true" aria-label="Danh sách phiếu xuất" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
           <div className="max-h-[90vh] w-full max-w-[95vw] overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
 
             <div className="mb-4 flex items-center justify-between">

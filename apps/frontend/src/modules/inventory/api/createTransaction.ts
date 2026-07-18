@@ -1,10 +1,10 @@
-import { inventoryApi } from './inventory.api'
+import { api } from '../../../lib/api'
 
 export async function createTransaction(
   payload: any,
 ) {
   const response =
-    await inventoryApi.post(
+    await api.post(
       '/inventory/transactions',
       payload,
     )

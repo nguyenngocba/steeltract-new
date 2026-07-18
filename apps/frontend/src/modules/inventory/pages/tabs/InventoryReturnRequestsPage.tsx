@@ -29,7 +29,6 @@ import {
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { advanceReturnRequest, getReturnRequests } from '../../api/transactions.api'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import { invalidateInventoryReadState } from '../../hooks/invalidateInventoryReadState'
 import type { ReturnRequest } from '../../types/transaction-engine.types'
 
@@ -150,13 +149,12 @@ export function InventoryReturnRequestsPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-      <div className="w-full min-w-0 flex-1 space-y-1">
+      <div className="w-full min-w-0 flex-1 space-y-2">
       <section className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
-        <CockpitKpiCard title="Requested" value={formatQuantity(metrics.requestedCount, 0)} note="Phiếu đang chờ" icon={<FileClock size={18} />} tone="amber" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
-        <CockpitKpiCard title="Received Today" value={formatQuantity(metrics.receivedToday, 0)} note="Đã nhận hôm nay" icon={<CheckCircle2 size={18} />} tone="emerald" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
-        <CockpitKpiCard title="Rejected Today" value={formatQuantity(metrics.rejectedToday, 0)} note="Từ chối hôm nay" icon={<XCircle size={18} />} tone="red" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
-        <CockpitKpiCard title="Pending Quantity" value={formatQuantity(metrics.pendingQuantity)} note="Khối lượng chờ nhận" icon={<PackageCheck size={18} />} tone="purple" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
+        <CockpitKpiCard className="!h-[108px] !px-4 !py-3" title="Requested" value={formatQuantity(metrics.requestedCount, 0)} note="Phiếu đang chờ" icon={<FileClock size={18} />} tone="amber" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
+        <CockpitKpiCard className="!h-[108px] !px-4 !py-3" title="Received Today" value={formatQuantity(metrics.receivedToday, 0)} note="Đã nhận hôm nay" icon={<CheckCircle2 size={18} />} tone="emerald" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
+        <CockpitKpiCard className="!h-[108px] !px-4 !py-3" title="Rejected Today" value={formatQuantity(metrics.rejectedToday, 0)} note="Từ chối hôm nay" icon={<XCircle size={18} />} tone="red" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
+        <CockpitKpiCard className="!h-[108px] !px-4 !py-3" title="Pending Quantity" value={formatQuantity(metrics.pendingQuantity)} note="Khối lượng chờ nhận" icon={<PackageCheck size={18} />} tone="purple" state={returnsQuery.isLoading ? 'loading' : 'normal'} />
       </section>
 
       <section className="grid grid-cols-1 gap-1 xl:grid-cols-4">

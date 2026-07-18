@@ -1,7 +1,10 @@
 import { io }
   from 'socket.io-client'
 
+import { API_BASE_URL }
+  from '../../lib/api'
+
 export const runtimeSocket =
   io(
-    'http://172.168.53.116:3000',
+    API_BASE_URL,
   )

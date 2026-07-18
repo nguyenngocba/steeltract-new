@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { AlertCircle, AlertTriangle, CheckCircle, CircleDollarSign, PackageCheck, RefreshCw, ShieldX, TriangleAlert } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactDonutSummary,
   HorizontalBars,
@@ -192,10 +191,8 @@ export function InventoryAlertsPage() {
   
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-1 -mt-2">
-        <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-6 gap-1.5">
+      <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-3 2xl:grid-cols-6">
           <OverviewMetricCard
             title="Cảnh báo nghiêm trọng"
             value={formatQuantity(kpi.critical, 0)}

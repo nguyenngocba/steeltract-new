@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { inventoryApi } from '../api/inventory.api'
+import { api } from '../../../lib/api'
 
 type TransactionFilters = {
   fromDate?: string
@@ -18,7 +18,7 @@ async function fetchTransactions(
   signal?: AbortSignal,
 ) {
   const response =
-    await inventoryApi.get(
+    await api.get(
       '/inventory/transactions',
       {
         params: filters,

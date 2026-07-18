@@ -1,5 +1,5 @@
 import { Box, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 export type ModuleTone = 'blue' | 'emerald' | 'amber' | 'red' | 'purple' | 'cyan'
 
@@ -278,6 +278,7 @@ export function ModuleDetailDrawer({
   title,
   subtitle,
   actions,
+  footer,
   children,
   onClose,
   widthClass,
@@ -288,12 +289,72 @@ export function ModuleDetailDrawer({
   title: string
   subtitle?: string
   actions?: ReactNode
+  footer?: ReactNode
   children: ReactNode
   onClose: () => void
   widthClass?: string
   size?: 'sm' | 'md' | 'lg'
   placement?: 'right' | 'center'
 }) {
+  const drawerRef = useRef<HTMLElement>(null)
+  const closeRef = useRef(onClose)
+  const titleId = useId()
+
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const frame = window.requestAnimationFrame(() => {
+      const firstControl = drawerRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )
+      ;(firstControl ?? drawerRef.current)?.focus()
+    })
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !drawerRef.current) return
+
+      const controls = Array.from(drawerRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ))
+      if (!controls.length) {
+        event.preventDefault()
+        drawerRef.current.focus()
+        return
+      }
+
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus()
+    }
+  }, [open])
+
   if (!open) return null
 
   const sizeClass = {
@@ -301,7 +362,7 @@ export function ModuleDetailDrawer({
     md: 'w-screen md:w-[58vw] md:min-w-[900px] md:max-w-[1180px]',
     lg: 'w-screen md:w-[62vw] md:min-w-[980px] md:max-w-[1280px]',
   }[size]
-  const resolvedWidthClass = widthClass ?? sizeClass
+  const resolvedWidthClass = widthClass ? `w-screen ${widthClass}` : sizeClass
 
   const shellClass =
     placement === 'center'
@@ -314,16 +375,23 @@ export function ModuleDetailDrawer({
 
   return (
     <div className={shellClass}>
-      <aside className={asideClass}>
+      <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={asideClass}
+      >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-cyan-300/15 px-5 py-4">
           <div className="min-w-0">
-            <h3 className="truncate text-xl font-semibold text-white">{title}</h3>
+            <h3 id={titleId} className="truncate text-xl font-semibold text-white">{title}</h3>
             {subtitle ? <p className="mt-1 truncate text-sm text-slate-400">{subtitle}</p> : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {actions}
             <button type="button" onClick={onClose} className={moduleMutedButton} aria-label="Đóng">
-              <X size={14} />
+              <X size={14} aria-hidden="true" />
               Đóng
             </button>
           </div>
@@ -331,6 +399,7 @@ export function ModuleDetailDrawer({
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {children}
         </div>
+        {footer ? <footer className="shrink-0 border-t border-cyan-300/15 bg-slate-950/80 px-5 py-4">{footer}</footer> : null}
       </aside>
     </div>
   )

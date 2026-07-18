@@ -3,7 +3,6 @@ import { Plus, RefreshCw } from 'lucide-react'
 
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { ModuleDetailDrawer } from '../../../../shared/ui/modules'
-import { InventoryTabWorkspace } from '../../components/InventoryTabWorkspace'
 import {
   CompactTrendChart,
   HorizontalBars,
@@ -292,10 +291,8 @@ export function InventoryAdjustmentsPage() {
 
   return (
     <EnterpriseModulePage>
-      <InventoryTabWorkspace />
-
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="space-y-2">
+        <div className="grid gap-1 md:grid-cols-3 xl:grid-cols-6">
           <InventoryKpi title="Adjustment Today" value={formatQuantity(kpis.today, 0)} note="Phiếu trong ngày" tone="blue" />
           <InventoryKpi title="Adjustment Month" value={formatQuantity(kpis.month, 0)} note="Phiếu trong tháng" tone="cyan" />
           <InventoryKpi title="Increase Qty" value={formatQuantity(kpis.increaseQty)} note="Tăng tồn" tone="emerald" />
