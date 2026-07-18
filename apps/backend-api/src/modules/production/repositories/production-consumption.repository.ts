@@ -11,7 +11,9 @@ export class ProductionConsumptionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   transaction<T>(fn: (tx: ProductionConsumptionTx) => Promise<T>) {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   }
 
   findMany(
@@ -27,15 +29,22 @@ export class ProductionConsumptionRepository {
     });
   }
 
-  findOrderForConsumption(id: string) {
-    return this.prisma.productionOrder.findUnique({
+  findOrderForConsumption(
+    id: string,
+    tx: ProductionConsumptionTx = this.prisma,
+  ) {
+    return tx.productionOrder.findUnique({
       where: { id },
-      select: { id: true, orderNo: true },
+      select: { id: true, orderNo: true, status: true },
     });
   }
 
-  findIssuesForConsumption(productionOrderId: string, inventoryItemId: string) {
-    return this.prisma.productionMaterialIssue.findMany({
+  findIssuesForConsumption(
+    productionOrderId: string,
+    inventoryItemId: string,
+    tx: ProductionConsumptionTx = this.prisma,
+  ) {
+    return tx.productionMaterialIssue.findMany({
       where: {
         productionOrderId,
         inventoryItemId,
@@ -45,8 +54,12 @@ export class ProductionConsumptionRepository {
     });
   }
 
-  findConsumptionsForMaterial(productionOrderId: string, inventoryItemId: string) {
-    return this.prisma.productionMaterialConsumption.findMany({
+  findConsumptionsForMaterial(
+    productionOrderId: string,
+    inventoryItemId: string,
+    tx: ProductionConsumptionTx = this.prisma,
+  ) {
+    return tx.productionMaterialConsumption.findMany({
       where: {
         productionOrderId,
         inventoryItemId,

@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 
 import {
   ComponentStatus,
@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 const EPSILON = 0.000001;
 const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
@@ -22,6 +23,7 @@ type LocationKey = {
   level?: string | null;
 };
 
+@UseGuards(JwtAuthGuard)
 @Controller('runtime/integrity')
 export class RuntimeIntegrityController {
   constructor(private readonly prisma: PrismaService) {}

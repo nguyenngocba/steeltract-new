@@ -16,7 +16,9 @@ export class MaterialIssueRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   transaction<T>(fn: (tx: MaterialIssueTx) => Promise<T>) {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   }
 
   findMany(productionOrderId?: string, status?: string) {
@@ -33,12 +35,15 @@ export class MaterialIssueRepository {
   findIssueById(id: string, tx: MaterialIssueTx = this.prisma) {
     return tx.productionMaterialIssue.findUnique({
       where: { id },
-      include: { inventoryItem: { include: { unitMaster: true } } },
+      include: {
+        productionOrder: true,
+        inventoryItem: { include: { unitMaster: true } },
+      },
     });
   }
 
-  findIssueForReturn(id: string) {
-    return this.prisma.productionMaterialIssue.findUnique({
+  findIssueForReturn(id: string, tx: MaterialIssueTx = this.prisma) {
+    return tx.productionMaterialIssue.findUnique({
       where: { id },
       include: {
         reservationLine: {
@@ -77,8 +82,8 @@ export class MaterialIssueRepository {
     });
   }
 
-  findReservationForIssue(id: string) {
-    return this.prisma.productionMaterialReservation.findUnique({
+  findReservationForIssue(id: string, tx: MaterialIssueTx = this.prisma) {
+    return tx.productionMaterialReservation.findUnique({
       where: { id },
       include: {
         lines: {
@@ -127,8 +132,12 @@ export class MaterialIssueRepository {
     });
   }
 
-  findIssuesForMaterial(productionOrderId: string, inventoryItemId: string) {
-    return this.prisma.productionMaterialIssue.findMany({
+  findIssuesForMaterial(
+    productionOrderId: string,
+    inventoryItemId: string,
+    tx: MaterialIssueTx = this.prisma,
+  ) {
+    return tx.productionMaterialIssue.findMany({
       where: {
         productionOrderId,
         inventoryItemId,
@@ -140,8 +149,9 @@ export class MaterialIssueRepository {
   findConsumptionsForMaterial(
     productionOrderId: string,
     inventoryItemId: string,
+    tx: MaterialIssueTx = this.prisma,
   ) {
-    return this.prisma.productionMaterialConsumption.findMany({
+    return tx.productionMaterialConsumption.findMany({
       where: {
         productionOrderId,
         inventoryItemId,

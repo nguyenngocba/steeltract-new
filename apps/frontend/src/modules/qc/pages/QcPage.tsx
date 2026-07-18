@@ -1,9 +1,10 @@
 import { useDeferredValue, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { CockpitKpiCard } from '@/shared/ui/cockpit'
 import { approveInspection, completeInspection, createInspection, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
 import { queryKeys } from '@/lib/query/query-keys'
 import { useQcDashboard, useQcWorkspace } from '../hooks/useQcWorkspace'
@@ -167,13 +168,15 @@ export function QcPage() {
     },
   })
 
-  return <OperationalShell>
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
-      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Chất lượng (QC)</p><h1 className="mt-1 text-2xl font-semibold">Chất lượng (QC)</h1><p className="mt-1 text-xs text-slate-500">QC móc nối sản xuất và cấu kiện. Thành phẩm chỉ được chuyển bãi khi QC đạt hoặc đã duyệt.</p></div>
-        <div className="flex gap-2"><button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button><button className={mutedButton}>Xuất Excel</button><button className={mutedButton}>Báo cáo</button></div>
-      </header>
-      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>{tabs.map((item) => <Link key={item.id} to={item.path} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs transition ${tab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{item.label}</Link>)}</nav>
+  return <EnterpriseWorkspace
+    eyebrow="Chất lượng (QC)"
+    title="Chất lượng (QC)"
+    description="QC móc nối sản xuất và cấu kiện. Thành phẩm chỉ được chuyển bãi khi QC đạt hoặc đã duyệt."
+    breadcrumbs={['Vận hành', 'Chất lượng']}
+    tabs={tabs}
+    activeTab={tab}
+    actions={<><button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button><button className={mutedButton}>Xuất Excel</button><button className={mutedButton}>Báo cáo</button></>}
+  >
       <FilterBar query={query} status={status} onQuery={setQuery} onStatus={setStatus} />
       {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
       {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
@@ -190,8 +193,7 @@ export function QcPage() {
       <InspectionDetail inspection={selectedInspection} onClose={() => setSelectedInspection(null)} onStart={(id) => startMutation.mutate(id)} onPass={(id) => passMutation.mutate(id)} onFail={(id) => failMutation.mutate(id)} />
       <QueueDetail row={selectedQueue} onClose={() => setSelectedQueue(null)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
       <CreateInspectionDialog open={createDialogOpen} queue={runtime.productionQueue} checklists={runtime.checklists} saving={createMutation.isPending || quickApproveMutation.isPending} onClose={() => setCreateDialogOpen(false)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
-    </main>
-  </OperationalShell>
+  </EnterpriseWorkspace>
 }
 
 function CreateInspectionDialog({
@@ -343,8 +345,7 @@ function ByProject({ rows }: { rows: QcCockpit['byProject'] }) {
 }
 
 function Kpi({ icon: Icon, title, value, note, tone = 'cyan' }: { icon: LucideIcon; title: string; value: string; note: string; tone?: 'cyan' | 'emerald' | 'red' | 'amber' | 'purple' }) {
-  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-400' : tone === 'red' ? 'from-red-500 to-rose-400' : tone === 'amber' ? 'from-amber-500 to-orange-400' : tone === 'purple' ? 'from-purple-500 to-fuchsia-400' : 'from-blue-500 to-cyan-400'
-  return <div className={`${panel} relative overflow-hidden p-4`}><div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`} /><span className={`inline-flex rounded-lg bg-gradient-to-br ${color} p-3 text-white shadow-lg shadow-black/20`}><Icon size={20} /></span><div className="mt-3 text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div><div className="mt-2 text-2xl font-semibold text-white">{value}</div><div className="mt-1 text-xs text-slate-500">{note}</div></div>
+  return <CockpitKpiCard title={title} value={value} note={note} tone={tone} icon={<Icon size={18} />} />
 }
 
 function Donut({ title, center, rows }: { title: string; center: string; rows: Array<[string, number, string]> }) {

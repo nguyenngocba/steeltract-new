@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
 import { Package } from "lucide-react";
 
-import { EnterpriseModulePage } from "../../../../shared/runtime-tabs/EnterpriseModulePage";
+import { ComponentsWorkspace } from "../../components/ComponentsWorkspace";
 import {
   ModuleDataGrid,
   ModuleDetailDrawer,
@@ -382,7 +382,7 @@ export function ComponentsListPage() {
   const selectedRemainingQty = selected?.remainingQty ?? 0;
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="flex items-center justify-end gap-1">
           <button
@@ -1283,7 +1283,7 @@ export function ComponentsListPage() {
           </>
         ) : null}
       </ModuleDetailDrawer>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   );
 }
 

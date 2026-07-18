@@ -1008,8 +1008,10 @@ model InventoryTransaction {
   @@index([zoneId])
   @@index([projectId])
   @@index([transactionDate])
+  @@index([transactionDate(sort: Desc), id], map: "inventory_transactions_transactionDate_id_idx")
   @@index([type, transactionDate(sort: Desc)], map: "inventory_transactions_type_transactionDate_idx")
   @@index([projectId, transactionDate(sort: Desc)], map: "inventory_transactions_projectId_transactionDate_idx")
+  @@index([type, referenceModule, referenceId], map: "inventory_transactions_reference_idx")
   @@map("inventory_transactions")
 }
 
@@ -1787,6 +1789,7 @@ model DispatchEvent {
   @@index([dispatchOrderId])
   @@index([type])
   @@index([createdAt])
+  @@index([dispatchOrderId, createdAt(sort: Desc), id], map: "dispatch_events_order_createdAt_id_idx")
   @@map("dispatch_events")
 }
 
@@ -2828,8 +2831,11 @@ model OutboxEvent {
 
   @@unique([idempotencyKey])
   @@index([status, nextAttemptAt])
+  @@index([status, nextAttemptAt, createdAt, id], map: "outbox_events_claim_idx")
   @@index([eventName])
   @@index([createdAt])
+  @@index([createdAt, id], map: "outbox_events_createdAt_id_idx")
+  @@index([updatedAt(sort: Desc), id], map: "outbox_events_updatedAt_id_idx")
   @@map("outbox_events")
 }
 
@@ -2850,6 +2856,8 @@ model EnterpriseProjectionDocument {
   @@unique([projectionName, entityKey])
   @@index([projectionName, scopeKey])
   @@index([projectionName, updatedAt])
+  @@index([projectionName, sourceOccurredAt(sort: Desc), id], map: "projection_documents_name_occurredAt_id_idx")
+  @@index([projectionName, scopeKey, sourceOccurredAt(sort: Desc), id], map: "projection_documents_scope_occurredAt_id_idx")
   @@index([sourceEventId])
   @@map("enterprise_projection_documents")
 }
@@ -2934,6 +2942,8 @@ model BackgroundJob {
 
   @@unique([idempotencyKey])
   @@index([queue, status, runAt])
+  @@index([status, priority(sort: Desc), runAt, id], map: "background_jobs_claim_idx")
+  @@index([updatedAt(sort: Desc), id], map: "background_jobs_updatedAt_id_idx")
   @@index([name])
   @@index([heartbeatAt])
   @@map("background_jobs")
@@ -2953,6 +2963,7 @@ model JobExecution {
   job BackgroundJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
+  @@index([jobId, startedAt(sort: Desc), id], map: "job_executions_jobId_startedAt_id_idx")
   @@index([status])
   @@index([startedAt])
   @@map("job_executions")
@@ -3790,6 +3801,8 @@ model ProductionMaterialLedger {
   @@index([inventoryItemId])
   @@index([eventType])
   @@index([eventDate])
+  @@index([productionOrderId, eventDate(sort: Desc), id], map: "production_material_ledger_order_eventDate_id_idx")
+  @@index([inventoryItemId, eventDate(sort: Desc), id], map: "production_material_ledger_item_eventDate_id_idx")
   @@index([warehouseId, zoneId, slotId, level])
 }
 

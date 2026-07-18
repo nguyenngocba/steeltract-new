@@ -7,9 +7,11 @@ describe('ProductionConsumptionService material flow', () => {
     const tx = { marker: 'shared-transaction' } as never;
     const createdAt = new Date('2026-07-11T02:00:00.000Z');
     const repository = {
-      findOrderForConsumption: jest
-        .fn()
-        .mockResolvedValue({ id: 'order-1', orderNo: 'PO-001' }),
+      findOrderForConsumption: jest.fn().mockResolvedValue({
+        id: 'order-1',
+        orderNo: 'PO-001',
+        status: 'IN_PROGRESS',
+      }),
       findIssuesForConsumption: jest.fn().mockResolvedValue([
         {
           inventoryItemId: 'material-1',

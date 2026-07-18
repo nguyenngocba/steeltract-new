@@ -1,5 +1,85 @@
 # Current State
 
+## RFC016 Enterprise Production Certification
+
+Status: **NOT READY**
+
+The current worktree passes backend/frontend builds, Prisma validation and all
+70 backend suites (185 tests), and its non-root Docker/Compose deployment
+foundation validates. Production certification is blocked by unguarded business
+mutations in Inventory, QC and Projects, warning-only stale Job/Outbox lock
+detection without safe recovery, and pending migration
+`20260717190000_enterprise_data_scalability_indexes` without production-size
+lock/WAL evidence. No application code, schema, migration, API or frontend was
+changed by RFC016.
+
+## RFC013 Enterprise Database & Performance Readiness
+
+Status: **IMPLEMENTED - CONDITIONALLY READY**
+
+Outbox and Background Job claims are now atomic and safe across workers;
+Operations Center avoids exact scans for table-size telemetry; Inventory posting
+uses batch validation/database cost aggregation; and replay checkpoints ignored
+events once per batch. Additive indexes remain pending. Static audit covers all
+127 Prisma models, but live `EXPLAIN` and production-size benchmarks are blocked
+because PostgreSQL at `localhost:5432` is currently unavailable.
+
+## RFC012 Enterprise Data Scalability Foundation
+
+Status: **IMPLEMENTED - CONDITIONALLY READY**
+
+Projection reads now support additive keyset/no-count pagination, replay resumes
+from durable checkpoints with bounded work per invocation, and Outbox claims
+have stable ordering. Additive history/replay indexes and a guarded hot/warm/cold
+policy are prepared. No migration was deployed and no physical partition or
+archive deletion was attempted. The current database is too small for a valid
+100M/1B-row benchmark, so scale certification remains an operational gate. The
+focused Projection suite passes; two unrelated baseline harness defects still
+prevent a clean full backend Jest run.
+
+## RFC011 Enterprise Query API Adoption
+
+Status: **IMPLEMENTED - SEVEN-MODULE QUERY BOUNDARY AVAILABLE**
+
+Inventory, Components, Production, QC, Yard, Logistics and Projects now expose
+stable module/view aliases through an authenticated projection-only Query API.
+QC/Yard/Logistics/Projects canonical facts are registered in the shared engine;
+no duplicate projection runtime was created. Existing operator workspaces remain
+on Repository Live Read Models under ADR011, and legacy APIs remain compatible.
+
+## RFC010 Enterprise Operator Application Layer
+
+Status: **IMPLEMENTED - INTERNAL USE-CASE BOUNDARY**
+
+Eleven daily operator operations now compose RFC009 processes and owner command
+services behind one internal application service. Every operation returns a
+standard result, process/correlation identity, completed-step timeline and
+durable audit receipt reference. No controller/public route was added; UI/API
+exposure and real operator certification remain separate rollout gates.
+
+## RFC009 Enterprise Process Orchestration Layer
+
+Status: **IMPLEMENTED - INTERNAL APPLICATION BOUNDARY**
+
+Six typed process coordinators now call existing owner command services through
+a saga-style executor. Deterministic step keys, correlation/causation, bounded
+transient retry, explicit command compensation and durable audit/Outbox receipts
+are implemented. No cross-context transaction, repository access, domain rule,
+controller, route, frontend, schema or Projection Engine change was introduced.
+Processes are resumable by re-submission with the same process ID; unattended
+worker-driven resume remains a later operational rollout.
+
+## EPIC UI001 Enterprise UI Foundation Rollout
+
+Status: **IMPLEMENTED - INVENTORY CANON ROLLED OUT**
+
+The active Components, Production, QC, Yard, Projects, Logistics, Suppliers
+and Administration surfaces now share one Inventory-derived page composition.
+Canonical cockpit KPI/chart/table/filter/pagination/drawer primitives remain in
+place, and page-level loading/empty/permission/error/offline presentation is
+available centrally. Inventory, backend contracts, React Query and business
+behavior were unchanged.
+
 ## RFC003 Production Aggregate and Execution Implementation
 
 Status: **APPROVED - CANONICAL DOMAIN COMPLETE**
@@ -1720,3 +1800,40 @@ produced 142 deterministic documents with no active failure. Historical
 Inventory compatibility events remain incomplete; Production Execution, QC
 Disposition, Yard Loading, Projects and Logistics canonical publishers are
 absent and were not invented.
+
+# RFC014 Enterprise Production Hardening (2026-07-17)
+
+Status: **IMPLEMENTED WITH OPERATIONAL LIMITATIONS**
+
+The shared Background Worker is now single-flight per process, catches timer
+failures and drains its active batch during shutdown. Persistent infrastructure
+errors are bounded and normalized, and recovery diagnostics expose stale Job and
+Outbox locks without unsafe automatic replay. Internal runtime, telemetry,
+performance, integrity and simulation controllers now require JWT. Remaining
+production gates are lease-based stale-work recovery, bounded large-data
+integrity validation, representative database load tests and an approved global
+authorization cutover for legacy business controllers.
+
+# RFC015 Production Deployment Readiness (2026-07-17)
+
+Status: **IMPLEMENTED - CONDITIONALLY DEPLOYMENT READY**
+
+Production startup now validates database, JWT secret, CORS, feature flags and
+runtime limits before Nest creation. The API exposes liveness and database-backed
+readiness probes, honors configured host/port/proxy/logging and executes graceful
+shutdown hooks. A real non-root Node 22 Alpine image builds successfully, while
+production Compose gates API startup on one-shot Prisma migration. Release still
+requires staging PostgreSQL health/shutdown smoke, RFC013 migration lock-budget
+approval and external TLS/secrets/monitoring controls.
+
+# RFC017 Production Readiness Blocker Resolution (2026-07-18)
+
+Status: **IMPLEMENTED - PRODUCTION-LIKE VALIDATION PENDING**
+
+HTTP routes are now JWT-protected by default; only health, login and refresh are
+explicitly public. Background Jobs and Outbox work now use renewable,
+owner-checked leases with safe stale-claim recovery. The pending RFC013 index
+migration is additive and online (`CREATE INDEX CONCURRENTLY`) with a lock
+timeout and rollback procedure. Backend regression passes 72/72 suites and
+194/194 tests. Production certification still requires measured migration and
+multi-worker crash-recovery drills on a representative PostgreSQL environment.

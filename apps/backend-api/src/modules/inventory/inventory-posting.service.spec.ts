@@ -9,21 +9,31 @@ describe('InventoryPostingService', () => {
 
   function setup(stock = 10) {
     const repository = {
-      findInboundCostLines: jest.fn().mockResolvedValue([
+      aggregateInboundCosts: jest.fn().mockResolvedValue([
         {
           inventoryItemId: 'material-1',
-          quantity: 10,
-          unitPrice: 20,
-          totalAmount: 200,
+          totalQuantity: 10,
+          totalValue: 200,
         },
       ]),
-      findItemById: jest.fn().mockResolvedValue({
-        id: 'material-1',
-        code: 'M1',
-        unit: 'kg',
-        unitMaster: null,
-      }),
-      findLocationStockBucket: jest.fn().mockResolvedValue({ quantity: stock }),
+      findPostingItemsByIds: jest.fn().mockResolvedValue([
+        {
+          id: 'material-1',
+          code: 'M1',
+          unit: 'kg',
+          unitMaster: null,
+        },
+      ]),
+      findLocationStockBuckets: jest.fn().mockResolvedValue([
+        {
+          inventoryItemId: 'material-1',
+          warehouseId: 'warehouse-1',
+          zoneId: 'zone-1',
+          slotId: 'A01',
+          level: 'L1',
+          quantity: stock,
+        },
+      ]),
       nextOperationalCode: jest.fn().mockResolvedValue('XK-00001'),
       createTransaction: jest.fn().mockResolvedValue({
         id: 'transaction-1',
@@ -162,7 +172,8 @@ describe('InventoryPostingService', () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    expect(repository.findLocationStockBucket).toHaveBeenCalledTimes(1);
+    expect(repository.findPostingItemsByIds).toHaveBeenCalledTimes(1);
+    expect(repository.findLocationStockBuckets).toHaveBeenCalledTimes(1);
     expect(repository.createTransaction).not.toHaveBeenCalled();
   });
 

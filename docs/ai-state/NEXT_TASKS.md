@@ -1,5 +1,77 @@
 # Next Tasks
 
+- **RFC016 P0 authorization remediation**: establish deny-by-default route
+  authentication/permission coverage, secure all Inventory, QC and Projects
+  mutations, explicitly govern compatibility controllers and add anonymous plus
+  role-matrix API tests.
+- **RFC016 P0 claimed-work recovery**: add owner-checked heartbeats, lease expiry
+  and safe reclaim for stale `RUNNING` Jobs and `DISPATCHING` Outbox records;
+  prove no duplicate execution with crash and competing-worker tests.
+- **RFC016 P0 migration certification**: test
+  `20260717190000_enterprise_data_scalability_indexes` on a production-size
+  clone and approve lock, blocked-write, WAL, duration and abort budgets before
+  deployment.
+- **RFC016 certification rerun**: after all P0 gates, run stable staging startup,
+  readiness, `SIGTERM`, complete seven-context operator workflows, production-
+  volume replay/load and archive/restore drills, then reassess certification.
+
+- **RFC013 database certification**: Restore PostgreSQL runtime, deploy the
+  pending indexes first to a production-size clone, then collect `EXPLAIN
+(ANALYZE, BUFFERS)`, lock wait, WAL and write-amplification evidence.
+- **RFC013 duplicate-index cleanup**: In a separately approved non-additive
+  maintenance window, verify and remove the five redundant Dashboard Snapshot
+  indexes already covered by identical unique indexes.
+- **RFC013 FK index evidence**: Use `pg_stat_statements` and slow-query samples
+  before indexing the 17 relation candidates without a leading index. Do not
+  add every FK index mechanically.
+- **RFC013 cursor rollout**: Add backward-compatible keyset contracts to the
+  highest-volume legacy history APIs after consumer compatibility review; exact
+  page/total APIs remain unchanged in this sprint.
+
+- **RFC012 online index rollout**: Review the pending additive index migration
+  against production-size clones with `EXPLAIN (ANALYZE, BUFFERS)`, lock-budget
+  controls and rollback criteria before deployment.
+- **RFC012 archive worker**: Implement export/checksum/restore verification and
+  projection-watermark guards before deleting any hot Outbox, receipt, log or
+  timeline row.
+- **RFC012 scale certification**: Run controlled 10M/100M progression tests for
+  keyset queries, replay throughput, WAL growth, autovacuum and projection lag.
+  Do not claim billion-row readiness from the current small database.
+- **Projection consumer adoption**: Move high-volume clients to opaque cursor
+  pagination with `withTotal=false`; retain offset totals only where operators
+  genuinely require exact counts.
+
+- **RFC011 consumer cutover**: Migrate dashboard/analytics consumers to
+  `/query-api/modules` incrementally after comparing projection payloads and
+  lag against current contracts. Keep operator workspace reads live per ADR011.
+- **RFC011 real replay certification**: Replay retained QC, Yard, Logistics and
+  Projects canonical Outbox events in a controlled environment and compare
+  projection document counts/entity keys before declaring historical coverage.
+
+- **RFC010 operator certification**: Invoke all eleven use-cases against
+  disposable real aggregates, replay each process ID, and compare owner
+  timeline/Outbox counts before any public API rollout.
+- **RFC010 API rollout decision**: Keep `EnterpriseOperatorService` internal
+  until an additive authenticated command API defines permission, DTO and
+  idempotency-header contracts. Do not redirect legacy routes implicitly.
+
+- **RFC009 process operator certification**: Invoke each process with real
+  disposable aggregates, then repeat the same process ID and verify exact owner
+  command replay, no duplicate timeline/Outbox records and correlated audit
+  receipts.
+- **RFC009 unattended resume decision**: Add a durable process scheduler only
+  through a separately approved additive persistence RFC. Current processes are
+  safely resumable by caller re-submission and deliberately do not create a
+  second business-state store.
+
+- **UI001 visual certification**: Run Playwright screenshots at desktop and
+  mobile sizes against authenticated real-data routes, checking long labels,
+  table overflow, drawer focus and action wrapping. Pixel polish belongs to the
+  later Gemini presentation phase; do not fork the shared foundation.
+- **UI foundation adoption rule**: New module roots must use
+  `EnterpriseWorkspace`, cockpit primitives and truthful shared states. Do not
+  introduce module-specific shell, toolbar, KPI or pagination frameworks.
+
 - **RFC003 operator execution certification**: On a designated disposable
   Production Order, verify Order start creates one run, pause/resume preserves
   versions and timestamps, completion blocks active runs, abort preserves its
@@ -533,3 +605,41 @@ Backlog after the locked order:
   snapshot readers.
 - EPIC174: complete atomic Outbox parity and normalize Inventory runtime metric
   naming, then rerun Core Platform v1.0 certification.
+
+# RFC014 Production Hardening Follow-up
+
+1. Add owner-checked Background Job heartbeats and lease expiry before enabling
+   automatic stale `RUNNING`/`DISPATCHING` recovery; prove no duplicate execution
+   under worker pause and process-crash tests.
+2. Replace full-dataset runtime integrity endpoints with bounded, resumable or
+   offline validation jobs before production-scale use.
+3. Approve a route-by-route authorization compatibility plan, then secure legacy
+   business controllers consistently rather than applying an implicit global
+   guard without client validation.
+4. Run RFC012-014 replay, queue, lock-contention, shutdown and database timeout
+   tests against representative PostgreSQL volume and connection-pool limits.
+
+# RFC015 Deployment Release Gates
+
+1. Run the built image against staging PostgreSQL; require `/health/live` and
+   `/health/ready` HTTP 200, then send `SIGTERM` during an active worker tick and
+   confirm clean drain within the 60-second grace period.
+2. Validate and deploy `20260717190000_enterprise_data_scalability_indexes` on a
+   production-size clone with lock, WAL and rollback budgets before release.
+3. Integrate the image with the target platform secret manager, TLS ingress,
+   centralized logs/metrics, immutable registry tags, image signing and SBOM.
+4. Decide worker topology explicitly per environment. Keep replay disabled at
+   startup and ensure at least one, but intentionally bounded, worker-enabled
+   replica processes Outbox and Background Jobs.
+
+# RFC017 Certification Rerun Gates
+
+1. Execute the concurrent RFC013 index migration on a production-size clone;
+   capture duration, write latency, lock waits, WAL volume, disk use and replica
+   lag per index before approving production deploy.
+2. Kill and pause competing worker processes during active Job and Outbox work;
+   verify lease takeover, stale-owner rejection and idempotent side effects.
+3. Run anonymous/authenticated/role API smoke tests and prove every mutation is
+   rejected without a valid access token.
+4. Run image startup, readiness and `SIGTERM` drain against stable staging
+   PostgreSQL, then rerun RFC016 production certification.

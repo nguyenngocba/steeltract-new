@@ -6,11 +6,13 @@ import type { LoginDto, RefreshTokenDto } from './dto/auth.dto';
 import { loginSchema, refreshTokenSchema } from './dto/auth.dto';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { Public } from './public.decorator';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('login')
   login(
     @Body(new ZodValidationPipe(loginSchema))
@@ -19,6 +21,7 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Public()
   @Post('refresh')
   refresh(
     @Body(new ZodValidationPipe(refreshTokenSchema))

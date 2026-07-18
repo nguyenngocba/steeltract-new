@@ -1,7 +1,10 @@
 import { InventoryReadModelService } from './inventory-read-model.service';
 
 describe('InventoryReadModelService ADR011 boundary', () => {
-  const metrics = { recordReadModelHit: jest.fn() };
+  const metrics = {
+    recordReadModelHit: jest.fn(),
+    recordInventoryReadModelHit: jest.fn(),
+  };
   const snapshots = {
     inventoryMaterial: jest.fn(),
     inventoryLocations: jest.fn(),

@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { Prisma, ProductionMaterialLedgerEventType } from '@prisma/client';
+import {
+  Prisma,
+  ProductionMaterialLedgerEventType,
+  ProductionOrderStatus,
+} from '@prisma/client';
 
 import { InventoryRepository } from '../../inventory/inventory.repository';
 
@@ -17,6 +21,11 @@ import { ProductionConsumptionRepository } from '../repositories/production-cons
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
 const epsilon = 0.000001;
+
+const consumptionOrderStatuses = new Set<ProductionOrderStatus>([
+  ProductionOrderStatus.IN_PROGRESS,
+  ProductionOrderStatus.PAUSED,
+]);
 
 type IssueBucket = {
   inventoryItemId: string;
@@ -60,90 +69,98 @@ export class ProductionConsumptionService {
     dto: CreateProductionConsumptionDto,
     actorId?: string,
   ) {
-    const [order, material] = await Promise.all([
-      this.repository.findOrderForConsumption(productionOrderId),
-      this.inventoryRepository.findItemById(dto.inventoryItemId),
-    ]);
-
-    if (!order) {
-      throw new NotFoundException('Production order not found');
-    }
-    if (!material) {
-      throw new NotFoundException('Inventory material not found');
-    }
-    const materialUnit = material.unitMaster?.symbol ?? material.unit;
-    if (!materialUnit) {
-      throw new BadRequestException('Inventory material unit is required');
-    }
-
-    const [issues, previousConsumptions] = await Promise.all([
-      this.repository.findIssuesForConsumption(
-        productionOrderId,
-        dto.inventoryItemId,
-      ),
-      this.repository.findConsumptionsForMaterial(
-        productionOrderId,
-        dto.inventoryItemId,
-      ),
-    ]);
-
-    const issuedQty = this.sum(
-      issues.map((issue) => Number(issue.issuedQty ?? 0)),
-    );
-    const returnedQty = this.sum(
-      issues.map((issue) => Number(issue.returnedQty ?? 0)),
-    );
-    const previousConsumedQty = this.sum(
-      previousConsumptions.map((row) => Number(row.consumedQty ?? 0)),
-    );
-    const previousScrapQty = this.sum(
-      previousConsumptions.map((row) => Number(row.scrapQty ?? 0)),
-    );
-    const consumedQty = Number(dto.consumedQty ?? 0);
-    const scrapQty = Number(dto.scrapQty ?? 0);
-    const netIssuedQty = issuedQty - returnedQty;
-    const remainingQty = netIssuedQty - previousConsumedQty - previousScrapQty;
-
-    if (issuedQty <= epsilon || netIssuedQty <= epsilon) {
-      throw new BadRequestException(
-        'No net issued material available to consume',
-      );
-    }
-    if (consumedQty > netIssuedQty + epsilon) {
-      throw new BadRequestException(
-        'Consumed quantity cannot exceed net issued quantity',
-      );
-    }
-    if (consumedQty > remainingQty + epsilon) {
-      throw new BadRequestException(
-        'Consumed quantity cannot exceed remaining quantity',
-      );
-    }
-    if (scrapQty > Math.max(remainingQty - consumedQty, 0) + epsilon) {
-      throw new BadRequestException(
-        'Scrap quantity cannot exceed remaining quantity',
-      );
-    }
-    if (
-      returnedQty +
-        previousConsumedQty +
-        previousScrapQty +
-        consumedQty +
-        scrapQty >
-      issuedQty + epsilon
-    ) {
-      throw new BadRequestException(
-        'Return, consume, and scrap quantities cannot exceed issued quantity',
-      );
-    }
-
-    const ledgerLines = this.allocateConsumptionLedger(
-      issues,
-      previousConsumedQty + previousScrapQty,
-      consumedQty,
-    );
-
     return this.repository.transaction(async (tx) => {
+      const [order, material] = await Promise.all([
+        this.repository.findOrderForConsumption(productionOrderId, tx),
+        this.inventoryRepository.findItemById(dto.inventoryItemId, tx),
+      ]);
+
+      if (!order) {
+        throw new NotFoundException('Production order not found');
+      }
+      if (!consumptionOrderStatuses.has(order.status)) {
+        throw new BadRequestException(
+          `Production order state ${order.status} does not allow consumption`,
+        );
+      }
+      if (!material) {
+        throw new NotFoundException('Inventory material not found');
+      }
+      const materialUnit = material.unitMaster?.symbol ?? material.unit;
+      if (!materialUnit) {
+        throw new BadRequestException('Inventory material unit is required');
+      }
+
+      const [issues, previousConsumptions] = await Promise.all([
+        this.repository.findIssuesForConsumption(
+          productionOrderId,
+          dto.inventoryItemId,
+          tx,
+        ),
+        this.repository.findConsumptionsForMaterial(
+          productionOrderId,
+          dto.inventoryItemId,
+          tx,
+        ),
+      ]);
+
+      const issuedQty = this.sum(
+        issues.map((issue) => Number(issue.issuedQty ?? 0)),
+      );
+      const returnedQty = this.sum(
+        issues.map((issue) => Number(issue.returnedQty ?? 0)),
+      );
+      const previousConsumedQty = this.sum(
+        previousConsumptions.map((row) => Number(row.consumedQty ?? 0)),
+      );
+      const previousScrapQty = this.sum(
+        previousConsumptions.map((row) => Number(row.scrapQty ?? 0)),
+      );
+      const consumedQty = Number(dto.consumedQty ?? 0);
+      const scrapQty = Number(dto.scrapQty ?? 0);
+      const netIssuedQty = issuedQty - returnedQty;
+      const remainingQty =
+        netIssuedQty - previousConsumedQty - previousScrapQty;
+
+      if (issuedQty <= epsilon || netIssuedQty <= epsilon) {
+        throw new BadRequestException(
+          'No net issued material available to consume',
+        );
+      }
+      if (consumedQty > netIssuedQty + epsilon) {
+        throw new BadRequestException(
+          'Consumed quantity cannot exceed net issued quantity',
+        );
+      }
+      if (consumedQty > remainingQty + epsilon) {
+        throw new BadRequestException(
+          'Consumed quantity cannot exceed remaining quantity',
+        );
+      }
+      if (scrapQty > Math.max(remainingQty - consumedQty, 0) + epsilon) {
+        throw new BadRequestException(
+          'Scrap quantity cannot exceed remaining quantity',
+        );
+      }
+      if (
+        returnedQty +
+          previousConsumedQty +
+          previousScrapQty +
+          consumedQty +
+          scrapQty >
+        issuedQty + epsilon
+      ) {
+        throw new BadRequestException(
+          'Return, consume, and scrap quantities cannot exceed issued quantity',
+        );
+      }
+
+      const ledgerLines = this.allocateConsumptionLedger(
+        issues,
+        previousConsumedQty + previousScrapQty,
+        consumedQty,
+      );
+
       const consumption = await this.repository.create(
         {
           productionOrderId,

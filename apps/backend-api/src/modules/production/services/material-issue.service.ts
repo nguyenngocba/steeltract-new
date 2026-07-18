@@ -6,6 +6,7 @@ import {
 
 import {
   Prisma,
+  ProductionOrderStatus,
   ProductionMaterialLedgerEventType,
   ProductionMaterialReservationStatus,
   ProductionMaterialReservationLineStatus,
@@ -25,6 +26,18 @@ import {
   MaterialIssueTx,
 } from '../repositories/material-issue.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
+
+const issueOrderStatuses = new Set<ProductionOrderStatus>([
+  ProductionOrderStatus.READY,
+  ProductionOrderStatus.IN_PROGRESS,
+  ProductionOrderStatus.PAUSED,
+]);
+
+const returnOrderStatuses = new Set<ProductionOrderStatus>([
+  ProductionOrderStatus.IN_PROGRESS,
+  ProductionOrderStatus.PAUSED,
+  ProductionOrderStatus.COMPLETED,
+]);
 
 @Injectable()
 export class MaterialIssueService {
@@ -62,6 +75,11 @@ export class MaterialIssueService {
       );
 
       if (body.status === 'ISSUED') {
+        this.assertOrderState(
+          issue.productionOrder.status,
+          issueOrderStatuses,
+          'issue',
+        );
         const postingReceipt = await this.inventoryPosting.issueMaterial(
           this.issuePostingCommand(issue, actorId),
           tx,
@@ -111,6 +129,11 @@ export class MaterialIssueService {
       }
       let inventoryTransactionId: string | undefined;
       if (current.status !== 'ISSUED' && body.status === 'ISSUED') {
+        this.assertOrderState(
+          current.productionOrder.status,
+          issueOrderStatuses,
+          'issue',
+        );
         const postingReceipt = await this.inventoryPosting.issueMaterial(
           this.issuePostingCommand(current),
           tx,
@@ -151,66 +174,76 @@ export class MaterialIssueService {
     body: IssueFromReservationDto = {},
     actorId?: string,
   ) {
-    const reservation =
-      await this.repository.findReservationForIssue(reservationId);
-
-    if (!reservation) {
-      throw new NotFoundException('Production material reservation not found');
-    }
-
-    const issueableStatuses: ProductionMaterialReservationStatus[] = [
-      ProductionMaterialReservationStatus.RESERVED,
-      ProductionMaterialReservationStatus.PARTIALLY_ISSUED,
-    ];
-    if (!issueableStatuses.includes(reservation.status)) {
-      throw new BadRequestException('Only active reservations can be issued');
-    }
-
-    const requested = new Map(
-      (body.lines ?? []).map((line) => [line.reservationLineId, line.quantity]),
-    );
-    const targetLines = reservation.lines
-      .map((line) => {
-        const remaining =
-          Number(line.reservedQty ?? 0) -
-          Number(line.issuedQty ?? 0) +
-          Number(line.returnedQty ?? 0);
-        const requestedQty = requested.has(line.id)
-          ? Number(requested.get(line.id) ?? remaining)
-          : body.lines?.length
-            ? 0
-            : remaining;
-        return { line, quantity: requestedQty };
-      })
-      .filter((item) => item.quantity > 0);
-
-    if (!targetLines.length) {
-      throw new BadRequestException(
-        'No reserved material quantity available to issue',
+    return this.repository.transaction(async (tx) => {
+      const reservation = await this.repository.findReservationForIssue(
+        reservationId,
+        tx,
       );
-    }
 
-    for (const item of targetLines) {
-      const openQty =
-        Number(item.line.reservedQty ?? 0) -
-        Number(item.line.issuedQty ?? 0) +
-        Number(item.line.returnedQty ?? 0);
-      if (item.quantity > openQty + 0.000001) {
-        throw new BadRequestException(
-          `Cannot issue more than reserved quantity for ${item.line.inventoryItem.code}`,
+      if (!reservation) {
+        throw new NotFoundException(
+          'Production material reservation not found',
         );
       }
-    }
+      this.assertOrderState(
+        reservation.productionOrder.status,
+        issueOrderStatuses,
+        'issue',
+      );
 
-    const issueBaseCount = await this.repository.countTodayIssues();
+      const issueableStatuses: ProductionMaterialReservationStatus[] = [
+        ProductionMaterialReservationStatus.RESERVED,
+        ProductionMaterialReservationStatus.PARTIALLY_ISSUED,
+      ];
+      if (!issueableStatuses.includes(reservation.status)) {
+        throw new BadRequestException('Only active reservations can be issued');
+      }
 
-    return this.repository.transaction(async (tx) => {
+      const requested = new Map(
+        (body.lines ?? []).map((line) => [
+          line.reservationLineId,
+          line.quantity,
+        ]),
+      );
+      const targetLines = reservation.lines
+        .map((line) => {
+          const remaining =
+            Number(line.reservedQty ?? 0) -
+            Number(line.issuedQty ?? 0) +
+            Number(line.returnedQty ?? 0);
+          const requestedQty = requested.has(line.id)
+            ? Number(requested.get(line.id) ?? remaining)
+            : body.lines?.length
+              ? 0
+              : remaining;
+          return { line, quantity: requestedQty };
+        })
+        .filter((item) => item.quantity > 0);
+
+      if (!targetLines.length) {
+        throw new BadRequestException(
+          'No reserved material quantity available to issue',
+        );
+      }
+
+      for (const item of targetLines) {
+        const openQty =
+          Number(item.line.reservedQty ?? 0) -
+          Number(item.line.issuedQty ?? 0) +
+          Number(item.line.returnedQty ?? 0);
+        if (item.quantity > openQty + 0.000001) {
+          throw new BadRequestException(
+            `Cannot issue more than reserved quantity for ${item.line.inventoryItem.code}`,
+          );
+        }
+      }
+
       const issues = [];
 
-      for (const [index, item] of targetLines.entries()) {
+      for (const item of targetLines) {
         const issue = await this.repository.createIssueInTransaction(
           {
-            issueNo: this.repository.formatIssueNo(issueBaseCount + index + 1),
+            issueNo: await this.repository.nextIssueNo(tx),
             productionOrderId: reservation.productionOrderId,
             reservationId: reservation.id,
             reservationLineId: item.line.id,
@@ -302,56 +335,65 @@ export class MaterialIssueService {
     body: ReturnMaterialIssueDto = {},
     actorId?: string,
   ) {
-    const issue = await this.repository.findIssueForReturn(id);
-
-    if (!issue) {
-      throw new NotFoundException('Material issue not found');
-    }
-    if (issue.status !== 'ISSUED' && issue.status !== 'RETURNED') {
-      throw new BadRequestException('Only issued material can be returned');
-    }
-
-    const [issuesForMaterial, consumptionsForMaterial] = await Promise.all([
-      this.repository.findIssuesForMaterial(
-        issue.productionOrderId,
-        issue.inventoryItemId,
-      ),
-      this.repository.findConsumptionsForMaterial(
-        issue.productionOrderId,
-        issue.inventoryItemId,
-      ),
-    ]);
-    const issuedForMaterial = this.sum(
-      issuesForMaterial.map((row) => Number(row.issuedQty ?? 0)),
-    );
-    const returnedForMaterial = this.sum(
-      issuesForMaterial.map((row) => Number(row.returnedQty ?? 0)),
-    );
-    const consumedForMaterial = this.sum(
-      consumptionsForMaterial.map((row) => Number(row.consumedQty ?? 0)),
-    );
-    const scrapForMaterial = this.sum(
-      consumptionsForMaterial.map((row) => Number(row.scrapQty ?? 0)),
-    );
-    const issueRemainingQty =
-      Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0);
-    const materialRemainingQty =
-      issuedForMaterial -
-      returnedForMaterial -
-      consumedForMaterial -
-      scrapForMaterial;
-    const returnableQty = Math.min(issueRemainingQty, materialRemainingQty);
-    const quantity = Number(body.quantity ?? returnableQty);
-
-    if (quantity <= 0 || quantity > returnableQty + 0.000001) {
-      throw new BadRequestException(
-        `Cannot return more than remaining material quantity (${Math.max(returnableQty, 0).toLocaleString('vi-VN')})`,
-      );
-    }
-
-    const destination = await this.resolveMainWarehouseReturnDestination(issue);
-
     return this.repository.transaction(async (tx) => {
+      const issue = await this.repository.findIssueForReturn(id, tx);
+
+      if (!issue) {
+        throw new NotFoundException('Material issue not found');
+      }
+      if (issue.status !== 'ISSUED' && issue.status !== 'RETURNED') {
+        throw new BadRequestException('Only issued material can be returned');
+      }
+      this.assertOrderState(
+        issue.productionOrder.status,
+        returnOrderStatuses,
+        'return material',
+      );
+
+      const [issuesForMaterial, consumptionsForMaterial] = await Promise.all([
+        this.repository.findIssuesForMaterial(
+          issue.productionOrderId,
+          issue.inventoryItemId,
+          tx,
+        ),
+        this.repository.findConsumptionsForMaterial(
+          issue.productionOrderId,
+          issue.inventoryItemId,
+          tx,
+        ),
+      ]);
+      const issuedForMaterial = this.sum(
+        issuesForMaterial.map((row) => Number(row.issuedQty ?? 0)),
+      );
+      const returnedForMaterial = this.sum(
+        issuesForMaterial.map((row) => Number(row.returnedQty ?? 0)),
+      );
+      const consumedForMaterial = this.sum(
+        consumptionsForMaterial.map((row) => Number(row.consumedQty ?? 0)),
+      );
+      const scrapForMaterial = this.sum(
+        consumptionsForMaterial.map((row) => Number(row.scrapQty ?? 0)),
+      );
+      const issueRemainingQty =
+        Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0);
+      const materialRemainingQty =
+        issuedForMaterial -
+        returnedForMaterial -
+        consumedForMaterial -
+        scrapForMaterial;
+      const returnableQty = Math.min(issueRemainingQty, materialRemainingQty);
+      const quantity = Number(body.quantity ?? returnableQty);
+
+      if (quantity <= 0 || quantity > returnableQty + 0.000001) {
+        throw new BadRequestException(
+          `Cannot return more than remaining material quantity (${Math.max(returnableQty, 0).toLocaleString('vi-VN')})`,
+        );
+      }
+
+      const destination = await this.resolveMainWarehouseReturnDestination(
+        issue,
+        tx,
+      );
       const postingReceipt = await this.inventoryPosting.returnMaterial(
         {
           referenceModule: 'production_material_issue',
@@ -514,36 +556,42 @@ export class MaterialIssueService {
     );
   }
 
-  private async resolveMainWarehouseReturnDestination(issue: {
-    inventoryItemId: string;
-    inventoryItem: {
-      zoneId: string | null;
-      slotId: string | null;
-      level: string | null;
-      zone?: {
-        id: string;
-        warehouseId: string | null;
-        row: string | null;
-        column: string | null;
+  private async resolveMainWarehouseReturnDestination(
+    issue: {
+      inventoryItemId: string;
+      inventoryItem: {
+        zoneId: string | null;
+        slotId: string | null;
         level: string | null;
-        warehouse?: {
-          code: string | null;
+        zone?: {
+          id: string;
+          warehouseId: string | null;
+          row: string | null;
+          column: string | null;
+          level: string | null;
+          warehouse?: {
+            code: string | null;
+          } | null;
         } | null;
-      } | null;
-    };
-  }) {
+      };
+    },
+    tx: MaterialIssueTx,
+  ) {
     const mainWarehouse = await this.inventoryRepository.findWarehouseByCode(
       'MAIN',
+      tx,
     );
 
     if (!mainWarehouse) {
       throw new BadRequestException('Main warehouse is not configured');
     }
 
-    const currentMainStock = await this.inventoryRepository.findPositiveLocationStock(
-      issue.inventoryItemId,
-      mainWarehouse.id,
-    );
+    const currentMainStock =
+      await this.inventoryRepository.findPositiveLocationStock(
+        issue.inventoryItemId,
+        mainWarehouse.id,
+        tx,
+      );
 
     if (currentMainStock?.warehouseId && currentMainStock.zoneId) {
       return {
@@ -574,6 +622,7 @@ export class MaterialIssueService {
 
     const fallbackZone = await this.inventoryRepository.findActiveWarehouseZone(
       'MAIN',
+      tx,
     );
 
     if (!fallbackZone?.warehouseId) {
@@ -609,6 +658,18 @@ export class MaterialIssueService {
       throw new BadRequestException('Inventory material unit is required');
     }
     return unit;
+  }
+
+  private assertOrderState(
+    status: ProductionOrderStatus,
+    allowed: Set<ProductionOrderStatus>,
+    operation: string,
+  ) {
+    if (!allowed.has(status)) {
+      throw new BadRequestException(
+        `Production order state ${status} does not allow ${operation}`,
+      );
+    }
   }
 
   private async refreshReservationStatus(

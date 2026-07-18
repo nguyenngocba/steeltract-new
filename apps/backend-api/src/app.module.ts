@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { JobsModule } from './core/jobs/jobs.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { PerformanceModule } from './core/performance/performance.module';
@@ -35,17 +36,19 @@ import { SimulationModule } from './modules/simulation/simulation.module';
 import { DictionariesModule } from './modules/master-data/dictionaries/dictionaries.module';
 import { UomModule } from './modules/master-data/uom/uom.module';
 import { SuppliersModule } from './modules/master-data/suppliers/suppliers.module';
-import { RuntimeWsModule } from './core/ws/runtime-ws.module'
-import { CqrsModule } from './core/cqrs/cqrs.module'
-import { EventsModule } from './core/events/events.module'
-import { TelemetryModule } from './core/telemetry/telemetry.module'
-import { MaterialMovementsModule } from './modules/material-movements/material-movements.module'
-import { RuntimeModule } from './modules/runtime/runtime.module'
-import { SystemModule } from './modules/system/system.module'
-import { CostingModule } from './modules/costing/costing.module'
-import { LogisticsModule } from './modules/logistics/logistics.module'
-import { OperationsCenterModule } from './modules/operations-center/operations-center.module'
+import { RuntimeWsModule } from './core/ws/runtime-ws.module';
+import { CqrsModule } from './core/cqrs/cqrs.module';
+import { EventsModule } from './core/events/events.module';
+import { TelemetryModule } from './core/telemetry/telemetry.module';
+import { MaterialMovementsModule } from './modules/material-movements/material-movements.module';
+import { RuntimeModule } from './modules/runtime/runtime.module';
+import { SystemModule } from './modules/system/system.module';
+import { CostingModule } from './modules/costing/costing.module';
+import { LogisticsModule } from './modules/logistics/logistics.module';
+import { OperationsCenterModule } from './modules/operations-center/operations-center.module';
 import { ProjectionModule } from './core/projections/projection.module';
+import { EnterpriseProcessModule } from './modules/process-orchestration/enterprise-process.module';
+import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 @Module({
   imports: [
     EventsModule,
@@ -94,9 +97,14 @@ import { ProjectionModule } from './core/projections/projection.module';
     LogisticsModule,
     OperationsCenterModule,
     ProjectionModule,
+    EnterpriseProcessModule,
   ],
-  controllers: [
-  AppController,
+  controllers: [AppController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
 })
 export class AppModule implements NestModule {

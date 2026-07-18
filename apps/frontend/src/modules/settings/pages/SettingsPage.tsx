@@ -2,7 +2,7 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Building2, CheckCircle2, DatabaseBackup, Edit3, FileDigit, Globe2, Link2, Plus, Save, Settings, ShieldCheck, SlidersHorizontal, Trash2, Workflow, XCircle } from 'lucide-react'
 
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { systemApi, type WorkflowCheck } from '@/modules/system/api/system.api'
 import { inventoryApi } from '@/modules/inventory/api/inventory.api'
 import { useCategories } from '@/modules/inventory/hooks/useCategories'
@@ -73,13 +73,16 @@ export function SettingsPage() {
     ['Giao diện & Hiển thị', Globe2],
   ] as const, [])
 
-  return <OperationalShell>
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
-      <header className="flex flex-wrap items-end justify-between gap-3 pb-4">
-        <div><h1 className="text-2xl font-semibold">Cài đặt hệ thống</h1><p className="mt-1 text-sm text-slate-500">Quản lý toàn bộ cấu hình và thiết lập hệ thống</p></div>
-        <button className={primaryButton}><Save size={16} />Lưu thay đổi</button>
-      </header>
-      <nav className={`${panel} mb-3 flex gap-1 overflow-x-auto p-1`}>{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs transition ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{label}</button>)}</nav>
+  return <EnterpriseWorkspace
+    eyebrow="Quản trị"
+    title="Cài đặt hệ thống"
+    description="Quản lý toàn bộ cấu hình và thiết lập hệ thống"
+    breadcrumbs={['Quản trị', 'Cài đặt']}
+    tabs={tabs.map(([id, label]) => ({ id, label }))}
+    activeTab={tab}
+    onTabChange={(id) => setTab(id as Tab)}
+    actions={<button className={primaryButton}><Save size={16} />Lưu thay đổi</button>}
+  >
       {tab === 'overview' && <Overview data={data} workflow={workflow} category={category} stats={stats} />}
       {tab === 'general' && <ConfigGrid title="Cấu hình chung" values={data?.system} />}
       {tab === 'permissions' && <ConfigGrid title="Tổng quan phân quyền" values={{ users: fmt(stats.totalUsers), activeUsers: fmt(stats.activeUsers), roles: fmt(stats.roles), permissions: fmt(stats.permissions) }} />}
@@ -88,8 +91,7 @@ export function SettingsPage() {
       {tab === 'notifications' && <Toggles rows={data?.notifications ?? {}} />}
       {tab === 'backup' && <ConfigGrid title="Sao lưu dữ liệu" values={data?.backup} />}
       {tab === 'logs' && <Activities rows={data?.recentActivities ?? []} />}
-    </main>
-  </OperationalShell>
+  </EnterpriseWorkspace>
 }
 
 function Overview({ data, workflow, category, stats }: { data: any; workflow?: WorkflowCheck; category: ReadonlyArray<readonly [string, any]>; stats: Record<string, number> }) {

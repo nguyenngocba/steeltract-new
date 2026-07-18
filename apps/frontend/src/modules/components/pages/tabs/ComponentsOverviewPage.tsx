@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BarChart3, Package } from "lucide-react";
 
-import { EnterpriseModulePage } from "../../../../shared/runtime-tabs/EnterpriseModulePage";
+import { ComponentsWorkspace } from "../../components/ComponentsWorkspace";
 import {
   ModuleEmptyState,
   ModuleFilterBar,
@@ -103,7 +103,7 @@ export function ComponentsOverviewPage() {
   const maxTop = Math.max(1, ...topProfiles.map(([, value]) => value));
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
           <CockpitKpiCard
@@ -378,6 +378,6 @@ export function ComponentsOverviewPage() {
           </aside>
         </div>
       </div>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   );
 }

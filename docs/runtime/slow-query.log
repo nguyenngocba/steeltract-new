@@ -6,3 +6,5 @@
 {"endpoint":"background","method":"N/A","model":"public","action":"UPDATE","elapsed":736,"occurredAt":"2026-07-12T12:52:52.716Z"}
 {"endpoint":"background","method":"N/A","model":"public","action":"UPDATE","elapsed":375,"occurredAt":"2026-07-12T21:42:51.355Z"}
 {"endpoint":"background","method":"N/A","model":"public","action":"UPDATE","elapsed":298,"occurredAt":"2026-07-12T21:42:51.629Z"}
+{"endpoint":"background","method":"N/A","model":"outbox_events","action":"QUERY","elapsed":310,"occurredAt":"2026-07-17T15:26:56.416Z"}
+{"endpoint":"background","method":"N/A","model":"background_jobs","action":"QUERY","elapsed":255,"occurredAt":"2026-07-17T17:57:36.069Z"}

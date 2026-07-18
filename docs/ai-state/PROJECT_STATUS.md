@@ -1,5 +1,57 @@
 # Project Status
 
+On 2026-07-18 RFC016 completed the Enterprise Production Certification review.
+Architecture, canonical Outbox, builds, regression and Docker artifact controls
+pass, but the product is **NOT READY** for production deployment. Release is
+blocked by unauthenticated Inventory/QC/Projects mutations, missing lease-based
+recovery for stale claimed background work and an undeployed RFC013 index
+migration lacking production-size lock/WAL validation. This certification made
+no code, schema, API, business or frontend change.
+
+On 2026-07-17 RFC013 completed the database-readiness implementation pass.
+Atomic `SKIP LOCKED` claims remove queue selection races, operational telemetry
+no longer runs repeated exact table counts, Inventory posting removes N+1 and
+historical line materialization, and replay checkpoint writes are batched.
+Prisma/build/focused tests pass and the migration remains additive/pending.
+Production database certification remains conditional because live PostgreSQL
+and representative-scale `EXPLAIN ANALYZE` evidence are unavailable.
+
+On 2026-07-17 RFC012 implemented the Enterprise Data Scalability Foundation.
+Outbox/replay ordering is deterministic, projection replay is checkpointed and
+bounded, and projection queries offer backward-compatible keyset/no-count mode.
+Additive composite indexes and guarded retention/archive/partition policy are
+prepared but not deployed. Current real row counts are too small to certify
+hundreds of millions or billions of rows; production-like load and archive
+restore drills remain mandatory.
+
+On 2026-07-17 RFC011 added a consistent Enterprise Query API across all seven
+implemented business modules. The additive GET-only facade maps module views to
+shared projection documents and extends the existing registry for QC, Yard,
+Logistics and Projects canonical events. Strong operator workspace reads and
+all legacy routes remain unchanged; no schema, migration, command or frontend
+change was introduced.
+
+On 2026-07-17 RFC010 implemented the internal Enterprise Operator Application
+Layer. Eleven operator use-cases now coordinate existing processes and owner
+commands and return a common operation envelope with process/correlation IDs,
+timeline and audit receipt. The layer owns no business rules or persistence and
+adds no route, frontend, schema, repository, aggregate or Projection Engine
+change.
+
+On 2026-07-17 RFC009 added the internal Enterprise Process Orchestration Layer.
+Material Allocation, Production Release, QC Release, Yard Release, Shipment and
+Project Completion flows coordinate only exported owner command services. The
+layer provides deterministic idempotency, bounded retry, compensation and
+durable process receipts without owning business rules or introducing a shared
+cross-domain transaction. No route, frontend, schema, repository, aggregate or
+Projection Engine changed.
+
+On 2026-07-17 EPIC UI001 implemented the Enterprise UI Foundation using
+Inventory as the unchanged design canon. All requested active module roots now
+share the same header, breadcrumb, actions and tab composition; Components uses
+one wrapper across every active tab. Existing cockpit primitives were reused,
+with no backend, API, query, workflow or business change.
+
 On 2026-07-17 RFC003 completed the canonical Production domain by adding the
 AD-017 Production Execution aggregate. Durable run state, optimistic versions,
 idempotent command replay, active-run uniqueness, atomic timeline/audit/Outbox
@@ -740,3 +792,40 @@ available; EPIC144 did not invent missing workflows.
 - Migration deploy: PASS.
 - Real-Outbox replay/idempotency/determinism: PASS.
 - Authoritative projection certification: PARTIAL, see runtime matrix.
+
+# RFC014 Enterprise Production Hardening
+
+- Worker single-flight and graceful drain: PASS.
+- Timer error propagation/logging: PASS.
+- Bounded Job/Outbox/Projection error persistence: PASS.
+- Stale-lock diagnostics: PASS, warning-only.
+- Internal operational endpoint authentication: PASS.
+- Backend regression: PASS, 69/69 suites and 175/175 tests.
+- Automatic stale-lock recovery: PENDING lease/heartbeat design.
+- Large-data runtime integrity scans: NOT PRODUCTION-SCALE READY.
+- Global legacy route authorization: PENDING approved compatibility cutover.
+- Overall status: CONDITIONALLY PRODUCTION READY.
+
+# RFC015 Production Deployment Readiness
+
+- Production configuration validation: PASS.
+- Secret/default-placeholder rejection: PASS.
+- Liveness/readiness contracts: PASS; live DB smoke pending staging database.
+- Graceful shutdown hooks and worker drain integration: PASS.
+- Docker image build/non-root/healthcheck: PASS.
+- Compose migration-before-API ordering: PASS.
+- Kubernetes rollout: NOT APPLICABLE, no existing platform manifests.
+- Pending RFC013 migration clone validation: BLOCKING RELEASE.
+- Overall status: CONDITIONALLY DEPLOYMENT READY.
+
+# RFC017 Production Readiness Blocker Resolution
+
+- Mutation authentication boundary: PASS, global deny-by-default JWT guard.
+- Explicit public-route allowlist: PASS, health/login/refresh only.
+- Background Job lease reclaim/renewal/ownership: PASS.
+- Outbox lease reclaim/renewal/ownership: PASS.
+- Online additive migration implementation/review: PASS.
+- Production-size migration WAL/lock measurement and deploy: PENDING.
+- Backend regression: PASS, 72/72 suites and 194/194 tests.
+- Overall status: CONDITIONALLY READY pending production-like operational
+  certification.

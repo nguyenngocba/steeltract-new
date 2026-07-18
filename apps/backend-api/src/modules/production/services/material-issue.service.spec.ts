@@ -21,6 +21,7 @@ describe('MaterialIssueService atomic material flow', () => {
       issuedDate: new Date('2026-07-11T01:00:00.000Z'),
       status: 'ISSUED',
       remarks: 'Issue material',
+      productionOrder: { status: 'IN_PROGRESS' },
       inventoryItem: { unit: 'kg', unitMaster: null },
     };
     const repository = {

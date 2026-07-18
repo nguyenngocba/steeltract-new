@@ -1,5 +1,95 @@
 # SteelTrack AI Changelog
 
+## 2026-07-18 RFC016 Enterprise Production Certification
+
+Completed:
+
+- Certified all seven bounded contexts and shared deployment/runtime controls
+  without changing application code, schema, API, business logic or frontend.
+- Re-ran backend/frontend builds, 185-test backend regression, Prisma validation,
+  migration status, Compose validation and Docker artifact inspection.
+- Classified Enterprise Production as `NOT READY` because active Inventory, QC
+  and Projects mutations lack authentication, stale claimed work has no safe
+  lease recovery and one additive migration remains pending/unproven at scale.
+
+## 2026-07-17 RFC013 Enterprise Database & Performance Readiness
+
+Completed:
+
+- Made Outbox and Background Job claims atomic, bounded and multi-worker safe
+  with PostgreSQL `SKIP LOCKED` while preserving processing order.
+- Replaced Operations Center count fan-out/full-table telemetry counts with
+  grouped status queries and explicit PostgreSQL row estimates.
+- Removed Inventory posting material/location N+1 reads and historical cost-line
+  loading through batch reads and database aggregation.
+- Reduced irrelevant replay checkpoint writes to one per batch and prepared
+  additive queue/history indexes without deploying migrations.
+
+## 2026-07-17 RFC012 Enterprise Data Scalability Foundation
+
+Completed:
+
+- Added additive composite indexes for high-volume transaction, Outbox,
+  projection, Dispatch and Production material history query shapes.
+- Added deterministic Outbox ordering, durable replay resume, bounded replay
+  runs and optional projection keyset pagination without breaking page clients.
+- Defined enforceable hot/warm/cold, retention, legal-hold and partition review
+  policy without deleting data or applying speculative physical partitions.
+- Verified projection/replay behavior while explicitly withholding billion-row
+  certification because the current runtime dataset is small.
+
+## 2026-07-17 RFC011 Enterprise Query API Adoption
+
+Completed:
+
+- Added one authenticated GET-only module query facade for Inventory,
+  Components, Production, QC, Yard, Logistics and Projects.
+- Added canonical event projections for QC, Yard, Logistics and Projects using
+  the existing Projection Engine and repository.
+- Preserved ADR011 live reads for operator workspaces while making dashboard,
+  analytics and cross-module projection adoption consistent.
+- Added module/view mapping, unknown-view validation and projection/replay
+  regression coverage without schema, command, business or frontend changes.
+
+## 2026-07-17 RFC010 Enterprise Operator Application Layer
+
+Completed:
+
+- Added eleven internal operator use-cases above the RFC009 orchestration and
+  existing owner command services.
+- Standardized operation results with process/correlation IDs, ordered timeline,
+  collected results and durable audit receipt references.
+- Propagated deterministic step idempotency and stable Inventory receive
+  references without adding domain rules.
+- Added application routing/order tests without changing routes, frontend,
+  repositories, aggregates, schema or Projection Engine.
+
+## 2026-07-17 RFC009 Enterprise Process Orchestration Layer
+
+Completed:
+
+- Added a backend-only saga-style application layer for six enterprise process
+  families without adding routes, repositories or cross-domain business rules.
+- Propagated deterministic step idempotency, correlation and causation to the
+  existing Production, QC, Yard, Logistics and Projects command services.
+- Added bounded transient retry, explicit owner-command compensation, durable
+  process audit/Outbox receipts and failure propagation.
+- Added process integration coverage without changing frontend, schema,
+  aggregates, Inventory or the Projection Engine.
+
+## 2026-07-17 EPIC UI001 Enterprise UI Foundation Rollout
+
+Completed:
+
+- Extracted Inventory's page hierarchy into the shared `EnterpriseWorkspace`
+  composition without changing Inventory presentation.
+- Standardized Components, Production, QC, Yard, Projects, Logistics,
+  Suppliers and Administration root layouts and navigation.
+- Added shared page-level loading, empty, permission, error and offline states.
+- Replaced repeated QC, Suppliers, Users and Roles KPI markup with the existing
+  `CockpitKpiCard` primitive.
+- Changed no backend, API, React Query, workflow or business logic.
+
 ## 2026-07-17 RFC003 Production Aggregate and Execution Implementation
 
 Completed:
@@ -4301,3 +4391,38 @@ Notes:
   Consumption and Completion do not mutate stock.
 - Added focused aggregate, command atomicity and material event contract tests;
   public API and UI remain unchanged.
+
+# 2026-07-17 - RFC014 Enterprise Production Hardening
+
+- Prevented overlapping Background Worker timer ticks and made shutdown await
+  the active batch.
+- Added bounded safe error persistence for Jobs, Outbox and Projection failures,
+  plus warning-only stale-lock diagnostics.
+- Added JWT protection to internal runtime events, metrics, telemetry, integrity
+  and simulation endpoints without changing authenticated response contracts.
+- Repaired two stale test harnesses and restored a clean full backend regression
+  result of 69/69 suites and 175/175 tests.
+- Added focused hardening regression coverage; no schema, migration, business,
+  event-contract or frontend behavior changed.
+
+# 2026-07-17 - RFC015 Production Deployment Readiness
+
+- Added strict production startup configuration and secret/feature-flag
+  validation, controlled CORS, dynamic host/port and graceful shutdown hooks.
+- Added liveness and database-backed readiness probes and removed JWT payload
+  console logging.
+- Added a reproducible non-root backend Docker image, production Compose
+  migration gate, deployment environment template and exact pnpm toolchain pin.
+- Built and inspected the real image and validated Prisma inside it; no frontend,
+  schema, migration, business, CQRS, Projection or Aggregate behavior changed.
+
+# 2026-07-18 - RFC017 Production Readiness Blocker Resolution
+
+- Applied a global deny-by-default JWT guard with an explicit allowlist limited
+  to health, login and token refresh routes.
+- Added owner-checked lease renewal, stale claim recovery and compare-and-set
+  completion/failure handling for Background Jobs and Outbox dispatch.
+- Converted the pending RFC013 indexes to online concurrent creation with a
+  bounded lock timeout and automated migration-safety validation.
+- Preserved business behavior, public response contracts, frontend and schema;
+  the migration remains pending production-like clone measurement and deploy.

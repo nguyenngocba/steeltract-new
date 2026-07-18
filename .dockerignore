@@ -1,0 +1,13 @@
+.git
+.semble-index
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!apps/backend-api/.env.example
+**/*.log
+backups
+uploads
+apps/backend-api/uploads

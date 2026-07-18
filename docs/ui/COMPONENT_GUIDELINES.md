@@ -7,6 +7,8 @@
 3. Keep query state and mutation behavior in hooks/pages, never in visual shells.
 4. Keep domain labels and status rules close to the domain module.
 5. Prefer composition over adding page-specific boolean props to shared UI.
+6. Use `EnterpriseWorkspace` for new module roots; do not duplicate the shell,
+   header, breadcrumb or tab navigation in a page.
 
 ## KPI
 
@@ -61,6 +63,9 @@ typed mapping contract is approved. Do not infer color from arbitrary strings.
 Do not add one-line placeholder skeletons under alternate shared folders. The
 active shared loading primitives are under `shared/ui/modules`.
 
+For a page-level no-permission, error or offline state, use
+`EnterpriseWorkspaceStatePanel` rather than a module-specific alert surface.
+
 ## Review Checklist
 
 - Existing layout, class names, section order, and responsive behavior preserved.
@@ -70,4 +75,3 @@ active shared loading primitives are under `shared/ui/modules`.
 - Loading, empty, error, and disabled states remain reachable.
 - Keyboard and close behavior remain unchanged for drawers.
 - Frontend build and `git diff --check` pass.
-

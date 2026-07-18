@@ -1,0 +1,32 @@
+services:
+  migrate:
+    image: ${STEELTRACK_BACKEND_IMAGE:?STEELTRACK_BACKEND_IMAGE is required}
+    env_file:
+      - ${STEELTRACK_BACKEND_ENV_FILE:?STEELTRACK_BACKEND_ENV_FILE is required}
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    restart: "no"
+
+  backend:
+    image: ${STEELTRACK_BACKEND_IMAGE:?STEELTRACK_BACKEND_IMAGE is required}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    env_file:
+      - ${STEELTRACK_BACKEND_ENV_FILE:?STEELTRACK_BACKEND_ENV_FILE is required}
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "${STEELTRACK_BIND_ADDRESS:-127.0.0.1}:${STEELTRACK_BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ${STEELTRACK_STORAGE_PATH:?STEELTRACK_STORAGE_PATH is required}:/data/steeltrack-storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 4

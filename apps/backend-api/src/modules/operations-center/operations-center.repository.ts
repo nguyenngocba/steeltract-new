@@ -16,25 +16,24 @@ export class OperationsCenterRepository {
     private readonly prisma: PrismaService,
   ) {}
 
-  countBackgroundJobsByStatus() {
-    return Promise.all(
-      Object.values(BackgroundJobStatus).map(async (status) => ({
-        status,
-        count: await this.prisma.backgroundJob.count({
-          where: {
-            status,
-          },
-        }),
-      })),
+  async countBackgroundJobsByStatus() {
+    const rows = await this.prisma.backgroundJob.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+    const counts = new Map(
+      rows.map((row) => [row.status, row._count._all]),
     );
+    return Object.values(BackgroundJobStatus).map((status) => ({
+      status,
+      count: counts.get(status) ?? 0,
+    }));
   }
 
   recentBackgroundJobs() {
     return this.prisma.backgroundJob.findMany({
       take: 10,
-      orderBy: {
-        updatedAt: 'desc',
-      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         name: true,
@@ -49,25 +48,24 @@ export class OperationsCenterRepository {
     });
   }
 
-  countOutboxEventsByStatus() {
-    return Promise.all(
-      Object.values(OutboxEventStatus).map(async (status) => ({
-        status,
-        count: await this.prisma.outboxEvent.count({
-          where: {
-            status,
-          },
-        }),
-      })),
+  async countOutboxEventsByStatus() {
+    const rows = await this.prisma.outboxEvent.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+    const counts = new Map(
+      rows.map((row) => [row.status, row._count._all]),
     );
+    return Object.values(OutboxEventStatus).map((status) => ({
+      status,
+      count: counts.get(status) ?? 0,
+    }));
   }
 
   recentOutboxEvents() {
     return this.prisma.outboxEvent.findMany({
       take: 10,
-      orderBy: {
-        updatedAt: 'desc',
-      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         eventName: true,
@@ -178,21 +176,47 @@ export class OperationsCenterRepository {
     ]);
   }
 
-  databaseTableCounts() {
-    return Promise.all([
-      this.prisma.inventoryTransaction.count(),
-      this.prisma.inventoryTransactionItem.count(),
-      this.prisma.inventoryLocationStock.count(),
-      this.prisma.project.count(),
-      this.prisma.projectTask.count(),
-      this.prisma.dispatchOrder.count(),
-      this.prisma.productionOrder.count(),
-      this.prisma.workCenter.count(),
-      this.prisma.productionStage.count(),
-      this.prisma.backgroundJob.count(),
-      this.prisma.outboxEvent.count(),
-      this.prisma.attachment.count(),
-    ]);
+  async databaseTableCounts() {
+    const tableNames = [
+      'inventory_transactions',
+      'inventory_transaction_items',
+      'inventory_location_stocks',
+      'projects',
+      'project_tasks',
+      'dispatch_orders',
+      'production_orders',
+      'work_centers',
+      'production_stages',
+      'background_jobs',
+      'outbox_events',
+      'attachments',
+    ];
+    const rows = await this.prisma.$queryRaw<
+      Array<{ tableName: string; estimatedRows: bigint }>
+    >`
+      SELECT relname AS "tableName",
+             GREATEST(n_live_tup, 0)::bigint AS "estimatedRows"
+      FROM pg_stat_user_tables
+      WHERE schemaname = current_schema()
+        AND relname IN (
+          'inventory_transactions',
+          'inventory_transaction_items',
+          'inventory_location_stocks',
+          'projects',
+          'project_tasks',
+          'dispatch_orders',
+          'production_orders',
+          'work_centers',
+          'production_stages',
+          'background_jobs',
+          'outbox_events',
+          'attachments'
+        )
+    `;
+    const estimates = new Map(
+      rows.map((row) => [row.tableName, Number(row.estimatedRows)]),
+    );
+    return tableNames.map((tableName) => estimates.get(tableName) ?? 0);
   }
 
   databaseSize() {

@@ -32,12 +32,18 @@ module/pages            data binding, page state, workflow orchestration
 | Generic empty state | `ModuleEmptyState` | `@/shared/ui/modules` | For module workflows and tables. |
 | Cockpit empty state | `CockpitEmptyState` | `@/shared/ui/cockpit` | For compact cockpit widgets. |
 | Generic semantic badge | `StatusBadge` | `components/ui-system` | Use only when its tone mapping matches the domain. |
+| Enterprise page | `EnterpriseWorkspace` | `@/shared/ui/enterprise` | Breadcrumb, header, actions and route/local tabs. |
+| Complete page state | `EnterpriseWorkspaceStatePanel` | `@/shared/ui/enterprise` | Loading, empty, no-permission, error and offline. |
 
 ## Inventory Composition
 
 Inventory keeps the established Industrial Cockpit presentation. Shared
 components own shell behavior; pages own labels, columns, datasets, status
 semantics, chart series, and workflows.
+
+Inventory is the Enterprise Design Canon. Other modules use
+`EnterpriseWorkspace`; Inventory may retain its approved compatibility wrappers
+where replacing them would alter presentation.
 
 Approved root composition:
 
@@ -76,4 +82,3 @@ Current Inventory density conventions:
 - No page-specific status mapping in a generic badge.
 - No visual migration solely to make two components share a name.
 - No deletion of legacy files without import and route verification.
-

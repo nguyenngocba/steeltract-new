@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { EnterpriseModulePage } from "../../../../shared/runtime-tabs/EnterpriseModulePage";
+import { ComponentsWorkspace } from "../../components/ComponentsWorkspace";
 import {
   CockpitChartCard,
   CockpitKpiCard,
@@ -35,7 +35,7 @@ export function ComponentsHistoryPage() {
   }, [query]);
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-6">
           <CockpitKpiCard
@@ -234,6 +234,6 @@ export function ComponentsHistoryPage() {
           </div>
         </div>
       </div>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   );
 }

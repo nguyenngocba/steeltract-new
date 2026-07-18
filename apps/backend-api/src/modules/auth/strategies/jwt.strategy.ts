@@ -15,12 +15,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: AccessTokenPayload) {
-
-  console.log(
-    'JWT PAYLOAD:',
-    payload,
-  )
-
   if (payload.tokenType !== 'access') {
     throw new UnauthorizedException(
       'Invalid access token',

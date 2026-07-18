@@ -24,12 +24,15 @@ type LedgerSourceLine = {
 
 @Injectable()
 export class ProductionMaterialLedgerService {
-  constructor(private readonly repository: ProductionMaterialLedgerRepository) {}
+  constructor(
+    private readonly repository: ProductionMaterialLedgerRepository,
+  ) {}
 
   findAll(query: ListProductionMaterialLedgerDto = {}) {
     return this.repository.findMany(this.buildWhere(query), {
       take: query.limit ?? 100,
-      skip: query.page && query.limit ? (query.page - 1) * query.limit : undefined,
+      skip:
+        query.page && query.limit ? (query.page - 1) * query.limit : undefined,
     });
   }
 
@@ -37,7 +40,9 @@ export class ProductionMaterialLedgerService {
     const row = await this.repository.findById(id);
 
     if (!row) {
-      throw new NotFoundException('Production material ledger record not found');
+      throw new NotFoundException(
+        'Production material ledger record not found',
+      );
     }
 
     return row;
@@ -84,7 +89,7 @@ export class ProductionMaterialLedgerService {
     return this.repository.createMany(data, tx);
   }
 
-  createMaterialEvent(
+  async createMaterialEvent(
     params: {
       eventName: ProductionMaterialEventName;
       productionOrderId: string;
@@ -125,6 +130,58 @@ export class ProductionMaterialLedgerService {
       'production.material.returned': 'RETURNED',
     };
     const aggregateVersion = Math.max(1, occurredAt.getTime());
+
+    const existing = await this.repository.findOutboxEvent(idempotencyKey, tx);
+    if (existing) return existing;
+
+    await this.repository.createProductionLog(
+      {
+        productionOrderId: params.productionOrderId,
+        type: 'NOTE',
+        message: params.eventName,
+        workerId: params.actorId,
+        metadata: {
+          aggregateType: 'ProductionMaterial',
+          aggregateId,
+          aggregateVersion,
+          inventoryItemId: params.inventoryItemId ?? null,
+        },
+      },
+      tx,
+    );
+    await this.repository.createActivityLog(
+      {
+        action: params.eventName,
+        entity: 'ProductionMaterial',
+        entityId: aggregateId,
+        module: 'production',
+        userId: params.actorId,
+        metadata: {
+          productionOrderId: params.productionOrderId,
+          inventoryItemId: params.inventoryItemId ?? null,
+        },
+      },
+      tx,
+    );
+    const auditIdempotencyKey = `${idempotencyKey}:audit`;
+    await this.repository.createOutboxEvent(
+      {
+        eventName: 'audit.activity.created',
+        payload: {
+          action: params.eventName,
+          entityId: aggregateId,
+          module: 'production',
+        },
+        metadata: {
+          module: 'production',
+          persistToOutbox: true,
+          idempotencyKey: auditIdempotencyKey,
+        },
+        idempotencyKey: auditIdempotencyKey,
+        maxRetries: 10,
+      },
+      tx,
+    );
 
     return this.repository.createOutboxEvent(
       {
@@ -193,5 +250,4 @@ export class ProductionMaterialLedgerService {
           : undefined,
     } satisfies Prisma.ProductionMaterialLedgerWhereInput;
   }
-
 }

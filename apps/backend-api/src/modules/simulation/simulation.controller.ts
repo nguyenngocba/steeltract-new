@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   bootstrapSimulationSchema,
   runScenarioSchema,
@@ -16,6 +17,7 @@ import type {
   StartSimulationDto,
 } from './dto/simulation.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('simulation')
 export class SimulationController {
   constructor(private readonly simulationService: SimulationService) {}

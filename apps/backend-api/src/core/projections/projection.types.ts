@@ -21,6 +21,17 @@ export const enterpriseProjectionNames = [
   'ComponentUsage',
   'OpenReservations',
   'ReleasedComponentCatalog',
+  'QcInspectionSummary',
+  'QcNcrSummary',
+  'QcTimeline',
+  'YardItemSummary',
+  'YardMovementTimeline',
+  'YardLoadingSummary',
+  'ShipmentSummary',
+  'ShipmentTimeline',
+  'ProjectMaterialAllocation',
+  'ProjectAcceptanceSummary',
+  'ProjectTimeline',
 ] as const;
 
 export type EnterpriseProjectionName =
@@ -61,4 +72,6 @@ export type ProjectionListQuery = {
   limit: number;
   scopeKey?: string;
   state?: string;
+  cursor?: string;
+  withTotal?: boolean;
 };

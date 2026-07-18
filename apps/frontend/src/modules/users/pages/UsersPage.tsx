@@ -15,7 +15,8 @@ import {
   UserX,
 } from 'lucide-react'
 
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { CockpitKpiCard } from '@/shared/ui/cockpit'
 import {
   inventoryInput,
   inventoryMutedButton,
@@ -68,14 +69,12 @@ export function UsersPage() {
   ).length
 
   return (
-    <OperationalShell>
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#06111e_0%,#081827_52%,#0b1220_100%)] p-4 text-slate-100">
-        <header className="flex flex-wrap items-end justify-between gap-3 pb-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Người dùng</h1>
-            <p className="mt-1 text-sm text-slate-400">Quản lý tài khoản người dùng và phân quyền trong hệ thống</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <EnterpriseWorkspace
+      eyebrow="Quản trị"
+      title="Người dùng"
+      description="Quản lý tài khoản người dùng và phân quyền trong hệ thống"
+      breadcrumbs={['Quản trị', 'Người dùng']}
+      actions={<div className="flex flex-wrap gap-2">
             <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500">
               <Plus size={16} /> Thêm người dùng
             </button>
@@ -85,8 +84,8 @@ export function UsersPage() {
             <button className={inventoryMutedButton}>
               <MoreHorizontal size={15} />
             </button>
-          </div>
-        </header>
+          </div>}
+    >
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <IconKpi icon={UserRound} title="Tổng người dùng" value={fmt(data.length)} note="Tài khoản hệ thống" />
@@ -122,8 +121,7 @@ export function UsersPage() {
           <UserTable rows={filtered} selectedId={selected?.id} onSelect={setSelectedId} />
           <UserDetail user={selected} />
         </div>
-      </main>
-    </OperationalShell>
+    </EnterpriseWorkspace>
   )
 }
 
@@ -217,23 +215,7 @@ function UserDetail({ user }: { user: SystemUser | null }) {
 }
 
 function IconKpi({ icon: Icon, title, value, note, tone = 'blue' }: { icon: LucideIcon; title: string; value: string; note: string; tone?: 'blue' | 'emerald' | 'amber' | 'red' | 'purple' }) {
-  const color = {
-    blue: 'text-blue-300 bg-blue-500/15',
-    emerald: 'text-emerald-300 bg-emerald-500/15',
-    amber: 'text-amber-300 bg-amber-500/15',
-    red: 'text-red-300 bg-red-500/15',
-    purple: 'text-purple-300 bg-purple-500/15',
-  }[tone]
-  return (
-    <section className={`${inventoryPanel} p-4`}>
-      <div className={`mb-3 grid h-11 w-11 place-items-center rounded-xl ${color}`}>
-        <Icon size={22} />
-      </div>
-      <p className="text-xs text-slate-500">{title}</p>
-      <h2 className="mt-1 text-2xl font-semibold text-white">{value}</h2>
-      <p className="text-xs text-slate-500">{note}</p>
-    </section>
-  )
+  return <CockpitKpiCard title={title} value={value} note={note} tone={tone} icon={<Icon size={18} />} />
 }
 
 function Avatar({ user, large = false }: { user: SystemUser; large?: boolean }) {

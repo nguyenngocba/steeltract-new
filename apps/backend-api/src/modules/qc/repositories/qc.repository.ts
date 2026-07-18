@@ -12,7 +12,9 @@ export class QcRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   transaction<T>(fn: (tx: QcTx) => Promise<T>) {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   }
 
   createChecklist(data: Prisma.QcChecklistCreateInput, tx: QcTx = this.prisma) {
@@ -93,6 +95,19 @@ export class QcRepository {
     });
   }
 
+  async updateInspectionVersioned(
+    id: string,
+    expectedUpdatedAt: Date,
+    data: Prisma.QcInspectionUpdateManyMutationInput,
+    tx: QcTx,
+  ) {
+    const result = await tx.qcInspection.updateMany({
+      where: { id, updatedAt: expectedUpdatedAt },
+      data,
+    });
+    return result.count === 1 ? this.findInspectionById(id, tx) : null;
+  }
+
   findInspections(params: {
     search?: string;
     status?: Prisma.EnumQcInspectionStatusFilter['equals'];
@@ -161,6 +176,26 @@ export class QcRepository {
       data,
       include: this.ncrInclude(),
     });
+  }
+
+  findNcrById(id: string, tx: QcTx = this.prisma) {
+    return tx.nonConformanceReport.findUnique({
+      where: { id },
+      include: this.ncrInclude(),
+    });
+  }
+
+  async updateNcrVersioned(
+    id: string,
+    expectedUpdatedAt: Date,
+    data: Prisma.NonConformanceReportUpdateManyMutationInput,
+    tx: QcTx,
+  ) {
+    const result = await tx.nonConformanceReport.updateMany({
+      where: { id, updatedAt: expectedUpdatedAt },
+      data,
+    });
+    return result.count === 1 ? this.findNcrById(id, tx) : null;
   }
 
   findNcrs(params: {
@@ -236,6 +271,7 @@ export class QcRepository {
       payload: Prisma.InputJsonValue;
       metadata: Prisma.InputJsonValue;
       idempotencyKey: string;
+      maxRetries?: number;
     },
     tx: QcTx,
   ) {
@@ -246,17 +282,16 @@ export class QcRepository {
     });
   }
 
+  findOutboxEvent(idempotencyKey: string, tx: QcTx) {
+    return tx.outboxEvent.findUnique({ where: { idempotencyKey } });
+  }
+
   nextInspectionNo(tx: QcTx = this.prisma) {
     return nextOperationalCode(tx, 'qcInspection', 'inspectionNo', 'QC');
   }
 
   nextNcrNo(tx: QcTx = this.prisma) {
-    return nextOperationalCode(
-      tx,
-      'nonConformanceReport',
-      'ncrNo',
-      'NCR',
-    );
+    return nextOperationalCode(tx, 'nonConformanceReport', 'ncrNo', 'NCR');
   }
 
   checklistInclude() {

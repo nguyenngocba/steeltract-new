@@ -1,13 +1,8 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common'
-import {
-  DispatchOrderStatus,
-  Prisma,
-} from '@prisma/client'
+import { Inject, Injectable } from '@nestjs/common';
+import { DispatchOrderStatus, Prisma } from '@prisma/client';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
+import { nextOperationalCode } from '../../common/utils/code-generator';
 
 export const dispatchInclude = {
   project: true,
@@ -23,9 +18,10 @@ export const dispatchInclude = {
       createdAt: 'asc',
     },
   },
-} satisfies Prisma.DispatchOrderInclude
+} satisfies Prisma.DispatchOrderInclude;
 
-type DbClient = PrismaService | Prisma.TransactionClient
+type DbClient = PrismaService | Prisma.TransactionClient;
+export type LogisticsTx = Prisma.TransactionClient;
 
 @Injectable()
 export class LogisticsRepository {
@@ -34,6 +30,16 @@ export class LogisticsRepository {
     private readonly prisma: PrismaService,
   ) {}
 
+  transaction<T>(fn: (tx: LogisticsTx) => Promise<T>) {
+    return this.prisma.$transaction(fn, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+  }
+
+  nextShipmentCode(tx: LogisticsTx) {
+    return nextOperationalCode(tx, 'dispatchOrder', 'code', 'DX');
+  }
+
   findDispatchOrders() {
     return this.prisma.dispatchOrder.findMany({
       include: dispatchInclude,
@@ -41,14 +47,14 @@ export class LogisticsRepository {
         createdAt: 'desc',
       },
       take: 200,
-    })
+    });
   }
 
-  findDispatchOrder(id: string) {
-    return this.prisma.dispatchOrder.findUnique({
+  findDispatchOrder(id: string, db: DbClient = this.prisma) {
+    return db.dispatchOrder.findUnique({
       where: { id },
       include: dispatchInclude,
-    })
+    });
   }
 
   createDispatchOrder(
@@ -58,7 +64,7 @@ export class LogisticsRepository {
     return db.dispatchOrder.create({
       data,
       include: dispatchInclude,
-    })
+    });
   }
 
   updateDispatchOrder(
@@ -70,29 +76,46 @@ export class LogisticsRepository {
       where: { id },
       data,
       include: dispatchInclude,
-    })
+    });
+  }
+
+  async updateDispatchOrderVersioned(
+    id: string,
+    expectedUpdatedAt: Date,
+    data: Prisma.DispatchOrderUpdateManyMutationInput,
+    tx: LogisticsTx,
+  ) {
+    const result = await tx.dispatchOrder.updateMany({
+      where: { id, updatedAt: expectedUpdatedAt },
+      data,
+    });
+    return result.count === 1 ? this.findDispatchOrder(id, tx) : null;
+  }
+
+  createDispatchEvent(data: Prisma.DispatchEventCreateInput, tx: LogisticsTx) {
+    return tx.dispatchEvent.create({ data });
   }
 
   findDispatchOrderStatus(id: string) {
     return this.prisma.dispatchOrder.findUnique({
       where: { id },
       select: { status: true },
-    })
+    });
   }
 
   findProjectTasksForDispatchSuggestion(params: {
-    projectId: string
-    projectTaskId?: string
+    projectId: string;
+    projectTaskId?: string;
   }) {
     const where: Prisma.ProjectTaskWhereInput = {
       projectId: params.projectId,
       progress: {
         lt: 100,
       },
-    }
+    };
 
     if (params.projectTaskId) {
-      where.id = params.projectTaskId
+      where.id = params.projectTaskId;
     }
 
     return this.prisma.projectTask.findMany({
@@ -115,7 +138,7 @@ export class LogisticsRepository {
         { sortOrder: 'asc' },
       ],
       take: params.projectTaskId ? 1 : 5,
-    })
+    });
   }
 
   findActiveComponentDispatch(
@@ -133,16 +156,19 @@ export class LogisticsRepository {
         dispatchOrder: true,
         component: true,
       },
-    })
+    });
   }
 
-  findProjectTaskMaterialAllocation(projectTaskId: string, inventoryItemId: string) {
+  findProjectTaskMaterialAllocation(
+    projectTaskId: string,
+    inventoryItemId: string,
+  ) {
     return this.prisma.projectTaskMaterialAllocation.findFirst({
       where: {
         projectTaskId,
         inventoryItemId,
       },
-    })
+    });
   }
 
   updateProjectTaskMaterialAllocation(
@@ -152,20 +178,25 @@ export class LogisticsRepository {
     return this.prisma.projectTaskMaterialAllocation.update({
       where: { id },
       data,
-    })
+    });
   }
 
-  createProjectTaskMaterialAllocation(data: Prisma.ProjectTaskMaterialAllocationCreateInput) {
-    return this.prisma.projectTaskMaterialAllocation.create({ data })
+  createProjectTaskMaterialAllocation(
+    data: Prisma.ProjectTaskMaterialAllocationCreateInput,
+  ) {
+    return this.prisma.projectTaskMaterialAllocation.create({ data });
   }
 
-  findProjectTaskComponentAllocation(projectTaskId: string, componentId: string) {
+  findProjectTaskComponentAllocation(
+    projectTaskId: string,
+    componentId: string,
+  ) {
     return this.prisma.projectTaskComponentAllocation.findFirst({
       where: {
         projectTaskId,
         componentId,
       },
-    })
+    });
   }
 
   updateProjectTaskComponentAllocation(
@@ -175,21 +206,46 @@ export class LogisticsRepository {
     return this.prisma.projectTaskComponentAllocation.update({
       where: { id },
       data,
-    })
+    });
   }
 
-  createProjectTaskComponentAllocation(data: Prisma.ProjectTaskComponentAllocationCreateInput) {
-    return this.prisma.projectTaskComponentAllocation.create({ data })
+  createProjectTaskComponentAllocation(
+    data: Prisma.ProjectTaskComponentAllocationCreateInput,
+  ) {
+    return this.prisma.projectTaskComponentAllocation.create({ data });
   }
 
   updateComponent(id: string, data: Prisma.ComponentUpdateInput) {
     return this.prisma.component.update({
       where: { id },
       data,
-    })
+    });
   }
 
-  createActivityLog(data: Prisma.ActivityLogCreateInput) {
-    return this.prisma.activityLog.create({ data })
+  createActivityLog(
+    data: Prisma.ActivityLogCreateInput,
+    db: DbClient = this.prisma,
+  ) {
+    return db.activityLog.create({ data });
+  }
+
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    tx: LogisticsTx,
+  ) {
+    return tx.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
+
+  findOutboxEvent(idempotencyKey: string, tx: LogisticsTx) {
+    return tx.outboxEvent.findUnique({ where: { idempotencyKey } });
   }
 }

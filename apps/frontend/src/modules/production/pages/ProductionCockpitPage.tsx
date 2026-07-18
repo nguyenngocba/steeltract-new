@@ -1,9 +1,9 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import toast from 'react-hot-toast'
 import { Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleKpiStrip } from '@/shared/ui/modules'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '@/shared/ui/cockpit'
 import {
@@ -201,23 +201,20 @@ export function ProductionCockpitPage() {
     setCockpitPage(1)
   }, [deferredSearch, mode, statusFilter])
 
-  return <OperationalShell>
-    <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100">
-      <div className="w-full min-w-0 flex-1 space-y-1">
-      <div className="flex items-center justify-end gap-1">
+  return <EnterpriseWorkspace
+    eyebrow="Sản xuất"
+    title="Điều hành sản xuất"
+    description="Lệnh sản xuất, thực thi, vật tư và tiến độ xưởng trên cùng một workspace."
+    breadcrumbs={['Vận hành', 'Sản xuất']}
+    tabs={productionTabs.map((tab) => ({ id: tab.path, label: tab.label, path: tab.path }))}
+    activeTab={location.pathname}
+    actions={<div className="flex items-center justify-end gap-1">
         <button onClick={() => setCreateOrderOpen(true)} className={`${inventoryMutedButton} h-9 rounded-xl`}>+ Tạo lệnh sản xuất</button>
         <button onClick={() => setCreateBomOpen(true)} className={`${inventoryMutedButton} h-9 rounded-xl`}>+ Tạo BOM</button>
         <button className={`${inventoryMutedButton} h-9 rounded-xl`}>Xuất báo cáo</button>
-      </div>
-
-      <nav className="overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-        <div className="flex min-w-max gap-1">
-        {productionTabs.map((tab) => <Link key={tab.path} to={tab.path}
-          className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${location.pathname === tab.path ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/30' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
-          {tab.label}
-        </Link>)}
-        </div>
-      </nav>
+      </div>}
+  >
+      <div className="w-full min-w-0 flex-1 space-y-1">
 
       <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
         {isWorkOrderMode ? (
@@ -271,8 +268,7 @@ export function ProductionCockpitPage() {
       {createOrderOpen && <ManufacturingOrderModal components={components} boms={boms} onClose={() => setCreateOrderOpen(false)} />}
       {createBomOpen && <ProductionBomModal components={components} onClose={() => setCreateBomOpen(false)} />}
       </div>
-    </main>
-  </OperationalShell>
+  </EnterpriseWorkspace>
 }
 
 function ProductionNavigationPlaceholder({

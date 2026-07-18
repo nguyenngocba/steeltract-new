@@ -1,26 +1,20 @@
-import { Module } from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { PrismaModule }
-  from '../../core/prisma/prisma.module'
-import { SnapshotsModule }
-  from '../../core/snapshots/snapshots.module'
-import { EventsModule }
-  from '../../core/events/events.module'
+import { PrismaModule } from '../../core/prisma/prisma.module';
+import { SnapshotsModule } from '../../core/snapshots/snapshots.module';
+import { EventsModule } from '../../core/events/events.module';
 
-import { ProjectsController }
-  from './projects.controller'
+import { ProjectsController } from './projects.controller';
 
-import { ProjectsService }
-  from './services/projects.service'
+import { ProjectsService } from './services/projects.service';
 
-import { ProjectsRepository }
-  from './repositories/projects.repository'
+import { ProjectCommandService } from './services/project-command.service';
 
-import { ComponentsModule }
-  from '../components/components.module'
+import { ProjectsRepository } from './repositories/projects.repository';
 
-import { RbacModule }
-  from '../rbac/rbac.module'
+import { ComponentsModule } from '../components/components.module';
+
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
   imports: [
@@ -31,17 +25,10 @@ import { RbacModule }
     EventsModule,
   ],
 
-  controllers: [
-    ProjectsController,
-  ],
+  controllers: [ProjectsController],
 
-  providers: [
-    ProjectsService,
-    ProjectsRepository,
-  ],
+  providers: [ProjectsService, ProjectCommandService, ProjectsRepository],
 
-  exports: [
-    ProjectsService,
-  ],
+  exports: [ProjectsService, ProjectCommandService],
 })
 export class ProjectsModule {}

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Activity, Boxes, Construction, MapPinned, Radio, Search, Truck, Warehouse, type LucideIcon } from 'lucide-react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useComponents } from '@/modules/components/hooks/queries/useComponents'
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
-import { ModuleFilterBar, ModulePageHeader, moduleInput, moduleMutedButton, modulePanel, modulePrimaryButton } from '@/shared/ui/modules'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { ModuleFilterBar, moduleInput, moduleMutedButton, modulePanel, modulePrimaryButton } from '@/shared/ui/modules'
 import { CockpitChartCard, CockpitKpiCard } from '@/shared/ui/cockpit'
 import { YardTabWorkspace } from '../components/YardTabWorkspace'
 import { YardZoneDetailDialog } from '../components/YardZoneDetailDialog'
@@ -284,40 +284,21 @@ export function YardPage() {
   ]
 
   return (
-    <OperationalShell>
-      <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(14,165,233,0.13),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(99,102,241,0.11),transparent_26%),linear-gradient(180deg,#08111f_0%,#101827_48%,#0b1220_100%)] p-3 text-slate-100 w-full min-w-0 flex-1 space-y-1">
-        <ModulePageHeader
-          eyebrow="Steeltrack yard"
-          title="Bãi tập kết"
-          description="QC hoàn thành → nhập bãi → lưu vị trí → điều chuyển → xuất bãi"
-          action={
-            <>
+    <EnterpriseWorkspace
+      eyebrow="SteelTrack Yard"
+      title="Bãi tập kết"
+      description="QC hoàn thành → nhập bãi → lưu vị trí → điều chuyển → xuất bãi"
+      breadcrumbs={['Vận hành', 'Bãi tập kết']}
+      tabs={yardTabs.map(([id, label, path]) => ({ id, label, path }))}
+      activeTab={tab}
+      actions={<>
               <button onClick={openCreateZone} className={mutedButton}>+ Zone</button>
               <button onClick={() => openCreateSlot()} className={mutedButton}>+ Slot</button>
               <button onClick={() => setOperation('inbound')} className={primaryButton}>+ Nhập bãi</button>
               <button onClick={() => setOperation('outbound')} className={mutedButton}>Xuất bãi</button>
               <button onClick={() => setOperation('transfer')} className={mutedButton}>+ Chuyển nội bộ</button>
-            </>
-          }
-        />
-        
-        <nav className="mb-1 overflow-auto rounded-xl border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-          <div className="flex min-w-max gap-1">
-            {yardTabs.map(([id, label, path]) => (
-              <Link
-                key={id}
-                to={path}
-                className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-                  tab === id
-                    ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/30'
-                    : 'text-slate-400 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </nav>
+            </>}
+    >
 
         {/* Unified 5-column grid KPI Strip with h-[108px] cards */}
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-5">
@@ -520,7 +501,6 @@ export function YardPage() {
             </footer>
           </div>
         </div> : null}
-      </main>
-    </OperationalShell>
+    </EnterpriseWorkspace>
   )
 }

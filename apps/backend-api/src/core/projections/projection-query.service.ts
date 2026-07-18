@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { ProjectionRegistryService } from './projection-registry.service';
 import { ProjectionRepository } from './projection.repository';
@@ -56,13 +56,59 @@ export class ProjectionQueryService {
     });
   }
 
-  list(projectionName: string, query: ProjectionListQuery) {
+  async list(projectionName: string, query: ProjectionListQuery) {
     this.registry.get(projectionName);
-    return this.repository.listDocuments(projectionName, query);
+    const result = await this.repository.listDocuments(projectionName, {
+      ...query,
+      cursor: query.cursor ? this.decodeCursor(query.cursor) : undefined,
+    });
+    return {
+      items: result.items,
+      meta: {
+        ...result.meta,
+        nextCursor: result.nextCursor
+          ? this.encodeCursor(result.nextCursor)
+          : null,
+      },
+    };
   }
 
   find(projectionName: string, entityKey: string) {
     this.registry.get(projectionName);
     return this.repository.findDocument(projectionName, entityKey);
+  }
+
+  private encodeCursor(cursor: { sourceOccurredAt: Date; id: string }) {
+    return Buffer.from(
+      JSON.stringify({
+        sourceOccurredAt: cursor.sourceOccurredAt.toISOString(),
+        id: cursor.id,
+      }),
+    ).toString('base64url');
+  }
+
+  private decodeCursor(value: string) {
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(value, 'base64url').toString('utf8'),
+      ) as { sourceOccurredAt?: unknown; id?: unknown };
+      if (
+        typeof decoded.sourceOccurredAt !== 'string' ||
+        typeof decoded.id !== 'string' ||
+        !decoded.id
+      ) {
+        throw new Error('invalid cursor');
+      }
+      const date = new Date(decoded.sourceOccurredAt);
+      if (
+        Number.isNaN(date.getTime()) ||
+        date.toISOString() !== decoded.sourceOccurredAt
+      ) {
+        throw new Error('invalid cursor');
+      }
+      return { sourceOccurredAt: date, id: decoded.id };
+    } catch {
+      throw new BadRequestException('Invalid projection cursor');
+    }
   }
 }

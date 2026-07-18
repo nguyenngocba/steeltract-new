@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import {
   ComponentStatus,
@@ -13,6 +10,7 @@ import {
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
 type DbClient = PrismaService | Prisma.TransactionClient;
+export type ProjectTx = Prisma.TransactionClient;
 
 export const projectTaskRepositoryInclude = {
   dependencies: true,
@@ -39,8 +37,10 @@ export class ProjectsRepository {
     private readonly prisma: PrismaService,
   ) {}
 
-  transaction<T>(callback: (tx: Prisma.TransactionClient) => Promise<T>) {
-    return this.prisma.$transaction(callback);
+  transaction<T>(callback: (tx: ProjectTx) => Promise<T>) {
+    return this.prisma.$transaction(callback, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   }
 
   findAll(params: {
@@ -73,6 +73,22 @@ export class ProjectsRepository {
     });
   }
 
+  findAggregate(id: string, db: DbClient = this.prisma) {
+    return db.project.findUnique({
+      where: { id },
+      include: {
+        tasks: {
+          select: {
+            id: true,
+            parentTaskId: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+  }
+
   create(data: Prisma.ProjectCreateInput, db: DbClient = this.prisma) {
     return db.project.create({
       data,
@@ -90,6 +106,19 @@ export class ProjectsRepository {
       },
       data,
     });
+  }
+
+  async updateVersioned(
+    id: string,
+    expectedUpdatedAt: Date,
+    data: Prisma.ProjectUpdateManyMutationInput,
+    tx: ProjectTx,
+  ) {
+    const result = await tx.project.updateMany({
+      where: { id, updatedAt: expectedUpdatedAt },
+      data,
+    });
+    return result.count === 1 ? this.findAggregate(id, tx) : null;
   }
 
   delete(id: string, db: DbClient = this.prisma) {
@@ -135,10 +164,7 @@ export class ProjectsRepository {
 
   findProjectTemplates() {
     return this.prisma.projectTemplate.findMany({
-      orderBy: [
-        { isDefault: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
   }
 
@@ -187,10 +213,7 @@ export class ProjectsRepository {
     });
   }
 
-  findProjectTask(
-    taskId: string,
-    db: DbClient = this.prisma,
-  ) {
+  findProjectTask(taskId: string, db: DbClient = this.prisma) {
     return db.projectTask.findUnique({
       where: { id: taskId },
       include: projectTaskRepositoryInclude,
@@ -246,14 +269,15 @@ export class ProjectsRepository {
     return Promise.all([
       db.projectTaskDependency.deleteMany({
         where: {
-          OR: [
-            { projectTaskId: taskId },
-            { dependsOnTaskId: taskId },
-          ],
+          OR: [{ projectTaskId: taskId }, { dependsOnTaskId: taskId }],
         },
       }),
-      db.projectTaskMaterialAllocation.deleteMany({ where: { projectTaskId: taskId } }),
-      db.projectTaskComponentAllocation.deleteMany({ where: { projectTaskId: taskId } }),
+      db.projectTaskMaterialAllocation.deleteMany({
+        where: { projectTaskId: taskId },
+      }),
+      db.projectTaskComponentAllocation.deleteMany({
+        where: { projectTaskId: taskId },
+      }),
       db.projectTaskResource.deleteMany({ where: { projectTaskId: taskId } }),
     ]);
   }
@@ -270,6 +294,46 @@ export class ProjectsRepository {
     db: DbClient = this.prisma,
   ) {
     return db.projectTaskMaterialAllocation.create({ data });
+  }
+
+  findProjectTaskMaterialAllocation(
+    projectTaskId: string,
+    inventoryItemId: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.projectTaskMaterialAllocation.findFirst({
+      where: { projectTaskId, inventoryItemId },
+    });
+  }
+
+  createOutboxEvent(
+    data: {
+      eventName: string;
+      payload: Prisma.InputJsonValue;
+      metadata: Prisma.InputJsonValue;
+      idempotencyKey: string;
+    },
+    tx: ProjectTx,
+  ) {
+    return tx.outboxEvent.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
+
+  findOutboxEvent(idempotencyKey: string, tx: ProjectTx) {
+    return tx.outboxEvent.findUnique({ where: { idempotencyKey } });
+  }
+
+  findProjectAcceptanceEvents(projectId: string, tx: ProjectTx) {
+    return tx.outboxEvent.findMany({
+      where: {
+        eventName: 'project.acceptance.completed',
+        payload: { path: ['projectId'], equals: projectId },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   createProjectTaskComponentAllocation(
@@ -321,10 +385,7 @@ export class ProjectsRepository {
   findInventoryItemByIdOrCode(value: string, db: DbClient = this.prisma) {
     return db.inventoryItem.findFirst({
       where: {
-        OR: [
-          { id: value },
-          { code: value },
-        ],
+        OR: [{ id: value }, { code: value }],
       },
       select: { id: true },
     });
@@ -333,24 +394,30 @@ export class ProjectsRepository {
   findComponentByIdOrCode(value: string, db: DbClient = this.prisma) {
     return db.component.findFirst({
       where: {
-        OR: [
-          { id: value },
-          { code: value },
-        ],
+        OR: [{ id: value }, { code: value }],
       },
       select: { id: true },
     });
   }
 
-  findProjectComponent(projectId: string, componentId: string, db: DbClient = this.prisma) {
-    return db.component.findUnique({
-      where: { id: componentId },
-    }).then((component) =>
-      component && component.projectId === projectId ? component : null,
-    );
+  findProjectComponent(
+    projectId: string,
+    componentId: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.component
+      .findUnique({
+        where: { id: componentId },
+      })
+      .then((component) =>
+        component && component.projectId === projectId ? component : null,
+      );
   }
 
-  updateProjectComponentReturned(componentId: string, db: DbClient = this.prisma) {
+  updateProjectComponentReturned(
+    componentId: string,
+    db: DbClient = this.prisma,
+  ) {
     return db.component.update({
       where: { id: componentId },
       data: {
@@ -447,14 +514,40 @@ export class ProjectsRepository {
   }
 
   async findProjectDetailSources(projectId: string, tab: string) {
-    const needsComponents = ['overview', 'components', 'costs', 'command'].includes(tab);
-    const needsMaterials = ['overview', 'materials', 'costs', 'command'].includes(tab);
-    const needsWbs = ['overview', 'progress', 'command', 'site', 'costs', 'logs'].includes(tab);
-    const needsReturns = ['overview', 'materials', 'command', 'logs'].includes(tab);
-    const needsDocuments = ['overview', 'documents', 'command', 'site'].includes(tab);
+    const needsComponents = [
+      'overview',
+      'components',
+      'costs',
+      'command',
+    ].includes(tab);
+    const needsMaterials = [
+      'overview',
+      'materials',
+      'costs',
+      'command',
+    ].includes(tab);
+    const needsWbs = [
+      'overview',
+      'progress',
+      'command',
+      'site',
+      'costs',
+      'logs',
+    ].includes(tab);
+    const needsReturns = ['overview', 'materials', 'command', 'logs'].includes(
+      tab,
+    );
+    const needsDocuments = [
+      'overview',
+      'documents',
+      'command',
+      'site',
+    ].includes(tab);
     const needsLogs = ['overview', 'logs', 'command', 'site'].includes(tab);
     const needsProduction = ['overview', 'command'].includes(tab);
-    const needsComponentTasks = ['overview', 'progress', 'command'].includes(tab);
+    const needsComponentTasks = ['overview', 'progress', 'command'].includes(
+      tab,
+    );
 
     const [
       project,
@@ -520,9 +613,7 @@ export class ProjectsRepository {
       needsDocuments
         ? this.findProjectDocuments(projectId)
         : Promise.resolve([]),
-      needsLogs
-        ? this.findProjectActivityLogs(projectId)
-        : Promise.resolve([]),
+      needsLogs ? this.findProjectActivityLogs(projectId) : Promise.resolve([]),
     ]);
 
     return {
@@ -569,7 +660,10 @@ export class ProjectsRepository {
         deletedAt: null,
         OR: projectId
           ? [
-              { entityType: { in: ['project', 'Project'] }, entityId: projectId },
+              {
+                entityType: { in: ['project', 'Project'] },
+                entityId: projectId,
+              },
               {
                 links: {
                   some: {

@@ -15,9 +15,9 @@ import {
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { ModuleDetailDrawer, moduleInput, moduleMutedButton, modulePrimaryButton } from '@/shared/ui/modules'
 import {
   CockpitChartCard,
@@ -318,29 +318,18 @@ export function ProjectsPage() {
       : null
 
   return (
-    <OperationalShell>
-      <main className="w-full min-w-0 flex-1 space-y-1 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-3 text-slate-100">
-        <div className="flex flex-wrap items-center justify-between gap-1">
-          <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1">
-            {tabs.map((item) => (
-              <Link
-                key={item.id}
-                to={item.path}
-                className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs transition ${
-                  currentTab === item.id
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30'
-                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex shrink-0 gap-1">
+    <EnterpriseWorkspace
+      eyebrow="Dự án"
+      title="Quản lý công trình"
+      description="Theo dõi tiến độ, cấu kiện, vật tư, chi phí và hồ sơ công trình."
+      breadcrumbs={['Điều hành', 'Dự án']}
+      tabs={tabs}
+      activeTab={currentTab}
+      actions={<div className="flex shrink-0 gap-1">
             <button type="button" onClick={() => setCreateOpen(true)} className={primaryButton}>+ Thêm công trình</button>
             <button type="button" className={mutedButton}>Xuất Excel</button>
-          </div>
-        </div>
+          </div>}
+    >
 
         <FilterBar query={query} status={status} type={type} projectTypes={projectTypes} onQuery={setQuery} onStatus={setStatus} onType={setType} />
         {isLoading ? <CockpitEmptyState title="Đang tải dữ liệu công trình" description="Dữ liệu sẽ xuất hiện khi API trả kết quả." /> : null}
@@ -441,8 +430,7 @@ export function ProjectsPage() {
           onClose={() => setReturnComponentTarget(null)}
           onSubmit={(reason) => returnComponentTarget?.projectId ? returnComponentMutation.mutate({ projectId: returnComponentTarget.projectId, componentId: returnComponentTarget.id, reason }) : undefined}
         />
-      </main>
-    </OperationalShell>
+    </EnterpriseWorkspace>
   )
 }
 

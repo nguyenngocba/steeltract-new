@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  UseGuards,
 } from '@nestjs/common'
 
 import { PrismaService }
@@ -11,6 +12,10 @@ import {
   TransactionType,
 } from '@prisma/client'
 
+import { JwtAuthGuard }
+  from '../auth/jwt-auth.guard'
+
+@UseGuards(JwtAuthGuard)
 @Controller('runtime')
 export class RuntimeController {
   constructor(

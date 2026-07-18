@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { ModuleEmptyState, ModuleFilterBar } from '../../../../shared/ui/modules'
 import { componentsInput } from './ComponentsCockpitShared'
@@ -25,7 +25,7 @@ export function ComponentsInternalQcPage() {
   const pendingCount = rows.filter((row) => row[6] !== 'Hoàn thành').length
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-6">
           <CockpitKpiCard title="Tổng phiếu QC" value="1.248" note="+15,6% so với tháng trước" state="normal" tone="cyan" />
@@ -113,6 +113,6 @@ export function ComponentsInternalQcPage() {
           </div>
         </div>
       </div>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   )
 }

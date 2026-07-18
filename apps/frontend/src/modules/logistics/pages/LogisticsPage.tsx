@@ -13,7 +13,7 @@ import {
   Truck,
   X,
 } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
 import {
   advanceDispatchOrder,
@@ -29,7 +29,7 @@ import {
   type DispatchSuggestion,
 } from '@/modules/logistics/api/logistics.api'
 import { getProjectsRuntime, type ProjectRuntimeRow, type ProjectsRuntime } from '@/modules/projects/api/projects.api'
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import {
   CockpitChartCard,
   CockpitEmptyState,
@@ -136,34 +136,22 @@ export function LogisticsPage() {
   })
 
   return (
-    <OperationalShell>
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0f172a_46%,#111827_100%)] p-4 text-slate-100">
-        <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-semibold text-white">Vận chuyển</h1>
-            <p className="text-xs text-slate-500">Điều xe, theo dõi giao nhận từ kho/bãi đến công trình.</p>
-          </div>
-          <div className="flex items-center gap-2">
+    <EnterpriseWorkspace
+      eyebrow="Logistics"
+      title="Vận chuyển"
+      description="Điều xe, theo dõi giao nhận từ kho/bãi đến công trình."
+      breadcrumbs={['Vận hành', 'Vận chuyển']}
+      tabs={tabs}
+      activeTab={tab}
+      actions={<div className="flex items-center gap-2">
             <button className={moduleMutedButton} onClick={refresh} type="button">
               <RefreshCw size={14} /> Làm mới
             </button>
             <button className={modulePrimaryButton} onClick={() => setCreating(true)} type="button">
               <Plus size={14} /> Tạo điều xe
             </button>
-          </div>
-        </header>
-
-        <nav className="mb-1 flex gap-1 overflow-x-auto rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-1">
-          {tabs.map((item) => (
-            <Link
-              key={item.id}
-              to={item.path}
-              className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-xs transition ${tab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+          </div>}
+    >
 
         <section className="grid gap-1 md:grid-cols-2 xl:grid-cols-4">
           <CockpitKpiCard title="Chờ điều xe" value={fmt(dashboard?.kpis.waiting ?? 0)} note="Nháp / kế hoạch / bốc hàng" icon={<CalendarClock size={18} />} tone="amber" state={dashboardLoading ? 'loading' : 'normal'} />
@@ -204,8 +192,7 @@ export function LogisticsPage() {
           pending={advanceMutation.isPending}
         />
         {creating ? <CreateDispatchDrawer projects={projects} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); refresh() }} /> : null}
-      </main>
-    </OperationalShell>
+    </EnterpriseWorkspace>
   )
 }
 

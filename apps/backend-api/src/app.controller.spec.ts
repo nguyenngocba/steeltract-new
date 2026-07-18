@@ -1,24 +1,39 @@
-/*
-import { Test, TestingModule } from '@nestjs/testing';
+import { ServiceUnavailableException } from '@nestjs/common';
+
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 
 describe('AppController', () => {
-  let appController: AppController;
+  it('reports the API health contract', () => {
+    const controller = new AppController({} as never);
 
-  beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
-    }).compile();
-
-    appController = app.get<AppController>(AppController);
+    expect(controller.health()).toEqual({
+      app: 'SteelTrack ERP API',
+      status: 'running',
+    });
+    expect(controller.liveness()).toEqual(
+      expect.objectContaining({ status: 'live' }),
+    );
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+  it('reports readiness only when the database responds', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([{ '?column?': 1 }]);
+    const controller = new AppController({ $queryRaw: queryRaw } as never);
+
+    await expect(controller.readiness()).resolves.toEqual(
+      expect.objectContaining({
+        status: 'ready',
+        checks: { database: 'up' },
+      }),
+    );
+  });
+
+  it('returns service unavailable when the database is not ready', async () => {
+    const controller = new AppController({
+      $queryRaw: jest.fn().mockRejectedValue(new Error('unavailable')),
+    } as never);
+
+    await expect(controller.readiness()).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 });
-*/

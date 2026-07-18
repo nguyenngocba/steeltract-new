@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { safeErrorMessage } from '../../common/utils/safe-error-message';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ProjectionDefinition,
@@ -9,6 +10,10 @@ import {
 } from './projection.types';
 
 type OutboxCursor = { createdAt: Date; id: string };
+type ProjectionDocumentCursor = { sourceOccurredAt: Date; id: string };
+type ProjectionDocumentQuery = Omit<ProjectionListQuery, 'cursor'> & {
+  cursor?: ProjectionDocumentCursor;
+};
 
 @Injectable()
 export class ProjectionRepository {
@@ -132,7 +137,7 @@ export class ProjectionRepository {
     event: ProjectionSourceEvent,
     error: unknown,
   ) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = safeErrorMessage(error);
     const deadLetter = event.retryCount + 1 >= event.maxRetries;
     await this.prisma.$transaction([
       this.prisma.enterpriseProjectionFailure.upsert({
@@ -182,28 +187,55 @@ export class ProjectionRepository {
     });
   }
 
-  async listDocuments(projectionName: string, query: ProjectionListQuery) {
+  async listDocuments(projectionName: string, query: ProjectionDocumentQuery) {
+    const cursorWhere:
+      | Prisma.EnterpriseProjectionDocumentWhereInput
+      | undefined = query.cursor
+      ? {
+          OR: [
+            { sourceOccurredAt: { lt: query.cursor.sourceOccurredAt } },
+            {
+              sourceOccurredAt: query.cursor.sourceOccurredAt,
+              id: { lt: query.cursor.id },
+            },
+          ],
+        }
+      : undefined;
     const where: Prisma.EnterpriseProjectionDocumentWhereInput = {
       projectionName,
       scopeKey: query.scopeKey,
       data: query.state ? { path: ['state'], equals: query.state } : undefined,
+      AND: cursorWhere ? [cursorWhere] : undefined,
     };
-    const [items, total] = await Promise.all([
+    const [page, total] = await Promise.all([
       this.prisma.enterpriseProjectionDocument.findMany({
         where,
         orderBy: [{ sourceOccurredAt: 'desc' }, { id: 'desc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
+        skip: query.cursor ? undefined : (query.page - 1) * query.limit,
+        take: query.limit + 1,
       }),
-      this.prisma.enterpriseProjectionDocument.count({ where }),
+      query.withTotal === false
+        ? Promise.resolve(null)
+        : this.prisma.enterpriseProjectionDocument.count({
+            where: { ...where, AND: undefined },
+          }),
     ]);
+    const hasMore = page.length > query.limit;
+    const items = hasMore ? page.slice(0, query.limit) : page;
+    const last = items.at(-1);
     return {
       items,
+      nextCursor:
+        hasMore && last
+          ? { sourceOccurredAt: last.sourceOccurredAt, id: last.id }
+          : null,
       meta: {
         page: query.page,
         limit: query.limit,
         total,
-        totalPages: Math.max(1, Math.ceil(total / query.limit)),
+        totalPages:
+          total === null ? null : Math.max(1, Math.ceil(total / query.limit)),
+        hasMore,
       },
     };
   }
@@ -241,6 +273,44 @@ export class ProjectionRepository {
         : undefined,
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: limit,
+    });
+  }
+
+  async replayCursor(
+    projectionName: string,
+  ): Promise<OutboxCursor | undefined> {
+    const checkpoint =
+      await this.prisma.enterpriseProjectionCheckpoint.findUnique({
+        where: { projectionName },
+        select: { lastOutboxEventId: true },
+      });
+    if (!checkpoint?.lastOutboxEventId) return undefined;
+    const event = await this.prisma.outboxEvent.findUnique({
+      where: { id: checkpoint.lastOutboxEventId },
+      select: { id: true, createdAt: true },
+    });
+    return event ?? undefined;
+  }
+
+  advanceReplayCursor(
+    projectionName: string,
+    event: ProjectionSourceEvent,
+    schemaVersion: number,
+  ) {
+    return this.prisma.enterpriseProjectionCheckpoint.upsert({
+      where: { projectionName },
+      create: {
+        projectionName,
+        schemaVersion,
+        lastOutboxEventId: event.id,
+        lastProcessedAt: new Date(),
+        status: 'HEALTHY',
+      },
+      update: {
+        schemaVersion,
+        lastOutboxEventId: event.id,
+        lastProcessedAt: new Date(),
+      },
     });
   }
 

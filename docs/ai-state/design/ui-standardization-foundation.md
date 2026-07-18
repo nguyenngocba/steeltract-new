@@ -135,3 +135,9 @@ Performance:
 - Inventory-specific chart helpers remain local until at least one more module needs the same chart abstraction.
 - Detail drawers and workflow modals remain module-specific.
 - Some older module pages still use local card/table styles and should be migrated gradually without changing workflows.
+# EPIC UI001 Update (2026-07-17)
+
+`EnterpriseWorkspace` is now the canonical module-root composition derived
+from Inventory. Components shares one wrapper across all tabs; Production, QC,
+Yard, Projects, Logistics, Suppliers and Administration use the same root
+hierarchy. Existing page business/data composition remains module-owned.

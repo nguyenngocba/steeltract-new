@@ -9,6 +9,7 @@ describe('ProductionReservationService draft semantics', () => {
       orderNo: 'PO-001',
       bomId: 'bom-1',
       quantity: 1,
+      status: 'RELEASED',
       bom: {
         items: [
           {
@@ -22,6 +23,7 @@ describe('ProductionReservationService draft semantics', () => {
       },
     };
     const repository = {
+      transaction: jest.fn((callback) => callback({ marker: 'tx' })),
       findOrderWithBom: jest.fn().mockResolvedValue(order),
       nextReservationNo: jest.fn().mockResolvedValue('RSV-001'),
       create: jest.fn().mockResolvedValue({ id: 'reservation-1' }),
@@ -41,5 +43,28 @@ describe('ProductionReservationService draft semantics', () => {
     expect(repository.create).toHaveBeenCalled();
     expect(ledger.createReservationEntries).not.toHaveBeenCalled();
     expect(ledger.createMaterialEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects reservation demand before the production order is released', async () => {
+    const repository = {
+      transaction: jest.fn((callback) => callback({ marker: 'tx' })),
+      findOrderWithBom: jest.fn().mockResolvedValue({
+        id: 'order-1',
+        orderNo: 'PO-001',
+        bomId: 'bom-1',
+        quantity: 1,
+        status: 'DRAFT',
+        bom: { items: [{ id: 'line-1' }] },
+      }),
+    } as unknown as ProductionReservationRepository;
+    const service = new ProductionReservationService(
+      repository,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.create('order-1', { autoReserve: false }, 'operator-1'),
+    ).rejects.toThrow('Material reservation requires');
   });
 });

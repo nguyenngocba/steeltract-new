@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Package } from 'lucide-react'
 
-import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
 import { ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
@@ -108,7 +108,7 @@ export function ComponentsStockPage() {
   }), [components])
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <CockpitKpiCard title="Tổng cấu kiện" value={formatQuantity(lifecycleCounts.total, 0)} note="Tất cả lifecycle" tone="blue" state="normal" onClick={() => setStatusFilter('')} trendData={[1, 2, 3, 5, lifecycleCounts.total]} />
@@ -216,6 +216,6 @@ export function ComponentsStockPage() {
           </>
         ) : null}
       </ModuleDetailDrawer>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   )
 }

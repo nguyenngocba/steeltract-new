@@ -1,9 +1,11 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 
+import { JwtAuthGuard } from '../../modules/auth/jwt-auth.guard';
 import { CacheService } from './cache.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { RuntimeHealthService } from './runtime-health.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('performance')
 export class PerformanceController {
   constructor(

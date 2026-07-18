@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
 import { useCreateTransaction } from '../../../inventory/hooks/useCreateTransaction'
@@ -277,7 +277,7 @@ export function ComponentsMaterialStockPage() {
   }
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-6">
           <CockpitKpiCard title="Tổng mã vật tư SX" value={formatQuantity(rows.length, 0)} state="normal" tone="cyan" />
@@ -431,6 +431,6 @@ export function ComponentsMaterialStockPage() {
           </div>
         ) : null}
       </ModuleDetailDrawer>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   )
 }

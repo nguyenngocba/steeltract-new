@@ -11,7 +11,9 @@ export class YardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   transaction<T>(fn: (tx: YardTx) => Promise<T>) {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   }
 
   createZone(data: Prisma.YardZoneCreateInput, tx: YardTx = this.prisma) {
@@ -158,6 +160,31 @@ export class YardRepository {
       where: { id },
       include: this.placementInclude(),
     });
+  }
+
+  findActivePlacementForItem(
+    itemType: Prisma.EnumYardItemTypeFilter['equals'],
+    itemId: string,
+    tx: YardTx = this.prisma,
+  ) {
+    return tx.yardItemPlacement.findFirst({
+      where: { itemType, itemId, removedAt: null },
+      include: this.placementInclude(),
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updatePlacementVersioned(
+    id: string,
+    expectedUpdatedAt: Date,
+    data: Prisma.YardItemPlacementUncheckedUpdateManyInput,
+    tx: YardTx,
+  ) {
+    const result = await tx.yardItemPlacement.updateMany({
+      where: { id, updatedAt: expectedUpdatedAt },
+      data,
+    });
+    return result.count === 1 ? this.findPlacementById(id, tx) : null;
   }
 
   findActivePlacementsForSlot(slotId: string, tx: YardTx = this.prisma) {
@@ -399,6 +426,10 @@ export class YardRepository {
       create: data,
       update: {},
     });
+  }
+
+  findOutboxEvent(idempotencyKey: string, tx: YardTx) {
+    return tx.outboxEvent.findUnique({ where: { idempotencyKey } });
   }
 
   findComponentForOutbound(id: string, tx: YardTx) {

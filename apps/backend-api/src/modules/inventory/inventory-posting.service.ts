@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
-import { Prisma, TransactionType } from '@prisma/client';
+import { TransactionType } from '@prisma/client';
 
 import { inventoryCodePrefix } from './inventory-transaction-code';
 import { InventoryEventService } from './inventory-event.service';
@@ -58,13 +58,11 @@ export class InventoryPostingService {
     ];
     const costs = await this.averageCosts(materialIds, tx);
 
-    const materials = new Map<
-      string,
-      {
-        unit: string | null;
-        unitMaster: { code: string; symbol: string } | null;
-      }
-    >();
+    const postingItems = await this.repository.findPostingItemsByIds(
+      materialIds,
+      tx,
+    );
+    const materials = new Map(postingItems.map((item) => [item.id, item]));
     for (const line of command.lines) {
       if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
         throw new BadRequestException(
@@ -72,23 +70,27 @@ export class InventoryPostingService {
         );
       }
 
-      const item = await this.repository.findItemById(line.inventoryItemId, tx);
+      const item = materials.get(line.inventoryItemId);
       if (!item) {
         throw new BadRequestException(
           `Material not found: ${line.inventoryItemId}`,
         );
       }
-      materials.set(line.inventoryItemId, item);
     }
 
     if (kind === 'ISSUE') {
-      for (const bucket of aggregateInventoryBuckets(command.lines)) {
-        const stock = await this.repository.findLocationStockBucket(bucket, tx);
+      const buckets = aggregateInventoryBuckets(command.lines);
+      const stocks = await this.repository.findLocationStockBuckets(
+        buckets,
+        tx,
+      );
+      const stockByBucket = new Map(
+        stocks.map((stock) => [inventoryBucketKey(stock), stock]),
+      );
+      for (const bucket of buckets) {
+        const stock = stockByBucket.get(inventoryBucketKey(bucket));
         if (Number(stock?.quantity ?? 0) + 0.000001 < bucket.quantity) {
-          const item = await this.repository.findItemById(
-            bucket.inventoryItemId,
-            tx,
-          );
+          const item = materials.get(bucket.inventoryItemId);
           throw new BadRequestException(
             `Insufficient stock for ${item?.code ?? bucket.inventoryItemId} at selected location`,
           );
@@ -267,29 +269,12 @@ export class InventoryPostingService {
     materialIds: string[],
     tx: InventoryPostingTransaction,
   ) {
-    const rows = await this.repository.findInboundCostLines(materialIds, tx);
-    const totals = new Map<string, { quantity: number; value: number }>();
-
-    rows.forEach((row) => {
-      const quantity = Math.abs(Number(row.quantity ?? 0));
-      const value =
-        row.totalAmount != null
-          ? Math.abs(Number(row.totalAmount))
-          : Math.abs(Number(row.unitPrice ?? 0)) * quantity;
-      if (quantity <= 0 || value <= 0) return;
-      const total = totals.get(row.inventoryItemId) ?? {
-        quantity: 0,
-        value: 0,
-      };
-      total.quantity += quantity;
-      total.value += value;
-      totals.set(row.inventoryItemId, total);
-    });
+    const totals = await this.repository.aggregateInboundCosts(materialIds, tx);
 
     return new Map(
-      [...totals.entries()].map(([id, total]) => [
-        id,
-        total.quantity > 0 ? total.value / total.quantity : 0,
+      totals.map((total) => [
+        total.inventoryItemId,
+        total.totalQuantity > 0 ? total.totalValue / total.totalQuantity : 0,
       ]),
     );
   }

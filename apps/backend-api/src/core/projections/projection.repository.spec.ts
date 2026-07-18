@@ -107,4 +107,58 @@ describe('ProjectionRepository', () => {
       }),
     );
   });
+
+  it('uses a stable keyset cursor and skips exact count when requested', async () => {
+    const sourceOccurredAt = new Date('2026-07-17T02:00:00.000Z');
+    const findMany = jest.fn().mockResolvedValue([
+      { id: 'doc-3', sourceOccurredAt },
+      { id: 'doc-2', sourceOccurredAt },
+      { id: 'doc-1', sourceOccurredAt },
+    ]);
+    const count = jest.fn();
+    const repository = new ProjectionRepository({
+      enterpriseProjectionDocument: { findMany, count },
+    } as never);
+
+    await expect(
+      repository.listDocuments('ProductionOrderSummary', {
+        page: 1,
+        limit: 2,
+        cursor: { sourceOccurredAt, id: 'doc-4' },
+        withTotal: false,
+      }),
+    ).resolves.toEqual({
+      items: [
+        { id: 'doc-3', sourceOccurredAt },
+        { id: 'doc-2', sourceOccurredAt },
+      ],
+      nextCursor: { sourceOccurredAt, id: 'doc-2' },
+      meta: {
+        page: 1,
+        limit: 2,
+        total: null,
+        totalPages: null,
+        hasMore: true,
+      },
+    });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ sourceOccurredAt: 'desc' }, { id: 'desc' }],
+        skip: undefined,
+        take: 3,
+        where: expect.objectContaining({
+          AND: [
+            {
+              OR: [
+                { sourceOccurredAt: { lt: sourceOccurredAt } },
+                { sourceOccurredAt, id: { lt: 'doc-4' } },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+    expect(count).not.toHaveBeenCalled();
+  });
 });

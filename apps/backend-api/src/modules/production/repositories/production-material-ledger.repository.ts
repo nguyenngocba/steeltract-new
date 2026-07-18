@@ -54,6 +54,24 @@ export class ProductionMaterialLedgerRepository {
     });
   }
 
+  findOutboxEvent(idempotencyKey: string, tx: ProductionLedgerTx) {
+    return tx.outboxEvent.findUnique({ where: { idempotencyKey } });
+  }
+
+  createProductionLog(
+    data: Prisma.ProductionLogUncheckedCreateInput,
+    tx: ProductionLedgerTx,
+  ) {
+    return tx.productionLog.create({ data });
+  }
+
+  createActivityLog(
+    data: Prisma.ActivityLogCreateInput,
+    tx: ProductionLedgerTx,
+  ) {
+    return tx.activityLog.create({ data });
+  }
+
   include() {
     return {
       productionOrder: {

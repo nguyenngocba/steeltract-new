@@ -12,7 +12,9 @@ export class ProductionReservationRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   transaction<T>(fn: (tx: ProductionReservationTx) => Promise<T>) {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   }
 
   findMany(params: {
@@ -33,15 +35,18 @@ export class ProductionReservationRepository {
     });
   }
 
-  findById(id: string) {
-    return this.prisma.productionMaterialReservation.findUnique({
+  findById(id: string, tx: ProductionReservationTx = this.prisma) {
+    return tx.productionMaterialReservation.findUnique({
       where: { id },
       include: this.include(),
     });
   }
 
-  create(data: Prisma.ProductionMaterialReservationUncheckedCreateInput) {
-    return this.prisma.productionMaterialReservation.create({
+  create(
+    data: Prisma.ProductionMaterialReservationUncheckedCreateInput,
+    tx: ProductionReservationTx = this.prisma,
+  ) {
+    return tx.productionMaterialReservation.create({
       data,
       include: this.include(),
     });
@@ -71,8 +76,11 @@ export class ProductionReservationRepository {
     });
   }
 
-  findOrderWithBom(productionOrderId: string) {
-    return this.prisma.productionOrder.findUnique({
+  findOrderWithBom(
+    productionOrderId: string,
+    tx: ProductionReservationTx = this.prisma,
+  ) {
+    return tx.productionOrder.findUnique({
       where: { id: productionOrderId },
       include: {
         bom: {
@@ -94,8 +102,9 @@ export class ProductionReservationRepository {
     materialIds: string[],
     activeStatuses: ProductionMaterialReservationStatus[],
     excludeReservationId?: string,
+    tx: ProductionReservationTx = this.prisma,
   ) {
-    return this.prisma.productionMaterialReservationLine.findMany({
+    return tx.productionMaterialReservationLine.findMany({
       where: {
         inventoryItemId: { in: materialIds },
         reservationId: excludeReservationId
@@ -108,9 +117,9 @@ export class ProductionReservationRepository {
     });
   }
 
-  nextReservationNo() {
+  nextReservationNo(tx: ProductionReservationTx = this.prisma) {
     return nextOperationalCode(
-      this.prisma,
+      tx,
       'productionMaterialReservation',
       'reservationNo',
       'RSV',

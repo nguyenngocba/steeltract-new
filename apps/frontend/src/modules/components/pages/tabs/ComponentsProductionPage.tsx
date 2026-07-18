@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Clock, Package, Settings } from 'lucide-react'
 
-import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
 import { ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { useProductionOrders } from '../../hooks/queries/useComponents'
@@ -49,7 +49,7 @@ export function ComponentsProductionPage() {
   const recentOrders = productionOrders.slice(0, 5)
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
           <CockpitKpiCard title="Tổng lệnh SX" value={formatQuantity(productionOrders.length, 0)} note="Tất cả lệnh" tone="blue" state="normal" trendData={[1, 2, 3, 5, productionOrders.length]} />
@@ -164,6 +164,6 @@ export function ComponentsProductionPage() {
           </>
         ) : null}
       </ModuleDetailDrawer>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   )
 }

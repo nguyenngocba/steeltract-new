@@ -10,6 +10,7 @@ import { QcCockpitRepository } from './repositories/qc-cockpit.repository';
 import { QcReadModelRepository } from './repositories/qc-read-model.repository';
 import { QcReadModelService } from './services/qc-read-model.service';
 import { QcService } from './services/qc.service';
+import { QcCommandService } from './services/qc-command.service';
 import { QcSnapshotReadService } from './services/qc-snapshot-read.service';
 import { QcController } from './qc.controller';
 
@@ -24,12 +25,13 @@ import { QcController } from './qc.controller';
   controllers: [QcController],
   providers: [
     QcService,
+    QcCommandService,
     QcReadModelService,
     QcSnapshotReadService,
     QcRepository,
     QcCockpitRepository,
     QcReadModelRepository,
   ],
-  exports: [QcService, QcSnapshotReadService],
+  exports: [QcService, QcCommandService, QcSnapshotReadService],
 })
 export class QcModule {}

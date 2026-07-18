@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
+import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
 import { ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
 import { useYardMovementsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
@@ -30,7 +30,7 @@ export function ComponentsTransfersPage() {
   const recentRows = rows.slice(0, 5)
 
   return (
-    <EnterpriseModulePage>
+    <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-4">
           <CockpitKpiCard title="Tổng lệnh chuyển" value={formatQuantity(rows.length, 0)} state="normal" tone="cyan" />
@@ -116,6 +116,6 @@ export function ComponentsTransfersPage() {
           </div>
         </div>
       </div>
-    </EnterpriseModulePage>
+    </ComponentsWorkspace>
   )
 }

@@ -298,6 +298,67 @@ export class ProjectionRegistryService {
           event.eventName === 'component.reactivated',
       }),
     ),
+    latest(
+      'QcInspectionSummary',
+      (name) => name.startsWith('qc.inspection.'),
+      ['inspectionId'],
+      ['productionOrderId', 'componentId'],
+    ),
+    latest(
+      'QcNcrSummary',
+      (name) =>
+        name.startsWith('qc.ncr.') || name.startsWith('qc.disposition.'),
+      ['ncrId', 'dispositionId'],
+      ['inspectionId', 'productionOrderId'],
+    ),
+    timeline('QcTimeline', (name) => name.startsWith('qc.'), [
+      'inspectionId',
+      'ncrId',
+      'productionOrderId',
+    ]),
+    latest(
+      'YardItemSummary',
+      (name) => name.startsWith('yard.item.'),
+      ['yardItemId', 'itemId', 'placementId'],
+      ['zoneId'],
+    ),
+    timeline('YardMovementTimeline', (name) => name.startsWith('yard.item.'), [
+      'yardItemId',
+      'itemId',
+      'placementId',
+    ]),
+    latest(
+      'YardLoadingSummary',
+      (name) => name.startsWith('yard.loading.'),
+      ['loadingTaskId', 'shipmentId'],
+      ['shipmentId'],
+    ),
+    latest(
+      'ShipmentSummary',
+      (name) => name.startsWith('logistics.shipment.'),
+      ['shipmentId', 'dispatchId'],
+      ['projectId'],
+    ),
+    timeline(
+      'ShipmentTimeline',
+      (name) => name.startsWith('logistics.shipment.'),
+      ['shipmentId', 'dispatchId'],
+    ),
+    latest(
+      'ProjectMaterialAllocation',
+      (name) => name === 'project.material.allocated',
+      ['allocationId'],
+      ['projectId', 'taskId'],
+    ),
+    latest(
+      'ProjectAcceptanceSummary',
+      (name) => name === 'project.acceptance.completed',
+      ['acceptanceId'],
+      ['projectId'],
+    ),
+    timeline('ProjectTimeline', (name) => name.startsWith('project.'), [
+      'projectId',
+    ]),
   ];
 
   all() {

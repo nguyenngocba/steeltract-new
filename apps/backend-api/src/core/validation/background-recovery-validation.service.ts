@@ -1,11 +1,5 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
-import {
-  BackgroundJobStatus,
-  OutboxEventStatus,
-} from '@prisma/client';
+import { Inject, Injectable } from '@nestjs/common';
+import { BackgroundJobStatus, OutboxEventStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -17,6 +11,7 @@ export class BackgroundRecoveryValidationService {
   ) {}
 
   async validate() {
+    const staleBefore = new Date(Date.now() - this.lockTimeoutMs());
     const [
       snapshotJobs,
       retryJobs,
@@ -26,6 +21,8 @@ export class BackgroundRecoveryValidationService {
       failedOutbox,
       deadLetterOutbox,
       duplicateOutboxKeys,
+      staleRunningJobs,
+      staleDispatchingOutbox,
       recentExecutions,
     ] = await Promise.all([
       this.prisma.backgroundJob.count({
@@ -63,6 +60,21 @@ export class BackgroundRecoveryValidationService {
         },
       }),
       this.duplicateOutboxKeys(),
+      this.prisma.backgroundJob.count({
+        where: {
+          status: BackgroundJobStatus.RUNNING,
+          OR: [
+            { heartbeatAt: { lt: staleBefore } },
+            { heartbeatAt: null, lockedAt: { lt: staleBefore } },
+          ],
+        },
+      }),
+      this.prisma.outboxEvent.count({
+        where: {
+          status: OutboxEventStatus.DISPATCHING,
+          lockedAt: { lt: staleBefore },
+        },
+      }),
       this.prisma.jobExecution.findMany({
         orderBy: {
           startedAt: 'desc',
@@ -85,13 +97,18 @@ export class BackgroundRecoveryValidationService {
         duplicateBackgroundJobKeys: duplicateJobKeys,
         duplicateOutboxKeys,
         healthy:
-          duplicateJobKeys.length === 0 &&
-          duplicateOutboxKeys.length === 0,
+          duplicateJobKeys.length === 0 && duplicateOutboxKeys.length === 0,
       },
       outboxReplay: {
         pendingOutbox,
         failedOutbox,
         deadLetterOutbox,
+      },
+      staleLocks: {
+        thresholdMs: this.lockTimeoutMs(),
+        backgroundJobs: staleRunningJobs,
+        outboxEvents: staleDispatchingOutbox,
+        healthy: staleRunningJobs === 0 && staleDispatchingOutbox === 0,
       },
       recentExecutions: recentExecutions.map((row) => ({
         id: row.id,
@@ -106,30 +123,43 @@ export class BackgroundRecoveryValidationService {
   }
 
   private duplicateBackgroundJobKeys() {
-    return this.prisma.backgroundJob.groupBy({
-      by: ['idempotencyKey'],
-      where: {
-        idempotencyKey: {
-          not: null,
+    return this.prisma.backgroundJob
+      .groupBy({
+        by: ['idempotencyKey'],
+        where: {
+          idempotencyKey: {
+            not: null,
+          },
         },
-      },
-      _count: {
-        _all: true,
-      },
-    }).then((rows) => rows.filter((row) => row._count._all > 1));
+        _count: {
+          _all: true,
+        },
+      })
+      .then((rows) => rows.filter((row) => row._count._all > 1));
   }
 
   private duplicateOutboxKeys() {
-    return this.prisma.outboxEvent.groupBy({
-      by: ['idempotencyKey'],
-      where: {
-        idempotencyKey: {
-          not: null,
+    return this.prisma.outboxEvent
+      .groupBy({
+        by: ['idempotencyKey'],
+        where: {
+          idempotencyKey: {
+            not: null,
+          },
         },
-      },
-      _count: {
-        _all: true,
-      },
-    }).then((rows) => rows.filter((row) => row._count._all > 1));
+        _count: {
+          _all: true,
+        },
+      })
+      .then((rows) => rows.filter((row) => row._count._all > 1));
+  }
+
+  private lockTimeoutMs() {
+    const configured = Number(process.env.BACKGROUND_LOCK_STALE_MS ?? 300_000);
+    if (!Number.isFinite(configured)) {
+      return 300_000;
+    }
+
+    return Math.min(Math.max(Math.floor(configured), 30_000), 3_600_000);
   }
 }

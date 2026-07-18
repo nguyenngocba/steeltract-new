@@ -9,6 +9,28 @@ import { nextOperationalCode } from '../../common/utils/code-generator';
 
 type DbClient = PrismaService | Prisma.TransactionClient;
 
+type PostingInventoryItem = {
+  id: string;
+  code: string;
+  unit: string | null;
+  unitMaster: { code: string; symbol: string } | null;
+};
+
+type AggregatedInboundCost = {
+  inventoryItemId: string;
+  totalQuantity: number;
+  totalValue: number;
+};
+
+type LocationStockBucketRow = {
+  inventoryItemId: string;
+  warehouseId: string | null;
+  zoneId: string | null;
+  slotId: string | null;
+  level: string | null;
+  quantity: number;
+};
+
 export type InventoryMaterialQuery = {
   page?: number;
   pageSize?: number;
@@ -62,6 +84,21 @@ export class InventoryRepository {
     return db.inventoryItem.findMany({
       where: { id: { in: ids } },
       select: { id: true, code: true, name: true },
+    });
+  }
+
+  findPostingItemsByIds(
+    ids: string[],
+    db: DbClient = this.prisma,
+  ): Promise<PostingInventoryItem[]> {
+    return db.inventoryItem.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        code: true,
+        unit: true,
+        unitMaster: { select: { code: true, symbol: true } },
+      },
     });
   }
 
@@ -1441,6 +1478,29 @@ export class InventoryRepository {
     });
   }
 
+  aggregateInboundCosts(
+    materialIds: string[],
+    db: DbClient = this.prisma,
+  ): Promise<AggregatedInboundCost[]> {
+    if (materialIds.length === 0) return Promise.resolve([]);
+    return db.$queryRaw<AggregatedInboundCost[]>(Prisma.sql`
+      SELECT
+        "inventoryItemId",
+        SUM(ABS(quantity))::double precision AS "totalQuantity",
+        SUM(
+          CASE
+            WHEN "totalAmount" IS NOT NULL THEN ABS("totalAmount")
+            ELSE ABS(COALESCE("unitPrice", 0)) * ABS(quantity)
+          END
+        )::double precision AS "totalValue"
+      FROM inventory_transaction_items
+      WHERE "inventoryItemId" IN (${Prisma.join(materialIds)})
+        AND quantity > 0
+        AND ("unitPrice" > 0 OR "totalAmount" > 0)
+      GROUP BY "inventoryItemId"
+    `);
+  }
+
   aggregateTransactionItemQuantity(
     inventoryItemId: string,
     db: DbClient = this.prisma,
@@ -1468,6 +1528,38 @@ export class InventoryRepository {
         zoneId: where.zoneId ?? null,
         slotId: where.slotId ?? null,
         level: where.level ?? null,
+      },
+    });
+  }
+
+  findLocationStockBuckets(
+    buckets: Array<{
+      inventoryItemId: string;
+      warehouseId?: string | null;
+      zoneId?: string | null;
+      slotId?: string | null;
+      level?: string | null;
+    }>,
+    db: DbClient = this.prisma,
+  ): Promise<LocationStockBucketRow[]> {
+    if (buckets.length === 0) return Promise.resolve([]);
+    return db.inventoryLocationStock.findMany({
+      where: {
+        OR: buckets.map((bucket) => ({
+          inventoryItemId: bucket.inventoryItemId,
+          warehouseId: bucket.warehouseId ?? null,
+          zoneId: bucket.zoneId ?? null,
+          slotId: bucket.slotId ?? null,
+          level: bucket.level ?? null,
+        })),
+      },
+      select: {
+        inventoryItemId: true,
+        warehouseId: true,
+        zoneId: true,
+        slotId: true,
+        level: true,
+        quantity: true,
       },
     });
   }

@@ -74,9 +74,12 @@ export class JobSchedulerService {
         {
           createdAt: 'desc',
         },
+        {
+          id: 'desc',
+        },
       ],
       skip: params.skip,
-      take: params.take,
+      take: Math.min(params.take ?? 100, 100),
     });
   }
 
@@ -123,9 +126,10 @@ export class JobSchedulerService {
   private includeExecutions() {
     return {
       executions: {
-        orderBy: {
-          startedAt: 'desc' as const,
-        },
+        orderBy: [
+          { startedAt: 'desc' as const },
+          { id: 'desc' as const },
+        ],
         take: 10,
       },
     };

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { BarChart3, FileText, PackageSearch, Pencil, Search, Star, Truck, X, type LucideIcon } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
-import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
-import { SectionHeader } from '@/shared/ui/enterprise'
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { CockpitKpiCard } from '@/shared/ui/cockpit'
 import { SupplierFormModal } from '../components/SupplierFormModal'
 import {
   useCreateSupplierMutation,
@@ -98,16 +98,16 @@ export function SuppliersPage() {
   }
 
   return (
-    <EnterpriseModulePage>
-      <SectionHeader
-        title="Nhà cung cấp"
-        description={isSupplierListView ? 'Danh sách nhà cung cấp liên kết Inventory inbound và supplier master.' : 'Không gian nghiệp vụ nhà cung cấp được đồng bộ với sidebar và URL.'}
-      />
-
+    <EnterpriseWorkspace
+      eyebrow="Đối tác"
+      title="Nhà cung cấp"
+      description={isSupplierListView ? 'Danh sách nhà cung cấp liên kết Inventory inbound và supplier master.' : 'Không gian nghiệp vụ nhà cung cấp được đồng bộ với sidebar và URL.'}
+      breadcrumbs={['Mua hàng', 'Nhà cung cấp']}
+      tabs={supplierTabs}
+      activeTab={moduleTab}
+      actions={<button type="button" className={primaryButton} onClick={openCreateModal}>+ Thêm nhà cung cấp</button>}
+    >
       <div className="space-y-4">
-        <nav className={`${panel} flex flex-wrap gap-1 p-1`}>
-          {supplierTabs.map((tab) => <Link key={tab.id} to={tab.path} className={`rounded-lg px-4 py-2 text-xs transition ${moduleTab === tab.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>{tab.label}</Link>)}
-        </nav>
 
         {isSupplierListView ? <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -132,7 +132,6 @@ export function SuppliersPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button onClick={openCreateModal} className={primaryButton}>+ Tạo nhà cung cấp</button>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1fr_330px]">
@@ -224,18 +223,12 @@ export function SuppliersPage() {
         onClose={() => setOpenModal(false)}
         onSubmit={handleSubmit}
       />
-    </EnterpriseModulePage>
+    </EnterpriseWorkspace>
   )
 }
 
 function KpiCard({ title, value, note, tone = 'cyan' }: { title: string; value: number; note: string; tone?: 'cyan' | 'emerald' | 'amber' }) {
-  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-400 text-emerald-200' : tone === 'amber' ? 'from-amber-500 to-orange-400 text-amber-200' : 'from-blue-500 to-cyan-400 text-cyan-200'
-  return <div className={`${panel} relative overflow-hidden p-4`}>
-    <div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`} />
-    <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">{title}</div>
-    <div className="mt-3 text-3xl font-semibold text-white">{fmt(value)}</div>
-    <div className="mt-1 text-xs text-slate-500">{note}</div>
-  </div>
+  return <CockpitKpiCard title={title} value={fmt(value)} note={note} tone={tone} />
 }
 
 function SupplierNavigationPlaceholder({ tab }: { tab: SupplierModuleTab }) {

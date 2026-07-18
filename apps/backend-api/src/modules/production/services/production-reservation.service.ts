@@ -6,6 +6,7 @@ import {
 
 import {
   Prisma,
+  ProductionOrderStatus,
   ProductionMaterialLedgerEventType,
   ProductionMaterialReservationStatus,
   ProductionMaterialReservationLineStatus,
@@ -20,7 +21,10 @@ import {
   ReleaseProductionReservationDto,
 } from '../dto/production.dto';
 import { productionMaterialEvents } from '../domain/production-material-contracts';
-import { ProductionReservationRepository } from '../repositories/production-reservation.repository';
+import {
+  ProductionReservationRepository,
+  ProductionReservationTx,
+} from '../repositories/production-reservation.repository';
 import { ProductionMaterialLedgerService } from './production-material-ledger.service';
 
 const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
@@ -29,6 +33,13 @@ const activeReservationStatuses: ProductionMaterialReservationStatus[] = [
 ];
 
 const epsilon = 0.000001;
+
+const reservationOrderStatuses = new Set<ProductionOrderStatus>([
+  ProductionOrderStatus.RELEASED,
+  ProductionOrderStatus.READY,
+  ProductionOrderStatus.IN_PROGRESS,
+  ProductionOrderStatus.PAUSED,
+]);
 
 type StockBucket = {
   inventoryItemId: string;
@@ -128,22 +139,28 @@ export class ProductionReservationService {
     dto: CreateProductionReservationDto,
     actorId?: string,
   ) {
-    const order = await this.getOrderWithBom(productionOrderId);
-    const reservation = await this.repository.create({
-      reservationNo: await this.nextReservationNo(order.orderNo),
-      productionOrderId: order.id,
-      bomId: order.bomId,
-      expiresAt: dto.expiresAt,
-      note: dto.note,
-      lines: {
-        create: (order.bom?.items ?? []).map((item) => ({
-          bomItemId: item.id,
-          inventoryItemId: item.materialId,
-          requiredQty:
-            item.quantity * (1 + item.wastePercent / 100) * order.quantity,
-          status: ProductionMaterialReservationLineStatus.OPEN,
-        })),
-      },
+    const reservation = await this.repository.transaction(async (tx) => {
+      const order = await this.getOrderWithBom(productionOrderId, tx);
+      this.assertReservationOrderState(order.status);
+      return this.repository.create(
+        {
+          reservationNo: await this.repository.nextReservationNo(tx),
+          productionOrderId: order.id,
+          bomId: order.bomId,
+          expiresAt: dto.expiresAt,
+          note: dto.note,
+          lines: {
+            create: (order.bom?.items ?? []).map((item) => ({
+              bomItemId: item.id,
+              inventoryItemId: item.materialId,
+              requiredQty:
+                item.quantity * (1 + item.wastePercent / 100) * order.quantity,
+              status: ProductionMaterialReservationLineStatus.OPEN,
+            })),
+          },
+        },
+        tx,
+      );
     });
 
     if (dto.autoReserve) {
@@ -158,26 +175,36 @@ export class ProductionReservationService {
     dto: ReserveProductionReservationDto = {},
     actorId?: string,
   ) {
-    const existing = await this.findOne(id);
-    if (existing.status !== ProductionMaterialReservationStatus.DRAFT) {
-      throw new BadRequestException('Only draft reservations can be reserved');
-    }
-
-    const order = await this.getOrderWithBom(existing.productionOrderId);
-    const previewLines = await this.buildPreviewLines(order, existing.id);
-    const shortages = previewLines.filter((line) => line.shortageQty > epsilon);
-    if (shortages.length) {
-      throw new BadRequestException(
-        `Không đủ vật tư kho SX để giữ chỗ: ${shortages
-          .map(
-            (line) =>
-              `${line.materialCode} thiếu ${line.shortageQty.toLocaleString('vi-VN')}`,
-          )
-          .join('; ')}`,
-      );
-    }
-
     await this.repository.transaction(async (tx) => {
+      const existing = await this.repository.findById(id, tx);
+      if (!existing) {
+        throw new NotFoundException(
+          'Production material reservation not found',
+        );
+      }
+      if (existing.status !== ProductionMaterialReservationStatus.DRAFT) {
+        throw new BadRequestException(
+          'Only draft reservations can be reserved',
+        );
+      }
+
+      const order = await this.getOrderWithBom(existing.productionOrderId, tx);
+      this.assertReservationOrderState(order.status);
+      const previewLines = await this.buildPreviewLines(order, existing.id, tx);
+      const shortages = previewLines.filter(
+        (line) => line.shortageQty > epsilon,
+      );
+      if (shortages.length) {
+        throw new BadRequestException(
+          `Không đủ vật tư kho SX để giữ chỗ: ${shortages
+            .map(
+              (line) =>
+                `${line.materialCode} thiếu ${line.shortageQty.toLocaleString('vi-VN')}`,
+            )
+            .join('; ')}`,
+        );
+      }
+
       await this.repository.deleteLines(id, tx);
 
       const ledgerLines: Array<{
@@ -275,12 +302,19 @@ export class ProductionReservationService {
     dto: ReleaseProductionReservationDto = {},
     actorId?: string,
   ) {
-    const reservation = await this.findOne(id);
-    if (!activeReservationStatuses.includes(reservation.status)) {
-      throw new BadRequestException('Only active reservations can be released');
-    }
-
     await this.repository.transaction(async (tx) => {
+      const reservation = await this.repository.findById(id, tx);
+      if (!reservation) {
+        throw new NotFoundException(
+          'Production material reservation not found',
+        );
+      }
+      if (!activeReservationStatuses.includes(reservation.status)) {
+        throw new BadRequestException(
+          'Only active reservations can be released',
+        );
+      }
+
       const releasedQuantity = this.sum(
         reservation.lines.map((line) =>
           Math.max(
@@ -358,17 +392,22 @@ export class ProductionReservationService {
     dto: ReleaseProductionReservationDto = {},
     actorId?: string,
   ) {
-    const reservation = await this.findOne(id);
-    if (
-      ![
-        ProductionMaterialReservationStatus.DRAFT,
-        ...activeReservationStatuses,
-      ].includes(reservation.status)
-    ) {
-      throw new BadRequestException('Reservation cannot be expired');
-    }
-
     await this.repository.transaction(async (tx) => {
+      const reservation = await this.repository.findById(id, tx);
+      if (!reservation) {
+        throw new NotFoundException(
+          'Production material reservation not found',
+        );
+      }
+      if (
+        ![
+          ProductionMaterialReservationStatus.DRAFT,
+          ...activeReservationStatuses,
+        ].includes(reservation.status)
+      ) {
+        throw new BadRequestException('Reservation cannot be expired');
+      }
+
       const releasedQuantity = this.sum(
         reservation.lines.map((line) =>
           Math.max(
@@ -454,12 +493,17 @@ export class ProductionReservationService {
       };
     }>,
     excludeReservationId?: string,
+    tx?: ProductionReservationTx,
   ): Promise<PreviewLine[]> {
     const bomItems = order.bom?.items ?? [];
     const materialIds = [...new Set(bomItems.map((item) => item.materialId))];
     const [stockBuckets, reservedByBucket] = await Promise.all([
-      this.productionStockBuckets(materialIds),
-      this.activeReservedQuantityByBucket(materialIds, excludeReservationId),
+      this.productionStockBuckets(materialIds, tx),
+      this.activeReservedQuantityByBucket(
+        materialIds,
+        excludeReservationId,
+        tx,
+      ),
     ]);
 
     return bomItems.map((item) => {
@@ -522,8 +566,11 @@ export class ProductionReservationService {
     });
   }
 
-  private async getOrderWithBom(productionOrderId: string) {
-    const order = await this.repository.findOrderWithBom(productionOrderId);
+  private async getOrderWithBom(
+    productionOrderId: string,
+    tx?: ProductionReservationTx,
+  ) {
+    const order = await this.repository.findOrderWithBom(productionOrderId, tx);
 
     if (!order) {
       throw new NotFoundException('Production order not found');
@@ -538,21 +585,25 @@ export class ProductionReservationService {
     return order;
   }
 
-  private async productionStockBuckets(materialIds: string[]) {
+  private async productionStockBuckets(
+    materialIds: string[],
+    tx?: ProductionReservationTx,
+  ) {
     const buckets = new Map<string, StockBucket[]>();
     if (!materialIds.length) return buckets;
 
-    const productionWarehouse = await this.inventoryRepository.findWarehouseByCode(
-      'PRODUCTION',
-    );
+    const productionWarehouse =
+      await this.inventoryRepository.findWarehouseByCode('PRODUCTION', tx);
 
     if (!productionWarehouse) return buckets;
 
-    const locationStocks = await this.inventoryRepository.findPositiveLocationStocks(
-      materialIds,
-      productionWarehouse.id,
-      'PRODUCTION',
-    );
+    const locationStocks =
+      await this.inventoryRepository.findPositiveLocationStocks(
+        materialIds,
+        productionWarehouse.id,
+        'PRODUCTION',
+        tx,
+      );
 
     for (const row of locationStocks) {
       this.addBucketQuantity(buckets, row.inventoryItemId, {
@@ -575,6 +626,7 @@ export class ProductionReservationService {
   private async activeReservedQuantityByBucket(
     materialIds: string[],
     excludeReservationId?: string,
+    tx?: ProductionReservationTx,
   ) {
     const reservedByBucket = new Map<string, number>();
     if (!materialIds.length) return reservedByBucket;
@@ -583,6 +635,7 @@ export class ProductionReservationService {
       materialIds,
       activeReservationStatuses,
       excludeReservationId,
+      tx,
     );
 
     for (const line of lines) {
@@ -641,8 +694,12 @@ export class ProductionReservationService {
     ].join('|');
   }
 
-  private async nextReservationNo(_orderNo: string) {
-    return this.repository.nextReservationNo();
+  private assertReservationOrderState(status: ProductionOrderStatus) {
+    if (!reservationOrderStatuses.has(status)) {
+      throw new BadRequestException(
+        'Material reservation requires a released, ready, active, or paused production order',
+      );
+    }
   }
 
   private materialEventGroups(
@@ -666,7 +723,8 @@ export class ProductionReservationService {
         0,
       );
       if (quantity <= epsilon) continue;
-      const unit = line.inventoryItem.unitMaster?.symbol ?? line.inventoryItem.unit;
+      const unit =
+        line.inventoryItem.unitMaster?.symbol ?? line.inventoryItem.unit;
       if (!unit) {
         throw new BadRequestException('Inventory material unit is required');
       }

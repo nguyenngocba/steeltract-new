@@ -1066,6 +1066,7 @@ export class OperationsCenterService {
     return labels.map((table, index) => ({
       table,
       rows: counts[index] ?? 0,
+      estimated: true,
     }));
   }
 
