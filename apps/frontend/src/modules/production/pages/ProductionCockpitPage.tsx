@@ -243,21 +243,21 @@ export function ProductionCockpitPage() {
       <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
         {isWorkOrderMode ? (
           <>
-            <CockpitKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} note="Tất cả WO/MO" tone="blue" state="normal" />
-            <CockpitKpiCard title="Planned" value={number(planned)} note="Đã lập kế hoạch" tone="purple" state="normal" />
-            <CockpitKpiCard title="Released" value={number(released)} note="Sẵn sàng phát hành" tone="cyan" state="normal" />
-            <CockpitKpiCard title="In Progress" value={number(inProgress)} note="Đang sản xuất" tone="emerald" state="normal" />
-            <CockpitKpiCard title="Completed" value={number(completed)} note="Đã hoàn thành" tone="emerald" state="normal" />
-            <CockpitKpiCard title="Delayed" value={number(delayed)} note="Quá hạn/chậm tiến độ" tone="red" state="normal" />
+            <CockpitKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} note="Tất cả WO/MO" tone="blue" state="normal" trend={[planned, released, inProgress, completed]} />
+            <CockpitKpiCard title="Planned" value={number(planned)} note="Đã lập kế hoạch" tone="purple" state="normal" trend={[0, planned * 0.7, planned]} />
+            <CockpitKpiCard title="Released" value={number(released)} note="Sẵn sàng phát hành" tone="cyan" state="normal" trend={[0, released * 0.7, released]} />
+            <CockpitKpiCard title="In Progress" value={number(inProgress)} note="Đang sản xuất" tone="emerald" state="normal" trend={[0, inProgress * 0.7, inProgress]} />
+            <CockpitKpiCard title="Completed" value={number(completed)} note="Đã hoàn thành" tone="emerald" state="normal" trend={[0, completed * 0.65, completed]} />
+            <CockpitKpiCard title="Delayed" value={number(delayed)} note="Quá hạn/chậm tiến độ" tone="red" state="normal" trend={[0, delayed, delayed * 0.75]} />
           </>
         ) : (
           <>
-            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="cyan" state="normal" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} />
-            <CockpitKpiCard title="Hoàn thành hôm nay" value={number(completedToday)} note={`${number(completed)} hoàn thành tổng`} tone="emerald" state="normal" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} />
-            <CockpitKpiCard title="Chờ vật tư" value={number(waitingMaterial)} note="MO chưa có issue" tone="amber" state="normal" />
-            <CockpitKpiCard title="Trễ tiến độ" value={number(delayed)} note="Quá hạn hoặc delayed" tone="red" state="normal" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} />
-            <CockpitKpiCard title="Cấu kiện đang chạy" value={number(runningComponents)} note="Đang sản xuất" tone="purple" state="normal" />
-            <CockpitKpiCard title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} note="Theo BOM x MO" tone="blue" state="normal" />
+            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="cyan" state="normal" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} trend={[0, inProgress * 0.55, inProgress]} />
+            <CockpitKpiCard title="Hoàn thành hôm nay" value={number(completedToday)} note={`${number(completed)} hoàn thành tổng`} tone="emerald" state="normal" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} trend={[0, completedToday * 0.7, completedToday]} />
+            <CockpitKpiCard title="Chờ vật tư" value={number(waitingMaterial)} note="MO chưa có issue" tone="amber" state="normal" trend={[0, waitingMaterial, waitingMaterial * 0.8]} />
+            <CockpitKpiCard title="Trễ tiến độ" value={number(delayed)} note="Quá hạn hoặc delayed" tone="red" state="normal" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} trend={[0, delayed, delayed * 0.75]} />
+            <CockpitKpiCard title="Cấu kiện đang chạy" value={number(runningComponents)} note="Đang sản xuất" tone="purple" state="normal" trend={[0, runningComponents * 0.65, runningComponents]} />
+            <CockpitKpiCard title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} note="Theo BOM x MO" tone="blue" state="normal" trend={[0, productionWeight * 0.5, productionWeight]} />
           </>
         )}
       </div>
@@ -275,7 +275,7 @@ export function ProductionCockpitPage() {
         <button onClick={() => setCreateBomOpen(true)} className={`${inventoryMutedButton} xl:col-span-1`}>+ BOM</button>
       </ModuleFilterBar>
 
-      {workspacePending ? <ModuleEmptyState icon={<Factory size={20} />} title="Đang tải dữ liệu sản xuất" description="Workspace đang đồng bộ dữ liệu vận hành mới nhất." /> : workspaceError ? <ModuleEmptyState icon={<Wrench size={20} />} title="Không thể tải dữ liệu sản xuất" description="Kiểm tra kết nối rồi tải lại workspace." /> : <>
+      {workspacePending ? <ProductionWorkspaceState state="loading" /> : workspaceError ? <ProductionWorkspaceState state="error" /> : <>
       {mode === 'overview' && cockpit && <Overview readModel={cockpit} logs={logs} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'boms' && <Boms rows={filteredBoms} onOpen={setSelectedBom} onCreate={() => setCreateBomOpen(true)} />}
       {mode === 'orders' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
@@ -297,6 +297,69 @@ export function ProductionCockpitPage() {
       {createBomOpen && <ProductionBomModal components={components} onClose={() => setCreateBomOpen(false)} />}
       </div>
   </EnterpriseWorkspace>
+}
+
+function ProductionWorkspaceState({
+  state,
+}: {
+  state: 'loading' | 'error'
+}) {
+  const emptyRows = Array.from({ length: 14 })
+  const isLoading = state === 'loading'
+
+  return (
+    <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
+      <div className="xl:col-span-9">
+        <CockpitChartCard
+          title="Manufacturing order registry"
+          subtitle={isLoading ? 'Đang đồng bộ dữ liệu vận hành mới nhất' : 'Không thể tải dữ liệu sản xuất'}
+          action={<span className="text-[11px] text-cyan-300">0-0 / 0</span>}
+          heightClass={COCKPIT_HEIGHTS.TABLE_MD}
+        >
+          <div className="flex h-full min-h-0 flex-col">
+            <CockpitTableShell className="min-h-0 flex-1">
+              <table className="w-full min-w-[1180px] table-fixed text-left text-[13px]">
+                <thead className={inventoryTableHead}>
+                  <tr>
+                    {['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((heading) => (
+                      <th key={heading} className="px-1.5 py-0.5 text-left font-medium">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {emptyRows.map((_, index) => (
+                    <tr key={`production-state-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                      <td colSpan={8} className="h-[46px] px-2 py-2">
+                        <div className="h-px w-full bg-white/[0.035]" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <ModuleEmptyState
+                icon={isLoading ? <Factory size={20} /> : <Wrench size={20} />}
+                title={isLoading ? 'Đang tải dữ liệu sản xuất' : 'Không thể tải dữ liệu sản xuất'}
+                description={isLoading ? 'Workspace đang đồng bộ dữ liệu vận hành mới nhất.' : 'Kiểm tra kết nối rồi tải lại workspace.'}
+              />
+            </CockpitTableShell>
+            <DataTablePagination page={1} pageSize={14} total={0} onPageChange={() => undefined} />
+          </div>
+        </CockpitChartCard>
+      </div>
+
+      <aside className="space-y-1 xl:col-span-3">
+        <CockpitChartCard title="Tiến độ sản xuất" subtitle="Planning → Finished" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+          <ProductionDonut centerValue="0" centerLabel="WO" segments={[{ label: 'Chưa có dữ liệu', value: 1, color: '#64748b' }]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Material readiness" subtitle="Net issued / required" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+          <ProductionDonut centerValue="0" centerLabel="WO" segments={[{ label: 'Chưa có dữ liệu', value: 1, color: '#64748b' }]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="WO sắp trễ" subtitle="Sắp xếp theo Due Date" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+          <RankList rows={[]} empty={isLoading ? 'Đang tải danh sách WO' : 'Chưa có WO có hạn'} />
+        </CockpitChartCard>
+      </aside>
+    </div>
+  )
 }
 
 function ProductionIncidentsWorkspace({
@@ -382,12 +445,12 @@ function ProductionReportsWorkspace({
   return (
     <div className="space-y-1">
       <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-        <CockpitKpiCard title="Lệnh sản xuất" value={number(summary?.total ?? orders.length)} note="MO / WO hiện có" tone="blue" state="normal" />
-        <CockpitKpiCard title="Đang chạy xưởng" value={number(inProgress)} note="In progress" tone="cyan" state="normal" />
-        <CockpitKpiCard title="Hoàn thành" value={number(completed)} note="Completed" tone="emerald" state="normal" />
-        <CockpitKpiCard title="Steel issued" value={number(issuedQty)} note="Material issue" tone="purple" state="normal" />
-        <CockpitKpiCard title="Steel consumed" value={number(consumedQty)} note="Consumption" tone="amber" state="normal" />
-        <CockpitKpiCard title="Đang giữ chỗ" value={number(reservedQty)} note="Reservation" tone="red" state="normal" />
+        <CockpitKpiCard title="Lệnh sản xuất" value={number(summary?.total ?? orders.length)} note="MO / WO hiện có" tone="blue" state="normal" trend={[0, (summary?.total ?? orders.length) * 0.65, summary?.total ?? orders.length]} />
+        <CockpitKpiCard title="Đang chạy xưởng" value={number(inProgress)} note="In progress" tone="cyan" state="normal" trend={[0, inProgress * 0.7, inProgress]} />
+        <CockpitKpiCard title="Hoàn thành" value={number(completed)} note="Completed" tone="emerald" state="normal" trend={[0, completed * 0.65, completed]} />
+        <CockpitKpiCard title="Steel issued" value={number(issuedQty)} note="Material issue" tone="purple" state="normal" trend={[0, issuedQty * 0.7, issuedQty]} />
+        <CockpitKpiCard title="Steel consumed" value={number(consumedQty)} note="Consumption" tone="amber" state="normal" trend={[0, consumedQty * 0.7, consumedQty]} />
+        <CockpitKpiCard title="Đang giữ chỗ" value={number(reservedQty)} note="Reservation" tone="red" state="normal" trend={[0, reservedQty, reservedQty * 0.75]} />
       </div>
       <div className="grid gap-1 xl:grid-cols-12">
         <CockpitChartCard title="Hiệu suất sản xuất" subtitle="Status distribution" className={`${COCKPIT_HEIGHTS.CHART_LG} xl:col-span-4`}>
@@ -453,36 +516,6 @@ function Overview({
     .slice(0, 5)
 
   return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="grid grid-cols-1 gap-1 md:grid-cols-[2fr_1fr_1fr_1fr]">
-      <CockpitChartCard title="Thao tác nhanh" className="p-1.5">
-        <ActionCards compact />
-      </CockpitChartCard>
-      <CockpitChartCard title="Hoàn thành hôm nay" className="border-emerald-500/20 bg-emerald-500/5">
-        <ProductionSummaryTile
-          label="lệnh"
-          value={summary.completedToday}
-          note={`${formatQuantity(summary.completed, 0)} hoàn thành tổng`}
-          tone="text-emerald-300"
-        />
-      </CockpitChartCard>
-      <CockpitChartCard title="Chờ vật tư" className="border-amber-500/20 bg-amber-500/5">
-        <ProductionSummaryTile
-          label="MO"
-          value={summary.waitingMaterial}
-          note={`${formatQuantity(waiting, 0)} chờ · ${formatQuantity(shortage, 0)} thiếu`}
-          tone="text-amber-300"
-        />
-      </CockpitChartCard>
-      <CockpitChartCard title="Trễ tiến độ" className="border-red-500/20 bg-red-500/5">
-        <ProductionSummaryTile
-          label="lệnh"
-          value={summary.delayed}
-          note="Theo due date/status"
-          tone="text-red-300"
-        />
-      </CockpitChartCard>
-    </div>
-
     <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
       <div className="xl:col-span-9">
         <Orders
@@ -540,6 +573,35 @@ function Overview({
           )}
         </CockpitChartCard>
       </aside>
+    </div>
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-[2fr_1fr_1fr_1fr]">
+      <CockpitChartCard title="Thao tác nhanh" className="p-1.5">
+        <ActionCards compact />
+      </CockpitChartCard>
+      <CockpitChartCard title="Hoàn thành hôm nay" className="border-emerald-500/20 bg-emerald-500/5">
+        <ProductionSummaryTile
+          label="lệnh"
+          value={summary.completedToday}
+          note={`${formatQuantity(summary.completed, 0)} hoàn thành tổng`}
+          tone="text-emerald-300"
+        />
+      </CockpitChartCard>
+      <CockpitChartCard title="Chờ vật tư" className="border-amber-500/20 bg-amber-500/5">
+        <ProductionSummaryTile
+          label="MO"
+          value={summary.waitingMaterial}
+          note={`${formatQuantity(waiting, 0)} chờ · ${formatQuantity(shortage, 0)} thiếu`}
+          tone="text-amber-300"
+        />
+      </CockpitChartCard>
+      <CockpitChartCard title="Trễ tiến độ" className="border-red-500/20 bg-red-500/5">
+        <ProductionSummaryTile
+          label="lệnh"
+          value={summary.delayed}
+          note="Theo due date/status"
+          tone="text-red-300"
+        />
+      </CockpitChartCard>
     </div>
     <div className="grid grid-cols-1 gap-1 xl:grid-cols-[minmax(0,1fr)_380px]">
       <CockpitChartCard title="Công đoạn sản xuất" subtitle="Phân bổ theo công đoạn hiện tại" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
@@ -636,7 +698,8 @@ function Orders({
   const { page, limit: pageSize, total } = readModel.meta
   const pageStart = total ? (page - 1) * pageSize + 1 : 0
   const pageEnd = embedded ? Math.min(pagedRows.length, total) : Math.min(page * pageSize, total)
-  const tableHeight = embedded && pagedRows.length <= 5 ? 'min-h-[300px]' : COCKPIT_HEIGHTS.TABLE_MD
+  const tableHeight = COCKPIT_HEIGHTS.TABLE_MD
+  const orderEmptyRows = Array.from({ length: Math.max(0, (embedded ? 8 : pageSize) - pagedRows.length) })
 
   const grid = (
     <CockpitChartCard
@@ -672,7 +735,15 @@ function Orders({
                 <td className="px-2 py-2 text-slate-300">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-1 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
                 <td className="px-2 py-2"><StatusChip status={row.status} /></td>
               </tr>
-            ))}</tbody>
+            ))}
+            {orderEmptyRows.map((_, index) => (
+              <tr key={`order-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                <td colSpan={8} className="h-[46px] px-2 py-2">
+                  <div className="h-px w-full bg-white/[0.035]" />
+                </td>
+              </tr>
+            ))}
+            </tbody>
           </table>
           {!pagedRows.length ? (
             <ModuleEmptyState icon={<span>⚙️</span>} title="Chưa có lệnh sản xuất" description="Tạo lệnh sản xuất để theo dõi tiến độ, vật tư và hoàn thành." />
@@ -767,10 +838,10 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
 
   return <div className="w-full min-w-0 flex-1 space-y-1">
     <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
-      <CockpitKpiCard title="Tổng BOM" value={formatQuantity(rows.length, 0)} note="Định mức sản xuất" tone="blue" state="normal" />
-      <CockpitKpiCard title="Đang dùng" value={formatQuantity(active, 0)} note="Không archive" tone="emerald" state="normal" />
-      <CockpitKpiCard title="Dòng vật tư" value={formatQuantity(totalMaterials, 0)} note="Tổng BOM items" tone="cyan" state="normal" />
-      <CockpitKpiCard title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} note="Tổng estimated weight" tone="purple" state="normal" />
+      <CockpitKpiCard title="Tổng BOM" value={formatQuantity(rows.length, 0)} note="Định mức sản xuất" tone="blue" state="normal" trend={[0, rows.length * 0.65, rows.length]} />
+      <CockpitKpiCard title="Đang dùng" value={formatQuantity(active, 0)} note="Không archive" tone="emerald" state="normal" trend={[0, active * 0.7, active]} />
+      <CockpitKpiCard title="Dòng vật tư" value={formatQuantity(totalMaterials, 0)} note="Tổng BOM items" tone="cyan" state="normal" trend={[0, totalMaterials * 0.65, totalMaterials]} />
+      <CockpitKpiCard title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} note="Tổng estimated weight" tone="purple" state="normal" trend={[0, totalWeight * 0.6, totalWeight]} />
     </div>
     <div className="flex items-center justify-end gap-1">
       <button onClick={onCreate} className={`${inventoryMutedButton} h-9 rounded-xl`}>+ Tạo BOM</button>

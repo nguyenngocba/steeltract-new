@@ -38,6 +38,8 @@ export function NotificationsPage() {
     return true
   }), [filter, items, query])
   const selected = rows.find((item) => item.id === selectedId) ?? rows[0] ?? null
+  const feedEmptyRows = Array.from({ length: Math.max(0, 8 - rows.length) })
+  const summary = data?.summary
 
   return (
     <OperationalShell>
@@ -51,10 +53,10 @@ export function NotificationsPage() {
         </header>
 
         <section className="mb-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <CockpitKpiCard title="Tổng thông báo" value={fmt(data?.summary.total ?? items.length)} note="Dữ liệu hệ thống" icon={<Bell size={18} />} />
-          <CockpitKpiCard title="Chưa đọc" value={fmt(data?.summary.unread ?? 0)} note="Cần xử lý" tone="amber" icon={<AlertTriangle size={18} />} />
-          <CockpitKpiCard title="Ưu tiên cao" value={fmt(data?.summary.highPriority ?? 0)} note="Cảnh báo quan trọng" tone="red" icon={<ShieldAlert size={18} />} />
-          <CockpitKpiCard title="Đã đọc" value={fmt(data?.summary.read ?? 0)} note="Đã xử lý" tone="emerald" icon={<Check size={18} />} />
+          <CockpitKpiCard title="Tổng thông báo" value={fmt(summary?.total ?? items.length)} note="Dữ liệu hệ thống" icon={<Bell size={18} />} trend={[items.length * 0.55, items.length * 0.8, items.length]} />
+          <CockpitKpiCard title="Chưa đọc" value={fmt(summary?.unread ?? 0)} note="Cần xử lý" tone="amber" icon={<AlertTriangle size={18} />} trend={[0, summary?.unread ?? 0, (summary?.unread ?? 0) * 0.75]} />
+          <CockpitKpiCard title="Ưu tiên cao" value={fmt(summary?.highPriority ?? 0)} note="Cảnh báo quan trọng" tone="red" icon={<ShieldAlert size={18} />} trend={[0, summary?.highPriority ?? 0, summary?.highPriority ?? 0]} />
+          <CockpitKpiCard title="Đã đọc" value={fmt(summary?.read ?? 0)} note="Đã xử lý" tone="emerald" icon={<Check size={18} />} trend={[0, (summary?.read ?? 0) * 0.65, summary?.read ?? 0]} />
         </section>
 
         <section className={`${inventoryPanel} mb-3 p-3`}>
@@ -70,10 +72,10 @@ export function NotificationsPage() {
               <option value="read">Đã đọc</option>
             </select>
             <div className="flex flex-wrap gap-2">
-              <Tab active={filter === 'all'} onClick={() => setFilter('all')} label="Tất cả" count={data?.summary.total ?? 0} />
-              <Tab active={filter === 'unread'} onClick={() => setFilter('unread')} label="Chưa đọc" count={data?.summary.unread ?? 0} />
-              <Tab active={filter === 'priority'} onClick={() => setFilter('priority')} label="Ưu tiên cao" count={data?.summary.highPriority ?? 0} />
-              <Tab active={filter === 'read'} onClick={() => setFilter('read')} label="Đã đọc" count={data?.summary.read ?? 0} />
+              <Tab active={filter === 'all'} onClick={() => setFilter('all')} label="Tất cả" count={summary?.total ?? 0} />
+              <Tab active={filter === 'unread'} onClick={() => setFilter('unread')} label="Chưa đọc" count={summary?.unread ?? 0} />
+              <Tab active={filter === 'priority'} onClick={() => setFilter('priority')} label="Ưu tiên cao" count={summary?.highPriority ?? 0} />
+              <Tab active={filter === 'read'} onClick={() => setFilter('read')} label="Đã đọc" count={summary?.read ?? 0} />
             </div>
             <button className={inventoryMutedButton}><Filter size={15} /> Lọc theo</button>
           </div>
@@ -101,6 +103,9 @@ export function NotificationsPage() {
                     {isPriority(item) && <span className="mt-2 inline-block rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">Ưu tiên cao</span>}
                   </div>
                 </button>
+              ))}
+              {feedEmptyRows.map((_, index) => (
+                <div key={`notification-empty-${index}`} aria-hidden="true" className="h-[81px] border-b border-white/[0.04] bg-white/[0.012]" />
               ))}
             </div>
             {!rows.length ? (

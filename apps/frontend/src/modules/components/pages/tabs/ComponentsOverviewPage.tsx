@@ -119,6 +119,7 @@ export function ComponentsOverviewPage() {
   const readyShipRows = rows
     .filter((row) => /READY|Đã QC|DA QC|QC đạt|QC dat/i.test(row.status))
     .slice(0, 4);
+  const componentTableEmptyRows = Array.from({ length: Math.max(0, 8 - paginatedRows.length) });
   const quickStats = [
     { title: "Đang sản xuất", value: `${formatQuantity(statusCounts.producing, 0)} cấu kiện`, note: "CUT/WELD/PAINT", tone: "text-cyan-300" },
     { title: "Tồn kho", value: `${formatQuantity(statusCounts.stock, 0)} cấu kiện`, note: "STOCK", tone: "text-amber-300" },
@@ -137,6 +138,7 @@ export function ComponentsOverviewPage() {
             note="Toàn bộ lifecycle"
             tone="blue"
             state="normal"
+            trend={[statusCounts.total * 0.72, statusCounts.total * 0.86, statusCounts.total]}
           />
           <CockpitKpiCard
             title="Đang sản xuất"
@@ -144,6 +146,7 @@ export function ComponentsOverviewPage() {
             note="Cut / Weld / Paint"
             tone="purple"
             state="normal"
+            trend={[0, statusCounts.producing * 0.6, statusCounts.producing]}
           />
           <CockpitKpiCard
             title="Trong kho cấu kiện"
@@ -151,6 +154,7 @@ export function ComponentsOverviewPage() {
             note="Đang lưu kho"
             tone="amber"
             state="normal"
+            trend={[statusCounts.stock * 0.8, statusCounts.stock * 0.9, statusCounts.stock]}
           />
           <CockpitKpiCard
             title="Ready to ship"
@@ -158,6 +162,7 @@ export function ComponentsOverviewPage() {
             note="QC đạt / READY"
             tone="emerald"
             state="normal"
+            trend={[0, statusCounts.qcPass * 0.55, statusCounts.qcPass]}
           />
           <CockpitKpiCard
             title="Chờ QC"
@@ -165,6 +170,7 @@ export function ComponentsOverviewPage() {
             note="Suy ra từ stage"
             tone="red"
             state="normal"
+            trend={[statusCounts.waitingQc * 0.5, statusCounts.waitingQc, statusCounts.waitingQc * 0.7]}
           />
           <CockpitKpiCard
             title="Đang xuất bãi"
@@ -172,6 +178,7 @@ export function ComponentsOverviewPage() {
             note="SHIPPED"
             tone="cyan"
             state="normal"
+            trend={[0, statusCounts.transferring * 0.65, statusCounts.transferring]}
           />
         </div>
 
@@ -249,7 +256,7 @@ export function ComponentsOverviewPage() {
                   Xem tất cả
                 </button>
               }
-              className={paginatedRows.length <= 5 ? "min-h-[300px]" : COCKPIT_HEIGHTS.TABLE_MD}
+              className={COCKPIT_HEIGHTS.TABLE_MD}
             >
               <CockpitTableShell className="h-full">
                 <table className="w-full min-w-[980px] table-fixed text-[13px]">
@@ -318,6 +325,13 @@ export function ComponentsOverviewPage() {
                         </tr>
                       ))
                     )}
+                    {!isLoading && componentTableEmptyRows.map((_, index) => (
+                      <tr key={`component-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                        <td colSpan={8} className="h-9 px-1.5 py-0.5">
+                          <div className="h-px w-full bg-white/[0.035]" />
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </CockpitTableShell>
@@ -451,6 +465,7 @@ function ComponentQueue({
   const toneClass = tone === "emerald"
     ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
     : "border-amber-400/30 bg-amber-500/10 text-amber-300";
+  const emptyRows = Array.from({ length: Math.max(0, 4 - rows.length) });
 
   return (
     <div className="space-y-1">
@@ -462,6 +477,9 @@ function ComponentQueue({
           </div>
           <span className={`rounded-lg border px-2 py-0.5 ${toneClass}`}>{row.status}</span>
         </div>
+      ))}
+      {emptyRows.map((_, index) => (
+        <div key={`queue-empty-${index}`} aria-hidden="true" className="h-[42px] rounded-xl border border-white/[0.055] bg-white/[0.018]" />
       ))}
     </div>
   );

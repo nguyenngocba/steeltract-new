@@ -977,7 +977,7 @@ export function InventoryLocationsPage() {
   }, [rows]);
 
   return <EnterpriseModulePage>
-    <div className="w-full min-w-0 flex-1 space-y-2">
+    <div className="w-full min-w-0 flex-1 space-y-2 -mt-2">
       <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
         <InventoryMetricCard
           title="Tổng vị trí"
@@ -1031,7 +1031,7 @@ export function InventoryLocationsPage() {
         />
       </div>
 
-      <InventoryPanel className="rounded-xl">
+      <InventoryPanel className="rounded-xl -mt-1">
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_minmax(260px,1fr)_120px_120px_auto]">
           {/* Dropdown trạng thái */}
           <select
@@ -1102,7 +1102,7 @@ export function InventoryLocationsPage() {
       </InventoryPanel>
 
             {/* Row 1 Grid */}
-      <div className="grid grid-cols-12 gap-1">
+      <div className="grid grid-cols-12 gap-1 -mt-1">
         {/* Cột trái: Danh sách vị trí + 4 card dưới */}
         <div className="col-span-12 2xl:col-span-9 flex flex-col gap-1">
           {/* Bảng danh sách vị trí */}
@@ -1110,17 +1110,17 @@ export function InventoryLocationsPage() {
             <div className="flex flex-col h-full justify-between">
               {/* Phần bảng cuộn - được bọc viền */}
               <div className="overflow-auto scrollbar-none flex-1 rounded-lg border border-white/10">
-                <table className="w-full text-[14px] text-left">
+                <table className="w-full text-[15px] text-left">
                   <thead className="bg-white/[0.06] sticky top-0 z-10">
                     <tr className="border-b border-white/10 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
-                        <th className="py-2 px-3 text-left">Kho</th>
-                        <th className="py-2 px-3 text-left">Vị trí</th>
-                        <th className="py-2 px-3 text-center">Slot</th>
-                        <th className="py-2 px-3 text-center">Tầng</th>
-                        <th className="py-2 px-3 text-right">Khối lượng</th>
-                        <th className="py-2 px-3 text-right">Số vật tư</th>
-                        <th className="py-2 px-3 text-center">Trạng thái</th>
-                        <th className="py-2 px-3 text-center">Thao tác</th>
+                        <th className="px-1.5 py-1 text-left">Kho</th>
+                        <th className="px-1.5 py-1 text-left">Vị trí</th>
+                        <th className="px-1.5 py-1 text-center">Slot</th>
+                        <th className="px-1.5 py-1 text-center">Tầng</th>
+                        <th className="px-1.5 py-1 text-right">Khối lượng</th>
+                        <th className="px-1.5 py-1 text-right">Số vật tư</th>
+                        <th className="px-1.5 py-1 text-center">Trạng thái</th>
+                        <th className="px-1.5 py-1 text-center">Thao tác</th>
                       </tr>
                     </thead>
                   <tbody className="divide-y divide-white/5">
@@ -1140,13 +1140,13 @@ export function InventoryLocationsPage() {
                                 ? 'Kho sản xuất'
                                 : (zone.warehouse?.code || '-')}
                           </td>
-                          <td className="py-2.5 px-1 font-semibold text-cyan-300">{zone.code}</td>
+                          <td className="py-2.5 px-1 font-medium text-cyan-300">{zone.code}</td>
                           <td className="py-2.5 px-1 text-center text-slate-200">{zone.column || '-'}</td>
                           <td className="py-2.5 px-1 text-center text-slate-200">{zone.level || '-'}</td>
-                          <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
+                          <td className="py-2.5 px-1 text-right text-slate-200 font-medium">
                             {formatQuantity(n(zone.totalStockQuantity), 1)} tấn
                           </td>
-                          <td className="py-2.5 px-1 text-right text-slate-200 font-mono">
+                          <td className="py-2.5 px-1 text-right text-slate-200 font-medium">
                             {formatQuantity(n(zone.materialCount), 0)}
                           </td>
                           <td className="py-2.5 px-1 text-center">
@@ -1189,7 +1189,7 @@ export function InventoryLocationsPage() {
                   total={rows.length}
                   pageSize={PAGE_SIZE}
                   onPageChange={setPage}
-                  containerClassName="grid grid-cols-1 items-center gap-1 px-4 py-0.5 text-xs text-slate-400 md:grid-cols-3"
+                  containerClassName="grid grid-cols-1 items-center gap-1 px-4 py-0.5 text-xs text-slate-400 md:grid-cols-3 border-t-0"
                 />
               </div>
             </div>
@@ -1277,7 +1277,7 @@ export function InventoryLocationsPage() {
                   <div key={item.code}>
                     <div className="flex items-center justify-between text-xs mb-0.5">
                       <span className="font-semibold text-cyan-300">{item.code} <span className="text-slate-400 font-normal ml-1 truncate max-w-[120px] inline-block align-bottom">{item.name}</span></span>
-                      <div className="flex items-center gap-1.5 font-mono">
+                      <div className="flex items-center gap-1.5 font-medium">
                         <span className="text-slate-200">{formatQuantity(item.stock, 0)} tấn</span>
                         <span className="text-slate-500">·</span>
                         <span className="text-emerald-300">{formatShortCurrency(item.value)}</span>
@@ -1318,9 +1318,9 @@ export function InventoryLocationsPage() {
                       <div className="flex items-center justify-between text-xs mb-0.5">
                         <span className="font-medium text-cyan-300 truncate max-w-[160px]" title={zone.name}>{zone.name}</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-slate-400 font-mono">{formatQuantity(zone.stock, 1)} / {formatQuantity(zone.capacity, 0)} tấn</span>
-                          <span className="text-emerald-400 font-semibold font-mono">({percent.toFixed(0)}%)</span>
-                          <span className="text-slate-500 font-mono">{zone.occupiedSlots} ô</span>
+                          <span className="text-slate-400 font-medium">{formatQuantity(zone.stock, 1)} / {formatQuantity(zone.capacity, 0)} tấn</span>
+                          <span className="text-emerald-400 font-semibold font-medium">({percent.toFixed(0)}%)</span>
+                          <span className="text-slate-500 font-medium">{zone.occupiedSlots} ô</span>
                         </div>
                       </div>
                       <div className="h-1 rounded-full bg-white/10 overflow-hidden">
@@ -1402,8 +1402,8 @@ export function InventoryLocationsPage() {
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-300 truncate max-w-[100px]" title={name}>{name}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-slate-400 font-mono">{data.count} vị trí</span>
-                            <span className="text-cyan-300 font-mono font-semibold">{formatQuantity(data.stock, 1)} tấn</span>
+                            <span className="text-slate-400 font-medium">{data.count} vị trí</span>
+                            <span className="text-cyan-300 font-medium font-semibold">{formatQuantity(data.stock, 1)} tấn</span>
                           </div>
                         </div>
                         <div className="mt-0.5 h-1 rounded-full bg-white/10 overflow-hidden">
@@ -1522,7 +1522,7 @@ export function InventoryLocationsPage() {
                             <td className="py-2 px-3 text-slate-200 max-w-[240px] truncate" title={item.name}>{item.name}</td>
                             <td className="py-2 px-3 text-slate-300">{item.slot}</td>
                             <td className="py-2 px-3 text-slate-300">{item.level}</td>
-                            <td className="py-2 px-3 text-right text-slate-200 font-mono">{formatQuantity(item.quantity, 1)} tấn</td>
+                            <td className="py-2 px-3 text-right text-slate-200 font-medium">{formatQuantity(item.quantity, 1)} tấn</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1578,8 +1578,8 @@ export function InventoryLocationsPage() {
                             <tr key={item.code} className="hover:bg-white/5">
                               <td className="py-2 px-3 font-medium text-cyan-300">{item.code}</td>
                               <td className="py-2 px-3 text-slate-200">{item.name}</td>
-                              <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(item.stock, 1)}</td>
-                              <td className="py-2 px-3 text-right font-mono text-emerald-300">{formatShortCurrency(item.value)}</td>
+                              <td className="py-2 px-3 text-right font-medium text-slate-200">{formatQuantity(item.stock, 1)}</td>
+                              <td className="py-2 px-3 text-right font-medium text-emerald-300">{formatShortCurrency(item.value)}</td>
                               <td className="py-2 px-3 text-slate-400">{item.locationStr}</td>
                             </tr>
                           ))}
@@ -1639,9 +1639,9 @@ export function InventoryLocationsPage() {
                           return (
                             <tr key={zone.id} className="hover:bg-white/5">
                               <td className="py-2 px-3 font-medium text-cyan-300">{zone.name}</td>
-                              <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(zone.stock, 1)}</td>
-                              <td className="py-2 px-3 text-right font-mono text-slate-200">{formatQuantity(zone.capacity, 1)}</td>
-                              <td className="py-2 px-3 text-right font-mono text-emerald-300">{percent.toFixed(0)}%</td>
+                              <td className="py-2 px-3 text-right font-medium text-slate-200">{formatQuantity(zone.stock, 1)}</td>
+                              <td className="py-2 px-3 text-right font-medium text-slate-200">{formatQuantity(zone.capacity, 1)}</td>
+                              <td className="py-2 px-3 text-right font-medium text-emerald-300">{percent.toFixed(0)}%</td>
                               <td className="py-2 px-3 text-right text-slate-400">{zone.occupiedSlots}</td>
                             </tr>
                           )

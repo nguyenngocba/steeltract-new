@@ -1,10 +1,9 @@
 # Next Tasks
 
-- **COMPOSITION001 build and visual certification**: run frontend/backend build
-  and capture authenticated screenshots for Production, Components, QC,
-  Suppliers, Settings and Notifications at 1366px, 1600px and 1920px. Confirm
-  each page has one obvious hero workspace and that support rails do not compete
-  with the primary table/feed/catalog/queue.
+- **COMPOSITION001 breakpoint certification**: the 1440x1100 screenshot QA pass
+  is complete. Run a later release-candidate sweep at 1366px, 1600px and 1920px
+  with a live backend dataset to confirm the same table/feed/catalog/queue hero
+  balance under real data density.
 - **COMPOSITION001 remaining route review**: perform a second composition pass
   for Projects, Reports, Command Center, Analytics, Copilot, Marketplace,
   Workflow, Digital Twin, Kernel, Federation and Telemetry-like routes after

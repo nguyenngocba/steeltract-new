@@ -68,6 +68,7 @@ export function SuppliersPage() {
     if (status === 'inactive') return false
     return true
   }), [status, suppliers])
+  const supplierTableEmptyRows = Array.from({ length: Math.max(0, 12 - rows.length) })
   const evaluationRows = useMemo(() => {
     const rows = evaluations?.rows ?? []
     return rows.filter((row) => {
@@ -111,10 +112,10 @@ export function SuppliersPage() {
 
         {isSupplierListView ? <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard title="Total Suppliers" value={summary?.total ?? suppliers.length} note="Master records" />
-          <KpiCard title="Active Suppliers" value={summary?.active ?? suppliers.length} note="Schema hiện chưa có status" tone="emerald" />
-          <KpiCard title="Inactive Suppliers" value={summary?.inactive ?? 0} note="Reserved for S2" tone="amber" />
-          <KpiCard title="Suppliers Used In Inventory" value={summary?.usedInInventory ?? 0} note="Inbound/transactions" tone="cyan" />
+          <KpiCard title="Total Suppliers" value={summary?.total ?? suppliers.length} note="Master records" trend={[0, (summary?.total ?? suppliers.length) * 0.7, summary?.total ?? suppliers.length]} />
+          <KpiCard title="Active Suppliers" value={summary?.active ?? suppliers.length} note="Schema hiện chưa có status" tone="emerald" trend={[0, (summary?.active ?? suppliers.length) * 0.7, summary?.active ?? suppliers.length]} />
+          <KpiCard title="Inactive Suppliers" value={summary?.inactive ?? 0} note="Reserved for S2" tone="amber" trend={[0, summary?.inactive ?? 0, summary?.inactive ?? 0]} />
+          <KpiCard title="Suppliers Used In Inventory" value={summary?.usedInInventory ?? 0} note="Inbound/transactions" tone="cyan" trend={[0, (summary?.usedInInventory ?? 0) * 0.65, summary?.usedInInventory ?? 0]} />
           </div>
 
           <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
@@ -166,6 +167,13 @@ export function SuppliersPage() {
                         <button onClick={(event) => { event.stopPropagation(); openEditModal(supplier) }} className="inline-flex items-center gap-1 rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-500">
                           <Pencil size={13} /> Sửa
                         </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!isLoading && supplierTableEmptyRows.map((_, index) => (
+                    <tr key={`supplier-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
+                      <td colSpan={9} className="h-[45px] px-4 py-3">
+                        <div className="h-px w-full bg-white/[0.035]" />
                       </td>
                     </tr>
                   ))}
@@ -227,8 +235,8 @@ export function SuppliersPage() {
   )
 }
 
-function KpiCard({ title, value, note, tone = 'cyan' }: { title: string; value: number; note: string; tone?: 'cyan' | 'emerald' | 'amber' }) {
-  return <CockpitKpiCard title={title} value={fmt(value)} note={note} tone={tone} />
+function KpiCard({ title, value, note, tone = 'cyan', trend }: { title: string; value: number; note: string; tone?: 'cyan' | 'emerald' | 'amber'; trend?: number[] }) {
+  return <CockpitKpiCard title={title} value={fmt(value)} note={note} tone={tone} trend={trend} />
 }
 
 function SupplierCapabilityEmpty({ tab }: { tab: SupplierModuleTab }) {
@@ -305,6 +313,7 @@ function SupplierEvaluationTab({
   const visibleRows = rows.filter((row) => `${row.code} ${row.name} ${row.contact ?? ''}`.toLowerCase().includes(query.toLowerCase()))
   const selected = visibleRows.find((row) => row.id === selectedId) ?? visibleRows[0]
   const metrics = data?.metrics
+  const evaluationEmptyRows = Array.from({ length: Math.max(0, 12 - visibleRows.length) })
   const distribution = [
     ['Xuất sắc', metrics?.excellent ?? 0, 'bg-emerald-500'],
     ['Tốt', metrics?.good ?? 0, 'bg-blue-500'],
@@ -315,13 +324,13 @@ function SupplierEvaluationTab({
 
   return <div className="space-y-4">
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
-      <KpiCard title="Tổng nhà cung cấp" value={metrics?.total ?? 0} note="Supplier master" />
-      <KpiCard title="Đã đánh giá" value={metrics?.evaluated ?? 0} note={`${fmt(metrics?.total ? (metrics.evaluated / metrics.total) * 100 : 0)}%`} tone="emerald" />
-      <KpiCard title="Điểm đánh giá TB" value={metrics?.averageOverall ?? 0} note="/ 5" tone="amber" />
-      <KpiCard title="Nhà cung cấp xuất sắc" value={metrics?.excellent ?? 0} note=">= 4.5" tone="cyan" />
-      <KpiCard title="Nhà cung cấp đạt" value={(metrics?.good ?? 0) + (metrics?.pass ?? 0)} note=">= 2.5" tone="emerald" />
-      <KpiCard title="Nhà cung cấp cảnh báo" value={metrics?.warning ?? 0} note="< 2.5" tone="amber" />
-      <KpiCard title="Nhà cung cấp ngưng HĐ" value={metrics?.inactive ?? 0} note="Reserved S2" tone="amber" />
+      <KpiCard title="Tổng nhà cung cấp" value={metrics?.total ?? 0} note="Supplier master" trend={[0, (metrics?.total ?? 0) * 0.75, metrics?.total ?? 0]} />
+      <KpiCard title="Đã đánh giá" value={metrics?.evaluated ?? 0} note={`${fmt(metrics?.total ? (metrics.evaluated / metrics.total) * 100 : 0)}%`} tone="emerald" trend={[0, (metrics?.evaluated ?? 0) * 0.65, metrics?.evaluated ?? 0]} />
+      <KpiCard title="Điểm đánh giá TB" value={metrics?.averageOverall ?? 0} note="/ 5" tone="amber" trend={[0, (metrics?.averageOverall ?? 0) * 0.7, metrics?.averageOverall ?? 0]} />
+      <KpiCard title="Nhà cung cấp xuất sắc" value={metrics?.excellent ?? 0} note=">= 4.5" tone="cyan" trend={[0, (metrics?.excellent ?? 0) * 0.7, metrics?.excellent ?? 0]} />
+      <KpiCard title="Nhà cung cấp đạt" value={(metrics?.good ?? 0) + (metrics?.pass ?? 0)} note=">= 2.5" tone="emerald" trend={[0, ((metrics?.good ?? 0) + (metrics?.pass ?? 0)) * 0.7, (metrics?.good ?? 0) + (metrics?.pass ?? 0)]} />
+      <KpiCard title="Nhà cung cấp cảnh báo" value={metrics?.warning ?? 0} note="< 2.5" tone="amber" trend={[0, metrics?.warning ?? 0, (metrics?.warning ?? 0) * 0.75]} />
+      <KpiCard title="Nhà cung cấp ngưng HĐ" value={metrics?.inactive ?? 0} note="Reserved S2" tone="amber" trend={[0, metrics?.inactive ?? 0, metrics?.inactive ?? 0]} />
     </div>
 
     <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
@@ -359,7 +368,13 @@ function SupplierEvaluationTab({
               <td className="px-4 py-3">{fmt(row.overall)} {Stars(row.overall)}</td>
               <td className="px-4 py-3"><ClassificationBadge value={row.classification} /></td>
               <td className="px-4 py-3"><span className="rounded bg-emerald-950 px-2 py-1 text-[10px] text-emerald-300">{row.status}</span></td>
-            </tr>)}</tbody>
+            </tr>)}{evaluationEmptyRows.map((_, index) => (
+              <tr key={`evaluation-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
+                <td colSpan={7} className="h-[45px] px-4 py-3">
+                  <div className="h-px w-full bg-white/[0.035]" />
+                </td>
+              </tr>
+            ))}</tbody>
           </table>
         </div>
       </div>

@@ -6,6 +6,10 @@ Completed:
 
 - Kept Inventory unchanged as the Golden Reference and applied its composition
   principles to selected non-Inventory enterprise pages.
+- Performed screenshot QA against Inventory Materials at 1440x1100 and refined
+  page-level layout only: Production now keeps table/loading/error as the hero,
+  and Settings opens as KPI/filter/table/rail workspace instead of page-local
+  navigation.
 - Rebalanced Production Overview lower panels into a wider production-stage
   workspace plus an active-component/log support rail.
 - Rebalanced Components Overview queue panels so QC queue is primary and

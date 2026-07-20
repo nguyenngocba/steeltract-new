@@ -7,6 +7,7 @@ import { formatCurrencyVnd, formatDateTime, formatQuantity, parseLocaleNumber } 
 import { API_BASE_URL } from '@/lib/api';
 import { getAttachments, uploadAttachment } from '@/lib/attachments/attachments-api';
 import type { Attachment } from '@/lib/attachments/attachment.types';
+import { InventoryPagination } from '../components/InventoryVisuals'
 import {
   ModuleAnalyticsPanel,
   ModuleDataGrid,
@@ -538,7 +539,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
   // Phân trang giao dịch
   const [transactionPage, setTransactionPage] = useState(1)
-  const transactionPageSize = 15
+  const transactionPageSize = 13
 
   // Phân trang công trình
   const [projectPage, setProjectPage] = useState(1)
@@ -948,16 +949,17 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
           )}
 
           {activeTab === 'transactions' && (
-            <ModuleAnalyticsPanel title="Lịch sử giao dịch" note="Tổng hợp các giao dịch nhập/xuất" className="mt-1">
+            <ModuleAnalyticsPanel title="Lịch sử giao dịch" className="mt-1">
               <div className="overflow-auto">
+                <div className="overflow-hidden rounded-xl border border-white/10">
                 <table className="w-full min-w-[900px] text-sm table-fixed">
                   <colgroup>
-                    <col className="w-[100px]" />
-                    <col className="w-[100px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[110px]" />
                     <col className="w-[80px]" />
                     <col className="w-[150px]" />
-                    <col className="w-[60px]" />
-                    <col className="w-[120px]" />
+                    <col className="w-[80px]" />
+                    <col className="w-[140px]" />
                     <col className="w-[180px]" />
                   </colgroup>
                   <thead className="bg-white/[0.06] text-xs uppercase tracking-[0.08em] text-slate-400">
@@ -1000,10 +1002,10 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                           <td className="truncate px-2 py-1.5 text-cyan-300" title={row.transactionNo ?? '-'}>{row.transactionNo ?? '-'}</td>
                           <td className="px-2 py-1.5"><TransactionTypeBadge row={row} type={row.type} isPositive={row.quantity >= 0} /></td>
                           <td className="truncate px-2 py-1.5 text-slate-200" title={row.counterparty}>{row.counterparty}</td>
-                          <td className={`px-2 py-1.5 text-right font-mono tabular-nums font-semibold ${colorClass}`}>
+                          <td className={`px-2 py-1.5 text-right font-medium tabular-nums font-semibold ${colorClass}`}>
                             {`${displayQty} ${unit}`.trim()}
                           </td>
-                          <td className={`px-2 py-1.5 text-right font-mono tabular-nums font-semibold ${colorClass}`}>
+                          <td className={`px-2 py-1.5 text-right font-medium tabular-nums font-semibold ${colorClass}`}>
                             {money(row.totalAmount)}
                           </td>
                           <td className="truncate px-2 py-1.5 text-left">
@@ -1025,33 +1027,16 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                     )}
                   </tbody>
                 </table>
-              </div>
-
-              {totalTransactionPages > 1 && (
-                <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
-                  <span>
-                    Hiển thị {(transactionPage - 1) * transactionPageSize + 1}-
-                    {Math.min(transactionPage * transactionPageSize, materialTransactionsQuery.data?.total ?? 0)}/{materialTransactionsQuery.data?.total ?? 0} giao dịch
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setTransactionPage((p) => Math.max(1, p - 1))}
-                      disabled={transactionPage <= 1}
-                      className={moduleMutedButton}
-                    >
-                      Trước
-                    </button>
-                    <span className="px-2 py-1 text-slate-300">{transactionPage}/{totalTransactionPages}</span>
-                    <button
-                      onClick={() => setTransactionPage((p) => Math.min(totalTransactionPages, p + 1))}
-                      disabled={transactionPage >= totalTransactionPages}
-                      className={moduleMutedButton}
-                    >
-                      Sau
-                    </button>
-                  </div>
                 </div>
-              )}
+              </div>
+              <InventoryPagination
+              page={transactionPage}
+              pageCount={totalTransactionPages}
+              total={materialTransactionsQuery.data?.total ?? 0}
+              pageSize={transactionPageSize}
+              onPageChange={setTransactionPage}
+              containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
+              />
             </ModuleAnalyticsPanel>
           )}
 

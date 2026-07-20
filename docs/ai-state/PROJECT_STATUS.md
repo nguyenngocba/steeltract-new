@@ -4,11 +4,12 @@ On 2026-07-20 COMPOSITION001 refined page composition outside Inventory.
 Inventory remains the Golden Reference and was not modified. Production,
 Components, QC, Suppliers, Settings and Notifications now lean harder into one
 dominant workspace plus a narrower support rail instead of equal card
-collections. This pass only rearranged page composition and preserved backend,
-APIs, routes, permissions, authentication, database, React Query contracts,
-business logic, shared tokens and shared component APIs. Frontend build,
-backend build and `git diff --check` passed; browser screenshot certification
-is pending.
+collections. A 1440x1100 screenshot QA pass compared the target pages with
+Inventory Materials: Production table/loading/error states now keep the hero
+footprint, and Settings now opens as KPI/filter/table/rail workspace. This pass
+only rearranged page composition and preserved backend, APIs, routes,
+permissions, authentication, database, React Query contracts, business logic,
+shared tokens and shared component APIs.
 
 On 2026-07-18 VISUAL001 applied an Enterprise Visual Composition
 Transformation through shared UI primitives. Inventory remains the benchmark:

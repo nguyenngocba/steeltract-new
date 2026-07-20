@@ -811,7 +811,7 @@ export function InventoryMaterialsPage() {
         }}
       />
 
-      <div className="space-y-2">
+      <div className="space-y-1 -mt-2">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <InventoryMetricCard
             title="Tổng giá trị tồn kho"
@@ -955,7 +955,7 @@ export function InventoryMaterialsPage() {
                       </div>
                       {deleteError && <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{deleteError}</div>}
                       <div className="rounded-lg border border-white/10 overflow-hidden">
-                      <CockpitTableShell className="h-[clamp(320px,52vh,520px)] min-h-[320px]">
+                      <CockpitTableShell className="h-[clamp(400px,60vh,520px)] min-h-[400px]">
                         <table className="w-full min-w-[1050px] text-sm table-fixed">
                           <colgroup>
                             <col className="w-[140px]" />   {/* Tên vật tư */}
@@ -994,9 +994,9 @@ export function InventoryMaterialsPage() {
                                 <td className="truncate px-1.5 py-0.5 text-white" title={item.materialName}>{item.materialName}</td>
                                 <td className="truncate px-1.5 py-0.5 text-slate-300" title={item.materialType ?? '-'}>{item.materialType ?? '-'}</td>
                                 <td className="px-1.5 py-0.5 text-slate-300">{item.unit ?? '-'}</td>
-                                <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>
-                                <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-amber-300" title={formatQuantity(productionWarehouseStock(item), 3)}>{formatQuantity(productionWarehouseStock(item), 3)}</td>
-                                <td className="truncate px-1.5 py-0.5 text-right font-mono tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-medium tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-medium tabular-nums text-amber-300" title={formatQuantity(productionWarehouseStock(item), 3)}>{formatQuantity(productionWarehouseStock(item), 3)}</td>
+                                <td className="truncate px-1.5 py-0.5 text-right font-medium tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
                                 <td className="truncate px-1.5 py-0.5 text-right text-slate-300" title={money(Number(item.averageCost ?? 0))}>{money(Number(item.averageCost ?? 0))}</td>
                                 <td className="truncate px-1.5 py-0.5 text-right font-medium text-cyan-300" title={money(Number(item.inventoryValue ?? 0))}>{money(Number(item.inventoryValue ?? 0))}</td>
                                 <td className="truncate px-1.5 py-0.5 align-middle">
@@ -1018,7 +1018,7 @@ export function InventoryMaterialsPage() {
                         </table>
                       </CockpitTableShell>
                       </div>
-                      <InventoryPagination page={activePage} pageCount={totalPages} total={materialsData?.total ?? 0} pageSize={PAGE_SIZE} onPageChange={setPage} containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3" />
+                      <InventoryPagination page={activePage} pageCount={totalPages} total={materialsData?.total ?? 0} pageSize={PAGE_SIZE} onPageChange={setPage} containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0" />
                     </InventoryPanel>
 
                    <div className="space-y-1 xl:col-span-3">
@@ -1045,7 +1045,7 @@ export function InventoryMaterialsPage() {
                         value={`${formatQuantity(kpis.totalQty, 1)} tấn`}
                         delta={quantityDelta.text}
                         deltaColorClass={quantityDelta.color}
-                        className="h-[178px]"
+                        className="h-[188px]"
                         chartHeightClass="h-[82px] overflow-y-auto scrollbar-none"
                       >
                         <StockTrendChart rows={monthlyTrend} />
@@ -1142,9 +1142,9 @@ export function InventoryMaterialsPage() {
                         <td className="truncate px-3 py-2 text-slate-300" title={item.category}>{item.category ?? '-'}</td>
                         <td className="truncate px-3 py-1.5 text-slate-300" title={item.materialType ?? '-'}>{item.materialType ?? '-'}</td>
                         <td className="px-3 py-1.5 text-slate-300">{item.unit ?? '-'}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-amber-300" title={formatQuantity(productionWarehouseStock(item), 3)}>{formatQuantity(productionWarehouseStock(item), 3)}</td>
-                        <td className="truncate px-3 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium tabular-nums text-slate-200" title={formatQuantity(mainWarehouseStock(item), 3)}>{formatQuantity(mainWarehouseStock(item), 3)}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium tabular-nums text-amber-300" title={formatQuantity(productionWarehouseStock(item), 3)}>{formatQuantity(productionWarehouseStock(item), 3)}</td>
+                        <td className="truncate px-3 py-1.5 text-right font-medium tabular-nums text-cyan-300" title={formatQuantity(totalWarehouseStock(item), 3)}>{formatQuantity(totalWarehouseStock(item), 3)}</td>
                         <td className="truncate px-3 py-1.5 text-right text-slate-300" title={money(Number(item.averageCost ?? 0))}>{money(Number(item.averageCost ?? 0))}</td>
                         <td className="truncate px-3 py-1.5 text-right font-medium text-cyan-300" title={money(Number(item.inventoryValue ?? 0))}>{money(Number(item.inventoryValue ?? 0))}</td>
                         <td className="truncate px-3 py-1.5">
@@ -1171,7 +1171,7 @@ export function InventoryMaterialsPage() {
                 total={materialsData?.total ?? 0}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
-                containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3"
+                containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
               />
             </div>
           </div>

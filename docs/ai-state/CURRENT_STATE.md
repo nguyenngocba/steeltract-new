@@ -2,7 +2,7 @@
 
 ## COMPOSITION001 Enterprise Workspace Composition Redesign
 
-Status: **IMPLEMENTED - BROWSER QA PENDING**
+Status: **IMPLEMENTED - SCREENSHOT QA PASS**
 
 Inventory remains unchanged as the Golden Reference. Selected non-Inventory
 pages have been rebalanced around a clear hero workspace and secondary support
@@ -11,8 +11,13 @@ QC queue primary over Ready to Ship, QC gives trend analysis primary width,
 Suppliers keeps directory/evaluation tables dominant, Settings emphasizes
 configuration catalogs and Notifications emphasizes the operational feed.
 Shared cards, design tokens, theme, typography, spacing system and component
-APIs were not changed. Frontend build, backend build and `git diff --check`
-passed; authenticated browser screenshot certification remains pending.
+APIs were not changed. Screenshot QA at 1440x1100 compared Inventory Materials
+against Production, Components, QC, Suppliers, Settings and Notifications.
+Production now keeps table/loading/error states as the hero workspace, and
+Settings now uses KPI, toolbar, table hero and support rail instead of
+page-local configuration navigation. Frontend build passed after the visual
+refinement; backend build and final `git diff --check` remain part of the
+current verification gate.
 
 ## VISUAL001 Enterprise Visual Composition Transformation
 

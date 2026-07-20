@@ -739,7 +739,7 @@ export function InventoryOverviewPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className="space-y-2">
+      <div className="space-y-2 -mt-2">
         <div className="grid grid-cols-1 md:grid-cols-4 2xl:grid-cols-5 gap-1">
           <OverviewMetricCard
             title="Tổng giá trị tồn kho"
@@ -837,7 +837,7 @@ export function InventoryOverviewPage() {
             isLoading={isLoading}
           />
           <OverviewMetricCard
-            title="Pending Returns"
+            title="Phiếu trả vật tư"
             value={formatQuantity(pendingReturns.count, 0)}
             note={`${formatQuantity(pendingReturns.quantity)} chờ nhận`}
             noteClassName="text-amber-300"
@@ -849,7 +849,7 @@ export function InventoryOverviewPage() {
           />
         </div>
 
-        <InventoryPanel className="rounded-xl">
+        <InventoryPanel className="rounded-xl -mt-1">
           <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
             <LabeledFilter label="">
               <select value={warehouseFilter} onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }} className={compactInput}>
@@ -917,7 +917,7 @@ export function InventoryOverviewPage() {
         </InventoryPanel>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-1">
-          <div className="space-y-1 xl:col-span-9">
+          <div className="space-y-1 xl:col-span-9 -mt-1">
             <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr] gap-1">
               <InventoryChartCard title="Thao tác nhanh" className="p-1.5">
                 <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
@@ -1022,6 +1022,7 @@ export function InventoryOverviewPage() {
                 total={materialsData?.total ?? 0}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
+                containerClassName="border-t-0"
               />
             </InventoryPanel>
 
@@ -1031,7 +1032,7 @@ export function InventoryOverviewPage() {
             </div>
           </div>
 
-          <div className="space-y-1 xl:col-span-3">
+          <div className="space-y-1 xl:col-span-3 -mt-1">
             {/* 1. Phân bố tồn kho */}
             <ChartCard
               title="Phân bố tồn kho"
@@ -1077,7 +1078,7 @@ export function InventoryOverviewPage() {
             <InventoryChartCard
               title="Top vật tư tồn kho"
               note="Theo giá trị tồn kho"
-              className="h-[207px]"
+              className="h-[215px]"
             >
               <div className="h-[160px] overflow-y-auto [&::-webkit-scrollbar]:hidden scrollbar-width-none pr-1">
                 {topMaterials.length > 0 ? (
@@ -1095,10 +1096,10 @@ export function InventoryOverviewPage() {
           </div>
         </div>
 
-        <InventoryChartCard title="Tình trạng kho">
-          <div className="grid grid-cols-1 items-center gap-10 text-xs md:grid-cols-[220px_1fr_auto_auto_auto]">
+        <InventoryChartCard title="Tình trạng kho" className="-mt-1">
+          <div className="grid grid-cols-1 items-center gap-10 text-xs md:grid-cols-[220px_1fr_auto_auto_auto] -mt-1">
             <label className="block">
-              <span className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-slate-500">Kho chính</span>
+              <span className="mb-1 -mt-1 block text-[10px] uppercase tracking-[0.12em] text-slate-500">Kho chính</span>
               <select
                 value={warehouseFilter}
                 onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }}
@@ -1113,7 +1114,7 @@ export function InventoryOverviewPage() {
               </select>
             </label>
 
-            <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-1 md:grid-cols-4 -mt-3">
               <StatusMetric label="Tổng mã" value={selectedWarehouseStat.total} tone="cyan" />
               <StatusMetric label="Sắp hết" value={selectedWarehouseStat.low} tone="amber" />
               <StatusMetric label="Hết hàng" value={selectedWarehouseStat.out} tone="red" />
@@ -1360,7 +1361,7 @@ function OverviewModal({
   // Phân trang cho recent-inbound / recent-outbound
   const [page, setPage] = useState(1)
   const [pageStock, setPageStock] = useState(1)
-  const STOCK_PAGE_SIZE = 13
+  const STOCK_PAGE_SIZE = 15
 
   const {
   data: fullStockData,
@@ -1504,7 +1505,8 @@ function OverviewModal({
         ) : null}
 
           {type === 'stock-full' ? (
-            <div className="overflow-hidden rounded-xl border border-white/10">
+              <>
+              <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
               <table className="w-full min-w-[1400px] text-sm table-fixed">
                 <colgroup>
                   <col className="w-[120px]" />
@@ -1580,40 +1582,17 @@ function OverviewModal({
                   })}
                 </tbody>
               </table>
-
-              <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-2 text-xs text-slate-400">
-                <span>
-                  Hiển thị {totalStock === 0 ? 0 : (pageStock - 1) * STOCK_PAGE_SIZE + 1}
-                  -
-                  {Math.min(pageStock * STOCK_PAGE_SIZE, totalStock)}
-                  / {totalStock} vật tư
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPageStock((p) => Math.max(1, p - 1))}
-                    disabled={pageStock <= 1}
-                    className={inventoryMutedButton}
-                  >
-                    Trước
-                  </button>
-
-                  <span className="px-2 py-1 text-slate-300">
-                    {pageStock}/{totalStockPages}
-                  </span>
-
-                  <button
-                    onClick={() => setPageStock((p) => Math.min(totalStockPages, p + 1))}
-                    disabled={pageStock >= totalStockPages}
-                    className={inventoryMutedButton}
-                  >
-                    Sau
-                  </button>
-                </div>
-              </div>
-
-              </div>
-              ) : null}
+            </div>
+            <InventoryPagination
+              page={pageStock}
+              pageCount={totalStockPages}
+              total={totalStock}
+              pageSize={STOCK_PAGE_SIZE}
+              onPageChange={setPageStock}
+              containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0 mb-2"
+            />
+          </>
+        ) : null}
 
           {type === 'alerts-full' ? (
             <div className="grid max-h-[74vh] gap-4 overflow-auto xl:grid-cols-[1fr_320px]">

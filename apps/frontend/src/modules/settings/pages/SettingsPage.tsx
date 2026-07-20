@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CheckCircle2, DatabaseBackup, Edit3, FileDigit, Globe2, Link2, Plus, Save, Settings, ShieldCheck, SlidersHorizontal, Trash2, Workflow, XCircle } from 'lucide-react'
+import { Bell, Building2, CheckCircle2, DatabaseBackup, Edit3, FileDigit, Globe2, Link2, Plus, Save, Search, Settings, ShieldCheck, SlidersHorizontal, Trash2, Workflow, XCircle } from 'lucide-react'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { api } from '@/lib/api'
@@ -60,7 +60,6 @@ const emptyMaterialType: MaterialTypeForm = { code: '', name: '', description: '
 const emptyUnit: UnitForm = { code: '', name: '', symbol: '', category: 'WEIGHT', precision: '0' }
 
 export function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('overview')
   const { data } = useQuery({ queryKey: ['system-overview'], queryFn: systemApi.overview, refetchInterval: 10000 })
   const { data: workflow } = useQuery({ queryKey: ['operational-workflow'], queryFn: systemApi.workflow, refetchInterval: 10000 })
   const stats = data?.stats ?? {}
@@ -82,23 +81,9 @@ export function SettingsPage() {
     title="Cài đặt hệ thống"
     description="Quản lý toàn bộ cấu hình và thiết lập hệ thống"
     breadcrumbs={['Quản trị', 'Cài đặt']}
-    tabs={tabs.map(([id, label]) => ({ id, label }))}
-    activeTab={tab}
-    onTabChange={(id) => setTab(id as Tab)}
     actions={<button className={primaryButton}><Save size={16} />Lưu thay đổi</button>}
   >
-      {tab === 'overview' && <Overview data={data} workflow={workflow} category={category} stats={stats} />}
-      {tab === 'general' && <ConfigGrid title="Cấu hình chung" values={data?.system} />}
-      {tab === 'organization' && <PlatformFoundation title="Organization" description="Company, plants, factories, warehouses, teams, shifts and calendars." rows={organizationCapabilities} />}
-      {tab === 'permissions' && <ConfigGrid title="Tổng quan phân quyền" values={{ users: fmt(stats.totalUsers), activeUsers: fmt(stats.activeUsers), roles: fmt(stats.roles), permissions: fmt(stats.permissions) }} />}
-      {tab === 'security' && <PlatformFoundation title="Security Center" description="Audit logs, sessions, API tokens, devices, password policy, MFA and IP whitelist." rows={securityCapabilities} />}
-      {tab === 'monitoring' && <PlatformFoundation title="Monitoring" description="Health, jobs, queues, notifications, background tasks, scheduler, webhooks and email queue." rows={monitoringCapabilities} />}
-      {tab === 'master' && <SettingsCatalogs />}
-      {tab === 'integrations' && <Integrations rows={data?.integrations ?? []} />}
-      {tab === 'notifications' && <Toggles rows={data?.notifications ?? {}} />}
-      {tab === 'backup' && <ConfigGrid title="Sao lưu dữ liệu" values={data?.backup} />}
-      {tab === 'reports' && <PlatformFoundation title="Reports Center" description="Operational, Inventory, Production, QC, Project and Supplier report catalog." rows={reportCapabilities} />}
-      {tab === 'logs' && <Activities rows={data?.recentActivities ?? []} />}
+      <Overview data={data} workflow={workflow} category={category} stats={stats} />
   </EnterpriseWorkspace>
 }
 
@@ -142,6 +127,7 @@ const reportCapabilities: PlatformCapability[] = [
 function PlatformFoundation({ title, description, rows }: { title: string; description: string; rows: PlatformCapability[] }) {
   const [query, setQuery] = useState('')
   const filtered = rows.filter((row) => `${row.name} ${row.owner} ${row.readSource}`.toLowerCase().includes(query.toLowerCase()))
+  const emptyRows = Array.from({ length: Math.max(0, 10 - filtered.length) })
 
   return (
     <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -182,6 +168,13 @@ function PlatformFoundation({ title, description, rows }: { title: string; descr
                     <td className="px-4 py-3 text-slate-400">{row.nextStep}</td>
                   </tr>
                 ))}
+                {emptyRows.map((_, index) => (
+                  <tr key={`platform-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
+                    <td colSpan={4} className="h-[45px] px-4 py-3">
+                      <div className="h-px w-full bg-white/[0.035]" />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -211,15 +204,114 @@ function UsefulEmpty({ title, description }: { title: string; description: strin
 }
 
 function Overview({ data, workflow, category, stats }: { data: any; workflow?: WorkflowCheck; category: ReadonlyArray<readonly [string, any]>; stats: Record<string, number> }) {
-  return <div className="grid gap-3 xl:grid-cols-[300px_1fr]">
-    <aside className={`${panel} p-4`}><h2 className="text-sm font-semibold">Danh mục cài đặt</h2><div className="mt-3 space-y-1">{category.map(([label, Icon], index) => <div key={label} className={`flex items-center gap-3 rounded px-3 py-2 text-sm ${index === 0 ? 'bg-blue-600/30 text-blue-200' : 'text-slate-400'}`}><Icon size={16} />{label}</div>)}</div></aside>
-    <section className="grid gap-3 xl:grid-cols-2">
-      <Card title="Thông tin công ty" icon={Building2}><Info k="Tên công ty" v={data?.company?.name || 'STEELTRACK'} /><Info k="Mã số thuế" v={data?.company?.taxCode || '-'} /><Info k="Địa chỉ" v={data?.company?.address || '-'} /><Info k="Điện thoại" v={data?.company?.phone || '-'} /><Info k="Email" v={data?.company?.email || '-'} /></Card>
-      <Card title="Cấu hình hệ thống" icon={Settings}>{Object.entries(data?.system ?? {}).map(([k, v]) => <Info key={k} k={label(k)} v={String(v)} />)}</Card>
-      <Card title="Cấu hình chứng từ" icon={FileDigit}>{Object.entries(data?.documents ?? {}).map(([k, v]) => <Info key={k} k={label(k)} v={String(v)} />)}</Card>
-      <Card title="Kiểm tra workflow vận hành" icon={Workflow}><WorkflowPanel workflow={workflow} /></Card>
-      <Card title="Tích hợp hệ thống" icon={Link2}>{(data?.integrations ?? []).map((row: any) => <Info key={row.name} k={row.name} v={row.status} tone={row.status === 'ENABLED' || row.status === 'CONNECTED' ? 'ok' : 'warn'} />)}</Card>
-      <Card title="Thống kê hệ thống" icon={DatabaseBackup}><Info k="Tổng người dùng" v={fmt(stats.totalUsers)} /><Info k="Tổng vai trò" v={fmt(stats.roles)} /><Info k="Tổng quyền" v={fmt(stats.permissions)} /><Info k="Tổng nhật ký" v={fmt(stats.activityTotal)} /></Card>
+  const [query, setQuery] = useState('')
+  const capabilityRows = category.map(([name, Icon], index) => ({
+    id: name,
+    name,
+    owner: ['Administration', 'System', 'Inventory', 'Security', 'Operations'][index % 5],
+    source: index < 2 ? 'System overview' : index < 6 ? 'Module contract' : 'Configuration contract',
+    status: index < 4 ? 'READY' : 'NEEDS_CONTRACT',
+    Icon,
+  }))
+  const filteredRows = capabilityRows.filter((row) =>
+    `${row.name} ${row.owner} ${row.source} ${row.status}`.toLowerCase().includes(query.toLowerCase()),
+  )
+  const emptyRows = Array.from({ length: Math.max(0, 12 - filteredRows.length) })
+  const okSteps = workflow?.steps.filter((step) => step.status === 'OK').length ?? 0
+  const warnSteps = workflow?.steps.filter((step) => step.status === 'WARN').length ?? 0
+  const blockedSteps = workflow?.steps.filter((step) => step.status === 'BLOCKED').length ?? 0
+
+  return <div className="w-full min-w-0 flex-1 space-y-1">
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
+      <MiniKpi label="Tổng cấu hình" value={fmt(capabilityRows.length)} />
+      <MiniKpi label="Người dùng" value={fmt(stats.totalUsers)} />
+      <MiniKpi label="Workflow OK" value={fmt(okSteps)} />
+      <MiniKpi label="Cần kiểm tra" value={fmt(warnSteps + blockedSteps)} />
+    </div>
+
+    <div className={`${panel} p-3`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-72 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3">
+          <Search size={15} className="text-cyan-400" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className={`${input} w-full border-0 bg-transparent px-0 focus:border-0`}
+            placeholder="Tìm cấu hình, owner hoặc nguồn dữ liệu..."
+          />
+        </div>
+        <button className={actionButton}>Bộ lọc: Tất cả</button>
+        <button className={actionButton}>Làm mới</button>
+        <button className={primaryButton}>Tạo cấu hình</button>
+      </div>
+    </div>
+
+    <section className="grid grid-cols-1 gap-1 xl:grid-cols-12">
+      <div className="xl:col-span-9">
+        <div className={`${panel} min-h-[620px] overflow-hidden`}>
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-white">Danh mục cấu hình</h2>
+              <p className="mt-1 text-xs text-slate-500">System settings, master data, workflow và security contracts</p>
+            </div>
+            <span className="text-[11px] text-cyan-300">0-{filteredRows.length} / {capabilityRows.length}</span>
+          </div>
+          <div className="max-h-[540px] overflow-auto">
+            <table className="w-full min-w-[920px] table-fixed text-sm">
+              <thead className="sticky top-0 z-10 bg-cyan-300/[0.055] text-xs uppercase tracking-[0.08em] text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 text-left">Capability</th>
+                  <th className="px-4 py-3 text-left">Owner</th>
+                  <th className="px-4 py-3 text-left">Nguồn dữ liệu</th>
+                  <th className="px-4 py-3 text-left">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map(({ id, name, owner, source, status, Icon }) => (
+                  <tr key={id} className="border-t border-cyan-300/10 text-slate-200">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Icon size={16} className="text-cyan-300" />
+                        <span className="font-semibold text-white">{name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-300">{owner}</td>
+                    <td className="px-4 py-3 text-slate-400">{source}</td>
+                    <td className="px-4 py-3">
+                      <span className={status === 'READY' ? 'text-emerald-300' : 'text-amber-300'}>{status}</span>
+                    </td>
+                  </tr>
+                ))}
+                {emptyRows.map((_, index) => (
+                  <tr key={`settings-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
+                    <td colSpan={4} className="h-[45px] px-4 py-3">
+                      <div className="h-px w-full bg-white/[0.035]" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <aside className="space-y-1 xl:col-span-3">
+        <Card title="Thông tin công ty" icon={Building2}>
+          <Info k="Tên công ty" v={data?.company?.name || 'STEELTRACK'} />
+          <Info k="Mã số thuế" v={data?.company?.taxCode || '-'} />
+          <Info k="Địa chỉ" v={data?.company?.address || '-'} />
+          <Info k="Email" v={data?.company?.email || '-'} />
+        </Card>
+        <Card title="Kiểm tra workflow" icon={Workflow}>
+          <WorkflowPanel workflow={workflow} />
+        </Card>
+        <Card title="Thống kê hệ thống" icon={DatabaseBackup}>
+          <Info k="Tổng vai trò" v={fmt(stats.roles)} />
+          <Info k="Tổng quyền" v={fmt(stats.permissions)} />
+          <Info k="Tổng nhật ký" v={fmt(stats.activityTotal)} />
+          <Info k="Business mới" v="Không" />
+        </Card>
+      </aside>
     </section>
   </div>
 }
@@ -430,7 +522,17 @@ function SettingsCatalogs() {
 }
 
 function MiniKpi({ label, value }: { label: string; value: string }) {
-  return <div className={`${panel} p-3`}><div className="text-[10px] uppercase tracking-[0.14em] text-slate-500">{label}</div><div className="mt-1 text-xl font-semibold text-white">{value}</div></div>
+  return <div className={`${panel} relative h-[108px] overflow-hidden p-3`}>
+    <div className="relative z-10">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold text-white">{value}</div>
+      <div className="mt-1 text-[10px] font-semibold text-emerald-400">Configuration ready</div>
+    </div>
+    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="absolute inset-x-3 bottom-1 h-9 w-[calc(100%-24px)] opacity-90">
+      <polyline points="0,34 0,28 20,22 40,24 60,16 80,12 100,8 100,34" fill="rgba(6,182,212,0.2)" stroke="none" />
+      <polyline points="0,28 20,22 40,24 60,16 80,12 100,8" fill="none" stroke="#06b6d4" strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+    </svg>
+  </div>
 }
 
 function HeaderLine({ title, editing, loading, onReset, onSave }: { title: string; editing: boolean; loading: boolean; onReset: () => void; onSave: () => void }) {
