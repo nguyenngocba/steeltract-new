@@ -1094,14 +1094,15 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
               {/* Bảng Top projects */}
               <ModuleAnalyticsPanel title="Danh sách công trình" note="Top 10 công trình sử dụng nhiều nhất" className="min-h-[540px]">
                 <div className="overflow-auto h-[470px]">
+                  <div className="overflow-hidden rounded-xl border border-white/10">
                   <table className="w-full min-w-[700px] text-sm table-fixed">
                     <colgroup>
-                      <col className="w-[100px]" />
-                      <col className="w-[140px]" />
-                      <col className="w-[60px]" />
-                      <col className="w-[60px]" />
                       <col className="w-[120px]" />
-                      <col className="w-[160px]" />
+                      <col className="w-[140px]" />
+                      <col className="w-[80px]" />
+                      <col className="w-[80px]" />
+                      <col className="w-[120px]" />
+                      <col className="w-[120px]" />
                     </colgroup>
                     <thead className={moduleTableHead}>
                       <tr>
@@ -1109,7 +1110,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                         <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Công trình</th>
                         <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đã xuất</th>
                         <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đã trả</th>
-                        <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Giá trị</th>
+                        <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Tổng giá trị</th>
                         <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Hồ sơ</th>
                       </tr>
                     </thead>
@@ -1122,13 +1123,13 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                           <td className="truncate px-2 py-1.5 text-slate-200" title={row.projectName ?? 'Không rõ'}>
                             {row.projectName ?? 'Không rõ'}
                           </td>
-                          <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-400" title={`${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim()}>
+                          <td className="truncate px-2 py-1.5 text-right font-medium tabular-nums font-semibold text-emerald-400" title={`${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim()}>
                             {`${fmt(row.issuedQty ?? row.quantity)} ${unit}`.trim()}
                           </td>
-                          <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums text-amber-400" title={`${fmt(row.returnedQty)} ${unit}`.trim()}>
+                          <td className="truncate px-2 py-1.5 text-right font-medium tabular-nums text-amber-400" title={`${fmt(row.returnedQty)} ${unit}`.trim()}>
                             {`${fmt(row.returnedQty)} ${unit}`.trim()}
                           </td>
-                          <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-cyan-300" title={money(row.issuedValue ?? num(row.quantity) * averageCost)}>
+                          <td className="truncate px-2 py-1.5 text-right font-medium tabular-nums font-semibold text-cyan-300" title={money(row.issuedValue ?? num(row.quantity) * averageCost)}>
                             {money(row.issuedValue ?? num(row.quantity) * averageCost)}
                           </td>
                           <td className="px-2 py-1.5 text-left">
@@ -1152,34 +1153,18 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
 
                 {/* Phân trang */}
-                {totalProjectPages > 1 && (
-                  <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
-                    <span>
-                      Hiển thị {(projectPage - 1) * projectPageSize + 1}-
-                      {Math.min(projectPage * projectPageSize, projectRows.length)}/{projectRows.length} công trình
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setProjectPage((p) => Math.max(1, p - 1))}
-                        disabled={projectPage <= 1}
-                        className={moduleMutedButton}
-                      >
-                        Trước
-                      </button>
-                      <span className="px-2 py-1 text-slate-300">{projectPage}/{totalProjectPages}</span>
-                      <button
-                        onClick={() => setProjectPage((p) => Math.min(totalProjectPages, p + 1))}
-                        disabled={projectPage >= totalProjectPages}
-                        className={moduleMutedButton}
-                      >
-                        Sau
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <InventoryPagination
+                  page={projectPage}
+                  pageCount={totalProjectPages}
+                  total={projectRows.length}
+                  pageSize={projectPageSize}
+                  onPageChange={setProjectPage}
+                  containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
+                />
               </ModuleAnalyticsPanel>
             </div>
             </div>
@@ -1231,14 +1216,15 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                 {/* Bảng danh sách nhà cung cấp tùy chỉnh */}
                 <ModuleAnalyticsPanel title="Danh sách nhà cung cấp" note="Top 10 nhà cung cấp chính" className="min-h-[470px]">
                   <div className="overflow-auto h-[470px]">
+                    <div className="overflow-hidden rounded-xl border border-white/10">
                     <table className="w-full min-w-[700px] text-sm table-fixed">
                       <colgroup>
-                        <col className="w-[100px]" />
+                        <col className="w-[120px]" />
                         <col className="w-[140px]" />
                         <col className="w-[80px]" />
                         <col className="w-[80px]" />
                         <col className="w-[120px]" />
-                        <col className="w-[160px]" />
+                        <col className="w-[120px]" />
                       </colgroup>
                       <thead className={moduleTableHead}>
                         <tr>
@@ -1247,7 +1233,7 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                           <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Số lượng</th>
                           <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Đơn giá</th>
                           <th className="px-2 py-1.5 text-right font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Tổng giá trị</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Chứng từ</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-slate-400 text-xs uppercase tracking-[0.08em]">Hồ sơ</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1259,13 +1245,13 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                             <td className="truncate px-2 py-1.5 text-slate-200" title={row.supplierName ?? 'Không rõ'}>
                               {row.supplierName ?? 'Không rõ'}
                             </td>
-                            <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-400" title={`${fmt(row.quantity)} ${unit}`.trim()}>
+                            <td className="truncate px-2 py-1.5 text-right font-medium tabular-nums font-semibold text-emerald-400" title={`${fmt(row.quantity)} ${unit}`.trim()}>
                               {`${fmt(row.quantity)} ${unit}`.trim()}
                             </td>
-                            <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums text-cyan-300" title={money(row.unitPrice ?? row.latestUnitPrice ?? averageCost)}>
+                            <td className="truncate px-2 py-1.5 text-right font-medium tabular-nums text-cyan-300" title={money(row.unitPrice ?? row.latestUnitPrice ?? averageCost)}>
                               {money(row.unitPrice ?? row.latestUnitPrice ?? averageCost)}
                             </td>
-                            <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums font-semibold text-cyan-300" title={money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}>
+                            <td className="truncate px-2 py-1.5 text-right font-medium tabular-nums font-semibold text-cyan-300" title={money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}>
                               {money(row.totalValue ?? row.totalAmount ?? num(row.quantity) * num(row.unitPrice ?? averageCost))}
                             </td>
                             <td className="truncate px-2 py-1.5 text-left">
@@ -1289,34 +1275,18 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                         )}
                       </tbody>
                     </table>
+                    </div>
                   </div>
 
                   {/* Phân trang */}
-                  {totalSupplierPages > 1 && (
-                    <div className="flex items-center justify-between gap-3 px-4 py-1.5 text-xs text-slate-400 border-t border-white/10">
-                      <span>
-                        Hiển thị {(supplierPage - 1) * supplierPageSize + 1}-
-                        {Math.min(supplierPage * supplierPageSize, supplierRows.length)}/{supplierRows.length} nhà cung cấp
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
-                          disabled={supplierPage <= 1}
-                          className={moduleMutedButton}
-                        >
-                          Trước
-                        </button>
-                        <span className="px-2 py-1 text-slate-300">{supplierPage}/{totalSupplierPages}</span>
-                        <button
-                          onClick={() => setSupplierPage((p) => Math.min(totalSupplierPages, p + 1))}
-                          disabled={supplierPage >= totalSupplierPages}
-                          className={moduleMutedButton}
-                        >
-                          Sau
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <InventoryPagination
+                    page={supplierPage}
+                    pageCount={totalSupplierPages}
+                    total={supplierRows.length}
+                    pageSize={supplierPageSize}
+                    onPageChange={setSupplierPage}
+                    containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
+                  />
                 </ModuleAnalyticsPanel>
               </div>
             </div>
@@ -1340,8 +1310,9 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
 
           {activeTab === 'logs' && (
             <div className="space-y-1 mt-1">
-              <ModuleAnalyticsPanel title="Lịch sử thay đổi" note="Tổng hợp từ các giao dịch nhập/xuất gần nhất">
+              <ModuleAnalyticsPanel title="Lịch sử thay đổi">
                 <div className="overflow-auto">
+                  <div className="overflow-hidden rounded-xl border border-white/10">
                   <table className="w-full min-w-[700px] text-sm">
                     <thead className="bg-white/[0.06] text-xs uppercase tracking-[0.08em] text-slate-400">
                       <tr>
@@ -1364,10 +1335,10 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                           </td>
                           <td className="px-3 py-2 text-cyan-300">{row.transactionNo ?? '-'}</td>
                           <td className="px-3 py-2 text-slate-200">{row.counterparty}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-white">
+                          <td className="px-3 py-2 text-right font-medium tabular-nums text-white">
                             {`${fmt(row.quantity)} ${unit}`.trim()}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-cyan-300">
+                          <td className="px-3 py-2 text-right font-medium tabular-nums text-cyan-300">
                             {money(row.totalAmount)}
                           </td>
                         </tr>
@@ -1381,34 +1352,18 @@ export function InventoryMaterialDetailModal({ open, detail, fallback, onClose, 
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
 
                 {/* Phân trang */}
-                {totalLogPages > 1 && (
-                  <div className="flex items-center justify-between gap-3 px-4 py-1 text-xs text-slate-400 border-t border-white/10">
-                    <span>
-                      Hiển thị {(logPage - 1) * logPageSize + 1}-
-                        {Math.min(logPage * logPageSize, materialTransactionsQuery.data?.total ?? 0)}/{materialTransactionsQuery.data?.total ?? 0} giao dịch
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setLogPage((p) => Math.max(1, p - 1))}
-                        disabled={logPage <= 1}
-                        className={moduleMutedButton}
-                      >
-                        Trước
-                      </button>
-                      <span className="px-2 py-1 text-slate-300">{logPage}/{totalLogPages}</span>
-                      <button
-                        onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
-                        disabled={logPage >= totalLogPages}
-                        className={moduleMutedButton}
-                      >
-                        Sau
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <InventoryPagination
+                  page={logPage}
+                  pageCount={totalLogPages}
+                  total={materialTransactionsQuery.data?.total ?? 0}
+                  pageSize={logPageSize}
+                  onPageChange={setLogPage}
+                  containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
+                />
               </ModuleAnalyticsPanel>
             </div>
           )}
@@ -2002,7 +1957,7 @@ function DetailTable({ title, headers, rows }: { title: string; headers: string[
 }
 
 function buildTransactionRows(inbound: any[], outbound: any[]) {
-  return [
+  const rows = [
     ...inbound.map((x: any) => ({
       ...x,
       type: normalizeTransactionType(
@@ -2034,6 +1989,8 @@ function buildTransactionRows(inbound: any[], outbound: any[]) {
         num(row.quantity) * num(row.unitPrice),
       ),
     }))
+
+  return dedupeTransactionRows(rows)
     .sort(
       (a: any, b: any) =>
         +new Date(
@@ -2050,7 +2007,7 @@ function buildTransactionRows(inbound: any[], outbound: any[]) {
 }
 
 function buildServerTransactionRows(transactions: any[]) {
-  return transactions.flatMap((transaction: any) => {
+  const rows = transactions.flatMap((transaction: any) => {
     const items = Array.isArray(transaction?.items) ? transaction.items : []
     return items.map((line: any) => ({
       ...line,
@@ -2083,6 +2040,87 @@ function buildServerTransactionRows(transactions: any[]) {
         '-',
     }))
   })
+
+  return dedupeTransactionRows(rows)
+}
+
+function transactionRowDedupeKey(row: any) {
+  const transactionNo = String(row?.transactionNo ?? row?.documentNo ?? '').trim()
+  if (transactionNo) return `no:${transactionNo}`
+
+  const transactionId = String(
+    row?.transactionId ??
+    row?.inventoryTransactionId ??
+    row?.inventoryTransaction?.id ??
+    row?.transaction?.id ??
+    '',
+  ).trim()
+  if (transactionId) return `tx:${transactionId}`
+
+  const id = String(row?.id ?? '').trim()
+  if (id) return `id:${id}`
+
+  return [
+    row?.transactionDate ?? row?.createdAt ?? '',
+    row?.type ?? row?.transactionType ?? row?.businessType ?? '',
+    row?.counterparty ?? row?.supplierName ?? row?.projectName ?? '',
+    row?.quantity ?? '',
+    row?.totalAmount ?? row?.totalValue ?? '',
+  ].map((value) => String(value).trim()).join('|')
+}
+
+function transactionExactRowKey(row: any) {
+  return [
+    row?.id ?? '',
+    row?.transactionId ?? row?.inventoryTransactionId ?? '',
+    row?.transactionNo ?? row?.documentNo ?? '',
+    row?.inventoryItemId ?? row?.materialId ?? '',
+    row?.warehouseId ?? '',
+    row?.zoneId ?? '',
+    row?.slotId ?? '',
+    row?.level ?? '',
+    row?.lotNo ?? row?.lot ?? '',
+    row?.serialNo ?? row?.serial ?? '',
+    row?.quantity ?? '',
+  ].map((value) => String(value).trim()).join('|')
+}
+
+function dedupeTransactionRows(rows: any[]) {
+  const exactSeen = new Set<string>()
+  const merged = new Map<string, any>()
+
+  rows.forEach((row) => {
+    const exactKey = transactionExactRowKey(row)
+    if (exactSeen.has(exactKey)) return
+    exactSeen.add(exactKey)
+
+    const key = transactionRowDedupeKey(row)
+    const existing = merged.get(key)
+    if (!existing) {
+      merged.set(key, { ...row })
+      return
+    }
+
+    merged.set(key, {
+      ...existing,
+      ...row,
+      id: existing.id ?? row.id,
+      transactionId: existing.transactionId ?? row.transactionId,
+      transactionNo: existing.transactionNo ?? row.transactionNo,
+      transactionDate: existing.transactionDate ?? row.transactionDate,
+      type: existing.type ?? row.type,
+      rawType: existing.rawType ?? row.rawType,
+      direction: existing.direction ?? row.direction,
+      counterparty: existing.counterparty && existing.counterparty !== '-'
+        ? existing.counterparty
+        : row.counterparty,
+      quantity: num(existing.quantity) + num(row.quantity),
+      totalAmount: num(existing.totalAmount) + num(row.totalAmount),
+      attachmentCount: Math.max(num(existing.attachmentCount), num(row.attachmentCount)),
+    })
+  })
+
+  return Array.from(merged.values())
 }
 
 function transactionEntityKeys(row: any) {

@@ -19,6 +19,7 @@ import {
   inventoryTableRow,
   inventoryTableShell,
   inventoryMutedButton,
+  InventoryPagination,
 } from '../../components/InventoryVisuals'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useProjects } from '../../hooks/useProjects'
@@ -320,7 +321,7 @@ export function InventoryOutboundPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
-  const pageSize = 12
+  const pageSize = 11
   const attachmentMap = useInventoryTransactionAttachmentMap()
   const applySearch = () => {
     setSearch(searchDraft)
@@ -592,7 +593,7 @@ export function InventoryOutboundPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className="space-y-2 text-xs">
+      <div className="space-y-2 text-xs -mt-2">
         {/* KPI Section */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <CockpitKpiCard
@@ -638,7 +639,7 @@ export function InventoryOutboundPage() {
         </div>
 
         {/* Enterprise Toolbar & Quick Actions */}
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between -mt-1">
           <div className="flex-1 min-w-0">
             <ModuleFilterBar sticky={false} className="p-2.5">
               <div className="col-span-12 xl:col-span-3">
@@ -770,7 +771,7 @@ export function InventoryOutboundPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-1.5">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-1.5 -mt-1">
             <InventoryPanel
               title={
                 <div className="flex items-center justify-between">
@@ -787,8 +788,7 @@ export function InventoryOutboundPage() {
               }
               className="xl:col-span-9"
             >
-              <div className="rounded-lg border border-white/10 overflow-hidden">
-              <CockpitTableShell className="h-[420px]">
+                <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
                 <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
                   <colgroup>
                     <col className="w-[100px]" /> {/* Ngày */}
@@ -809,7 +809,7 @@ export function InventoryOutboundPage() {
                     style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                   >
                     <tr>
-                      {['NGÀY XUẤT', 'MÃ PHIẾU XUẤT', 'LOẠI XUẤT', 'ĐƠN VỊ NHẬN', 'KHO XUẤT', 'KHỐI LƯỢNG', 'GIÁ TRỊ', 'HỒ SƠ', 'TRẠNG THÁI', 'NGƯỜI TẠO'].map((h) => (
+                      {['NGÀY XUẤT', 'MÃ PHIẾU XUẤT', 'LOẠI XUẤT', 'ĐƠN VỊ NHẬN', 'KHO XUẤT', 'KHỐI LƯỢNG', 'GIÁ TRỊ', 'HỒ SƠ', 'SL MÃ VẬT TƯ', 'NGƯỜI TẠO'].map((h) => (
                         <th key={h} className="px-4 py-2 text-left font-medium">
                           {h}
                         </th>
@@ -846,14 +846,10 @@ export function InventoryOutboundPage() {
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-2.5 py-1">
-                            <span className={`rounded px-2 py-0.5 text-[11px] font-semibold border ${
-                              isPending
-                                ? 'border-amber-700/60 bg-amber-500/10 text-amber-300'
-                                : 'border-emerald-700/60 bg-emerald-500/10 text-emerald-300'
-                            }`}>
-                              {String(x.status ?? 'COMPLETED')}
-                            </span>
+                          <td className="px-2.5 py-1 text-center font-semibold text-cyan-300">
+                            {new Set(
+                              transactionItems(x).map((line: any) => line.inventoryItemId)
+                            ).size}
                           </td>
                           <td className="px-2.5 py-1 text-slate-400">{transactionActor(x)}</td>
                         </tr>
@@ -861,13 +857,14 @@ export function InventoryOutboundPage() {
                     })}
                   </tbody>
                 </table>
-              </CockpitTableShell>
               </div>
-              <DataTablePagination
+              <InventoryPagination
                 page={page}
-                pageSize={pageSize}
+                pageCount={pageCount}
                 total={rows.length}
+                pageSize={pageSize}
                 onPageChange={setPage}
+                containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
               />
             </InventoryPanel>
 
@@ -885,7 +882,7 @@ export function InventoryOutboundPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-12">
+        <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-12 -mt-1">
           <InventoryChartCard title="KPI tài chính xuất kho" className="p-3 xl:col-span-4">
             <FinancialKpiRows
               today={kpis.amountToday}
@@ -903,7 +900,7 @@ export function InventoryOutboundPage() {
             <TrendPanel rows={monthlyTrend} />
           </InventoryChartCard>
 
-          <InventoryChartCard title="Tiêu thụ theo công trình" className="p-3 xl:col-span-6">
+          <InventoryChartCard title="Tiêu thụ theo công trình" className="p-3 xl:col-span-6 -mt-0.5">
             <div className="space-y-2">
               {projectConsumption.length ? projectConsumption.map((item) => (
                 <div key={item.name} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
@@ -931,7 +928,7 @@ export function InventoryOutboundPage() {
             </div>
           </InventoryChartCard>
 
-          <InventoryChartCard title="Tiêu thụ theo vật tư" className="p-3 xl:col-span-6">
+          <InventoryChartCard title="Tiêu thụ theo vật tư" className="p-3 xl:col-span-6 -mt-0.5">
             <div className="overflow-auto rounded-xl border border-white/10">
               <table className="w-full min-w-[620px] text-sm">
                 <thead className={inventoryTableHead}>
@@ -962,7 +959,7 @@ export function InventoryOutboundPage() {
             </div>
           </InventoryChartCard>
 
-          <InventoryChartCard title="Mục đích xuất kho" className="p-3 xl:col-span-5">
+          <InventoryChartCard title="Mục đích xuất kho" className="p-3 xl:col-span-5 -mt-0.5">
             <CompactDonutSummary
               segments={purposeSegments}
               centerValue={formatCurrency(sumTransactionAmount(rows))}
@@ -970,7 +967,7 @@ export function InventoryOutboundPage() {
             />
           </InventoryChartCard>
 
-          <InventoryChartCard title="Cảnh báo tiêu thụ bất thường" className="p-3 xl:col-span-7">
+          <InventoryChartCard title="Cảnh báo tiêu thụ bất thường" className="p-3 xl:col-span-7 -mt-0.5">
             <div className="space-y-2">
               {abnormalAlerts.length ? abnormalAlerts.map((alert) => (
                 <div key={alert.key} className="flex items-start justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-500/[0.055] p-3">
@@ -998,11 +995,11 @@ export function InventoryOutboundPage() {
       </div>
       {showAll && (
         <div role="dialog" aria-modal="true" aria-label="Danh sách phiếu xuất" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
-          <div className="max-h-[90vh] w-full max-w-[95vw] overflow-auto rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+          <div className="max-h-[90vh] w-full max-w-[95vw] flex flex-col rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
 
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">
-                Danh sách phiếu xuất ({rows.length} phiếu)
+                Tổng danh sách phiếu xuất ({rows.length} phiếu)
               </h3>
 
               <button
@@ -1013,7 +1010,7 @@ export function InventoryOutboundPage() {
               </button>
             </div>
 
-            <div className="overflow-auto rounded-xl border border-white/10">
+            <div className="flex-1 min-h-[550px] overflow-y-auto rounded-xl border border-white/10">
             <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
                   <colgroup>
                     <col className="w-[100px]" /> {/* Ngày */}
@@ -1027,9 +1024,12 @@ export function InventoryOutboundPage() {
                     <col className="w-[100px]" /> {/* Trạng thái */}
                     <col className="w-[140px]" /> {/* Người tạo */}
                   </colgroup>
-                  <thead className={`${inventoryTableHead} border-b border-cyan-400/20`}>
-                    <tr className="bg-slate-900 text-slate-400 font-semibold uppercase">
-                      {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Khối lượng', 'Giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                   <thead
+                    className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10`}
+                    style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                  >
+                    <tr className="font-semibold uppercase">
+                      {['Ngày xuất', 'Mã phiếu xuất', 'Loại xuất', 'Đơn vị nhận', 'Kho xuất', 'Khối lượng', 'Giá trị', 'Hồ sơ', 'SL mã vật tư', 'Người tạo'].map((h) => (
                         <th key={h} className="px-4 py-2 text-left font-medium">
                           {h}
                         </th>
@@ -1066,14 +1066,8 @@ export function InventoryOutboundPage() {
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span className={`rounded px-2 py-0.5 text-[11px] font-semibold border ${
-                              isPending
-                                ? 'border-amber-700/60 bg-amber-500/10 text-amber-300'
-                                : 'border-emerald-700/60 bg-emerald-500/10 text-emerald-300'
-                            }`}>
-                              {String(x.status ?? 'COMPLETED')}
-                            </span>
+                          <td className="px-4 py-2.5 text-center font-medium text-cyan-300">
+                            {transactionItems(x).length}
                           </td>
                           <td className="px-4 py-2.5 text-slate-400">{transactionActor(x)}</td>
                         </tr>
@@ -1082,14 +1076,18 @@ export function InventoryOutboundPage() {
                   </tbody>
                 </table>
               </div>
-              <DataTablePagination
-                page={page}
-                pageSize={pageSize}
-                total={rows.length}
-                onPageChange={setPage}
-              />
+               <div className="flex-none pt-2">
+                <InventoryPagination
+                  page={page}
+                  pageCount={pageCount}
+                  total={rows.length}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
+                />
           </div>
         </div>
+      </div>
       )}
 
       <InventoryTransactionAttachmentDrawer

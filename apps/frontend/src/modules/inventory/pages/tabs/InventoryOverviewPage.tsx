@@ -581,14 +581,14 @@ export function InventoryOverviewPage() {
       const current = series.at(-1) ?? 0
       const previous = series.at(-2) ?? 0
       const difference = current - previous
-      if (difference === 0) return `0 ${suffix} (0%) so với lần ghi nhận trước`
+      if (difference === 0) return `0 ${suffix} (0%)`
       const percent = previous ? (difference / Math.abs(previous)) * 100 : null
       const value = suffix === 'đ'
         ? formatCurrencyVnd(Math.abs(difference))
         : `${formatQuantity(Math.abs(difference), 1)} ${suffix}`
       return `${difference > 0 ? '▲' : '▼'}${value}${
         percent == null ? '' : ` (${percent > 0 ? '+' : ''}${percent.toFixed(1)}%)`
-      } so với lần ghi nhận trước`
+      }`
     }
     const trend = {
       value: values,

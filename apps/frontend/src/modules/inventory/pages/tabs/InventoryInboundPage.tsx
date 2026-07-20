@@ -24,6 +24,7 @@ import {
   inventoryTableRow,
   inventoryTableShell,
   inventoryMutedButton,
+  InventoryPagination,
 } from '../../components/InventoryVisuals'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { useSuppliers } from '../../hooks/useSuppliers'
@@ -279,7 +280,7 @@ export function InventoryInboundPage() {
   const { data: suppliers = [] } = useSuppliers()
   const { data: zones = [] } = useZones()
   const { data: tx = [], isLoading, refetch } = useInventoryTransactions({ type: 'INBOUND' })
-
+  const [showAll, setShowAll] = useState(false)
   const [date, setDate] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const [zoneId, setZoneId] = useState('')
@@ -287,7 +288,7 @@ export function InventoryInboundPage() {
   const [page, setPage] = useState(1)
   const [attachmentDrawer, setAttachmentDrawer] = useState<{ transaction: any; attachments: any[] } | null>(null)
   const [selectedInbound, setSelectedInbound] = useState<any | null>(null)
-  const pageSize = 14
+  const pageSize = 11
   const attachmentMap = useInventoryTransactionAttachmentMap()
   const [searchDraft, setSearchDraft] = useState('')
   function applySearch() {
@@ -505,7 +506,7 @@ export function InventoryInboundPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className="space-y-2 text-xs">
+      <div className="space-y-2 text-xs -mt-2">
         {/* KPI Section */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-6">
           <CockpitKpiCard
@@ -559,7 +560,7 @@ export function InventoryInboundPage() {
         </div>
 
         {/* Enterprise Toolbar & Quick Actions */}
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between -mt-1">
           <div className="flex-1 min-w-0">
             <ModuleFilterBar sticky={false} className="p-2.5">
               <div className="col-span-12 xl:col-span-3">
@@ -671,13 +672,29 @@ export function InventoryInboundPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-1.5">
-            <InventoryPanel title="Danh sách phiếu nhập" className="xl:col-span-9 p-0">
-              <CockpitTableShell>
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-1 -mt-1">
+            <InventoryPanel
+              title={
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                    Danh sách phiếu nhập
+                  </h3>
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+                  >
+                    Xem tất cả
+                  </button>
+                </div>
+              }
+              className="xl:col-span-9"
+            >
+              <div className="rounded-lg border border-white/10 overflow-hidden">
+                <div className="min-h-[260px] max-h-[430px] overflow-y-auto">
                 <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
                   <colgroup>
-                    <col className="w-[120px]" /> {/* Mã phiếu nhập */}
-                    <col className="w-[100px]" /> {/* Ngày nhập */}
+                    <col className="w-[100px]" /> {/* Mã phiếu nhập */}
+                    <col className="w-[120px]" /> {/* Ngày nhập */}
                     <col className="w-[200px]" /> {/* Nhà cung cấp */}
                     <col className="w-[110px]" /> {/* Vị trí */}
                     <col className="w-[100px]" /> {/* Số lượng */}
@@ -685,12 +702,17 @@ export function InventoryInboundPage() {
                     <col className="w-[100px]" /> {/* Đơn giá */}
                     <col className="w-[120px]" /> {/* Tổng giá trị */}
                     <col className="w-[80px]" />  {/* Hồ sơ */}
-                    <col className="w-[100px]" /> {/* Trạng thái */}
+                    <col className="w-[120px]" /> {/* Trạng thái */}
                     <col className="w-[100px]" /> {/* Người tạo */}
                   </colgroup>
-                  <thead className={`${inventoryTableHead} border-b border-cyan-400/10`}>
-                    <tr className="bg-slate-900 text-slate-400 font-semibold uppercase">
-                      {['Mã phiếu nhập', 'Ngày nhập', 'Nhà cung cấp', 'Vị trí', 'Số lượng', 'ĐVT', 'Đơn giá', 'Tổng giá trị', 'Hồ sơ', 'Trạng thái', 'Người tạo'].map((h) => (
+                  <thead
+                    className={`${inventoryTableHead}
+                      text-slate-300
+                      border-b border-cyan-400/10`}
+                    style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                  >
+                    <tr>
+                      {['Ngày nhập', 'Mã phiếu nhập', 'Nhà cung cấp', 'Vị trí', 'Số lượng', 'ĐVT', 'Đơn giá', 'Tổng giá trị', 'Hồ sơ', 'SL mã vật tư', 'Người tạo'].map((h) => (
                         <th key={h} className="px-4 py-2 text-left font-medium">
                           {h}
                         </th>
@@ -706,38 +728,41 @@ export function InventoryInboundPage() {
                           className="border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-500/5 hover:text-cyan-300 cursor-pointer"
                           onClick={() => setSelectedInbound(x)}
                         >
-                          <td className="px-4 py-2.5 text-cyan-300 font-semibold">{x.transactionNo}</td>
-                          <td className="px-4 py-2.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
-                          <td className="px-4 py-2.5 truncate">{supplierName(x)}</td>
-                          <td className="px-4 py-2.5 truncate">{transactionZones(x).join(', ') || '-'}</td>
-                          <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 3)}</td>
-                          <td className="px-4 py-2.5">{transactionUnits(x)}</td>
-                          <td className="px-4 py-2.5">{unitPrice == null ? '-' : formatCurrency(unitPrice)}</td>
-                          <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
-                          <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
+                          <td className="px-2.5 py-1">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                          <td className="px-2.5 py-1 text-cyan-300 font-medium">{x.transactionNo}</td>
+                          <td className="px-2.5 py-1 truncate">{supplierName(x)}</td>
+                          <td className="px-2.5 py-1 truncate">{transactionZones(x).join(', ') || '-'}</td>
+                          <td className="px-2.5 py-1 font-medium">{formatQuantity(transactionQuantity(x), 3)}</td>
+                          <td className="px-2.5 py-1">{transactionUnits(x)}</td>
+                          <td className="px-2.5 py-1">{unitPrice == null ? '-' : formatCurrency(unitPrice)}</td>
+                          <td className="px-2.5 py-1 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
+                          <td className="px-2.5 py-1" onClick={(event) => event.stopPropagation()}>
                             <InventoryTransactionAttachmentButton
                               transaction={x}
                               attachmentMap={attachmentMap}
                               onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
                             />
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span className="rounded border border-emerald-700/60 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                              {String(x.status ?? 'COMPLETED')}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-slate-400">{x.createdBy ?? 'Admin'}</td>
+                            <td className="px-2.5 py-1 text-center">
+                              <span className="inline-flex min-w-[30px] items-center justify-center rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-semibold text-cyan-300">
+                                {transactionItems(x).length}
+                              </span>
+                            </td>
+                          <td className="px-2.5 py-1 text-slate-400">{x.createdBy ?? 'Admin'}</td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
-              </CockpitTableShell>
-              <DataTablePagination
+                </div>
+              </div>
+              <InventoryPagination
                 page={page}
-                pageSize={pageSize}
+                pageCount={pageCount}
                 total={rows.length}
+                pageSize={pageSize}
                 onPageChange={setPage}
+                containerClassName="grid grid-cols-1 items-center gap-2 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t-0"
               />
             </InventoryPanel>
 
@@ -748,42 +773,149 @@ export function InventoryInboundPage() {
               <InventoryChartCard title="Top vật tư nhập" className="p-2">
                 <HorizontalBars rows={topMaterials.map((m) => [m.code, m.value])} valueFormatter={(value) => formatCurrency(value)} />
               </InventoryChartCard>
+              </div>
+              
+          {/* Hàng dưới */}
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+
               <InventoryChartCard title="Top NCC theo giá trị nhập" className="p-2">
                 <div className="space-y-2">
                   {topSuppliers.map((supplier) => (
-                    <div key={supplier.name} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
-                      <div className="truncate font-semibold text-cyan-100">{supplier.name}</div>
+                    <div
+                      key={supplier.name}
+                      className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs"
+                    >
+                      <div className="truncate font-semibold text-cyan-100">
+                        {supplier.name}
+                      </div>
+
                       <div className="mt-1 grid grid-cols-2 gap-2 text-slate-400">
                         <span>{formatQuantity(supplier.quantity, 3)}</span>
-                        <span className="text-right text-emerald-300">{formatCurrency(supplier.value)}</span>
+                        <span className="text-right text-emerald-300">
+                          {formatCurrency(supplier.value)}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               </InventoryChartCard>
+
               <InventoryChartCard title="Top NCC theo khối lượng" className="p-2">
                 <div className="space-y-2">
                   {topSuppliersByQuantity.map((supplier) => (
-                    <div key={supplier.name} className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs">
-                      <div className="truncate font-semibold text-cyan-100">{supplier.name}</div>
+                    <div
+                      key={supplier.name}
+                      className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-xs"
+                    >
+                      <div className="truncate font-semibold text-cyan-100">
+                        {supplier.name}
+                      </div>
+
                       <div className="mt-1 grid grid-cols-2 gap-2 text-slate-400">
                         <span>{formatQuantity(supplier.quantity, 3)}</span>
-                        <span className="text-right text-emerald-300">{formatCurrency(supplier.value)}</span>
+                        <span className="text-right text-emerald-300">
+                          {formatCurrency(supplier.value)}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               </InventoryChartCard>
+
               <InventoryChartCard title="Top vật tư tăng giá" className="p-2">
                 <PriceChangeList rows={priceChanges.increases} />
               </InventoryChartCard>
+
               <InventoryChartCard title="Top vật tư giảm giá" className="p-2">
                 <PriceChangeList rows={priceChanges.decreases} />
               </InventoryChartCard>
+
             </div>
           </div>
         )}
       </div>
+            {showAll && (
+        <div role="dialog" aria-modal="true" aria-label="Danh sách phiếu nhập" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
+          <div className="max-h-[90vh] w-full max-w-[95vw] flex flex-col rounded-xl border border-white/10 bg-[#0b1424]/95 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">
+                Tổng danh sách phiếu nhập ({rows.length} phiếu)
+              </h3>
+              <button
+                onClick={() => setShowAll(false)}
+                className="rounded border border-white/10 bg-white/5 px-3 py-1 text-slate-300 hover:text-white"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-[400px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
+                <colgroup>
+                  <col className="w-[100px]" /> {/* Mã phiếu nhập */}
+                  <col className="w-[120px]" /> {/* Ngày nhập */}
+                  <col className="w-[200px]" /> {/* Nhà cung cấp */}
+                  <col className="w-[110px]" /> {/* Vị trí */}
+                  <col className="w-[100px]" /> {/* Số lượng */}
+                  <col className="w-[70px]" />  {/* ĐVT */}
+                  <col className="w-[100px]" /> {/* Đơn giá */}
+                  <col className="w-[120px]" /> {/* Tổng giá trị */}
+                  <col className="w-[80px]" />  {/* Hồ sơ */}
+                  <col className="w-[100px]" /> {/* SL MÃ VẬT TƯ */}
+                  <col className="w-[100px]" /> {/* Người tạo */}
+                </colgroup>
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>
+                    {['Ngày nhập', 'Mã phiếu nhập', 'Nhà cung cấp', 'Vị trí', 'Số lượng', 'ĐVT', 'Đơn giá', 'Tổng giá trị', 'Hồ sơ', 'SL Mã vật tư', 'Người tạo'].map((h) => (
+                      <th key={h} className="px-4 py-2 text-left font-medium">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((x: any) => {
+                    const unitPrice = transactionUnitPrice(x)
+                    return (
+                      <tr
+                        key={x.id}
+                        className="border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-500/5 hover:text-cyan-300 cursor-pointer"
+                        onClick={() => {
+                          setSelectedInbound(x)
+                          setShowAll(false)
+                        }}
+                      >
+                        <td className="px-4 py-2.5">{formatDate(x.transactionDate ?? x.createdAt)}</td>
+                        <td className="px-4 py-2.5 text-cyan-300 font-semibold">{x.transactionNo}</td>
+                        <td className="px-4 py-2.5 truncate">{supplierName(x)}</td>
+                        <td className="px-4 py-2.5 truncate">{transactionZones(x).join(', ') || '-'}</td>
+                        <td className="px-4 py-2.5 font-medium">{formatQuantity(transactionQuantity(x), 3)}</td>
+                        <td className="px-4 py-2.5">{transactionUnits(x)}</td>
+                        <td className="px-4 py-2.5">{unitPrice == null ? '-' : formatCurrency(unitPrice)}</td>
+                        <td className="px-4 py-2.5 font-bold text-emerald-400">{formatCurrency(transactionAmount(x))}</td>
+                        <td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
+                          <InventoryTransactionAttachmentButton
+                            transaction={x}
+                            attachmentMap={attachmentMap}
+                            onOpen={(attachments) => setAttachmentDrawer({ transaction: x, attachments })}
+                          />
+                        </td>
+                            <td className="px-2.5 py-1 text-center">
+                              <span className="inline-flex min-w-[30px] items-center justify-center rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-semibold text-cyan-300">
+                                {transactionItems(x).length}
+                              </span>
+                            </td>
+                        <td className="px-4 py-2.5 text-slate-400">{x.createdBy ?? 'Admin'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       <InventoryTransactionAttachmentDrawer
         open={Boolean(attachmentDrawer)}
         transaction={attachmentDrawer?.transaction}
