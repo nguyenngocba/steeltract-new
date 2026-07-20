@@ -19,7 +19,7 @@ const triggers = [
 
   {
     trigger: 'Truck Arrival',
-    action: 'Open Dispatch Runtime',
+    action: 'Mở điều xe',
     status: 'WAITING',
   },
 ]
@@ -43,7 +43,7 @@ export function TriggerRuntimePanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-lime-400">
-          Trigger Runtime
+          Bộ kích hoạt quy trình
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

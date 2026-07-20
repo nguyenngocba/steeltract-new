@@ -11,7 +11,7 @@ export function FederationPage() {
       <div className="space-y-6 p-6">
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-sky-400">
-            Federation Runtime
+            Kết nối liên nhà máy
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">

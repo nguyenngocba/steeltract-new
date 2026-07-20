@@ -1,5 +1,81 @@
 # Components Module
 
+## EPIC BUSINESS001 Steel Structure Domain Completion
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Components Overview, List, Internal QC and Reports now use component
+  lifecycle, fabrication, QC wait, ready-to-ship and shipping language.
+- Placeholder-style NCR counts were removed where no authoritative NCR contract
+  exists; existing lifecycle-derived queues are used instead.
+- Project distribution and lifecycle status remain derived from existing read
+  data only.
+- No backend, API, React Query, permission or business behavior changed.
+
+## UX Review Round 2
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Components Overview right-side cockpit now prioritizes status distribution,
+  activity and project distribution.
+- Added QC waiting and ready-to-ship queue cards using existing component
+  status/location rows.
+- Chart cards were increased in visual weight to match Inventory's cockpit
+  usefulness.
+- No backend, API, React Query, permission or business behavior changed.
+
+## UX Review Round 1
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Components Overview table now shows Top N rows in the dashboard context.
+- The table card exposes `Xem tất cả` and routes to `/components/list` for the
+  full Enterprise Table workspace.
+- Components List remains the full workspace with filters, pagination and
+  detail drawer.
+- Short dashboard component lists use a smaller card height to reduce empty
+  space.
+- No backend, API, React Query, permission or business behavior changed.
+
+## EPIC UI005B Design Language Inference
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Components Overview, List and Reports now follow Inventory's inferred
+  workspace rhythm: KPI first, compact toolbar, table as anchor, side analytics
+  and summary strip.
+- Components List create actions moved into the toolbar instead of a standalone
+  action row before KPIs.
+- Components tables use the shared Enterprise table head/row density more
+  consistently.
+- Backend, API, React Query, route, permission, authentication and business
+  behavior are unchanged.
+
+## EPIC UI005A Workspace Completion
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - SCREENSHOT EVIDENCE BLOCKED**
+
+- Components workspace wrapper no longer renders duplicated page-local hero,
+  breadcrumb or tab chrome inside the application shell.
+- Internal QC now derives its table, status and summary from live Components
+  read data instead of static rows.
+- Components Reports now has a dedicated workspace route rather than reusing the
+  History page as a route placeholder.
+- Legacy null wrapper pages now delegate to the active Components Overview
+  workspace.
+- No backend, API, React Query, route, permission, DTO or business behavior
+  changed.
+
 ## RFC003 Aggregate Command API
 
 Implemented on 2026-07-17.

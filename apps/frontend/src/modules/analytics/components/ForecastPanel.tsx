@@ -33,11 +33,11 @@ export function ForecastPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-pink-400">
-          Forecast Runtime
+          Dự báo vận hành
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Predictive operational intelligence
+          Theo dõi xu hướng khi có đủ dữ liệu lịch sử.
         </div>
       </div>
 

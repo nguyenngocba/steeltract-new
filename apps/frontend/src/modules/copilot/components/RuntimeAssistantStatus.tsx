@@ -1,22 +1,22 @@
 const metrics = [
   {
-    label: 'AI Runtime',
-    value: 'ONLINE',
+    label: 'Trợ lý',
+    value: 'Sẵn sàng',
   },
 
   {
-    label: 'Operational Insights',
-    value: 284,
+    label: 'Gợi ý vận hành',
+    value: 'Theo dữ liệu',
   },
 
   {
-    label: 'Realtime Analysis',
-    value: 'ACTIVE',
+    label: 'Phân tích trực tiếp',
+    value: 'Đang theo dõi',
   },
 
   {
-    label: 'Prediction Engine',
-    value: 'READY',
+    label: 'Dự báo',
+    value: 'Sẵn sàng',
   },
 ]
 

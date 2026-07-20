@@ -1,22 +1,22 @@
 const metrics = [
   {
-    label: 'Cognitive Signals',
-    value: 884,
+    label: 'Tín hiệu vận hành',
+    value: 'Theo dõi',
   },
 
   {
-    label: 'Unified Runtimes',
-    value: 28,
+    label: 'Workspace liên kết',
+    value: 'Đang kết nối',
   },
 
   {
-    label: 'AI Cognition',
-    value: 'ACTIVE',
+    label: 'Phân tích trợ lý',
+    value: 'Sẵn sàng',
   },
 
   {
-    label: 'Industrial Brain',
-    value: 'ONLINE',
+    label: 'Điều phối trung tâm',
+    value: 'Sẵn sàng',
   },
 ]
 

@@ -1,5 +1,24 @@
 # QC Module
 
+## EPIC QC001 Enterprise Quality Command Center
+
+Status: **IMPLEMENTED - VISUAL QA PENDING** (2026-07-18)
+
+QC Overview now uses the Enterprise cockpit language already established by
+Inventory, Production and Components:
+
+- KPI-first quality status scan.
+- Quality alerts from existing inspection and production queue rows.
+- Top N inspection queue with working `Xem tất cả` navigation to the full QC
+  workspace.
+- Right-side MO waiting queue and latest inspection decision context.
+- Status distribution, project summary, NCR summary and QC trend panels.
+- Calibration now renders a truthful no-data state until an authoritative
+  equipment calibration read contract exists.
+
+No backend, API, React Query, route, permission, authentication, database or
+business behavior changed.
+
 ## Core Platform v1.0 Certification
 
 Status: **PASS** (EPIC174, 2026-07-13)

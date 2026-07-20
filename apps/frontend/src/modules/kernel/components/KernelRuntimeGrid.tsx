@@ -1,6 +1,6 @@
 const metrics = [
   {
-    label: 'Kernel Runtime',
+    label: 'Nền tảng lõi',
     value: 'ONLINE',
   },
 

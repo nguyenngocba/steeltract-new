@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { AlertTriangle, Bell, Check, ClipboardCheck, Factory, Filter, PackageCheck, ShieldAlert, Truck } from 'lucide-react'
+import { AlertTriangle, Bell, Check, ClipboardCheck, Factory, Filter, PackageCheck, Search, ShieldAlert, Truck } from 'lucide-react'
 
 import { OperationalShell } from '@/shared/layouts/OperationalShell'
+import { CockpitKpiCard } from '@/shared/ui/cockpit'
 import {
+  inventoryInput,
   inventoryMutedButton,
   inventoryPanel,
 } from '@/modules/inventory/components/InventoryVisuals'
@@ -19,6 +21,7 @@ type FilterValue = 'all' | 'unread' | 'priority' | 'read'
 
 export function NotificationsPage() {
   const [filter, setFilter] = useState<FilterValue>('all')
+  const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data } = useQuery<SystemNotificationsResponse>({
     queryKey: ['system-notifications'],
@@ -27,11 +30,13 @@ export function NotificationsPage() {
   })
   const items = data?.items ?? []
   const rows = useMemo(() => items.filter((item) => {
+    const matchesQuery = `${item.title} ${item.message} ${item.type ?? ''} ${item.severity ?? ''}`.toLowerCase().includes(query.toLowerCase())
+    if (!matchesQuery) return false
     if (filter === 'unread') return !item.isRead
     if (filter === 'read') return item.isRead
     if (filter === 'priority') return isPriority(item)
     return true
-  }), [filter, items])
+  }), [filter, items, query])
   const selected = rows.find((item) => item.id === selectedId) ?? rows[0] ?? null
 
   return (
@@ -45,18 +50,37 @@ export function NotificationsPage() {
           <button className={inventoryMutedButton}><Check size={15} /> Đánh dấu tất cả đã đọc</button>
         </header>
 
-        <section className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Tab active={filter === 'all'} onClick={() => setFilter('all')} label="Tất cả" count={data?.summary.total ?? 0} />
-            <Tab active={filter === 'unread'} onClick={() => setFilter('unread')} label="Chưa đọc" count={data?.summary.unread ?? 0} />
-            <Tab active={filter === 'priority'} onClick={() => setFilter('priority')} label="Ưu tiên cao" count={data?.summary.highPriority ?? 0} />
-            <Tab active={filter === 'read'} onClick={() => setFilter('read')} label="Đã đọc" count={data?.summary.read ?? 0} />
-          </div>
-          <button className={inventoryMutedButton}><Filter size={15} /> Lọc theo</button>
+        <section className="mb-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <CockpitKpiCard title="Tổng thông báo" value={fmt(data?.summary.total ?? items.length)} note="Dữ liệu hệ thống" icon={<Bell size={18} />} />
+          <CockpitKpiCard title="Chưa đọc" value={fmt(data?.summary.unread ?? 0)} note="Cần xử lý" tone="amber" icon={<AlertTriangle size={18} />} />
+          <CockpitKpiCard title="Ưu tiên cao" value={fmt(data?.summary.highPriority ?? 0)} note="Cảnh báo quan trọng" tone="red" icon={<ShieldAlert size={18} />} />
+          <CockpitKpiCard title="Đã đọc" value={fmt(data?.summary.read ?? 0)} note="Đã xử lý" tone="emerald" icon={<Check size={18} />} />
         </section>
 
-        <div className="grid gap-3 xl:grid-cols-[1fr_520px]">
-          <section className={`${inventoryPanel} overflow-hidden`}>
+        <section className={`${inventoryPanel} mb-3 p-3`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3">
+              <Search size={15} className="text-cyan-400" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-9 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" placeholder="Tìm tiêu đề, nội dung, module hoặc mức độ..." />
+            </div>
+            <select value={filter} onChange={(event) => setFilter(event.target.value as FilterValue)} className={inventoryInput}>
+              <option value="all">Bộ lọc: Tất cả</option>
+              <option value="unread">Chưa đọc</option>
+              <option value="priority">Ưu tiên cao</option>
+              <option value="read">Đã đọc</option>
+            </select>
+            <div className="flex flex-wrap gap-2">
+              <Tab active={filter === 'all'} onClick={() => setFilter('all')} label="Tất cả" count={data?.summary.total ?? 0} />
+              <Tab active={filter === 'unread'} onClick={() => setFilter('unread')} label="Chưa đọc" count={data?.summary.unread ?? 0} />
+              <Tab active={filter === 'priority'} onClick={() => setFilter('priority')} label="Ưu tiên cao" count={data?.summary.highPriority ?? 0} />
+              <Tab active={filter === 'read'} onClick={() => setFilter('read')} label="Đã đọc" count={data?.summary.read ?? 0} />
+            </div>
+            <button className={inventoryMutedButton}><Filter size={15} /> Lọc theo</button>
+          </div>
+        </section>
+
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <section className={`${inventoryPanel} min-h-[640px] overflow-hidden`}>
             <div className="divide-y divide-white/10">
               {rows.map((item) => (
                 <button
@@ -79,6 +103,14 @@ export function NotificationsPage() {
                 </button>
               ))}
             </div>
+            {!rows.length ? (
+              <div className="p-8 text-center">
+                <div className="text-sm font-semibold text-white">Chưa có thông báo phù hợp</div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Thử đổi bộ lọc hoặc kiểm tra Operations Center nếu bạn đang theo dõi cảnh báo hệ thống.
+                </p>
+              </div>
+            ) : null}
             <div className="border-t border-white/10 px-4 py-3 text-xs text-slate-400">Hiển thị 1 - {rows.length}/{rows.length} thông báo</div>
           </section>
 
@@ -90,9 +122,9 @@ export function NotificationsPage() {
 }
 
 function NotificationDetail({ item }: { item: SystemNotification | null }) {
-  if (!item) return <aside className={`${inventoryPanel} p-4 text-sm text-slate-500`}>Chưa có thông báo.</aside>
+  if (!item) return <aside className={`${inventoryPanel} min-h-[360px] p-4 text-sm text-slate-500 xl:sticky xl:top-3`}>Chưa có thông báo.</aside>
   return (
-    <aside className={`${inventoryPanel} p-5`}>
+    <aside className={`${inventoryPanel} p-5 xl:sticky xl:top-3 xl:max-h-[calc(100vh-1.5rem)] xl:overflow-auto`}>
       <div className="flex items-start gap-4">
         <NotificationIcon item={item} large />
         <div className="min-w-0 flex-1">

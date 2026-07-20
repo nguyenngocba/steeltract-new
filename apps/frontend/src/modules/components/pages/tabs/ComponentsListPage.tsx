@@ -48,6 +48,8 @@ import {
   ComponentsDonut,
   ComponentsMiniBars,
   ComponentsSelect,
+  componentsTableHead,
+  componentsTableRow,
   componentsMutedButton,
   componentsPrimaryButton,
 } from "./ComponentsCockpitShared";
@@ -384,45 +386,24 @@ export function ComponentsListPage() {
   return (
     <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
-        <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={() => setCreateOpen(true)}
-            className={`${componentsPrimaryButton} h-9 rounded-xl`}
-          >
-            + Tạo cấu kiện
-          </button>
-          <button
-            onClick={() => openProductionFor()}
-            className="h-9 rounded-xl border border-emerald-400/30 bg-emerald-600 px-3 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500"
-          >
-            + Tạo lệnh sản xuất
-          </button>
-          <button
-            onClick={() => openBomFor()}
-            className={`${componentsMutedButton} h-9 rounded-xl`}
-          >
-            + Tạo BOM
-          </button>
-        </div>
-
         {/* KPI Cards */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <InventoryMetricCard
             title="Tổng cấu kiện"
             value={formatQuantity(cockpitKpis.total, 0)}
-            note="Toàn bộ cấu kiện"
+            note="Theo lifecycle"
             tone="blue"
           />
           <InventoryMetricCard
-            title="Đang sản xuất"
+            title="Đang gia công"
             value={formatQuantity(cockpitKpis.running, 0)}
-            note="Lệnh chạy hoạt động"
+            note="Cut / Weld / Paint"
             tone="cyan"
           />
           <InventoryMetricCard
-            title="Hoàn thành"
+            title="Ready to ship"
             value={formatQuantity(cockpitKpis.completed, 0)}
-            note="Cấu kiện đã sẵn sàng"
+            note="QC đạt / sẵn sàng"
             tone="emerald"
           />
           <InventoryMetricCard
@@ -434,7 +415,7 @@ export function ComponentsListPage() {
           <InventoryMetricCard
             title="Trễ tiến độ"
             value={formatQuantity(cockpitKpis.delayed, 0)}
-            note="Quá hạn kế hoạch"
+            note="Cần xử lý"
             tone="red"
           />
         </div>
@@ -491,20 +472,36 @@ export function ComponentsListPage() {
             <option value="Workshop A">Workshop A</option>
             <option value="QC nội bộ">QC nội bộ</option>
           </ComponentsSelect>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className={`${componentsPrimaryButton} xl:col-span-1`}
+          >
+            + Cấu kiện
+          </button>
+          <button
+            onClick={() => openProductionFor()}
+            className="h-9 rounded-lg border border-emerald-400/30 bg-emerald-600 px-3 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500 xl:col-span-1"
+          >
+            + Lệnh SX
+          </button>
+          <button
+            onClick={() => openBomFor()}
+            className={`${componentsMutedButton} xl:col-span-1`}
+          >
+            + BOM
+          </button>
         </ModuleFilterBar>
 
-        <div className="grid grid-cols-12 gap-1">
+        <div className="grid grid-cols-12 gap-1 items-start">
           <div className="col-span-12 xl:col-span-9">
             <div className="mb-1 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">
-                Danh sách cấu kiện
+                Component lifecycle registry
               </h3>
-              <button
-                type="button"
-                className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
-              >
-                Xem tất cả
-              </button>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span>{workspace?.meta.total ?? 0} cấu kiện</span>
+                <span className="hidden text-cyan-300 md:inline">Sort: Read model</span>
+              </div>
             </div>
             <CockpitTableShell className={COCKPIT_HEIGHTS.TABLE_MD}>
               <table className="w-full min-w-[1050px] table-fixed text-[13px]">
@@ -523,7 +520,7 @@ export function ComponentsListPage() {
                   <col className="w-[95px]" />
                   <col className="w-[70px]" />
                 </colgroup>
-                <thead className="bg-transparent text-slate-350 border-b border-cyan-400/10">
+                <thead className={componentsTableHead}>
                   <tr>
                     {[
                       "Mã cấu kiện",
@@ -542,7 +539,7 @@ export function ComponentsListPage() {
                     ].map((h, i) => (
                       <th
                         key={h}
-                        className={`px-4 py-2.5 text-xs font-semibold text-slate-300 ${i === 10 ? "text-right" : "text-left"}`}
+                        className={`px-1.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-300 ${i === 10 ? "text-right" : "text-left"}`}
                       >
                         {h}
                       </th>
@@ -561,60 +558,60 @@ export function ComponentsListPage() {
                       <tr
                         key={row.code}
                         onClick={() => openDetail(row)}
-                        className="cursor-pointer hover:bg-cyan-400/[0.04] border-b border-white/[0.04] transition duration-150"
+                        className={`cursor-pointer ${componentsTableRow}`}
                       >
                         <td
-                          className="truncate px-4 py-2.5 text-cyan-300 font-mono"
+                          className="truncate px-1.5 py-0.5 text-cyan-300 font-mono"
                           title={row.code}
                         >
                           {row.code}
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-white"
+                          className="truncate px-1.5 py-0.5 text-white"
                           title={row.name}
                         >
                           {row.name}
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-slate-300"
+                          className="truncate px-1.5 py-0.5 text-slate-300"
                           title={row.profile}
                         >
                           {row.profile}
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-slate-300"
+                          className="truncate px-1.5 py-0.5 text-slate-300"
                           title={row.type}
                         >
                           {row.type}
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-slate-300"
+                          className="truncate px-1.5 py-0.5 text-slate-300"
                           title={row.project}
                         >
                           {row.project}
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-cyan-300 font-mono"
+                          className="truncate px-1.5 py-0.5 text-cyan-300 font-mono"
                           title={row.workOrder}
                         >
                           {row.workOrder}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-1.5 py-0.5">
                           <ProgressMeter value={row.progress} />
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-1.5 py-0.5">
                           <ProgressMeter
                             value={row.materialReady}
                             tone={row.materialReady < 100 ? "amber" : "emerald"}
                           />
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-slate-300"
+                          className="truncate px-1.5 py-0.5 text-slate-300"
                           title={row.location}
                         >
                           {row.location}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-1.5 py-0.5">
                           <span
                             className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.rawStatus)}`}
                           >
@@ -622,19 +619,19 @@ export function ComponentsListPage() {
                           </span>
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 font-mono tabular-nums text-right text-cyan-300"
+                          className="truncate px-1.5 py-0.5 font-mono tabular-nums text-right text-cyan-300"
                           title={`${formatQuantity(row.weight, 3)} kg`}
                         >
                           {formatQuantity(row.weight, 3)} kg
                         </td>
                         <td
-                          className="truncate px-4 py-2.5 text-slate-300"
+                          className="truncate px-1.5 py-0.5 text-slate-300"
                           title={row.createdAt}
                         >
                           {new Date(row.createdAt).toLocaleDateString("vi-VN")}
                         </td>
                         <td
-                          className="px-4 py-2.5"
+                          className="px-1.5 py-0.5"
                           onClick={(event) => event.stopPropagation()}
                         >
                           <button

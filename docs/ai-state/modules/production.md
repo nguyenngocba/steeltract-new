@@ -1,5 +1,93 @@
 # Production Module
 
+## EPIC BUSINESS001 Steel Structure Domain Completion
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Production reports and order registry now use manufacturing-order and
+  steel-fabrication language.
+- Material flow metrics are labelled as steel issue, steel consumption and
+  reservation where existing data supports it.
+- Ready-to-release now lists real work orders with material readiness >= 100%
+  instead of a placeholder explanation.
+- No backend, API, React Query, permission or business behavior changed.
+
+## UX Review Round 2
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Production Overview right-side cockpit now prioritizes progress distribution,
+  material readiness and `Cần chú ý hôm nay`.
+- The attention queue uses existing delayed, material shortage and low-progress
+  signals from Production read data.
+- Chart cards were increased in visual weight to match Inventory's cockpit
+  usefulness.
+- No backend, API, React Query, permission or business behavior changed.
+
+## UX Review Round 1
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Production Overview order table now shows Top N rows in the dashboard
+  context.
+- The table card exposes `Xem tất cả` and routes to `/production/orders` for
+  the full Enterprise Table workspace.
+- Short dashboard order lists use a smaller card height to reduce empty space.
+- No backend, API, React Query, permission or business behavior changed.
+
+## EPIC UI005B Design Language Inference
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Production Overview now mirrors Inventory's operating rhythm without copying
+  Inventory-specific JSX or data.
+- Quick manufacturing actions and today/waiting/delayed summary cards appear
+  before the main order table.
+- Recent activity moved into supporting context below the primary table and
+  side analytics.
+- Backend, API, React Query, route, permission, authentication and business
+  behavior are unchanged.
+
+## EPIC UI005A Workspace Completion
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - SCREENSHOT EVIDENCE BLOCKED**
+
+- Active Production workspace no longer renders duplicated page-local hero,
+  breadcrumb or tab chrome inside the application shell.
+- Primary Production create actions moved into the operational filter toolbar.
+- Incidents and Reports now render data-backed workspaces using existing orders,
+  logs, issues, reservations and material-flow read data instead of placeholder
+  navigation panels.
+- Operator-facing temporary/TODO labels were replaced with truthful limitation
+  text where backend fields are not yet available.
+- No backend, API, React Query, route, permission, DTO or business behavior
+  changed.
+
+## EPIC UI006 Shared Components Consolidation
+
+Implemented on 2026-07-18.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Production no longer imports
+  `@/modules/inventory/components/InventoryVisuals`.
+- Production chart cards, table tokens, status chips, meters, compact donut,
+  mini bars and panel facade delegate to shared Enterprise UI components.
+- Existing Production page names, wrappers and behavior remain compatible; the
+  module facade is now thin and business-readable.
+- No API, React Query, route, permission, DTO, backend or business behavior
+  changed.
+
 ## EPIC UI005 Enterprise Workspace
 
 Implemented on 2026-07-18.

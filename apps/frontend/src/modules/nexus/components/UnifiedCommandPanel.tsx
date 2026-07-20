@@ -1,9 +1,9 @@
 const commands = [
-  'Optimize enterprise logistics',
-  'Rebalance production federation',
-  'Predict procurement risks',
-  'Analyze global telemetry anomalies',
-  'Simulate autonomous dispatch workflows',
+  'Tối ưu điều phối logistics',
+  'Cân bằng tải sản xuất',
+  'Theo dõi rủi ro mua hàng',
+  'Phân tích cảnh báo hệ thống',
+  'Mô phỏng quy trình điều xe',
 ]
 
 export function UnifiedCommandPanel() {
@@ -19,11 +19,11 @@ export function UnifiedCommandPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-pink-400">
-          Unified Command Runtime
+          Bảng lệnh điều hành
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Industrial command cognition layer
+          Các thao tác phân tích nhanh cho đội vận hành.
         </div>
       </div>
 

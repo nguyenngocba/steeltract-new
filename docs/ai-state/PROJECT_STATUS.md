@@ -1,5 +1,119 @@
 # Project Status
 
+On 2026-07-20 COMPOSITION001 refined page composition outside Inventory.
+Inventory remains the Golden Reference and was not modified. Production,
+Components, QC, Suppliers, Settings and Notifications now lean harder into one
+dominant workspace plus a narrower support rail instead of equal card
+collections. This pass only rearranged page composition and preserved backend,
+APIs, routes, permissions, authentication, database, React Query contracts,
+business logic, shared tokens and shared component APIs. Frontend build,
+backend build and `git diff --check` passed; browser screenshot certification
+is pending.
+
+On 2026-07-18 VISUAL001 applied an Enterprise Visual Composition
+Transformation through shared UI primitives. Inventory remains the benchmark:
+KPI stays compact, charts gain decision weight, main operational tables/queues
+gain viewport dominance and right-side context stays secondary. The change was
+implemented in shared cockpit/workspace primitives, not by copying Inventory
+JSX or changing module business logic. Browser screenshot certification remains
+pending.
+
+On 2026-07-18 PLATFORM002 completed the Enterprise Application Completion pass.
+Active menus were audited for visible unfinished/developer wording, and the
+most visible source/debug labels were removed from Dashboard, Production,
+Components, Inventory Locations, Command Center, Analytics and Copilot. Pages
+now use more commercial ERP language while still relying only on existing data
+and contracts. No backend, API, React Query, route, permission, authentication,
+database or business behavior changed.
+
+On 2026-07-18 PLATFORM001 completed the first Enterprise Platform foundation
+pass. Settings now covers Organization, Security, Monitoring and Reports Center
+as useful capability workspaces without creating backend/API contracts or fake
+numbers. Notification Center now has real KPI cards, search, filters, list and
+detail panel from existing notification data. Supplier incomplete tabs now show
+controlled empty states with next-step guidance, and active Dashboard wording no
+longer uses placeholder language. Backend, API, React Query, route, permission,
+database and business behavior are unchanged.
+
+On 2026-07-18 FINAL001 performed the Enterprise Workspace release-candidate
+polish pass across Inventory, Production, Components, QC and shared Enterprise
+UI surfaces. The pass preserved NAV001's sidebar-first model, confirmed
+full-width workspace behavior and aligned QC page-level panel/input/button/table
+aliases with shared module tokens. Remaining UI debt is documented for browser
+visual certification, shared QC modal shells, cross-module status badges and
+older Inventory local form fragments. No backend, API, React Query, route,
+permission, authentication, database or business behavior changed.
+
+On 2026-07-18 NAV001 removed duplicated workspace navigation from the active
+Enterprise UI shell. Route-level module tabs, page titles, descriptions and
+breadcrumbs are no longer rendered inside `EnterpriseWorkspace`; the global
+left sidebar owns that navigation. Operational actions remain visible and
+non-route local tabs are preserved only where they do not duplicate sidebar
+routes. `EnterpriseModulePage` now uses the full available workspace width, and
+Inventory Material Detail no longer shows the Inventory module tab bar inside
+the record view. No backend, API, route, permission, database or business logic
+changed.
+
+On 2026-07-18 EPIC QC001 upgraded the active QC Overview into an Enterprise
+Quality Command Center. QC now follows the Inventory/Production/Components
+cockpit language: KPI-first scan, quality alerts, Top N inspection queue with
+`Xem tất cả`, right-side MO waiting/latest-inspection decision support, and
+status/project/NCR summaries from existing data. Static calibration equipment
+cards were removed and replaced with a truthful no-data state because no
+authoritative calibration contract exists yet. No backend, API, React Query,
+route, permission, authentication, database or business behavior changed.
+
+On 2026-07-18 EPIC BUSINESS001 aligned Production and Components with steel
+structure fabrication domain language. Production now presents MO/WO,
+steel issue, steel consumption, material readiness and release-ready work
+orders from existing data. Components now presents lifecycle, fabrication,
+QC wait, ready-to-ship, shipping and project-distribution views without
+inventing NCR or missing domain facts. No backend, API, React Query, route,
+permission, authentication, database or business behavior changed.
+
+On 2026-07-18 UX Review Round 2 improved Production and Components Overview
+from a business-cockpit perspective. Production now surfaces progress,
+material readiness and an attention queue for delayed, shortage and low
+progress orders. Components now surfaces status distribution, project
+distribution, QC waiting and ready-to-ship queues. All changes use existing
+read data only; no backend, API, React Query, route, permission, database or
+business behavior changed.
+
+On 2026-07-18 UX Review Round 1 applied Inventory's table-card behavior to
+Production and Components. Dashboard tables now show Top N rows and expose
+`Xem tất cả` only when a corresponding full workspace exists:
+`/production/orders` and `/components/list`. The dedicated workspaces remain
+the place for full filtering, pagination and drawer inspection. Short datasets
+no longer leave as much empty table-card height. No backend, API, React Query,
+route, permission or business behavior changed.
+
+On 2026-07-18 EPIC UI005B inferred the Inventory Golden Reference design
+language and applied it to Production and Components. The implementation did
+not copy Inventory data/hooks/JSX; it mapped the operating philosophy: KPI
+first, filters near tables, table-dominant workspace, compact side analytics,
+summary strips and drawer-preserved context. Production Overview now reads as a
+manufacturing cockpit with quick actions and operational status before the
+order table. Components Overview/List/Reports now use denser table rhythm and
+toolbar-anchored actions. No backend, API, React Query, route, permission,
+authentication, database or business behavior changed.
+
+On 2026-07-18 EPIC UI005A completed the active Production and Components
+workspace cleanup against the Inventory Golden Reference. Redundant in-page
+hero/navigation chrome was removed, Production Incidents and Reports now render
+real operational workspaces, Components Internal QC uses live component data
+instead of static rows and Components Reports has its own route target.
+Backend, APIs, DTOs, React Query, routes, permissions and business behavior are
+unchanged. Visual certification is not yet approved because screenshot evidence
+is blocked by the missing browser harness.
+
+On 2026-07-18 EPIC UI006 consolidated duplicated Inventory and Production UI
+patterns into `shared/ui/enterprise-components` and extended the shared
+Enterprise form catalog. Inventory remains the Golden Reference through a
+compatibility wrapper, while Production no longer imports Inventory visual
+helpers directly. Backend, API, React Query, routes, permissions, DTOs and
+business behavior are unchanged. Visual/browser certification remains pending
+because the current environment has no browser harness.
+
 On 2026-07-18 EPIC UI005 standardized the Production operator workspace and
 forms against the Inventory Golden Reference. Production mutations now reuse a
 single Enterprise form/modal layer, browser prompts were removed, and primary

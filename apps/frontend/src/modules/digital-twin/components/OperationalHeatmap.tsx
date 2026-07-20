@@ -61,7 +61,7 @@ export function OperationalHeatmap() {
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Runtime operational intensity
+          Cường độ vận hành
         </div>
       </div>
 

@@ -320,7 +320,7 @@ function ExecutiveControlTower({ cockpit, isLoading }: { cockpit?: DashboardExec
   return (
     <div className="space-y-1">
       <div className="grid grid-cols-12 gap-1">
-        <CockpitChartCard title="Tình trạng vận hành hôm nay" subtitle="REAL · Inventory / Production / Yard / QC / Suppliers / Projects" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+        <CockpitChartCard title="Tình trạng vận hành hôm nay" subtitle="Inventory / Production / Yard / QC / Suppliers / Projects" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
           {isLoading ? (
             <ModuleEmptyState title="Đang tải" description="Hệ thống đang tổng hợp tình trạng vận hành." />
           ) : (
@@ -328,21 +328,21 @@ function ExecutiveControlTower({ cockpit, isLoading }: { cockpit?: DashboardExec
           )}
         </CockpitChartCard>
 
-        <CockpitChartCard title="7 ngày tới" subtitle="REAL · Moving average và trạng thái vận hành" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+        <CockpitChartCard title="7 ngày tới" subtitle="Moving average và trạng thái vận hành" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
           <ExecutiveSummaryPanel rows={summary?.items ?? []} />
         </CockpitChartCard>
 
-        <CockpitChartCard title="Khuyến nghị hôm nay" subtitle="REAL · Rules engine từ cảnh báo vận hành" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+        <CockpitChartCard title="Khuyến nghị hôm nay" subtitle="Rules engine từ cảnh báo vận hành" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
           <SuggestedActionsPanel rows={recommendations?.items ?? []} />
         </CockpitChartCard>
       </div>
 
       <div className="grid grid-cols-12 gap-1">
-        <CockpitChartCard title="Hoạt động theo module" subtitle="REAL · Nhóm hoạt động gần đây" className="col-span-12 xl:col-span-7" heightClass="h-[340px]">
+        <CockpitChartCard title="Hoạt động theo module" subtitle="Nhóm hoạt động gần đây" className="col-span-12 xl:col-span-7" heightClass="h-[340px]">
           <ActivityModuleGroups rows={activities} />
         </CockpitChartCard>
 
-        <CockpitChartCard title="Notification Center" subtitle="REAL · Critical / Warning / Information" className="col-span-12 xl:col-span-5" heightClass="h-[340px]">
+        <CockpitChartCard title="Notification Center" subtitle="Critical / Warning / Information" className="col-span-12 xl:col-span-5" heightClass="h-[340px]">
           <NotificationCenterPanel notifications={notifications} />
         </CockpitChartCard>
       </div>
@@ -528,23 +528,23 @@ function PredictiveTrendsTab({ cockpit, isLoading }: { cockpit?: DashboardExecut
 
   return (
     <div className="grid grid-cols-12 gap-1">
-      <CockpitChartCard title="Dự báo thiếu vật tư" subtitle="REAL · Tồn hiện tại / tiêu thụ 30-90 ngày" className="col-span-12 xl:col-span-8" heightClass="h-[360px]">
+      <CockpitChartCard title="Dự báo thiếu vật tư" subtitle="Tồn hiện tại / tiêu thụ 30-90 ngày" className="col-span-12 xl:col-span-8" heightClass="h-[360px]">
         <MaterialShortageForecast rows={shortageRows} />
       </CockpitChartCard>
 
-      <CockpitChartCard title="Nên nhập" subtitle="REAL · Khuyến nghị theo moving average" className="col-span-12 xl:col-span-4" heightClass="h-[360px]">
+      <CockpitChartCard title="Nên nhập" subtitle="Khuyến nghị theo moving average" className="col-span-12 xl:col-span-4" heightClass="h-[360px]">
         <RecommendationPanel rows={recommendations} />
       </CockpitChartCard>
 
-      <CockpitChartCard title="Nguy cơ dừng sản xuất" subtitle="REAL · BOM + issued + tồn khả dụng" className="col-span-12 xl:col-span-5" heightClass="h-[300px]">
+      <CockpitChartCard title="Nguy cơ dừng sản xuất" subtitle="BOM + issued + tồn khả dụng" className="col-span-12 xl:col-span-5" heightClass="h-[300px]">
         <ProductionRiskPanel rows={risks} />
       </CockpitChartCard>
 
-      <CockpitChartCard title="Xu hướng tiêu thụ" subtitle="REAL · 30 ngày gần nhất so với 30 ngày trước" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
+      <CockpitChartCard title="Xu hướng tiêu thụ" subtitle="30 ngày gần nhất so với 30 ngày trước" className="col-span-12 xl:col-span-4" heightClass="h-[300px]">
         <ConsumptionTrendPanel trends={trends?.consumptionTrends} />
       </CockpitChartCard>
 
-      <CockpitChartCard title="Dự báo tồn kho" subtitle="REAL · 7 / 30 / 90 ngày từ rolling average" className="col-span-12 xl:col-span-3" heightClass="h-[300px]">
+      <CockpitChartCard title="Dự báo tồn kho" subtitle="7 / 30 / 90 ngày từ rolling average" className="col-span-12 xl:col-span-3" heightClass="h-[300px]">
         <InventoryProjectionPanel forecast={forecast} />
       </CockpitChartCard>
     </div>
@@ -724,7 +724,7 @@ function RecentActivitiesTab({ cockpit, isLoading }: { cockpit?: DashboardExecut
     <div className="grid grid-cols-12 gap-1">
       <CockpitChartCard
         title="Hoạt động theo module"
-        subtitle="REAL · Kho / Sản xuất / Bãi / QC / Projects / Suppliers"
+        subtitle="Kho / Sản xuất / Bãi / QC / Projects / Suppliers"
         className="col-span-12 xl:col-span-5"
         heightClass="h-[620px]"
         action={
@@ -745,7 +745,7 @@ function RecentActivitiesTab({ cockpit, isLoading }: { cockpit?: DashboardExecut
 
       <CockpitChartCard
         title="Timeline hợp nhất toàn hệ thống"
-        subtitle="REAL · Dòng thời gian điều hành"
+        subtitle="Dòng thời gian điều hành"
         className="col-span-12 xl:col-span-7"
         heightClass="h-[620px]"
       >
@@ -1699,7 +1699,7 @@ function buildYardAnalytics(metrics: any, movements: any[]): YardAnalytics {
     inbound: movements.filter((row) => row.type === 'PLACE').length,
     outbound: movements.filter((row) => row.type === 'REMOVE').length,
     moves: movements.filter((row) => row.type === 'MOVE').length,
-    assumption: metrics ? 'Yard occupancy đồng bộ realtime.' : 'Yard: placeholder 0.',
+    assumption: metrics ? 'Yard occupancy đồng bộ realtime.' : 'Yard: chưa có dữ liệu realtime.',
   }
 }
 
@@ -1719,7 +1719,7 @@ function buildQcTrend(qc: any): QcTrend {
     openNcrs: Number(metrics?.openNcrs ?? 0),
     passRate: Number(metrics?.passRate ?? 0),
     rows,
-    assumption: qc ? 'QC trend đồng bộ QC cockpit.' : 'QC: placeholder.',
+    assumption: qc ? 'QC trend đồng bộ QC cockpit.' : 'QC: chưa có dữ liệu cockpit.',
   }
 }
 

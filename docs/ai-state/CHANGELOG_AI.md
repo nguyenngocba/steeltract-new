@@ -1,5 +1,220 @@
 # SteelTrack AI Changelog
 
+## 2026-07-20 COMPOSITION001 Enterprise Workspace Composition Redesign
+
+Completed:
+
+- Kept Inventory unchanged as the Golden Reference and applied its composition
+  principles to selected non-Inventory enterprise pages.
+- Rebalanced Production Overview lower panels into a wider production-stage
+  workspace plus an active-component/log support rail.
+- Rebalanced Components Overview queue panels so QC queue is primary and
+  Ready to Ship is secondary context.
+- Rebalanced QC Overview analytics so trend owns the row and status/project/NCR
+  summaries move into a support rail.
+- Rebalanced Suppliers, Settings and Notifications so directory/catalog/feed
+  surfaces dominate while detail/guidance panels stay secondary.
+- Created `docs/ui/composition/` with principles, module review, before/after
+  analysis, hero workspace rules and summary.
+- Preserved backend, API, routes, permissions, authentication, database, React
+  Query contracts, business logic, Inventory pages, shared tokens and shared
+  component APIs.
+
+## 2026-07-18 VISUAL001 Enterprise Visual Composition Transformation
+
+Completed:
+
+- Reverse-engineered Inventory's strongest composition pattern into shared
+  cockpit/workspace primitives: compact KPI scan, stronger charts, dominant
+  table workspace and secondary right context.
+- Increased shared chart and table heights to give primary operational
+  workspaces more visual weight.
+- Strengthened large/table `CockpitChartCard` treatment and added a subtle
+  `CockpitTableShell` surface/scroll owner.
+- Reduced shared workspace spacing to improve information density without
+  changing module data or workflows.
+- Created `docs/ui/visual-composition/` analysis, rules, module comparison,
+  redesign summary and remaining opportunities.
+- Preserved backend, APIs, routes, permissions, authentication, database, React
+  Query contracts and business logic.
+
+## 2026-07-18 PLATFORM002 Enterprise Application Completion
+
+Completed:
+
+- Audited active application routes for visible unfinished or developer-oriented
+  wording.
+- Removed user-facing `REAL` source labels from Dashboard, Production and
+  Components cockpit copy.
+- Replaced Components QC `mock` wording with lifecycle-based business copy.
+- Replaced Inventory location `demo` labels with data verification language.
+- Reworded Command Center, Analytics and Copilot hero copy into commercial ERP
+  operations language.
+- Created `docs/ui/application-completion/` audit, review, empty-state,
+  shared-pattern, freeze-checklist and summary documents.
+- Preserved backend, APIs, routes, permissions, authentication, database, React
+  Query contracts and business logic.
+
+## 2026-07-18 PLATFORM001 Enterprise Platform Completion
+
+Completed:
+
+- Expanded Settings into an Enterprise Platform Hub for Organization,
+  Security, Monitoring and Reports Center capabilities without creating new
+  backend/API contracts.
+- Added useful platform empty states and capability tables for areas that do
+  not yet have authoritative read contracts.
+- Upgraded Notification Center with real KPI cards, search, filters, list and
+  detail panel using existing notification data.
+- Replaced Supplier temporary navigation/analytics wording with useful empty
+  states and next-step guidance.
+- Removed visible placeholder wording from active Dashboard assumptions and an
+  unused Projects placeholder helper.
+- Preserved backend, APIs, routes, permissions, database, React Query contracts
+  and business logic.
+
+## 2026-07-18 FINAL001 Enterprise Workspace Polish
+
+Completed:
+
+- Audited Inventory, Production, Components, QC and shared Enterprise UI
+  surfaces for release-candidate workspace consistency.
+- Kept the NAV001 sidebar-first model intact: no duplicated module navigation
+  inside `EnterpriseWorkspace`.
+- Aligned QC page-level visual aliases with shared module panel, input, button
+  and table tokens.
+- Documented remaining UI debt for modal shells, status badges, older
+  Inventory form fragments and browser visual certification.
+- Preserved backend, APIs, React Query, routes, permissions, authentication,
+  database and business logic.
+
+## 2026-07-18 NAV001 Eliminate Redundant Workspace Navigation
+
+Completed:
+
+- Removed route-based workspace navigation, module titles, descriptions and
+  breadcrumbs from the shared `EnterpriseWorkspace` content shell.
+- Preserved operational action buttons and non-route local tabs that do not
+  duplicate sidebar routing.
+- Expanded `EnterpriseModulePage` to use the full available workspace width
+  instead of applying an additional content max-width.
+- Removed the Inventory module tab bar from `MaterialDetailPage` while keeping
+  entity-level material detail tabs.
+- Preserved backend, APIs, routes, permissions, database and business logic.
+
+## 2026-07-18 EPIC QC001 Enterprise Quality Command Center
+
+Completed:
+
+- Reworked the QC overview into a quality command center using existing QC
+  workspace/dashboard data only.
+- Added a quality alert band for active inspections, failed/rework/NCR rows and
+  production orders still waiting for QC.
+- Applied the dashboard Top N rule with working `Xem tất cả` navigation to the
+  full QC list/plan workspaces.
+- Strengthened the right-side decision panel with MO waiting queue and latest
+  inspection context.
+- Replaced static calibration equipment examples with a truthful no-data state
+  until an authoritative calibration contract exists.
+- Preserved backend, APIs, React Query, routes, permissions, authentication,
+  database and business logic.
+
+## 2026-07-18 EPIC BUSINESS001 Steel Structure Domain Completion
+
+Completed:
+
+- Reframed Production reporting and order language around manufacturing-order,
+  steel issue/consumption, material readiness and release-readiness decisions.
+- Replaced a non-actionable Production ready-to-release placeholder with real
+  work orders where material readiness is at least 100%.
+- Reframed Components Overview, List, Internal QC and Reports around component
+  lifecycle, fabrication, QC wait, ready-to-ship and project distribution.
+- Removed placeholder-style `0 NCR` metrics where no NCR contract exists and
+  replaced them with values derived from existing lifecycle data.
+- Preserved backend, APIs, React Query contracts, routes, permissions,
+  authentication, database and business logic.
+
+## 2026-07-18 UX Review Round 2 Business Cockpit Alignment
+
+Completed:
+
+- Reworked Production Overview right-side cockpit cards around manager
+  decisions: progress distribution, material readiness and an attention queue
+  for delayed, shortage or low-progress orders.
+- Reworked Components Overview right-side cockpit cards around status
+  distribution, activity, project distribution, QC queue and ready-to-ship
+  queue.
+- Increased chart visual weight where Production/Components charts were reading
+  as secondary decoration.
+- Used only existing frontend read data; no backend, API, React Query,
+  permission, route, database or business logic changed.
+
+## 2026-07-18 UX Review Round 1 Production and Components Tables
+
+Completed:
+
+- Added `Xem tất cả` from Production overview order table to the full
+  `/production/orders` workspace.
+- Added `Xem tất cả` from Components overview table to the full
+  `/components/list` workspace.
+- Kept dashboard tables to Top N rows and left full filtering/pagination/drawer
+  workflows in the dedicated list workspaces.
+- Reduced oversized empty table feel by using smaller table card height when
+  dashboard datasets are short.
+- Preserved backend, APIs, React Query, routes, permissions and business logic.
+
+## 2026-07-18 EPIC UI005B Design Language Inference
+
+Completed:
+
+- Documented why Inventory Overview and Materials feel like the Golden
+  Reference: KPI-first hierarchy, compact filter adjacency, table-dominant
+  workspace, side analytics and drawer-preserved context.
+- Applied that design language to Production without copying Inventory JSX:
+  Production Overview now has quick actions and operational summary cards
+  before the main order table, with recent activity moved into supporting
+  context.
+- Applied the same philosophy to Components: Overview/List/Reports now use
+  denser table rhythm, toolbar-anchored actions and compact summary strips.
+- Preserved backend, APIs, DTOs, React Query contracts, routes, permissions,
+  authentication, database and business behavior.
+
+## 2026-07-18 EPIC UI005A Production & Components Workspace Completion
+
+Completed:
+
+- Removed redundant in-page hero/breadcrumb/tab chrome from active Production
+  and Components workspace wrappers so operational content starts immediately
+  under the application toolbar.
+- Converted Production Incidents and Reports from placeholder navigation panels
+  into real workspaces backed by existing Production read data.
+- Replaced the Components Internal QC static row set with live Components data
+  and truthful no-data states; added a dedicated Components Reports workspace
+  route.
+- Preserved backend, APIs, DTOs, React Query contracts, routes, permissions and
+  business behavior.
+- Browser screenshot evidence remains blocked because the current environment
+  has no Chromium, Google Chrome or Playwright executable.
+
+## 2026-07-18 EPIC UI006 Enterprise Shared Components Consolidation
+
+Completed:
+
+- Added `shared/ui/enterprise-components` as the shared visual catalog for
+  Inventory-canon panels, chart cards, KPI aliases, pagination, table tokens,
+  bars, donuts, meters, status badges and loading states.
+- Converted Inventory `InventoryVisuals` into a compatibility wrapper over the
+  shared catalog so existing Inventory pages keep the same imports and
+  rendering.
+- Removed Production's dependency on Inventory visual helpers; Production now
+  delegates duplicated chart/status/meter/donut/bar implementations to shared
+  components.
+- Extended `shared/forms` with textarea, multi-select, checkbox, radio group,
+  switch, validation summary, field hint, required label and drawer-form
+  primitives.
+- Preserved backend, API, React Query, routes, permissions, DTOs and business
+  behavior.
+
 ## 2026-07-18 BUGFIX INV001 Inventory Table Visibility
 
 Completed:

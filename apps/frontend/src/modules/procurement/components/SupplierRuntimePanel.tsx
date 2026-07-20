@@ -46,7 +46,7 @@ export function SupplierRuntimePanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">
-          Supplier Runtime
+          Nhà cung cấp
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

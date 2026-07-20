@@ -11,15 +11,15 @@ export function CopilotPage() {
       <div className="space-y-6 p-6">
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-fuchsia-400">
-            AI Copilot Runtime
+            Trợ lý vận hành
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">
-            Industrial Operational Copilot
+            Trợ lý điều hành SteelTrack
           </h1>
 
           <div className="mt-2 text-sm text-zinc-500">
-            AI-powered operational intelligence & runtime assistance
+            Gợi ý hành động, tóm tắt tình hình và hỗ trợ người vận hành từ dữ liệu hệ thống.
           </div>
         </div>
 

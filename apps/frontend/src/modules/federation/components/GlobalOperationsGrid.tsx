@@ -5,7 +5,7 @@ const operations = [
   },
 
   {
-    metric: 'Production Runtime',
+    metric: 'Sản xuất',
     value: '94%',
   },
 

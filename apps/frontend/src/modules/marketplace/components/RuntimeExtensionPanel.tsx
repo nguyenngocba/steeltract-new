@@ -1,7 +1,7 @@
 const extensions = [
   {
     extension:
-      'AI Procurement Runtime',
+      'Trợ lý mua hàng',
   },
 
   {
@@ -33,11 +33,11 @@ export function RuntimeExtensionPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-violet-400">
-          Runtime Extensions
+          Tiện ích mở rộng
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Available industrial runtime packages
+          Các gói mở rộng vận hành có thể kết nối
         </div>
       </div>
 

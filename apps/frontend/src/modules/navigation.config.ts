@@ -29,7 +29,7 @@ export const navigation = [
     items: [
       {
         key: 'inventory',
-        label: 'Inventory Runtime',
+        label: 'Inventory',
         vi: 'Quản Lý Kho',
         path: '/inventory',
       },
@@ -43,8 +43,8 @@ export const navigation = [
     items: [
       {
         key: 'components',
-        label: 'Components Runtime',
-        vi: 'Runtime Cấu Kiện',
+        label: 'Components',
+        vi: 'Quản lý cấu kiện',
         path: '/components',
       },
     ],
@@ -57,8 +57,8 @@ export const navigation = [
     items: [
       {
         key: 'production',
-        label: 'Production Runtime',
-        vi: 'Runtime Sản Xuất',
+        label: 'Production',
+        vi: 'Quản lý sản xuất',
         path: '/production/orders',
       },
     ],
@@ -71,8 +71,8 @@ export const navigation = [
     items: [
       {
         key: 'yard',
-        label: 'Yard Runtime',
-        vi: 'Runtime Bãi',
+        label: 'Yard',
+        vi: 'Quản lý bãi',
         path: '/yard',
       },
     ],
@@ -85,8 +85,8 @@ export const navigation = [
     items: [
       {
         key: 'qc',
-        label: 'QC Runtime',
-        vi: 'Runtime QC',
+        label: 'QC',
+        vi: 'Quản lý chất lượng',
         path: '/qc/incoming',
       },
     ],
@@ -99,8 +99,8 @@ export const navigation = [
     items: [
       {
         key: 'logistics',
-        label: 'Logistics Runtime',
-        vi: 'Runtime Logistics',
+        label: 'Logistics',
+        vi: 'Điều phối vận tải',
         path: '/logistics',
       },
     ],
@@ -114,8 +114,8 @@ export const navigation = [
     items: [
       {
         key: 'digital-twin',
-        label: 'Digital Twin Runtime',
-        vi: 'Digital Twin Runtime',
+        label: 'Digital Twin',
+        vi: 'Bản sao vận hành',
         path: '/digital-twin',
       },
     ],

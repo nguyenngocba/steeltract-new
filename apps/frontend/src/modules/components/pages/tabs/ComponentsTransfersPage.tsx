@@ -36,7 +36,7 @@ export function ComponentsTransfersPage() {
           <CockpitKpiCard title="Tổng lệnh chuyển" value={formatQuantity(rows.length, 0)} state="normal" tone="cyan" />
           <CockpitKpiCard title="Hoàn thành" value={formatQuantity(rows.length, 0)} state="normal" tone="emerald" />
           <CockpitKpiCard title="Nguồn dữ liệu" value="YARD MOVE" state="normal" tone="blue" />
-          <CockpitKpiCard title="Cập nhật" value="LIVE" note="5 giây/lần" state="normal" tone="purple" />
+          <CockpitKpiCard title="Cập nhật" value="Tự động" note="5 giây/lần" state="normal" tone="purple" />
         </div>
 
         <ModuleFilterBar>

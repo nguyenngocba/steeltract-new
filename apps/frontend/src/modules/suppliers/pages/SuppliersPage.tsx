@@ -134,13 +134,13 @@ export function SuppliersPage() {
           </select>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1fr_330px]">
-          <div className={`${panel} overflow-hidden`}>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className={`${panel} min-h-[640px] overflow-hidden`}>
             <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
               <h2 className="text-sm font-semibold text-slate-100">Supplier list ({rows.length})</h2>
               <span className="text-xs text-slate-500">Master cockpit</span>
             </div>
-            <div className="overflow-auto">
+            <div className="max-h-[590px] overflow-auto">
               <table className="w-full min-w-[1040px] text-left text-sm">
                 <thead className={tableHead}>
                   <tr>
@@ -174,7 +174,7 @@ export function SuppliersPage() {
             </div>
           </div>
 
-          <aside className="space-y-4">
+          <aside className="space-y-3 xl:sticky xl:top-3 xl:self-start">
             <InsightList title="Top Suppliers" rows={summary?.topSuppliers ?? []} empty="Chưa có dữ liệu xếp hạng." />
             <div className={`${panel} p-4`}>
               <h3 className="text-sm font-semibold text-slate-100">Recent Suppliers</h3>
@@ -189,12 +189,12 @@ export function SuppliersPage() {
             </div>
             <InsightList title="Most Used Suppliers" rows={summary?.mostUsedSuppliers ?? []} empty="Chưa có NCC dùng trong Inventory." />
             <div className={`${panel} p-4`}>
-              <h3 className="text-sm font-semibold text-slate-100">Analytics placeholders</h3>
+              <h3 className="text-sm font-semibold text-slate-100">Supplier analytics readiness</h3>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <PlaceholderCard icon={BarChart3} label="Spend trend" />
-                <PlaceholderCard icon={Truck} label="Delivery SLA" />
-                <PlaceholderCard icon={Star} label="Quality score" />
-                <PlaceholderCard icon={PackageSearch} label="Material mix" />
+                <SupplierInsightEmptyCard icon={BarChart3} label="Spend trend" />
+                <SupplierInsightEmptyCard icon={Truck} label="Delivery SLA" />
+                <SupplierInsightEmptyCard icon={Star} label="Quality score" />
+                <SupplierInsightEmptyCard icon={PackageSearch} label="Material mix" />
               </div>
             </div>
           </aside>
@@ -207,7 +207,7 @@ export function SuppliersPage() {
           onFilterChange={setEvaluationFilter}
           onOpenSupplier={setSelectedSupplier}
           onCreateScore={() => undefined}
-        /> : <SupplierNavigationPlaceholder tab={moduleTab} />}
+        /> : <SupplierCapabilityEmpty tab={moduleTab} />}
       </div>
 
       <SupplierDetailWorkspace
@@ -231,7 +231,7 @@ function KpiCard({ title, value, note, tone = 'cyan' }: { title: string; value: 
   return <CockpitKpiCard title={title} value={fmt(value)} note={note} tone={tone} />
 }
 
-function SupplierNavigationPlaceholder({ tab }: { tab: SupplierModuleTab }) {
+function SupplierCapabilityEmpty({ tab }: { tab: SupplierModuleTab }) {
   const labels: Record<SupplierModuleTab, string> = {
     overview: 'Tổng quan',
     list: 'Danh sách NCC',
@@ -244,14 +244,30 @@ function SupplierNavigationPlaceholder({ tab }: { tab: SupplierModuleTab }) {
     reports: 'Báo cáo',
   }
 
-  return <div className={`${panel} p-6`}>
-    <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
-      <FileText size={18} />
-    </div>
-    <div className="mt-3 text-center text-sm font-semibold text-slate-100">{labels[tab]}</div>
-    <p className="mx-auto mt-1 max-w-xl text-center text-xs text-slate-500">
-      Route và sidebar đã được đồng bộ. Dữ liệu nghiệp vụ riêng cho tab này sẽ được nối khi Supplier/Purchasing phase tương ứng có API.
-    </p>
+  return <div className="grid gap-3 xl:grid-cols-[1fr_360px]">
+    <section className={`${panel} overflow-hidden`}>
+      <div className="border-b border-slate-800 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-100">{labels[tab]}</h2>
+        <p className="mt-1 text-xs text-slate-500">Workspace đã sẵn sàng cho dữ liệu nghiệp vụ thật của nhà cung cấp.</p>
+      </div>
+      <div className="p-6 text-center">
+        <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+          <FileText size={18} />
+        </div>
+        <div className="mt-3 text-sm font-semibold text-slate-100">Chưa có dữ liệu cho {labels[tab]}</div>
+        <p className="mx-auto mt-1 max-w-xl text-xs text-slate-500">
+          Chưa có read contract riêng cho tab này. UI giữ trạng thái rỗng có kiểm soát, không tạo dữ liệu mẫu hoặc số liệu giả.
+        </p>
+      </div>
+    </section>
+    <aside className={`${panel} p-4`}>
+      <h3 className="text-sm font-semibold text-white">Bước tiếp theo</h3>
+      <div className="mt-3 space-y-2 text-xs text-slate-400">
+        <p className="rounded border border-slate-800 bg-slate-950/50 p-3">Xác định owner dữ liệu cho {labels[tab]}.</p>
+        <p className="rounded border border-slate-800 bg-slate-950/50 p-3">Expose read model/API trước khi bật bảng dữ liệu.</p>
+        <p className="rounded border border-slate-800 bg-slate-950/50 p-3">Sau khi có API, dùng Enterprise Table và drawer hiện có.</p>
+      </div>
+    </aside>
   </div>
 }
 
@@ -326,13 +342,13 @@ function SupplierEvaluationTab({
       <button className={mutedButton}>Làm mới</button>
     </div>
 
-    <div className="grid gap-4 xl:grid-cols-[1fr_520px]">
-      <div className={`${panel} overflow-hidden`}>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className={`${panel} min-h-[640px] overflow-hidden`}>
         <div className="flex justify-between border-b border-slate-800 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-100">Danh sách đánh giá</h2>
           <span className="text-xs text-slate-500">{visibleRows.length} kết quả</span>
         </div>
-        <div className="overflow-auto">
+        <div className="max-h-[580px] overflow-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className={tableHead}><tr>{['STT', 'Mã nhà cung cấp', 'Tên nhà cung cấp', 'Lần đánh giá mới nhất', 'Điểm tổng', 'Xếp loại', 'Trạng thái'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead>
             <tbody>{visibleRows.map((row, index) => <tr key={row.id} onClick={() => setSelectedId(row.id)} className={`cursor-pointer ${tableRow} ${selected?.id === row.id ? 'bg-cyan-500/10' : ''}`}>
@@ -348,7 +364,7 @@ function SupplierEvaluationTab({
         </div>
       </div>
 
-      <div className={`${panel} p-4`}>
+      <div className={`${panel} p-4 xl:sticky xl:top-3 xl:self-start`}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-slate-100">Kết quả đánh giá chi tiết</h2>
@@ -434,11 +450,11 @@ function ClassificationBadge({ value }: { value: SupplierEvaluationRow['classifi
   return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{label}</span>
 }
 
-function PlaceholderCard({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+function SupplierInsightEmptyCard({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return <div className="rounded border border-slate-800 bg-slate-950/60 p-3">
     <Icon size={16} className="text-cyan-300" />
     <div className="mt-2 text-slate-300">{label}</div>
-    <div className="mt-1 text-[10px] text-slate-600">S2 analytics</div>
+    <div className="mt-1 text-[10px] text-slate-600">Chưa có dữ liệu thật</div>
   </div>
 }
 

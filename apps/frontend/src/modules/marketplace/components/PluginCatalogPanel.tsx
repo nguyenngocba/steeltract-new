@@ -20,7 +20,7 @@ export function PluginCatalogPanel() {
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Installed industrial runtime plugins
+          Tiện ích vận hành đã kết nối
         </div>
       </div>
 

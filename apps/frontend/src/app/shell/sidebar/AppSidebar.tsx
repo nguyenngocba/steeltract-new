@@ -217,7 +217,7 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed }: Props) {
             Ẩn sidebar
           </button>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-            Runtime Status
+            Trạng thái hệ thống
           </div>
 
           <div className="mt-3 flex items-center gap-2">

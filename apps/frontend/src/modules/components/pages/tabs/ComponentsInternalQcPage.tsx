@@ -1,117 +1,156 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, ClipboardCheck, Search, ShieldAlert } from 'lucide-react'
 
 import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
 import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
-import { ModuleEmptyState, ModuleFilterBar } from '../../../../shared/ui/modules'
-import { componentsInput } from './ComponentsCockpitShared'
+import { ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
+import { useComponents } from '../../hooks/queries/useComponents'
+import { formatQuantity } from '@/shared/utils/number-format'
+import { ComponentsDonut, componentsInput, componentsMutedButton } from './ComponentsCockpitShared'
 
-const qcRows = [
-  ['QC-2506-1248', 'BEAM H450x200x10x16', 'LOT-0625-001', 'Kích thước', 'QC Kích thước', '29/06/2025', 'Hoàn thành', 'Đạt', 'Trần Minh B'],
-  ['QC-2506-1247', 'PLATE 20mm', 'LOT-0625-002', 'Bề mặt', 'QC Bề mặt', '29/06/2025', 'Hoàn thành', 'Đạt', 'Nguyễn Văn A'],
-  ['QC-2506-1246', 'COLUMN H300x300x10x15', 'LOT-0625-003', 'Kích thước', 'QC Kích thước', '29/06/2025', 'Đang xử lý', '—', 'Phạm Văn C'],
-]
+function qcDisposition(status: string) {
+  if (['READY', 'SHIPPED', 'DELIVERED', 'INSTALLED'].includes(status)) return 'Đạt'
+  if (['CUTTING', 'WELDING', 'PAINTING'].includes(status)) return 'Đang kiểm'
+  return 'Chờ dữ liệu'
+}
+
+function qcArea(status: string) {
+  if (status === 'WELDING') return 'Hàn'
+  if (status === 'PAINTING') return 'Sơn'
+  if (status === 'CUTTING') return 'Kích thước'
+  return 'Tổng hợp'
+}
 
 export function ComponentsInternalQcPage() {
+  const { data: components = [], isLoading, isError } = useComponents()
   const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
-  const rows = useMemo(() => qcRows.filter((row) => {
-    if (!query.trim()) return true
-    return row.join(' ').toLowerCase().includes(query.toLowerCase())
-  }), [query])
   const pageSize = 14
-  const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const passedCount = rows.filter((row) => row[7] === 'Đạt').length
-  const failedCount = rows.filter((row) => row[7] === 'Không đạt').length
-  const pendingCount = rows.filter((row) => row[6] !== 'Hoàn thành').length
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, status])
+
+  const rows = useMemo(() => components.map((component) => ({
+    id: component.id,
+    code: component.code,
+    name: component.name,
+    project: component.project?.code ?? component.project?.name ?? '-',
+    status: component.status,
+    area: qcArea(component.status),
+    result: qcDisposition(component.status),
+    location: [component.zone, component.position].filter(Boolean).join(' / ') || '-',
+    updatedAt: component.updatedAt ? new Date(component.updatedAt).toLocaleDateString('vi-VN') : '-',
+  })).filter((row) => {
+    if (status && row.result !== status) return false
+    if (!query.trim()) return true
+    return `${row.code} ${row.name} ${row.project} ${row.area} ${row.result}`.toLowerCase().includes(query.toLowerCase())
+  }), [components, query, status])
+
+  const passedCount = rows.filter((row) => row.result === 'Đạt').length
+  const activeCount = rows.filter((row) => row.result === 'Đang kiểm').length
+  const waitingCount = rows.filter((row) => row.result === 'Chờ dữ liệu').length
+  const readyToShipCount = rows.filter((row) => ['READY', 'SHIPPED', 'DELIVERED', 'INSTALLED'].includes(row.status)).length
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
-        <div className="grid grid-cols-1 gap-1 xl:grid-cols-6">
-          <CockpitKpiCard title="Tổng phiếu QC" value="1.248" note="+15,6% so với tháng trước" state="normal" tone="cyan" />
-          <CockpitKpiCard title="Đạt" value="1.086" note="87,0%" state="normal" tone="emerald" />
-          <CockpitKpiCard title="Không đạt" value="98" note="7,9%" state="normal" tone="red" />
-          <CockpitKpiCard title="Chờ xử lý" value="64" note="5,1%" state="normal" tone="amber" />
-          <CockpitKpiCard title="Đang xử lý" value="32" note="2,6%" state="normal" tone="blue" />
-          <CockpitKpiCard title="Khu vực QC" value="2" note="kích thước / hàn" state="normal" tone="purple" />
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
+          <CockpitKpiCard title="Cấu kiện cần QC" value={formatQuantity(rows.length, 0)} note="Dữ liệu cấu kiện" state="normal" tone="cyan" />
+          <CockpitKpiCard title="QC đạt" value={formatQuantity(passedCount, 0)} note="READY trở lên" state="normal" tone="emerald" />
+          <CockpitKpiCard title="Đang kiểm" value={formatQuantity(activeCount, 0)} note="Cut / Weld / Paint" state="normal" tone="blue" />
+          <CockpitKpiCard title="Chờ QC fact" value={formatQuantity(waitingCount, 0)} note="Chưa có result riêng" state="normal" tone="amber" />
+          <CockpitKpiCard title="Ready to ship" value={formatQuantity(readyToShipCount, 0)} note="Có thể chuyển bãi" state="normal" tone="purple" />
+          <CockpitKpiCard title="Nguồn dữ liệu" value="Đang cập nhật" note="Lifecycle cấu kiện" state="normal" tone="red" />
         </div>
 
         <ModuleFilterBar>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm theo mã phiếu, cấu kiện, lot, người tạo..."
-            className={`${componentsInput} xl:col-span-4`}
-          />
-          {['Trạng thái', 'Khu vực QC', 'Loại cấu kiện', 'Loại QC'].map((item) => (
-            <select key={item} className={`${componentsInput} xl:col-span-2`}>
-              <option>{item}</option>
-            </select>
-          ))}
-          <input type="date" className={`${componentsInput} xl:col-span-2`} />
+          <div className="flex min-w-64 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-6">
+            <Search size={15} className="text-cyan-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm mã cấu kiện, tên, dự án, khu vực QC..."
+              className={`${componentsInput} w-full border-0 bg-transparent px-0 focus:border-0 focus:bg-transparent`}
+            />
+          </div>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className={`${componentsInput} xl:col-span-3`}>
+            <option value="">Kết quả: Tất cả</option>
+            <option value="Đạt">Đạt</option>
+            <option value="Đang kiểm">Đang kiểm</option>
+            <option value="Chờ dữ liệu">Chờ dữ liệu</option>
+          </select>
+          <button type="button" onClick={() => { setQuery(''); setStatus('') }} className={`${componentsMutedButton} xl:col-span-2`}>Làm mới</button>
         </ModuleFilterBar>
 
-        <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-          <div className="xl:col-span-9">
-            <CockpitChartCard title={`Danh sách phiếu QC nội bộ (${rows.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
-              <CockpitTableShell className="h-full">
-                <table className="w-full min-w-[1050px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
-                    <tr>
-                      {['Mã phiếu QC', 'Cấu kiện', 'Lot / Heat', 'Loại QC', 'Khu vực QC', 'Ngày tạo', 'Trạng thái', 'Kết quả', 'Người QC'].map((heading) => (
-                        <th key={heading} className="px-1.5 py-0.5 text-left font-medium">{heading}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedRows.length ? paginatedRows.map((row) => (
-                      <tr key={row[0]} className="border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
-                        {row.map((cell, index) => (
-                          <td key={`${row[0]}-${cell}`} className={`px-2 py-2 ${index === 0 ? 'text-cyan-300' : ''} ${cell === 'Đạt' ? 'text-emerald-300' : ''}`}>
-                            {cell}
-                          </td>
+        {isError ? (
+          <ModuleEmptyState icon={<ShieldAlert size={18} />} title="Không thể tải dữ liệu QC cấu kiện" description="Kiểm tra kết nối hoặc quyền truy cập Components." />
+        ) : (
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
+            <div className="xl:col-span-9">
+              <CockpitChartCard title={`Hàng đợi QC cấu kiện (${rows.length})`} subtitle="Theo lifecycle cấu kiện hiện có" className={COCKPIT_HEIGHTS.TABLE_MD}>
+                <CockpitTableShell className="h-full">
+                  <table className="w-full min-w-[960px] table-fixed text-[13px]">
+                    <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+                      <tr>
+                        {['Mã cấu kiện', 'Tên', 'Dự án', 'Khu vực QC', 'Lifecycle', 'Kết quả', 'Vị trí', 'Cập nhật'].map((heading) => (
+                          <th key={heading} className="px-3 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
                         ))}
                       </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={9} className="px-2 py-10">
-                          <ModuleEmptyState icon="✓" title="Chưa có dữ liệu QC" description="Không tìm thấy phiếu QC phù hợp với bộ lọc hiện tại." />
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </CockpitTableShell>
-              <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
-            </CockpitChartCard>
-          </div>
+                    </thead>
+                    <tbody>
+                      {isLoading ? (
+                        <tr><td colSpan={8} className="px-3 py-8"><ModuleLoadingState label="Đang tải QC cấu kiện..." /></td></tr>
+                      ) : pageRows.length ? pageRows.map((row) => (
+                        <tr key={row.id} className="border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
+                          <td className="truncate px-3 py-2 font-mono text-cyan-300">{row.code}</td>
+                          <td className="truncate px-3 py-2 text-white">{row.name}</td>
+                          <td className="truncate px-3 py-2">{row.project}</td>
+                          <td className="px-3 py-2">{row.area}</td>
+                          <td className="px-3 py-2">{row.status}</td>
+                          <td className={`px-3 py-2 ${row.result === 'Đạt' ? 'text-emerald-300' : row.result === 'Đang kiểm' ? 'text-cyan-300' : 'text-amber-300'}`}>{row.result}</td>
+                          <td className="truncate px-3 py-2">{row.location}</td>
+                          <td className="px-3 py-2">{row.updatedAt}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={8} className="px-3 py-10">
+                            <ModuleEmptyState icon={<ClipboardCheck size={18} />} title="Chưa có dữ liệu QC cấu kiện" description="Không tìm thấy cấu kiện phù hợp với bộ lọc hiện tại." />
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </CockpitTableShell>
+                <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+              </CockpitChartCard>
+            </div>
 
-          <div className="space-y-1 xl:col-span-3">
-            <CockpitChartCard title="Đạt QC" className={COCKPIT_HEIGHTS.CHART_SM}>
-              <div className="flex h-full flex-col justify-center gap-1 text-sm text-slate-300">
-                <div className="text-3xl font-bold text-emerald-300">{passedCount}</div>
-                <div>Phiếu đạt trong dữ liệu đang hiển thị.</div>
-              </div>
-            </CockpitChartCard>
-            <CockpitChartCard title="Không đạt" className={COCKPIT_HEIGHTS.CHART_SM}>
-              <div className="flex h-full flex-col justify-center gap-1 text-sm text-slate-300">
-                <div className="text-3xl font-bold text-red-300">{failedCount}</div>
-                <div>Phiếu cần xử lý lại.</div>
-              </div>
-            </CockpitChartCard>
-            <CockpitChartCard title="Gần đây" className={COCKPIT_HEIGHTS.CHART_SM}>
-              {rows.length ? rows.slice(0, 5).map((row) => (
-                <div key={row[0]} className="mb-1 flex justify-between gap-1 text-[12px] text-slate-300">
-                  <span className="truncate text-cyan-300">{row[0]}</span>
-                  <span className="shrink-0">{row[7]}</span>
-                </div>
-              )) : (
-                <ModuleEmptyState icon="🕒" title="Chưa có hoạt động" description="Chưa có phiếu QC gần đây." />
-              )}
-              {pendingCount ? <div className="mt-1 text-[11px] text-amber-300">{pendingCount} phiếu đang xử lý</div> : null}
-            </CockpitChartCard>
+            <div className="space-y-1 xl:col-span-3">
+              <CockpitChartCard title="Phân bổ QC" className={COCKPIT_HEIGHTS.CHART_SM}>
+                <ComponentsDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="QC" segments={[
+                  { label: 'Đạt', value: passedCount, color: '#14c987' },
+                  { label: 'Đang kiểm', value: activeCount, color: '#06b6d4' },
+                  { label: 'Chờ', value: waitingCount, color: '#f59e0b' },
+                ]} />
+              </CockpitChartCard>
+              <CockpitChartCard title="NCR" className={COCKPIT_HEIGHTS.CHART_SM}>
+                <ModuleEmptyState icon={<ShieldAlert size={18} />} title="Chưa có NCR từ API" description="NCR thật sẽ hiển thị khi QC domain cung cấp contract." />
+              </CockpitChartCard>
+              <CockpitChartCard title="Gần đây" className={COCKPIT_HEIGHTS.CHART_SM}>
+                {rows.slice(0, 5).map((row) => (
+                  <div key={row.id} className="mb-1 flex justify-between gap-2 text-xs text-slate-300">
+                    <span className="truncate text-cyan-300">{row.code}</span>
+                    <span className="shrink-0">{row.result}</span>
+                  </div>
+                ))}
+                {!rows.length ? <ModuleEmptyState icon={<CheckCircle2 size={18} />} title="Chưa có hoạt động" description="Không có cấu kiện trong bộ lọc hiện tại." /> : null}
+              </CockpitChartCard>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </ComponentsWorkspace>
   )

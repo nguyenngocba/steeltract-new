@@ -1,22 +1,22 @@
 const events = [
   {
-    runtime: 'Inventory Runtime',
-    fix: 'Cache synchronization restored',
+    runtime: 'Kho vật tư',
+    fix: 'Đồng bộ dữ liệu đã ổn định',
   },
 
   {
-    runtime: 'Realtime Bus',
-    fix: 'Socket reconnection completed',
+    runtime: 'Kênh cập nhật trực tiếp',
+    fix: 'Kết nối đã được khôi phục',
   },
 
   {
-    runtime: 'Workflow Runtime',
-    fix: 'Execution deadlock resolved',
+    runtime: 'Quy trình vận hành',
+    fix: 'Tắc nghẽn thực thi đã được xử lý',
   },
 
   {
-    runtime: 'Analytics Runtime',
-    fix: 'Telemetry recovery completed',
+    runtime: 'Phân tích vận hành',
+    fix: 'Dòng dữ liệu theo dõi đã phục hồi',
   },
 ]
 
@@ -33,11 +33,11 @@ export function SelfHealingPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-orange-400">
-          Self-Healing Runtime
+          Phục hồi vận hành tự động
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Autonomous runtime recovery engine
+          Theo dõi các tình huống đã được hệ thống khôi phục an toàn.
         </div>
       </div>
 

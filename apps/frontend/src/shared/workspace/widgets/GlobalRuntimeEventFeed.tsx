@@ -20,7 +20,7 @@ export function GlobalRuntimeEventFeed() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-cyan-400">
-          Global Runtime Events
+          Sự kiện toàn hệ thống
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
@@ -52,7 +52,7 @@ export function GlobalRuntimeEventFeed() {
 
         {events.length === 0 && (
           <div className="text-sm text-zinc-500">
-            No runtime events
+            Chưa có sự kiện hệ thống
           </div>
         )}
       </div>

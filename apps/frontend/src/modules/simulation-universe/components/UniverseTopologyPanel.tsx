@@ -1,9 +1,9 @@
 const runtimes = [
-  'Inventory Runtime',
-  'Production Runtime',
-  'Workflow Runtime',
-  'AI Copilot Runtime',
-  'Autonomous Runtime',
+  'Kho vật tư',
+  'Sản xuất',
+  'Quy trình',
+  'Trợ lý điều hành',
+  'Tự động hóa',
 ]
 
 export function UniverseTopologyPanel() {
@@ -19,11 +19,11 @@ export function UniverseTopologyPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-cyan-300">
-          Simulation Universe Topology
+          Bản đồ mô phỏng vận hành
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Connected industrial simulation runtimes
+          Kết nối các không gian mô phỏng để theo dõi tác động vận hành.
         </div>
       </div>
 

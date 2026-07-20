@@ -7,7 +7,7 @@ export function RuntimeHeader() {
         </div>
 
         <div className="mt-1 text-sm text-zinc-400">
-          Industrial Operations Runtime
+          Trung tâm vận hành
         </div>
       </div>
 
@@ -15,7 +15,7 @@ export function RuntimeHeader() {
         <div className="h-2 w-2 rounded-full bg-emerald-400" />
 
         <div className="text-sm text-zinc-400">
-          Runtime Online
+          Hệ thống sẵn sàng
         </div>
       </div>
     </div>

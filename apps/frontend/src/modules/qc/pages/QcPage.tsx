@@ -1,10 +1,18 @@
-import { useDeferredValue, useState } from 'react'
+import { useDeferredValue, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { CockpitKpiCard } from '@/shared/ui/cockpit'
+import {
+  moduleInput,
+  moduleMutedButton,
+  modulePanel,
+  modulePrimaryButton,
+  moduleTableHead,
+  moduleTableRow,
+} from '@/shared/ui/modules'
 import { approveInspection, completeInspection, createInspection, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
 import { queryKeys } from '@/lib/query/query-keys'
 import { useQcDashboard, useQcWorkspace } from '../hooks/useQcWorkspace'
@@ -23,12 +31,12 @@ const tabs: Array<{ id: QcTab; label: string; path: string }> = [
   { id: 'dashboard', label: 'Dashboard', path: '/qc/dashboard' },
   { id: 'reports', label: 'Báo cáo', path: '/qc/reports' },
 ]
-const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
-const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
-const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
-const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
-const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
-const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
+const panel = modulePanel
+const input = moduleInput
+const primaryButton = modulePrimaryButton
+const mutedButton = moduleMutedButton
+const tableHead = moduleTableHead
+const tableRow = moduleTableRow
 const fmt = (value = 0) => formatQuantity(value, 1)
 const date = (value?: string | null) => value ? formatDateTime(value) : '-'
 
@@ -280,30 +288,114 @@ function FilterBar({ query, status, onQuery, onStatus }: { query: string; status
 }
 
 function Overview({ runtime, rows, queue, onOpen, onQueue, onCreate, onQuickApprove }: { runtime: QcCockpit; rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
+  const navigate = useNavigate()
   const m = runtime.metrics
+  const attentionInspections = rows
+    .filter((row) => ['READY', 'IN_PROGRESS', 'FAILED', 'REWORK_REQUIRED'].includes(row.status) || row.result === 'FAIL' || row.ncrCount > 0 || row.issueCount > 0)
+    .sort((a, b) => (b.ncrCount + b.issueCount) - (a.ncrCount + a.issueCount))
+    .slice(0, 5)
+  const waitingQueue = queue.filter((row) => row.qcStatus !== 'APPROVED').slice(0, 5)
+
   return <div className="mt-3 space-y-4">
-    <KpiStrip runtime={runtime} />
-    <div className="grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows.slice(0, 10)} onOpen={onOpen} /><aside className="space-y-4"><Latest rows={rows} onOpen={onOpen} /><Donut title="Thống kê theo loại kiểm tra" center={fmt(m.total)} rows={runtime.byCategory.map((r, i) => [r.category, r.count, ['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500'][i % 4]]) as any} /><NcrSummary runtime={runtime} /></aside></div>
-    <div className="grid gap-4 xl:grid-cols-2"><Trend rows={runtime.trend} /><ByProject rows={runtime.byProject} /></div>
-    <ProductionQueue rows={queue.slice(0, 8)} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} />
+    <KpiStrip runtime={runtime} rows={rows} />
+    <QualityAlerts inspections={attentionInspections} queue={waitingQueue} onOpen={onOpen} onQueue={onQueue} />
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <InspectionTable
+        title="Top inspection queue"
+        rows={rows.slice(0, 10)}
+        onOpen={onOpen}
+        action={<button type="button" onClick={() => navigate('/qc/production')} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
+      />
+      <aside className="space-y-4">
+        <ProductionQueue
+          rows={queue.slice(0, 5)}
+          onOpen={onQueue}
+          onCreate={onCreate}
+          onQuickApprove={onQuickApprove}
+          compact
+          action={<button type="button" onClick={() => navigate('/qc/plan')} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
+        />
+        <Latest rows={rows} onOpen={onOpen} />
+      </aside>
+    </div>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Trend rows={runtime.trend} />
+      <aside className="space-y-4">
+        <Donut title="Inspection Status Distribution" center={fmt(m.total)} rows={runtime.byCategory.map((r, i) => [r.category, r.count, ['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500'][i % 4]]) as any} />
+        <ByProject rows={runtime.byProject} />
+        <NcrSummary runtime={runtime} />
+      </aside>
+    </div>
   </div>
 }
 
-function KpiStrip({ runtime }: { runtime: QcCockpit }) {
+function QualityAlerts({
+  inspections,
+  queue,
+  onOpen,
+  onQueue,
+}: {
+  inspections: QcInspectionRow[]
+  queue: QcProductionQueueRow[]
+  onOpen: (row: QcInspectionRow) => void
+  onQueue: (row: QcProductionQueueRow) => void
+}) {
+  const hasAlerts = inspections.length > 0 || queue.length > 0
+  return <div className={`${panel} p-4`}>
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-semibold text-white">Quality alerts</h2>
+        <p className="mt-1 text-xs text-slate-500">Ưu tiên kiểm tra cấu kiện, NCR/rework và MO đang chặn xuất bãi.</p>
+      </div>
+      <span className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">{inspections.length + queue.length} cần xem</span>
+    </div>
+    {hasAlerts ? (
+      <div className="mt-3 grid gap-2 xl:grid-cols-2">
+        <div className="space-y-2">
+          {inspections.map((row) => (
+            <button key={row.id} type="button" onClick={() => onOpen(row)} className="grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs hover:border-red-400/35 hover:bg-white/[0.06]">
+              <span className="min-w-0">
+                <span className="block truncate font-semibold text-cyan-300">{row.inspectionNo}</span>
+                <span className="block truncate text-slate-400">{row.componentCode} · {row.projectName}</span>
+              </span>
+              <span className="rounded border border-red-400/30 bg-red-500/10 px-2 py-0.5 text-red-300">{row.status}</span>
+            </button>
+          ))}
+        </div>
+        <div className="space-y-2">
+          {queue.map((row) => (
+            <button key={row.id} type="button" onClick={() => onQueue(row)} className="grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs hover:border-amber-400/35 hover:bg-white/[0.06]">
+              <span className="min-w-0">
+                <span className="block truncate font-semibold text-cyan-300">{row.orderNo}</span>
+                <span className="block truncate text-slate-400">{row.componentCode} · {row.componentName}</span>
+              </span>
+              <span className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-amber-300">Chờ QC</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : <Empty title="Không có cảnh báo QC đang mở." />}
+  </div>
+}
+
+function KpiStrip({ runtime, rows = [] }: { runtime: QcCockpit; rows?: QcInspectionRow[] }) {
   const m = runtime.metrics
-  return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Tổng phiếu kiểm tra" value={fmt(m.total)} note="Trong hệ thống" /><Kpi icon={CheckCircle2} title="Đạt" value={fmt(m.passed)} note={`${fmt(m.passRate)}%`} tone="emerald" /><Kpi icon={XCircle} title="Không đạt" value={fmt(m.failed + m.rework)} note="Rework/Failed" tone="red" /><Kpi icon={CalendarClock} title="Chờ xử lý" value={fmt(m.pending)} note="Phiếu" tone="amber" /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note="Trong tổng số" tone="purple" /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(m.waitingProductionOrders)} note="Chặn xuất bãi" tone="cyan" /></div>
+  const today = new Date().toISOString().slice(0, 10)
+  const passedToday = rows.filter((row) => row.date?.slice(0, 10) === today && ['PASSED', 'APPROVED'].includes(row.status)).length
+  const failedToday = rows.filter((row) => row.date?.slice(0, 10) === today && ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(row.status)).length
+  return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Pending inspection" value={fmt(m.pending)} note="Chờ xử lý" tone="amber" /><Kpi icon={SlidersHorizontal} title="In progress" value={fmt(m.inProgress)} note="Đang kiểm" /><Kpi icon={CheckCircle2} title="Passed today" value={fmt(passedToday || m.passed)} note={`${fmt(m.passRate)}% pass rate`} tone="emerald" /><Kpi icon={XCircle} title="Failed today" value={fmt(failedToday || m.failed + m.rework)} note="Fail / Rework" tone="red" /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note="Cần disposition" tone="purple" /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(m.waitingProductionOrders)} note="Chặn xuất bãi" tone="cyan" /></div>
 }
 
 function Inspections({ rows, queue, onOpen, onQueue, onCreate, onQuickApprove, onPass, onFail }: { rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; onPass: (row: QcInspectionRow) => void; onFail: (row: QcInspectionRow) => void }) {
   return <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows} onOpen={onOpen} onPass={onPass} onFail={onFail} /><aside className="space-y-4"><ProductionQueue rows={queue} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} compact /></aside></div>
 }
 
-function InspectionTable({ rows, onOpen, onPass, onFail }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void; onPass?: (row: QcInspectionRow) => void; onFail?: (row: QcInspectionRow) => void }) {
-  return <div className={`${panel} overflow-hidden`}><div className="flex justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">Danh sách phiếu kiểm tra</h2><span className="text-xs text-slate-500">{rows.length} phiếu</span></div><div className="overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className={tableHead}><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}</tbody></table></div>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</div>
+function InspectionTable({ rows, onOpen, onPass, onFail, title = 'Danh sách phiếu kiểm tra', action }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void; onPass?: (row: QcInspectionRow) => void; onFail?: (row: QcInspectionRow) => void; title?: string; action?: ReactNode }) {
+  return <div className={`${panel} min-h-[620px] overflow-hidden`}><div className="flex justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">{title}</h2><div className="flex items-center gap-3"><span className="text-xs text-slate-500">{rows.length} phiếu</span>{action}</div></div><div className="max-h-[560px] overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className={tableHead}><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}</tbody></table></div>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</div>
 }
 
-function ProductionQueue({ rows, onOpen, onCreate, onQuickApprove, compact = false }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; compact?: boolean }) {
-  return <div className={`${panel} overflow-hidden`}><div className="border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">MO hoàn thành chờ QC</h2></div><div className={`${compact ? 'max-h-[520px]' : 'max-h-80'} overflow-auto`}>{rows.map((row) => <div key={row.id} onClick={() => onOpen(row)} className="grid cursor-pointer grid-cols-[1fr_auto] gap-3 border-b border-slate-800 px-4 py-3 text-xs hover:bg-cyan-950/20"><span><b className="text-cyan-300">{row.orderNo}</b><span className="mt-1 block text-slate-300">{row.componentCode} · {row.componentName}</span><span className="mt-1 block text-slate-500">{row.title}</span><span className="mt-1 block text-slate-500">{row.inspectionCount} phiếu QC</span></span><span className="space-y-2 text-right"><StatusBadge value={row.qcStatus === 'APPROVED' ? 'APPROVED' : row.qcStatus === 'REWORK_REQUIRED' ? 'REWORK_REQUIRED' : 'READY'} />{row.qcStatus !== 'APPROVED' ? <><button onClick={(e) => { e.stopPropagation(); onCreate(row) }} className="block w-full rounded border border-blue-700 px-3 py-1 text-[10px] text-blue-200">Tạo QC</button><button onClick={(e) => { e.stopPropagation(); onQuickApprove(row) }} className="block w-full rounded bg-emerald-600 px-3 py-1 text-[10px] text-white">Tạo & duyệt đạt</button></> : <span className="block rounded border border-emerald-700 px-3 py-1 text-[10px] text-emerald-300">Cho phép xuất bãi</span>}</span></div>)}{!rows.length ? <Empty title="Chưa có MO hoàn thành chờ QC." /> : null}</div></div>
+function ProductionQueue({ rows, onOpen, onCreate, onQuickApprove, compact = false, action }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; compact?: boolean; action?: ReactNode }) {
+  return <div className={`${panel} overflow-hidden`}><div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3"><h2 className="text-sm font-semibold">MO hoàn thành chờ QC</h2>{action}</div><div className={`${compact ? 'max-h-[520px]' : 'max-h-80'} overflow-auto`}>{rows.map((row) => <div key={row.id} onClick={() => onOpen(row)} className="grid cursor-pointer grid-cols-[1fr_auto] gap-3 border-b border-slate-800 px-4 py-3 text-xs hover:bg-cyan-950/20"><span><b className="text-cyan-300">{row.orderNo}</b><span className="mt-1 block text-slate-300">{row.componentCode} · {row.componentName}</span><span className="mt-1 block text-slate-500">{row.title}</span><span className="mt-1 block text-slate-500">{row.inspectionCount} phiếu QC</span></span><span className="space-y-2 text-right"><StatusBadge value={row.qcStatus === 'APPROVED' ? 'APPROVED' : row.qcStatus === 'REWORK_REQUIRED' ? 'REWORK_REQUIRED' : 'READY'} />{row.qcStatus !== 'APPROVED' ? <><button onClick={(e) => { e.stopPropagation(); onCreate(row) }} className="block w-full rounded border border-blue-700 px-3 py-1 text-[10px] text-blue-200">Tạo QC</button><button onClick={(e) => { e.stopPropagation(); onQuickApprove(row) }} className="block w-full rounded bg-emerald-600 px-3 py-1 text-[10px] text-white">Tạo & duyệt đạt</button></> : <span className="block rounded border border-emerald-700 px-3 py-1 text-[10px] text-emerald-300">Cho phép xuất bãi</span>}</span></div>)}{!rows.length ? <Empty title="Chưa có MO hoàn thành chờ QC." /> : null}</div></div>
 }
 
 function Plan({ queue, onCreate, onQuickApprove }: { queue: QcProductionQueueRow[]; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
@@ -319,7 +411,7 @@ function Ncr({ runtime }: { runtime: QcCockpit }) {
 }
 
 function Calibration() {
-  return <div className="mt-3 grid gap-4 xl:grid-cols-3">{['Máy đo kích thước', 'Máy siêu âm UT', 'Máy đo sơn phủ', 'Cân tải trọng', 'Thước đo laser', 'Thiết bị đo độ thẳng'].map((name, index) => <div key={name} className={`${panel} p-4`}><Gauge className="text-cyan-300" size={22} /><h3 className="mt-3 text-sm font-semibold">{name}</h3><p className="mt-2 text-xs text-slate-500">Trạng thái hiệu chuẩn: {index % 4 === 0 ? 'Sắp hết hạn' : 'Còn hiệu lực'}</p><Progress value={index % 4 === 0 ? 78 : 42} /></div>)}</div>
+  return <div className="mt-3"><div className={`${panel} p-6`}><Gauge className="text-cyan-300" size={22} /><h2 className="mt-3 text-sm font-semibold">Hiệu chuẩn thiết bị</h2><p className="mt-2 max-w-2xl text-sm text-slate-500">Chưa có dữ liệu hiệu chuẩn thiết bị từ backend QC. Trang này giữ trạng thái rỗng có kiểm soát thay vì dựng danh sách thiết bị giả.</p></div></div>
 }
 
 function Reports({ runtime }: { runtime: QcCockpit }) {
@@ -327,8 +419,9 @@ function Reports({ runtime }: { runtime: QcCockpit }) {
 }
 
 function Latest({ rows, onOpen }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void }) {
+  const navigate = useNavigate()
   const latest = rows[0]
-  return <div className={`${panel} p-4`}><div className="flex justify-between"><h3 className="text-sm font-semibold">Phiếu kiểm tra mới nhất</h3><button className="text-xs text-cyan-300">Xem tất cả</button></div>{latest ? <button onClick={() => onOpen(latest)} className="mt-3 w-full rounded border border-slate-800 p-3 text-left text-xs hover:border-cyan-600"><div className="flex justify-between"><b className="text-cyan-300">{latest.inspectionNo}</b><StatusBadge value={latest.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 text-slate-400"><span>Dự án</span><span className="text-right text-slate-200">{latest.projectName}</span><span>Cấu kiện</span><span className="text-right text-slate-200">{latest.componentCode}</span><span>Kết quả</span><span className="text-right"><ResultBadge value={latest.result} /></span><span>Tỷ lệ đạt</span><span className="text-right text-emerald-300">{fmt(latest.passRate)}%</span></div></button> : <Empty title="Chưa có phiếu kiểm tra." />}</div>
+  return <div className={`${panel} p-4`}><div className="flex justify-between"><h3 className="text-sm font-semibold">Phiếu kiểm tra mới nhất</h3><button type="button" onClick={() => navigate('/qc/production')} className="text-xs text-cyan-300 hover:text-cyan-200">Xem tất cả</button></div>{latest ? <button onClick={() => onOpen(latest)} className="mt-3 w-full rounded border border-slate-800 p-3 text-left text-xs hover:border-cyan-600"><div className="flex justify-between"><b className="text-cyan-300">{latest.inspectionNo}</b><StatusBadge value={latest.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 text-slate-400"><span>Dự án</span><span className="text-right text-slate-200">{latest.projectName}</span><span>Cấu kiện</span><span className="text-right text-slate-200">{latest.componentCode}</span><span>Kết quả</span><span className="text-right"><ResultBadge value={latest.result} /></span><span>Tỷ lệ đạt</span><span className="text-right text-emerald-300">{fmt(latest.passRate)}%</span></div></button> : <Empty title="Chưa có phiếu kiểm tra." />}</div>
 }
 
 function NcrSummary({ runtime }: { runtime: QcCockpit }) {

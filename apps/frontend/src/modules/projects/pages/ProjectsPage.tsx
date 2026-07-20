@@ -2735,10 +2735,6 @@ function StatusMiniBars({ rows, suffix = '', currency = false }: { rows: Array<[
   )
 }
 
-function Placeholder({ title, description, icon }: { title: string; description: string; icon: ReactNode }) {
-  return <CockpitEmptyState title={title} description={description} icon={icon} />
-}
-
 function defaultTemplateStructure(): ProjectTemplateStructure {
   return {
     version: 1,

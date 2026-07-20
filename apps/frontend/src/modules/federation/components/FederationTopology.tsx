@@ -23,7 +23,7 @@ export function FederationTopology() {
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Distributed industrial runtime federation
+          Kết nối vận hành giữa các nhà máy
         </div>
       </div>
 

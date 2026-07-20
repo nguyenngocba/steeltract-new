@@ -1,5 +1,17 @@
 # Inventory Module
 
+## EPIC UI006 Shared Components Consolidation
+
+Status: **IMPLEMENTED - VISUAL QA PENDING** (2026-07-18)
+
+- `InventoryVisuals.tsx` now delegates to
+  `shared/ui/enterprise-components` while preserving existing Inventory imports.
+- Inventory remains the Golden Reference, but reusable panel, chart, KPI,
+  pagination, table token, bar/donut and loading-state implementations are now
+  owned by shared UI.
+- No Inventory API, React Query hook, route, permission, layout intent or
+  business workflow changed.
+
 ## BUGFIX INV001 Inventory Table Visibility
 
 Status: **IMPLEMENTED** (2026-07-18)

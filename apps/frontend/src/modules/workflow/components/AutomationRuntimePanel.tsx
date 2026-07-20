@@ -39,7 +39,7 @@ export function AutomationRuntimePanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-lime-400">
-          Automation Runtime
+          Tự động hóa quy trình
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

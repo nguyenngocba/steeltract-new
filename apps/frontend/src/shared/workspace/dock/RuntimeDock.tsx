@@ -20,9 +20,7 @@ export function RuntimeDock() {
             p-4
           "
         >
-          <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-            Runtime
-          </div>
+          <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">Trạng thái</div>
 
           <div className="mt-3 text-sm font-medium text-white">
             {item}

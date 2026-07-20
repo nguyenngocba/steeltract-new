@@ -14,11 +14,11 @@ export function KernelPage() {
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">
-            Runtime Kernel Engine
+            Trung tâm nền tảng lõi
           </h1>
 
           <div className="mt-2 text-sm text-zinc-500">
-            Industrial runtime orchestration & service mesh
+            Theo dõi các dịch vụ nền, lịch chạy và kết nối hệ thống.
           </div>
         </div>
 

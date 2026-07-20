@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BarChart3, Package } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { ComponentsWorkspace } from "../../components/ComponentsWorkspace";
 import {
@@ -25,6 +26,8 @@ import {
   ComponentsSelect,
   componentsInput,
   componentsMutedButton,
+  componentsTableHead,
+  componentsTableRow,
 } from "./ComponentsCockpitShared";
 
 function statusTone(label: string) {
@@ -40,13 +43,14 @@ function statusTone(label: string) {
 }
 
 export function ComponentsOverviewPage() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [project, setProject] = useState("");
   const [status, setStatus] = useState("");
   const [location, setLocation] = useState("");
   const [type, setType] = useState("");
   const [page, setPage] = useState(1);
-  const pageSize = 14;
+  const pageSize = 8;
   const { data: readModel, isLoading } = useComponentsOverview({
     page,
     limit: pageSize,
@@ -63,7 +67,7 @@ export function ComponentsOverviewPage() {
   }, [project, status, location, type, query]);
 
   const rows = readModel?.data ?? [];
-  const paginatedRows = rows;
+  const paginatedRows = rows.slice(0, 8);
   const dashboardData = dashboard?.data;
   const statusCounts = dashboardData
     ? {
@@ -71,7 +75,7 @@ export function ComponentsOverviewPage() {
         producing: dashboardData.producingCount,
         stock: dashboardData.stockCount,
         qcPass: dashboardData.readyCount,
-        qcFail: 0,
+        waitingQc: rows.filter((row) => /QC|kiểm|kiem|CUTTING|WELDING|PAINTING/i.test(`${row.status} ${row.location}`)).length,
         transferring: dashboardData.shippedCount,
       }
     : {
@@ -79,7 +83,7 @@ export function ComponentsOverviewPage() {
     producing: 0,
     stock: 0,
     qcPass: 0,
-    qcFail: 0,
+    waitingQc: 0,
     transferring: 0,
       };
   const dashboardActivity =
@@ -99,52 +103,73 @@ export function ComponentsOverviewPage() {
       color: colors[index % colors.length],
     }),
   );
-  const topProfiles: Array<[string, number]> = [];
-  const maxTop = Math.max(1, ...topProfiles.map(([, value]) => value));
+  const projectRows = Array.from(
+    rows.reduce((map, row) => {
+      const key = row.project || "Chưa gán dự án";
+      map.set(key, (map.get(key) ?? 0) + 1);
+      return map;
+    }, new Map<string, number>()),
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+  const maxProject = Math.max(1, ...projectRows.map(([, value]) => value));
+  const waitingQcRows = rows
+    .filter((row) => /QC|kiểm|kiem|INTERNAL/i.test(`${row.status} ${row.location}`))
+    .slice(0, 4);
+  const readyShipRows = rows
+    .filter((row) => /READY|Đã QC|DA QC|QC đạt|QC dat/i.test(row.status))
+    .slice(0, 4);
+  const quickStats = [
+    { title: "Đang sản xuất", value: `${formatQuantity(statusCounts.producing, 0)} cấu kiện`, note: "CUT/WELD/PAINT", tone: "text-cyan-300" },
+    { title: "Tồn kho", value: `${formatQuantity(statusCounts.stock, 0)} cấu kiện`, note: "STOCK", tone: "text-amber-300" },
+    { title: "Sẵn sàng xuất bãi", value: `${formatQuantity(statusCounts.qcPass, 0)} cấu kiện`, note: "READY", tone: "text-emerald-300" },
+    { title: "Đang chuyển", value: `${formatQuantity(statusCounts.transferring, 0)} cấu kiện`, note: "SHIPPED", tone: "text-purple-300" },
+    { title: "Hoạt động", value: `${formatQuantity(dashboardActivity.length, 0)} dòng`, note: "Timeline", tone: "text-blue-300" },
+  ];
 
   return (
     <ComponentsWorkspace>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
           <CockpitKpiCard
-            title="Tổng số cấu kiện"
+            title="Tổng cấu kiện"
             value={formatQuantity(statusCounts.total, 0)}
-            note="Dữ liệu hiện tại"
+            note="Toàn bộ lifecycle"
             tone="blue"
             state="normal"
           />
           <CockpitKpiCard
             title="Đang sản xuất"
             value={formatQuantity(statusCounts.producing, 0)}
-            note="Theo trạng thái"
+            note="Cut / Weld / Paint"
             tone="purple"
             state="normal"
           />
           <CockpitKpiCard
-            title="Tồn kho cấu kiện"
+            title="Trong kho cấu kiện"
             value={formatQuantity(statusCounts.stock, 0)}
-            note="Theo trạng thái"
+            note="Đang lưu kho"
             tone="amber"
             state="normal"
           />
           <CockpitKpiCard
-            title="Đã QC đạt"
+            title="Ready to ship"
             value={formatQuantity(statusCounts.qcPass, 0)}
-            note="Theo trạng thái"
+            note="QC đạt / READY"
             tone="emerald"
             state="normal"
           />
           <CockpitKpiCard
-            title="QC không đạt"
-            value={formatQuantity(statusCounts.qcFail, 0)}
-            note="Theo trạng thái"
+            title="Chờ QC"
+            value={formatQuantity(statusCounts.waitingQc, 0)}
+            note="Suy ra từ stage"
             tone="red"
             state="normal"
           />
           <CockpitKpiCard
-            title="Đang chuyển"
+            title="Đang xuất bãi"
             value={formatQuantity(statusCounts.transferring, 0)}
-            note="Theo trạng thái"
+            note="SHIPPED"
             tone="cyan"
             state="normal"
           />
@@ -211,15 +236,24 @@ export function ComponentsOverviewPage() {
           </button>
         </ModuleFilterBar>
 
-        <div className="grid grid-cols-12 gap-1">
+        <div className="grid grid-cols-12 gap-1 items-start">
           <div className="col-span-12 xl:col-span-9">
             <CockpitChartCard
-              title={`Danh sách cấu kiện (${readModel?.meta.total ?? 0})`}
-              className={COCKPIT_HEIGHTS.TABLE_MD}
+              title={`Top ${paginatedRows.length} cấu kiện`}
+              action={
+                <button
+                  type="button"
+                  onClick={() => navigate("/components/list")}
+                  className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+                >
+                  Xem tất cả
+                </button>
+              }
+              className={paginatedRows.length <= 5 ? "min-h-[300px]" : COCKPIT_HEIGHTS.TABLE_MD}
             >
               <CockpitTableShell className="h-full">
                 <table className="w-full min-w-[980px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-350">
+                  <thead className={componentsTableHead}>
                     <tr>
                       {[
                         "Mã cấu kiện",
@@ -233,7 +267,7 @@ export function ComponentsOverviewPage() {
                       ].map((heading) => (
                         <th
                           key={heading}
-                          className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300 border-b border-cyan-400/10"
+                          className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300"
                         >
                           {heading}
                         </th>
@@ -251,34 +285,34 @@ export function ComponentsOverviewPage() {
                       paginatedRows.map((row) => (
                         <tr
                           key={row.id}
-                          className="border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]"
+                          className={componentsTableRow}
                         >
-                          <td className="truncate px-4 py-2.5 text-cyan-300 font-mono">
+                          <td className="truncate px-1.5 py-0.5 text-cyan-300 font-mono">
                             {row.code}
                           </td>
-                          <td className="truncate px-4 py-2.5 text-white">
+                          <td className="truncate px-1.5 py-0.5 text-white">
                             {row.name}
                           </td>
-                          <td className="truncate px-4 py-2.5 text-slate-300">
+                          <td className="truncate px-1.5 py-0.5 text-slate-300">
                             {row.profile}
                           </td>
-                          <td className="truncate px-4 py-2.5 text-slate-300">
+                          <td className="truncate px-1.5 py-0.5 text-slate-300">
                             {row.project}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-1.5 py-0.5">
                             <span
                               className={`rounded-lg border px-2 py-0.5 text-xs ${statusTone(row.status)}`}
                             >
                               {row.status}
                             </span>
                           </td>
-                          <td className="truncate px-4 py-2.5 text-slate-300">
+                          <td className="truncate px-1.5 py-0.5 text-slate-300">
                             {row.location}
                           </td>
-                          <td className="px-4 py-2.5 font-mono tabular-nums text-cyan-300">
+                          <td className="px-1.5 py-0.5 font-mono tabular-nums text-cyan-300">
                             {formatQuantity(row.quantity, 0)}
                           </td>
-                          <td className="px-4 py-2.5 font-mono tabular-nums text-emerald-300">
+                          <td className="px-1.5 py-0.5 font-mono tabular-nums text-emerald-300">
                             {formatQuantity(row.qcQuantity, 0)}
                           </td>
                         </tr>
@@ -297,18 +331,12 @@ export function ComponentsOverviewPage() {
                 </div>
               ) : null}
             </CockpitChartCard>
-            <DataTablePagination
-              page={page}
-              pageSize={pageSize}
-              total={readModel?.meta.total ?? 0}
-              onPageChange={setPage}
-            />
           </div>
 
           <aside className="col-span-12 space-y-1 xl:col-span-3">
             <CockpitChartCard
-              title="Tổng hợp"
-              className={COCKPIT_HEIGHTS.CHART_SM}
+              title="Trạng thái cấu kiện"
+              className={COCKPIT_HEIGHTS.CHART_MD}
             >
               <ComponentsDonut
                 centerValue={formatQuantity(dashboardData?.totalComponents ?? 0, 0)}
@@ -322,7 +350,7 @@ export function ComponentsOverviewPage() {
             </CockpitChartCard>
             <CockpitChartCard
               title="Hoạt động"
-              className={COCKPIT_HEIGHTS.CHART_SM}
+              className={COCKPIT_HEIGHTS.CHART_ALERT}
             >
               <ComponentsMiniBars
                 values={dashboardActivity}
@@ -330,22 +358,22 @@ export function ComponentsOverviewPage() {
               />
             </CockpitChartCard>
             <CockpitChartCard
-              title="Thống kê"
-              className={COCKPIT_HEIGHTS.CHART_SM}
+              title="Theo dự án"
+              className={COCKPIT_HEIGHTS.CHART_MD}
             >
               <div className="space-y-1">
-                {topProfiles.map(([profile, value]) => (
+                {projectRows.map(([projectName, value]) => (
                   <div
-                    key={profile}
+                    key={projectName}
                     className="grid grid-cols-[1fr_70px_44px] items-center gap-1 text-xs"
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-slate-200">{profile}</div>
+                      <div className="truncate text-slate-200">{projectName}</div>
                       <div className="mt-1 h-2 rounded-full bg-white/10">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
                           style={{
-                            width: `${Math.max(8, (value / maxTop) * 100)}%`,
+                            width: `${Math.max(8, (value / maxProject) * 100)}%`,
                           }}
                         />
                       </div>
@@ -358,7 +386,7 @@ export function ComponentsOverviewPage() {
                         (value /
                           Math.max(
                             1,
-                            readModel?.analytics.totalQuantity ?? 0,
+                            rows.length,
                           )) *
                         100
                       ).toFixed(1)}
@@ -366,18 +394,75 @@ export function ComponentsOverviewPage() {
                     </span>
                   </div>
                 ))}
-                {!topProfiles.length ? (
+                {!projectRows.length ? (
                   <ModuleEmptyState
                     icon={<BarChart3 size={18} />}
-                    title="Chưa có thống kê"
-                    description="Các cấu kiện theo profile sẽ hiển thị tại đây."
+                    title="Chưa có phân bổ dự án"
+                    description="Cấu kiện theo dự án sẽ hiển thị khi workspace có dữ liệu."
                   />
                 ) : null}
               </div>
             </CockpitChartCard>
           </aside>
         </div>
+
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <CockpitChartCard title="Hàng đợi QC" subtitle="Theo trạng thái/vị trí hiện có" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+            {waitingQcRows.length ? (
+              <ComponentQueue rows={waitingQcRows} tone="amber" />
+            ) : (
+              <ModuleEmptyState icon={<Package size={18} />} title="Không có cấu kiện chờ QC" description="Các cấu kiện có trạng thái hoặc vị trí QC sẽ xuất hiện tại đây." />
+            )}
+          </CockpitChartCard>
+          <CockpitChartCard title="Ready to ship" subtitle="Cấu kiện sẵn sàng chuyển" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+            {readyShipRows.length ? (
+              <ComponentQueue rows={readyShipRows} tone="emerald" />
+            ) : (
+              <ModuleEmptyState icon={<Package size={18} />} title="Chưa có cấu kiện sẵn sàng chuyển" description="Các cấu kiện READY/QC đạt sẽ xuất hiện tại đây." />
+            )}
+          </CockpitChartCard>
+        </div>
+
+        <CockpitChartCard title="Thống kê nhanh" className="min-h-0">
+          <div className="grid grid-cols-1 divide-y divide-white/10 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
+            {quickStats.map((item) => (
+              <div key={item.title} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                <span className="truncate text-xs text-slate-400">{item.title}</span>
+                <div className="min-w-0 text-right">
+                  <div className={`truncate text-sm font-bold ${item.tone}`}>{item.value}</div>
+                  <div className="truncate text-[10px] text-slate-500">{item.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CockpitChartCard>
       </div>
     </ComponentsWorkspace>
+  );
+}
+
+function ComponentQueue({
+  rows,
+  tone,
+}: {
+  rows: Array<{ id: string; code: string; name: string; project: string; status: string }>
+  tone: "amber" | "emerald"
+}) {
+  const toneClass = tone === "emerald"
+    ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+    : "border-amber-400/30 bg-amber-500/10 text-amber-300";
+
+  return (
+    <div className="space-y-1">
+      {rows.map((row) => (
+        <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-cyan-300">{row.code}</div>
+            <div className="truncate text-slate-400">{row.name} · {row.project || "-"}</div>
+          </div>
+          <span className={`rounded-lg border px-2 py-0.5 ${toneClass}`}>{row.status}</span>
+        </div>
+      ))}
+    </div>
   );
 }

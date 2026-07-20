@@ -37,7 +37,7 @@ export function MachineRuntimeMap() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-indigo-400">
-          Machine Runtime Map
+          Bản đồ máy móc
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

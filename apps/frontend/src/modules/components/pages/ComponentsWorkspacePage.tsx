@@ -1,1 +1,1 @@
-export function ComponentsWorkspacePage() { return null }
+export { ComponentsOverviewPage as ComponentsWorkspacePage } from './tabs/ComponentsOverviewPage'

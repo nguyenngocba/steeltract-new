@@ -35,11 +35,11 @@ export function RealtimeTelemetryPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">
-          Runtime Telemetry
+          Theo dõi vận hành
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Live runtime metrics & industrial observability
+          Chỉ số vận hành và khả năng quan sát hệ thống
         </div>
       </div>
 

@@ -11,16 +11,20 @@ import { useMaterialTypes } from '@/modules/inventory/hooks/useMaterialTypes'
 import { useUnits } from '@/modules/inventory/hooks/useUnits'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
-type Tab = 'overview' | 'general' | 'permissions' | 'master' | 'integrations' | 'notifications' | 'backup' | 'logs'
+type Tab = 'overview' | 'general' | 'organization' | 'permissions' | 'security' | 'monitoring' | 'master' | 'integrations' | 'notifications' | 'backup' | 'reports' | 'logs'
 
 const tabs: Array<[Tab, string]> = [
   ['overview', 'Tổng quan'],
   ['general', 'Cấu hình chung'],
+  ['organization', 'Tổ chức'],
   ['permissions', 'Phân quyền'],
+  ['security', 'Bảo mật'],
+  ['monitoring', 'Giám sát'],
   ['master', 'Danh mục / Đơn vị'],
   ['integrations', 'Tích hợp'],
   ['notifications', 'Thông báo'],
   ['backup', 'Sao lưu & Phục hồi'],
+  ['reports', 'Trung tâm báo cáo'],
   ['logs', 'Nhật ký cấu hình'],
 ]
 const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
@@ -85,13 +89,125 @@ export function SettingsPage() {
   >
       {tab === 'overview' && <Overview data={data} workflow={workflow} category={category} stats={stats} />}
       {tab === 'general' && <ConfigGrid title="Cấu hình chung" values={data?.system} />}
+      {tab === 'organization' && <PlatformFoundation title="Organization" description="Company, plants, factories, warehouses, teams, shifts and calendars." rows={organizationCapabilities} />}
       {tab === 'permissions' && <ConfigGrid title="Tổng quan phân quyền" values={{ users: fmt(stats.totalUsers), activeUsers: fmt(stats.activeUsers), roles: fmt(stats.roles), permissions: fmt(stats.permissions) }} />}
+      {tab === 'security' && <PlatformFoundation title="Security Center" description="Audit logs, sessions, API tokens, devices, password policy, MFA and IP whitelist." rows={securityCapabilities} />}
+      {tab === 'monitoring' && <PlatformFoundation title="Monitoring" description="Health, jobs, queues, notifications, background tasks, scheduler, webhooks and email queue." rows={monitoringCapabilities} />}
       {tab === 'master' && <SettingsCatalogs />}
       {tab === 'integrations' && <Integrations rows={data?.integrations ?? []} />}
       {tab === 'notifications' && <Toggles rows={data?.notifications ?? {}} />}
       {tab === 'backup' && <ConfigGrid title="Sao lưu dữ liệu" values={data?.backup} />}
+      {tab === 'reports' && <PlatformFoundation title="Reports Center" description="Operational, Inventory, Production, QC, Project and Supplier report catalog." rows={reportCapabilities} />}
       {tab === 'logs' && <Activities rows={data?.recentActivities ?? []} />}
   </EnterpriseWorkspace>
+}
+
+type PlatformCapability = {
+  name: string
+  owner: string
+  readSource: string
+  nextStep: string
+}
+
+const organizationCapabilities: PlatformCapability[] = [
+  { name: 'Company', owner: 'Administration', readSource: 'System overview', nextStep: 'Kết nối company profile với form cấu hình chung.' },
+  { name: 'Plants / Factories', owner: 'Organization', readSource: 'Chưa có read contract riêng', nextStep: 'Tạo backend contract trước khi nhập dữ liệu nhà máy.' },
+  { name: 'Warehouses', owner: 'Inventory', readSource: 'Inventory warehouse/location contracts', nextStep: 'Liên kết warehouse vào organization view.' },
+  { name: 'Teams / Shifts / Calendars', owner: 'Organization', readSource: 'Chưa có read contract riêng', nextStep: 'Định nghĩa lịch làm việc trước khi mở UI nhập ca.' },
+]
+
+const securityCapabilities: PlatformCapability[] = [
+  { name: 'Audit Logs', owner: 'Security', readSource: '/system/activity-logs', nextStep: 'Dùng System Logs cho audit hiện tại.' },
+  { name: 'User Sessions', owner: 'Security', readSource: 'Chưa có session read contract', nextStep: 'Expose session read model trước khi quản trị phiên.' },
+  { name: 'Password Policy', owner: 'Security', readSource: 'Chưa có policy read contract', nextStep: 'Khóa rule policy trong backend trước khi cấu hình.' },
+  { name: 'MFA / Devices / IP Whitelist', owner: 'Security', readSource: 'Chưa có backend contract', nextStep: 'Giữ empty state; không dựng trạng thái giả.' },
+  { name: 'API Tokens', owner: 'Security', readSource: 'Chưa có token registry', nextStep: 'Thiết kế token ownership và audit trước khi mở UI.' },
+]
+
+const monitoringCapabilities: PlatformCapability[] = [
+  { name: 'Health', owner: 'Operations Center', readSource: '/operations-center', nextStep: 'Dùng Operations Center làm runtime health workspace.' },
+  { name: 'Jobs / Queues', owner: 'Background Engine', readSource: 'Operations overview', nextStep: 'Điều hướng operator sang Operations Center Jobs.' },
+  { name: 'Notifications', owner: 'System', readSource: '/system/notifications', nextStep: 'Dùng Notification Center hiện có.' },
+  { name: 'Scheduler / Webhooks / Email Queue', owner: 'Monitoring', readSource: 'Chưa có read contract riêng', nextStep: 'Tạo read model trước khi hiển thị trạng thái.' },
+]
+
+const reportCapabilities: PlatformCapability[] = [
+  { name: 'Operational Reports', owner: 'Operations', readSource: 'Module dashboards', nextStep: 'Tập hợp report links từ module đã có.' },
+  { name: 'Inventory Reports', owner: 'Inventory', readSource: 'Inventory read models', nextStep: 'Ưu tiên báo cáo tồn kho/giao dịch.' },
+  { name: 'Production Reports', owner: 'Production', readSource: 'Production cockpit/read models', nextStep: 'Liên kết báo cáo sản xuất khi dashboard certified.' },
+  { name: 'QC Reports', owner: 'QC', readSource: 'QC dashboard/workspace', nextStep: 'Chỉ hiển thị dữ liệu QC thật, không dựng số lỗi giả.' },
+  { name: 'Project / Supplier Reports', owner: 'Projects/Suppliers', readSource: 'Module workspaces', nextStep: 'Mở catalog sau khi contracts ổn định.' },
+]
+
+function PlatformFoundation({ title, description, rows }: { title: string; description: string; rows: PlatformCapability[] }) {
+  const [query, setQuery] = useState('')
+  const filtered = rows.filter((row) => `${row.name} ${row.owner} ${row.readSource}`.toLowerCase().includes(query.toLowerCase()))
+
+  return (
+    <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-3">
+          <MiniKpi label="Dữ liệu nghiệp vụ" value="Chưa có" />
+          <MiniKpi label="Backend mới" value="Không tạo" />
+          <MiniKpi label="Trạng thái" value="Sẵn sàng cấu hình" />
+        </div>
+        <div className={`${panel} p-3`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${input} min-w-[280px] flex-1`} placeholder="Tìm capability, owner hoặc nguồn dữ liệu..." />
+            <button className={actionButton}>Làm mới</button>
+            <button className={primaryButton}>Tạo cấu hình</button>
+          </div>
+        </div>
+        <section className={`${panel} min-h-[620px] overflow-hidden`}>
+          <div className="border-b border-slate-800 px-4 py-3">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            <p className="mt-1 text-xs text-slate-500">{description}</p>
+          </div>
+          <div className="max-h-[520px] overflow-auto">
+            <table className="w-full min-w-[880px] text-sm">
+              <thead className="bg-cyan-300/[0.055] text-xs uppercase tracking-[0.08em] text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 text-left">Capability</th>
+                  <th className="px-4 py-3 text-left">Owner</th>
+                  <th className="px-4 py-3 text-left">Nguồn dữ liệu</th>
+                  <th className="px-4 py-3 text-left">Bước tiếp theo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row) => (
+                  <tr key={row.name} className="border-t border-cyan-300/10 text-slate-200">
+                    <td className="px-4 py-3 font-semibold text-cyan-300">{row.name}</td>
+                    <td className="px-4 py-3">{row.owner}</td>
+                    <td className="px-4 py-3 text-slate-400">{row.readSource}</td>
+                    <td className="px-4 py-3 text-slate-400">{row.nextStep}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!filtered.length ? <UsefulEmpty title="Không có capability phù hợp" description="Điều chỉnh bộ lọc hoặc quay lại tổng quan cài đặt để chọn nhóm cấu hình khác." /> : null}
+        </section>
+      </div>
+      <aside className={`${panel} p-4 xl:sticky xl:top-3 xl:self-start`}>
+        <h3 className="text-sm font-semibold text-white">Hướng dẫn cấu hình</h3>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          Khu vực này chỉ trình bày capability nền tảng đã được xác định. Khi
+          chưa có backend contract, UI giữ trạng thái rỗng có kiểm soát và
+          không tạo dữ liệu giả.
+        </p>
+        <div className="mt-4 space-y-2">
+          <Info k="Business mới" v="Không" />
+          <Info k="API mới" v="Không" />
+          <Info k="Dữ liệu giả" v="Không" />
+          <Info k="Điều hướng" v="Dùng sidebar hiện có" />
+        </div>
+      </aside>
+    </section>
+  )
+}
+
+function UsefulEmpty({ title, description }: { title: string; description: string }) {
+  return <div className="border-t border-slate-800 p-8 text-center"><div className="text-sm font-semibold text-slate-200">{title}</div><p className="mt-2 text-xs text-slate-500">{description}</p></div>
 }
 
 function Overview({ data, workflow, category, stats }: { data: any; workflow?: WorkflowCheck; category: ReadonlyArray<readonly [string, any]>; stats: Record<string, number> }) {

@@ -678,7 +678,7 @@ export function OperationalCockpitPage({
 
             <div className="rounded-xl border border-cyan-500/10 bg-[#081421] p-4">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-white">
-                Live activity
+                Hoạt động gần đây
               </h2>
               <div className="mt-4 space-y-3">
                 {[

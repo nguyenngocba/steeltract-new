@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 
 import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
-  InventoryChartCard,
-  InventoryKpi,
-  inventoryGridGap,
-  inventoryPageStack,
-  inventoryTableHead,
-  inventoryTableRow,
-} from '@/modules/inventory/components/InventoryVisuals'
+  EnterpriseChartCard as InventoryChartCard,
+  EnterpriseKpi as InventoryKpi,
+  enterpriseGridGap as inventoryGridGap,
+  enterprisePageStack as inventoryPageStack,
+  enterpriseTableHead as inventoryTableHead,
+  enterpriseTableRow as inventoryTableRow,
+} from '@/shared/ui/enterprise-components'
 import { ModuleDataGrid, ModuleDetailDrawer, ModuleKpiStrip } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 

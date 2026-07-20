@@ -59,6 +59,7 @@ const ComponentsMaterialStockPage = lazyNamed(() => import('@/modules/components
 const ComponentsTransfersPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsTransfersPage'), 'ComponentsTransfersPage')
 const ComponentsInternalQcPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsInternalQcPage'), 'ComponentsInternalQcPage')
 const ComponentsHistoryPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsHistoryPage'), 'ComponentsHistoryPage')
+const ComponentsReportsPage = lazyNamed(() => import('@/modules/components/pages/tabs/ComponentsReportsPage'), 'ComponentsReportsPage')
 const SettingsPage = lazyNamed(() => import('@/modules/settings/pages/SettingsPage'), 'SettingsPage')
 const UsersPage = lazyNamed(() => import('@/modules/users/pages/UsersPage'), 'UsersPage')
 const RolesPage = lazyNamed(() => import('@/modules/roles/pages/RolesPage'), 'RolesPage')
@@ -349,7 +350,7 @@ export function AppRouter() {
 
       <Route
         path="/components/reports"
-        element={<ComponentsHistoryPage />}
+        element={<ComponentsReportsPage />}
       />
 
       <Route

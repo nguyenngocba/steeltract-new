@@ -15,11 +15,11 @@ export function IntelligencePage() {
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">
-            Industrial Data Lake Runtime
+            Trung tâm dữ liệu vận hành
           </h1>
 
           <div className="mt-2 text-sm text-zinc-500">
-            Enterprise telemetry lake & operational intelligence mesh
+            Tổng hợp dữ liệu vận hành và tín hiệu phân tích cho đội điều hành.
           </div>
         </div>
 

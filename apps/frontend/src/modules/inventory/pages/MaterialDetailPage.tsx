@@ -6,15 +6,9 @@ import {
 } from '../../../shared/runtime-tabs/EnterpriseModulePage'
 
 import {
-  EnterpriseTabBar,
-} from '../../../shared/runtime-tabs/EnterpriseTabBar'
-
-import {
-  SectionHeader,
   RuntimePanel,
 } from '../../../shared/ui/enterprise'
 
-import { inventoryTabs } from '../config/inventory-tabs'
 import { useMaterialDetail } from '../hooks/useMaterialDetail'
 import { useQuery } from '@tanstack/react-query'
 import { getTransactionDetail } from '../api/endpoints/inventory.endpoint'
@@ -97,15 +91,6 @@ export function MaterialDetailPage() {
 
   return (
     <EnterpriseModulePage>
-      <SectionHeader
-        title="Material Detail"
-        description="Stock and transaction history driven by inventory transactions."
-      />
-
-      <EnterpriseTabBar
-        tabs={inventoryTabs}
-      />
-
       <div className="mb-4 flex items-center justify-between">
         <Link
           to="/inventory/materials"

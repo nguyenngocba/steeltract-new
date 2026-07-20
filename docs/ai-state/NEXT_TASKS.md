@@ -1,5 +1,105 @@
 # Next Tasks
 
+- **COMPOSITION001 build and visual certification**: run frontend/backend build
+  and capture authenticated screenshots for Production, Components, QC,
+  Suppliers, Settings and Notifications at 1366px, 1600px and 1920px. Confirm
+  each page has one obvious hero workspace and that support rails do not compete
+  with the primary table/feed/catalog/queue.
+- **COMPOSITION001 remaining route review**: perform a second composition pass
+  for Projects, Reports, Command Center, Analytics, Copilot, Marketplace,
+  Workflow, Digital Twin, Kernel, Federation and Telemetry-like routes after
+  screenshot review. Do not modify shared tokens or components unless a
+  separate design-system EPIC approves it.
+
+- **VISUAL001 browser composition certification**: capture authenticated
+  screenshots for Production, Components, QC, Projects, Suppliers, Settings,
+  Notifications, Reports, Command Center, Analytics, Copilot, Workflow,
+  Marketplace, Digital Twin, Kernel, Federation and Telemetry-like active
+  routes at 1366px, 1600px, 1920px and ultrawide. Confirm each route has one
+  obvious focal point and table/queue/catalog surfaces occupy the majority of
+  the workspace.
+- **VISUAL001 primary workspace primitive**: consider an explicit
+  `EnterpriseHeroWorkspace` or `primary` card prop after screenshot review.
+  Current implementation uses shared height/card inference to avoid broad page
+  rewrites.
+
+- **PLATFORM002 browser certification**: capture authenticated screenshots for
+  every active sidebar/menu route at 1366px, 1600px, 1920px and ultrawide.
+  Confirm there are no visible unfinished/developer labels and that every empty
+  state gives business context and next action.
+- **PLATFORM002 enum-label review**: plan a dedicated display-label mapping
+  sprint for backend enum values such as `DELIVERED`, `SHIPPED`, `READY`,
+  `WO/MO` and similar domain abbreviations. Do not rewrite API enum values in
+  UI code without a shared label contract.
+
+- **PLATFORM001 visual QA**: validate `/settings`, `/notifications`,
+  `/system-logs`, `/users`, `/roles`, `/operations-center` and Supplier
+  secondary tabs in browser. Confirm every visible platform surface has KPI,
+  toolbar/filter, table/list, right panel or useful empty-state guidance.
+- **PLATFORM001 backend contract roadmap**: define read contracts before adding
+  real data for MFA, sessions, API tokens, scheduler, webhooks, email queue,
+  plants, factories, shifts and calendars.
+
+- **FINAL001 release-candidate visual QA**: capture authenticated screenshots
+  for Inventory, Production, Components and QC at 1366px, 1600px, 1920px and
+  ultrawide. Confirm shell spacing, table width, right-panel balance, dialogs
+  and drawer scroll ownership before freezing the design system.
+- **FINAL001 shared primitive cleanup**: move QC dialog/detail shells and
+  cross-module status badges onto shared Enterprise primitives in a focused
+  follow-up, preserving behavior.
+
+- **NAV001 visual certification**: with browser tooling, validate active
+  Inventory, Production, Components, QC, Yard, Logistics, Projects, Suppliers,
+  Users/Roles and Settings routes. Confirm content starts with operational
+  data/action bars, sidebar remains the only route navigation and record-level
+  tabs still work.
+
+- **QC001 authenticated visual certification**: with browser tooling, validate
+  `/qc`, `/qc/production` and `/qc/plan` using real authenticated data. Confirm
+  Top N behavior, `Xem tất cả` navigation, quality alerts, queue actions,
+  detail dialogs and responsive layout.
+- **QC calibration contract decision**: keep calibration in a truthful empty
+  state until a backend read contract exists for equipment, due dates and
+  calibration status. Do not reintroduce static equipment rows.
+
+- **BUSINESS001 operator review**: have a Production Director / Factory Manager
+  validate whether Production and Components now answer steel fabrication
+  decisions within five seconds. Pay special attention to QC/NCR gaps that need
+  authoritative backend contracts before more UI claims are added.
+
+- **UX Review Round 2 visual check**: with browser tooling, validate that
+  Production answers running/delayed/blocked/attention questions within five
+  seconds and Components answers production/QC/ready/project questions within
+  five seconds.
+
+- **UX Review Round 1 visual check**: once browser tooling is available, verify
+  `Xem tất cả` navigation from Production Overview to `/production/orders` and
+  Components Overview to `/components/list`, then confirm dashboard cards show
+  Top N while full workspaces keep filter/pagination/drawer behavior.
+
+- **UI005B visual certification**: capture authenticated screenshots for
+  Inventory, Production and Components at standard breakpoints once a browser
+  harness is available. Compare hierarchy and density, not pixel identity.
+- **UI005B follow-up modules**: apply the same inferred design-language process
+  to QC, Yard, Logistics and Projects after Production/Components are visually
+  certified.
+
+- **UI005A screenshot certification**: install or provide an approved browser
+  harness, then capture before/after evidence for every active Production and
+  Components page. Current code implementation is complete, but the EPIC must
+  remain visually uncertified until screenshots exist.
+- **UI005A legacy Components cleanup**: review non-routed legacy Components tab
+  and panel stubs in a separate cleanup sprint. Active routes no longer depend
+  on those placeholders, but the files still exist outside the active page tree.
+
+- **UI006 shared component adoption**: when touching Inventory/Production pages,
+  prefer direct imports from `shared/ui/enterprise-components` and
+  `shared/forms`. Keep `InventoryVisuals` and `ProductionCockpitShared` as thin
+  compatibility facades only; do not add new layout logic there.
+- **UI006 legacy form cleanup**: migrate remaining Inventory page-local form
+  fragments to `EnterpriseForm` primitives in a focused Inventory-only sprint,
+  preserving behavior and layout.
+
 - **UI005 authenticated visual certification**: validate Production at
   360x800, 768x1024, 1366x768, 1440x900 and 1920x1080 with real authenticated
   data. Exercise Manufacturing Order, BOM, Return, Consumption and Yard staging

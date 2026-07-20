@@ -1,26 +1,26 @@
 const orchestrations = [
   {
-    runtime: 'Production Runtime',
+    runtime: 'Sản xuất',
     optimization:
-      'Shift workload to Plant B',
+      'Đề xuất điều phối tải xưởng khi có dữ liệu kế hoạch',
   },
 
   {
-    runtime: 'Inventory Runtime',
+    runtime: 'Kho vật tư',
     optimization:
-      'Increase procurement volume by 12%',
+      'Theo dõi rủi ro bổ sung vật tư từ tồn kho',
   },
 
   {
-    runtime: 'Dispatch Runtime',
+    runtime: 'Điều xe',
     optimization:
-      'Optimize truck loading sequence',
+      'Sắp xếp thứ tự chất xe khi có lệnh giao hàng',
   },
 
   {
-    runtime: 'QC Runtime',
+    runtime: 'QC',
     optimization:
-      'Escalate anomaly inspection workflow',
+      'Ưu tiên phiếu kiểm khi phát sinh cảnh báo chất lượng',
   },
 ]
 
@@ -37,11 +37,11 @@ export function PredictiveOrchestrationPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-orange-400">
-          Predictive Orchestration
+          Đề xuất điều phối
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          AI runtime optimization engine
+          Gợi ý vận hành dựa trên dữ liệu hiện có của từng module.
         </div>
       </div>
 

@@ -11,7 +11,7 @@ export function DigitalTwinPage() {
       <div className="space-y-6 p-6">
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-indigo-400">
-            Digital Twin Runtime
+            Bản sao vận hành
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">

@@ -1,29 +1,33 @@
 import type { ReactNode } from 'react'
-import { formatQuantity } from '@/shared/utils/number-format'
 import {
-  ModuleFilterBar,
-  moduleInput,
-  moduleMutedButton,
-  modulePrimaryButton,
-  moduleTableHead,
-  moduleTableRow,
-  moduleTableShell,
-} from '@/shared/ui/modules'
-import { CockpitChartCard, CockpitKpiCard, COCKPIT_SHELL } from '@/shared/ui/cockpit'
+  EnterpriseCompactDonut,
+  EnterpriseMiniBars,
+  EnterpriseProductionPanel,
+  enterpriseInput,
+  enterpriseModulePrimaryButton,
+  enterpriseModuleTableHead,
+  enterpriseModuleTableRow,
+  enterpriseMutedButton,
+  enterpriseTableShell,
+} from '@/shared/ui/enterprise-components'
+import { ModuleFilterBar } from '@/shared/ui/modules'
+import { CockpitKpiCard, COCKPIT_SHELL } from '@/shared/ui/cockpit'
 
 export const componentsPanel = COCKPIT_SHELL
 
-export const componentsInput = moduleInput
+export const componentsInput = enterpriseInput
 
-export const componentsTableShell = moduleTableShell
+export const componentsTableShell = enterpriseTableShell
 
-export const componentsTableHead = moduleTableHead
+export const componentsTableHead = enterpriseModuleTableHead
 
-export const componentsTableRow = moduleTableRow
+export const componentsTableRow = enterpriseModuleTableRow
 
-export const componentsMutedButton = moduleMutedButton
+export const componentsMutedButton = enterpriseMutedButton
 
-export const componentsPrimaryButton = modulePrimaryButton
+export const componentsPrimaryButton = enterpriseModulePrimaryButton
+
+type ComponentsTone = 'blue' | 'emerald' | 'cyan' | 'amber' | 'red' | 'purple' | 'indigo' | 'violet' | 'orange'
 
 export function ComponentsKpiCard({
   title,
@@ -36,7 +40,7 @@ export function ComponentsKpiCard({
   title: string
   value: string
   sub?: string
-  tone?: any
+  tone?: ComponentsTone
   active?: boolean
   onClick?: () => void
 }) {
@@ -62,11 +66,7 @@ export function ComponentsPanel({
   action?: ReactNode
   children: ReactNode
 }) {
-  return (
-    <CockpitChartCard title={title} action={action} heightClass="h-[170px]" chartHeightClass="h-[74px]">
-      {children}
-    </CockpitChartCard>
-  )
+  return <EnterpriseProductionPanel title={title} action={action}>{children}</EnterpriseProductionPanel>
 }
 
 export function ComponentsFilterBar({
@@ -112,49 +112,9 @@ export function ComponentsDonut({
   centerValue: string
   centerLabel: string
 }) {
-  const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
-  let cursor = 0
-  const gradient = segments
-    .map((item) => {
-      const start = cursor
-      const end = cursor + (item.value / total) * 100
-      cursor = end
-      return `${item.color} ${start}% ${end}%`
-    })
-    .join(', ')
-
-  return (
-    <div className="grid h-[74px] grid-cols-[74px_1fr] items-center gap-2 overflow-hidden">
-      <div className="relative h-[68px] w-[68px] rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.2)]" style={{ background: `conic-gradient(${gradient})` }}>
-        <div className="absolute inset-1.5 rounded-full bg-[#08111f]" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="text-xs font-bold text-white">{centerValue}</div>
-          <div className="text-[7px] text-slate-500 scale-90 leading-none">{centerLabel}</div>
-        </div>
-      </div>
-      <div className="space-y-0.5 overflow-hidden">
-        {segments.slice(0, 3).map((item) => (
-          <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-1.5 text-[10px]">
-            <span className="flex min-w-0 items-center gap-1 text-slate-350">
-              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="truncate font-sans">{item.label}</span>
-            </span>
-            <span className="whitespace-nowrap font-mono tabular-nums text-slate-300">{formatQuantity(item.value, 0)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  return <EnterpriseCompactDonut segments={segments} centerValue={centerValue} centerLabel={centerLabel} compact />
 }
 
 export function ComponentsMiniBars({ values, tone = 'cyan' }: { values: number[]; tone?: 'cyan' | 'emerald' | 'amber' }) {
-  const max = Math.max(1, ...values)
-  const color = tone === 'emerald' ? 'from-emerald-500 to-teal-300' : tone === 'amber' ? 'from-amber-500 to-orange-300' : 'from-blue-500 to-cyan-300'
-  return (
-    <div className="flex h-[74px] items-end gap-1 px-1">
-      {values.map((value, index) => (
-        <div key={index} className={`flex-1 rounded-t bg-gradient-to-t ${color}`} style={{ height: `${Math.max(8, (value / max) * 100)}%` }} />
-      ))}
-    </div>
-  )
+  return <EnterpriseMiniBars values={values} tone={tone} heightClass="h-[74px]" gapClass="gap-1 px-1" roundedClass="rounded-t" />
 }

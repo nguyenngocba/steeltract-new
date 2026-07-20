@@ -33,7 +33,7 @@ export function SchedulerRuntimePanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">
-          Runtime Scheduler
+          Lịch chạy hệ thống
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

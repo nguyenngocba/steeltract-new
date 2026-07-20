@@ -19,11 +19,11 @@ export function AiCommandPalette() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-fuchsia-400">
-          AI Command Palette
+          Lệnh trợ lý
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Runtime operational command interface
+          Các câu hỏi nhanh cho người vận hành.
         </div>
       </div>
 

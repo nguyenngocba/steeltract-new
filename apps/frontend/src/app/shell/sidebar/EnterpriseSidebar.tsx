@@ -83,7 +83,7 @@ export function EnterpriseSidebar() {
 
         <div className="mt-2 text-xs uppercase tracking-[0.3em] text-zinc-500">
 
-          Industrial Runtime Platform
+          Enterprise Operations Platform
 
         </div>
 

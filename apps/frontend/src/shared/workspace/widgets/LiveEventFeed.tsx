@@ -35,7 +35,7 @@ export function LiveEventFeed() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-cyan-400">
-          Live Runtime Feed
+          Luồng sự kiện trực tiếp
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

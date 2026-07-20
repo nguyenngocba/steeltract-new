@@ -24,7 +24,7 @@ const runtimeItems = [
 
   {
     title:
-      'Inventory Runtime',
+      'Kho vật tư',
 
     path:
       '/inventory',
@@ -32,7 +32,7 @@ const runtimeItems = [
 
   {
     title:
-      'Components Runtime',
+      'Cấu kiện',
 
     path:
       '/components',
@@ -40,7 +40,7 @@ const runtimeItems = [
 
   {
     title:
-      'Production Runtime',
+      'Sản xuất',
 
     path:
       '/production/orders',
@@ -48,7 +48,7 @@ const runtimeItems = [
 
   {
     title:
-      'QC Runtime',
+      'QC',
 
     path:
       '/qc/incoming',
@@ -56,7 +56,7 @@ const runtimeItems = [
 
   {
     title:
-      'Logistics Runtime',
+      'Logistics',
 
     path:
       '/logistics',
@@ -64,7 +64,7 @@ const runtimeItems = [
 
   {
     title:
-      'Analytics Runtime',
+      'Phân tích vận hành',
 
     path:
       '/analytics',
@@ -80,7 +80,7 @@ const runtimeItems = [
 
   {
     title:
-      'Admin Runtime',
+      'Quản trị hệ thống',
 
     path:
       '/admin/users',
@@ -229,7 +229,7 @@ export function CommandPalette() {
 
               <div className="rounded-full bg-cyan-500/10 px-3 py-1 text-[10px] uppercase tracking-wide text-cyan-400">
 
-                Runtime
+                Workspace
 
               </div>
 
@@ -241,7 +241,7 @@ export function CommandPalette() {
 
             <div className="rounded-2xl border border-zinc-800 bg-black p-6 text-sm text-zinc-500">
 
-              No runtime found...
+              Không tìm thấy workspace phù hợp.
 
             </div>
 

@@ -37,11 +37,11 @@ export function CopilotConversation() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-fuchsia-400">
-          AI Runtime Conversation
+          Trao đổi với trợ lý
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Operational intelligence stream
+          Tóm tắt tình hình vận hành khi có dữ liệu.
         </div>
       </div>
 

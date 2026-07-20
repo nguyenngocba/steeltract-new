@@ -1,9 +1,9 @@
 const lakes = [
   'Inventory Events',
   'Production Telemetry',
-  'QC Runtime Streams',
+  'QC Streams',
   'Workflow Events',
-  'AI Runtime Logs',
+  'Nhật ký trợ lý',
 ]
 
 export function DataLakePanel() {

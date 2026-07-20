@@ -1,10 +1,10 @@
 const runtimes = [
-  'Kernel Runtime',
-  'Autonomous Runtime',
-  'Simulation Universe',
-  'Workflow Runtime',
-  'AI Copilot Runtime',
-  'Federation Runtime',
+  'Nền tảng lõi',
+  'Tự động hóa',
+  'Mô phỏng vận hành',
+  'Quy trình',
+  'Trợ lý điều hành',
+  'Kết nối hệ thống',
 ]
 
 export function NeuralTopologyPanel() {
@@ -20,11 +20,11 @@ export function NeuralTopologyPanel() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-pink-400">
-          Neural Runtime Topology
+          Bản đồ kết nối vận hành
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Unified industrial cognition network
+          Một góc nhìn thống nhất cho các năng lực điều hành doanh nghiệp.
         </div>
       </div>
 

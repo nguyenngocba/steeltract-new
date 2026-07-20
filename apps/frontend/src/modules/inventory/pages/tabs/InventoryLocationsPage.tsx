@@ -126,7 +126,7 @@ function materialCostFromAudit(row: any) {
 }
 
 function auditZone(zone: WarehouseLocation) {
-  if (zone.code.startsWith('DEMO-')) return 'Demo record'
+  if (zone.code.startsWith('DEMO-')) return 'Needs verification'
   if (zone.code.startsWith('ST-WH-')) return 'Warehouse-like record'
   if (zone.row || zone.column || zone.level || /^[A-Z]\d{2}$/i.test(zone.code)) return 'Real storage location'
   return 'Needs review'
@@ -502,7 +502,7 @@ export function InventoryLocationsPage() {
   const stats = useMemo(() => ({
     total: (zones as WarehouseLocation[]).length,
     active: (zones as WarehouseLocation[]).filter((zone) => zone.active).length,
-    demo: (zones as WarehouseLocation[]).filter((zone) => auditZone(zone) === 'Demo record').length,
+    demo: (zones as WarehouseLocation[]).filter((zone) => auditZone(zone) === 'Needs verification').length,
     warehouseLike: (zones as WarehouseLocation[]).filter((zone) => auditZone(zone) === 'Warehouse-like record').length,
     real: (zones as WarehouseLocation[]).filter((zone) => auditZone(zone) === 'Real storage location').length,
     materialCount: (zones as WarehouseLocation[]).filter(isRealStorageLocation).reduce((sum, zone) => sum + n(zone.materialCount), 0),
@@ -1744,12 +1744,12 @@ function IconButton({ title, onClick, children }: { title: string; onClick: (eve
 function AuditChip({ value }: { value: string }) {
   const labels: Record<string, string> = {
     'Real storage location': 'Vị trí lưu kho thật',
-    'Demo record': 'Bản ghi demo',
+    'Needs verification': 'Dữ liệu cần xác minh',
     'Warehouse-like record': 'Cấu trúc kho',
     'Needs review': 'Cần kiểm tra',
   }
   const displayValue = labels[value] || value
-  const tone = value === 'Real storage location' ? 'bg-emerald-950 text-emerald-300' : value === 'Demo record' ? 'bg-red-950 text-red-300' : value === 'Warehouse-like record' ? 'bg-amber-950 text-amber-300' : 'bg-slate-800 text-slate-300'
+  const tone = value === 'Real storage location' ? 'bg-emerald-950 text-emerald-300' : value === 'Needs verification' ? 'bg-red-950 text-red-300' : value === 'Warehouse-like record' ? 'bg-amber-950 text-amber-300' : 'bg-slate-800 text-slate-300'
   return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{displayValue}</span>
 }
 

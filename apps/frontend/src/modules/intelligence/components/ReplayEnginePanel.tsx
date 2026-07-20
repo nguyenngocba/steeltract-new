@@ -1,21 +1,21 @@
 const replays = [
   {
-    runtime: 'Inventory Runtime',
+    runtime: 'Kho vật tư',
     replay: '12h replay available',
   },
 
   {
-    runtime: 'Production Runtime',
+    runtime: 'Sản xuất',
     replay: '24h replay available',
   },
 
   {
-    runtime: 'QC Runtime',
+    runtime: 'QC',
     replay: '8h replay available',
   },
 
   {
-    runtime: 'Dispatch Runtime',
+    runtime: 'Điều xe',
     replay: '48h replay available',
   },
 ]

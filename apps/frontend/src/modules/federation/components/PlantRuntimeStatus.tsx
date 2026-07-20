@@ -39,7 +39,7 @@ export function PlantRuntimeStatus() {
     >
       <div>
         <div className="text-xs uppercase tracking-[0.2em] text-sky-400">
-          Plant Runtime Status
+          Trạng thái nhà máy
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">

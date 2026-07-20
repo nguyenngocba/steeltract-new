@@ -14,15 +14,15 @@ export function CommandCenterPage() {
         <div className="flex items-start justify-between">
           <div>
             <div className="text-xs uppercase tracking-[0.3em] text-cyan-400">
-              Command Center
+              Trung tâm điều hành
             </div>
 
             <h1 className="mt-2 text-4xl font-black text-white">
-              Global Industrial Runtime
+              Điều phối vận hành toàn hệ thống
             </h1>
 
             <div className="mt-2 text-sm text-zinc-500">
-              Unified operational telemetry & realtime event intelligence
+              Theo dõi sức khỏe nền tảng, luồng sự kiện và cảnh báo vận hành trong một không gian làm việc.
             </div>
           </div>
 

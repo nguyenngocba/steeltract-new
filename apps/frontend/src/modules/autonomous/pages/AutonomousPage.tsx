@@ -11,15 +11,15 @@ export function AutonomousPage() {
       <div className="space-y-6 p-6">
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-orange-400">
-            Autonomous Runtime
+            Tự động hóa vận hành
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">
-            Industrial Autonomous Engine
+            Trung tâm điều phối tự động
           </h1>
 
           <div className="mt-2 text-sm text-zinc-500">
-            Self-optimizing industrial orchestration runtime
+            Theo dõi các đề xuất điều phối và tình huống hệ thống có thể tự xử lý.
           </div>
         </div>
 

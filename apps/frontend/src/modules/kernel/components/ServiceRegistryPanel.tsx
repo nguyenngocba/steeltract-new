@@ -20,7 +20,7 @@ export function ServiceRegistryPanel() {
         </div>
 
         <div className="mt-1 text-sm text-zinc-500">
-          Registered industrial runtime services
+          Dịch vụ nền đã đăng ký
         </div>
       </div>
 

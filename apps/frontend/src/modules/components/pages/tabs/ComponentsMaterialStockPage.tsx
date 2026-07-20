@@ -285,7 +285,7 @@ export function ComponentsMaterialStockPage() {
           <CockpitKpiCard title="Đã reserve BOM" value={formatQuantity(totalReserved)} note="chờ allocation backend" state="normal" tone="purple" />
           <CockpitKpiCard title="Khả dụng sản xuất" value={formatQuantity(totalAvailable)} state="normal" tone="blue" />
           <CockpitKpiCard title="Cảnh báo thiếu BOM" value={formatQuantity(warningCount, 0)} note="cần cấp phát" state="normal" tone="amber" />
-          <CockpitKpiCard title="Trạng thái dữ liệu" value="LIVE" note="làm mới mỗi 5 giây" state="normal" tone="cyan" />
+          <CockpitKpiCard title="Trạng thái dữ liệu" value="Tự động" note="làm mới mỗi 5 giây" state="normal" tone="cyan" />
         </div>
 
         <ModuleFilterBar>

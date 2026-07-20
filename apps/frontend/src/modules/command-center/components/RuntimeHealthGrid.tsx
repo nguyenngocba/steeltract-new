@@ -1,16 +1,16 @@
 const services = [
   {
-    service: 'Inventory Runtime',
+    service: 'Kho vật tư',
     health: 'ONLINE',
   },
 
   {
-    service: 'Production Runtime',
+    service: 'Sản xuất',
     health: 'ONLINE',
   },
 
   {
-    service: 'QC Runtime',
+    service: 'QC',
     health: 'WARNING',
   },
 
@@ -20,12 +20,12 @@ const services = [
   },
 
   {
-    service: 'Realtime Event Bus',
+    service: 'Kênh sự kiện',
     health: 'ONLINE',
   },
 
   {
-    service: 'Dispatch Runtime',
+    service: 'Điều xe',
     health: 'ONLINE',
   },
 ]

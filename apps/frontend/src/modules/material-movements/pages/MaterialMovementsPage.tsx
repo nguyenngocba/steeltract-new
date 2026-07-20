@@ -25,7 +25,7 @@ export function MaterialMovementsPage() {
 
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-400">
-            Warehouse Runtime
+            Kho vật tư
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">

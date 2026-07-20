@@ -14,11 +14,11 @@ export function MarketplacePage() {
           </div>
 
           <h1 className="mt-2 text-4xl font-black text-white">
-            Runtime Extension Platform
+            Trung tâm mở rộng nền tảng
           </h1>
 
           <div className="mt-2 text-sm text-zinc-500">
-            Dynamic industrial runtime modules & operational plugins
+            Quản lý các tiện ích mở rộng và kết nối phục vụ vận hành.
           </div>
         </div>
 
