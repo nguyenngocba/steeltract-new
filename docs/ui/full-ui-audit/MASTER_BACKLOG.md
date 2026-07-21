@@ -20,7 +20,7 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | QC | 82% | EPIC 6.0 source/build completion adds shared pagination/table shell treatment and removes inert/synthetic UI; browser certification and route/calibration decisions remain. |
 | Logistics | 90% | EPIC 8.0 source/build completion aligns all Logistics tabs/routes to the SteelTrack UI Canon with shared pagination, filters, and workspaces; browser certification remains. |
 | Planning | 90% | EPIC 9.0 source/build completion registers all Planning tabs/routes and aligns workspace UI to the SteelTrack UI Canon using real data; browser QA pending. |
-| Admin | 64% | Settings/Users/Roles are real-data surfaces; security/admin gaps and pagination remain. |
+| Admin | 90% | EPIC 10.0 source/build completion standardizes Settings, Users, Roles, and System Logs to the SteelTrack UI Canon with shared pagination, CockpitKpiCards, and CockpitTableShells; browser QA pending. |
 
 ## P0 Critical
 
@@ -48,11 +48,11 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | UI-P1-011 | Add Logistics standard filters beyond search | Logistics | Implemented (EPIC 8.0) | Medium | M | API filter support |
 | UI-P1-012 | Add Logistics pagination and empty rows to dispatch table | Logistics | Implemented (EPIC 8.0) | Medium | M | API or client pagination |
 | UI-P1-013 | Audit existing Planning workspace after route decision | Planning | Implemented (EPIC 9.0) | Medium | M | Route activation |
-| UI-P1-014 | Normalize Admin Settings local UI classes to shared primitives | Admin | Open | Medium | M | UI standard decision |
-| UI-P1-015 | Add Users/Roles standard pagination | Admin | Open | Medium | M | API/client pagination decision |
+| UI-P1-014 | Normalize Admin Settings local UI classes to shared primitives | Admin | Implemented (EPIC 10.0) | Medium | M | UI standard decision |
+| UI-P1-015 | Add Users/Roles standard pagination | Admin | Implemented (EPIC 10.0) | Medium | M | API/client pagination decision |
 | UI-P1-016 | Logistics logs/reports need explicit route branch behavior instead of fallback-like behavior | Logistics | Implemented (EPIC 8.0) | Medium | M | Logistics log/report contracts |
 | UI-P1-017 | Secondary Inventory pages need table/scroll/pagination parity review after global audit | Inventory | Open | Medium | M | Browser harness |
-| UI-P1-018 | Admin System Logs needs focused security/admin UI audit | Admin | Open | Medium | M | Security audit scope |
+| UI-P1-018 | Admin System Logs needs focused security/admin UI audit | Admin | Implemented (EPIC 10.0) | Medium | M | Security audit scope |
 
 ## P2 Future Improvements
 

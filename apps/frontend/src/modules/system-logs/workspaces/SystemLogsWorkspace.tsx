@@ -1,31 +1,44 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileClock, RefreshCw, Search } from 'lucide-react'
-
-import { OperationalShell } from '@/shared/layouts/OperationalShell'
 import {
-  CompactDonutSummary,
-  CompactTrendChart,
-  HorizontalBars,
-  inventoryInput,
-  inventoryMutedButton,
-  inventoryPanel,
-  inventoryTableHead,
-  inventoryTableRow,
-  inventoryTableShell,
-} from '@/modules/inventory/components/InventoryVisuals'
+  Activity,
+  Download,
+  FileClock,
+  Filter,
+  Layers,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  X,
+} from 'lucide-react'
+
+import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import {
+  CockpitChartCard,
+  CockpitEmptyState,
+  CockpitKpiCard,
+  CockpitStatusList,
+  CockpitTableShell,
+  DataTablePagination,
+} from '@/shared/ui/cockpit'
+import {
+  ModuleLoadingState,
+  moduleMutedButton,
+} from '@/shared/ui/modules'
 import { systemApi, type ActivityLog, type ActivitySummary } from '@/modules/system/api/system.api'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
-const date = (value?: string) => value ? formatDateTime(value) : '-'
+const date = (value?: string) => (value ? formatDateTime(value) : '—')
 const fmt = (value = 0) => formatQuantity(value, 0)
-const colors = ['#1d7cff', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#38bdf8']
 
 export function SystemLogsWorkspace() {
   const [query, setQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
   const [actionFilter, setActionFilter] = useState('all')
-  const { data = [], refetch } = useQuery<ActivityLog[]>({
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const { data = [], isLoading, refetch } = useQuery<ActivityLog[]>({
     queryKey: ['system-activity-logs'],
     queryFn: systemApi.activityLogs,
     refetchInterval: 10000,
@@ -35,126 +48,255 @@ export function SystemLogsWorkspace() {
     queryFn: systemApi.activitySummary,
     refetchInterval: 10000,
   })
-  const modules = Array.from(new Set(data.map((row) => row.module).filter(Boolean))) as string[]
-  const actions = Array.from(new Set(data.map((row) => row.action).filter(Boolean)))
-  const rows = useMemo(() => data.filter((row) => {
-    if (moduleFilter !== 'all' && row.module !== moduleFilter) return false
-    if (actionFilter !== 'all' && row.action !== actionFilter) return false
-    return `${row.action} ${row.entity} ${row.entityId ?? ''} ${row.module ?? ''} ${row.user?.username ?? ''}`
-      .toLowerCase()
-      .includes(query.toLowerCase())
-  }), [actionFilter, data, moduleFilter, query])
-  const actionRows = Object.entries(summary?.byAction ?? {}).sort((a, b) => b[1] - a[1])
-  const moduleRows = Object.entries(summary?.byModule ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 6)
-  const dayRows = Object.entries(summary?.byDay ?? {}).sort((a, b) => a[0].localeCompare(b[0])).slice(-6).map(([label, value]) => ({ label, value }))
+
+  const modules = useMemo(
+    () => Array.from(new Set(data.map((row) => row.module).filter(Boolean))) as string[],
+    [data],
+  )
+  const actions = useMemo(
+    () => Array.from(new Set(data.map((row) => row.action).filter(Boolean))),
+    [data],
+  )
+
+  const filtered = useMemo(
+    () =>
+      data.filter((row) => {
+        if (moduleFilter !== 'all' && row.module !== moduleFilter) return false
+        if (actionFilter !== 'all' && row.action !== actionFilter) return false
+        return `${row.action} ${row.entity} ${row.entityId ?? ''} ${row.module ?? ''} ${row.user?.username ?? ''}`
+          .toLowerCase()
+          .includes(query.toLowerCase())
+      }),
+    [actionFilter, data, moduleFilter, query],
+  )
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const isFiltered = Boolean(query || moduleFilter !== 'all' || actionFilter !== 'all')
+
+  const totalLogs = summary?.total ?? data.length
+  const moduleCount = modules.length
 
   return (
-    <OperationalShell>
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_30%),linear-gradient(135deg,#06111e_0%,#081827_52%,#0b1220_100%)] p-4 text-slate-100">
-        <header className="flex flex-wrap items-end justify-between gap-3 pb-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Nhật ký hệ thống</h1>
-            <p className="mt-1 text-sm text-slate-400">Theo dõi tất cả hoạt động trong hệ thống</p>
-          </div>
-          <button className={inventoryMutedButton}><Download size={16} /> Xuất Excel</button>
-        </header>
+    <EnterpriseWorkspace
+      eyebrow="Quản trị"
+      title="Nhật ký hệ thống"
+      description="Theo dõi toàn bộ lịch sử thao tác, sự kiện và biến động dữ liệu trên hệ thống."
+      breadcrumbs={['Quản trị', 'Nhật ký hệ thống']}
+      actions={
+        <div className="flex items-center gap-2">
+          <button className={moduleMutedButton} onClick={() => refetch()} type="button">
+            <RefreshCw size={14} /> Làm mới
+          </button>
+          <button className={moduleMutedButton} type="button">
+            <Download size={14} /> Xuất Excel
+          </button>
+        </div>
+      }
+    >
+      {/* 1. Operational KPIs */}
+      <section className="grid gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitKpiCard
+          title="Tổng lượt lưu vết"
+          value={fmt(totalLogs)}
+          note="Nhật ký sự kiện hệ thống"
+          icon={<FileClock size={18} />}
+          tone="cyan"
+          state={isLoading ? 'loading' : 'normal'}
+        />
+        <CockpitKpiCard
+          title="Module hoạt động"
+          value={fmt(moduleCount)}
+          note="Số phân hệ phát sinh log"
+          icon={<Layers size={18} />}
+          tone="blue"
+          state={isLoading ? 'loading' : 'normal'}
+        />
+        <CockpitKpiCard
+          title="Hành động khác nhau"
+          value={fmt(actions.length)}
+          note="Chủng loại thao tác"
+          icon={<Activity size={18} />}
+          tone="emerald"
+          state={isLoading ? 'loading' : 'normal'}
+        />
+        <CockpitKpiCard
+          title="Trạng thái giám sát"
+          value="100%"
+          note="Ghi nhận thời gian thực"
+          icon={<ShieldCheck size={18} />}
+          tone="purple"
+          state={isLoading ? 'loading' : 'normal'}
+        />
+      </section>
 
-        <section className={`${inventoryPanel} p-3`}>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3">
-              <Search size={15} className="text-cyan-400" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm hành động, đối tượng, người dùng..." className="h-9 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" />
-            </div>
-            <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className={inventoryInput}>
-              <option value="all">Module: Tất cả</option>
-              {modules.map((module) => <option key={module} value={module}>{module}</option>)}
-            </select>
-            <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className={inventoryInput}>
-              <option value="all">Loại hoạt động: Tất cả</option>
-              {actions.map((action) => <option key={action} value={action}>{action}</option>)}
-            </select>
-            <button onClick={() => refetch()} className={inventoryMutedButton}><RefreshCw size={15} /> Làm mới</button>
+      {/* 2. Toolbar & Quick Filters */}
+      <section className="my-1 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-2">
+        <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2">
+          <Search size={14} className="text-cyan-300 shrink-0" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Tìm hành động, đối tượng, người dùng..."
+            className="h-8 w-full bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-xs text-slate-400">
+            <Filter size={14} className="text-slate-400" />
           </div>
+          <select
+            value={moduleFilter}
+            onChange={(event) => setModuleFilter(event.target.value)}
+            className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
+          >
+            <option value="all">Tất cả Module</option>
+            {modules.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={actionFilter}
+            onChange={(event) => setActionFilter(event.target.value)}
+            className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
+          >
+            <option value="all">Tất cả Hành động</option>
+            {actions.map((act) => (
+              <option key={act} value={act}>
+                {act}
+              </option>
+            ))}
+          </select>
+
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('')
+                setModuleFilter('all')
+                setActionFilter('all')
+              }}
+              className="h-8 rounded-lg border border-red-500/30 bg-red-500/10 px-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition flex items-center gap-1 shrink-0"
+              title="Xóa bộ lọc"
+            >
+              <X size={12} /> Xóa lọc
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* 3. Hero Table & Right Analytics Rail */}
+      <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3 flex flex-col justify-between">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">Lịch sử sự kiện nhật ký hệ thống</h2>
+              <span className="text-xs text-slate-500">{fmt(filtered.length)} bản ghi</span>
+            </div>
+
+            <CockpitTableShell className="min-h-[480px]">
+              {filtered.length > 0 ? (
+                <table className="w-full min-w-[750px] table-fixed text-[13px]">
+                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium w-40">Thời gian</th>
+                      <th className="px-3 py-2 text-left font-medium">Người thực hiện</th>
+                      <th className="px-3 py-2 text-left font-medium">Hành động</th>
+                      <th className="px-3 py-2 text-left font-medium">Đối tượng</th>
+                      <th className="px-3 py-2 text-right font-medium">Module</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.map((row) => (
+                      <tr key={row.id} className="border-b border-cyan-300/10 text-slate-300 hover:bg-cyan-300/[0.055] transition">
+                        <td className="px-3 py-2 font-mono text-slate-400 text-xs">{date(row.createdAt)}</td>
+                        <td className="px-3 py-2 truncate">
+                          <span className="text-white font-medium">{row.user?.fullName ?? row.user?.username ?? row.userId ?? 'System'}</span>
+                          <span className="block text-[11px] text-slate-500 font-mono">{row.user?.email ?? '—'}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <ActionBadge action={row.action} />
+                        </td>
+                        <td className="px-3 py-2 text-slate-300 truncate">
+                          <span className="font-semibold text-slate-200">{row.entity}</span>
+                          <span className="block text-[11px] text-slate-500 font-mono">{row.entityId ?? '—'}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-cyan-300 font-semibold">{row.module ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <CockpitEmptyState
+                  title="Chưa có nhật ký ghi nhận"
+                  description="Không tìm thấy nhật ký thỏa mãn điều kiện lọc."
+                />
+              )}
+            </CockpitTableShell>
+          </div>
+
+          {filtered.length > 0 && (
+            <DataTablePagination
+              page={page}
+              pageSize={pageSize}
+              total={filtered.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 20, 50]}
+            />
+          )}
         </section>
 
-        <div className="mt-3 grid gap-3 xl:grid-cols-[330px_1fr]">
-          <aside className="space-y-3">
-            <section className={`${inventoryPanel} p-4`}>
-              <h2 className="text-sm font-semibold text-white">Tổng quan</h2>
-              <div className="mt-4 space-y-3">
-                <SummaryLine label="Tất cả hoạt động" value={fmt(summary?.total ?? data.length)} />
-                {actionRows.slice(0, 6).map(([action, count]) => <SummaryLine key={action} label={action} value={fmt(count)} />)}
-              </div>
-            </section>
-            <section className={`${inventoryPanel} p-4`}>
-              <h2 className="text-sm font-semibold text-white">Hoạt động theo module</h2>
-              <div className="mt-4">
-                <CompactDonutSummary
-                  segments={moduleRows.map(([label, value], index) => ({ label, value, color: colors[index % colors.length] }))}
-                  centerValue={fmt(summary?.total ?? data.length)}
-                  centerLabel="Nhật ký"
-                />
-              </div>
-            </section>
-            <section className={`${inventoryPanel} p-4`}>
-              <h2 className="text-sm font-semibold text-white">Nhịp hoạt động</h2>
-              <div className="mt-3"><CompactTrendChart rows={dayRows.length ? dayRows : [{ label: '-', value: 0 }]} /></div>
-            </section>
-          </aside>
-          <section className={inventoryTableShell}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <h2 className="text-sm font-semibold text-white">Danh sách nhật ký ({fmt(rows.length)})</h2>
-              <FileClock size={18} className="text-cyan-300" />
-            </div>
-            <table className="w-full text-sm">
-              <thead className={inventoryTableHead}>
-                <tr>
-                  <th className="px-4 py-3 text-left">Thời gian</th>
-                  <th className="px-4 py-3 text-left">Người dùng</th>
-                  <th className="px-4 py-3 text-left">Hành động</th>
-                  <th className="px-4 py-3 text-left">Đối tượng</th>
-                  <th className="px-4 py-3 text-left">Module</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className={inventoryTableRow}>
-                    <td className="px-4 py-3 text-slate-400">{date(row.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-white">{row.user?.fullName ?? row.user?.username ?? row.userId ?? 'System'}</span>
-                      <span className="block text-xs text-slate-500">{row.user?.email ?? '-'}</span>
-                    </td>
-                    <td className="px-4 py-3"><ActionBadge action={row.action} /></td>
-                    <td className="px-4 py-3 text-slate-300">{row.entity}<span className="block text-xs text-slate-500">{row.entityId ?? '-'}</span></td>
-                    <td className="px-4 py-3 text-cyan-300">{row.module ?? '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        </div>
-      </main>
-    </OperationalShell>
-  )
-}
+        <aside className="space-y-1">
+          <CockpitChartCard title="Phân bố theo Module">
+            <CockpitStatusList
+              items={Object.entries(summary?.byModule ?? {})
+                .slice(0, 6)
+                .map(([m, count]) => ({
+                  id: m,
+                  label: m,
+                  value: `${fmt(count)} sự kiện`,
+                  statusTone: 'cyan',
+                }))}
+              emptyMessage="Chưa có dữ liệu module."
+            />
+          </CockpitChartCard>
 
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="truncate text-slate-400">{label}</span>
-      <span className="font-medium text-cyan-300">{value}</span>
-    </div>
+          <CockpitChartCard title="Tần suất Hành động">
+            <CockpitStatusList
+              items={Object.entries(summary?.byAction ?? {})
+                .slice(0, 6)
+                .map(([act, count]) => ({
+                  id: act,
+                  label: act,
+                  value: `${fmt(count)} lần`,
+                  statusTone: 'emerald',
+                }))}
+              emptyMessage="Chưa có dữ liệu hành động."
+            />
+          </CockpitChartCard>
+        </aside>
+      </div>
+    </EnterpriseWorkspace>
   )
 }
 
 function ActionBadge({ action }: { action: string }) {
   const lower = action.toLowerCase()
-  const cls = lower.includes('delete') || lower.includes('xóa')
-    ? 'border-red-500/40 bg-red-500/10 text-red-300'
-    : lower.includes('create') || lower.includes('thêm')
-      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-      : lower.includes('login') || lower.includes('đăng nhập')
-        ? 'border-blue-500/40 bg-blue-500/10 text-blue-300'
-        : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-  return <span className={`rounded-lg border px-2 py-1 text-xs font-medium ${cls}`}>{action}</span>
+  const cls =
+    lower.includes('delete') || lower.includes('xóa')
+      ? 'border-red-500/30 bg-red-500/10 text-red-300'
+      : lower.includes('create') || lower.includes('thêm')
+        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+        : lower.includes('login') || lower.includes('đăng nhập')
+          ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+  return <span className={`rounded-lg border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{action}</span>
 }

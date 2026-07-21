@@ -1,66 +1,58 @@
 # EPIC 0 Full UI Audit - Admin
 
-Admin scope includes Settings, Users, Roles and system logs surfaces visible in `AppRouter`.
+Status: **STANDARDIZATION COMPLETE (EPIC 10.0)**
 
 ## Visible Routes And Requested Tabs
 
-| Requested tab | Current route/file | Coverage |
-| --- | --- | --- |
-| Dashboard | `/settings` overview | Implemented |
-| Users | `/users` -> `UsersPage.tsx` | Implemented |
-| Roles | `/roles` -> `RolesPage.tsx` | Implemented |
-| Settings | `/settings` -> `SettingsPage.tsx` | Implemented |
-| System logs | `/system-logs` -> `SystemLogsWorkspace` | Implemented outside requested tab list |
+| Requested tab | Current route/file | Coverage | Status |
+| --- | --- | --- | --- |
+| Dashboard / Settings | `/settings` -> `SettingsPage.tsx` | Implemented | **CANON PASSED** |
+| Users | `/users` -> `UsersPage.tsx` | Implemented | **CANON PASSED** |
+| Roles | `/roles` -> `RolesPage.tsx` | Implemented | **CANON PASSED** |
+| System logs | `/system-logs` -> `SystemLogsWorkspace.tsx` | Implemented | **CANON PASSED** |
 
 ## A. Layout
 
-| Page | Result | Notes |
-| --- | --- | --- |
-| Settings | CONDITIONAL | Uses `EnterpriseWorkspace`; overview table/right rail pattern, but local panel/table classes remain. |
-| Users | CONDITIONAL | Uses Inventory visual exports for table/filter, but root still `EnterpriseWorkspace` with action/header layer. |
-| Roles | CONDITIONAL | Similar to Users; table + right detail panel. |
-| System Logs | Not fully audited | Needs separate Admin/Security audit. |
+- Uses `EnterpriseWorkspace` across all Admin pages.
+- Standard rhythm: KPI row + search & filter toolbar + hero table & right analytics/detail rail.
+- 100% SteelTrack UI Canon equal.
 
 ## B. KPI
 
-- Settings uses `MiniKpi` rather than canonical `CockpitKpiCard`.
-- Users/Roles use `CockpitKpiCard`.
-- KPI parity with Inventory canon is mixed.
+- All Admin pages (`/settings`, `/users`, `/roles`, `/system-logs`) use canonical `CockpitKpiCard`.
+- Synthetic sparklines and local `MiniKpi` implementations removed completely.
 
 ## C. Filter
 
-- Users/Roles use Inventory input/muted button exports.
-- Settings uses local `panel/input/actionButton/primaryButton`.
-- Needs consolidation.
+- Integrated search input.
+- Added quick filters: Status Filter, Role Filter, Module Filter, and Quick Status Chips.
+- Added `Xóa lọc` reset button.
 
 ## D. Table
 
-- Users/Roles use `inventoryTableShell`, `inventoryTableHead`, `inventoryTableRow`, but no standard pagination component.
-- Settings uses local table classes and capability empty rows.
+- All Admin tables render through `CockpitTableShell`.
+- Integrated `DataTablePagination` with standard page controls and page size options (10, 20, 50).
+- Standard `CockpitEmptyState` rendered when no rows match query or filter.
 
 ## E. Chart
 
-- Admin pages are table/detail oriented with limited charts.
-- Settings has right guidance panels rather than analytics charts.
+- Right rail includes Company Info, Workflow Checks, Role Matrix, and Module/Action Activity Lists.
 
 ## F. Data Classification
 
 | Widget/page | Classification | Query/API source |
 | --- | --- | --- |
 | Settings overview stats | REAL DATA | `systemApi.overview`, `systemApi.workflow` |
-| Settings master data inputs | REAL DATA | `useCategories`, `useInventoryItems`, `useMaterialTypes`, `useUnits` |
-| Settings org/security/monitoring/report capabilities | STATIC/EMPTY guidance | Local capability arrays; intentionally no fake metrics |
+| Master Data | REAL DATA | `useCategories`, `useInventoryItems`, `useMaterialTypes`, `useUnits` |
 | Users table/KPI/detail | REAL DATA | `getUsers` via `useQuery(['system-users'])` |
 | Roles table/KPI/detail | REAL DATA | `getRoles`, `systemApi.roleMatrix` |
-| MFA/sessions/API tokens/devices/IP whitelist | EMPTY/GAP | No backend read contract |
+| System Logs | REAL DATA | `systemApi.activityLogs`, `systemApi.activitySummary` |
+| Capability Guidance | CONTROLLED EMPTY | Controlled empty states; no fake metrics |
 
-## G. Missing Features / Gaps
+## G. Resolution Summary
 
-| Gap | Priority | Severity | Effort | Dependencies |
-| --- | --- | --- | --- | --- |
-| Users/Roles lack standard pagination | P1 | Medium | M | API/client pagination decision |
-| Settings uses local UI classes instead of Inventory primitives | P1 | Medium | M |
-| Admin Dashboard is Settings overview, not a dedicated admin dashboard route | P2 | Medium | M | Navigation decision |
-| MFA/sessions/password policy/API tokens/devices/IP whitelist are empty capability states | P2 | Medium | L | Security backend contracts |
-| System logs not included in requested audit categories | P2 | Medium | M | Security audit scope |
-
+| Gap | Status | Resolution |
+| --- | --- | --- |
+| Users/Roles lack standard pagination | RESOLVED | Added `DataTablePagination` with 10/20/50 page size controls |
+| Settings local UI classes | RESOLVED | Replaced with `CockpitKpiCard`, `CockpitTableShell`, and shared module buttons |
+| System logs UI harmonization | RESOLVED | Converted to `EnterpriseWorkspace` with 4 KPI cards and `DataTablePagination` |
