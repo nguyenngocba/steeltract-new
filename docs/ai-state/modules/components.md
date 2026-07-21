@@ -1,5 +1,19 @@
 # Components Module
 
+## Components Inventory Canon Alignment
+
+Implemented on 2026-07-21.
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+- Components Overview now follows the Inventory Overview rhythm more closely:
+  KPI scan, compact filters, dominant table hero, right analytics rail and
+  independent lower queue section.
+- Components List now follows the Inventory Materials rhythm: filter panel,
+  table hero with stable empty rows, Inventory pagination and a fuller right
+  analytics rail.
+- No backend, API, React Query, permission, route or business behavior changed.
+
 ## EPIC BUSINESS001 Steel Structure Domain Completion
 
 Implemented on 2026-07-18.
@@ -368,3 +382,12 @@ Component identity events now contain resulting identity/catalog facts.
 Revision events consistently carry revision, BOM and content-hash facts when
 present. New Component projections are authoritative by contract; the current
 retained Outbox contains no historical canonical Component commands.
+
+## Inventory Structural UI Alignment
+
+Components Overview and Components List were structurally aligned to the
+Inventory Inbound and Inventory Materials page hierarchy. The two target pages
+now use `EnterpriseModulePage` directly, keep a single content stack, place the
+table as the hero inside the 9/3 grid, and close the hero grid before rendering
+the bottom analytics/summary section. Backend contracts and business behavior
+were unchanged.

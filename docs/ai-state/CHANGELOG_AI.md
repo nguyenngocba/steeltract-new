@@ -1,5 +1,20 @@
 # SteelTrack AI Changelog
 
+## 2026-07-21 Components Inventory Canon Alignment
+
+Completed:
+
+- Used Inventory Overview and Inventory Materials as the visual composition
+  reference for Components Overview and Components List.
+- Components Overview now gives the component table a stronger Inventory-like
+  hero footprint, keeps analytics in a compact right rail and places QC/ready
+  queues in an independent full-width section below.
+- Components List now uses an Inventory-style filter panel, table panel,
+  stable empty rows, Inventory pagination wrapper and a fuller right analytics
+  rail beside the table.
+- Preserved backend, API, routes, permissions, React Query contracts, drawer
+  behavior and business logic.
+
 ## 2026-07-20 COMPOSITION001 Enterprise Workspace Composition Redesign
 
 Completed:
@@ -4704,3 +4719,30 @@ Notes:
   dialogs now own viewport scroll, focus containment, Escape and restoration.
 - Preserved backend, API contracts, query keys, DTOs, routes, permissions and
   business behavior; no mock data was added.
+
+# 2026-07-21 - Components Inventory Structural Alignment
+
+- Compared Components Overview/List against Inventory Inbound/Materials by JSX
+  hierarchy, wrapper ownership and grid section structure.
+- Removed the double workspace wrapper from the two target Components pages and
+  aligned hero grids, right rails and bottom analytics with the Inventory canon.
+- Preserved backend, API, query hooks, routes and business behavior.
+- Completed a source-level final UI parity checklist and fixed remaining
+  visual differences in Components table width/density, panel title branch,
+  right-rail card primitives and chart helper contracts.
+
+# 2026-07-21 - EPIC 0 Full UI Audit
+
+- Created an audit-only UI inventory for Inventory, Components, Production,
+  Projects, Suppliers, QC, Logistics, Planning and Admin.
+- Classified visible routes, data sources, empty/placeholder surfaces and
+  missing UI capabilities against the Inventory canon.
+- Added a master UI backlog without modifying frontend/backend source code.
+
+# 2026-07-21 - EPIC 0.5 Master Backlog Prioritization
+
+- Reclassified full UI audit findings into P0 Critical, P1 Production-ready and
+  P2 Future backlog groups.
+- Added module completion percentages and a nine-phase execution plan from
+  Inventory through Admin.
+- Kept the work documentation-only; no frontend/backend source code changed.

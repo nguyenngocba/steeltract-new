@@ -2,19 +2,20 @@ import { useEffect, useState } from "react";
 import { BarChart3, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { ComponentsWorkspace } from "../../components/ComponentsWorkspace";
+import { EnterpriseModulePage } from "@/shared/runtime-tabs/EnterpriseModulePage";
 import {
   ModuleEmptyState,
-  ModuleFilterBar,
   ModuleLoadingState,
 } from "../../../../shared/ui/modules";
 import {
-  CockpitChartCard,
   CockpitKpiCard,
-  CockpitTableShell,
-  COCKPIT_HEIGHTS,
-  DataTablePagination,
 } from "../../../../shared/ui/cockpit";
+import {
+  InventoryChartCard,
+  InventoryPanel,
+  inventoryTableHead,
+  inventoryTableRow,
+} from "../../../inventory/components/InventoryVisuals";
 import {
   useComponentsDashboard,
   useComponentsOverview,
@@ -24,11 +25,11 @@ import {
   ComponentsDonut,
   ComponentsMiniBars,
   ComponentsSelect,
-  componentsInput,
   componentsMutedButton,
-  componentsTableHead,
-  componentsTableRow,
 } from "./ComponentsCockpitShared";
+
+const inventoryFilterControl =
+  "h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65";
 
 function statusTone(label: string) {
   if (label.includes("Không đạt"))
@@ -129,8 +130,8 @@ export function ComponentsOverviewPage() {
   ];
 
   return (
-    <ComponentsWorkspace>
-      <div className="w-full min-w-0 flex-1 space-y-1">
+    <EnterpriseModulePage>
+      <div className="space-y-2 text-xs -mt-2">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
           <CockpitKpiCard
             title="Tổng cấu kiện"
@@ -139,6 +140,7 @@ export function ComponentsOverviewPage() {
             tone="blue"
             state="normal"
             trend={[statusCounts.total * 0.72, statusCounts.total * 0.86, statusCounts.total]}
+            className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
             title="Đang sản xuất"
@@ -147,6 +149,7 @@ export function ComponentsOverviewPage() {
             tone="purple"
             state="normal"
             trend={[0, statusCounts.producing * 0.6, statusCounts.producing]}
+            className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
             title="Trong kho cấu kiện"
@@ -155,6 +158,7 @@ export function ComponentsOverviewPage() {
             tone="amber"
             state="normal"
             trend={[statusCounts.stock * 0.8, statusCounts.stock * 0.9, statusCounts.stock]}
+            className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
             title="Ready to ship"
@@ -163,6 +167,7 @@ export function ComponentsOverviewPage() {
             tone="emerald"
             state="normal"
             trend={[0, statusCounts.qcPass * 0.55, statusCounts.qcPass]}
+            className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
             title="Chờ QC"
@@ -171,6 +176,7 @@ export function ComponentsOverviewPage() {
             tone="red"
             state="normal"
             trend={[statusCounts.waitingQc * 0.5, statusCounts.waitingQc, statusCounts.waitingQc * 0.7]}
+            className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
             title="Đang xuất bãi"
@@ -179,75 +185,64 @@ export function ComponentsOverviewPage() {
             tone="cyan"
             state="normal"
             trend={[0, statusCounts.transferring * 0.65, statusCounts.transferring]}
+            className="!h-[92px] !p-3"
           />
         </div>
 
-        <ModuleFilterBar>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm theo mã, tên, profile, dự án..."
-            className={`${componentsInput} xl:col-span-4`}
-          />
-          <ComponentsSelect
-            value={project}
-            onChange={setProject}
-            className="xl:col-span-2"
-          >
-            <option value="">Dự án</option>
-            {(readModel?.filters.projects ?? []).map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </ComponentsSelect>
-          <ComponentsSelect
-            value={status}
-            onChange={setStatus}
-            className="xl:col-span-2"
-          >
-            <option value="">Trạng thái</option>
-            {(readModel?.filters.statuses ?? []).map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </ComponentsSelect>
-          <ComponentsSelect
-            value={location}
-            onChange={setLocation}
-            className="xl:col-span-2"
-          >
-            <option value="">Vị trí</option>
-            {(readModel?.filters.locations ?? []).map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </ComponentsSelect>
-          <ComponentsSelect
-            value={type}
-            onChange={setType}
-            className="xl:col-span-1"
-          >
-            <option value="">Loại</option>
-            {(readModel?.filters.types ?? []).map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </ComponentsSelect>
-          <button
-            onClick={() => {
-              setQuery("");
-              setProject("");
-              setStatus("");
-              setLocation("");
-              setType("");
-            }}
-            className={`${componentsMutedButton} xl:col-span-1`}
-          >
-            Làm mới
-          </button>
-        </ModuleFilterBar>
+        <InventoryPanel className="rounded-xl">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm theo mã, tên, profile, dự án..."
+              className={`${inventoryFilterControl} xl:col-span-2`}
+            />
+            <ComponentsSelect value={project} onChange={setProject} className={inventoryFilterControl}>
+              <option value="">Dự án</option>
+              {(readModel?.filters.projects ?? []).map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </ComponentsSelect>
+            <ComponentsSelect value={status} onChange={setStatus} className={inventoryFilterControl}>
+              <option value="">Trạng thái</option>
+              {(readModel?.filters.statuses ?? []).map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </ComponentsSelect>
+            <ComponentsSelect value={location} onChange={setLocation} className={inventoryFilterControl}>
+              <option value="">Vị trí</option>
+              {(readModel?.filters.locations ?? []).map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </ComponentsSelect>
+            <ComponentsSelect value={type} onChange={setType} className={inventoryFilterControl}>
+              <option value="">Loại</option>
+              {(readModel?.filters.types ?? []).map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </ComponentsSelect>
+            <button
+              onClick={() => {
+                setQuery("");
+                setProject("");
+                setStatus("");
+                setLocation("");
+                setType("");
+              }}
+              className={componentsMutedButton}
+            >
+              Làm mới
+            </button>
+          </div>
+        </InventoryPanel>
 
-        <div className="grid grid-cols-12 gap-1 items-start">
-          <div className="col-span-12 xl:col-span-9">
-            <CockpitChartCard
-              title={`Top ${paginatedRows.length} cấu kiện`}
-              action={
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-1 -mt-1">
+          <InventoryPanel
+            title={
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                  Top {paginatedRows.length} cấu kiện
+                </h3>
                 <button
                   type="button"
                   onClick={() => navigate("/components/list")}
@@ -255,12 +250,17 @@ export function ComponentsOverviewPage() {
                 >
                   Xem tất cả
                 </button>
-              }
-              className={COCKPIT_HEIGHTS.TABLE_MD}
-            >
-              <CockpitTableShell className="h-full">
-                <table className="w-full min-w-[980px] table-fixed text-[13px]">
-                  <thead className={componentsTableHead}>
+              </div>
+            }
+            className="xl:col-span-9"
+          >
+            <div className="rounded-lg border border-white/10 overflow-hidden">
+              <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
+                <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
+                  <thead
+                    className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10`}
+                    style={{ backgroundColor: "rgba(30, 41, 59, 1)" }}
+                  >
                     <tr>
                       {[
                         "Mã cấu kiện",
@@ -274,7 +274,7 @@ export function ComponentsOverviewPage() {
                       ].map((heading) => (
                         <th
                           key={heading}
-                          className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300"
+                          className="px-4 py-2 text-left font-medium"
                         >
                           {heading}
                         </th>
@@ -292,34 +292,34 @@ export function ComponentsOverviewPage() {
                       paginatedRows.map((row) => (
                         <tr
                           key={row.id}
-                          className={componentsTableRow}
+                          className={inventoryTableRow}
                         >
-                          <td className="truncate px-1.5 py-0.5 text-cyan-300 font-mono">
+                          <td className="truncate px-2.5 py-1 text-cyan-300 font-mono">
                             {row.code}
                           </td>
-                          <td className="truncate px-1.5 py-0.5 text-white">
+                          <td className="truncate px-2.5 py-1 text-white">
                             {row.name}
                           </td>
-                          <td className="truncate px-1.5 py-0.5 text-slate-300">
+                          <td className="truncate px-2.5 py-1 text-slate-300">
                             {row.profile}
                           </td>
-                          <td className="truncate px-1.5 py-0.5 text-slate-300">
+                          <td className="truncate px-2.5 py-1 text-slate-300">
                             {row.project}
                           </td>
-                          <td className="px-1.5 py-0.5">
+                          <td className="px-2.5 py-1">
                             <span
                               className={`rounded-lg border px-2 py-0.5 text-xs ${statusTone(row.status)}`}
                             >
                               {row.status}
                             </span>
                           </td>
-                          <td className="truncate px-1.5 py-0.5 text-slate-300">
+                          <td className="truncate px-2.5 py-1 text-slate-300">
                             {row.location}
                           </td>
-                          <td className="px-1.5 py-0.5 font-mono tabular-nums text-cyan-300">
+                          <td className="px-2.5 py-1 font-mono tabular-nums text-cyan-300">
                             {formatQuantity(row.quantity, 0)}
                           </td>
-                          <td className="px-1.5 py-0.5 font-mono tabular-nums text-emerald-300">
+                          <td className="px-2.5 py-1 font-mono tabular-nums text-emerald-300">
                             {formatQuantity(row.qcQuantity, 0)}
                           </td>
                         </tr>
@@ -334,7 +334,8 @@ export function ComponentsOverviewPage() {
                     ))}
                   </tbody>
                 </table>
-              </CockpitTableShell>
+              </div>
+            </div>
               {!isLoading && !rows.length ? (
                 <div className="p-3">
                   <ModuleEmptyState
@@ -344,13 +345,12 @@ export function ComponentsOverviewPage() {
                   />
                 </div>
               ) : null}
-            </CockpitChartCard>
-          </div>
+          </InventoryPanel>
 
-          <aside className="col-span-12 space-y-1 xl:col-span-3">
-            <CockpitChartCard
+          <div className="space-y-1.5 xl:col-span-3">
+            <InventoryChartCard
               title="Trạng thái cấu kiện"
-              className={COCKPIT_HEIGHTS.CHART_MD}
+              className="p-2"
             >
               <ComponentsDonut
                 centerValue={formatQuantity(dashboardData?.totalComponents ?? 0, 0)}
@@ -361,19 +361,10 @@ export function ComponentsOverviewPage() {
                     : [{ label: "Chưa có dữ liệu", value: 1, color: "#334155" }]
                 }
               />
-            </CockpitChartCard>
-            <CockpitChartCard
-              title="Hoạt động"
-              className={COCKPIT_HEIGHTS.CHART_ALERT}
-            >
-              <ComponentsMiniBars
-                values={dashboardActivity}
-                tone="emerald"
-              />
-            </CockpitChartCard>
-            <CockpitChartCard
+            </InventoryChartCard>
+            <InventoryChartCard
               title="Theo dự án"
-              className={COCKPIT_HEIGHTS.CHART_MD}
+              className="p-2"
             >
               <div className="space-y-1">
                 {projectRows.map(([projectName, value]) => (
@@ -416,42 +407,47 @@ export function ComponentsOverviewPage() {
                   />
                 ) : null}
               </div>
-            </CockpitChartCard>
-          </aside>
+            </InventoryChartCard>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <CockpitChartCard title="Hàng đợi QC" subtitle="Theo trạng thái/vị trí hiện có" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+          <InventoryChartCard title="Hàng đợi QC" className="p-2">
             {waitingQcRows.length ? (
               <ComponentQueue rows={waitingQcRows} tone="amber" />
             ) : (
               <ModuleEmptyState icon={<Package size={18} />} title="Không có cấu kiện chờ QC" description="Các cấu kiện có trạng thái hoặc vị trí QC sẽ xuất hiện tại đây." />
             )}
-          </CockpitChartCard>
-          <CockpitChartCard title="Ready to ship" subtitle="Cấu kiện sẵn sàng chuyển" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+          </InventoryChartCard>
+          <InventoryChartCard title="Ready to ship" className="p-2">
             {readyShipRows.length ? (
               <ComponentQueue rows={readyShipRows} tone="emerald" />
             ) : (
               <ModuleEmptyState icon={<Package size={18} />} title="Chưa có cấu kiện sẵn sàng chuyển" description="Các cấu kiện READY/QC đạt sẽ xuất hiện tại đây." />
             )}
-          </CockpitChartCard>
-        </div>
-
-        <CockpitChartCard title="Thống kê nhanh" className="min-h-0">
-          <div className="grid grid-cols-1 divide-y divide-white/10 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
-            {quickStats.map((item) => (
-              <div key={item.title} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                <span className="truncate text-xs text-slate-400">{item.title}</span>
-                <div className="min-w-0 text-right">
-                  <div className={`truncate text-sm font-bold ${item.tone}`}>{item.value}</div>
-                  <div className="truncate text-[10px] text-slate-500">{item.note}</div>
+          </InventoryChartCard>
+          <InventoryChartCard title="Hoạt động" className="p-2">
+            <ComponentsMiniBars
+              values={dashboardActivity}
+              tone="emerald"
+            />
+          </InventoryChartCard>
+          <InventoryChartCard title="Thống kê nhanh" className="p-2">
+            <div className="space-y-1">
+              {quickStats.slice(0, 4).map((item) => (
+                <div key={item.title} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
+                  <span className="truncate text-xs text-slate-400">{item.title}</span>
+                  <div className="min-w-0 text-right">
+                    <div className={`truncate text-sm font-bold ${item.tone}`}>{item.value}</div>
+                    <div className="truncate text-[10px] text-slate-500">{item.note}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CockpitChartCard>
+              ))}
+            </div>
+          </InventoryChartCard>
+        </div>
       </div>
-    </ComponentsWorkspace>
+    </EnterpriseModulePage>
   );
 }
 

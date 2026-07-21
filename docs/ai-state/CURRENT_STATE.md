@@ -1,5 +1,16 @@
 # Current State
 
+## Components Inventory Canon Alignment
+
+Status: **IMPLEMENTED - VISUAL QA PENDING**
+
+Components Overview and Components List were realigned with the current
+Inventory Golden Reference. Overview now uses an Inventory-like table hero,
+compact analytics rail and independent lower queue section. List now uses an
+Inventory-style filter panel, dominant table panel, stable empty rows,
+Inventory pagination and a fuller analytics rail. Backend, APIs, routes,
+permissions, React Query contracts and business behavior are unchanged.
+
 ## COMPOSITION001 Enterprise Workspace Composition Redesign
 
 Status: **IMPLEMENTED - SCREENSHOT QA PASS**
@@ -2078,3 +2089,40 @@ paths are compatibility re-exports only. Login delegates to the canonical auth
 API; the interceptor's private anonymous refresh client is the sole approved
 transport exception. Frontend/backend builds pass; local module smoke remains
 pending because PostgreSQL was unavailable at backend startup.
+
+# Components Inventory Structural Alignment (2026-07-21)
+
+Status: **IMPLEMENTED**
+
+Components Overview and Components List now use the same direct
+`EnterpriseModulePage` shell pattern as Inventory Inbound and Materials. The
+target pages no longer carry an extra workspace wrapper around the page stack,
+and their hero grid, right rail and bottom analytics structures now follow the
+Inventory reference hierarchy. No backend, API, query, route or business
+behavior changed.
+
+Final source-level parity checklist is complete. Remaining differences found in
+Components table viewport width/density, panel title padding branch, right-rail
+card primitives and Components List chart helper forwarding were corrected.
+Screenshot certification is still pending because the workspace has no browser
+runner installed.
+
+# EPIC 0 Full UI Audit (2026-07-21)
+
+Status: **COMPLETED - DOCUMENTATION ONLY**
+
+The full UI audit now lives under `docs/ui/full-ui-audit/`. It covers the
+visible Inventory, Components, Production, Projects, Suppliers, QC, Logistics,
+Planning and Admin surfaces against the Inventory canon. The audit records
+route coverage, layout/KPI/filter/table/chart/data classifications, missing
+features and a master remediation backlog. No frontend/backend source code was
+modified for this phase.
+
+# EPIC 0.5 Master Backlog Prioritization (2026-07-21)
+
+Status: **COMPLETED - DOCUMENTATION ONLY**
+
+The full UI audit backlog now has P0/P1/P2 prioritization, status, dependency
+and complexity fields. `EXECUTION_PLAN.md` defines nine remediation phases from
+Inventory through Admin and records current completion percentages for every
+audited module. No frontend/backend source code was modified.

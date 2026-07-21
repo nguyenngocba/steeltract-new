@@ -1,5 +1,10 @@
 # Next Tasks
 
+- **Components visual QA**: compare `/components` and `/components/list`
+  against Inventory Overview and Inventory Materials at 1366px, 1600px and
+  1920px with real data. Confirm the table remains the hero, right rails feel
+  full and lower sections do not create large empty surfaces.
+
 - **COMPOSITION001 breakpoint certification**: the 1440x1100 screenshot QA pass
   is complete. Run a later release-candidate sweep at 1366px, 1600px and 1920px
   with a live backend dataset to confirm the same table/feed/catalog/queue hero
@@ -779,3 +784,27 @@ Backlog after the locked order:
    preserves the existing backend URL as its compatibility fallback.
 3. Exercise token expiry and concurrent 401 refresh against staging to validate
    the existing single-flight refresh behavior under production latency.
+
+# Components UI Follow-up
+
+1. Run browser screenshot comparison for Components Overview/List against
+   Inventory Inbound/Materials once a local browser runner is available.
+2. Apply the same structural review to the remaining Components tabs before
+   certifying the full Components UI surface.
+
+# EPIC 0 UI Audit Follow-up
+
+1. Resolve the P0 browser screenshot harness blocker before declaring visual
+   certification for any non-Inventory module.
+2. Use `docs/ui/full-ui-audit/MASTER_BACKLOG.md` as the sequencing source for
+   the next UI remediation sprint.
+3. Decide whether Planning should be registered as a visible route before
+   investing in Planning UI polish.
+
+# EPIC 0.5 Execution Plan Follow-up
+
+1. Start Phase 1 Inventory Finish from
+   `docs/ui/full-ui-audit/EXECUTION_PLAN.md` unless business priority overrides
+   the documented sequence.
+2. Treat P0 items in `MASTER_BACKLOG.md` as blockers before certifying any
+   downstream module as visually production-ready.

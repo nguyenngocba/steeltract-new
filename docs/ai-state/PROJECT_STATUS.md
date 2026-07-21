@@ -1,5 +1,25 @@
 # Project Status
 
+On 2026-07-21 Components was aligned more closely with the Inventory Golden
+Reference. Components Overview now treats the component table as the primary
+workspace with a compact analytics rail and lower queue section. Components
+List now follows the Inventory Materials rhythm with a filter panel, dominant
+table panel, stable empty rows, Inventory pagination and side analytics. This
+was a frontend-only composition pass; backend, APIs, routes, permissions,
+React Query contracts and business behavior are unchanged.
+
+On 2026-07-21 EPIC 0 Full UI Audit was completed as documentation-only work.
+The audit covers Inventory, Components, Production, Projects, Suppliers, QC,
+Logistics, Planning and Admin against the Inventory canon, and records route
+coverage, layout/KPI/filter/table/chart/data classifications, missing features
+and a prioritized master backlog. No frontend/backend source code changed.
+
+On 2026-07-21 EPIC 0.5 prioritized the UI audit backlog. The master backlog now
+uses P0 Critical, P1 Production-ready and P2 Future categories with status,
+dependency and complexity fields. The execution plan defines module completion
+percentages and nine phases: Inventory, Components, Production, Projects,
+Suppliers, QC, Logistics, Planning and Admin. No source code changed.
+
 On 2026-07-20 COMPOSITION001 refined page composition outside Inventory.
 Inventory remains the Golden Reference and was not modified. Production,
 Components, QC, Suppliers, Settings and Notifications now lean harder into one
@@ -983,3 +1003,12 @@ available; EPIC144 did not invent missing workflows.
 - Direct authenticated Axios/fetch/XHR bypass: NONE.
 - API/UI/business/backend changes: NONE.
 - Authenticated module runtime smoke: PENDING, local PostgreSQL unavailable.
+
+# Components Inventory Structural Alignment
+
+- Components Overview shell parity with Inventory Inbound: PASS.
+- Components List shell parity with Inventory Materials: PASS.
+- Double workspace wrapper on target pages: REMOVED.
+- Hero grid/right rail/bottom analytics structural parity: PASS.
+- Final source-level visual parity checklist: PASS.
+- Backend/API/query/business changes: NONE.
