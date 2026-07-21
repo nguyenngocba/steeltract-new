@@ -1,1 +1,1 @@
-export function PlanningOverview() { return <div /> }
+export { PlanningPage as PlanningOverview } from "../pages/PlanningPage"

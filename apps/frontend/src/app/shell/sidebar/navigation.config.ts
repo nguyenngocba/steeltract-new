@@ -9,6 +9,7 @@ import {
   Users,
   Settings,
   Factory,
+  CalendarClock,
   Bell,
   MonitorCog,
 } from 'lucide-react'
@@ -187,6 +188,21 @@ export const navigation = [
       { title: 'Sự cố', path: '/production/incidents' },
       { title: 'Nhật ký sản xuất', path: '/production/logs' },
       { title: 'Báo cáo', path: '/production/reports' },
+    ],
+  },
+
+  {
+    title: 'KẾ HOẠCH',
+    icon: CalendarClock,
+    children: [
+      { title: 'Tổng quan kế hoạch', path: '/planning' },
+      { title: 'Kế hoạch tổng thể', path: '/planning/master' },
+      { title: 'Kế hoạch sản xuất', path: '/planning/production' },
+      { title: 'Nhu cầu vật tư (MRP)', path: '/planning/material' },
+      { title: 'Năng lực xưởng', path: '/planning/capacity' },
+      { title: 'Lịch chạy hàng ngày', path: '/planning/schedule' },
+      { title: 'Điểm nghẽn', path: '/planning/constraints' },
+      { title: 'Báo cáo kế hoạch', path: '/planning/reports' },
     ],
   },
 

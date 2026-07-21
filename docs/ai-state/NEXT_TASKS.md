@@ -1,5 +1,6 @@
 # Next Tasks
 
+- **EPIC 9.0 Planning Workspace Reconstruction**: Completed. Reconstructed all visible Planning pages and routes (/planning, /planning/overview, /planning/master, /planning/production, /planning/capacity, /planning/material, /planning/procurement, /planning/schedule, /planning/calendar, /planning/constraints, /planning/reports) to match the SteelTrack UI Canon using shared components, DataTablePagination, and real backend data mapping.
 - **EPIC 8.0 Logistics UI Reconstruction**: Completed. Reconstructed all visible Logistics pages and routes (/logistics, /planning, /vehicles, /dispatch, /loading, /tracking, /deliveries, /documents, /reports) to match the SteelTrack UI Canon using shared components, DataTablePagination, and real backend contracts.
 - **EPIC 7.0 global UI certification follow-up**: use
   `docs/ui/global-ui-consistency-report.md` and

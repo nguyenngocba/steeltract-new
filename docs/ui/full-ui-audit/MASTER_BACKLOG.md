@@ -19,7 +19,7 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | Suppliers | 82% | EPIC 5.0 source/build completion aligns active Supplier list/quality and empty capability workspaces to the Inventory canon; browser certification and backend read contracts remain. |
 | QC | 82% | EPIC 6.0 source/build completion adds shared pagination/table shell treatment and removes inert/synthetic UI; browser certification and route/calibration decisions remain. |
 | Logistics | 90% | EPIC 8.0 source/build completion aligns all Logistics tabs/routes to the SteelTrack UI Canon with shared pagination, filters, and workspaces; browser certification remains. |
-| Planning | 20% | Source files exist but no visible route is registered in the audited router. |
+| Planning | 90% | EPIC 9.0 source/build completion registers all Planning tabs/routes and aligns workspace UI to the SteelTrack UI Canon using real data; browser QA pending. |
 | Admin | 64% | Settings/Users/Roles are real-data surfaces; security/admin gaps and pagination remain. |
 
 ## P0 Critical
@@ -27,7 +27,7 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | ID | Issue | Module | Status | Severity | Complexity | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
 | UI-P0-001 | Browser screenshot harness unavailable, blocking true visual certification across modules | All | Open | High | M | Approved Chromium/Playwright harness |
-| UI-P0-002 | Planning module has no visible registered route despite requested module scope | Planning | Open | High | S/M | Product navigation decision |
+| UI-P0-002 | Planning module has no visible registered route despite requested module scope | Planning | Implemented (EPIC 9.0) | High | S/M | Product navigation decision |
 | UI-P0-003 | Logistics `/vehicles` and `/planning` routes fall back instead of rendering distinct requested workspaces | Logistics | Implemented (EPIC 8.0) | High | M/L | Logistics read contracts or route removal decision |
 | UI-P0-004 | EPIC 7.0 global consistency certification remains source-level only without screenshot proof | All | Open | High | M | UI-P0-001 |
 
@@ -47,7 +47,7 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | UI-P1-010 | Normalize QC panel/table primitives to Inventory/Enterprise shared surfaces | QC | Implemented at table/pagination level - browser QA pending | Medium | M | UI standard decision |
 | UI-P1-011 | Add Logistics standard filters beyond search | Logistics | Implemented (EPIC 8.0) | Medium | M | API filter support |
 | UI-P1-012 | Add Logistics pagination and empty rows to dispatch table | Logistics | Implemented (EPIC 8.0) | Medium | M | API or client pagination |
-| UI-P1-013 | Audit existing Planning workspace after route decision | Planning | Open | Medium | M | Route activation |
+| UI-P1-013 | Audit existing Planning workspace after route decision | Planning | Implemented (EPIC 9.0) | Medium | M | Route activation |
 | UI-P1-014 | Normalize Admin Settings local UI classes to shared primitives | Admin | Open | Medium | M | UI standard decision |
 | UI-P1-015 | Add Users/Roles standard pagination | Admin | Open | Medium | M | API/client pagination decision |
 | UI-P1-016 | Logistics logs/reports need explicit route branch behavior instead of fallback-like behavior | Logistics | Implemented (EPIC 8.0) | Medium | M | Logistics log/report contracts |

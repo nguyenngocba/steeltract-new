@@ -65,6 +65,7 @@ const UsersPage = lazyNamed(() => import('@/modules/users/pages/UsersPage'), 'Us
 const RolesPage = lazyNamed(() => import('@/modules/roles/pages/RolesPage'), 'RolesPage')
 const SystemLogsWorkspace = lazyNamed(() => import('@/modules/system-logs/workspaces/SystemLogsWorkspace'), 'SystemLogsWorkspace')
 const LogisticsPage = lazyNamed(() => import('@/modules/logistics/pages/LogisticsPage'), 'LogisticsPage')
+const PlanningPage = lazyNamed(() => import('@/modules/planning/pages/PlanningPage'), 'PlanningPage')
 const NotificationsPage = lazyNamed(() => import('@/modules/notifications/pages/NotificationsPage'), 'NotificationsPage')
 const OperationsCenterPage = lazyNamed(() => import('@/modules/operations-center/pages/OperationsCenterPage'), 'OperationsCenterPage')
 
@@ -299,6 +300,18 @@ export function AppRouter() {
       <Route path="/logistics/history" element={<LogisticsPage />} />
       <Route path="/logistics/logs" element={<LogisticsPage />} />
       <Route path="/logistics/reports" element={<LogisticsPage />} />
+
+      <Route path="/planning" element={<PlanningPage />} />
+      <Route path="/planning/overview" element={<PlanningPage />} />
+      <Route path="/planning/master" element={<PlanningPage />} />
+      <Route path="/planning/production" element={<PlanningPage />} />
+      <Route path="/planning/capacity" element={<PlanningPage />} />
+      <Route path="/planning/material" element={<PlanningPage />} />
+      <Route path="/planning/procurement" element={<PlanningPage />} />
+      <Route path="/planning/schedule" element={<PlanningPage />} />
+      <Route path="/planning/calendar" element={<PlanningPage />} />
+      <Route path="/planning/constraints" element={<PlanningPage />} />
+      <Route path="/planning/reports" element={<PlanningPage />} />
 
       <Route
         path="/suppliers"
