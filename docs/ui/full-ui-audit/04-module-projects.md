@@ -1,5 +1,19 @@
 # EPIC 0 Full UI Audit - Projects
 
+## EPIC 4.0 Completion Update
+
+Status: **P0/P1 SOURCE IMPLEMENTED - FRONTEND BUILD PASS, BROWSER QA PENDING**
+
+Projects now follows the active Inventory/Components/Production workspace
+rhythm on the visible route set. The Overview and Projects list tabs put the
+project table in the hero workspace with KPI cards first, a right analytics
+rail and a full-width lower analytics band. Progress, Components, Materials,
+Costs, Documents, Logs and Reports continue to use real `projects/runtime`,
+template and detail-tab data through existing APIs.
+
+No backend, route, API, permission, React Query contract, schema or business
+workflow changed.
+
 ## Visible Routes And Requested Tabs
 
 All visible Projects routes render `ProjectsPage.tsx`.
@@ -20,14 +34,18 @@ All visible Projects routes render `ProjectsPage.tsx`.
 
 - Uses `EnterpriseWorkspace` with route tabs.
 - Main pages use KPI/filter/table/right rail patterns.
-- The module is data-rich but page branches vary in visual density.
-- Not yet aligned pixel-for-pixel with Inventory canon.
+- Overview and list now follow the Inventory hero-table composition:
+  KPI -> filter -> hero table/right rail -> bottom analytics.
+- Detail drawer timeline now renders milestones from real WBS/phase data or a
+  standard empty state instead of static milestone labels.
+- Pixel-perfect browser certification remains pending.
 
 ## B. KPI
 
-- `KpiStrip` exists and is used in overview/list areas.
-- PASS for having KPI coverage.
-- CONDITIONAL for exact height/padding consistency.
+- `KpiStrip` is used in Overview, Projects List, Progress, Costs, Documents,
+  Logs and Reports coverage paths where route-level KPI context is relevant.
+- PASS for source-level KPI coverage and shared cockpit card usage.
+- CONDITIONAL for authenticated screenshot parity.
 
 ## C. Filter
 
@@ -37,14 +55,20 @@ All visible Projects routes render `ProjectsPage.tsx`.
 
 ## D. Table
 
-- Tables exist for projects, materials, components, progress/WBS, costs, documents/logs.
-- Uses `CockpitTableShell`, `CockpitEmptyState`, `DataTablePagination` in branches.
-- Pagination exists in several subviews but must be audited per route for consistent footer height and empty rows.
+- Tables exist for projects, materials, components, progress/WBS, costs,
+  documents/logs.
+- Uses `CockpitTableShell`, `CockpitEmptyState`, `DataTablePagination` in the
+  primary paginated branches.
+- Overview and Projects List now keep the project registry as the dominant
+  table surface instead of pushing it below analytics.
 
 ## E. Chart
 
-- Uses `CockpitChartCard`, `CockpitStatusList`, `CockpitRecentList`, project risk/workload/timeline components.
-- Some cards are real empty states when attachments/photos/tasks are absent.
+- Uses `CockpitChartCard`, `CockpitStatusList`, `CockpitRecentList`, project
+  risk/workload/timeline components.
+- Cards use real runtime/detail data or standard empty states when
+  attachments/photos/tasks are absent.
+- Static milestone labels were removed from the active project detail timeline.
 
 ## F. Data Classification
 
@@ -63,6 +87,5 @@ All visible Projects routes render `ProjectsPage.tsx`.
 | --- | --- | --- | --- | --- |
 | Timeline is not a top-level requested route | P2 | Medium | M | Route/sidebar decision |
 | Budget naming differs from route (`costs`) | P3 | Low | S | Label decision |
-| Per-branch visual parity is not certified | P1 | High | L | Browser screenshots |
+| Authenticated browser visual certification | P1 | High | M | Browser screenshots |
 | Some empty states reference future attachment/photo foundation | P2 | Medium | M | Backend read contract |
-

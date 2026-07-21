@@ -1,26 +1,15 @@
-const metrics = [
-  {
-    label: 'Active Orders',
-    value: 24,
-  },
+type ProductionTelemetryMetric = {
+  label: string
+  value: string | number
+}
 
-  {
-    label: 'Machines Online',
-    value: 18,
-  },
+export function ProductionTelemetry({
+  metrics = [],
+}: {
+  metrics?: ProductionTelemetryMetric[]
+}) {
+  if (!metrics.length) return null
 
-  {
-    label: 'QC Pending',
-    value: 6,
-  },
-
-  {
-    label: 'Output Today',
-    value: 482,
-  },
-]
-
-export function ProductionTelemetry() {
   return (
     <div className="grid grid-cols-4 gap-4">
       {metrics.map((metric) => (

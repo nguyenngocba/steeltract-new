@@ -70,25 +70,35 @@ export function ComponentsOverviewPage() {
   const rows = readModel?.data ?? [];
   const paginatedRows = rows.slice(0, 8);
   const dashboardData = dashboard?.data;
-  const statusCounts = dashboardData
+  const statusCounts = readModel?.summary
     ? {
+        total: readModel.summary.total,
+        producing: readModel.summary.producing,
+        stock: readModel.summary.stock,
+        qcPass: readModel.summary.qcPass,
+        qcFail: readModel.summary.qcFail,
+        transferring: readModel.summary.transferring,
+      }
+    : dashboardData
+      ? {
         total: dashboardData.totalComponents,
         producing: dashboardData.producingCount,
         stock: dashboardData.stockCount,
         qcPass: dashboardData.readyCount,
-        waitingQc: rows.filter((row) => /QC|kiểm|kiem|CUTTING|WELDING|PAINTING/i.test(`${row.status} ${row.location}`)).length,
+        qcFail: 0,
         transferring: dashboardData.shippedCount,
       }
-    : {
+      : {
     total: 0,
     producing: 0,
     stock: 0,
     qcPass: 0,
-    waitingQc: 0,
+    qcFail: 0,
     transferring: 0,
       };
-  const dashboardActivity =
-    dashboardData?.payload?.timelineActions?.map((row) => row.count) ?? [];
+  const dashboardActivity = readModel?.analytics.activitySeries
+    ?? dashboardData?.payload?.timelineActions?.map((row) => row.count)
+    ?? [];
   const colors = [
     "#1d7cff",
     "#06b6d4",
@@ -97,8 +107,8 @@ export function ComponentsOverviewPage() {
     "#ef4444",
     "#14c987",
   ];
-  const typeSegments = (dashboardData?.payload?.statusCounts ?? []).map(
-    ({ status: label, count: value }, index) => ({
+  const typeSegments = (readModel?.analytics.typeSegments ?? []).map(
+    ([label, value], index) => ({
       label,
       value,
       color: colors[index % colors.length],
@@ -126,8 +136,9 @@ export function ComponentsOverviewPage() {
     { title: "Tồn kho", value: `${formatQuantity(statusCounts.stock, 0)} cấu kiện`, note: "STOCK", tone: "text-amber-300" },
     { title: "Sẵn sàng xuất bãi", value: `${formatQuantity(statusCounts.qcPass, 0)} cấu kiện`, note: "READY", tone: "text-emerald-300" },
     { title: "Đang chuyển", value: `${formatQuantity(statusCounts.transferring, 0)} cấu kiện`, note: "SHIPPED", tone: "text-purple-300" },
-    { title: "Hoạt động", value: `${formatQuantity(dashboardActivity.length, 0)} dòng`, note: "Timeline", tone: "text-blue-300" },
+    { title: "Hoạt động", value: `${formatQuantity(dashboardActivity.reduce((sum, value) => sum + value, 0), 0)} sự kiện`, note: "Timeline", tone: "text-blue-300" },
   ];
+  const kpiTrend = dashboardActivity.length ? dashboardActivity : undefined;
 
   return (
     <EnterpriseModulePage>
@@ -139,7 +150,7 @@ export function ComponentsOverviewPage() {
             note="Toàn bộ lifecycle"
             tone="blue"
             state="normal"
-            trend={[statusCounts.total * 0.72, statusCounts.total * 0.86, statusCounts.total]}
+            trendData={kpiTrend}
             className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
@@ -148,7 +159,7 @@ export function ComponentsOverviewPage() {
             note="Cut / Weld / Paint"
             tone="purple"
             state="normal"
-            trend={[0, statusCounts.producing * 0.6, statusCounts.producing]}
+            trendData={kpiTrend}
             className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
@@ -157,7 +168,7 @@ export function ComponentsOverviewPage() {
             note="Đang lưu kho"
             tone="amber"
             state="normal"
-            trend={[statusCounts.stock * 0.8, statusCounts.stock * 0.9, statusCounts.stock]}
+            trendData={kpiTrend}
             className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
@@ -166,16 +177,16 @@ export function ComponentsOverviewPage() {
             note="QC đạt / READY"
             tone="emerald"
             state="normal"
-            trend={[0, statusCounts.qcPass * 0.55, statusCounts.qcPass]}
+            trendData={kpiTrend}
             className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
-            title="Chờ QC"
-            value={formatQuantity(statusCounts.waitingQc, 0)}
-            note="Suy ra từ stage"
+            title="Không đạt"
+            value={formatQuantity(statusCounts.qcFail, 0)}
+            note="Theo read model"
             tone="red"
             state="normal"
-            trend={[statusCounts.waitingQc * 0.5, statusCounts.waitingQc, statusCounts.waitingQc * 0.7]}
+            trendData={kpiTrend}
             className="!h-[92px] !p-3"
           />
           <CockpitKpiCard
@@ -184,7 +195,7 @@ export function ComponentsOverviewPage() {
             note="SHIPPED"
             tone="cyan"
             state="normal"
-            trend={[0, statusCounts.transferring * 0.65, statusCounts.transferring]}
+            trendData={kpiTrend}
             className="!h-[92px] !p-3"
           />
         </div>
@@ -352,15 +363,19 @@ export function ComponentsOverviewPage() {
               title="Trạng thái cấu kiện"
               className="p-2"
             >
-              <ComponentsDonut
-                centerValue={formatQuantity(dashboardData?.totalComponents ?? 0, 0)}
-                centerLabel="Tổng"
-                segments={
-                  typeSegments.length
-                    ? typeSegments
-                    : [{ label: "Chưa có dữ liệu", value: 1, color: "#334155" }]
-                }
-              />
+              {typeSegments.length ? (
+                <ComponentsDonut
+                  centerValue={formatQuantity(statusCounts.total, 0)}
+                  centerLabel="Tổng"
+                  segments={typeSegments}
+                />
+              ) : (
+                <ModuleEmptyState
+                  icon={<BarChart3 size={18} />}
+                  title="Chưa có phân bổ trạng thái"
+                  description="Biểu đồ sẽ hiển thị khi read model trả về nhóm trạng thái."
+                />
+              )}
             </InventoryChartCard>
             <InventoryChartCard
               title="Theo dự án"

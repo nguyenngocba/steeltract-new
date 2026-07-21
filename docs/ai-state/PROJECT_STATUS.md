@@ -1,5 +1,76 @@
 # Project Status
 
+On 2026-07-21 EPIC 7.0 completed a documentation-only global UI consistency
+audit across Inventory, Components, Production, Projects, Suppliers, QC,
+Logistics, Planning and Admin. The audit produced a global difference report
+and a design debt register. No frontend or backend source code changed.
+Highest remaining risks are the missing authenticated screenshot harness,
+Planning route visibility, Logistics Vehicles/Planning fallback behavior and
+Admin pagination/primitive drift.
+
+On 2026-07-21 EPIC 6.0 completed a QC-only UI readiness pass. QC inspection
+workspaces now use page/limit read-model state, shared `DataTablePagination`,
+shared cockpit table shell treatment and standard empty states. The fixed
+`limit: 100` read path and inert toolbar buttons were removed, and QC KPI cards
+no longer receive synthetic trend arrays. Backend, API contracts, routes,
+permissions, schema, React Query contracts and business behavior are unchanged.
+Browser screenshot certification remains pending because no approved
+authenticated browser harness is available in the workspace.
+
+On 2026-07-21 EPIC 3.2 finalized Production workspace readiness at source/build
+level. The post-polish review found the active P0/P1 operator surfaces already
+complete after EPIC 3 and EPIC 3.1, so no additional Production source changes
+were required. Running, Completed and Scrap remain P2 route/model decisions
+rather than UI blockers. Browser screenshot certification remains pending.
+
+On 2026-07-21 EPIC 5.0 completed a Suppliers-only UI completion pass.
+Supplier Overview/List and Quality now follow the Inventory-canon workspace
+rhythm with KPI cards, compact filters, paginated hero tables, right analytics
+rails and lower analytics/empty-state sections. Supplier KPI cards no longer
+receive synthetic trend arrays. Capability tabs without read contracts now show
+full controlled empty workspaces instead of lone placeholder cards. Backend,
+API contracts, routes, permissions, schema, React Query contracts and business
+behavior are unchanged. Browser screenshot certification remains pending
+because no approved authenticated browser harness is available in the
+workspace.
+
+On 2026-07-21 EPIC 4.0 completed a Projects-only UI completion pass. Projects
+Overview and Projects List now follow the Inventory-canon table-hero rhythm
+with KPI cards, the existing global filter, right analytics rails and lower
+analytics bands. The active project detail timeline now uses real WBS/phase
+data or a standard empty state instead of static milestone labels. Backend,
+API contracts, routes, permissions, schema, React Query contracts and business
+behavior are unchanged. Browser screenshot certification remains pending
+because no approved authenticated browser harness is available in the
+workspace.
+
+On 2026-07-21 EPIC 3.1 completed a Production-only UI polish pass. Production
+now removes inert toolbar controls, gives the Execution Queue an Inventory-like
+table hero before the kanban board, and strengthens right rails for Queue,
+Consumptions and Incidents with filled real-data analytics/empty states.
+Backend, API contracts, schema, permissions, React Query contracts and business
+behavior are unchanged. Browser screenshot certification remains pending
+because no approved authenticated browser harness is available in the
+workspace.
+
+On 2026-07-21 EPIC 3 completed Production P0/P1 source/build remediation.
+Production now has a route-visible Machines workspace backed by the existing
+machine endpoint, no synthetic KPI trend arrays or fake chart fallback values,
+and standard pagination/empty-row treatment for Consumption, Incidents and the
+major table workspaces. Backend, API contracts, schema, permissions and
+business behavior are unchanged. Browser screenshot certification remains
+pending because no approved authenticated browser harness is available in the
+workspace.
+
+On 2026-07-21 EPIC 2 completed the Components P0/P1 source/build remediation.
+Components Overview/List remain aligned with Inventory, and the secondary
+Components tabs now use Inventory-canon panels, chart cards, table hero
+surfaces and pagination. Hardcoded trend arrays, synthetic chart fallback
+values and non-functional History filters were removed. Backend, API, routes,
+permissions, React Query contracts, schema and business behavior are unchanged.
+Browser screenshot certification remains pending because no approved harness is
+available in the workspace.
+
 On 2026-07-21 Components was aligned more closely with the Inventory Golden
 Reference. Components Overview now treats the component table as the primary
 workspace with a compact analytics rail and lower queue section. Components

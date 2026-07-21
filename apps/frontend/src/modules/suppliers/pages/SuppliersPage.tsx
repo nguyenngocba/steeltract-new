@@ -1,9 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, FileText, PackageSearch, Pencil, Search, Star, Truck, X, type LucideIcon } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
-import { CockpitKpiCard } from '@/shared/ui/cockpit'
+import {
+  CockpitChartCard,
+  CockpitEmptyState,
+  CockpitKpiCard,
+  CockpitRecentList,
+  CockpitStatusList,
+  CockpitTableShell,
+  DataTablePagination,
+} from '@/shared/ui/cockpit'
 import { SupplierFormModal } from '../components/SupplierFormModal'
 import {
   useCreateSupplierMutation,
@@ -24,12 +32,13 @@ import type {
 const fmt = (value = 0) => formatQuantity(value, 2)
 const money = (value = 0) => formatQuantity(value, 0)
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
-const panel = 'rounded-lg border border-white/10 bg-slate-950/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+const panel = 'rounded-2xl border border-cyan-300/15 bg-slate-950/35 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl'
 const input = 'h-9 rounded-lg border border-white/10 bg-slate-950/65 px-3 text-xs text-slate-100 outline-none transition focus:border-blue-400'
 const primaryButton = 'rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500'
 const mutedButton = 'rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-slate-200 hover:bg-white/[0.08]'
-const tableHead = 'bg-white/[0.04] text-[10px] uppercase tracking-[0.12em] text-slate-400'
-const tableRow = 'border-t border-white/10 text-slate-200 transition hover:bg-cyan-400/10'
+const tableHead = 'bg-transparent text-slate-300 border-b border-cyan-400/10'
+const tableRow = 'border-b border-cyan-400/10 text-slate-300 transition hover:bg-cyan-400/[0.055]'
+const pageSizeOptions = [10, 20, 50, 100]
 
 type DetailTab = 'overview' | 'materials' | 'inbound' | 'ratings' | 'files'
 type SupplierModuleTab = 'overview' | 'list' | 'quotes' | 'purchase-orders' | 'deliveries' | 'quality' | 'payables' | 'logs' | 'reports'
@@ -49,8 +58,9 @@ const supplierTabs: Array<{ id: SupplierModuleTab; label: string; path: string }
 export function SuppliersPage() {
   const location = useLocation()
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
   const [evaluationFilter, setEvaluationFilter] = useState('all')
+  const [supplierPage, setSupplierPage] = useState(1)
+  const [supplierPageSize, setSupplierPageSize] = useState(20)
   const [openModal, setOpenModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
@@ -64,11 +74,9 @@ export function SuppliersPage() {
   const isSupplierListView = moduleTab === 'overview' || moduleTab === 'list'
   const isSupplierQualityView = moduleTab === 'quality'
 
-  const rows = useMemo(() => suppliers.filter((supplier) => {
-    if (status === 'inactive') return false
-    return true
-  }), [status, suppliers])
-  const supplierTableEmptyRows = Array.from({ length: Math.max(0, 12 - rows.length) })
+  const rows = suppliers
+  const supplierTableEmptyRows = Array.from({ length: Math.max(0, supplierPageSize - Math.min(supplierPageSize, rows.length - (supplierPage - 1) * supplierPageSize)) })
+  const supplierPagedRows = rows.slice((supplierPage - 1) * supplierPageSize, supplierPage * supplierPageSize)
   const evaluationRows = useMemo(() => {
     const rows = evaluations?.rows ?? []
     return rows.filter((row) => {
@@ -77,6 +85,8 @@ export function SuppliersPage() {
       return row.classification === evaluationFilter
     })
   }, [evaluationFilter, evaluations?.rows])
+
+  useEffect(() => setSupplierPage(1), [rows.length, supplierPageSize])
 
   function openCreateModal() {
     setEditing(null)
@@ -108,18 +118,18 @@ export function SuppliersPage() {
       activeTab={moduleTab}
       actions={<button type="button" className={primaryButton} onClick={openCreateModal}>+ Thêm nhà cung cấp</button>}
     >
-      <div className="space-y-4">
+      <div className="space-y-1">
 
         {isSupplierListView ? <>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard title="Total Suppliers" value={summary?.total ?? suppliers.length} note="Master records" trend={[0, (summary?.total ?? suppliers.length) * 0.7, summary?.total ?? suppliers.length]} />
-          <KpiCard title="Active Suppliers" value={summary?.active ?? suppliers.length} note="Schema hiện chưa có status" tone="emerald" trend={[0, (summary?.active ?? suppliers.length) * 0.7, summary?.active ?? suppliers.length]} />
-          <KpiCard title="Inactive Suppliers" value={summary?.inactive ?? 0} note="Reserved for S2" tone="amber" trend={[0, summary?.inactive ?? 0, summary?.inactive ?? 0]} />
-          <KpiCard title="Suppliers Used In Inventory" value={summary?.usedInInventory ?? 0} note="Inbound/transactions" tone="cyan" trend={[0, (summary?.usedInInventory ?? 0) * 0.65, summary?.usedInInventory ?? 0]} />
+          <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard title="Total Suppliers" value={summary?.total ?? suppliers.length} note="Master records" />
+          <KpiCard title="Active Suppliers" value={summary?.active ?? suppliers.length} note="Supplier records" tone="emerald" />
+          <KpiCard title="Inactive Suppliers" value={summary?.inactive ?? 0} note="From supplier summary" tone="amber" />
+          <KpiCard title="Suppliers Used In Inventory" value={summary?.usedInInventory ?? 0} note="Inbound/transactions" tone="cyan" />
           </div>
 
-          <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
-          <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3">
+          <div className="grid grid-cols-1 gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1 md:grid-cols-12">
+          <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3 md:col-span-6">
             <Search size={15} className="text-cyan-400" />
             <input
               value={search}
@@ -128,42 +138,40 @@ export function SuppliersPage() {
               className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none"
             />
           </div>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className={input}>
-            <option value="all">Status: All</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+          <div className="hidden items-center justify-end text-xs text-slate-500 md:col-span-6 md:flex">
+            Search reads from the authenticated supplier API.
+          </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className={`${panel} min-h-[640px] overflow-hidden`}>
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+          <div className="grid gap-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+          <section className={`${panel} p-3`}>
+            <div className="mb-1 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-100">Supplier list ({rows.length})</h2>
               <span className="text-xs text-slate-500">Master cockpit</span>
             </div>
-            <div className="max-h-[590px] overflow-auto">
-              <table className="w-full min-w-[1040px] text-left text-sm">
+            <CockpitTableShell className="h-[520px]">
+              <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
                 <thead className={tableHead}>
                   <tr>
                     {['STT', 'Supplier Code', 'Supplier Name', 'Contact', 'Phone', 'Email', 'Status', 'Created Date', 'Actions'].map((heading) => (
-                      <th key={heading} className="px-4 py-3 font-medium">{heading}</th>
+                      <th key={heading} className="px-1.5 py-1 font-medium">{heading}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
                     <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Đang tải nhà cung cấp...</td></tr>
-                  ) : rows.map((supplier, index) => (
+                  ) : supplierPagedRows.map((supplier, index) => (
                     <tr key={supplier.id} onClick={() => setSelectedSupplier(supplier)} className={`cursor-pointer ${tableRow}`}>
-                      <td className="px-4 py-3 text-slate-500">{index + 1}</td>
-                      <td className="px-4 py-3 font-semibold text-cyan-300">{supplier.code}</td>
-                      <td className="px-4 py-3">{supplier.name}</td>
-                      <td className="px-4 py-3">{supplier.contact || '-'}</td>
-                      <td className="px-4 py-3">{supplier.phone || '-'}</td>
-                      <td className="px-4 py-3">{supplier.email || '-'}</td>
-                      <td className="px-4 py-3"><span className="rounded bg-emerald-950 px-2 py-1 text-[10px] text-emerald-300">ACTIVE</span></td>
-                      <td className="px-4 py-3">{date(supplier.createdAt)}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-1.5 py-2 text-slate-500">{(supplierPage - 1) * supplierPageSize + index + 1}</td>
+                      <td className="truncate px-1.5 py-2 font-semibold text-cyan-300">{supplier.code}</td>
+                      <td className="truncate px-1.5 py-2 text-white">{supplier.name}</td>
+                      <td className="truncate px-1.5 py-2">{supplier.contact || '-'}</td>
+                      <td className="truncate px-1.5 py-2">{supplier.phone || '-'}</td>
+                      <td className="truncate px-1.5 py-2">{supplier.email || '-'}</td>
+                      <td className="px-1.5 py-2"><span className="rounded bg-emerald-950 px-2 py-1 text-[10px] text-emerald-300">ACTIVE</span></td>
+                      <td className="truncate px-1.5 py-2">{date(supplier.createdAt)}</td>
+                      <td className="px-1.5 py-2">
                         <button onClick={(event) => { event.stopPropagation(); openEditModal(supplier) }} className="inline-flex items-center gap-1 rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-500">
                           <Pencil size={13} /> Sửa
                         </button>
@@ -172,40 +180,32 @@ export function SuppliersPage() {
                   ))}
                   {!isLoading && supplierTableEmptyRows.map((_, index) => (
                     <tr key={`supplier-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
-                      <td colSpan={9} className="h-[45px] px-4 py-3">
+                      <td colSpan={9} className="h-[45px] px-1.5 py-2">
                         <div className="h-px w-full bg-white/[0.035]" />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+              {!isLoading && !rows.length ? <CockpitEmptyState title="Chưa có nhà cung cấp" description="Tạo nhà cung cấp đầu tiên để dùng trong Inventory inbound và đánh giá NCC." icon={<PackageSearch size={18} />} /> : null}
+            </CockpitTableShell>
+            <DataTablePagination page={supplierPage} pageSize={supplierPageSize} total={rows.length} onPageChange={setSupplierPage} pageSizeOptions={pageSizeOptions} onPageSizeChange={(value) => { setSupplierPageSize(value); setSupplierPage(1) }} />
+          </section>
+
+          <aside className="space-y-1 xl:sticky xl:top-3 xl:self-start">
+            <InsightList title="Top Suppliers" rows={summary?.topSuppliers ?? []} empty="Chưa có dữ liệu xếp hạng." />
+            <CockpitChartCard title="Recent Suppliers" heightClass="h-[170px]" chartHeightClass="h-[98px]">
+              <CockpitRecentList items={(summary?.recentSuppliers ?? suppliers.slice(0, 5)).map((supplier) => ({ id: supplier.id, title: supplier.code, subtitle: supplier.name, time: date(supplier.createdAt), statusDot: 'bg-cyan-400' }))} emptyMessage="Chưa có nhà cung cấp gần đây." />
+            </CockpitChartCard>
+            <InsightList title="Most Used Suppliers" rows={summary?.mostUsedSuppliers ?? []} empty="Chưa có NCC dùng trong Inventory." />
+          </aside>
           </div>
 
-          <aside className="space-y-3 xl:sticky xl:top-3 xl:self-start">
-            <InsightList title="Top Suppliers" rows={summary?.topSuppliers ?? []} empty="Chưa có dữ liệu xếp hạng." />
-            <div className={`${panel} p-4`}>
-              <h3 className="text-sm font-semibold text-slate-100">Recent Suppliers</h3>
-              <div className="mt-3 space-y-2">
-                {(summary?.recentSuppliers ?? suppliers.slice(0, 5)).map((supplier) => (
-                  <button key={supplier.id} onClick={() => setSelectedSupplier(supplier)} className="flex w-full justify-between rounded border border-slate-800 px-3 py-2 text-left text-xs hover:border-cyan-600">
-                    <span className="text-cyan-300">{supplier.code}</span>
-                    <span className="truncate pl-3 text-slate-300">{supplier.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <InsightList title="Most Used Suppliers" rows={summary?.mostUsedSuppliers ?? []} empty="Chưa có NCC dùng trong Inventory." />
-            <div className={`${panel} p-4`}>
-              <h3 className="text-sm font-semibold text-slate-100">Supplier analytics readiness</h3>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <SupplierInsightEmptyCard icon={BarChart3} label="Spend trend" />
-                <SupplierInsightEmptyCard icon={Truck} label="Delivery SLA" />
-                <SupplierInsightEmptyCard icon={Star} label="Quality score" />
-                <SupplierInsightEmptyCard icon={PackageSearch} label="Material mix" />
-              </div>
-            </div>
-          </aside>
+          <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+            <SupplierReadinessCard title="Spend trend" icon={BarChart3} />
+            <SupplierReadinessCard title="Delivery SLA" icon={Truck} />
+            <SupplierReadinessCard title="Quality score" icon={Star} />
+            <SupplierReadinessCard title="Material mix" icon={PackageSearch} />
           </div>
         </> : isSupplierQualityView ? <SupplierEvaluationTab
           data={evaluations}
@@ -235,8 +235,8 @@ export function SuppliersPage() {
   )
 }
 
-function KpiCard({ title, value, note, tone = 'cyan', trend }: { title: string; value: number; note: string; tone?: 'cyan' | 'emerald' | 'amber'; trend?: number[] }) {
-  return <CockpitKpiCard title={title} value={fmt(value)} note={note} tone={tone} trend={trend} />
+function KpiCard({ title, value, note, tone = 'cyan' }: { title: string; value: number; note: string; tone?: 'cyan' | 'emerald' | 'amber'; trend?: number[] }) {
+  return <CockpitKpiCard title={title} value={fmt(value)} note={note} tone={tone} />
 }
 
 function SupplierCapabilityEmpty({ tab }: { tab: SupplierModuleTab }) {
@@ -252,30 +252,68 @@ function SupplierCapabilityEmpty({ tab }: { tab: SupplierModuleTab }) {
     reports: 'Báo cáo',
   }
 
-  return <div className="grid gap-3 xl:grid-cols-[1fr_360px]">
-    <section className={`${panel} overflow-hidden`}>
-      <div className="border-b border-slate-800 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-100">{labels[tab]}</h2>
-        <p className="mt-1 text-xs text-slate-500">Workspace đã sẵn sàng cho dữ liệu nghiệp vụ thật của nhà cung cấp.</p>
+  const question: Partial<Record<SupplierModuleTab, string>> = {
+    quotes: 'Báo giá nào đang cần xử lý?',
+    'purchase-orders': 'Gần đây đã mua gì từ nhà cung cấp?',
+    deliveries: 'Nhà cung cấp nào giao trễ?',
+    payables: 'Công nợ nhà cung cấp đang ở đâu?',
+    logs: 'Có hoạt động nhà cung cấp nào mới?',
+    reports: 'Báo cáo nhà cung cấp nào đã sẵn sàng?',
+  }
+  const columns = capabilityColumns(tab)
+
+  return <div className="space-y-1">
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+      <CockpitKpiCard title="Tổng bản ghi" value="-" note="Chưa có read contract" tone="cyan" state="empty" />
+      <CockpitKpiCard title="Đang xử lý" value="-" note="Chưa có dữ liệu" tone="amber" state="empty" />
+      <CockpitKpiCard title="Hoàn thành" value="-" note="Chưa có dữ liệu" tone="emerald" state="empty" />
+      <CockpitKpiCard title="Cần chú ý" value="-" note="Chưa có dữ liệu" tone="red" state="empty" />
+    </div>
+    <div className="grid grid-cols-1 gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1 md:grid-cols-12">
+      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3 md:col-span-7">
+        <Search size={15} className="text-cyan-400" />
+        <input disabled placeholder={`Tìm kiếm ${labels[tab].toLowerCase()}...`} className="h-9 w-full bg-transparent text-xs text-slate-500 outline-none" />
       </div>
-      <div className="p-6 text-center">
-        <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
-          <FileText size={18} />
+      <div className="hidden items-center justify-end text-xs text-slate-500 md:col-span-5 md:flex">Đang chờ backend read contract.</div>
+    </div>
+    <div className="grid gap-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+      <section className={`${panel} p-3`}>
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">{labels[tab]}</h2>
+          <span className="text-xs text-slate-500">{question[tab] ?? 'Workspace đã sẵn sàng cho dữ liệu thật.'}</span>
         </div>
-        <div className="mt-3 text-sm font-semibold text-slate-100">Chưa có dữ liệu cho {labels[tab]}</div>
-        <p className="mx-auto mt-1 max-w-xl text-xs text-slate-500">
-          Chưa có read contract riêng cho tab này. UI giữ trạng thái rỗng có kiểm soát, không tạo dữ liệu mẫu hoặc số liệu giả.
-        </p>
-      </div>
-    </section>
-    <aside className={`${panel} p-4`}>
-      <h3 className="text-sm font-semibold text-white">Bước tiếp theo</h3>
-      <div className="mt-3 space-y-2 text-xs text-slate-400">
-        <p className="rounded border border-slate-800 bg-slate-950/50 p-3">Xác định owner dữ liệu cho {labels[tab]}.</p>
-        <p className="rounded border border-slate-800 bg-slate-950/50 p-3">Expose read model/API trước khi bật bảng dữ liệu.</p>
-        <p className="rounded border border-slate-800 bg-slate-950/50 p-3">Sau khi có API, dùng Enterprise Table và drawer hiện có.</p>
-      </div>
-    </aside>
+        <CockpitTableShell className="h-[520px]">
+          <table className="w-full min-w-[960px] table-fixed text-left text-sm">
+            <thead className={tableHead}>
+              <tr>{columns.map((heading) => <th key={heading} className="px-1.5 py-1 font-medium">{heading}</th>)}</tr>
+            </thead>
+            <tbody>{Array.from({ length: 10 }).map((_, index) => (
+              <tr key={`capability-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
+                <td colSpan={columns.length} className="h-[45px] px-1.5 py-2"><div className="h-px w-full bg-white/[0.035]" /></td>
+              </tr>
+            ))}</tbody>
+          </table>
+          <CockpitEmptyState title={`Chưa có dữ liệu cho ${labels[tab]}`} description="UI giữ trạng thái rỗng có kiểm soát, không tạo dữ liệu mẫu hoặc số liệu giả." icon={<FileText size={18} />} />
+        </CockpitTableShell>
+      </section>
+      <aside className="space-y-1">
+        <CockpitChartCard title="Bước tiếp theo" heightClass="h-[170px]" chartHeightClass="h-[98px]">
+          <CockpitStatusList items={[
+            { id: 'owner', label: `Xác định owner dữ liệu ${labels[tab]}`, value: 'Pending', statusTone: 'amber' },
+            { id: 'read-model', label: 'Expose read model/API', value: 'Pending', statusTone: 'cyan' },
+            { id: 'table', label: 'Bật Enterprise Table', value: 'Sau API', statusTone: 'purple' },
+          ]} />
+        </CockpitChartCard>
+        <SupplierReadinessCard title="Filter readiness" icon={Search} />
+        <SupplierReadinessCard title="Report readiness" icon={FileText} />
+      </aside>
+    </div>
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+      <SupplierReadinessCard title="Trend" icon={BarChart3} />
+      <SupplierReadinessCard title="SLA" icon={Truck} />
+      <SupplierReadinessCard title="Score" icon={Star} />
+      <SupplierReadinessCard title="Material mix" icon={PackageSearch} />
+    </div>
   </div>
 }
 
@@ -310,10 +348,13 @@ function SupplierEvaluationTab({
 }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string>()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const visibleRows = rows.filter((row) => `${row.code} ${row.name} ${row.contact ?? ''}`.toLowerCase().includes(query.toLowerCase()))
+  const pagedRows = visibleRows.slice((page - 1) * pageSize, page * pageSize)
   const selected = visibleRows.find((row) => row.id === selectedId) ?? visibleRows[0]
   const metrics = data?.metrics
-  const evaluationEmptyRows = Array.from({ length: Math.max(0, 12 - visibleRows.length) })
+  const evaluationEmptyRows = Array.from({ length: Math.max(0, pageSize - Math.min(pageSize, visibleRows.length - (page - 1) * pageSize)) })
   const distribution = [
     ['Xuất sắc', metrics?.excellent ?? 0, 'bg-emerald-500'],
     ['Tốt', metrics?.good ?? 0, 'bg-blue-500'],
@@ -322,8 +363,10 @@ function SupplierEvaluationTab({
   ] as const
   const totalClassified = Math.max(1, distribution.reduce((sum, [, value]) => sum + value, 0))
 
-  return <div className="space-y-4">
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+  useEffect(() => setPage(1), [filter, pageSize, query, rows.length])
+
+  return <div className="space-y-1">
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard title="Tổng nhà cung cấp" value={metrics?.total ?? 0} note="Supplier master" trend={[0, (metrics?.total ?? 0) * 0.75, metrics?.total ?? 0]} />
       <KpiCard title="Đã đánh giá" value={metrics?.evaluated ?? 0} note={`${fmt(metrics?.total ? (metrics.evaluated / metrics.total) * 100 : 0)}%`} tone="emerald" trend={[0, (metrics?.evaluated ?? 0) * 0.65, metrics?.evaluated ?? 0]} />
       <KpiCard title="Điểm đánh giá TB" value={metrics?.averageOverall ?? 0} note="/ 5" tone="amber" trend={[0, (metrics?.averageOverall ?? 0) * 0.7, metrics?.averageOverall ?? 0]} />
@@ -333,12 +376,12 @@ function SupplierEvaluationTab({
       <KpiCard title="Nhà cung cấp ngưng HĐ" value={metrics?.inactive ?? 0} note="Reserved S2" tone="amber" trend={[0, metrics?.inactive ?? 0, metrics?.inactive ?? 0]} />
     </div>
 
-    <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
-      <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3">
+    <div className="grid grid-cols-1 gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1 md:grid-cols-12">
+      <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3 md:col-span-7">
         <Search size={15} className="text-cyan-400" />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm kiếm theo tên, mã NCC, người liên hệ..." className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none" />
       </div>
-      <select value={filter} onChange={(event) => onFilterChange(event.target.value)} className={input}>
+      <select value={filter} onChange={(event) => onFilterChange(event.target.value)} className={`${input} md:col-span-5`}>
         <option value="all">Kết quả đánh giá: Tất cả</option>
         <option value="evaluated">Đã đánh giá</option>
         <option value="EXCELLENT">Xuất sắc</option>
@@ -347,42 +390,41 @@ function SupplierEvaluationTab({
         <option value="WARNING">Cảnh báo</option>
         <option value="UNRATED">Chưa đánh giá</option>
       </select>
-      <button className={mutedButton}>Bộ lọc</button>
-      <button className={mutedButton}>Làm mới</button>
     </div>
 
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className={`${panel} min-h-[640px] overflow-hidden`}>
-        <div className="flex justify-between border-b border-slate-800 px-4 py-3">
+    <div className="grid gap-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+      <section className={`${panel} p-3`}>
+        <div className="mb-1 flex justify-between">
           <h2 className="text-sm font-semibold text-slate-100">Danh sách đánh giá</h2>
           <span className="text-xs text-slate-500">{visibleRows.length} kết quả</span>
         </div>
-        <div className="max-h-[580px] overflow-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className={tableHead}><tr>{['STT', 'Mã nhà cung cấp', 'Tên nhà cung cấp', 'Lần đánh giá mới nhất', 'Điểm tổng', 'Xếp loại', 'Trạng thái'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead>
-            <tbody>{visibleRows.map((row, index) => <tr key={row.id} onClick={() => setSelectedId(row.id)} className={`cursor-pointer ${tableRow} ${selected?.id === row.id ? 'bg-cyan-500/10' : ''}`}>
-              <td className="px-4 py-3 text-slate-500">{index + 1}</td>
-              <td className="px-4 py-3 text-cyan-300">{row.code}</td>
-              <td className="px-4 py-3">{row.name}</td>
-              <td className="px-4 py-3">{date(row.lastEvaluationAt)}</td>
-              <td className="px-4 py-3">{fmt(row.overall)} {Stars(row.overall)}</td>
-              <td className="px-4 py-3"><ClassificationBadge value={row.classification} /></td>
-              <td className="px-4 py-3"><span className="rounded bg-emerald-950 px-2 py-1 text-[10px] text-emerald-300">{row.status}</span></td>
+        <CockpitTableShell className="h-[520px]">
+          <table className="w-full min-w-[960px] table-fixed text-left text-sm">
+            <thead className={tableHead}><tr>{['STT', 'Mã nhà cung cấp', 'Tên nhà cung cấp', 'Lần đánh giá mới nhất', 'Điểm tổng', 'Xếp loại', 'Trạng thái'].map((heading) => <th key={heading} className="px-1.5 py-1 font-medium">{heading}</th>)}</tr></thead>
+            <tbody>{pagedRows.map((row, index) => <tr key={row.id} onClick={() => setSelectedId(row.id)} className={`cursor-pointer ${tableRow} ${selected?.id === row.id ? 'bg-cyan-500/10' : ''}`}>
+              <td className="px-1.5 py-2 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
+              <td className="truncate px-1.5 py-2 text-cyan-300">{row.code}</td>
+              <td className="truncate px-1.5 py-2 text-white">{row.name}</td>
+              <td className="truncate px-1.5 py-2">{date(row.lastEvaluationAt)}</td>
+              <td className="px-1.5 py-2">{fmt(row.overall)} {Stars(row.overall)}</td>
+              <td className="px-1.5 py-2"><ClassificationBadge value={row.classification} /></td>
+              <td className="px-1.5 py-2"><span className="rounded bg-emerald-950 px-2 py-1 text-[10px] text-emerald-300">{row.status}</span></td>
             </tr>)}{evaluationEmptyRows.map((_, index) => (
               <tr key={`evaluation-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]">
-                <td colSpan={7} className="h-[45px] px-4 py-3">
+                <td colSpan={7} className="h-[45px] px-1.5 py-2">
                   <div className="h-px w-full bg-white/[0.035]" />
                 </td>
               </tr>
             ))}</tbody>
           </table>
-        </div>
-      </div>
+          {!visibleRows.length ? <CockpitEmptyState title="Chưa có đánh giá nhà cung cấp" description="Khi backend trả kết quả đánh giá, bảng sẽ hiển thị tại đây." icon={<Star size={18} />} /> : null}
+        </CockpitTableShell>
+        <DataTablePagination page={page} pageSize={pageSize} total={visibleRows.length} onPageChange={setPage} pageSizeOptions={pageSizeOptions} onPageSizeChange={(value) => { setPageSize(value); setPage(1) }} />
+      </section>
 
-      <div className={`${panel} p-4 xl:sticky xl:top-3 xl:self-start`}>
+      <CockpitChartCard title="Kết quả đánh giá chi tiết" heightClass="h-[520px]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-100">Kết quả đánh giá chi tiết</h2>
             <p className="mt-1 text-xs text-slate-500">{selected ? `${selected.code} · ${selected.name}` : 'Chọn nhà cung cấp để xem điểm'}</p>
           </div>
           {selected ? <button onClick={() => {
@@ -411,21 +453,20 @@ function SupplierEvaluationTab({
             </div>)}
           </div>
         </div> : <EmptyState icon={Star} title="Chưa chọn nhà cung cấp" note="Chọn một dòng trong danh sách đánh giá để xem điểm chi tiết." />}
-      </div>
+      </CockpitChartCard>
     </div>
 
-    <div className="grid gap-4 xl:grid-cols-3">
-      <div className={`${panel} p-4`}>
-        <h3 className="text-sm font-semibold text-slate-100">Xu hướng điểm đánh giá</h3>
+    <div className="grid gap-1 md:grid-cols-2 xl:grid-cols-3">
+      <CockpitChartCard title="Xu hướng điểm đánh giá" heightClass="h-[220px]" chartHeightClass="h-[150px]">
         <div className="mt-4 flex h-48 items-end gap-3 border-b border-l border-slate-800 px-3 pb-3">
           {(data?.trend ?? []).map((point) => <div key={point.month} className="flex flex-1 flex-col items-center justify-end gap-2">
             <div className="w-full rounded-t bg-blue-500" style={{ height: `${Math.max(8, point.average / 5 * 100)}%` }} />
             <span className="text-[10px] text-slate-500">{point.month}</span>
           </div>)}
         </div>
-      </div>
-      <div className={`${panel} p-4`}>
-        <h3 className="text-sm font-semibold text-slate-100">Phân loại nhà cung cấp</h3>
+        {!data?.trend?.length ? <CockpitEmptyState title="Chưa có xu hướng" description="Xu hướng sẽ xuất hiện khi có lịch sử đánh giá." /> : null}
+      </CockpitChartCard>
+      <CockpitChartCard title="Phân loại nhà cung cấp" heightClass="h-[220px]" chartHeightClass="h-[150px]">
         <div className="mt-4 space-y-3">
           {distribution.map(([label, value, color]) => <div key={label} className="grid grid-cols-[92px_1fr_48px] items-center gap-3 text-xs">
             <span className="text-slate-300">{label}</span>
@@ -433,17 +474,10 @@ function SupplierEvaluationTab({
             <span className="text-right text-slate-400">{value}</span>
           </div>)}
         </div>
-      </div>
-      <div className={`${panel} p-4`}>
-        <h3 className="text-sm font-semibold text-slate-100">Lịch sử đánh giá gần nhất</h3>
-        <div className="mt-3 space-y-2">
-          {(data?.recent ?? []).map((row) => <div key={row.id} className="grid grid-cols-[1fr_70px] gap-3 rounded border border-slate-800 px-3 py-2 text-xs">
-            <span><b className="text-cyan-300">{row.code}</b><span className="mt-1 block truncate text-slate-400">{row.name}</span></span>
-            <span className="text-right text-emerald-300">{fmt(row.overall)}</span>
-          </div>)}
-          {!data?.recent?.length ? <p className="rounded border border-slate-800 p-3 text-xs text-slate-500">Chưa có lịch sử đánh giá.</p> : null}
-        </div>
-      </div>
+      </CockpitChartCard>
+      <CockpitChartCard title="Lịch sử đánh giá gần nhất" heightClass="h-[220px]" chartHeightClass="h-[150px]">
+        <CockpitRecentList items={(data?.recent ?? []).map((row) => ({ id: row.id, title: row.code, subtitle: row.name, time: `${fmt(row.overall)}/5`, statusDot: row.classification === 'WARNING' ? 'bg-amber-400' : 'bg-emerald-400' }))} emptyMessage="Chưa có lịch sử đánh giá." />
+      </CockpitChartCard>
     </div>
   </div>
 }
@@ -465,12 +499,24 @@ function ClassificationBadge({ value }: { value: SupplierEvaluationRow['classifi
   return <span className={`rounded px-2 py-1 text-[10px] ${tone}`}>{label}</span>
 }
 
-function SupplierInsightEmptyCard({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return <div className="rounded border border-slate-800 bg-slate-950/60 p-3">
-    <Icon size={16} className="text-cyan-300" />
-    <div className="mt-2 text-slate-300">{label}</div>
-    <div className="mt-1 text-[10px] text-slate-600">Chưa có dữ liệu thật</div>
-  </div>
+function SupplierReadinessCard({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <CockpitChartCard title={title} heightClass="h-[170px]" chartHeightClass="h-[98px]">
+      <CockpitEmptyState title="Chưa có dữ liệu" description="Đang chờ read contract thật. Không hiển thị số liệu mẫu." icon={<Icon size={18} />} />
+    </CockpitChartCard>
+  )
+}
+
+function capabilityColumns(tab: SupplierModuleTab) {
+  const columns: Partial<Record<SupplierModuleTab, string[]>> = {
+    quotes: ['Mã báo giá', 'Nhà cung cấp', 'Vật tư', 'Giá trị', 'Hiệu lực', 'Trạng thái'],
+    'purchase-orders': ['Mã đơn mua', 'Nhà cung cấp', 'Ngày đặt', 'Giá trị', 'Tiến độ', 'Trạng thái'],
+    deliveries: ['Mã giao hàng', 'Nhà cung cấp', 'Ngày giao', 'Vật tư', 'Số lượng', 'Trạng thái'],
+    payables: ['Mã chứng từ', 'Nhà cung cấp', 'Ngày đến hạn', 'Giá trị', 'Đã thanh toán', 'Trạng thái'],
+    logs: ['Thời gian', 'Nhà cung cấp', 'Hành động', 'Người thực hiện', 'Ghi chú'],
+    reports: ['Tên báo cáo', 'Nguồn dữ liệu', 'Kỳ báo cáo', 'Trạng thái', 'Xuất file'],
+  }
+  return columns[tab] ?? ['Mã', 'Nhà cung cấp', 'Ngày', 'Giá trị', 'Trạng thái']
 }
 
 function SupplierDetailWorkspace({ supplier, onClose, onEdit }: { supplier: Supplier | null; onClose: () => void; onEdit: (supplier: Supplier) => void }) {

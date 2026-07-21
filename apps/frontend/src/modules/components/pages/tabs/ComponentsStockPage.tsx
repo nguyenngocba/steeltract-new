@@ -2,9 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Package } from 'lucide-react'
 
-import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
-import { ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
-import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
+import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
+import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
+import { CockpitKpiCard } from '../../../../shared/ui/cockpit'
+import {
+  InventoryChartCard,
+  InventoryPagination,
+  InventoryPanel,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '../../../inventory/components/InventoryVisuals'
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
 import { useProductionBoms, useProductionOrders } from '../../../production/hooks/useProductionCockpit'
 import { useYardSlotsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
@@ -108,17 +115,18 @@ export function ComponentsStockPage() {
   }), [components])
 
   return (
-    <ComponentsWorkspace>
+    <EnterpriseModulePage>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-          <CockpitKpiCard title="Tổng cấu kiện" value={formatQuantity(lifecycleCounts.total, 0)} note="Tất cả lifecycle" tone="blue" state="normal" onClick={() => setStatusFilter('')} trendData={[1, 2, 3, 5, lifecycleCounts.total]} />
-          <CockpitKpiCard title="READY" value={formatQuantity(lifecycleCounts.ready, 0)} note="Sẵn sàng" tone="emerald" state="normal" onClick={() => setStatusFilter('READY')} trendData={[1, 2, 3, 4, lifecycleCounts.ready]} />
-          <CockpitKpiCard title="SHIPPED" value={formatQuantity(lifecycleCounts.shipped, 0)} note="Đã xuất bãi" tone="cyan" state="normal" onClick={() => setStatusFilter('SHIPPED')} trendData={[0, 1, 2, 3, lifecycleCounts.shipped]} />
-          <CockpitKpiCard title="DELIVERED" value={formatQuantity(lifecycleCounts.delivered, 0)} note="Đã nhận" tone="purple" state="normal" onClick={() => setStatusFilter('DELIVERED')} trendData={[0, 1, 1, 2, lifecycleCounts.delivered]} />
-          <CockpitKpiCard title="INSTALLED" value={formatQuantity(lifecycleCounts.installed, 0)} note="Đã lắp đặt" tone="amber" state="normal" onClick={() => setStatusFilter('INSTALLED')} trendData={[0, 0, 1, 1, lifecycleCounts.installed]} />
+          <CockpitKpiCard title="Tổng cấu kiện" value={formatQuantity(lifecycleCounts.total, 0)} note="Tất cả lifecycle" tone="blue" state="normal" onClick={() => setStatusFilter('')} className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="READY" value={formatQuantity(lifecycleCounts.ready, 0)} note="Sẵn sàng" tone="emerald" state="normal" onClick={() => setStatusFilter('READY')} className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="SHIPPED" value={formatQuantity(lifecycleCounts.shipped, 0)} note="Đã xuất bãi" tone="cyan" state="normal" onClick={() => setStatusFilter('SHIPPED')} className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="DELIVERED" value={formatQuantity(lifecycleCounts.delivered, 0)} note="Đã nhận" tone="purple" state="normal" onClick={() => setStatusFilter('DELIVERED')} className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="INSTALLED" value={formatQuantity(lifecycleCounts.installed, 0)} note="Đã lắp đặt" tone="amber" state="normal" onClick={() => setStatusFilter('INSTALLED')} className="!h-[92px] !p-3" />
         </div>
 
-        <ModuleFilterBar>
+        <InventoryPanel className="rounded-xl">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-8">
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên cấu kiện, zone, slot..." className={`${componentsInput} xl:col-span-6`} />
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${componentsInput} xl:col-span-2`}>
             <option value="">Trạng thái: Tất cả</option>
@@ -127,14 +135,18 @@ export function ComponentsStockPage() {
             <option value="DELIVERED">DELIVERED</option>
             <option value="INSTALLED">INSTALLED</option>
           </select>
-        </ModuleFilterBar>
+          </div>
+        </InventoryPanel>
 
         <div className="grid grid-cols-12 gap-1">
           <div className="col-span-12 xl:col-span-9">
-            <CockpitChartCard title={`Danh sách tồn kho cấu kiện (${filtered.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
-              <CockpitTableShell className="h-full">
-                <table className="w-full min-w-[980px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-355">
+            <InventoryPanel
+              title={<h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">{`Danh sách tồn kho cấu kiện (${filtered.length})`}</h3>}
+              className="h-[520px]"
+            >
+              <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
+                <table className="w-full min-w-[980px] table-fixed text-sm">
+                  <thead className={inventoryTableHead}>
                     <tr>
                       {['Mã cấu kiện', 'Tên', 'Dự án', 'Zone/kho', 'Vị trí', 'Trọng lượng', 'Trạng thái', 'Ngày tạo'].map((heading) => (
                         <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300 border-b border-cyan-400/10">{heading}</th>
@@ -145,7 +157,7 @@ export function ComponentsStockPage() {
                     {isLoading ? (
                       <tr><td colSpan={8} className="px-4 py-6"><ModuleLoadingState label="Đang tải tồn kho cấu kiện..." /></td></tr>
                     ) : paginatedRows.map((row) => (
-                      <tr key={row.id} onClick={() => setSelectedRow(row)} className="cursor-pointer border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
+                      <tr key={row.id} onClick={() => setSelectedRow(row)} className={inventoryTableRow}>
                         <td className="truncate px-4 py-2.5 text-cyan-300 font-mono">{row.code}</td>
                         <td className="truncate px-4 py-2.5 text-white">{row.name}</td>
                         <td className="truncate px-4 py-2.5 text-slate-300">{row.project}</td>
@@ -158,20 +170,20 @@ export function ComponentsStockPage() {
                     ))}
                   </tbody>
                 </table>
-              </CockpitTableShell>
+              </div>
               {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState icon={<Package size={18} />} title="Chưa có dữ liệu cấu kiện" description="Thử đổi từ khóa hoặc trạng thái lọc." /></div> : null}
-            </CockpitChartCard>
-            <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+            </InventoryPanel>
+            <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))} total={filtered.length} onPageChange={setPage} />
           </div>
           <div className="col-span-12 space-y-1 xl:col-span-3">
-            <CockpitChartCard title="Giá trị tồn" className={COCKPIT_HEIGHTS.CHART_SM}>
+            <InventoryChartCard title="Giá trị tồn" className="h-[170px]">
               <div className="space-y-1 text-xs text-slate-300">
                 <div className="flex justify-between"><span>Cấu kiện có vị trí bãi</span><b className="text-emerald-300">{inYard}</b></div>
                 <div className="flex justify-between"><span>Trọng lượng đang lưu</span><b className="text-cyan-300">{formatQuantity(totalWeight, 1)} tấn</b></div>
                 <div className="flex justify-between"><span>Tổng cấu kiện</span><b className="text-white">{formatQuantity(components.length, 0)}</b></div>
               </div>
-            </CockpitChartCard>
-            <CockpitChartCard title="Theo trạng thái" className={COCKPIT_HEIGHTS.CHART_SM}>
+            </InventoryChartCard>
+            <InventoryChartCard title="Theo trạng thái" className="h-[170px]">
               <ComponentsDonut
                 centerValue={formatQuantity(rows.length, 0)}
                 centerLabel="cấu kiện"
@@ -181,14 +193,14 @@ export function ComponentsStockPage() {
                   { label: 'Khác', value: Math.max(0, components.length - inYard - ready), color: '#1d7cff' },
                 ]}
               />
-            </CockpitChartCard>
-            <CockpitChartCard title="Cảnh báo" className={COCKPIT_HEIGHTS.CHART_SM}>
+            </InventoryChartCard>
+            <InventoryChartCard title="Cảnh báo" className="h-[170px]">
               <div className="space-y-1 text-xs text-slate-300">
                 <div className="flex justify-between"><span>READY chưa vào bãi</span><b className="text-amber-300">{ready}</b></div>
                 <div className="flex justify-between"><span>Chưa có vị trí bãi</span><b className="text-red-300">{Math.max(0, components.length - inYard)}</b></div>
                 {!components.length ? <ModuleEmptyState icon={<AlertTriangle size={18} />} title="Chưa có cảnh báo" description="Cảnh báo tồn kho cấu kiện sẽ hiển thị tại đây." /> : null}
               </div>
-            </CockpitChartCard>
+            </InventoryChartCard>
           </div>
         </div>
       </div>
@@ -216,6 +228,6 @@ export function ComponentsStockPage() {
           </>
         ) : null}
       </ModuleDetailDrawer>
-    </ComponentsWorkspace>
+    </EnterpriseModulePage>
   )
 }

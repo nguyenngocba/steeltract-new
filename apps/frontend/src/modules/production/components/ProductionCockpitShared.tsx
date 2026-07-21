@@ -39,7 +39,6 @@ export function ProductionKpi({ label, value, note, tone = 'cyan', active, onCli
       tone={mappedTone}
       active={active}
       onClick={onClick}
-      trend={[8, 12, 10, 15, 14, 18]}
     />
   )
 }

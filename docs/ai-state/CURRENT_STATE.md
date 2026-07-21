@@ -1,5 +1,104 @@
 # Current State
 
+## EPIC 6.0 QC UI Completion
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+QC has received a UI-only production-readiness pass. Inspection workspaces now
+use read-model pagination state instead of a fixed `limit: 100`, render through
+shared cockpit table/pagination primitives and use standard empty states.
+Global inert toolbar buttons were removed. KPI cards use authoritative runtime
+metrics without synthetic sparkline arrays.
+
+No backend, route, API, schema, permission, React Query contract or business
+behavior changed.
+
+## EPIC 3.2 Production Workspace Finalization
+
+Status: **SOURCE/BUILD FINALIZED - BROWSER QA PENDING**
+
+Production was re-audited after EPIC 3 and EPIC 3.1. Active P0/P1 workspaces
+already satisfy the source-level operator readiness gate: Queue, Machines,
+Consumptions, Incidents and the core order workspaces keep a complete
+table-first operational rhythm with real data or controlled empty states. No
+additional Production source changes were required in this pass.
+
+Running, Completed and Scrap remain P2 route/model decisions.
+
+## EPIC 5.0 Suppliers UI Completion
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+Suppliers received a UI-only completion pass against the current enterprise
+canon. Overview/List now uses KPI cards, compact search panel, a paginated
+hero supplier table, right analytics rail and bottom readiness analytics.
+Quality/Performance now uses KPI cards, compact filter/search, paginated hero
+evaluation table, right detail rail and bottom analytics from the existing
+evaluation cockpit data. Capability tabs without backend contracts now render
+full controlled empty workspaces rather than single placeholders.
+
+No backend, route, API, schema, permission, React Query contract or business
+behavior changed.
+
+## EPIC 4.0 Projects UI Completion
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+Projects received a UI-only completion pass against the Inventory,
+Components and Production canon. Overview and Projects List now start from the
+same operational rhythm as Inventory: KPI cards, the existing Projects filter,
+a dominant hero table, a right analytics rail and a lower analytics band.
+The active project detail timeline no longer uses static milestone labels; it
+renders WBS/phase milestones from real data or a standard empty state.
+
+No backend, route, API, schema, permission, React Query contract or business
+behavior changed.
+
+## EPIC 3.1 Production UI Polish
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+Production has received a focused UI polish pass after EPIC 3. The toolbar now
+uses working status filters instead of inert controls. Production Queue now
+starts with a table-hero registry, pagination, stable empty rows and a right
+analytics rail before the kanban lanes. Consumptions and Incidents now have
+fuller right rails using cockpit cards and real derived data or standard empty
+states.
+
+No backend, API, schema, permission, React Query contract or business behavior
+changed.
+
+## EPIC 3 Production Completion
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+Production P0/P1 remediation is source/build complete. The Machines workspace
+is now route-visible at `/production/machines` and uses the existing
+authenticated machine endpoint. Production KPI cards no longer fabricate
+sparkline trends, and chart areas no longer use synthetic fallback values to
+force visual output. Consumption and Incidents now paginate rather than render
+unbounded rows. BOM, Warehouse, Issues, Reservations, Material Ledger and Logs
+tables keep stable empty rows to preserve the Inventory table-hero footprint.
+
+Backend APIs, schema, permissions, React Query contracts and business behavior
+are unchanged. Final visual certification still requires authenticated
+screenshots.
+
+## EPIC 2 Components Completion
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+Components secondary workspaces have been remediated against the Inventory UI
+canon. Production/BOM, Stock, Material Stock, Transfers, Internal QC, History
+and Reports now use Inventory-canon primitives for panels, chart cards, table
+hero surfaces and pagination. Hardcoded trend arrays, synthetic chart fallback
+values and non-functional History filters were removed. Backend, API, React
+Query, routes, permissions, schema and business behavior are unchanged.
+
+Components is now estimated at 90% completion in the full UI audit backlog.
+Final certification still requires authenticated screenshots because the
+workspace has no approved browser harness.
+
 ## Components Inventory Canon Alignment
 
 Status: **IMPLEMENTED - VISUAL QA PENDING**

@@ -5,6 +5,7 @@ export const productionTabs = [
   { label: 'Production BOM', path: '/production/boms' },
   { label: 'Kho vật tư SX', path: '/production/warehouse' },
   { label: 'Theo dõi thực hiện', path: '/production/execution' },
+  { label: 'Máy móc', path: '/production/machines' },
   { label: 'Giữ chỗ vật tư', path: '/production/reservations' },
   { label: 'Sổ vật tư SX', path: '/production/material-ledger' },
   { label: 'Cấp phát vật tư', path: '/production/material-issues' },

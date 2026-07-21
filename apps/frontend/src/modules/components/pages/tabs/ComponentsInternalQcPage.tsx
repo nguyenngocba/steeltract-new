@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, ClipboardCheck, Search, ShieldAlert } from 'lucide-react'
 
-import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
-import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
-import { ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
+import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
+import { CockpitKpiCard } from '../../../../shared/ui/cockpit'
+import { ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
+import {
+  InventoryChartCard,
+  InventoryPagination,
+  InventoryPanel,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '../../../inventory/components/InventoryVisuals'
 import { useComponents } from '../../hooks/queries/useComponents'
 import { formatQuantity } from '@/shared/utils/number-format'
 import { ComponentsDonut, componentsInput, componentsMutedButton } from './ComponentsCockpitShared'
@@ -53,20 +60,24 @@ export function ComponentsInternalQcPage() {
   const waitingCount = rows.filter((row) => row.result === 'Chờ dữ liệu').length
   const readyToShipCount = rows.filter((row) => ['READY', 'SHIPPED', 'DELIVERED', 'INSTALLED'].includes(row.status)).length
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const latestUpdatedAt = rows
+    .map((row) => row.updatedAt)
+    .filter((value) => value && value !== '-')[0] ?? 'Chưa có'
 
   return (
-    <ComponentsWorkspace>
+    <EnterpriseModulePage>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-          <CockpitKpiCard title="Cấu kiện cần QC" value={formatQuantity(rows.length, 0)} note="Dữ liệu cấu kiện" state="normal" tone="cyan" />
-          <CockpitKpiCard title="QC đạt" value={formatQuantity(passedCount, 0)} note="READY trở lên" state="normal" tone="emerald" />
-          <CockpitKpiCard title="Đang kiểm" value={formatQuantity(activeCount, 0)} note="Cut / Weld / Paint" state="normal" tone="blue" />
-          <CockpitKpiCard title="Chờ QC fact" value={formatQuantity(waitingCount, 0)} note="Chưa có result riêng" state="normal" tone="amber" />
-          <CockpitKpiCard title="Ready to ship" value={formatQuantity(readyToShipCount, 0)} note="Có thể chuyển bãi" state="normal" tone="purple" />
-          <CockpitKpiCard title="Nguồn dữ liệu" value="Đang cập nhật" note="Lifecycle cấu kiện" state="normal" tone="red" />
+          <CockpitKpiCard title="Cấu kiện cần QC" value={formatQuantity(rows.length, 0)} note="Dữ liệu cấu kiện" state="normal" tone="cyan" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="QC đạt" value={formatQuantity(passedCount, 0)} note="READY trở lên" state="normal" tone="emerald" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Đang kiểm" value={formatQuantity(activeCount, 0)} note="Cut / Weld / Paint" state="normal" tone="blue" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Chờ dữ liệu" value={formatQuantity(waitingCount, 0)} note="Chưa có QC fact" state="normal" tone="amber" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Ready to ship" value={formatQuantity(readyToShipCount, 0)} note="Có thể chuyển bãi" state="normal" tone="purple" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Cập nhật gần nhất" value={latestUpdatedAt} note="Theo component row" state="normal" tone="blue" className="!h-[92px] !p-3" />
         </div>
 
-        <ModuleFilterBar>
+        <InventoryPanel className="rounded-xl">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-11">
           <div className="flex min-w-64 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-6">
             <Search size={15} className="text-cyan-400" />
             <input
@@ -83,17 +94,21 @@ export function ComponentsInternalQcPage() {
             <option value="Chờ dữ liệu">Chờ dữ liệu</option>
           </select>
           <button type="button" onClick={() => { setQuery(''); setStatus('') }} className={`${componentsMutedButton} xl:col-span-2`}>Làm mới</button>
-        </ModuleFilterBar>
+          </div>
+        </InventoryPanel>
 
         {isError ? (
           <ModuleEmptyState icon={<ShieldAlert size={18} />} title="Không thể tải dữ liệu QC cấu kiện" description="Kiểm tra kết nối hoặc quyền truy cập Components." />
         ) : (
           <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
             <div className="xl:col-span-9">
-              <CockpitChartCard title={`Hàng đợi QC cấu kiện (${rows.length})`} subtitle="Theo lifecycle cấu kiện hiện có" className={COCKPIT_HEIGHTS.TABLE_MD}>
-                <CockpitTableShell className="h-full">
-                  <table className="w-full min-w-[960px] table-fixed text-[13px]">
-                    <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+              <InventoryPanel
+                title={<h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">{`Hàng đợi QC cấu kiện (${rows.length})`}</h3>}
+                className="h-[520px]"
+              >
+                <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
+                  <table className="w-full min-w-[960px] table-fixed text-sm">
+                    <thead className={inventoryTableHead}>
                       <tr>
                         {['Mã cấu kiện', 'Tên', 'Dự án', 'Khu vực QC', 'Lifecycle', 'Kết quả', 'Vị trí', 'Cập nhật'].map((heading) => (
                           <th key={heading} className="px-3 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
@@ -104,7 +119,7 @@ export function ComponentsInternalQcPage() {
                       {isLoading ? (
                         <tr><td colSpan={8} className="px-3 py-8"><ModuleLoadingState label="Đang tải QC cấu kiện..." /></td></tr>
                       ) : pageRows.length ? pageRows.map((row) => (
-                        <tr key={row.id} className="border-b border-white/[0.04] text-slate-200 transition hover:bg-cyan-400/[0.04]">
+                        <tr key={row.id} className={inventoryTableRow}>
                           <td className="truncate px-3 py-2 font-mono text-cyan-300">{row.code}</td>
                           <td className="truncate px-3 py-2 text-white">{row.name}</td>
                           <td className="truncate px-3 py-2">{row.project}</td>
@@ -123,23 +138,23 @@ export function ComponentsInternalQcPage() {
                       )}
                     </tbody>
                   </table>
-                </CockpitTableShell>
-                <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
-              </CockpitChartCard>
+                </div>
+                <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(rows.length / pageSize))} total={rows.length} onPageChange={setPage} />
+              </InventoryPanel>
             </div>
 
             <div className="space-y-1 xl:col-span-3">
-              <CockpitChartCard title="Phân bổ QC" className={COCKPIT_HEIGHTS.CHART_SM}>
+              <InventoryChartCard title="Phân bổ QC" className="h-[170px]">
                 <ComponentsDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="QC" segments={[
                   { label: 'Đạt', value: passedCount, color: '#14c987' },
                   { label: 'Đang kiểm', value: activeCount, color: '#06b6d4' },
                   { label: 'Chờ', value: waitingCount, color: '#f59e0b' },
                 ]} />
-              </CockpitChartCard>
-              <CockpitChartCard title="NCR" className={COCKPIT_HEIGHTS.CHART_SM}>
+              </InventoryChartCard>
+              <InventoryChartCard title="NCR" className="h-[170px]">
                 <ModuleEmptyState icon={<ShieldAlert size={18} />} title="Chưa có NCR từ API" description="NCR thật sẽ hiển thị khi QC domain cung cấp contract." />
-              </CockpitChartCard>
-              <CockpitChartCard title="Gần đây" className={COCKPIT_HEIGHTS.CHART_SM}>
+              </InventoryChartCard>
+              <InventoryChartCard title="Gần đây" className="h-[170px]">
                 {rows.slice(0, 5).map((row) => (
                   <div key={row.id} className="mb-1 flex justify-between gap-2 text-xs text-slate-300">
                     <span className="truncate text-cyan-300">{row.code}</span>
@@ -147,11 +162,11 @@ export function ComponentsInternalQcPage() {
                   </div>
                 ))}
                 {!rows.length ? <ModuleEmptyState icon={<CheckCircle2 size={18} />} title="Chưa có hoạt động" description="Không có cấu kiện trong bộ lọc hiện tại." /> : null}
-              </CockpitChartCard>
+              </InventoryChartCard>
             </div>
           </div>
         )}
       </div>
-    </ComponentsWorkspace>
+    </EnterpriseModulePage>
   )
 }

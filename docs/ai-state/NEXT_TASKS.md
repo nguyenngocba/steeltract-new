@@ -1,5 +1,95 @@
 # Next Tasks
 
+- **EPIC 7.0 global UI certification follow-up**: use
+  `docs/ui/global-ui-consistency-report.md` and
+  `docs/ui/global-design-debt.md` as the source of truth for the next UI
+  remediation wave. Do not start broad refactors before the browser screenshot
+  harness decision.
+- **Global screenshot harness decision**: approve or provide an authenticated
+  Playwright/Chromium workflow so Inventory, Components, Production, Projects,
+  Suppliers, QC, Logistics, Planning and Admin can be certified at real
+  viewport sizes.
+- **Logistics/Planning P0 route decisions**: decide whether Logistics Vehicles
+  and Planning routes should receive real workspaces or be removed/hidden until
+  read contracts exist. Decide whether Planning should be registered as a
+  visible module.
+
+- **QC visual QA after EPIC 6.0**: capture authenticated screenshots for `/qc`,
+  `/qc/dashboard`, `/qc/inbound`, `/qc/production`, `/qc/final`, `/qc/ncr`,
+  `/qc/capa`, `/qc/logs` and `/qc/reports`. Confirm the paginated inspection
+  table, right rail, bottom analytics and empty states match the Inventory,
+  Components, Production, Projects and Suppliers rhythm.
+- **QC route/read-contract follow-up**: decide whether Pending, Passed and
+  Failed should become first-class route tabs. Define a calibration backend read
+  contract before replacing the controlled empty calibration workspace.
+
+- **Production visual QA after EPIC 3.2**: capture authenticated screenshots for
+  `/production`, `/production/orders`, `/production/planning`,
+  `/production/execution`, `/production/machines`, `/production/warehouse`,
+  `/production/reservations`, `/production/material-ledger`,
+  `/production/material-issues`, `/production/consumptions`,
+  `/production/incidents`, `/production/logs` and `/production/reports`.
+  Confirm the finalized operator workspaces remain visually complete with real
+  data density.
+
+- **Suppliers visual QA after EPIC 5.0**: capture authenticated screenshots for
+  `/suppliers`, `/suppliers/list`, `/suppliers/quotes`,
+  `/suppliers/purchase-orders`, `/suppliers/deliveries`,
+  `/suppliers/quality`, `/suppliers/payables`, `/suppliers/logs` and
+  `/suppliers/reports`. Confirm Supplier list, Quality and empty capability
+  workspaces match the Inventory/Components/Production/Projects rhythm.
+- **Supplier read-contract roadmap**: define backend read contracts before
+  populating Quotes, Purchase Orders, Deliveries, Payables, Logs and Reports.
+  Keep those workspaces as controlled empty states until authoritative data is
+  available.
+
+- **Projects visual QA after EPIC 4.0**: capture authenticated screenshots for
+  `/projects`, `/projects/list`, `/projects/templates`, `/projects/progress`,
+  `/projects/components`, `/projects/materials`, `/projects/costs`,
+  `/projects/documents`, `/projects/logs` and `/projects/reports`. Confirm the
+  hero table, right rail, lower analytics, empty states and drawer timeline
+  visually match the Inventory/Components/Production rhythm.
+- **Projects route decision follow-up**: decide whether Timeline, Resources and
+  Milestones should become first-class sidebar routes. They were not added in
+  EPIC 4.0 because the current router exposes Timeline only inside the project
+  detail drawer and the sprint was UI-only/no-route-redesign.
+- **Projects legacy mock-string cleanup**: review unused legacy source files in
+  `apps/frontend/src/modules/projects/components` that still contain sample
+  project names. They are not imported by active routes, but can be removed or
+  converted in a dedicated dead-code cleanup sprint.
+
+- **Production visual QA after EPIC 3.1**: capture authenticated screenshots for
+  `/production`, `/production/orders`, `/production/planning`,
+  `/production/execution`, `/production/machines`, `/production/warehouse`,
+  `/production/reservations`, `/production/material-ledger`,
+  `/production/material-issues`, `/production/consumptions`,
+  `/production/incidents` and `/production/logs`. Confirm the queue table hero,
+  right rails and bottom boards visually match the Inventory cockpit rhythm.
+
+- **Production browser certification**: capture authenticated screenshots for
+  `/production`, `/production/orders`, `/production/planning`,
+  `/production/execution`, `/production/machines`, `/production/boms`,
+  `/production/warehouse`, `/production/reservations`,
+  `/production/material-ledger`, `/production/material-issues`,
+  `/production/consumptions`, `/production/incidents`, `/production/logs` and
+  `/production/reports`. EPIC 3 is source/build implemented, but final visual
+  certification still depends on a browser harness.
+- **Production P2 route/query decisions**: decide whether Running, Completed
+  and Scrap should become first-class route tabs, and plan a separate Query API
+  adoption pass for non-order legacy read hooks. These were intentionally out
+  of P0/P1 scope.
+
+- **Components browser certification**: capture authenticated screenshots for
+  `/components`, `/components/list`, `/components/production`,
+  `/components/stock`, `/components/material-stock`, `/components/transfers`,
+  `/components/qc`, `/components/history` and `/components/reports` at the
+  standard breakpoints. EPIC 2 is source/build implemented, but final visual
+  certification still depends on a browser harness.
+- **Components authoritative QC/read-model follow-up**: Internal QC currently
+  renders lifecycle-derived component data because no authoritative Components
+  QC result/NCR read contract exists. Define the backend contract before
+  replacing those empty/derived states.
+
 - **Components visual QA**: compare `/components` and `/components/list`
   against Inventory Overview and Inventory Materials at 1366px, 1600px and
   1920px with real data. Confirm the table remains the hero, right rails feel

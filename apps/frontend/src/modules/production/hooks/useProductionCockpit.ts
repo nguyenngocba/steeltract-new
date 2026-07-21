@@ -60,8 +60,8 @@ export const useReservationPreview = (id?: string) =>
 export const useProductionLogs = (enabled = true) =>
   useQuery({ queryKey: ['production', 'logs'], queryFn: productionApi.logs, enabled })
 
-export const useProductionMachines = () =>
-  useQuery({ queryKey: ['production', 'machines'], queryFn: productionApi.machines, refetchInterval: 5000 })
+export const useProductionMachines = (enabled = true) =>
+  useQuery({ queryKey: ['production', 'machines'], queryFn: productionApi.machines, refetchInterval: 5000, enabled })
 
 export const useMaterialRequirements = (id?: string) =>
   useQuery({

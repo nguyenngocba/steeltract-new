@@ -1,5 +1,41 @@
 # Production Module
 
+## EPIC 3.1 Production UI Polish
+
+Implemented on 2026-07-21.
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+- Production toolbar now uses active quick status filters instead of inert
+  filters.
+- Production Queue now has a paginated table hero and right analytics rail
+  before the kanban board.
+- The kanban remains available as a lower operational workspace.
+- Consumption and Incidents right rails now use fuller cockpit analytics cards
+  backed by existing data or standard empty states.
+- Backend, API contracts, React Query contracts, permissions, schema and
+  business behavior are unchanged.
+
+## EPIC 3 Production Completion
+
+Implemented on 2026-07-21.
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+- `/production/machines` is now a visible Production workspace backed by the
+  existing `/production/machines` endpoint.
+- Production Machines uses shared cockpit table, pagination, KPI, donut,
+  mini-bar and empty-state primitives.
+- Production KPI cards no longer render synthetic trend arrays when no real
+  historical trend contract exists.
+- Production chart fallbacks no longer inject fake values; missing data is
+  represented by standard no-data states.
+- Consumption and Incidents now use `DataTablePagination`.
+- BOM, Warehouse, Issues, Reservations, Ledger and Logs tables preserve stable
+  empty rows for Inventory-canon table height behavior.
+- Backend, API contracts, React Query keys, permissions, schema and business
+  behavior are unchanged.
+
 ## EPIC BUSINESS001 Steel Structure Domain Completion
 
 Implemented on 2026-07-18.

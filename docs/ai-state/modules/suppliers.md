@@ -19,6 +19,10 @@ This module covers the Supplier Master Registry, Supplier Evaluations, and the P
 * Inventory-derived supplier usage and inbound transaction history.
 * Read-only supplier scorecard evaluation tab (linking SupplierScore by name and counts).
 * Layout aligns with the shared cockpit WMS design.
+* EPIC 5.0 aligns Supplier Overview/List and Quality with the enterprise UI
+  canon: KPI-first, compact filter, paginated hero table, right analytics rail,
+  bottom analytics and truthful empty capability workspaces for unavailable
+  purchasing data.
 
 ## Database Models
 

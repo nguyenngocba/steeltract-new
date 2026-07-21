@@ -7,10 +7,10 @@ This plan is documentation-only. It does not authorize code changes by itself.
 | Phase | Module | Current completion | Target completion for phase |
 | --- | --- | ---: | ---: |
 | 1 | Inventory | 88% | 96% |
-| 2 | Components | 78% | 94% |
-| 3 | Production | 72% | 92% |
-| 4 | Projects | 68% | 88% |
-| 5 | Suppliers | 55% | 86% |
+| 2 | Components | 90% | 94% after browser certification |
+| 3 | Production | 88% | 92% after browser certification |
+| 4 | Projects | 84% | 88% after browser certification |
+| 5 | Suppliers | 82% | 86% after browser certification |
 | 6 | QC | 62% | 88% |
 | 7 | Logistics | 58% | 86% |
 | 8 | Planning | 20% | 70% after route decision |
@@ -87,8 +87,9 @@ This plan is documentation-only. It does not authorize code changes by itself.
 
 **Completion criteria**
 - Overview/List remain certified.
-- All visible Components tabs pass the same audit checklist.
-- BOM/Ready Queue either have real workspaces or documented route decisions.
+- All visible Components tabs pass the same audit checklist at source/build level.
+- BOM is surfaced through the Production/BOM workspace with existing real data; a dedicated BOM route remains a deferred route/read-model decision.
+- Browser screenshots are captured before final 94% certification.
 
 ## Phase 3 - Production
 
@@ -121,29 +122,35 @@ This plan is documentation-only. It does not authorize code changes by itself.
 
 **Completion criteria**
 - Every visible Production route has KPI/filter/table/right rail or truthful empty state.
-- Machines route is implemented with real data or intentionally removed.
-- No legacy path silently bypasses UI standards.
+- Machines route is implemented with real data from the existing machine endpoint.
+- Production P0/P1 table pagination and empty-row parity is source/build complete.
+- Browser screenshots remain required before final 92% certification.
+- P2 legacy Query API cleanup remains deferred.
 
 ## Phase 4 - Projects
 
 **Objectives**
-- Normalize Projects branches against Inventory canon.
-- Decide Timeline route/label strategy.
+- Source/build normalize Projects branches against Inventory canon.
 - Keep rich Projects data but improve consistency.
+- Defer Timeline/Resources/Milestones route decisions to product navigation.
 
 **Files expected to change**
 - `apps/frontend/src/modules/projects/pages/ProjectsPage.tsx`
-- `apps/frontend/src/modules/projects/components/ProjectCockpit.tsx`
-- `apps/frontend/src/modules/projects/components/ProjectRuntimeTable.tsx`
-- `apps/frontend/src/modules/projects/components/ProjectTimeline.tsx`
-- `apps/frontend/src/modules/projects/components/ProjectsTable.tsx`
+- `docs/ui/full-ui-audit/04-module-projects.md`
+- `docs/reports/projects-ui-completion-report.md`
 
 **Backend work**
-- Only if Timeline/attachments/photos need real read contracts.
+- None for EPIC 4.0. Timeline/attachments/photos need separate read-contract
+  decisions before backend implementation.
 
 **Frontend work**
-- Normalize Overview, List, Templates, Progress, Components, Materials, Costs, Documents, Logs and Reports branches.
-- Standardize branch pagination and empty rows.
+- Normalize Overview and Projects List into the Inventory-style hero table,
+  right rail and bottom analytics structure.
+- Preserve existing Templates, Progress, Components, Materials, Costs,
+  Documents, Logs and Reports branch behavior while keeping shared cockpit
+  primitives and truthful empty states.
+- Render detail timeline milestones from WBS/phase data instead of static
+  milestone labels.
 
 **Real-data integration**
 - `getProjectsRuntime`, `getProjectTemplates`, `getProjectDetailTab`.
@@ -153,29 +160,36 @@ This plan is documentation-only. It does not authorize code changes by itself.
 - Large.
 
 **Completion criteria**
-- Project pages share consistent KPI/filter/table/right rail structure.
-- Timeline/Budget naming is resolved.
-- Empty states remain truthful.
+- Active Projects pages share consistent KPI/filter/table/right rail structure
+  at source/build level.
+- Timeline/Resources/Milestones first-class route decisions remain deferred.
+- Empty states remain truthful and no fake KPI/chart values are introduced.
+- Browser screenshots remain required before final 88% certification.
 
 ## Phase 5 - Suppliers
 
 **Objectives**
-- Replace local UI class strings with shared Inventory/Enterprise primitives.
+- Source/build align Supplier list and Quality workspaces with the Inventory
+  canon.
 - Add standard pagination.
-- Convert empty capability tabs only when real read contracts exist.
+- Keep unavailable purchase/payable/report branches as full controlled empty
+  workspaces until real read contracts exist.
 
 **Files expected to change**
 - `apps/frontend/src/modules/suppliers/pages/SuppliersPage.tsx`
-- `apps/frontend/src/modules/suppliers/components/SuppliersKpiStrip.tsx`
-- `apps/frontend/src/modules/suppliers/components/SupplierFormModal.tsx`
+- `docs/ui/full-ui-audit/05-module-suppliers.md`
+- `docs/reports/suppliers-ui-completion-report.md`
 
 **Backend work**
-- Supplier pagination/filter API if client-side pagination is not acceptable.
-- Future read contracts for quotes, purchase orders, deliveries, payables, logs and reports.
+- None for EPIC 5.0.
+- Future read contracts are still required for quotes, purchase orders,
+  deliveries, payables, logs and reports.
 
 **Frontend work**
-- Normalize KPI gap/height, filter panel, table shell, right rail, modal/drawer behavior.
-- Add pagination and empty-row behavior.
+- Normalize KPI gap/height, filter panel, table shell and right rail behavior.
+- Add client-side pagination and empty-row behavior for Supplier and Quality
+  tables.
+- Replace single-card capability placeholders with full empty workspaces.
 
 **Real-data integration**
 - `useSuppliersQuery`, `useSupplierCockpitSummaryQuery`, `useSupplierEvaluationCockpitQuery`, `useSupplierCockpitDetailQuery`.
@@ -184,9 +198,11 @@ This plan is documentation-only. It does not authorize code changes by itself.
 - Medium/Large.
 
 **Completion criteria**
-- Supplier list and quality pages meet Inventory visual standards.
+- Supplier list and quality pages meet Inventory visual standards at
+  source/build level.
 - Empty capability tabs remain clear and useful.
-- No fake supplier metrics.
+- No fake supplier metrics or charts.
+- Browser screenshots remain required before final 86% certification.
 
 ## Phase 6 - QC
 

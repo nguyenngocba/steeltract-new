@@ -337,7 +337,7 @@ export function ProjectsPage() {
         {templatesError && currentTab === 'templates' ? <CockpitEmptyState title="Không tải được template" description="Template Library sẽ hiển thị sau khi API /projects/templates hoạt động." /> : null}
 
         {currentTab === 'overview' && <OverviewTab runtime={runtime} rows={rows} status={status} onStatus={setStatus} onOpen={setSelectedProject} />}
-        {currentTab === 'list' && <ProjectListTab rows={rows} onOpen={setSelectedProject} />}
+        {currentTab === 'list' && <ProjectListTab runtime={runtime} rows={rows} onOpen={setSelectedProject} />}
         {currentTab === 'templates' && (
           <ProjectTemplatesTab
             templates={templates}
@@ -467,12 +467,15 @@ function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: Pro
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
       <KpiStrip runtime={runtime} delayed={delayed.length} status={status} onStatus={onStatus} />
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-3">
-        <StatusWidget runtime={runtime} />
-        <ProgressWidget rows={rows} />
-        <ValueWidget rows={rows} />
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
+        <ProjectTable rows={rows} onOpen={onOpen} />
+        <div className="space-y-1">
+          <StatusWidget runtime={runtime} />
+          <ProgressWidget rows={rows} />
+          <ValueWidget rows={rows} />
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="Tiến độ theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
           <ProjectLineChart series={buildProgressSeries(rows)} />
         </CockpitChartCard>
@@ -497,7 +500,6 @@ function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: Pro
           <CockpitRecentList items={recent.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, time: shortDate(row.updatedAt), statusDot: row.status === 'COMPLETED' ? 'bg-emerald-400' : 'bg-cyan-400' }))} />
         </CockpitChartCard>
       </div>
-      <ProjectTable rows={rows} onOpen={onOpen} />
     </div>
   )
 }
@@ -515,10 +517,33 @@ function KpiStrip({ runtime, delayed, status, onStatus }: { runtime: ProjectsRun
   )
 }
 
-function ProjectListTab({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
+function ProjectListTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
+  const delayed = rows.filter((row) => isDelayed(row))
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
-      <ProjectTable rows={rows} onOpen={onOpen} />
+      <KpiStrip runtime={runtime} delayed={delayed.length} />
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
+        <ProjectTable rows={rows} onOpen={onOpen} />
+        <div className="space-y-1">
+          <StatusWidget runtime={runtime} />
+          <CockpitChartCard title="Công trình sắp hoàn thành" heightClass="h-[170px]" chartHeightClass="h-[98px]">
+            <CockpitStatusList items={rows.filter((row) => row.status !== 'COMPLETED' && row.progress >= 80).slice(0, 4).map((row) => ({ id: row.id, label: row.name, value: `${fmt(row.progress)}%`, statusTone: 'emerald' }))} emptyMessage="Chưa có công trình nào trên 80%." />
+          </CockpitChartCard>
+          <CockpitChartCard title="Công trình cần chú ý" heightClass="h-[170px]" chartHeightClass="h-[98px]">
+            <CockpitStatusList items={delayed.slice(0, 4).map((row) => ({ id: row.id, label: row.name, value: row.delayedOrders || 'Quá hạn', statusTone: 'red' }))} emptyMessage="Không có công trình quá hạn." />
+          </CockpitChartCard>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <ProgressWidget rows={rows} />
+        <ValueWidget rows={rows} />
+        <CockpitChartCard title="Tiến độ theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <ProjectLineChart series={buildProgressSeries(rows)} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Giá trị theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <ProjectLineChart series={buildValueSeries(rows, runtime.financial)} currency />
+        </CockpitChartCard>
+      </div>
     </div>
   )
 }
@@ -1237,7 +1262,7 @@ function ProjectOverviewExecution({ rows, project }: { rows: ProjectWbsRuntime[]
         <CockpitEmptyState title="Chưa có hình ảnh công trường" description="Ảnh sẽ xuất hiện khi Project attachment/photo foundation được nối vào Công trình." />
       </CockpitChartCard>
       <CockpitChartCard title="Timeline dự án" heightClass="h-[220px]" className="xl:col-span-1">
-        <ProjectMilestoneTimeline progress={project.progress} delayed={isDelayed(project)} />
+        <ProjectMilestoneTimeline project={project} rows={rows} />
       </CockpitChartCard>
     </div>
   )
@@ -1432,7 +1457,7 @@ function ProjectTimeline({ project, rows, returnRequests, logs }: { project: Pro
   return (
     <div className="grid grid-cols-1 gap-1 xl:grid-cols-2">
       <CockpitChartCard title="Timeline dự án" heightClass="h-[260px]">
-        <ProjectMilestoneTimeline progress={project.progress} delayed={isDelayed(project)} />
+        <ProjectMilestoneTimeline project={project} rows={rows} />
       </CockpitChartCard>
       <CockpitChartCard title="Nhật ký gần đây" heightClass="h-[260px]">
         <CockpitRecentList items={(runtimeItems.length ? runtimeItems : derivedItems).slice(0, 10)} emptyMessage="Chưa có nhật ký dự án." />
@@ -1441,15 +1466,27 @@ function ProjectTimeline({ project, rows, returnRequests, logs }: { project: Pro
   )
 }
 
-function ProjectMilestoneTimeline({ progress, delayed }: { progress: number; delayed: boolean }) {
-  const milestones = ['Ký hợp đồng', 'Khởi công', 'Hoàn thành móng', 'Lắp dựng kết cấu chính', 'Lợp mái', 'Hoàn thiện', 'Nghiệm thu']
+function ProjectMilestoneTimeline({ project, rows }: { project: ProjectRuntimeRow; rows: ProjectWbsRuntime[] }) {
+  const milestones = rows
+    .filter((row) => row.type === 'PHASE' || row.level <= 1)
+    .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
+    .slice(0, 8)
+  if (!milestones.length) {
+    return <CockpitEmptyState title="Chưa có milestone" description="Milestone sẽ hiển thị khi công trình có WBS/phase thật." />
+  }
   return (
     <div className="flex h-full items-center gap-1 overflow-x-auto">
-      {milestones.map((label, index) => {
-        const threshold = (index / Math.max(1, milestones.length - 1)) * 100
-        const state = progress >= threshold ? 'Completed' : delayed && index <= Math.ceil(milestones.length / 2) ? 'Delayed' : Math.abs(progress - threshold) < 16 ? 'Current' : 'Upcoming'
+      {milestones.map((milestone) => {
+        const delayed = milestone.delayDays > 0 || isDelayed(project)
+        const state = milestone.progress >= 100 ? 'Completed' : delayed ? 'Delayed' : milestone.progress > 0 ? 'Current' : 'Upcoming'
         const color = state === 'Completed' ? 'bg-emerald-400' : state === 'Delayed' ? 'bg-red-400' : state === 'Current' ? 'bg-cyan-400' : 'bg-slate-600'
-        return <div key={label} className="min-w-[132px] rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs"><span className={`mb-2 block h-2 w-2 rounded-full ${color}`} /><div className="font-medium text-white">{label}</div><div className="mt-1 text-[11px] text-slate-500">{state}</div></div>
+        return (
+          <div key={milestone.id} className="min-w-[132px] rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs">
+            <span className={`mb-2 block h-2 w-2 rounded-full ${color}`} />
+            <div className="truncate font-medium text-white">{milestone.name}</div>
+            <div className="mt-1 text-[11px] text-slate-500">{state} · {fmt(milestone.progress)}%</div>
+          </div>
+        )
       })}
     </div>
   )

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
@@ -9,7 +9,8 @@ import {
   enterpriseTableHead as inventoryTableHead,
   enterpriseTableRow as inventoryTableRow,
 } from '@/shared/ui/enterprise-components'
-import { ModuleDataGrid, ModuleDetailDrawer, ModuleKpiStrip } from '@/shared/ui/modules'
+import { CockpitChartCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '@/shared/ui/cockpit'
+import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleKpiStrip } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
 import type { ProductionMaterialIssue, ProductionOrder, ProductionReservation } from '../api/production.api'
@@ -153,7 +154,11 @@ export function ProductionExecutionBoard({
   reservations: ProductionReservation[]
 }) {
   const [selected, setSelected] = useState<ExecutionCard | null>(null)
+  const [page, setPage] = useState(1)
   const cards = useMemo(() => buildCards(orders, issues, reservations), [orders, issues, reservations])
+  const pageSize = 14
+  const pagedCards = cards.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedCards.length) })
   const grouped = stages.map((stage) => ({
     ...stage,
     cards: cards.filter((card) => card.stage === stage.key),
@@ -161,6 +166,10 @@ export function ProductionExecutionBoard({
   const bottleneck = [...grouped].sort((a, b) => b.cards.length - a.cards.length)[0]
   const delayedCount = cards.filter((card) => card.delayed).length
   const waitingMaterial = cards.filter((card) => card.readiness.readinessPercent < 100 && card.stage !== 'Completed').length
+
+  useEffect(() => {
+    setPage(1)
+  }, [cards.length])
 
   return (
     <div className={inventoryPageStack}>
@@ -170,27 +179,60 @@ export function ProductionExecutionBoard({
         ))}
       </ModuleKpiStrip>
 
-      <div className={`grid ${inventoryGridGap} xl:grid-cols-[1fr_340px]`}>
-        <InventoryChartCard title="Current Bottleneck" note="Stage có nhiều WO nhất">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-red-300">Bottleneck</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{bottleneck?.key ?? '-'}</div>
-              <div className="mt-1 text-sm text-slate-400">{formatQuantity(bottleneck?.cards.length ?? 0, 0)} WO</div>
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <CockpitChartCard
+            title="Production Queue Registry"
+            subtitle="Work order, stage, material readiness, progress and delay status"
+            action={<span className="text-[11px] text-cyan-300">{cards.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, cards.length)} / {cards.length}</span>}
+            heightClass={COCKPIT_HEIGHTS.TABLE_MD}
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              <CockpitTableShell className="min-h-0 flex-1">
+                <table className="w-full min-w-[1160px] table-fixed text-left text-[13px]">
+                  <thead className={inventoryTableHead}>
+                    <tr>{['WO', 'Component', 'Stage', 'Material Ready', 'Progress', 'Reservations', 'Due', 'Status'].map((head) => (
+                      <th key={head} className="px-1.5 py-0.5 text-left font-medium">{head}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {pagedCards.map((card) => (
+                      <tr key={card.order.id} onClick={() => setSelected(card)} className={`cursor-pointer ${inventoryTableRow}`}>
+                        <td className="px-2 py-2 font-semibold text-cyan-300">{card.order.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500">{card.order.title}</div></td>
+                        <td className="truncate px-2 py-2 text-slate-200">{componentLabel(card.order)}</td>
+                        <td className="px-2 py-2 text-slate-300">{card.currentStage}</td>
+                        <td className="w-44 px-2 py-2">
+                          <Meter value={card.readiness.readinessPercent} tone={readinessBar(card.readiness.readinessPercent)} />
+                          <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(card.readiness.readinessPercent, 0)}%</div>
+                        </td>
+                        <td className="w-40 px-2 py-2">
+                          <Meter value={card.progress} tone={card.progress >= 80 ? 'bg-emerald-500' : card.progress >= 45 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                          <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(card.progress, 0)}%</div>
+                        </td>
+                        <td className="px-2 py-2 font-mono tabular-nums">{formatQuantity(card.reservations.length, 0)}</td>
+                        <td className={card.delayed ? 'px-2 py-2 text-red-300' : 'px-2 py-2 text-slate-300'}>{date(card.order.plannedEndAt)}</td>
+                        <td className="px-2 py-2"><StatusChip status={card.order.status} /></td>
+                      </tr>
+                    ))}
+                    {emptyRows.map((_, index) => (
+                      <tr key={`execution-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                        <td colSpan={8} className="h-[46px] px-2 py-2">
+                          <div className="h-px w-full bg-white/[0.035]" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!pagedCards.length ? (
+                  <ModuleEmptyState title="Chưa có work order trong queue" description="Work order sẽ xuất hiện khi Production có lệnh sản xuất thật." />
+                ) : null}
+              </CockpitTableShell>
+              <DataTablePagination page={page} pageSize={pageSize} total={cards.length} onPageChange={setPage} />
             </div>
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-amber-300">Waiting Material</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(waitingMaterial, 0)}</div>
-              <div className="mt-1 text-sm text-slate-400">Readiness &lt; 100%</div>
-            </div>
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-red-300">Delayed</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{formatQuantity(delayedCount, 0)}</div>
-              <div className="mt-1 text-sm text-slate-400">Due date đã quá hạn</div>
-            </div>
-          </div>
-        </InventoryChartCard>
-        <InventoryChartCard title="Stage Distribution" note="Planning → Completed">
+          </CockpitChartCard>
+        </div>
+        <aside className="space-y-1 xl:col-span-3">
+        <CockpitChartCard title="Stage Distribution" subtitle="Planning → Completed" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
           <ProductionDonut
             centerValue={formatQuantity(cards.length, 0)}
             centerLabel="WO"
@@ -200,9 +242,34 @@ export function ProductionExecutionBoard({
               color: ['#f59e0b', '#06b6d4', '#2563eb', '#6366f1', '#7c3aed', '#ec4899', '#14c987'][index],
             }))}
           />
-        </InventoryChartCard>
+        </CockpitChartCard>
+        <CockpitChartCard title="Current Bottleneck" subtitle="Stage có nhiều WO nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+          <div className="space-y-2 text-xs text-slate-300">
+            <InfoLine label="Bottleneck" value={bottleneck?.key ?? '-'} />
+            <InfoLine label="Waiting Material" value={formatQuantity(waitingMaterial, 0)} />
+            <InfoLine label="Delayed" value={formatQuantity(delayedCount, 0)} />
+          </div>
+        </CockpitChartCard>
+        <CockpitChartCard title="Attention Queue" subtitle="Delayed / waiting material" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+          <div className="space-y-1">
+            {cards.filter((card) => card.delayed || card.readiness.readinessPercent < 100).slice(0, 5).map((card) => (
+              <button key={card.order.id} type="button" onClick={() => setSelected(card)} className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs hover:border-cyan-400/35">
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-cyan-300">{card.order.orderNo}</span>
+                  <span className="block truncate text-slate-400">{card.currentStage}</span>
+                </span>
+                <span className={card.delayed ? 'text-red-300' : 'text-amber-300'}>{card.delayed ? 'DELAY' : 'MATERIAL'}</span>
+              </button>
+            ))}
+            {!cards.some((card) => card.delayed || card.readiness.readinessPercent < 100) ? (
+              <ModuleEmptyState title="Không có điểm nghẽn" description="Các WO trễ hoặc thiếu vật tư sẽ xuất hiện tại đây." />
+            ) : null}
+          </div>
+        </CockpitChartCard>
+        </aside>
       </div>
 
+      <InventoryChartCard title="Execution Kanban" note="Stage lanes">
       <div className="overflow-x-auto pb-2">
         <div className="grid min-w-[1680px] grid-cols-7 gap-3 2xl:min-w-0">
           {grouped.map((stage) => (
@@ -253,6 +320,7 @@ export function ProductionExecutionBoard({
           ))}
         </div>
       </div>
+      </InventoryChartCard>
 
       <ExecutionDrawer card={selected} onClose={() => setSelected(null)} />
     </div>

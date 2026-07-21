@@ -1,13 +1,12 @@
-import { useDeferredValue, useState, type ReactNode } from 'react'
+import { useDeferredValue, useEffect, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
-import { CockpitKpiCard } from '@/shared/ui/cockpit'
+import { CockpitEmptyState, CockpitKpiCard, CockpitTableShell, DataTablePagination } from '@/shared/ui/cockpit'
 import {
   moduleInput,
-  moduleMutedButton,
   modulePanel,
   modulePrimaryButton,
   moduleTableHead,
@@ -34,9 +33,9 @@ const tabs: Array<{ id: QcTab; label: string; path: string }> = [
 const panel = modulePanel
 const input = moduleInput
 const primaryButton = modulePrimaryButton
-const mutedButton = moduleMutedButton
 const tableHead = moduleTableHead
 const tableRow = moduleTableRow
+const pageSizeOptions = [10, 20, 50, 100]
 const fmt = (value = 0) => formatQuantity(value, 1)
 const date = (value?: string | null) => value ? formatDateTime(value) : '-'
 
@@ -48,6 +47,8 @@ export function QcPage() {
   const [selectedInspection, setSelectedInspection] = useState<QcInspectionRow | null>(null)
   const [selectedQueue, setSelectedQueue] = useState<QcProductionQueueRow | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [inspectionPage, setInspectionPage] = useState(1)
+  const [inspectionPageSize, setInspectionPageSize] = useState(20)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
@@ -56,8 +57,8 @@ export function QcPage() {
   const legacyTab = ['plan', 'standards', 'calibration'].includes(segment ?? '') ? segment as QcTab : undefined
   const tab = legacyTab ?? tabs.find((item) => item.path === location.pathname)?.id ?? 'overview'
   const { data, isLoading } = useQcWorkspace({
-    page: 1,
-    limit: 100,
+    page: inspectionPage,
+    limit: inspectionPageSize,
     search: deferredQuery || undefined,
     status: status === 'all' ? undefined : status,
     sortBy: 'updatedAt',
@@ -86,6 +87,9 @@ export function QcPage() {
     byProject: [],
   } : runtime
   const filteredInspections = runtime.inspections
+  useEffect(() => {
+    setInspectionPage(1)
+  }, [deferredQuery, status, tab, inspectionPageSize])
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.qc.workspaces() })
   const inspectionPayload = (row: QcProductionQueueRow) => ({
     productionOrderId: row.id,
@@ -183,14 +187,14 @@ export function QcPage() {
     breadcrumbs={['Vận hành', 'Chất lượng']}
     tabs={tabs}
     activeTab={tab}
-    actions={<><button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button><button className={mutedButton}>Xuất Excel</button><button className={mutedButton}>Báo cáo</button></>}
+    actions={<button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button>}
   >
       <FilterBar query={query} status={status} onQuery={setQuery} onStatus={setStatus} />
       {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
       {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
       {isLoading ? <div className={`${panel} mt-3 p-6 text-center text-sm text-slate-500`}>Đang tải QC cockpit...</div> : null}
       {(tab === 'overview' || tab === 'dashboard') && <Overview runtime={tab === 'dashboard' ? dashboardRuntime : runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
-      {['inbound', 'production', 'final'].includes(tab) && <Inspections rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
+      {['inbound', 'production', 'final'].includes(tab) && <Inspections rows={filteredInspections} queue={runtime.productionQueue} meta={runtime.meta} page={inspectionPage} pageSize={inspectionPageSize} onPageChange={setInspectionPage} onPageSizeChange={(value) => { setInspectionPageSize(value); setInspectionPage(1) }} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
       {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'standards' && <Standards runtime={runtime} />}
       {tab === 'ncr' && <Ncr runtime={runtime} />}
@@ -283,7 +287,6 @@ function FilterBar({ query, status, onQuery, onStatus }: { query: string; status
   return <div className={`${panel} flex flex-wrap items-end gap-2 p-3`}>
     <div className="flex min-w-[320px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3"><Search size={15} className="text-cyan-400" /><input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Tìm mã phiếu, MO, cấu kiện, dự án..." className="h-9 w-full bg-transparent text-xs outline-none" /></div>
     <select value={status} onChange={(e) => onStatus(e.target.value)} className={input}><option value="all">Trạng thái: Tất cả</option><option value="READY">Chờ xử lý</option><option value="IN_PROGRESS">Đang kiểm</option><option value="PASSED">Đạt</option><option value="APPROVED">Đã duyệt</option><option value="REWORK_REQUIRED">NCR/Rework</option><option value="FAILED">Không đạt</option></select>
-    <button className={primaryButton}>Tìm kiếm</button><button className={mutedButton}>Làm mới</button>
   </div>
 }
 
@@ -380,19 +383,73 @@ function QualityAlerts({
 
 function KpiStrip({ runtime, rows = [] }: { runtime: QcCockpit; rows?: QcInspectionRow[] }) {
   const m = runtime.metrics
-  const today = new Date().toISOString().slice(0, 10)
-  const passedToday = rows.filter((row) => row.date?.slice(0, 10) === today && ['PASSED', 'APPROVED'].includes(row.status)).length
-  const failedToday = rows.filter((row) => row.date?.slice(0, 10) === today && ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(row.status)).length
-  return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Pending inspection" value={fmt(m.pending)} note="Chờ xử lý" tone="amber" trend={[0, m.pending, m.pending * 0.8]} /><Kpi icon={SlidersHorizontal} title="In progress" value={fmt(m.inProgress)} note="Đang kiểm" trend={[0, m.inProgress * 0.6, m.inProgress]} /><Kpi icon={CheckCircle2} title="Passed today" value={fmt(passedToday || m.passed)} note={`${fmt(m.passRate)}% pass rate`} tone="emerald" trend={[0, passedToday || m.passed * 0.65, passedToday || m.passed]} /><Kpi icon={XCircle} title="Failed today" value={fmt(failedToday || m.failed + m.rework)} note="Fail / Rework" tone="red" trend={[0, failedToday || m.failed + m.rework, failedToday || m.failed + m.rework]} /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note="Cần disposition" tone="purple" trend={[0, m.openNcrs, m.openNcrs * 0.75]} /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(m.waitingProductionOrders)} note="Chặn xuất bãi" tone="cyan" trend={[0, m.waitingProductionOrders * 0.65, m.waitingProductionOrders]} /></div>
+  const visibleRows = rows.length ? `Đang xem ${fmt(rows.length)} phiếu` : 'Không có dòng phù hợp'
+  return <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"><Kpi icon={ClipboardCheck} title="Pending inspection" value={fmt(m.pending)} note="Chờ xử lý" tone="amber" /><Kpi icon={SlidersHorizontal} title="In progress" value={fmt(m.inProgress)} note="Đang kiểm" /><Kpi icon={CheckCircle2} title="Passed" value={fmt(m.passed)} note={`${fmt(m.passRate)}% pass rate`} tone="emerald" /><Kpi icon={XCircle} title="Failed / Rework" value={fmt(m.failed + m.rework)} note="Cần xử lý" tone="red" /><Kpi icon={FileBarChart} title="NCR mở" value={fmt(m.openNcrs)} note={visibleRows} tone="purple" /><Kpi icon={ShieldCheck} title="MO chờ QC" value={fmt(m.waitingProductionOrders)} note="Chặn xuất bãi" tone="cyan" /></div>
 }
 
-function Inspections({ rows, queue, onOpen, onQueue, onCreate, onQuickApprove, onPass, onFail }: { rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; onPass: (row: QcInspectionRow) => void; onFail: (row: QcInspectionRow) => void }) {
-  return <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_360px]"><InspectionTable rows={rows} onOpen={onOpen} onPass={onPass} onFail={onFail} /><aside className="space-y-4"><ProductionQueue rows={queue} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} compact /></aside></div>
+function Inspections({
+  rows,
+  queue,
+  meta,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  onOpen,
+  onQueue,
+  onCreate,
+  onQuickApprove,
+  onPass,
+  onFail,
+}: {
+  rows: QcInspectionRow[]
+  queue: QcProductionQueueRow[]
+  meta: QcCockpit['meta']
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
+  onOpen: (row: QcInspectionRow) => void
+  onQueue: (row: QcProductionQueueRow) => void
+  onCreate: (row: QcProductionQueueRow) => void
+  onQuickApprove: (row: QcProductionQueueRow) => void
+  onPass: (row: QcInspectionRow) => void
+  onFail: (row: QcInspectionRow) => void
+}) {
+  return <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]"><InspectionTable rows={rows} meta={meta} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} onOpen={onOpen} onPass={onPass} onFail={onFail} paginated /><aside className="space-y-4"><ProductionQueue rows={queue} onOpen={onQueue} onCreate={onCreate} onQuickApprove={onQuickApprove} compact /></aside></div>
 }
 
-function InspectionTable({ rows, onOpen, onPass, onFail, title = 'Danh sách phiếu kiểm tra', action }: { rows: QcInspectionRow[]; onOpen: (row: QcInspectionRow) => void; onPass?: (row: QcInspectionRow) => void; onFail?: (row: QcInspectionRow) => void; title?: string; action?: ReactNode }) {
-  const emptyRows = Array.from({ length: Math.max(0, 10 - rows.length) })
-  return <div className={`${panel} min-h-[620px] overflow-hidden`}><div className="flex justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">{title}</h2><div className="flex items-center gap-3"><span className="text-xs text-slate-500">{rows.length} phiếu</span>{action}</div></div><div className="max-h-[560px] overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className={tableHead}><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}{emptyRows.map((_, index) => <tr key={`qc-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]"><td colSpan={9} className="h-[45px] px-4 py-3"><div className="h-px w-full bg-white/[0.035]" /></td></tr>)}</tbody></table></div>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</div>
+function InspectionTable({
+  rows,
+  onOpen,
+  onPass,
+  onFail,
+  title = 'Danh sách phiếu kiểm tra',
+  action,
+  meta,
+  page = 1,
+  pageSize = 10,
+  onPageChange,
+  onPageSizeChange,
+  paginated = false,
+}: {
+  rows: QcInspectionRow[]
+  onOpen: (row: QcInspectionRow) => void
+  onPass?: (row: QcInspectionRow) => void
+  onFail?: (row: QcInspectionRow) => void
+  title?: string
+  action?: ReactNode
+  meta?: QcCockpit['meta']
+  page?: number
+  pageSize?: number
+  onPageChange?: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
+  paginated?: boolean
+}) {
+  const total = paginated ? meta?.total ?? rows.length : rows.length
+  const stableRows = Math.min(pageSize, 10)
+  const emptyRows = Array.from({ length: Math.max(0, stableRows - rows.length) })
+  return <div className={`${panel} flex min-h-[620px] flex-col overflow-hidden`}><div className="flex min-h-[48px] justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">{title}</h2><div className="flex items-center gap-3"><span className="text-xs text-slate-500">{fmt(total)} phiếu</span>{action}</div></div><CockpitTableShell className="max-h-[560px] rounded-none border-0"><table className="w-full min-w-[980px] text-left text-sm"><thead className={tableHead}><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button type="button" onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button type="button" onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}{emptyRows.map((_, index) => <tr key={`qc-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]"><td colSpan={9} className="h-[45px] px-4 py-3"><div className="h-px w-full bg-white/[0.035]" /></td></tr>)}</tbody></table>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</CockpitTableShell>{paginated && total > pageSize && onPageChange && onPageSizeChange ? <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} pageSizeOptions={pageSizeOptions} /> : null}</div>
 }
 
 function ProductionQueue({ rows, onOpen, onCreate, onQuickApprove, compact = false, action }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; compact?: boolean; action?: ReactNode }) {
@@ -475,9 +532,9 @@ function Info({ k, v }: { k: string; v: string }) {
 }
 
 function Empty({ title }: { title: string }) {
-  return <div className="p-8 text-center text-sm text-slate-500">{title}</div>
+  return <CockpitEmptyState icon={<ClipboardCheck size={18} />} title={title} description="QC chỉ hiển thị dữ liệu thật từ backend. Khi chưa có bản ghi phù hợp, workspace giữ trạng thái rỗng có kiểm soát." />
 }
 
 function emptyRuntime(): QcCockpit {
-  return { metrics: { total: 0, pending: 0, inProgress: 0, passed: 0, failed: 0, rework: 0, overdue: 0, openIssues: 0, openNcrs: 0, waitingProductionOrders: 0, passRate: 0, defects: [] }, inspections: [], productionQueue: [], checklists: [], ncrs: [], byCategory: [], byProject: [], trend: [], meta: { page: 1, limit: 100, total: 0, totalPages: 1 } }
+  return { metrics: { total: 0, pending: 0, inProgress: 0, passed: 0, failed: 0, rework: 0, overdue: 0, openIssues: 0, openNcrs: 0, waitingProductionOrders: 0, passRate: 0, defects: [] }, inspections: [], productionQueue: [], checklists: [], ncrs: [], byCategory: [], byProject: [], trend: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } }
 }

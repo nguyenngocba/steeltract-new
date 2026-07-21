@@ -91,6 +91,7 @@ Architecture Freeze v1.0 approved.
 * Project Detail snapshot parity is available through `SnapshotValidatorService.validateProjectDetails()`.
 * Operations Center exposes Project Detail snapshot health, including freshness, stale count, parity warnings, hits, fallback count, age, and lag.
 * Projects Architecture Freeze v1.0 is approved after EPIC116.1. New Project work should preserve the frozen pattern: Repository boundary, persistent outbox, background snapshot updates, snapshot-first reads, repository fallback, runtime metrics, and Operations Center health.
+* EPIC 4.0 aligns the active Projects UI with the Inventory/Components/Production canon: Overview and Projects List now use KPI-first, filter, hero table, right analytics rail, and lower analytics band composition. Active project timeline milestones now come from WBS/phase rows or a standard empty state instead of static milestone labels.
 
 ## Database Models
 

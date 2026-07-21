@@ -11,14 +11,13 @@ import {
   ModuleLoadingState,
 } from "../../../../shared/ui/modules";
 import {
-  CockpitChartCard,
   CockpitKpiCard,
-  CockpitTableShell,
 } from "../../../../shared/ui/cockpit";
 import { nextLocalCode } from "@/shared/utils/code-format";
 import { useProjects } from "../../../inventory/hooks/useProjects";
 import {
   inventoryInput,
+  InventoryChartCard,
   InventoryPanel,
   InventoryPagination,
   inventoryTableHead,
@@ -139,10 +138,6 @@ function ChartCard({
   delta,
   deltaColorClass = "text-slate-400",
   action,
-  page,
-  pageCount,
-  onPrev,
-  onNext,
   children,
   className = "h-[260px]",
   chartHeightClass = "h-[150px]",
@@ -152,30 +147,22 @@ function ChartCard({
   delta?: React.ReactNode;
   deltaColorClass?: string;
   action?: React.ReactNode;
-  page?: number;
-  pageCount?: number;
-  onPrev?: () => void;
-  onNext?: () => void;
   children: React.ReactNode;
   className?: string;
   chartHeightClass?: string;
 }) {
   return (
-    <CockpitChartCard
+    <InventoryChartCard
       title={title}
-      value={value}
-      delta={delta}
-      deltaColorClass={deltaColorClass}
       action={action}
-      page={page}
-      pageCount={pageCount}
-      onPrev={onPrev}
-      onNext={onNext}
       className={className}
-      chartHeightClass={chartHeightClass}
     >
-      {children}
-    </CockpitChartCard>
+      <div className="mb-2 flex items-end justify-between gap-2">
+        {value !== undefined ? <div className="text-lg font-bold text-white">{value}</div> : <span />}
+        {delta !== undefined ? <div className={`text-[10px] ${deltaColorClass}`}>{delta}</div> : null}
+      </div>
+      <div className={chartHeightClass}>{children}</div>
+    </InventoryChartCard>
   );
 }
 
@@ -493,8 +480,11 @@ export function ComponentsListPage() {
               className={inventoryFilterControl}
             >
               <option value="">Dự án</option>
-              <option value="PO-2506-014">PO-2506-014</option>
-              <option value="PO-2506-015">PO-2506-015</option>
+              {projects.map((item) => (
+                <option key={item.id} value={item.code ?? item.name}>
+                  {item.code ?? item.name}
+                </option>
+              ))}
             </ComponentsSelect>
             <ComponentsSelect
               value={status}
@@ -565,7 +555,7 @@ export function ComponentsListPage() {
               </div>
             </div>
             <div className="rounded-lg border border-white/10 overflow-hidden">
-            <CockpitTableShell className="h-[clamp(400px,60vh,520px)] min-h-[400px]">
+            <div className="h-[clamp(400px,60vh,520px)] min-h-[400px] overflow-auto">
               <table className="w-full min-w-[1050px] text-sm table-fixed">
                 <colgroup>
                   <col className="w-[110px]" />
@@ -718,7 +708,7 @@ export function ComponentsListPage() {
                   ))}
                 </tbody>
               </table>
-            </CockpitTableShell>
+            </div>
             </div>
             {!isLoading && !rows.length ? (
               <div className="p-3">
@@ -778,7 +768,7 @@ export function ComponentsListPage() {
           </div>
         </div>
 
-        <CockpitChartCard title="Thống kê nhanh" className="min-h-0">
+        <InventoryChartCard title="Thống kê nhanh" className="min-h-0">
           <div className="grid grid-cols-1 sm:grid-cols-5 divide-y sm:divide-y-0 divide-white/10">
             {quickStats.map((item, idx) => (
               <div
@@ -795,7 +785,7 @@ export function ComponentsListPage() {
               </div>
             ))}
           </div>
-        </CockpitChartCard>
+        </InventoryChartCard>
       </div>
 
       {createOpen ? (

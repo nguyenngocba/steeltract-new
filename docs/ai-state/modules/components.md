@@ -1,5 +1,25 @@
 # Components Module
 
+## EPIC 2 Components Completion
+
+Implemented on 2026-07-21.
+
+Status: **IMPLEMENTED - BUILD PASS, BROWSER QA PENDING**
+
+- Production/BOM, Stock, Material Stock, Transfers, Internal QC, History and
+  Reports now use Inventory-canon workspace primitives for panels, chart cards,
+  table hero surfaces and pagination.
+- Hardcoded sparkline/trend arrays and synthetic chart fallback values were
+  removed from active Components UI paths.
+- History filters now use the real read-model search/action contract instead
+  of non-functional dropdown/date controls.
+- Reports no longer fabricates lifecycle chart values from history row indexes.
+- Internal QC still uses real component lifecycle data because an authoritative
+  Components QC/NCR contract is not available; unsupported NCR data renders a
+  truthful empty state.
+- Backend, API, React Query, route, permission, schema and business behavior are
+  unchanged.
+
 ## Components Inventory Canon Alignment
 
 Implemented on 2026-07-21.

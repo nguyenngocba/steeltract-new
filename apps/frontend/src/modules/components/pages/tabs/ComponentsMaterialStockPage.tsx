@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Clock, Package } from 'lucide-react'
 
-import { ComponentsWorkspace } from '../../components/ComponentsWorkspace'
-import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '../../../../shared/ui/cockpit'
-import { ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleLoadingState } from '../../../../shared/ui/modules'
+import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
+import { CockpitKpiCard } from '../../../../shared/ui/cockpit'
+import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
+import {
+  InventoryChartCard,
+  InventoryPagination,
+  InventoryPanel,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '../../../inventory/components/InventoryVisuals'
 import { useCreateTransaction } from '../../../inventory/hooks/useCreateTransaction'
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
@@ -217,7 +225,6 @@ export function ComponentsMaterialStockPage() {
   })
   const totalValue = rows.reduce((sum, row) => sum + row.inventoryValue, 0)
   const totalAvailable = rows.reduce((sum, row) => sum + row.available, 0)
-  const totalReserved = rows.reduce((sum, row) => sum + row.reserved, 0)
   const warningCount = rows.filter((row) => row.status !== 'Sẵn sàng').length
   const topMaterials = [...rows].sort((a, b) => b.available - a.available).slice(0, 5)
   const pageSize = 14
@@ -277,18 +284,19 @@ export function ComponentsMaterialStockPage() {
   }
 
   return (
-    <ComponentsWorkspace>
+    <EnterpriseModulePage>
       <div className="w-full min-w-0 flex-1 space-y-1">
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-6">
-          <CockpitKpiCard title="Tổng mã vật tư SX" value={formatQuantity(rows.length, 0)} state="normal" tone="cyan" />
-          <CockpitKpiCard title="Giá trị tồn kho SX" value={money(totalValue)} note="đồng bộ từ giao dịch kho" state="normal" tone="emerald" />
-          <CockpitKpiCard title="Đã reserve BOM" value={formatQuantity(totalReserved)} note="chờ allocation backend" state="normal" tone="purple" />
-          <CockpitKpiCard title="Khả dụng sản xuất" value={formatQuantity(totalAvailable)} state="normal" tone="blue" />
-          <CockpitKpiCard title="Cảnh báo thiếu BOM" value={formatQuantity(warningCount, 0)} note="cần cấp phát" state="normal" tone="amber" />
-          <CockpitKpiCard title="Trạng thái dữ liệu" value="Tự động" note="làm mới mỗi 5 giây" state="normal" tone="cyan" />
+          <CockpitKpiCard title="Tổng mã vật tư SX" value={formatQuantity(rows.length, 0)} note="Theo bucket sản xuất" state="normal" tone="cyan" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Giá trị tồn kho SX" value={money(totalValue)} note="Từ giao dịch kho" state="normal" tone="emerald" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Giao dịch SX" value={formatQuantity(recentProductionTransactions.length, 0)} note="Gần đây" state="normal" tone="purple" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Khả dụng sản xuất" value={formatQuantity(totalAvailable)} note="Tồn sau cấp phát" state="normal" tone="blue" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Cảnh báo thiếu BOM" value={formatQuantity(warningCount, 0)} note="Cần kiểm tra" state="normal" tone="amber" className="!h-[92px] !p-3" />
+          <CockpitKpiCard title="Vị trí có vật tư" value={formatQuantity(topMaterials.length, 0)} note="Top khả dụng" state="normal" tone="cyan" className="!h-[92px] !p-3" />
         </div>
 
-        <ModuleFilterBar>
+        <InventoryPanel className="rounded-xl">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-8">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -304,14 +312,18 @@ export function ComponentsMaterialStockPage() {
           <button onClick={() => { setQuery(''); setStatus('') }} className={`${componentsMutedButton} xl:col-span-2`}>
             Làm mới
           </button>
-        </ModuleFilterBar>
+          </div>
+        </InventoryPanel>
 
         <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
           <div className="xl:col-span-9">
-            <CockpitChartCard title={`Danh sách vật tư cấp sản xuất (${filtered.length})`} className={COCKPIT_HEIGHTS.TABLE_MD}>
-              <CockpitTableShell className="h-full">
-                <table className="w-full min-w-[1180px] table-fixed text-[13px]">
-                  <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
+            <InventoryPanel
+              title={<h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">{`Danh sách vật tư cấp sản xuất (${filtered.length})`}</h3>}
+              className="h-[520px]"
+            >
+              <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
+                <table className="w-full min-w-[1180px] table-fixed text-sm">
+                  <thead className={inventoryTableHead}>
                     <tr>
                       {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho nhận', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
                         <th key={heading} className="px-1.5 py-0.5 text-left font-medium">{heading}</th>
@@ -326,7 +338,7 @@ export function ComponentsMaterialStockPage() {
                         </td>
                       </tr>
                     ) : paginatedRows.length ? paginatedRows.map((row) => (
-                      <tr key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`} onClick={() => setSelectedRow(row)} className="cursor-pointer border-t border-slate-800/80 text-slate-200 hover:bg-slate-900/40">
+                      <tr key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`} onClick={() => setSelectedRow(row)} className={inventoryTableRow}>
                         <td className="px-2 py-2 text-cyan-300">{row.code}</td>
                         <td className="px-2 py-2">{row.name}</td>
                         <td className="px-2 py-2"><span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-200">{materialUsageLabel(row.materialUsageType)}</span></td>
@@ -344,50 +356,50 @@ export function ComponentsMaterialStockPage() {
                     )) : (
                       <tr>
                         <td colSpan={13} className="px-2 py-10">
-                          <ModuleEmptyState icon="📦" title="Chưa có tồn kho sản xuất" description="Không tìm thấy vật tư sản xuất phù hợp với bộ lọc hiện tại." />
+                          <ModuleEmptyState icon={<Package size={18} />} title="Chưa có tồn kho sản xuất" description="Không tìm thấy vật tư sản xuất phù hợp với bộ lọc hiện tại." />
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
-              </CockpitTableShell>
-              <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
-            </CockpitChartCard>
+              </div>
+              <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))} total={filtered.length} onPageChange={setPage} />
+            </InventoryPanel>
           </div>
 
           <div className="space-y-1 xl:col-span-3">
-            <CockpitChartCard title="Thiếu vật tư" className={COCKPIT_HEIGHTS.CHART_SM}>
+            <InventoryChartCard title="Thiếu vật tư" className="h-[170px]">
               <div className="flex h-full flex-col justify-center gap-1 text-sm text-slate-300">
                 <div className="text-3xl font-bold text-amber-300">{formatQuantity(warningCount, 0)}</div>
                 <div>Vật tư cần kiểm tra cấp phát.</div>
               </div>
-            </CockpitChartCard>
-            <CockpitChartCard title="Giá trị" className={COCKPIT_HEIGHTS.CHART_SM}>
+            </InventoryChartCard>
+            <InventoryChartCard title="Giá trị" className="h-[170px]">
               <div className="flex h-full flex-col justify-center gap-1 text-sm text-slate-300">
                 <div className="text-2xl font-bold text-emerald-300">{money(totalValue)}</div>
                 <div>Khả dụng: {formatQuantity(totalAvailable)}</div>
               </div>
-            </CockpitChartCard>
-            <CockpitChartCard title="Giao dịch gần đây" className={COCKPIT_HEIGHTS.CHART_SM}>
+            </InventoryChartCard>
+            <InventoryChartCard title="Giao dịch gần đây" className="h-[170px]">
               {recentProductionTransactions.length ? recentProductionTransactions.map((transaction: any) => (
                 <div key={transaction.id} className="mb-1 flex justify-between gap-1 text-[12px] text-slate-300">
                   <span className="truncate text-cyan-300">{transaction.transactionNo ?? transaction.code}</span>
                   <span className="shrink-0">{formatDateTime(transaction.transactionDate ?? transaction.createdAt)}</span>
                 </div>
               )) : (
-                <ModuleEmptyState icon="🕒" title="Chưa có giao dịch" description="Chưa phát sinh giao dịch vật tư sản xuất." />
+                <ModuleEmptyState icon={<Clock size={18} />} title="Chưa có giao dịch" description="Chưa phát sinh giao dịch vật tư sản xuất." />
               )}
-            </CockpitChartCard>
-            <CockpitChartCard title="Top vật tư khả dụng" className={COCKPIT_HEIGHTS.CHART_SM}>
+            </InventoryChartCard>
+            <InventoryChartCard title="Top vật tư khả dụng" className="h-[170px]">
               {topMaterials.length ? topMaterials.map((row) => (
                 <div key={row.id} className="mb-1 flex justify-between gap-1 text-[12px] text-slate-300">
                   <span>{row.code}</span>
                   <span className="text-cyan-300">{formatQuantity(row.available)} {row.unit}</span>
                 </div>
               )) : (
-                <ModuleEmptyState icon="📦" title="Chưa có dữ liệu" description="Chưa có vật tư khả dụng." />
+                <ModuleEmptyState icon={<Package size={18} />} title="Chưa có dữ liệu" description="Chưa có vật tư khả dụng." />
               )}
-            </CockpitChartCard>
+            </InventoryChartCard>
           </div>
         </div>
       </div>
@@ -407,7 +419,7 @@ export function ComponentsMaterialStockPage() {
               <CockpitKpiCard title="Giá TB" value={money(selectedRow.averageCost)} state="normal" tone="blue" />
               <CockpitKpiCard title="Giá trị" value={money(selectedRow.inventoryValue)} state="normal" tone="purple" />
             </div>
-            <CockpitChartCard title="Lịch sử nhập / trả kho SX" className={COCKPIT_HEIGHTS.CHART_SM}>
+            <InventoryChartCard title="Lịch sử nhập / trả kho SX" className="h-[170px]">
               <div className="max-h-44 overflow-auto text-xs">
                 {selectedHistory.map(({ transaction, line }: any) => (
                   <div key={`${transaction.id}-${line.id}`} className="mb-1 flex justify-between rounded border border-slate-800 px-2 py-1.5">
@@ -416,9 +428,9 @@ export function ComponentsMaterialStockPage() {
                     <span>{formatQuantity(Math.abs(Number(line.quantity ?? 0)))} {selectedRow.unit}</span>
                   </div>
                 ))}
-                {!selectedHistory.length ? <ModuleEmptyState icon="🕒" title="Chưa có lịch sử" description="Chưa có lịch sử nhập/trả kho sản xuất." /> : null}
+                {!selectedHistory.length ? <ModuleEmptyState icon={<Clock size={18} />} title="Chưa có lịch sử" description="Chưa có lịch sử nhập/trả kho sản xuất." /> : null}
               </div>
-            </CockpitChartCard>
+            </InventoryChartCard>
             <div className="grid gap-1 rounded border border-amber-900/60 bg-amber-950/10 p-4 md:grid-cols-3">
               <input type="datetime-local" value={returnForm.returnedAt} onFocus={() => setReturnForm((prev) => ({ ...prev, returnedAt: formatLocalDateTimeInput() }))} onChange={(event) => setReturnForm((prev) => ({ ...prev, returnedAt: event.target.value }))} className={componentsInput} />
               <input value={returnForm.quantity} onFocus={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} onBlur={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantity(event.target.value) }))} onChange={(event) => setReturnForm((prev) => ({ ...prev, quantity: formatQuantityInput(event.target.value) }))} inputMode="decimal" placeholder="Số lượng trả" className={componentsInput} />
@@ -431,6 +443,6 @@ export function ComponentsMaterialStockPage() {
           </div>
         ) : null}
       </ModuleDetailDrawer>
-    </ComponentsWorkspace>
+    </EnterpriseModulePage>
   )
 }

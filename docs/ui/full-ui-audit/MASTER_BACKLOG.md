@@ -13,11 +13,11 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | Module | Completion | Basis |
 | --- | ---: | --- |
 | Inventory | 88% | Four canon pages are strong; secondary pages and reports need certification. |
-| Components | 78% | Overview/List aligned source-level; secondary tabs and BOM/Ready Queue need finish. |
-| Production | 72% | Broad real-data cockpit exists; per-mode parity and Machines gap remain. |
-| Projects | 68% | Rich real-data workspaces exist; branch-level parity and timeline/report polish pending. |
-| Suppliers | 55% | Real list/quality data exists, but several tabs are controlled empty states and local UI classes remain. |
-| QC | 62% | Real QC workspace exists; pagination, local primitives and empty calibration remain. |
+| Components | 90% | Overview/List and secondary tabs are source/build aligned to Inventory canon; browser visual certification and future route decisions remain. |
+| Production | 90% | EPIC 3.2 source/build finalization confirms P0/P1 workspaces are production-ready at source level. Browser visual certification and P2 route/query decisions remain. |
+| Projects | 84% | EPIC 4.0 source/build completion aligns active branches to the Inventory canon; authenticated browser certification and P2 route decisions remain. |
+| Suppliers | 82% | EPIC 5.0 source/build completion aligns active Supplier list/quality and empty capability workspaces to the Inventory canon; browser certification and backend read contracts remain. |
+| QC | 82% | EPIC 6.0 source/build completion adds shared pagination/table shell treatment and removes inert/synthetic UI; browser certification and route/calibration decisions remain. |
 | Logistics | 58% | Real dispatch data exists; vehicles/planning/logs/reports and pagination/filtering gaps remain. |
 | Planning | 20% | Source files exist but no visible route is registered in the audited router. |
 | Admin | 64% | Settings/Users/Roles are real-data surfaces; security/admin gaps and pagination remain. |
@@ -29,26 +29,30 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | UI-P0-001 | Browser screenshot harness unavailable, blocking true visual certification across modules | All | Open | High | M | Approved Chromium/Playwright harness |
 | UI-P0-002 | Planning module has no visible registered route despite requested module scope | Planning | Open | High | S/M | Product navigation decision |
 | UI-P0-003 | Logistics `/vehicles` and `/planning` routes fall back instead of rendering distinct requested workspaces | Logistics | Open | High | M/L | Logistics read contracts or route removal decision |
+| UI-P0-004 | EPIC 7.0 global consistency certification remains source-level only without screenshot proof | All | Open | High | M | UI-P0-001 |
 
 ## P1 Production-Ready
 
 | ID | Issue | Module | Status | Severity | Complexity | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
 | UI-P1-001 | Secondary Inventory pages need internal canon certification | Inventory | Open | Medium | M | Screenshot harness |
-| UI-P1-002 | Certify secondary Components tabs against Inventory canon | Components | Open | Medium | L | Screenshot harness |
-| UI-P1-003 | Components BOM workspace is partial and not Inventory-canon certified | Components | Open | Medium | M | Components BOM read model/UI decision |
-| UI-P1-004 | Production per-mode tables need height, pagination and empty-row parity certification | Production | Open | High | L | Screenshot harness |
-| UI-P1-005 | Production Machines workspace missing or not route-visible | Production | Open | Medium | M | Machine read contract/navigation decision |
-| UI-P1-006 | Projects per-branch visual parity not certified | Projects | Open | High | L | Screenshot harness |
-| UI-P1-007 | Replace Suppliers local panel/table/filter classes with shared Inventory/Enterprise primitives | Suppliers | Open | High | M | Shared component decision |
-| UI-P1-008 | Add standard Supplier table pagination | Suppliers | Open | Medium | M | API/client pagination decision |
-| UI-P1-009 | Add/verify QC pagination instead of rendering up to `limit: 100` rows | QC | Open | High | M | QC read model pagination contract |
-| UI-P1-010 | Normalize QC panel/table primitives to Inventory/Enterprise shared surfaces | QC | Open | Medium | M | UI standard decision |
+| UI-P1-002 | Certify secondary Components tabs against Inventory canon | Components | Implemented - browser QA pending | Medium | S | Screenshot harness |
+| UI-P1-003 | Components BOM workspace is partial and not Inventory-canon certified | Components | Implemented - route decision deferred | Medium | S | Components BOM read model/UI decision |
+| UI-P1-004 | Production per-mode tables need height, pagination and empty-row parity certification | Production | Implemented - EPIC 3.2 finalized, browser QA pending | High | L | Screenshot harness |
+| UI-P1-005 | Production Machines workspace missing or not route-visible | Production | Implemented | Medium | M | Existing machine read contract |
+| UI-P1-006 | Projects per-branch visual parity not certified | Projects | Implemented - browser QA pending | High | M | Screenshot harness |
+| UI-P1-007 | Replace Suppliers local panel/table/filter classes with shared Inventory/Enterprise primitives | Suppliers | Implemented - browser QA pending | High | M | Screenshot harness |
+| UI-P1-008 | Add standard Supplier table pagination | Suppliers | Implemented | Medium | S | Existing client-side read data |
+| UI-P1-009 | Add/verify QC pagination instead of rendering up to `limit: 100` rows | QC | Implemented - browser QA pending | High | M | QC read model pagination contract |
+| UI-P1-010 | Normalize QC panel/table primitives to Inventory/Enterprise shared surfaces | QC | Implemented at table/pagination level - browser QA pending | Medium | M | UI standard decision |
 | UI-P1-011 | Add Logistics standard filters beyond search | Logistics | Open | Medium | M | API filter support |
 | UI-P1-012 | Add Logistics pagination and empty rows to dispatch table | Logistics | Open | Medium | M | API or client pagination |
 | UI-P1-013 | Audit existing Planning workspace after route decision | Planning | Open | Medium | M | Route activation |
 | UI-P1-014 | Normalize Admin Settings local UI classes to shared primitives | Admin | Open | Medium | M | UI standard decision |
 | UI-P1-015 | Add Users/Roles standard pagination | Admin | Open | Medium | M | API/client pagination decision |
+| UI-P1-016 | Logistics logs/reports need explicit route branch behavior instead of fallback-like behavior | Logistics | Open | Medium | M | Logistics log/report contracts |
+| UI-P1-017 | Secondary Inventory pages need table/scroll/pagination parity review after global audit | Inventory | Open | Medium | M | Browser harness |
+| UI-P1-018 | Admin System Logs needs focused security/admin UI audit | Admin | Open | Medium | M | Security audit scope |
 
 ## P2 Future Improvements
 
@@ -81,3 +85,22 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 4. Finish Projects, Suppliers, QC and Logistics in that order unless business priority changes.
 5. Decide Planning visibility before UI implementation.
 6. Finish Admin after core operational modules unless a security/compliance release pulls it forward.
+
+## EPIC 7.0 Global UI Consistency Audit Addendum
+
+Generated on 2026-07-21.
+
+Primary outputs:
+
+- `docs/ui/global-ui-consistency-report.md`
+- `docs/ui/global-design-debt.md`
+
+Summary:
+
+- Inventory, Components, Production, Projects, Suppliers and QC are
+  source-level aligned to the Enterprise UI canon, but remain conditional until
+  authenticated screenshots certify spacing, scroll and responsive behavior.
+- Logistics and Planning contain the highest remaining visible consistency
+  risk.
+- Admin is real-data capable but still has mixed primitives and pagination
+  gaps.

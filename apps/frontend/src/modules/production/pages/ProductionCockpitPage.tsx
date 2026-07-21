@@ -24,7 +24,7 @@ import {
   enterpriseTableRow as inventoryTableRow,
 } from '@/shared/ui/enterprise-components'
 
-import type { ProductionBom, ProductionCockpitReadModel, ProductionComponent, ProductionLog, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
+import type { ProductionBom, ProductionCockpitReadModel, ProductionComponent, ProductionLog, ProductionMachine, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
 import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
   Meter,
@@ -59,6 +59,7 @@ import {
   useProductionConsumptions,
   useProductionIssues,
   useProductionLogs,
+  useProductionMachines,
   useProductionMaterialLedger,
   useProductionOrder,
   useProductionOrders,
@@ -190,6 +191,8 @@ export function ProductionCockpitPage() {
   const ledger = ledgerQuery.data ?? []
   const logsQuery = useProductionLogs(mode === 'overview' || mode === 'logs')
   const logs = logsQuery.data ?? []
+  const machinesQuery = useProductionMachines(mode === 'machines')
+  const machines = machinesQuery.data ?? []
   const { data: components = [] } = useProductionComponents(createOrderOpen || createBomOpen)
   const { data: inventoryItems = [] } = useInventoryItems()
   const { data: inventoryAudit = [] } = useInventoryAudit()
@@ -212,6 +215,11 @@ export function ProductionCockpitPage() {
   const delayed = summary?.delayed ?? 0
   const runningComponents = summary?.runningComponents ?? 0
   const productionWeight = summary?.productionWeight ?? 0
+  const machineOnline = machines.filter((machine) => machine.status !== 'OFFLINE' && machine.status !== 'DOWN').length
+  const machineMaintenance = machines.filter((machine) => machine.status === 'MAINTENANCE').length
+  const machineAverageUtilization = machines.length
+    ? machines.reduce((sum, machine) => sum + Number(machine.utilization ?? 0), 0) / machines.length
+    : 0
   const isWorkOrderMode = mode === 'orders'
   const activeQueries = isOrderWorkspace
     ? [cockpitQuery]
@@ -227,9 +235,11 @@ export function ProductionCockpitPage() {
               ? [legacyOrdersQuery, issuesQuery, consumptionsQuery]
               : mode === 'consumptions'
                 ? [issuesQuery, consumptionsQuery]
-                : mode === 'logs'
-                  ? [logsQuery]
-                  : []
+                : mode === 'machines'
+                  ? [machinesQuery]
+                  : mode === 'logs'
+                    ? [logsQuery]
+                    : []
   const workspacePending = activeQueries.some((query) => query.isPending)
   const workspaceError = activeQueries.some((query) => query.isError)
 
@@ -241,23 +251,32 @@ export function ProductionCockpitPage() {
       <div className="w-full min-w-0 flex-1 space-y-1">
 
       <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-        {isWorkOrderMode ? (
+        {mode === 'machines' ? (
           <>
-            <CockpitKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} note="Tất cả WO/MO" tone="blue" state="normal" trend={[planned, released, inProgress, completed]} />
-            <CockpitKpiCard title="Planned" value={number(planned)} note="Đã lập kế hoạch" tone="purple" state="normal" trend={[0, planned * 0.7, planned]} />
-            <CockpitKpiCard title="Released" value={number(released)} note="Sẵn sàng phát hành" tone="cyan" state="normal" trend={[0, released * 0.7, released]} />
-            <CockpitKpiCard title="In Progress" value={number(inProgress)} note="Đang sản xuất" tone="emerald" state="normal" trend={[0, inProgress * 0.7, inProgress]} />
-            <CockpitKpiCard title="Completed" value={number(completed)} note="Đã hoàn thành" tone="emerald" state="normal" trend={[0, completed * 0.65, completed]} />
-            <CockpitKpiCard title="Delayed" value={number(delayed)} note="Quá hạn/chậm tiến độ" tone="red" state="normal" trend={[0, delayed, delayed * 0.75]} />
+            <CockpitKpiCard title="Tổng máy" value={number(machines.length)} note="Theo endpoint Production Machines" tone="blue" state="normal" />
+            <CockpitKpiCard title="Online" value={number(machineOnline)} note="Không OFFLINE/DOWN" tone="emerald" state="normal" />
+            <CockpitKpiCard title="Bảo trì" value={number(machineMaintenance)} note="MAINTENANCE" tone="amber" state="normal" />
+            <CockpitKpiCard title="Utilization TB" value={`${formatQuantity(machineAverageUtilization, 0)}%`} note="Trung bình utilization" tone="cyan" state="normal" />
+            <CockpitKpiCard title="Work Centers" value={number(cockpit?.workCenters.length ?? 0)} note="Từ read model sản xuất" tone="purple" state="normal" />
+            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="MO đang chạy" tone="blue" state="normal" />
+          </>
+        ) : isWorkOrderMode ? (
+          <>
+            <CockpitKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} note="Tất cả WO/MO" tone="blue" state="normal" />
+            <CockpitKpiCard title="Planned" value={number(planned)} note="Đã lập kế hoạch" tone="purple" state="normal" />
+            <CockpitKpiCard title="Released" value={number(released)} note="Sẵn sàng phát hành" tone="cyan" state="normal" />
+            <CockpitKpiCard title="In Progress" value={number(inProgress)} note="Đang sản xuất" tone="emerald" state="normal" />
+            <CockpitKpiCard title="Completed" value={number(completed)} note="Đã hoàn thành" tone="emerald" state="normal" />
+            <CockpitKpiCard title="Delayed" value={number(delayed)} note="Quá hạn/chậm tiến độ" tone="red" state="normal" />
           </>
         ) : (
           <>
-            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="cyan" state="normal" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} trend={[0, inProgress * 0.55, inProgress]} />
-            <CockpitKpiCard title="Hoàn thành hôm nay" value={number(completedToday)} note={`${number(completed)} hoàn thành tổng`} tone="emerald" state="normal" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} trend={[0, completedToday * 0.7, completedToday]} />
-            <CockpitKpiCard title="Chờ vật tư" value={number(waitingMaterial)} note="MO chưa có issue" tone="amber" state="normal" trend={[0, waitingMaterial, waitingMaterial * 0.8]} />
-            <CockpitKpiCard title="Trễ tiến độ" value={number(delayed)} note="Quá hạn hoặc delayed" tone="red" state="normal" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} trend={[0, delayed, delayed * 0.75]} />
-            <CockpitKpiCard title="Cấu kiện đang chạy" value={number(runningComponents)} note="Đang sản xuất" tone="purple" state="normal" trend={[0, runningComponents * 0.65, runningComponents]} />
-            <CockpitKpiCard title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} note="Theo BOM x MO" tone="blue" state="normal" trend={[0, productionWeight * 0.5, productionWeight]} />
+            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="cyan" state="normal" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} />
+            <CockpitKpiCard title="Hoàn thành hôm nay" value={number(completedToday)} note={`${number(completed)} hoàn thành tổng`} tone="emerald" state="normal" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} />
+            <CockpitKpiCard title="Chờ vật tư" value={number(waitingMaterial)} note="MO chưa có issue" tone="amber" state="normal" />
+            <CockpitKpiCard title="Trễ tiến độ" value={number(delayed)} note="Quá hạn hoặc delayed" tone="red" state="normal" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} />
+            <CockpitKpiCard title="Cấu kiện đang chạy" value={number(runningComponents)} note="Đang sản xuất" tone="purple" state="normal" />
+            <CockpitKpiCard title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} note="Theo BOM x MO" tone="blue" state="normal" />
           </>
         )}
       </div>
@@ -268,9 +287,13 @@ export function ProductionCockpitPage() {
           <input value={search} onChange={(event) => setSearch(event.target.value)}
             placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className={`${inventoryInput} w-full border-0 bg-transparent px-0 focus:border-0 focus:bg-transparent`} />
         </div>
-        <button onClick={() => setStatusFilter('')} className={`${inventoryMutedButton} xl:col-span-1 ${!statusFilter ? 'border-cyan-400/50 text-cyan-200' : ''}`}>Trạng thái: Tất cả</button>
-        {['Xưởng: Tất cả', 'Dự án: Tất cả', 'Ưu tiên: Tất cả'].map((text) =>
-          <button key={text} className={`${inventoryMutedButton} xl:col-span-1`}>{text}</button>)}
+        <button onClick={() => setStatusFilter('')} className={`${inventoryMutedButton} xl:col-span-1 ${!statusFilter ? 'border-cyan-400/50 text-cyan-200' : ''}`}>Tất cả</button>
+        {[
+          ['IN_PROGRESS', 'Đang chạy'],
+          ['COMPLETED', 'Hoàn thành'],
+          ['DELAYED', 'Trễ'],
+        ].map(([value, label]) =>
+          <button key={value} onClick={() => setStatusFilter(value)} className={`${inventoryMutedButton} xl:col-span-1 ${statusFilter === value ? 'border-cyan-400/50 text-cyan-200' : ''}`}>{label}</button>)}
         <button onClick={() => setCreateOrderOpen(true)} className={`${inventoryMutedButton} xl:col-span-1`}>+ Lệnh SX</button>
         <button onClick={() => setCreateBomOpen(true)} className={`${inventoryMutedButton} xl:col-span-1`}>+ BOM</button>
       </ModuleFilterBar>
@@ -281,6 +304,7 @@ export function ProductionCockpitPage() {
       {mode === 'orders' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'planning' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'execution' && <ProductionExecutionBoard orders={orders} issues={issues} reservations={reservations} />}
+      {mode === 'machines' && <MachinesWorkspace machines={machines} workCenters={cockpit?.workCenters ?? []} search={search} />}
       {mode === 'reservations' && <Reservations rows={reservations} orders={orders} onOpen={setSelectedOrder} />}
       {mode === 'warehouse' && <ProductionWarehouseCockpit inventoryItems={inventoryItems as InventoryItemLike[]} auditRows={inventoryAudit as InventoryAuditLike[]} orders={orders} reservations={reservations} consumptions={consumptions} />}
       {mode === 'material-ledger' && <MaterialLedger rows={ledger} orders={orders} filters={ledgerFilters} onFiltersChange={setLedgerFilters} />}
@@ -349,15 +373,178 @@ function ProductionWorkspaceState({
 
       <aside className="space-y-1 xl:col-span-3">
         <CockpitChartCard title="Tiến độ sản xuất" subtitle="Planning → Finished" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <ProductionDonut centerValue="0" centerLabel="WO" segments={[{ label: 'Chưa có dữ liệu', value: 1, color: '#64748b' }]} />
+          <ModuleEmptyState
+            icon={<Factory size={18} />}
+            title={isLoading ? 'Đang tải tiến độ' : 'Chưa có dữ liệu tiến độ'}
+            description={isLoading ? 'Đang đồng bộ phân bổ trạng thái sản xuất.' : 'Biểu đồ sẽ hiển thị khi read model trả dữ liệu thật.'}
+          />
         </CockpitChartCard>
         <CockpitChartCard title="Material readiness" subtitle="Net issued / required" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <ProductionDonut centerValue="0" centerLabel="WO" segments={[{ label: 'Chưa có dữ liệu', value: 1, color: '#64748b' }]} />
+          <ModuleEmptyState
+            icon={<Boxes size={18} />}
+            title={isLoading ? 'Đang tải readiness' : 'Chưa có dữ liệu vật tư'}
+            description={isLoading ? 'Đang đồng bộ trạng thái cấp phát vật tư.' : 'Biểu đồ sẽ hiển thị khi có issue/reservation thật.'}
+          />
         </CockpitChartCard>
         <CockpitChartCard title="WO sắp trễ" subtitle="Sắp xếp theo Due Date" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
           <RankList rows={[]} empty={isLoading ? 'Đang tải danh sách WO' : 'Chưa có WO có hạn'} />
         </CockpitChartCard>
       </aside>
+    </div>
+  )
+}
+
+function MachinesWorkspace({
+  machines,
+  workCenters,
+  search,
+}: {
+  machines: ProductionMachine[]
+  workCenters: ProductionCockpitReadModel['workCenters']
+  search: string
+}) {
+  const [status, setStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 14
+  const normalizedSearch = search.trim().toLowerCase()
+  const rows = useMemo(() => machines.filter((machine) => {
+    if (status && machine.status !== status) return false
+    if (!normalizedSearch) return true
+    return `${machine.code} ${machine.name} ${machine.status} ${machine.workCenter?.code ?? ''} ${machine.workCenter?.name ?? ''}`
+      .toLowerCase()
+      .includes(normalizedSearch)
+  }), [machines, normalizedSearch, status])
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const statusOptions = Array.from(new Set(machines.map((machine) => machine.status).filter(Boolean))).sort()
+  const averageUtilization = machines.length
+    ? machines.reduce((sum, machine) => sum + Number(machine.utilization ?? 0), 0) / machines.length
+    : 0
+  const online = machines.filter((machine) => !['OFFLINE', 'DOWN'].includes(machine.status)).length
+  const statusSegments = statusOptions.map((label, index) => ({
+    label,
+    value: machines.filter((machine) => machine.status === label).length,
+    color: ['#14c987', '#06b6d4', '#f59e0b', '#ef4444', '#7c3aed', '#64748b'][index % 6],
+  }))
+  const workCenterRows = workCenters
+    .map((workCenter) => ({
+      id: workCenter.id,
+      title: `${workCenter.code} · ${workCenter.name}`,
+      subtitle: workCenter.status,
+      count: workCenter._count.machines,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map((workCenter) => ({ ...workCenter, value: formatQuantity(workCenter.count, 0) }))
+  const topUtilization = [...machines]
+    .sort((a, b) => Number(b.utilization ?? 0) - Number(a.utilization ?? 0))
+    .slice(0, 5)
+
+  useEffect(() => {
+    setPage(1)
+  }, [rows.length, status])
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1">
+      <ModuleFilterBar className="my-1">
+        <button
+          type="button"
+          onClick={() => setStatus('')}
+          className={`${inventoryMutedButton} xl:col-span-1 ${!status ? 'border-cyan-400/50 text-cyan-200' : ''}`}
+        >
+          Máy: Tất cả
+        </button>
+        {statusOptions.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setStatus(option)}
+            className={`${inventoryMutedButton} xl:col-span-1 ${status === option ? 'border-cyan-400/50 text-cyan-200' : ''}`}
+          >
+            {option}
+          </button>
+        ))}
+      </ModuleFilterBar>
+
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
+        <div className="xl:col-span-9">
+          <CockpitChartCard
+            title="Machine Status Registry"
+            subtitle="Máy móc, work center, trạng thái và utilization"
+            action={<span className="text-[11px] text-cyan-300">{rows.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, rows.length)} / {rows.length}</span>}
+            heightClass={COCKPIT_HEIGHTS.TABLE_MD}
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              <CockpitTableShell className="min-h-0 flex-1">
+                <table className="w-full min-w-[980px] table-fixed text-left text-[13px]">
+                  <thead className={inventoryTableHead}>
+                    <tr>{['Machine', 'Work Center', 'Status', 'Utilization', 'Code'].map((head) => <th key={head} className="px-1.5 py-0.5 text-left font-medium">{head}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {pagedRows.map((machine) => (
+                      <tr key={machine.id} className={inventoryTableRow}>
+                        <td className="px-2 py-2 text-cyan-300">{machine.name}<div className="mt-0.5 truncate text-[10px] text-slate-500">{machine.code}</div></td>
+                        <td className="px-2 py-2 text-slate-300">{machine.workCenter ? `${machine.workCenter.code} · ${machine.workCenter.name}` : '-'}</td>
+                        <td className="px-2 py-2"><StatusChip status={machine.status} /></td>
+                        <td className="w-44 px-2 py-2">
+                          <Meter value={Number(machine.utilization ?? 0)} tone={Number(machine.utilization ?? 0) >= 80 ? 'bg-emerald-500' : Number(machine.utilization ?? 0) >= 50 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                          <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(machine.utilization ?? 0, 0)}%</div>
+                        </td>
+                        <td className="px-2 py-2 font-mono text-slate-400">{machine.id}</td>
+                      </tr>
+                    ))}
+                    {emptyRows.map((_, index) => (
+                      <tr key={`machine-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                        <td colSpan={5} className="h-[46px] px-2 py-2">
+                          <div className="h-px w-full bg-white/[0.035]" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!pagedRows.length ? <ModuleEmptyState icon={<Wrench size={18} />} title="Chưa có dữ liệu máy móc" description="Danh sách máy sẽ hiển thị khi backend trả machine telemetry." /> : null}
+              </CockpitTableShell>
+              <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+            </div>
+          </CockpitChartCard>
+        </div>
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Trạng thái máy" subtitle="Theo machine status" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            {machines.length ? <ProductionDonut centerValue={formatQuantity(machines.length, 0)} centerLabel="máy" segments={statusSegments} /> : (
+              <ModuleEmptyState icon={<Wrench size={18} />} title="Chưa có machine status" description="Không dựng biểu đồ khi chưa có dữ liệu thật." />
+            )}
+          </CockpitChartCard>
+          <CockpitChartCard title="Utilization" subtitle="Trung bình máy" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="space-y-2 text-xs text-slate-300">
+              <Info k="Average" v={`${formatQuantity(averageUtilization, 0)}%`} />
+              <Info k="Online" v={formatQuantity(online, 0)} />
+              <Info k="Total" v={formatQuantity(machines.length, 0)} />
+            </div>
+          </CockpitChartCard>
+          <CockpitChartCard title="Work centers" subtitle="Máy theo work center" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={workCenterRows} empty="Chưa có work center" />
+          </CockpitChartCard>
+        </aside>
+      </div>
+
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-3">
+        <CockpitChartCard title="Top utilization" subtitle="Máy có utilization cao nhất" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <RankList rows={topUtilization.map((machine) => ({
+            id: machine.id,
+            title: machine.code,
+            subtitle: machine.name,
+            value: `${formatQuantity(machine.utilization ?? 0, 0)}%`,
+          }))} empty="Chưa có utilization" />
+        </CockpitChartCard>
+        <CockpitChartCard title="Machine health" subtitle="Online / offline thật" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          {machines.length ? <ProductionMiniBars values={[online, Math.max(0, machines.length - online), machines.filter((machine) => machine.status === 'MAINTENANCE').length]} /> : (
+            <ModuleEmptyState icon={<Wrench size={18} />} title="Chưa có health telemetry" description="Không hiển thị bar chart khi chưa có máy." />
+          )}
+        </CockpitChartCard>
+        <CockpitChartCard title="Work center capacity" subtitle="Machine count" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <RankList rows={workCenterRows} empty="Chưa có capacity" />
+        </CockpitChartCard>
+      </div>
     </div>
   )
 }
@@ -371,10 +558,39 @@ function ProductionIncidentsWorkspace({
 }) {
   const delayedRows = orders.filter((order) => isDelayedOrder(order))
   const incidentLogs = logs.filter((log) => /delay|incident|error|fail|cancel|scrap/i.test(`${log.type} ${log.message}`))
+  const incidentRows = [
+    ...delayedRows.map((order) => ({
+      id: `order-${order.id}`,
+      source: 'Order',
+      code: order.orderNo,
+      status: order.status,
+      description: order.title,
+      time: date(order.plannedEndAt),
+      tone: 'text-red-300',
+    })),
+    ...incidentLogs.map((log) => ({
+      id: `log-${log.id}`,
+      source: 'Log',
+      code: log.productionOrder?.orderNo ?? 'PRODUCTION',
+      status: log.type,
+      description: log.message,
+      time: formatDateTime(log.createdAt),
+      tone: 'text-amber-300',
+    })),
+  ]
+  const [page, setPage] = useState(1)
+  const pageSize = 14
+  const pagedRows = incidentRows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+
+  useEffect(() => {
+    setPage(1)
+  }, [incidentRows.length])
 
   return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_320px]">
-    <CockpitChartCard title={`Sự cố / cảnh báo sản xuất (${delayedRows.length + incidentLogs.length})`} subtitle="Delayed orders và log cảnh báo hiện có" className={COCKPIT_HEIGHTS.TABLE_MD}>
-      <CockpitTableShell className="h-full">
+    <CockpitChartCard title={`Sự cố / cảnh báo sản xuất (${incidentRows.length})`} subtitle="Delayed orders và log cảnh báo hiện có" heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
+      <div className="flex h-full min-h-0 flex-col">
+      <CockpitTableShell className="min-h-0 flex-1">
         <table className="w-full min-w-[780px] table-fixed text-[13px]">
           <thead className={inventoryTableHead}>
             <tr>
@@ -384,37 +600,44 @@ function ProductionIncidentsWorkspace({
             </tr>
           </thead>
           <tbody>
-            {delayedRows.map((order) => (
-              <tr key={`order-${order.id}`} className={inventoryTableRow}>
-                <td className="px-3 py-2 text-red-300">Order</td>
-                <td className="truncate px-3 py-2 font-mono text-cyan-300">{order.orderNo}</td>
-                <td className="px-3 py-2">{order.status}</td>
-                <td className="truncate px-3 py-2">{order.title}</td>
-                <td className="px-3 py-2">{date(order.plannedEndAt)}</td>
+            {pagedRows.map((row) => (
+              <tr key={row.id} className={inventoryTableRow}>
+                <td className={`px-3 py-2 ${row.tone}`}>{row.source}</td>
+                <td className="truncate px-3 py-2 font-mono text-cyan-300">{row.code}</td>
+                <td className="px-3 py-2">{row.status}</td>
+                <td className="truncate px-3 py-2">{row.description}</td>
+                <td className="px-3 py-2">{row.time}</td>
               </tr>
             ))}
-            {incidentLogs.map((log) => (
-              <tr key={`log-${log.id}`} className={inventoryTableRow}>
-                <td className="px-3 py-2 text-amber-300">Log</td>
-                <td className="truncate px-3 py-2 font-mono text-cyan-300">{log.productionOrder?.orderNo ?? 'PRODUCTION'}</td>
-                <td className="px-3 py-2">{log.type}</td>
-                <td className="truncate px-3 py-2">{log.message}</td>
-                <td className="px-3 py-2">{formatDateTime(log.createdAt)}</td>
+            {emptyRows.map((_, index) => (
+              <tr key={`incident-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                <td colSpan={5} className="h-[46px] px-2 py-2">
+                  <div className="h-px w-full bg-white/[0.035]" />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </CockpitTableShell>
-      {!delayedRows.length && !incidentLogs.length ? <div className="p-3"><ModuleEmptyState title="Không có sự cố đang mở" description="Workspace sẽ hiển thị delayed order hoặc log cảnh báo khi phát sinh." icon={<Wrench size={18} />} /></div> : null}
+      {!pagedRows.length ? <div className="p-3"><ModuleEmptyState title="Không có sự cố đang mở" description="Workspace sẽ hiển thị delayed order hoặc log cảnh báo khi phát sinh." icon={<Wrench size={18} />} /></div> : null}
+      <DataTablePagination page={page} pageSize={pageSize} total={incidentRows.length} onPageChange={setPage} />
+      </div>
     </CockpitChartCard>
     <aside className="space-y-1">
-      <CockpitChartCard title="Đơn hàng trễ" className={COCKPIT_HEIGHTS.CHART_SM}>
+      <CockpitChartCard title="Đơn hàng trễ" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
         <div className="text-3xl font-semibold text-red-300">{formatQuantity(delayedRows.length, 0)}</div>
         <p className="mt-2 text-xs text-slate-400">Tính từ Production Order quá hạn hoặc trạng thái delayed.</p>
       </CockpitChartCard>
-      <CockpitChartCard title="Log cảnh báo" className={COCKPIT_HEIGHTS.CHART_SM}>
+      <CockpitChartCard title="Log cảnh báo" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
         <div className="text-3xl font-semibold text-amber-300">{formatQuantity(incidentLogs.length, 0)}</div>
         <p className="mt-2 text-xs text-slate-400">Dựa trên action/description hiện có trong production log.</p>
+      </CockpitChartCard>
+      <CockpitChartCard title="Tổng cảnh báo" subtitle="Delayed + warning logs" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+        <div className="space-y-2 text-xs text-slate-300">
+          <Info k="Open items" v={formatQuantity(incidentRows.length, 0)} />
+          <Info k="Delayed orders" v={formatQuantity(delayedRows.length, 0)} />
+          <Info k="Warning logs" v={formatQuantity(incidentLogs.length, 0)} />
+        </div>
       </CockpitChartCard>
     </aside>
   </div>
@@ -441,16 +664,17 @@ function ProductionReportsWorkspace({
   const consumedQty = consumptions.reduce((sum, item) => sum + Number(item.consumedQty ?? 0), 0)
   const reservedQty = reservations.reduce((sum, item) => sum + item.lines.reduce((lineSum, line) => lineSum + Number(line.reservedQty ?? 0), 0), 0)
   const summary = readModel?.summary
+  const hasMaterialFlow = issuedQty > 0 || consumedQty > 0 || reservedQty > 0
 
   return (
     <div className="space-y-1">
       <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-        <CockpitKpiCard title="Lệnh sản xuất" value={number(summary?.total ?? orders.length)} note="MO / WO hiện có" tone="blue" state="normal" trend={[0, (summary?.total ?? orders.length) * 0.65, summary?.total ?? orders.length]} />
-        <CockpitKpiCard title="Đang chạy xưởng" value={number(inProgress)} note="In progress" tone="cyan" state="normal" trend={[0, inProgress * 0.7, inProgress]} />
-        <CockpitKpiCard title="Hoàn thành" value={number(completed)} note="Completed" tone="emerald" state="normal" trend={[0, completed * 0.65, completed]} />
-        <CockpitKpiCard title="Steel issued" value={number(issuedQty)} note="Material issue" tone="purple" state="normal" trend={[0, issuedQty * 0.7, issuedQty]} />
-        <CockpitKpiCard title="Steel consumed" value={number(consumedQty)} note="Consumption" tone="amber" state="normal" trend={[0, consumedQty * 0.7, consumedQty]} />
-        <CockpitKpiCard title="Đang giữ chỗ" value={number(reservedQty)} note="Reservation" tone="red" state="normal" trend={[0, reservedQty, reservedQty * 0.75]} />
+        <CockpitKpiCard title="Lệnh sản xuất" value={number(summary?.total ?? orders.length)} note="MO / WO hiện có" tone="blue" state="normal" />
+        <CockpitKpiCard title="Đang chạy xưởng" value={number(inProgress)} note="In progress" tone="cyan" state="normal" />
+        <CockpitKpiCard title="Hoàn thành" value={number(completed)} note="Completed" tone="emerald" state="normal" />
+        <CockpitKpiCard title="Steel issued" value={number(issuedQty)} note="Material issue" tone="purple" state="normal" />
+        <CockpitKpiCard title="Steel consumed" value={number(consumedQty)} note="Consumption" tone="amber" state="normal" />
+        <CockpitKpiCard title="Đang giữ chỗ" value={number(reservedQty)} note="Reservation" tone="red" state="normal" />
       </div>
       <div className="grid gap-1 xl:grid-cols-12">
         <CockpitChartCard title="Hiệu suất sản xuất" subtitle="Status distribution" className={`${COCKPIT_HEIGHTS.CHART_LG} xl:col-span-4`}>
@@ -461,7 +685,9 @@ function ProductionReportsWorkspace({
           ]} />
         </CockpitChartCard>
         <CockpitChartCard title="Luồng thép xưởng" subtitle="Issue / consume / reserve" className={`${COCKPIT_HEIGHTS.CHART_LG} xl:col-span-4`}>
-          <ProductionMiniBars values={[issuedQty || 1, consumedQty || 1, reservedQty || 1]} />
+          {hasMaterialFlow ? <ProductionMiniBars values={[issuedQty, consumedQty, reservedQty]} /> : (
+            <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có luồng vật tư" description="Biểu đồ sẽ hiển thị khi có issue, consumption hoặc reservation thật." />
+          )}
         </CockpitChartCard>
         <CockpitChartCard title="Hoạt động gần đây" subtitle="Production logs" className={`${COCKPIT_HEIGHTS.CHART_LG} xl:col-span-4`}>
           {logs.slice(0, 6).map((log) => (
@@ -493,6 +719,7 @@ function Overview({
   const { running, pending, completed } = readModel.overview.progress
   const { issued, waiting, shortage } = readModel.overview.material
   const stageRows = readModel.overview.stages.map(({ label, value }) => [label, value] as [string, number])
+  const hasStageData = stageRows.some(([, value]) => value > 0)
   const activeComponents = readModel.overview.activeComponents
   const summary = readModel.summary
   const attentionRows = orders
@@ -605,10 +832,16 @@ function Overview({
     </div>
     <div className="grid grid-cols-1 gap-1 xl:grid-cols-[minmax(0,1fr)_380px]">
       <CockpitChartCard title="Công đoạn sản xuất" subtitle="Phân bổ theo công đoạn hiện tại" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <ProductionMiniBars values={stageRows.map(([, value]) => value || 1)} />
-        <div className="mt-2 grid grid-cols-2 gap-1 text-xs md:grid-cols-5">
-          {stageRows.map(([label, value]) => <Info key={label} k={label} v={formatQuantity(value, 0)} />)}
-        </div>
+        {hasStageData ? (
+          <>
+            <ProductionMiniBars values={stageRows.map(([, value]) => value)} />
+            <div className="mt-2 grid grid-cols-2 gap-1 text-xs md:grid-cols-5">
+              {stageRows.map(([label, value]) => <Info key={label} k={label} v={formatQuantity(value, 0)} />)}
+            </div>
+          </>
+        ) : (
+          <ModuleEmptyState icon={<Factory size={18} />} title="Chưa có công đoạn sản xuất" description="Không dựng chart khi read model chưa có stage thật." />
+        )}
       </CockpitChartCard>
       <aside className="space-y-1">
         <CockpitChartCard title="Cấu kiện đang sản xuất" subtitle="Top 5 lệnh đang mở" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
@@ -818,6 +1051,7 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
   const [page, setPage] = useState(1)
   const pageSize = 14
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const pageStart = rows.length ? (page - 1) * pageSize + 1 : 0
   const pageEnd = Math.min(page * pageSize, rows.length)
   const statusSegments = [
@@ -838,10 +1072,10 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
 
   return <div className="w-full min-w-0 flex-1 space-y-1">
     <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
-      <CockpitKpiCard title="Tổng BOM" value={formatQuantity(rows.length, 0)} note="Định mức sản xuất" tone="blue" state="normal" trend={[0, rows.length * 0.65, rows.length]} />
-      <CockpitKpiCard title="Đang dùng" value={formatQuantity(active, 0)} note="Không archive" tone="emerald" state="normal" trend={[0, active * 0.7, active]} />
-      <CockpitKpiCard title="Dòng vật tư" value={formatQuantity(totalMaterials, 0)} note="Tổng BOM items" tone="cyan" state="normal" trend={[0, totalMaterials * 0.65, totalMaterials]} />
-      <CockpitKpiCard title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} note="Tổng estimated weight" tone="purple" state="normal" trend={[0, totalWeight * 0.6, totalWeight]} />
+      <CockpitKpiCard title="Tổng BOM" value={formatQuantity(rows.length, 0)} note="Định mức sản xuất" tone="blue" state="normal" />
+      <CockpitKpiCard title="Đang dùng" value={formatQuantity(active, 0)} note="Không archive" tone="emerald" state="normal" />
+      <CockpitKpiCard title="Dòng vật tư" value={formatQuantity(totalMaterials, 0)} note="Tổng BOM items" tone="cyan" state="normal" />
+      <CockpitKpiCard title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} note="Tổng estimated weight" tone="purple" state="normal" />
     </div>
     <div className="flex items-center justify-end gap-1">
       <button onClick={onCreate} className={`${inventoryMutedButton} h-9 rounded-xl`}>+ Tạo BOM</button>
@@ -868,7 +1102,15 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
                   <td className="px-2 py-2"><StatusChip status={row.status}/></td>
                   <td className="px-2 py-2 text-slate-300">{date(row.createdAt)}</td>
                   <td className="px-2 py-2"><div className="flex gap-1 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td>
-                </tr>)}</tbody>
+                </tr>)}
+                {emptyRows.map((_, index) => (
+                  <tr key={`bom-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                    <td colSpan={12} className="h-[46px] px-2 py-2">
+                      <div className="h-px w-full bg-white/[0.035]" />
+                    </td>
+                  </tr>
+                ))}
+                </tbody>
               </table>
               {!pagedRows.length ? <ModuleEmptyState icon={<span>⚙️</span>} title="Chưa có dữ liệu BOM" description="Tạo Production BOM để chuẩn hóa định mức vật tư cho sản xuất." /> : null}
             </CockpitTableShell>
@@ -1110,6 +1352,7 @@ function ProductionWarehouseCockpit({
   const [page, setPage] = useState(1)
   const pageSize = 14
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const statusSegments = [
     { label: 'OUT', value: rows.filter((row) => row.status === 'OUT').length, color: '#ef4444' },
     { label: 'LOW', value: rows.filter((row) => row.status === 'LOW').length, color: '#f59e0b' },
@@ -1142,6 +1385,13 @@ function ProductionWarehouseCockpit({
                     <td className="px-2 py-2 font-mono tabular-nums">{number(row.required)} {row.unit}</td>
                     <td className={row.shortage > 0 ? 'px-2 py-2 font-mono tabular-nums text-red-300' : 'px-2 py-2 font-mono tabular-nums text-slate-500'}>{number(row.shortage)} {row.unit}</td>
                     <td className="px-2 py-2"><span className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${statusToneClass(row.status)}`}>{statusText(row.status)}</span></td>
+                  </tr>
+                ))}
+                {emptyRows.map((_, index) => (
+                  <tr key={`production-warehouse-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+                    <td colSpan={8} className="h-[46px] px-2 py-2">
+                      <div className="h-px w-full bg-white/[0.035]" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1418,6 +1668,7 @@ function Issues({
   const [page, setPage] = useState(1)
   const pageSize = 14
   const pagedRows = issueRows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
 
   useEffect(() => {
     setPage(1)
@@ -1452,7 +1703,15 @@ function Issues({
             <td className="px-2 py-2"><StatusChip status={issue.status}/></td>
             <td className="px-2 py-2">{row.returnableQty > 0 ? <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row) }} className="text-amber-300">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
           </tr>
-        })}</tbody>
+        })}
+        {emptyRows.map((_, index) => (
+          <tr key={`issue-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+            <td colSpan={11} className="h-[46px] px-2 py-2">
+              <div className="h-px w-full bg-white/[0.035]" />
+            </td>
+          </tr>
+        ))}
+        </tbody>
       </table>
       {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Phiếu cấp phát vật tư sản xuất sẽ hiển thị tại đây." /> : null}
       </CockpitTableShell>
@@ -1588,55 +1847,88 @@ type ConsumptionSummaryRow = {
 function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssue[]; consumptions: ProductionMaterialConsumption[] }) {
   const [consumeTarget, setConsumeTarget] = useState<ProductionConsumptionTarget | null>(null)
   const rows = useMemo(() => buildConsumptionRows(issues, consumptions), [issues, consumptions])
+  const [page, setPage] = useState(1)
+  const pageSize = 14
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const issued = rows.reduce((sum, row) => sum + row.issuedQty, 0)
   const returned = rows.reduce((sum, row) => sum + row.returnedQty, 0)
   const consumed = rows.reduce((sum, row) => sum + row.consumedQty, 0)
   const scrap = rows.reduce((sum, row) => sum + row.scrapQty, 0)
   const remaining = rows.reduce((sum, row) => sum + row.remainingQty, 0)
 
-  return <div className="grid gap-3 xl:grid-cols-[1fr_330px]">
-    <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-5">
+  useEffect(() => {
+    setPage(1)
+  }, [rows.length])
+
+  return <div className="w-full min-w-0 flex-1 space-y-1">
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
         <InventoryKpi title="Issued" value={number(issued)} note="Đã cấp phát" tone="blue" />
         <InventoryKpi title="Returned" value={number(returned)} note="Đã hoàn trả" tone="amber" />
         <InventoryKpi title="Consumed" value={number(consumed)} note="Đã tiêu hao" tone="emerald" />
         <InventoryKpi title="Scrap" value={number(scrap)} note="Phế phẩm" tone="red" />
         <InventoryKpi title="Remaining" value={number(remaining)} note="Còn treo tại sản xuất" tone="purple" />
-      </div>
-      <InventoryChartCard title="Production Consumption" note="Issued = Returned + Consumed + Scrap + Remaining" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng vật tư</span>}>
-        <ModuleDataGrid><div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left text-xs">
-          <thead className={inventoryTableHead}><tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-3 py-2 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-          <tbody>{rows.slice(0,50).map(row=><tr className={inventoryTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
-            <td className="px-3 py-3 text-cyan-300">{row.orderNo}<div className="mt-1 text-[10px] text-slate-500">{row.title}</div></td>
-            <td>{row.material}</td>
-            <td>{number(row.issuedQty)}</td>
-            <td>{number(row.returnedQty)}</td>
-            <td className="text-emerald-300">{number(row.consumedQty)}</td>
-            <td className="text-red-300">{number(row.scrapQty)}</td>
-            <td className={row.remainingQty > 0 ? 'text-amber-300' : 'text-slate-500'}>{number(row.remainingQty)}</td>
-            <td>{row.unit ?? '-'}</td>
-            <td>{row.remainingQty > 0 && <button type="button" onClick={() => setConsumeTarget(row)} className="text-cyan-300">Consume</button>}</td>
-          </tr>)}</tbody>
-        </table></div></ModuleDataGrid>
-      </InventoryChartCard>
     </div>
-    <aside className="space-y-3">
-      <ProductionPanel title="Nguyên tắc tiêu hao">
+    <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_330px]">
+    <CockpitChartCard title="Production Consumption" subtitle="Issued = Returned + Consumed + Scrap + Remaining" action={<span className="text-[11px] text-cyan-300">{rows.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, rows.length)} / {rows.length}</span>} heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
+      <div className="flex h-full min-h-0 flex-col">
+      <CockpitTableShell className="min-h-0 flex-1">
+        <table className="w-full min-w-[1080px] table-fixed text-left text-[13px]">
+          <thead className={inventoryTableHead}><tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
+          <tbody>{pagedRows.map(row=><tr className={inventoryTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
+            <td className="px-2 py-2 text-cyan-300">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500">{row.title}</div></td>
+            <td className="px-2 py-2">{row.material}</td>
+            <td className="px-2 py-2 font-mono tabular-nums">{number(row.issuedQty)}</td>
+            <td className="px-2 py-2 font-mono tabular-nums">{number(row.returnedQty)}</td>
+            <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{number(row.consumedQty)}</td>
+            <td className="px-2 py-2 font-mono tabular-nums text-red-300">{number(row.scrapQty)}</td>
+            <td className={`px-2 py-2 font-mono tabular-nums ${row.remainingQty > 0 ? 'text-amber-300' : 'text-slate-500'}`}>{number(row.remainingQty)}</td>
+            <td className="px-2 py-2">{row.unit ?? '-'}</td>
+            <td className="px-2 py-2">{row.remainingQty > 0 ? <button type="button" onClick={() => setConsumeTarget(row)} className="text-cyan-300">Consume</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
+          </tr>)}
+          {emptyRows.map((_, index) => (
+            <tr key={`consumption-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+              <td colSpan={9} className="h-[46px] px-2 py-2">
+                <div className="h-px w-full bg-white/[0.035]" />
+              </td>
+            </tr>
+          ))}
+          </tbody>
+        </table>
+        {!pagedRows.length ? <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có dữ liệu tiêu hao" description="Consumption sẽ hiển thị khi vật tư đã issue được consume hoặc scrap." /> : null}
+      </CockpitTableShell>
+      <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+      </div>
+    </CockpitChartCard>
+    <aside className="space-y-1">
+      <CockpitChartCard title="Nguyên tắc tiêu hao" subtitle="Production consumption rule" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
         <div className="space-y-3 text-xs text-slate-300">
           <div>Chỉ consume vật tư đã issue cho MO.</div>
           <div className="text-cyan-300">Remaining = Issued - Returned - Consumed - Scrap.</div>
           <div>Ghi consume sẽ tạo ledger event CONSUME.</div>
         </div>
-      </ProductionPanel>
-      <ProductionPanel title="Phân bổ tiêu hao">
-        <ProductionDonut centerValue={number(issued)} centerLabel="issued" segments={[
-          { label: 'Returned', value: returned, color: '#f59e0b' },
-          { label: 'Consumed', value: consumed, color: '#14c987' },
-          { label: 'Scrap', value: scrap, color: '#ef4444' },
-          { label: 'Remaining', value: remaining, color: '#7c3aed' },
-        ]} />
-      </ProductionPanel>
+      </CockpitChartCard>
+      <CockpitChartCard title="Phân bổ tiêu hao" subtitle="Returned / Consumed / Scrap / Remaining" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+        {issued > 0 ? (
+          <ProductionDonut centerValue={number(issued)} centerLabel="issued" segments={[
+            { label: 'Returned', value: returned, color: '#f59e0b' },
+            { label: 'Consumed', value: consumed, color: '#14c987' },
+            { label: 'Scrap', value: scrap, color: '#ef4444' },
+            { label: 'Remaining', value: remaining, color: '#7c3aed' },
+          ]} />
+        ) : (
+          <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có phân bổ tiêu hao" description="Biểu đồ sẽ hiển thị khi có vật tư đã issue." />
+        )}
+      </CockpitChartCard>
+      <CockpitChartCard title="Cân bằng vật tư" subtitle="Issued - Returned - Consumed - Scrap" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+        <div className="space-y-2 text-xs text-slate-300">
+          <Info k="Issued" v={number(issued)} />
+          <Info k="Settled" v={number(returned + consumed + scrap)} />
+          <Info k="Remaining" v={number(remaining)} />
+        </div>
+      </CockpitChartCard>
     </aside>
+    </div>
     {consumeTarget ? <ProductionConsumptionModal target={consumeTarget} onClose={() => setConsumeTarget(null)} /> : null}
   </div>
 }
@@ -1663,6 +1955,7 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
   const [page, setPage] = useState(1)
   const pageSize = 14
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const statusSegments = [
     { label: 'Reserved', value: rows.filter((row) => row.status === 'RESERVED').length, color: '#14c987' },
     { label: 'Draft', value: rows.filter((row) => row.status === 'DRAFT').length, color: '#1d7cff' },
@@ -1706,7 +1999,15 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
               {['DRAFT','RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-red-300" onClick={() => run(() => expire.mutateAsync({ id: row.id }), 'Đã hết hạn giữ chỗ')}>Expire</button>}
             </div></td>
           </tr>
-        })}</tbody>
+        })}
+        {emptyRows.map((_, index) => (
+          <tr key={`reservation-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+            <td colSpan={11} className="h-[46px] px-2 py-2">
+              <div className="h-px w-full bg-white/[0.035]" />
+            </td>
+          </tr>
+        ))}
+        </tbody>
       </table>
       {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Reservation vật tư sản xuất sẽ hiển thị khi tạo giữ chỗ cho WO." /> : null}
       </CockpitTableShell>
@@ -1750,6 +2051,7 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
   const [page, setPage] = useState(1)
   const pageSize = 14
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const warehouseRows = Array.from(rows.reduce((map, row) => {
     const key = row.warehouse?.code ?? row.warehouseId ?? 'Chưa rõ kho'
     map.set(key, (map.get(key) ?? 0) + Math.abs(Number(row.quantity ?? 0)))
@@ -1800,7 +2102,15 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
             <td className={Number(row.quantity) < 0 ? 'px-2 py-2 font-mono tabular-nums text-amber-300' : 'px-2 py-2 font-mono tabular-nums text-emerald-300'}>{number(row.quantity)}</td>
             <td className="px-2 py-2">{row.createdBy ?? '-'}</td>
             <td className="px-2 py-2">{row.remark ?? '-'}</td>
-          </tr>)}</tbody>
+          </tr>)}
+          {emptyRows.map((_, index) => (
+            <tr key={`ledger-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+              <td colSpan={9} className="h-[46px] px-2 py-2">
+                <div className="h-px w-full bg-white/[0.035]" />
+              </td>
+            </tr>
+          ))}
+          </tbody>
         </table>
         {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Ledger sẽ có dữ liệu khi reservation, issue, return, consume hoặc adjust phát sinh." /> : null}
         </CockpitTableShell>
@@ -1845,6 +2155,7 @@ function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) 
   const [page, setPage] = useState(1)
   const pageSize = 14
   const pagedRows = logs.slice((page - 1) * pageSize, page * pageSize)
+  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const todayRows = logs.filter((row) => sameDay(row.createdAt))
   const typeRows = Array.from(logs.reduce((map, row) => {
     map.set(row.type, (map.get(row.type) ?? 0) + 1)
@@ -1862,7 +2173,15 @@ function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) 
   <CockpitChartCard title="Nhật ký thực thi sản xuất" subtitle="Production logs" heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
     <div className="flex h-full min-h-0 flex-col">
     <CockpitTableShell className="min-h-0 flex-1">
-    <table className="w-full min-w-[900px] table-fixed text-left text-[13px]"><thead className={inventoryTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{pagedRows.map(row=><tr className={inventoryTableRow} key={row.id}><td className="px-2 py-2">{formatDateTime(row.createdAt)}</td><td className="px-2 py-2 text-cyan-300">{row.productionOrder.orderNo}</td><td className="px-2 py-2">{row.productionOrder.title}</td><td className="px-2 py-2">{row.stage?.name??row.type}</td><td className="px-2 py-2">{row.workerId??'-'}</td><td className="px-2 py-2">{row.stage?.name??'-'}</td><td className="px-2 py-2"><StatusChip status={row.type}/></td><td className="px-2 py-2">{row.message}</td></tr>)}</tbody></table>
+    <table className="w-full min-w-[900px] table-fixed text-left text-[13px]"><thead className={inventoryTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{pagedRows.map(row=><tr className={inventoryTableRow} key={row.id}><td className="px-2 py-2">{formatDateTime(row.createdAt)}</td><td className="px-2 py-2 text-cyan-300">{row.productionOrder.orderNo}</td><td className="px-2 py-2">{row.productionOrder.title}</td><td className="px-2 py-2">{row.stage?.name??row.type}</td><td className="px-2 py-2">{row.workerId??'-'}</td><td className="px-2 py-2">{row.stage?.name??'-'}</td><td className="px-2 py-2"><StatusChip status={row.type}/></td><td className="px-2 py-2">{row.message}</td></tr>)}
+    {emptyRows.map((_, index) => (
+      <tr key={`log-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
+        <td colSpan={8} className="h-[46px] px-2 py-2">
+          <div className="h-px w-full bg-white/[0.035]" />
+        </td>
+      </tr>
+    ))}
+    </tbody></table>
     {!pagedRows.length ? <ModuleEmptyState icon={<span>🕒</span>} title="Chưa có nhật ký" description="Nhật ký sản xuất sẽ hiển thị khi có thao tác production." /> : null}
     </CockpitTableShell>
     <DataTablePagination page={page} pageSize={pageSize} total={logs.length} onPageChange={setPage} />

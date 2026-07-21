@@ -52,7 +52,6 @@ export function ComponentsKpiCard({
       tone={tone}
       active={active}
       onClick={onClick}
-      trend={[10, 15, 12, 18, 14, 22]}
     />
   )
 }

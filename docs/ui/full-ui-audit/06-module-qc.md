@@ -1,5 +1,24 @@
 # EPIC 0 Full UI Audit - QC
 
+## EPIC 6.0 UI Completion Update
+
+Implemented on 2026-07-21.
+
+Status: **P1 SOURCE/BUILD COMPLETE, BROWSER QA PENDING**
+
+- QC inspection workspaces now use `DataTablePagination` with page-size options
+  10, 20, 50 and 100.
+- QC read-model requests no longer use a fixed `limit: 100`; page and page
+  size are tracked by the workspace and reset when filters/tabs change.
+- Inspection tables now render through shared cockpit table shell primitives
+  with stable empty rows and a shared empty-state presentation.
+- Inert toolbar buttons were removed. QC now keeps only actionable controls:
+  create inspection, search and status filter.
+- KPI cards no longer receive synthetic sparkline arrays; they display real
+  runtime metrics only.
+- Calibration remains a controlled empty state because no backend read contract
+  exists.
+
 ## Visible Routes And Requested Tabs
 
 All QC routes render `QcPage.tsx`.
@@ -37,8 +56,10 @@ All QC routes render `QcPage.tsx`.
 ## D. Table
 
 - Inspection queue and production queue tables/lists exist.
-- No explicit page-size/pagination certification found; `/qc` fetches `limit: 100`.
-- Potential issue: large dataset could render too many rows unless branch-level table paging exists.
+- Inspection tables now use shared `DataTablePagination` and request the active
+  page/limit from the QC read model.
+- Production queue remains a compact operational rail on overview/full
+  inspection pages.
 
 ## E. Chart
 
@@ -59,8 +80,7 @@ All QC routes render `QcPage.tsx`.
 
 | Gap | Priority | Severity | Effort | Dependencies |
 | --- | --- | --- | --- | --- |
-| Add/verify pagination for inspection tables (`limit: 100` currently) | P1 | High | M | QC read model pagination contract |
+| Add/verify pagination for inspection tables (`limit: 100` currently) | Closed | High | M | QC read model pagination contract |
 | Pending/Passed/Failed are not first-class routes | P2 | Medium | M | Sidebar/filter route decision |
-| Replace local module table/panel strings with Inventory shared primitives | P1 | Medium | M |
+| Replace local module table/panel strings with Inventory shared primitives | Closed at table shell/pagination level; browser QA pending | Medium | M |
 | Calibration remains empty | P2 | Medium | M/L | Calibration backend/read contract |
-

@@ -1,5 +1,90 @@
 # SteelTrack AI Changelog
 
+## 2026-07-21 EPIC 5.0 Suppliers UI Completion
+
+Completed:
+
+- Refined active Supplier routes against the Inventory/Components/Production/
+  Projects UI canon without changing backend/API/business behavior.
+- Added standard pagination and stable empty rows to the Supplier list and
+  Quality evaluation table.
+- Removed synthetic Supplier KPI trend arrays.
+- Converted unavailable Supplier capability tabs into full controlled empty
+  workspaces with KPI, filter, table, right rail and bottom analytics
+  structure instead of lone placeholder cards.
+- Preserved existing Supplier hooks, API contracts, routes, permissions,
+  schema and workflow semantics.
+
+## 2026-07-21 EPIC 4.0 Projects UI Completion
+
+Completed:
+
+- Refined active Projects routes against the Inventory/Components/Production
+  UI canon without changing backend/API/business behavior.
+- Moved Projects Overview and Projects List to a table-hero composition with
+  KPI cards, right analytics rail and bottom analytics band.
+- Replaced the active project detail milestone timeline's static label list
+  with WBS/phase-derived milestones and a standard empty state when no real WBS
+  data exists.
+- Preserved existing Projects runtime/template/detail APIs, React Query
+  contracts, routes, permissions, schema and workflow semantics.
+
+## 2026-07-21 EPIC 3.1 Production UI Polish
+
+Completed:
+
+- Polished Production toolbar behavior by removing inert filter controls and
+  keeping only working status filters plus creation actions.
+- Added a paginated table-hero surface to Production Queue before the kanban
+  lanes so the tab follows Inventory's workspace rhythm.
+- Strengthened Production Queue right rail with stage distribution,
+  bottleneck metrics and an attention queue using existing production data.
+- Converted Consumption right rail into equal-height cockpit cards for rules,
+  distribution and balance.
+- Filled Incidents right rail with delayed-order, warning-log and total alert
+  coverage panels.
+- Preserved backend, API contracts, React Query contracts, permissions, schema
+  and business behavior.
+
+## 2026-07-21 EPIC 3 Production Completion
+
+Completed:
+
+- Exposed the Production Machines workspace through `/production/machines`
+  using the existing authenticated machine endpoint and shared cockpit
+  primitives.
+- Removed Production synthetic KPI trend arrays and fake chart fallback values.
+  Widgets now render real values or standard no-data states.
+- Added table pagination for Production Consumptions and Incidents so the
+  workspaces no longer render unbounded rows.
+- Added stable empty rows to Production BOM, Warehouse, Issues, Reservations,
+  Material Ledger and Logs table surfaces to preserve the Inventory table-hero
+  footprint with low data volume.
+- Removed hardcoded sample metrics from the unused legacy Production telemetry
+  component.
+- Preserved backend APIs, React Query contracts, permissions, routes outside
+  the new Machines route, schema and business behavior.
+- Created `docs/reports/production-completion-report.md` and updated the
+  Production full UI audit status.
+
+## 2026-07-21 EPIC 2 Components Completion
+
+Completed:
+
+- Remediated Components secondary tabs against the Inventory UI canon:
+  Production/BOM, Stock, Material Stock, Transfers, Internal QC, History and
+  Reports now use Inventory-canon page, panel, chart and pagination primitives
+  for their primary workspace surfaces.
+- Removed hardcoded/fabricated Components UI data paths: static KPI trend
+  arrays, synthetic donut fallback values, static source labels and the
+  Reports timeline index fallback were removed.
+- Replaced non-functional History filter controls with the real read-model
+  search/action filter contract.
+- Preserved backend APIs, React Query contracts, routes, permissions, schema
+  and domain behavior.
+- Created `docs/reports/components-completion-report.md` and updated the
+  Components full UI audit/backlog execution status.
+
 ## 2026-07-21 Components Inventory Canon Alignment
 
 Completed:
