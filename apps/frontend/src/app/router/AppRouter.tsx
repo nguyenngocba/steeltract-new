@@ -291,7 +291,11 @@ export function AppRouter() {
       <Route path="/logistics/planning" element={<LogisticsPage />} />
       <Route path="/logistics/vehicles" element={<LogisticsPage />} />
       <Route path="/logistics/dispatch" element={<LogisticsPage />} />
+      <Route path="/logistics/loading" element={<LogisticsPage />} />
       <Route path="/logistics/tracking" element={<LogisticsPage />} />
+      <Route path="/logistics/shipment-tracking" element={<LogisticsPage />} />
+      <Route path="/logistics/deliveries" element={<LogisticsPage />} />
+      <Route path="/logistics/documents" element={<LogisticsPage />} />
       <Route path="/logistics/history" element={<LogisticsPage />} />
       <Route path="/logistics/logs" element={<LogisticsPage />} />
       <Route path="/logistics/reports" element={<LogisticsPage />} />

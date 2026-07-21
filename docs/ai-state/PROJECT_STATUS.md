@@ -1,5 +1,7 @@
 # Project Status
 
+On 2026-07-21 EPIC 8.0 completed the Logistics UI Reconstruction sprint. All visible Logistics pages and routes (/logistics, /planning, /vehicles, /dispatch, /loading, /tracking, /deliveries, /documents, /reports) were aligned to the SteelTrack UI Canon (KPI row, search/status/project toolbar, hero table with DataTablePagination & empty/loading states, right analytics rail). Fake data, synthetic trends, and dead toolbar actions were eliminated. All builds and git checks passed.
+
 On 2026-07-21 EPIC 7.0 completed a documentation-only global UI consistency
 audit across Inventory, Components, Production, Projects, Suppliers, QC,
 Logistics, Planning and Admin. The audit produced a global difference report

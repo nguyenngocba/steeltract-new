@@ -18,7 +18,7 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | Projects | 84% | EPIC 4.0 source/build completion aligns active branches to the Inventory canon; authenticated browser certification and P2 route decisions remain. |
 | Suppliers | 82% | EPIC 5.0 source/build completion aligns active Supplier list/quality and empty capability workspaces to the Inventory canon; browser certification and backend read contracts remain. |
 | QC | 82% | EPIC 6.0 source/build completion adds shared pagination/table shell treatment and removes inert/synthetic UI; browser certification and route/calibration decisions remain. |
-| Logistics | 58% | Real dispatch data exists; vehicles/planning/logs/reports and pagination/filtering gaps remain. |
+| Logistics | 90% | EPIC 8.0 source/build completion aligns all Logistics tabs/routes to the SteelTrack UI Canon with shared pagination, filters, and workspaces; browser certification remains. |
 | Planning | 20% | Source files exist but no visible route is registered in the audited router. |
 | Admin | 64% | Settings/Users/Roles are real-data surfaces; security/admin gaps and pagination remain. |
 
@@ -28,7 +28,7 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | --- | --- | --- | --- | --- | --- | --- |
 | UI-P0-001 | Browser screenshot harness unavailable, blocking true visual certification across modules | All | Open | High | M | Approved Chromium/Playwright harness |
 | UI-P0-002 | Planning module has no visible registered route despite requested module scope | Planning | Open | High | S/M | Product navigation decision |
-| UI-P0-003 | Logistics `/vehicles` and `/planning` routes fall back instead of rendering distinct requested workspaces | Logistics | Open | High | M/L | Logistics read contracts or route removal decision |
+| UI-P0-003 | Logistics `/vehicles` and `/planning` routes fall back instead of rendering distinct requested workspaces | Logistics | Implemented (EPIC 8.0) | High | M/L | Logistics read contracts or route removal decision |
 | UI-P0-004 | EPIC 7.0 global consistency certification remains source-level only without screenshot proof | All | Open | High | M | UI-P0-001 |
 
 ## P1 Production-Ready
@@ -45,12 +45,12 @@ This backlog is documentation-only. It uses the completed UI audit as the source
 | UI-P1-008 | Add standard Supplier table pagination | Suppliers | Implemented | Medium | S | Existing client-side read data |
 | UI-P1-009 | Add/verify QC pagination instead of rendering up to `limit: 100` rows | QC | Implemented - browser QA pending | High | M | QC read model pagination contract |
 | UI-P1-010 | Normalize QC panel/table primitives to Inventory/Enterprise shared surfaces | QC | Implemented at table/pagination level - browser QA pending | Medium | M | UI standard decision |
-| UI-P1-011 | Add Logistics standard filters beyond search | Logistics | Open | Medium | M | API filter support |
-| UI-P1-012 | Add Logistics pagination and empty rows to dispatch table | Logistics | Open | Medium | M | API or client pagination |
+| UI-P1-011 | Add Logistics standard filters beyond search | Logistics | Implemented (EPIC 8.0) | Medium | M | API filter support |
+| UI-P1-012 | Add Logistics pagination and empty rows to dispatch table | Logistics | Implemented (EPIC 8.0) | Medium | M | API or client pagination |
 | UI-P1-013 | Audit existing Planning workspace after route decision | Planning | Open | Medium | M | Route activation |
 | UI-P1-014 | Normalize Admin Settings local UI classes to shared primitives | Admin | Open | Medium | M | UI standard decision |
 | UI-P1-015 | Add Users/Roles standard pagination | Admin | Open | Medium | M | API/client pagination decision |
-| UI-P1-016 | Logistics logs/reports need explicit route branch behavior instead of fallback-like behavior | Logistics | Open | Medium | M | Logistics log/report contracts |
+| UI-P1-016 | Logistics logs/reports need explicit route branch behavior instead of fallback-like behavior | Logistics | Implemented (EPIC 8.0) | Medium | M | Logistics log/report contracts |
 | UI-P1-017 | Secondary Inventory pages need table/scroll/pagination parity review after global audit | Inventory | Open | Medium | M | Browser harness |
 | UI-P1-018 | Admin System Logs needs focused security/admin UI audit | Admin | Open | Medium | M | Security audit scope |
 

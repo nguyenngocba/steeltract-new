@@ -1,5 +1,6 @@
 # Next Tasks
 
+- **EPIC 8.0 Logistics UI Reconstruction**: Completed. Reconstructed all visible Logistics pages and routes (/logistics, /planning, /vehicles, /dispatch, /loading, /tracking, /deliveries, /documents, /reports) to match the SteelTrack UI Canon using shared components, DataTablePagination, and real backend contracts.
 - **EPIC 7.0 global UI certification follow-up**: use
   `docs/ui/global-ui-consistency-report.md` and
   `docs/ui/global-design-debt.md` as the source of truth for the next UI
