@@ -6,9 +6,19 @@ type DataTablePaginationProps = {
   total: number
   onPageChange: (page: number) => void
   className?: string
+  pageSizeOptions?: number[]
+  onPageSizeChange?: (pageSize: number) => void
 }
 
-export function DataTablePagination({ page, pageSize, total, onPageChange, className = '' }: DataTablePaginationProps) {
+export function DataTablePagination({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  className = '',
+  pageSizeOptions,
+  onPageSizeChange,
+}: DataTablePaginationProps) {
   const pageCount = Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
   const safePage = Math.min(Math.max(1, page), pageCount)
   const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
@@ -40,7 +50,21 @@ export function DataTablePagination({ page, pageSize, total, onPageChange, class
         ))}
         {pages[pages.length - 1] < pageCount ? <span className="px-1 py-2 text-slate-500">...</span> : null}
       </div>
-      <div className="flex justify-start gap-2 md:justify-end">
+      <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+        {pageSizeOptions?.length && onPageSizeChange ? (
+          <select
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            className="h-8 rounded border border-slate-700 bg-slate-950/50 px-2 text-xs text-slate-300 outline-none transition hover:bg-white/5 focus:border-cyan-400"
+            aria-label="Số dòng mỗi trang"
+          >
+            {pageSizeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option} / trang
+              </option>
+            ))}
+          </select>
+        ) : null}
         <button
           type="button"
           disabled={safePage <= 1}

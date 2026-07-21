@@ -71,6 +71,8 @@ export function EnterprisePagination({
   pageSize,
   onPageChange,
   containerClassName,
+  pageSizeOptions,
+  onPageSizeChange,
 }: {
   page: number
   pageCount: number
@@ -78,6 +80,8 @@ export function EnterprisePagination({
   pageSize: number
   onPageChange: (page: number) => void
   containerClassName?: string
+  pageSizeOptions?: number[]
+  onPageSizeChange?: (pageSize: number) => void
 }) {
   void pageCount
   return (
@@ -87,6 +91,8 @@ export function EnterprisePagination({
       total={total}
       onPageChange={onPageChange}
       className={containerClassName}
+      pageSizeOptions={pageSizeOptions}
+      onPageSizeChange={onPageSizeChange}
     />
   )
 }
