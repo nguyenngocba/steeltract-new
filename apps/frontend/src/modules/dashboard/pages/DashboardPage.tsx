@@ -7,11 +7,15 @@ import {
   Bell,
   Boxes,
   Building2,
+  Calendar,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Factory,
   FileClock,
+  Filter,
+  Layers,
   PackageCheck,
   PackagePlus,
   Plus,
@@ -21,13 +25,16 @@ import {
   Truck,
   UserCheck,
   Warehouse,
+  X,
 } from 'lucide-react'
 
 import { getDispatchDashboard, getDispatchOrders } from '@/modules/logistics/api/logistics.api'
 import { getProjectsRuntime, type ProjectsRuntime } from '@/modules/projects/api/projects.api'
 import { productionApi, type ProductionOrder } from '@/modules/production/api/production.api'
 import { getInventoryItems } from '@/modules/inventory/api/inventory.api'
+import { useWarehouses } from '@/modules/inventory/hooks/useWarehouses'
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
+import { useInventoryTransactions } from '@/modules/inventory/hooks/useInventoryTransactions'
 import { getQcCockpit } from '@/modules/qc/api/qc.api'
 import { systemApi } from '@/modules/system/api/system.api'
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
@@ -49,13 +56,22 @@ import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 const fmt = (value = 0, digits = 0) => formatQuantity(value, digits)
 const date = (value?: string | null) => (value ? new Intl.DateTimeFormat('vi-VN').format(new Date(value)) : '—')
 
+type TimeRange = 'TODAY' | '7D' | '30D'
+
 export function DashboardPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  // Queries for real data across all modules
+  // Global Filters
+  const [timeRange, setTimeRange] = useState<TimeRange>('30D')
+  const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('all')
+
+  // Real Queries Across All 8 Modules
   const { data: inventoryRows = [], isLoading: inventoryLoading } = useInventoryAudit()
   const { data: inventoryItems = [] } = useQuery({ queryKey: ['inventory-items'], queryFn: getInventoryItems })
+  const { data: warehouses = [] } = useWarehouses()
+  const { data: transactionsRaw = [] } = useInventoryTransactions({})
   const { data: productionOrders = [], isLoading: productionLoading } = useQuery<ProductionOrder[]>({
     queryKey: ['production-orders'],
     queryFn: () => productionApi.orders(),
@@ -68,7 +84,7 @@ export function DashboardPage() {
     queryKey: ['logistics-dispatch-dashboard'],
     queryFn: getDispatchDashboard,
   })
-  const { data: dispatchOrders = [] } = useQuery({
+  const { data: dispatchOrders = [], isLoading: dispatchLoading } = useQuery({
     queryKey: ['logistics-dispatch-orders'],
     queryFn: getDispatchOrders,
   })
@@ -96,10 +112,34 @@ export function DashboardPage() {
     queryClient.invalidateQueries()
   }
 
-  // 1. Calculations for Executive KPIs
+  // Filtered Datasets Based on Global Filters
+  const projectsList = projectsRuntime?.projects ?? []
+
+  const filteredInventoryRows = useMemo(() => {
+    return inventoryRows.filter((row) => {
+      if (selectedWarehouse !== 'all' && row.warehouseId !== selectedWarehouse) return false
+      return true
+    })
+  }, [inventoryRows, selectedWarehouse])
+
+  const filteredProductionOrders = useMemo(() => {
+    return productionOrders.filter((mo: any) => {
+      if (selectedProject !== 'all' && mo.projectId !== selectedProject) return false
+      return true
+    })
+  }, [productionOrders, selectedProject])
+
+  const filteredDispatchOrders = useMemo(() => {
+    return dispatchOrders.filter((d: any) => {
+      if (selectedProject !== 'all' && d.projectId !== selectedProject) return false
+      return true
+    })
+  }, [dispatchOrders, selectedProject])
+
+  // Executive KPI Computations
   const inventoryValue = useMemo(() => {
-    return inventoryRows.reduce((sum, row) => sum + Number(row.stockValue || 0), 0)
-  }, [inventoryRows])
+    return filteredInventoryRows.reduce((sum, row) => sum + Number(row.stockValue || 0), 0)
+  }, [filteredInventoryRows])
 
   const lowStockItems = useMemo(() => {
     return inventoryItems.filter((item: any) => {
@@ -110,60 +150,168 @@ export function DashboardPage() {
   }, [inventoryItems])
 
   const runningMOs = useMemo(() => {
-    return productionOrders.filter((mo: any) => mo.status === 'RUNNING' || mo.status === 'IN_PROGRESS').length
-  }, [productionOrders])
+    return filteredProductionOrders.filter((mo: any) => mo.status === 'RUNNING' || mo.status === 'IN_PROGRESS').length
+  }, [filteredProductionOrders])
 
-  const activeProjects = useMemo(() => {
-    const projects = projectsRuntime?.projects ?? []
-    return projects.filter((p) => p.status === 'ACTIVE' || p.progress < 100).length
-  }, [projectsRuntime])
+  const activeProjectsCount = useMemo(() => {
+    return projectsList.filter((p) => p.status === 'ACTIVE' || p.progress < 100).length
+  }, [projectsList])
 
-  const deliveriesToday = useMemo(() => {
-    return dispatchOrders.filter(
+  const deliveriesTodayCount = useMemo(() => {
+    return filteredDispatchOrders.filter(
       (d) => ['LOADING', 'IN_TRANSIT', 'ARRIVED'].includes(d.status) || d.status === 'PLANNED',
     ).length
-  }, [dispatchOrders])
+  }, [filteredDispatchOrders])
 
-  const openQcIssues = useMemo(() => {
+  const openQcIssuesCount = useMemo(() => {
     return Number(qcCockpit?.metrics?.openNcrs ?? 0)
   }, [qcCockpit])
 
-  const pendingApprovals = useMemo(() => {
+  const pendingApprovalsCount = useMemo(() => {
     const waitingDispatch = dispatchDashboard?.kpis?.waiting ?? 0
-    const blockedMOs = productionOrders.filter((mo: any) => Number(mo.scrapCount) > 0).length
+    const blockedMOs = filteredProductionOrders.filter((mo: any) => Number(mo.scrapCount) > 0).length
     return waitingDispatch + blockedMOs
-  }, [dispatchDashboard, productionOrders])
+  }, [dispatchDashboard, filteredProductionOrders])
 
   const okWorkflowSteps = workflow?.steps.filter((s) => s.status === 'OK').length ?? 0
   const totalWorkflowSteps = workflow?.steps.length ?? 1
   const systemHealthPercent = Math.round((okWorkflowSteps / totalWorkflowSteps) * 100)
 
-  // Combined Unified Activity Feed (Newest first)
-  const unifiedActivities = useMemo(() => {
-    const items: Array<{ id: string; title: string; subtitle: string; time: string; tone?: 'cyan' | 'emerald' | 'amber' | 'red' }> = []
+  // Section 2: Unified Recent Activities Timeline (Grouped by Today, Yesterday, Earlier)
+  const groupedActivities = useMemo(() => {
+    const rawEvents: Array<{
+      id: string
+      module: string
+      title: string
+      description: string
+      createdAt: string
+      severity: 'Info' | 'Warning' | 'Critical'
+      targetPath?: string
+    }> = []
 
-    activityLogs.slice(0, 6).forEach((log) => {
-      items.push({
-        id: `log-${log.id}`,
+    // 1. System Audit Logs
+    activityLogs.forEach((log) => {
+      rawEvents.push({
+        id: `sys-${log.id}`,
+        module: log.module || 'System',
         title: `${log.user?.fullName || log.user?.username || 'System'}: ${log.action}`,
-        subtitle: `${log.module || 'System'} · ${log.entity} ${log.entityId || ''}`,
-        time: date(log.createdAt),
-        tone: log.action.toLowerCase().includes('delete') ? 'red' : 'cyan',
+        description: `${log.entity} ${log.entityId ? `#${log.entityId}` : ''}`,
+        createdAt: log.createdAt,
+        severity: log.action.toLowerCase().includes('delete') ? 'Critical' : 'Info',
+        targetPath: '/system-logs',
       })
     })
 
-    dispatchOrders.slice(0, 4).forEach((d) => {
-      items.push({
+    // 2. Dispatch Orders
+    filteredDispatchOrders.forEach((d) => {
+      rawEvents.push({
         id: `disp-${d.id}`,
-        title: `Điều xe ${d.code}: ${d.project?.name || 'Công trình'}`,
-        subtitle: `Xe: ${d.vehicle || 'Chưa gán'} · Trạng thái: ${d.status}`,
-        time: date(d.plannedAt || d.createdAt),
-        tone: 'emerald',
+        module: 'Logistics',
+        title: `Lệnh xe ${d.code}: ${d.project?.name || 'Giao vận'}`,
+        description: `Trạng thái: ${d.status} · Xe: ${d.vehicle || 'Chưa gán'}`,
+        createdAt: d.plannedAt || d.createdAt,
+        severity: d.status === 'CANCELLED' ? 'Warning' : 'Info',
+        targetPath: '/logistics/dispatch',
       })
     })
 
-    return items.slice(0, 8)
-  }, [activityLogs, dispatchOrders])
+    // 3. QC Inspections
+    if (qcCockpit?.inspections) {
+      qcCockpit.inspections.forEach((insp) => {
+        rawEvents.push({
+          id: `qc-${insp.id}`,
+          module: 'QC',
+          title: `Kiểm định ${insp.inspectionNo}: ${insp.componentName || insp.checklistName}`,
+          description: `Kết quả: ${insp.result} (${insp.status})`,
+          createdAt: insp.date,
+          severity: insp.result === 'FAIL' ? 'Critical' : 'Info',
+          targetPath: '/qc',
+        })
+      })
+    }
+
+    // Sort newest first
+    rawEvents.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+    // Group into Today, Yesterday, Earlier
+    const now = new Date()
+    const todayStr = now.toDateString()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = yesterday.toDateString()
+
+    const groups: { today: typeof rawEvents; yesterday: typeof rawEvents; earlier: typeof rawEvents } = {
+      today: [],
+      yesterday: [],
+      earlier: [],
+    }
+
+    rawEvents.slice(0, 15).forEach((event) => {
+      const eventDate = new Date(event.createdAt).toDateString()
+      if (eventDate === todayStr) {
+        groups.today.push(event)
+      } else if (eventDate === yesterdayStr) {
+        groups.yesterday.push(event)
+      } else {
+        groups.earlier.push(event)
+      }
+    })
+
+    return groups
+  }, [activityLogs, filteredDispatchOrders, qcCockpit])
+
+  // Section 3: Structured Notifications Center (Critical -> Warning -> Information)
+  const structuredNotifications = useMemo(() => {
+    const list: Array<{
+      id: string
+      priority: 'Critical' | 'Warning' | 'Information'
+      module: string
+      title: string
+      description: string
+      time: string
+      targetPath: string
+    }> = []
+
+    if (openQcIssuesCount > 0) {
+      list.push({
+        id: 'notif-qc',
+        priority: 'Critical',
+        module: 'QC',
+        title: 'Cần sửa đổi sự cố QC (NCR)',
+        description: `Hiện có ${openQcIssuesCount} phiếu NCR kiểm định chưa được đóng.`,
+        time: 'Hôm nay',
+        targetPath: '/qc',
+      })
+    }
+
+    if (lowStockItems > 0) {
+      list.push({
+        id: 'notif-stock',
+        priority: 'Warning',
+        module: 'Inventory',
+        title: 'Cảnh báo tồn kho tối thiểu',
+        description: `Có ${lowStockItems} mã vật tư tụt dưới ngưỡng dự trữ định mức.`,
+        time: 'Hôm nay',
+        targetPath: '/inventory',
+      })
+    }
+
+    if (pendingApprovalsCount > 0) {
+      list.push({
+        id: 'notif-appr',
+        priority: 'Information',
+        module: 'Logistics',
+        title: 'Lệnh chờ điều phối & phê duyệt',
+        description: `Có ${pendingApprovalsCount} lượt vận chuyển hoặc công đoạn sản xuất cần duyệt.`,
+        time: 'Hôm nay',
+        targetPath: '/logistics/dispatch',
+      })
+    }
+
+    return list
+  }, [lowStockItems, openQcIssuesCount, pendingApprovalsCount])
+
+  const hasActiveFilter = timeRange !== '30D' || selectedProject !== 'all' || selectedWarehouse !== 'all'
 
   return (
     <EnterpriseWorkspace
@@ -179,6 +327,82 @@ export function DashboardPage() {
         </div>
       }
     >
+      {/* GLOBAL DASHBOARD FILTERS TOOLBAR */}
+      <section className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-2">
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 mr-1">
+            <Filter size={13} className="text-cyan-300" /> Bộ lọc Executive:
+          </span>
+
+          {/* Time Range Chips */}
+          <div className="flex items-center gap-1">
+            {[
+              { id: 'TODAY', label: 'Hôm nay' },
+              { id: '7D', label: '7 Ngày' },
+              { id: '30D', label: '30 Ngày' },
+            ].map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setTimeRange(chip.id as TimeRange)}
+                className={`h-7 rounded-lg px-2.5 text-[11px] font-medium transition ${
+                  timeRange === chip.id
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 font-semibold'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200 border border-white/5'
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Project Select */}
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="h-7 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
+          >
+            <option value="all">Tất cả Công trình</option>
+            {projectsList.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Warehouse Select */}
+          <select
+            value={selectedWarehouse}
+            onChange={(e) => setSelectedWarehouse(e.target.value)}
+            className="h-7 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
+          >
+            <option value="all">Tất cả Kho</option>
+            {warehouses.map((w: any) => (
+              <option key={w.id} value={w.id}>
+                {w.name || w.code}
+              </option>
+            ))}
+          </select>
+
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={() => {
+                setTimeRange('30D')
+                setSelectedProject('all')
+                setSelectedWarehouse('all')
+              }}
+              className="h-7 rounded-lg border border-red-500/30 bg-red-500/10 px-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition flex items-center gap-1 shrink-0"
+              title="Xóa lọc"
+            >
+              <X size={12} /> Xóa lọc
+            </button>
+          )}
+        </div>
+      </section>
+
       {/* SECTION 1: 8 Executive KPI Cards */}
       <section className="grid gap-1 md:grid-cols-4 xl:grid-cols-8">
         <CockpitKpiCard
@@ -207,7 +431,7 @@ export function DashboardPage() {
         />
         <CockpitKpiCard
           title="Dự án triển khai"
-          value={isLoading ? '' : fmt(activeProjects)}
+          value={isLoading ? '' : fmt(activeProjectsCount)}
           note="Công trình đang chạy"
           icon={<Building2 size={16} />}
           tone="cyan"
@@ -215,7 +439,7 @@ export function DashboardPage() {
         />
         <CockpitKpiCard
           title="Giao hàng hôm nay"
-          value={isLoading ? '' : fmt(deliveriesToday)}
+          value={isLoading ? '' : fmt(deliveriesTodayCount)}
           note="Lệnh xe chạy tuyến"
           icon={<Truck size={16} />}
           tone="cyan"
@@ -223,15 +447,15 @@ export function DashboardPage() {
         />
         <CockpitKpiCard
           title="Sự cố QC / NCR"
-          value={isLoading ? '' : fmt(openQcIssues)}
+          value={isLoading ? '' : fmt(openQcIssuesCount)}
           note="Lỗi kiểm định chờ sửa"
           icon={<ShieldCheck size={16} />}
-          tone={openQcIssues > 0 ? 'red' : 'emerald'}
+          tone={openQcIssuesCount > 0 ? 'red' : 'emerald'}
           state={isLoading ? 'loading' : 'normal'}
         />
         <CockpitKpiCard
           title="Chờ điều phối / duyệt"
-          value={isLoading ? '' : fmt(pendingApprovals)}
+          value={isLoading ? '' : fmt(pendingApprovalsCount)}
           note="Cần xử lý phê duyệt"
           icon={<CalendarClock size={16} />}
           tone="amber"
@@ -257,7 +481,7 @@ export function DashboardPage() {
               <ModuleSummaryCard
                 title="Vật tư & Kho"
                 status="HOẠT ĐỘNG"
-                metric={`${fmt(inventoryRows.length)} vị trí tồn`}
+                metric={`${fmt(filteredInventoryRows.length)} vị trí tồn`}
                 subtitle={`Giá trị: ${formatCurrencyVnd(inventoryValue)}`}
                 actionLabel="Xem kho ➔"
                 onAction={() => navigate('/inventory')}
@@ -266,7 +490,7 @@ export function DashboardPage() {
               <ModuleSummaryCard
                 title="Sản xuất & Cấu kiện"
                 status="XƯỞNG ĐANG CHẠY"
-                metric={`${fmt(productionOrders.length)} lệnh sản xuất`}
+                metric={`${fmt(filteredProductionOrders.length)} lệnh sản xuất`}
                 subtitle={`${fmt(runningMOs)} MO đang chạy tại xưởng`}
                 actionLabel="Xem xưởng ➔"
                 onAction={() => navigate('/production')}
@@ -275,8 +499,8 @@ export function DashboardPage() {
               <ModuleSummaryCard
                 title="Công trình & WBS"
                 status="TIẾN ĐỘ TỐT"
-                metric={`${fmt(projectsRuntime?.projects?.length ?? 0)} công trình`}
-                subtitle={`${fmt(activeProjects)} dự án đang thi công`}
+                metric={`${fmt(projectsList.length)} công trình`}
+                subtitle={`${fmt(activeProjectsCount)} dự án đang thi công`}
                 actionLabel="Xem dự án ➔"
                 onAction={() => navigate('/projects')}
                 icon={<Building2 size={16} className="text-emerald-300" />}
@@ -293,17 +517,17 @@ export function DashboardPage() {
               <ModuleSummaryCard
                 title="Vận chuyển & Điều xe"
                 status="ĐANG CHẠY TUYẾN"
-                metric={`${fmt(dispatchOrders.length)} lượt vận chuyển`}
-                subtitle={`${fmt(deliveriesToday)} chuyến hôm nay`}
+                metric={`${fmt(filteredDispatchOrders.length)} lượt vận chuyển`}
+                subtitle={`${fmt(deliveriesTodayCount)} chuyến hôm nay`}
                 actionLabel="Xem điều xe ➔"
                 onAction={() => navigate('/logistics')}
                 icon={<Truck size={16} className="text-amber-300" />}
               />
               <ModuleSummaryCard
                 title="Chất lượng & QC"
-                status={openQcIssues > 0 ? 'CÓ CẢNH BÁO' : 'ĐẠT CHUẨN'}
+                status={openQcIssuesCount > 0 ? 'CÓ CẢNH BÁO' : 'ĐẠT CHUẨN'}
                 metric={`${fmt(qcCockpit?.metrics?.passRate ?? 98)}% tỷ lệ Pass`}
-                subtitle={`${fmt(openQcIssues)} NCR chưa khắc phục`}
+                subtitle={`${fmt(openQcIssuesCount)} NCR chưa khắc phục`}
                 actionLabel="Xem QC ➔"
                 onAction={() => navigate('/qc')}
                 icon={<ShieldCheck size={16} className="text-purple-300" />}
@@ -311,21 +535,53 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {/* SECTION 3: Trend Analytics */}
+          {/* SECTION 1 — Dedicated Operational Analytics Panels */}
           <section className="grid gap-1 lg:grid-cols-2">
+            {/* 1. Production Trend Analytics */}
             <CockpitChartCard title="Phân bố Trạng thái Sản xuất" className="h-[220px]">
-              {productionOrders.length > 0 ? (
-                <ProductionStatusDistribution orders={productionOrders} />
+              {filteredProductionOrders.length > 0 ? (
+                <ProductionStatusDistribution orders={filteredProductionOrders} />
               ) : (
-                <CockpitEmptyState title="Chưa có dữ liệu sản xuất" description="Số liệu sẽ hiển thị khi khởi tạo lệnh MO." />
+                <CockpitEmptyState
+                  title="Chưa có dữ liệu sản xuất"
+                  description="Dữ liệu tổng hợp theo thời gian thực sẽ xuất hiện khi có lệnh MO."
+                />
               )}
             </CockpitChartCard>
 
+            {/* 2. Logistics Trend Analytics */}
             <CockpitChartCard title="Trạng thái Chuyến vận chuyển" className="h-[220px]">
-              {dispatchOrders.length > 0 ? (
-                <LogisticsStatusDistribution orders={dispatchOrders} />
+              {filteredDispatchOrders.length > 0 ? (
+                <LogisticsStatusDistribution orders={filteredDispatchOrders} />
               ) : (
-                <CockpitEmptyState title="Chưa có dữ liệu điều xe" description="Số liệu sẽ hiển thị khi lập lịch vận chuyển." />
+                <CockpitEmptyState
+                  title="Chưa có dữ liệu điều xe"
+                  description="Dữ liệu tổng hợp theo thời gian thực sẽ xuất hiện khi lập lịch giao vận."
+                />
+              )}
+            </CockpitChartCard>
+
+            {/* 3. Project Trend Analytics */}
+            <CockpitChartCard title="Phân bố Tiến độ Dự án" className="h-[220px]">
+              {projectsList.length > 0 ? (
+                <ProjectStatusDistribution projects={projectsList} />
+              ) : (
+                <CockpitEmptyState
+                  title="Chưa có công trình"
+                  description="Dữ liệu tổng hợp dự án sẽ hiển thị khi khởi tạo WBS."
+                />
+              )}
+            </CockpitChartCard>
+
+            {/* 4. QC Inspection Trend Analytics */}
+            <CockpitChartCard title="Chỉ số Kiểm định QC" className="h-[220px]">
+              {qcCockpit?.metrics ? (
+                <QcMetricsDistribution metrics={qcCockpit.metrics} />
+              ) : (
+                <CockpitEmptyState
+                  title="Chưa có lịch sử QC"
+                  description="Dữ liệu kiểm định sẽ xuất hiện khi có lượt QC phát sinh."
+                />
               )}
             </CockpitChartCard>
           </section>
@@ -333,7 +589,7 @@ export function DashboardPage() {
 
         {/* RIGHT SIDEBAR: Notifications, Activities, Health & Quick Actions */}
         <aside className="space-y-1">
-          {/* SECTION 7: Quick Actions */}
+          {/* Quick Actions Navigation Shortcuts */}
           <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3">
             <h3 className="mb-2 text-sm font-semibold text-white">Thao tác Nhanh</h3>
             <div className="grid grid-cols-2 gap-1.5">
@@ -368,20 +624,17 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {/* SECTION 5: Notifications Center */}
-          <CockpitChartCard title="Trung tâm Cảnh báo & Thông báo" className="h-[240px]">
-            <NotificationCenter lowStock={lowStockItems} openQc={openQcIssues} pending={pendingApprovals} />
+          {/* SECTION 3 — Notifications Center */}
+          <CockpitChartCard title="Trung tâm Cảnh báo & Thông báo" className="h-[250px]">
+            <StructuredNotificationCenter notifications={structuredNotifications} onNavigate={(path) => navigate(path)} />
           </CockpitChartCard>
 
-          {/* SECTION 4: Recent Activities */}
-          <CockpitChartCard title="Nhật ký Hoạt động Gần đây" className="h-[240px]">
-            <CockpitRecentList
-              items={unifiedActivities}
-              emptyMessage="Chưa có nhật ký hoạt động."
-            />
+          {/* SECTION 2 — Unified Recent Activities Feed (Grouped by Today, Yesterday, Earlier) */}
+          <CockpitChartCard title="Nhật ký Hoạt động Hợp nhất" className="h-[270px]">
+            <UnifiedActivityTimeline groups={groupedActivities} onNavigate={(path) => path && navigate(path)} />
           </CockpitChartCard>
 
-          {/* SECTION 6: System Health Details */}
+          {/* System Health Details */}
           <CockpitChartCard title="Trạng thái Dịch vụ System">
             <CockpitStatusList
               items={[
@@ -443,40 +696,124 @@ function ModuleSummaryCard({
   )
 }
 
-function NotificationCenter({ lowStock, openQc, pending }: { lowStock: number; openQc: number; pending: number }) {
-  const alerts = []
-  if (openQc > 0) {
-    alerts.push({ id: 'qc', priority: 'Critical', text: `Có ${openQc} sự cố chất lượng (NCR) cần xử lý` })
-  }
-  if (lowStock > 0) {
-    alerts.push({ id: 'mrp', priority: 'Warning', text: `Có ${lowStock} mặt hàng thiếu tồn khả dụng` })
-  }
-  if (pending > 0) {
-    alerts.push({ id: 'appr', priority: 'Information', text: `Có ${pending} lệnh điều xe / sản xuất chờ phê duyệt` })
-  }
-
-  if (!alerts.length) {
-    return <CockpitEmptyState title="Hệ thống vận hành an toàn" description="Không phát sinh cảnh báo critical hay warning." />
+function StructuredNotificationCenter({
+  notifications,
+  onNavigate,
+}: {
+  notifications: Array<{
+    id: string
+    priority: 'Critical' | 'Warning' | 'Information'
+    module: string
+    title: string
+    description: string
+    time: string
+    targetPath: string
+  }>
+  onNavigate: (path: string) => void
+}) {
+  if (!notifications.length) {
+    return <CockpitEmptyState title="Vận hành bình thường" description="Không có thông báo critical hay warning." />
   }
 
   return (
-    <div className="space-y-2 overflow-y-auto max-h-[180px]">
-      {alerts.map((a) => (
+    <div className="space-y-2 overflow-y-auto max-h-[190px]">
+      {notifications.map((n) => (
         <div
-          key={a.id}
-          className={`rounded-lg border p-2 text-xs ${
-            a.priority === 'Critical'
+          key={n.id}
+          className={`rounded-lg border p-2 text-xs transition ${
+            n.priority === 'Critical'
               ? 'border-red-500/30 bg-red-500/10 text-red-200'
-              : a.priority === 'Warning'
+              : n.priority === 'Warning'
                 ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
                 : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200'
           }`}
         >
           <div className="flex items-center justify-between font-semibold">
-            <span>{a.priority}</span>
-            <span className="text-[10px] opacity-75">{a.priority === 'Critical' ? 'P1' : 'P2'}</span>
+            <span className="flex items-center gap-1">
+              <span className="font-bold">{n.priority.toUpperCase()}</span> · {n.module}
+            </span>
+            <button
+              type="button"
+              onClick={() => onNavigate(n.targetPath)}
+              className="text-[11px] font-semibold text-cyan-300 hover:underline flex items-center gap-0.5"
+            >
+              Xử lý <ChevronRight size={12} />
+            </button>
           </div>
-          <p className="mt-1 text-slate-300">{a.text}</p>
+          <p className="mt-1 font-medium text-white">{n.title}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{n.description}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function UnifiedActivityTimeline({
+  groups,
+  onNavigate,
+}: {
+  groups: {
+    today: Array<{ id: string; module: string; title: string; description: string; createdAt: string; severity: string; targetPath?: string }>
+    yesterday: Array<{ id: string; module: string; title: string; description: string; createdAt: string; severity: string; targetPath?: string }>
+    earlier: Array<{ id: string; module: string; title: string; description: string; createdAt: string; severity: string; targetPath?: string }>
+  }
+  onNavigate: (path?: string) => void
+}) {
+  const isEmpty = !groups.today.length && !groups.yesterday.length && !groups.earlier.length
+
+  if (isEmpty) {
+    return <CockpitEmptyState title="Chưa có nhật ký" description="Không phát hiện hoạt động gần đây." />
+  }
+
+  return (
+    <div className="space-y-3 overflow-y-auto max-h-[210px] text-xs">
+      {groups.today.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-semibold text-cyan-300 uppercase tracking-wider mb-1">Hôm nay</h4>
+          <ActivitySubList items={groups.today} onNavigate={onNavigate} />
+        </div>
+      )}
+
+      {groups.yesterday.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Hôm qua</h4>
+          <ActivitySubList items={groups.yesterday} onNavigate={onNavigate} />
+        </div>
+      )}
+
+      {groups.earlier.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Trước đó</h4>
+          <ActivitySubList items={groups.earlier} onNavigate={onNavigate} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ActivitySubList({
+  items,
+  onNavigate,
+}: {
+  items: Array<{ id: string; module: string; title: string; description: string; createdAt: string; severity: string; targetPath?: string }>
+  onNavigate: (path?: string) => void
+}) {
+  return (
+    <div className="space-y-1.5 border-l border-cyan-300/15 pl-2">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          onClick={() => onNavigate(item.targetPath)}
+          className="cursor-pointer rounded-md bg-slate-950/45 p-1.5 hover:bg-cyan-500/10 transition flex items-start justify-between gap-2"
+        >
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="rounded bg-cyan-500/20 px-1 py-0.5 text-[9px] font-mono text-cyan-300">{item.module}</span>
+              <span className="font-semibold text-white truncate max-w-[200px]">{item.title}</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[240px]">{item.description}</p>
+          </div>
+          <span className="text-[10px] text-slate-500 font-mono shrink-0">{date(item.createdAt)}</span>
         </div>
       ))}
     </div>
@@ -537,6 +874,55 @@ function LogisticsStatusDistribution({ orders }: { orders: any[] }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function ProjectStatusDistribution({ projects }: { projects: any[] }) {
+  const active = projects.filter((p) => p.status === 'ACTIVE' || p.progress < 100).length
+  const completed = projects.filter((p) => p.progress >= 100).length
+  const total = projects.length || 1
+
+  return (
+    <div className="space-y-3 text-xs">
+      <div>
+        <div className="mb-1 flex justify-between">
+          <span className="text-slate-300">Đang triển khai</span>
+          <span className="font-mono font-semibold text-cyan-300">{fmt(active)}</span>
+        </div>
+        <div className="h-2 rounded bg-white/10">
+          <i className="block h-full rounded bg-cyan-400" style={{ width: `${(active / total) * 100}%` }} />
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-1 flex justify-between">
+          <span className="text-slate-300">Hoàn thành</span>
+          <span className="font-mono font-semibold text-emerald-300">{fmt(completed)}</span>
+        </div>
+        <div className="h-2 rounded bg-white/10">
+          <i className="block h-full rounded bg-emerald-400" style={{ width: `${(completed / total) * 100}%` }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function QcMetricsDistribution({ metrics }: { metrics: any }) {
+  return (
+    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2">
+        <span className="text-emerald-300 font-bold text-base block">{fmt(metrics.passed)}</span>
+        <span className="text-slate-400 text-[11px]">Pass</span>
+      </div>
+      <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2">
+        <span className="text-amber-300 font-bold text-base block">{fmt(metrics.rework)}</span>
+        <span className="text-slate-400 text-[11px]">Rework</span>
+      </div>
+      <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-2">
+        <span className="text-red-300 font-bold text-base block">{fmt(metrics.failed)}</span>
+        <span className="text-slate-400 text-[11px]">Fail / NCR</span>
+      </div>
     </div>
   )
 }
