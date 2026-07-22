@@ -288,7 +288,7 @@ export class InventoryService {
           code: payload.code,
           name: payload.name,
           description: payload.description,
-          createdAt: new Date(),
+          createdAt: payload.createdAt ?? new Date(),
           minimumStock: payload.minimumStock ?? 0,
           materialUsageType: payload.materialUsageType ?? 'PRIMARY',
           unit: payload.unit ?? 'PCS',

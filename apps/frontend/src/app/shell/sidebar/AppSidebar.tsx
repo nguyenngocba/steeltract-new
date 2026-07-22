@@ -9,6 +9,7 @@ import { navigation }
 import { SidebarGroup }
   from './SidebarGroup'
 import { useAuthStore } from '@/store/auth.store'
+import sidebarLogo from '../../../../../../images/logo-tv.png'
 
 type NavigationItem = {
   id?: string
@@ -71,14 +72,9 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed }: Props) {
   if (collapsed) {
     return (
       <aside data-mini-sidebar-root="true" className="relative z-40 flex h-screen w-16 flex-col items-center border-r border-white/10 bg-[#07111f] py-3 shadow-[12px_0_34px_rgba(0,0,0,0.22)]">
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          title="Hiện sidebar"
-          className="rounded-xl border border-white/10 bg-white/[0.06] p-2 text-cyan-300 transition hover:bg-white/10 hover:text-cyan-100"
-        >
-          <PanelLeftOpen size={18} />
-        </button>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/18 bg-white/[0.045] p-1.5 shadow-[0_12px_28px_rgba(14,165,233,0.12)]">
+          <img src={sidebarLogo} alt="TRIVIETSTEEL" className="h-full w-full object-contain" />
+        </div>
         <div className="mt-3 h-px w-9 bg-white/10" />
 
         <div className="mt-3 flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto px-2">
@@ -129,6 +125,14 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed }: Props) {
             )
           })}
         </div>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          title="Hiện sidebar"
+          className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] p-2 text-cyan-300 transition hover:bg-white/10 hover:text-cyan-100"
+        >
+          <PanelLeftOpen size={18} />
+        </button>
       </aside>
     )
   }
@@ -155,15 +159,11 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed }: Props) {
         "
       >
         <div className="text-[11px] font-semibold uppercase tracking-[0.32em] text-cyan-300">
-          SteelTrack
+          TRIVIETSTEEL
         </div>
 
         <div className="mt-2 text-2xl font-semibold tracking-tight text-white">
-          ERP Platform
-        </div>
-
-        <div className="mt-1 text-xs text-slate-500">
-          Smart Factory Operations
+          Smart Solutions
         </div>
       </div>
 

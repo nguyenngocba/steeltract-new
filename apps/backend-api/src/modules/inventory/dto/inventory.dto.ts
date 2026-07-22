@@ -90,6 +90,7 @@ export const createInventoryItemSchema = z.object({
   zoneId: optionalNullableText,
   slotId: optionalNullableText,
   level: optionalNullableText,
+  createdAt: z.coerce.date().optional(),
   minimumStock: localeNumber(z.number().nonnegative()).optional().default(0),
 });
 

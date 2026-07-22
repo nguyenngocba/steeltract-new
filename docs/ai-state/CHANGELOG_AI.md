@@ -1,5 +1,150 @@
 # SteelTrack AI Changelog
 
+## 2026-07-22 Inventory Material Created Date Input
+
+Completed:
+
+- Added a `Ngày thêm` date-time picker to the Add Material drawer header so the
+  operator can set when a new material was added without changing the drawer
+  body layout.
+- Extended the create-material DTO to accept optional `createdAt` and persisted
+  it to the existing `InventoryItem.createdAt` field.
+- Kept edit material behavior unchanged; existing materials continue to display
+  their stored created date internally but do not expose an edit-time override.
+- No Prisma schema or migration was changed.
+
+## 2026-07-22 Executive Dashboard Data Availability Hotfix
+
+Completed:
+
+- Fixed Executive Dashboard data mapping for `Giá trị nhập kho`, `Giá trị xuất kho`
+  and `Sản xuất đang chạy`.
+- Made dashboard row extraction handle nested/paginated API payloads such as
+  `data`, `items`, `rows`, `transactions`, `results` and `records`.
+- Normalized inbound/outbound transaction types and included transaction line
+  item totals when header-level amount fields are absent.
+- Anchored 30-day KPI sparklines to the newest available backend timestamp and
+  added missing date fields such as `transactionDate`, `eventDate` and
+  `plannedStartAt`.
+- Removed the heavy left accent strip from analytics detail panels while
+  keeping the cleaner panel border and glow treatment.
+
+## 2026-07-22 Login & Sidebar Brand Polish
+
+Completed:
+
+- Rebuilt the login screen with `images/login-factory-bg.jpg` as the full-page
+  factory background and `images/logo-bg.jpg` as the login logo.
+- Added an animated luminous stroke running around the outside edge of the
+  central login panel.
+- Updated active sidebar branding from SteelTrack/ERP Platform to
+  TRIVIETSTEEL/Smart Solutions.
+- Updated collapsed sidebar to use `images/logo-tv.png` and moved the expand
+  button to the bottom of the mini sidebar.
+- Refined Executive Dashboard donut charts to use sharper flat-ended segments
+  with subtle spacing, avoiding the previous overlapping round-cap look.
+
+## 2026-07-22 Executive Dashboard Business Data Polish
+
+Completed:
+
+- Replaced the executive inventory-by-warehouse chart with inventory value by
+  material type using real `/inventory/audit` value fields.
+- Corrected the material group chart to use the same real inventory-value
+  dataset for both donut and legend.
+- Wired import/export trend to existing `/inventory/overview` movement history,
+  falling back only to real transaction rows and otherwise showing an empty
+  state.
+- Reworked the import/export widget into a period comparison chart with
+  currency axis, paired inbound/outbound bars and bottom metric table.
+- Added visible operational alert counts for low-stock materials, negative
+  stock, open NCR and late dispatches.
+- Softened Executive KPI drill-down colors and Vietnamese section/status text.
+- Added separate enlarged popups for the six dashboard chart panels and the
+  operational risk panel, each with hover lift/glow and additional detail
+  tables.
+- Removed header quick search, LIVE badge and refresh controls to free display
+  space.
+- Added custom date-range filtering beside `Hôm nay`, `7 ngày` and `30 ngày`,
+  with presets anchored to the newest available dashboard timestamp.
+- Changed top KPI drill-downs from full-page replacement to a smaller modal
+  overlay.
+- Changed the main import/export card to a compact zig-zag trend and enlarged
+  the popup grouped bar chart.
+- Added semantic color emphasis for important values in popup detail tables.
+- Tightened QC, delivery and operational-alert behavior so charts/alerts render
+  only from authoritative backend data.
+
+## 2026-07-22 Executive Dashboard KPI Reference Alignment
+
+Completed:
+
+- Refined the 8 Executive Dashboard KPI cards to match the provided reference:
+  smaller icon frame, title placed beside the icon, compact value display,
+  green/red percentage delta and 30-day mini trend line.
+- Removed old `Tốt` / `Bình thường` status badges from KPI cards.
+- Formatted currency KPI values into compact Vietnamese units such as `tỉ` and
+  `triệu` while preserving the existing backend data source.
+
+## 2026-07-22 Executive Dashboard Final Visual Polish
+
+Completed:
+
+- Improved Executive Dashboard KPI cards with stronger domain gradients,
+  semantic halos, accent borders, domain-shaped icon frames, richer sparklines
+  and more premium hover motion.
+- Increased analytics chart dominance through taller chart canvases, larger
+  donut visuals, stronger progress fills and reduced border-heavy panel feel.
+- Kept all data sources unchanged and did not add fake metrics or synthetic
+  values.
+
+## 2026-07-22 Executive Dashboard Chart Empty-State Polish
+
+Completed:
+
+- Removed repeated `Dữ liệu lịch sử chưa khả dụng` labels from Executive
+  Dashboard KPI sparklines.
+- Allowed dashboard trend panels to fall back to existing real
+  ranking/distribution/status data when time-series history is unavailable.
+- Reduced Executive Dashboard analytics font weights from heavy black/bold
+  styles to medium-weight typography for cleaner rendering.
+- Preserved backend, API contracts, business logic and data integrity.
+
+## 2026-07-22 Executive Dashboard V4.1 Final UI Polish
+
+Completed:
+
+- Added `shared/ui/analytics` primitives and domain themes for the Executive BI
+  Portal.
+- Refined dashboard KPI cards so each business domain has distinct visual
+  identity through color, icon, gradient, hover treatment, domain pattern and
+  sparkline.
+- Reworked domain analytics drill-down pages so Inventory, Inbound, Outbound,
+  Production, QC, Projects and Dispatch use different chart/layout
+  compositions instead of one generic template.
+- Preserved backend, API contracts, routes, permissions, schema and business
+  logic.
+- Kept missing authoritative data as standard empty states; no fake values or
+  synthetic chart arrays were added.
+
+## 2026-07-22 EPIC 12.4 Executive BI Portal Final Redesign
+
+Completed:
+
+- Rebuilt `DashboardPage.tsx` as an Executive BI Portal rather than a single
+  generic dashboard page.
+- Added exactly 8 executive KPI cards with domain-specific color identity,
+  iconography, status badge, hover/glow interaction and real-data sparkline or
+  no-history state.
+- Replaced hardcoded KPI values, hardcoded month arrays and generic fullscreen
+  detail content with existing backend/read-model data from Inventory,
+  Production, QC, Projects and Logistics APIs.
+- Added domain analytics workspaces for Inventory, Inbound, Outbound,
+  Production, QC, Projects and Dispatch.
+- Removed the dead Executive export action until a real export contract exists.
+- Preserved backend APIs, routes, schema, authentication, permissions and
+  business logic.
+
 ## 2026-07-21 EPIC 5.0 Suppliers UI Completion
 
 Completed:

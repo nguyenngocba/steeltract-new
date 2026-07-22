@@ -31,6 +31,7 @@ async function fetchTransactions(
 
 export function useInventoryTransactions(
   filters: TransactionFilters,
+  options: { enabled?: boolean } = {},
 ) {
   return useQuery({
     queryKey: [
@@ -39,6 +40,7 @@ export function useInventoryTransactions(
     ],
     queryFn: ({ signal }) =>
       fetchTransactions(filters, signal),
-    refetchInterval: 4000,
+    enabled: options.enabled ?? true,
+    refetchInterval: (options.enabled ?? true) ? 4000 : false,
   })
 }

@@ -1,5 +1,56 @@
 # Next Tasks
 
+- **Inventory Add Material date QA**: create a new material with a backdated
+  `Ngày thêm` value and confirm Materials analytics use the persisted
+  `createdAt` fallback when no transaction history exists.
+- **Executive Dashboard data QA after hotfix**: verify with authenticated real
+  data that `Giá trị nhập kho`, `Giá trị xuất kho` and `Sản xuất đang chạy`
+  now render non-empty KPI/card trends when backend rows exist.
+- **Executive Dashboard data screenshot QA**: verify the updated inventory
+  value by material type, import/export trend, material group value donut, QC
+  empty-state behavior, delivery empty-state behavior and risk table using an
+  authenticated browser session with seeded/real backend data.
+- **Executive Dashboard chart popup QA**: click all six main chart panels and
+  the operational risk panel, then verify hover lift/glow, enlarged popup
+  content, real-data detail tables and close/keyboard behavior.
+- **Executive Dashboard date filter QA**: verify `Hôm nay`, `7 ngày`, `30 ngày`
+  and `Chọn ngày` update the visible KPI/chart/table datasets that expose real
+  date fields.
+- **Executive Dashboard KPI modal QA**: verify the 8 KPI cards open smaller
+  modal overlays rather than replacing the whole dashboard.
+- **Executive Dashboard drill-down visual QA**: verify the calmer detail pages
+  remain readable after color softening, Vietnamese status labels and rounded
+  donut rendering.
+- **Executive Dashboard KPI screenshot QA**: verify the 8-card KPI row against
+  the latest provided card reference, especially icon/title alignment, compact
+  value units, delta color and 30-day sparkline readability.
+- **Executive Dashboard final screenshot QA**: capture authenticated desktop
+  screenshots for the KPI row and domain analytics pages to confirm the final
+  visual polish against `docs/ui-reference/kpi chinh.png`.
+- **Executive Dashboard browser QA**: visually confirm KPI sparklines, trend
+  fallback charts and medium-weight typography on the authenticated dashboard.
+- **Executive BI V4.1 screenshot certification**: capture authenticated
+  screenshots for `/` and every domain drill-down, then compare against
+  `docs/ui-reference/kpi chinh.png` and `docs/ui-reference/chi tiet bang.png`.
+- **Analytics framework reuse gate**: reuse `shared/ui/analytics` in one more
+  module analytics surface before freezing it as the permanent enterprise BI
+  primitive set.
+- **Executive BI Portal visual certification**: capture authenticated
+  before/after screenshots for `/` at the executive dashboard viewport and
+  compare against `docs/ui-reference/kpi chinh.png` and
+  `docs/ui-reference/chi tiet bang.png`.
+- **Executive BI export contract**: define a real export workflow before
+  restoring any `Xuất Excel` action in the Executive BI portal.
+- **Executive BI shared framework decision**: after one more analytics module
+  reuses the same primitives, decide whether `ExecutiveKpiCard`,
+  `ExecutiveAnalyticsPortal`, chart helpers and data utilities should move from
+  page-local implementation into shared dashboard components.
+
+- **Executive Dashboard UI Redesign V3**: Completed. Integrated Gap Analysis report and updated DashboardPage.tsx to match `kpi chinh.png` and `chi tiet bang.png` specification images. Fixed all layouts to fit 1920x1080 resolution without vertical scrollbars, translated 100% text to Vietnamese, and connected all drill-downs to the 95vw/92vh analytics modal with left filter sidebar and right visual analytics layouts. All builds and git checks passed.
+- **Executive Dashboard UI Redesign (Final Design)**: Completed. Redesigned the entire landing page to fit exactly 1920x1080 resolution with zero scrolling. Converted text-heavy panels (insights, matrices, text overviews) into high-density visual charts, progress bars, and minimal heatmaps. Translated all terms into Vietnamese. Upgraded the 8 KPI cards and 95vw/92vh drill-down popup layout containing left side filters and right analytics blocks. All builds and git checks passed.
+- **Executive Dashboard & KPI Drill-down Redesign (Version 2.0)**: Completed. Redesigned the top KPI section into exactly 8 KPI cards containing icons, delta changes, sparklines, and status badges on a single 1920x1080 screen with zero scrolling. Reconstructed all drill-down actions to trigger a beautiful fullscreen modal (95vw, 92vh) featuring a left sidebar filter panel and 6 detailed right content analytics panels (Summary, 12-Month Trend, Rankings, Distribution, Comparisons, Detail Table, and Highlights). All builds and git checks passed.
+- **Executive Analytics Fullscreen Popup UI Redesign**: Completed. Redesigned all Executive Dashboard KPI card actions to trigger an animated fullscreen (95vw, 92vh) modal analytics workspace. Preserves filter states and returns cleanly.
+- **EPIC 12.5 Executive Business Analytics & Cross-Module Intelligence**: Completed. Reconstructed DashboardPage.tsx to incorporate Cross-Module Analytics (material shortages ➔ production risk, completed production ➔ logistics shipping delays, project progress ➔ production lag, shipments blocked on QC Holds), Risk Matrices, Dependency Pipeline diagrams, Operational Heatmaps, and required executive decision action triggers.
 - **EPIC 12.4 Executive Dashboard Data Accuracy & Operational Analytics**: Completed. Audited all Executive KPIs to align with source modules, and reconstructed all AnalyticsPage.tsx charts to represent actual operational business answers while maintaining a diverse mix of visual representations and clear data source descriptions.
 - **EPIC 12.3 Executive Command Center**: Completed. Upgraded DashboardPage.tsx from a monitoring interface into an active command center. Added Quick Action cards for Low Stock, Production Blocked, QC failure NCRs, and Logistics cancellations; added an Operational Work Queue; added Personal Task and Smart Recommendations panels; and integrated the Executive Calendar schedule view.
 - **EPIC 12.2 Executive Drill-down Dashboards**: Completed. Enabled interactive drill-down navigation from all landing page widgets to a reconstructed, multi-tab detailed AnalyticsPage.tsx hosting 7 domain analytical views populated with real backend datasets.

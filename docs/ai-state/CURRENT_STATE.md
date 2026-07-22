@@ -1,5 +1,156 @@
 # Current State
 
+## Inventory Material Created Date Input
+
+Status: **IMPLEMENTED - BUILD PASS**
+
+The Add Material drawer now includes a compact `Ngày thêm` date-time input next
+to the `Thêm vật tư mới` header, preserving the existing form body layout. New
+materials send the selected timestamp through the existing create-material API,
+and the backend persists it to the existing `InventoryItem.createdAt` field.
+Editing existing materials remains unchanged. No schema or migration was
+introduced.
+
+## Executive Dashboard Data Availability Hotfix
+
+Status: **IMPLEMENTED - BUILD PASS**
+
+Executive Dashboard data extraction now handles nested/paginated payloads and
+line-item transaction values. The `Giá trị nhập kho` and `Giá trị xuất kho`
+KPIs/charts can now derive values from transaction headers or `items[]` lines,
+and their 30-day sparklines are anchored to the newest backend timestamp rather
+than the local current date. Production running counts now use a broader set of
+active production states. Analytics popup panels no longer render the heavy
+left colored accent strip.
+
+## Login & Sidebar Brand Polish
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+The login screen now uses the provided factory background and logo assets from
+`images/`, with a central dark glass panel and an animated luminous stroke
+running around the outside edge. The active application sidebar now presents
+TRIVIETSTEEL / Smart Solutions, while the collapsed sidebar uses `logo-tv.png`
+and keeps the expand control at the bottom. Executive Dashboard donut charts
+now render with sharper flat segment edges and subtle inter-slice spacing.
+Backend contracts and authentication behavior are unchanged.
+
+## Executive Dashboard Business Data Polish
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+Executive Dashboard content mapping now follows the business-data rules. The
+main inventory distribution chart uses inventory value by material type, the
+material-group donut/list share one value-based dataset, import/export trend
+uses existing inventory overview movement history when available, and QC,
+delivery and alerts render only from authoritative backend data or controlled
+empty states. The import/export widget now has a currency-axis comparison
+chart in its popup and a compact zig-zag trend on the main dashboard. KPI
+drill-down pages use calmer colors, Vietnamese section/status labels and now
+open as smaller modal overlays instead of replacing the whole dashboard. The
+six dashboard chart panels and the risk panel open their own enlarged popups
+with additional detail tables. Header quick search, LIVE and refresh controls
+were removed, and the time filter now supports custom date ranges. Backend
+contracts and business logic are unchanged.
+
+## Executive Dashboard KPI Reference Alignment
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+The 8 Executive Dashboard KPI cards now follow the provided KPI reference more
+closely: compact icon on the left, title text on the right of the icon, no
+status badge, compact currency values, green/red percentage delta and a 30-day
+mini trend line underneath. Backend, API contracts and business logic remain
+unchanged.
+
+## Executive Dashboard Final Visual Polish
+
+Status: **IMPLEMENTED - BUILD PASS**
+
+Executive Dashboard received a visual-only premium polish. KPI cards now have
+clearer semantic identity through domain-specific halo, icon frame, accent
+border, gradient and sparkline treatment. Analytics panels are more visual and
+less border-heavy, with taller charts, larger donut visuals and stronger
+progress/ranking treatments. Backend, API contracts, business logic and data
+sources are unchanged.
+
+## Executive Dashboard Chart Empty-State Polish
+
+Status: **IMPLEMENTED - BUILD PASS**
+
+Executive Dashboard chart presentation was stabilized after V4.1. KPI
+sparklines no longer print repeated `Dữ liệu lịch sử chưa khả dụng` text when
+history is missing; they render a quiet neutral line instead. Trend panels now
+use real ranking/distribution/status data as a fallback when time-series data
+is not available, avoiding repeated chart-level empty states without fabricating
+values. Dashboard analytics typography was reduced to medium-weight styles to
+avoid broken/heavy-looking text.
+
+Backend, API contracts and business logic are unchanged.
+
+## Executive Dashboard V4.1 Final UI Polish
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+The Executive Dashboard now has a shared analytics UI framework under
+`apps/frontend/src/shared/ui/analytics` and domain-specific themes for
+Inventory, Inbound, Outbound, Production, QC, Projects and Dispatch. KPI cards
+now communicate business identity visually through domain color, icon,
+gradient, pattern, hover treatment and real-data sparkline/empty-history state.
+
+Domain analytics drill-downs no longer render as one reusable template.
+Inventory emphasizes warehouse occupancy, ABC and aging; Inbound emphasizes
+supplier/receiving flow; Outbound emphasizes delivery/customer/shipment
+readiness; Production emphasizes order capacity and machine readiness; QC
+emphasizes Pareto/NCR/root cause readiness; Projects emphasizes milestone,
+budget and delay; Dispatch emphasizes shipment, route and truck utilization.
+
+Backend, APIs, routes, permissions, schema and business logic are unchanged.
+
+## EPIC 12.4 Executive BI Portal Final Redesign
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+The Executive Dashboard is now structured as an Executive BI Portal. The main
+page renders exactly eight domain KPI cards and large visual analytics groups.
+Each KPI opens a domain analytics workspace for Inventory, Inbound, Outbound,
+Production, QC, Projects or Dispatch. The implementation uses existing backend
+contracts only and renders `Dữ liệu chưa khả dụng` instead of fake historical
+charts when authoritative data is missing.
+
+Backend, API contracts, routes, schema, permissions and business logic are
+unchanged.
+
+## Executive Dashboard UI Redesign V3
+
+Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**
+
+Integrated Gap Analysis report and updated DashboardPage.tsx to match `kpi chinh.png` and `chi tiet bang.png` layouts. Configured 1920x1080 resolution compatibility with zero vertical scrolling, translated 100% of text and labels to Vietnamese, and enabled the 95vw/92vh detail analytics modal with sidebar filter control panels.
+
+## Executive Dashboard UI Redesign (Final Design)
+
+Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**
+
+Redesigned the entire landing page to fit exactly 1920x1085 resolution with zero vertical scrolling. Removed text-heavy panels (insights, matrices, text overviews) in favor of high-density visual charts (Inventory value by warehouse horizontal stacks, Production status, QC NCR, project donuts), progress bars, and minimal heatmaps. Translated all terms to Vietnamese.
+
+## Executive Dashboard & KPI Drill-down Redesign (Version 2.0)
+
+Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**
+
+Redesigned the top KPI section into exactly 8 KPI cards containing icons, delta changes, sparklines, and status badges on a single 1920x1080 screen with zero scrolling. Reconstructed all drill-down actions to trigger a beautiful fullscreen modal (95vw, 92vh) featuring a left sidebar filter panel and 6 detailed right content analytics panels (Summary, 12-Month Trend, Rankings, Distribution, Comparisons, Detail Table, and Highlights).
+
+## Executive Analytics Fullscreen Popup UI Redesign
+
+Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**
+
+Redesigned all Executive Dashboard drill-down actions to trigger an animated fullscreen (95vw, 92vh) modal analytics workspace. Features 5 summary KPI cards with delta trends, a 12-month zoomable historical trend chart, monthly comparisons & category distributions, top 10 horizontal ranking bars, density/occupancy distribution views, a 12-row monthly detail table, and factual operational insights. Preserves dashboard filter states and allows direct returns upon closing.
+
+## EPIC 12.5 Executive Business Analytics & Cross-Module Intelligence
+
+Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**
+
+Transformed DashboardPage.tsx into a comprehensive operational cockpit containing Cross-Module Analytics (material shortages affecting production, completed production awaiting shipping, delayed projects due to production lag, QC Holds blocking dispatch dispatches). Added the Executive Risk Matrix, Operational Dependency Pipeline view, Operational Heatmap, Business Flow summary, and executive decision-required action cards for PO triggers and NCR resolutions.
+
 ## EPIC 12.4 Executive Dashboard Data Accuracy & Operational Analytics
 
 Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**

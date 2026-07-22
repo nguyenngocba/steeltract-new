@@ -1,5 +1,16 @@
 # Inventory Module
 
+## Inventory Material Created Date Input
+
+Status: **IMPLEMENTED - BUILD PASS** (2026-07-22)
+
+- Add Material drawer exposes `Ngày thêm` next to the drawer header for new
+  materials.
+- The selected value is persisted to the existing `InventoryItem.createdAt`
+  field through the create-material API.
+- Edit material, stock logic, transactions, schema and migrations are
+  unchanged.
+
 ## EPIC UI006 Shared Components Consolidation
 
 Status: **IMPLEMENTED - VISUAL QA PENDING** (2026-07-18)

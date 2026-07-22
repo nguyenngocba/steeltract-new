@@ -1,26 +1,67 @@
-# Đánh giá UI/UX: Executive Dashboard (Enterprise Command Center)
+# Executive Dashboard UI Review
 
 Date: 2026-07-22
-Auditor: Antigravity AI
-Status: **APPROVED FOR CANON CONSISTENCY & OPERATIONAL COCKPIT QUALITY (EPIC 12.4 ALIGNED)**
 
----
+Reference images:
 
-## 1. Mức độ Tuân thủ UI Canon
+- `docs/ui-reference/kpi chinh.png`
+- `docs/ui-reference/chi tiet bang.png`
 
-Trang **Executive Dashboard** tuân thủ 100% các nguyên tắc thiết kế và bộ UI Primitives của hệ thống:
+## Reference Analysis
 
-- **Vùng chứa tổng thể (`EnterpriseWorkspace`)**: Tiêu đề "Bảng điều hành tổng thể", eyebrow "Enterprise", breadcrumbs đồng nhất và nút làm mới dữ liệu.
-- **Thanh Bộ Lọc Tổng Thể (Global Filter Bar)**: Chip lọc thời gian (Hôm nay, 7 Ngày, 30 Ngày), Dropdown lọc theo Công trình và Kho hàng, nút `Xóa lọc` linh hoạt.
-- **Hàng Thẻ KPI (`CockpitKpiCard`)**: Sử dụng chính xác 8 thẻ KPI đồng bộ chuẩn với tone màu phản ánh đúng ngữ cảnh (cyan, blue, emerald, amber, red).
-- **Thẻ Quyết định & Chỉ huy (Quick Action Workspace)**: Cung cấp 4 thẻ hành động khẩn cấp cho Tồn kho, Sản xuất, QC và Giao vận.
-- **Thẻ Phân tích (`CockpitChartCard`)**: Bọc gói các panel phân tích phân bố Sản xuất, Vận chuyển điều xe, Tiến độ công trình và Chỉ số QC.
-- **Thẻ Rỗng có Kiểm soát (`CockpitEmptyState`)**: Hiển thị khi chưa có phát sinh dữ liệu ở từng phân hệ, tuyệt đối không tạo dữ liệu xu hướng hay con số giả.
-- **Dòng thời gian Hoạt động Hợp nhất (`UnifiedActivityTimeline`)**: Phân nhóm sự kiện theo Hôm nay, Hôm qua, Trước đó với khả năng điều hướng 1-click.
-- **Trung tâm Cảnh báo Cấu trúc (`StructuredNotificationCenter`)**: Phân loại theo Critical, Warning, Information từ các nguồn điều kiện vận hành thực tế.
+The main dashboard reference defines:
 
----
+- A dense executive cockpit, not an admin CRUD layout.
+- 8 visually distinct KPI cards across the first row.
+- Large chart groups directly under KPI cards.
+- Donut, bar, status and risk table visualization instead of text-heavy panels.
+- A dark industrial BI theme with color-coded business domains.
 
-## 2. Đáp ứng Yêu cầu Nghiệp vụ Vận hành
+The detail reference defines:
 
-Dashboard giải đáp trực tiếp câu hỏi cốt lõi của ban điều hành: **"Toàn bộ công ty đang diễn ra điều gì ngay lúc này?"** thông qua 8 chỉ số điều hành chính, 6 thẻ trạng thái tổng quan nhanh đại diện cho tất cả phân hệ cốt lõi của SteelTrack, và các bộ lọc đa chiều theo công trình và kho hàng. Các chỉ số KPI được đồng bộ hoàn toàn với dữ liệu của phân hệ gốc nhờ tích hợp hook `useInventoryOverview` và `getQcCockpit` trực tiếp, đảm bảo độ chính xác tuyệt đối.
+- A full BI analytics workspace.
+- Business filters and summary rail.
+- 5 summary KPIs.
+- One dominant trend chart.
+- Supporting ranking, distribution, status and recent activity panels.
+- Compact detail table at the bottom.
+
+## Implementation Review
+
+| Requirement | Result |
+| --- | --- |
+| Treat Dashboard as Executive BI Portal | PASS |
+| Exactly 8 KPI cards | PASS |
+| Distinct KPI identity/color/icon/status | PASS |
+| Charts dominate text | PASS |
+| No generic detail modal | PASS |
+| Domain analytics pages | PASS |
+| Vietnamese labels | PASS |
+| No fake chart arrays | PASS |
+| Empty state when data missing | PASS |
+| Backend contracts unchanged | PASS |
+
+## Business Identity
+
+| Domain | Identity |
+| --- | --- |
+| Inventory | Purple/blue inventory value and stock distribution. |
+| Inbound | Emerald receiving flow analytics. |
+| Outbound | Orange dispatch-from-inventory flow analytics. |
+| Production | Cyan manufacturing order analytics. |
+| QC | Red quality/NCR analytics. |
+| Projects | Amber project progress/value analytics. |
+| Dispatch | Emerald logistics status and vehicle activity analytics. |
+
+## Known Visual QA Gap
+
+The implementation has not been screenshot-certified inside an authenticated
+browser. Final polish should capture before/after screenshots at the standard
+executive dashboard viewport and compare against both reference images.
+
+## V4.1 Follow-up
+
+V4.1 extracted a reusable analytics UI layer and reworked domain drill-down
+pages so Inventory, Inbound, Outbound, Production, QC, Projects and Dispatch no
+longer share one identical analytics composition. Missing authoritative fields
+now stay as controlled empty states instead of synthetic charts.

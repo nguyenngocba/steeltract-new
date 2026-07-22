@@ -34,6 +34,11 @@ const INTERNAL_CELLS = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((row) =>
 const INTERNAL_LEVELS = ['L1', 'L2', 'L3', 'L4']
 const TOTAL_STORAGE_CELL_LEVELS = INTERNAL_CELLS.length * INTERNAL_LEVELS.length
 
+function formatLocalDateTimeInput(value = new Date()) {
+  const pad = (input: number) => String(input).padStart(2, '0')
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`
+}
+
 function usageLabel(value: string) {
   return MATERIAL_USAGE_OPTIONS.find((item) => item.value === value)?.label ?? 'Vật tư chính'
 }
@@ -90,6 +95,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
   const [zoneId, setZoneId] = useState('')
   const [slotId, setSlotId] = useState('')
   const [level, setLevel] = useState('')
+  const [createdAt, setCreatedAt] = useState(formatLocalDateTimeInput())
   const [imagePreview, setImagePreview] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageName, setImageName] = useState('')
@@ -121,6 +127,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       setZoneId('')
       setSlotId('')
       setLevel('')
+      setCreatedAt(formatLocalDateTimeInput())
       setImagePreview('')
       setImageName('')
       setImageFile(null)
@@ -137,6 +144,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     setZoneId(material.zoneId ?? '')
     setSlotId(material.slotId ?? '')
     setLevel(material.level ?? '')
+    setCreatedAt(material.createdAt ? formatLocalDateTimeInput(new Date(material.createdAt)) : formatLocalDateTimeInput())
     setImagePreview(material.imageUrl ?? material.photoUrl ?? material.thumbnailUrl ?? '')
     setImageName(material.imageUrl || material.photoUrl ? 'Ảnh hiện có' : '')
     setImageFile(null)
@@ -200,6 +208,7 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
       zoneId,
       slotId,
       level,
+      ...(!isEditMode && createdAt ? { createdAt } : {}),
     }
 
     try {
@@ -254,15 +263,28 @@ export function MaterialDrawer({ open, material, onClose }: Props) {
     <div className="inventory-material-drawer fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/75 p-3 backdrop-blur-md sm:p-4">
       <style>{'.inventory-material-drawer select option{background:#0f172a;color:#e2e8f0}.inventory-material-drawer select:focus,.inventory-material-drawer input:focus,.inventory-material-drawer textarea:focus{outline:2px solid rgba(34,211,238,.55);outline-offset:1px}'}</style>
       <section className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl sm:max-h-[calc(100vh-2rem)]">
-        <header className="flex shrink-0 items-start justify-between border-b border-white/10 px-5 py-3">
+        <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-white/10 px-5 py-3">
           <div>
             <h2 className="text-xl font-semibold text-white">
               {isEditMode ? 'Sửa vật tư' : 'Thêm vật tư mới'}
             </h2>
           </div>
-          <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white">
-            <X size={18} />
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            {!isEditMode && (
+              <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                Ngày thêm
+                <input
+                  type="datetime-local"
+                  value={createdAt}
+                  onChange={(event) => setCreatedAt(event.target.value)}
+                  className={`${drawerInput} w-[190px] uppercase tracking-normal text-slate-100`}
+                />
+              </label>
+            )}
+            <button onClick={onClose} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white">
+              <X size={18} />
+            </button>
+          </div>
         </header>
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto overscroll-contain p-4 lg:grid-cols-12">
           <div className="lg:col-span-7">

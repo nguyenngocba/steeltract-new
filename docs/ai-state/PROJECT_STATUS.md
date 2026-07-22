@@ -1,5 +1,86 @@
 # Project Status
 
+On 2026-07-22 implemented the Inventory Material Created Date input. The Add
+Material drawer now shows a compact `Ngày thêm` date-time picker beside the
+`Thêm vật tư mới` header, and create-material requests persist that value to
+the existing `InventoryItem.createdAt` field. No schema, migration, API route
+or business workflow changed.
+
+On 2026-07-22 implemented an Executive Dashboard data availability hotfix.
+Inbound/outbound KPI and chart calculations now unwrap nested API payloads,
+normalize transaction direction/type values, include transaction `items[]`
+amounts when header totals are absent, and anchor 30-day sparklines to the
+newest backend timestamp. Production running counts now include the canonical
+active states used across the app. Analytics detail panels no longer show the
+heavy left-side colored strip.
+
+On 2026-07-22 completed Login & Sidebar Brand Polish. The login page now uses
+the provided factory background and TRIVIETSTEEL logo image with an animated
+luminous border around the center login card. The active sidebar brand now
+shows TRIVIETSTEEL / Smart Solutions, and the collapsed sidebar uses
+`logo-tv.png` with the expand button moved to the bottom. No backend, API,
+schema or authentication behavior changed.
+
+On 2026-07-22 completed Executive Dashboard Business Data Polish. The dashboard
+now maps inventory value by material type and material group from real
+`/inventory/audit` value fields, uses `/inventory/overview` movement trend for
+import/export history, and renders QC, delivery and operational alerts only
+from authoritative backend data or explicit empty states. Follow-up polish
+added a period-style import/export comparison chart, explicit alert count strip
+and calmer Vietnamese KPI drill-down pages. The six chart panels plus
+operational risk panel now have independent enlarged popups with real-data
+detail tables. Latest polish removed header quick search/LIVE/refresh controls,
+added custom date filtering, changed top KPI drill-downs to smaller modal
+overlays, changed the main import/export card to a zig-zag trend and enlarged
+the popup bar chart. No backend, API, schema or business behavior changed.
+
+On 2026-07-22 completed the Executive Dashboard KPI reference alignment. The 8
+KPI cards now use the requested reference structure: smaller icons, title text
+beside the icon, compact `tỉ`/`triệu` values, green/red percent change, removed
+`Tốt`/`Bình thường` badges and 30-day mini trend lines. No backend, API,
+schema or business behavior changed.
+
+On 2026-07-22 completed the Executive Dashboard final visual polish. KPI cards
+now align more closely with `docs/ui-reference/kpi chinh.png` through stronger
+domain-specific gradients, semantic glow, accent borders, custom icon frames
+and richer sparkline treatment. Analytics panels now give charts and progress
+visualizations more dominance while keeping backend/API/business logic
+unchanged.
+
+On 2026-07-22 completed the Executive Dashboard chart empty-state polish.
+Repeated `Dữ liệu lịch sử chưa khả dụng` labels were removed from KPI
+sparklines, trend panels now fall back to existing real ranking/distribution
+data when history is unavailable, and dashboard analytics typography was
+softened to medium-weight rendering. No backend, API, schema, route, permission
+or business behavior changed.
+
+On 2026-07-22 completed Executive Dashboard V4.1 Final UI Polish. Added a
+shared analytics UI framework under `shared/ui/analytics`, introduced
+domain-specific analytics themes and reworked the Executive BI drill-downs so
+each domain has its own chart composition and operational identity. The main
+KPI row now reads as eight distinct executive KPI cards rather than cloned
+cards.
+No backend, API, route, schema, permission or business behavior changed.
+
+On 2026-07-22 completed EPIC 12.4 Executive BI Portal Final Redesign.
+`DashboardPage.tsx` now treats the landing experience as an Executive BI
+Portal with a main executive cockpit plus domain analytics pages for Inventory,
+Inbound, Outbound, Production, QC, Projects and Dispatch. Hardcoded KPI values,
+hardcoded month arrays and generic analytics modal content were replaced with
+existing backend/read-model data or controlled `Dữ liệu chưa khả dụng` states.
+Backend contracts, routes, schema, permissions and business logic were not
+changed.
+
+On 2026-07-22 completed the Executive Dashboard UI Redesign V3. Integrated gap analysis report and updated DashboardPage.tsx to match `kpi chinh.png` and `chi tiet bang.png` specification images. Fixed all layouts to fit 1920x1080 resolution without vertical scrollbars, translated 100% text to Vietnamese, and connected all drill-downs to the 95vw/92vh analytics modal with left filter sidebar and right visual analytics layouts. All builds and git checks passed.
+
+On 2026-07-22 completed the Executive Dashboard UI Redesign (Final Design). Redesigned the entire landing page to fit exactly 1920x1080 resolution with zero scrolling. Converted text-heavy panels (insights, matrices, text overviews) into high-density visual charts, progress bars, and minimal heatmaps. Translated all terms into Vietnamese. Upgraded the 8 KPI cards and 95vw/92vh drill-down popup layout containing left side filters and right analytics blocks. All builds and git checks passed.
+
+On 2026-07-22 completed the Executive Dashboard & KPI Drill-down Redesign (Version 2.0). Upgraded the top KPI section into exactly 8 KPI cards containing icons, delta changes, sparklines, and status badges on a single 1920x1080 screen with zero scrolling. Reconstructed all drill-down actions to trigger a beautiful fullscreen modal (95vw, 92vh) featuring a left sidebar filter panel and 6 detailed right content analytics panels (Summary, 12-Month Trend, Rankings, Distribution, Comparisons, Detail Table, and Highlights). All builds and git checks passed.
+
+On 2026-07-22 completed the Executive Analytics Fullscreen Popup UI Redesign. Upgraded every dashboard KPI card click-action to open a beautiful fullscreen (95vw, 92vh) analytics modal workspace preserving dashboard state. Integrated 5 executive summary KPI cards with delta trends, a 12-month zoomable historical trend chart, monthly comparisons & category distributions, top 10 horizontal ranking bars, density/occupancy distribution views, a 12-row monthly detail table, and factual operational insights. All builds and git checks passed.
+
+On 2026-07-22 EPIC 12.5 completed the Executive Business Analytics & Cross-Module Intelligence sprint. Transformed DashboardPage.tsx into an operational business cockpit. Added Cross-Module Analytics linking Inventory shortages to production risk, completed production to logistics waittimes, delayed projects to production progress, and shipments blocked by QC holds. Integrated the Executive Risk Matrix, Operational Dependency Pipeline view, Operational Heatmap, Business Flow summary, and executive decision-required action cards. All builds and git checks passed.
+
 On 2026-07-22 EPIC 12.4 completed the Executive Dashboard Data Accuracy & Operational Analytics sprint. Audited all Executive KPIs and aligned calculations to use the exact same backend read models as their source modules (incorporating useInventoryOverview query on DashboardPage.tsx). Reconstructed all AnalyticsPage.tsx charts to represent actual operational business answers (Warehouse Occupancy, Top 10 Low Stock Materials, Inventory Category Distribution, Production status/progress, Vehicle Utilization, QC Pass Rates, Project Completion, and Executive Health Score), while maintaining a diverse mix of visual representations and clear data source descriptions. All builds and git checks passed.
 
 On 2026-07-22 EPIC 12.3 completed the Executive Command Center sprint. Upgraded DashboardPage.tsx from a monitoring tool into an operational command center. Integrated the Quick Action Workspace containing actionable Cards for Low Stock, Production Blocked, QC failure NCRs, and Logistics cancellations with primary/secondary actions; added an Operational Work Queue grouped by time/priority; added the Personal Task and Smart Recommendations panels; and integrated the Executive Calendar schedule view. All builds and git checks passed.
