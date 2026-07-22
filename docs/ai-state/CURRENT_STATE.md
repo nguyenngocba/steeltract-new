@@ -1,5 +1,11 @@
 # Current State
 
+## EPIC 12.2 Executive Drill-down Dashboards
+
+Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**
+
+Enabled comprehensive interactive drill-down navigation from all Executive Dashboard widgets (KPIs, Charts, Notifications, Timeline events) to dedicated operational analytics views. Reconstructed AnalyticsPage.tsx to host 7 detailed domain tabs (Inventory, Production, Logistics, QC, Projects, Planning, Admin) populated with real backend data queries and controlled empty states.
+
 ## EPIC 12.1 Executive Dashboard Analytics & Activity Center
 
 Status: **COMPLETED - BUILD PASS, CANON CERTIFIED**

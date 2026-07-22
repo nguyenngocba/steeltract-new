@@ -48,6 +48,7 @@ import {
 } from '@/shared/ui/cockpit'
 import {
   ModuleLoadingState,
+  moduleInput,
   moduleMutedButton,
   modulePrimaryButton,
 } from '@/shared/ui/modules'
@@ -403,7 +404,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* SECTION 1: 8 Executive KPI Cards */}
+      {/* SECTION 1: 8 Executive KPI Cards with Drill-down Navigation */}
       <section className="grid gap-1 md:grid-cols-4 xl:grid-cols-8">
         <CockpitKpiCard
           title="Giá trị tồn kho"
@@ -412,6 +413,7 @@ export function DashboardPage() {
           icon={<Warehouse size={16} />}
           tone="cyan"
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=inventory')}
         />
         <CockpitKpiCard
           title="Vật tư sắp hết"
@@ -420,6 +422,7 @@ export function DashboardPage() {
           icon={<AlertTriangle size={16} />}
           tone={lowStockItems > 0 ? 'amber' : 'emerald'}
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=inventory')}
         />
         <CockpitKpiCard
           title="Lệnh SX đang chạy"
@@ -428,6 +431,7 @@ export function DashboardPage() {
           icon={<Factory size={16} />}
           tone="blue"
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=production')}
         />
         <CockpitKpiCard
           title="Dự án triển khai"
@@ -436,6 +440,7 @@ export function DashboardPage() {
           icon={<Building2 size={16} />}
           tone="cyan"
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=projects')}
         />
         <CockpitKpiCard
           title="Giao hàng hôm nay"
@@ -444,6 +449,7 @@ export function DashboardPage() {
           icon={<Truck size={16} />}
           tone="cyan"
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=logistics')}
         />
         <CockpitKpiCard
           title="Sự cố QC / NCR"
@@ -452,6 +458,7 @@ export function DashboardPage() {
           icon={<ShieldCheck size={16} />}
           tone={openQcIssuesCount > 0 ? 'red' : 'emerald'}
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=qc')}
         />
         <CockpitKpiCard
           title="Chờ điều phối / duyệt"
@@ -460,6 +467,7 @@ export function DashboardPage() {
           icon={<CalendarClock size={16} />}
           tone="amber"
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=planning')}
         />
         <CockpitKpiCard
           title="Sức khỏe hệ thống"
@@ -468,6 +476,7 @@ export function DashboardPage() {
           icon={<CheckCircle2 size={16} />}
           tone="emerald"
           state={isLoading ? 'loading' : 'normal'}
+          onClick={() => navigate('/analytics?domain=admin')}
         />
       </section>
 
@@ -535,55 +544,79 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {/* SECTION 1 — Dedicated Operational Analytics Panels */}
+          {/* SECTION 1 — Dedicated Operational Analytics Panels with Card-level Click Navigation */}
           <section className="grid gap-1 lg:grid-cols-2">
             {/* 1. Production Trend Analytics */}
-            <CockpitChartCard title="Phân bố Trạng thái Sản xuất" className="h-[220px]">
-              {filteredProductionOrders.length > 0 ? (
-                <ProductionStatusDistribution orders={filteredProductionOrders} />
-              ) : (
-                <CockpitEmptyState
-                  title="Chưa có dữ liệu sản xuất"
-                  description="Dữ liệu tổng hợp theo thời gian thực sẽ xuất hiện khi có lệnh MO."
-                />
-              )}
-            </CockpitChartCard>
+            <div onClick={() => navigate('/analytics?domain=production')} className="cursor-pointer block">
+              <CockpitChartCard
+                title="Phân bố Trạng thái Sản xuất"
+                className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
+                heightClass="h-[220px]"
+              >
+                {filteredProductionOrders.length > 0 ? (
+                  <ProductionStatusDistribution orders={filteredProductionOrders} />
+                ) : (
+                  <CockpitEmptyState
+                    title="Chưa có dữ liệu sản xuất"
+                    description="Dữ liệu tổng hợp theo thời gian thực sẽ xuất hiện khi có lệnh MO."
+                  />
+                )}
+              </CockpitChartCard>
+            </div>
 
             {/* 2. Logistics Trend Analytics */}
-            <CockpitChartCard title="Trạng thái Chuyến vận chuyển" className="h-[220px]">
-              {filteredDispatchOrders.length > 0 ? (
-                <LogisticsStatusDistribution orders={filteredDispatchOrders} />
-              ) : (
-                <CockpitEmptyState
-                  title="Chưa có dữ liệu điều xe"
-                  description="Dữ liệu tổng hợp theo thời gian thực sẽ xuất hiện khi lập lịch giao vận."
-                />
-              )}
-            </CockpitChartCard>
+            <div onClick={() => navigate('/analytics?domain=logistics')} className="cursor-pointer block">
+              <CockpitChartCard
+                title="Trạng thái Chuyến vận chuyển"
+                className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
+                heightClass="h-[220px]"
+              >
+                {filteredDispatchOrders.length > 0 ? (
+                  <LogisticsStatusDistribution orders={filteredDispatchOrders} />
+                ) : (
+                  <CockpitEmptyState
+                    title="Chưa có dữ liệu điều xe"
+                    description="Dữ liệu tổng hợp theo thời gian thực sẽ xuất hiện khi lập lịch giao vận."
+                  />
+                )}
+              </CockpitChartCard>
+            </div>
 
             {/* 3. Project Trend Analytics */}
-            <CockpitChartCard title="Phân bố Tiến độ Dự án" className="h-[220px]">
-              {projectsList.length > 0 ? (
-                <ProjectStatusDistribution projects={projectsList} />
-              ) : (
-                <CockpitEmptyState
-                  title="Chưa có công trình"
-                  description="Dữ liệu tổng hợp dự án sẽ hiển thị khi khởi tạo WBS."
-                />
-              )}
-            </CockpitChartCard>
+            <div onClick={() => navigate('/analytics?domain=projects')} className="cursor-pointer block">
+              <CockpitChartCard
+                title="Phân bố Tiến độ Dự án"
+                className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
+                heightClass="h-[220px]"
+              >
+                {projectsList.length > 0 ? (
+                  <ProjectStatusDistribution projects={projectsList} />
+                ) : (
+                  <CockpitEmptyState
+                    title="Chưa có công trình"
+                    description="Dữ liệu tổng hợp dự án sẽ hiển thị khi khởi tạo WBS."
+                  />
+                )}
+              </CockpitChartCard>
+            </div>
 
             {/* 4. QC Inspection Trend Analytics */}
-            <CockpitChartCard title="Chỉ số Kiểm định QC" className="h-[220px]">
-              {qcCockpit?.metrics ? (
-                <QcMetricsDistribution metrics={qcCockpit.metrics} />
-              ) : (
-                <CockpitEmptyState
-                  title="Chưa có lịch sử QC"
-                  description="Dữ liệu kiểm định sẽ xuất hiện khi có lượt QC phát sinh."
-                />
-              )}
-            </CockpitChartCard>
+            <div onClick={() => navigate('/analytics?domain=qc')} className="cursor-pointer block">
+              <CockpitChartCard
+                title="Chỉ số Kiểm định QC"
+                className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
+                heightClass="h-[220px]"
+              >
+                {qcCockpit?.metrics ? (
+                  <QcMetricsDistribution metrics={qcCockpit.metrics} />
+                ) : (
+                  <CockpitEmptyState
+                    title="Chưa có lịch sử QC"
+                    description="Dữ liệu kiểm định sẽ xuất hiện khi có lượt QC phát sinh."
+                  />
+                )}
+              </CockpitChartCard>
+            </div>
           </section>
         </main>
 
@@ -634,17 +667,22 @@ export function DashboardPage() {
             <UnifiedActivityTimeline groups={groupedActivities} onNavigate={(path) => path && navigate(path)} />
           </CockpitChartCard>
 
-          {/* System Health Details */}
-          <CockpitChartCard title="Trạng thái Dịch vụ System">
-            <CockpitStatusList
-              items={[
-                { id: '1', label: 'Backend API Service', value: 'ONLINE', statusTone: 'emerald' },
-                { id: '2', label: 'Workflow Integrity', value: `${systemHealthPercent}%`, statusTone: 'cyan' },
-                { id: '3', label: 'Background Engine Jobs', value: 'ACTIVE', statusTone: 'emerald' },
-              ]}
-              emptyMessage="Chưa có dữ liệu hệ thống."
-            />
-          </CockpitChartCard>
+          {/* System Health Details with click navigation to system settings/logs */}
+          <div onClick={() => navigate('/analytics?domain=admin')} className="cursor-pointer block">
+            <CockpitChartCard
+              title="Trạng thái Dịch vụ System"
+              className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
+            >
+              <CockpitStatusList
+                items={[
+                  { id: '1', label: 'Backend API Service', value: 'ONLINE', statusTone: 'emerald' },
+                  { id: '2', label: 'Workflow Integrity', value: `${systemHealthPercent}%`, statusTone: 'cyan' },
+                  { id: '3', label: 'Background Engine Jobs', value: 'ACTIVE', statusTone: 'emerald' },
+                ]}
+                emptyMessage="Chưa có dữ liệu hệ thống."
+              />
+            </CockpitChartCard>
+          </div>
         </aside>
       </div>
     </EnterpriseWorkspace>
