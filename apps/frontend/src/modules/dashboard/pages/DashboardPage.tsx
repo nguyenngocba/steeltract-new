@@ -36,6 +36,7 @@ import { productionApi, type ProductionOrder } from '@/modules/production/api/pr
 import { getInventoryItems } from '@/modules/inventory/api/inventory.api'
 import { useWarehouses } from '@/modules/inventory/hooks/useWarehouses'
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
+import { useInventoryOverview } from '@/modules/inventory/hooks/useInventoryReadModels'
 import { useInventoryTransactions } from '@/modules/inventory/hooks/useInventoryTransactions'
 import { getQcCockpit } from '@/modules/qc/api/qc.api'
 import { systemApi } from '@/modules/system/api/system.api'
@@ -76,6 +77,7 @@ export function DashboardPage() {
 
   // Real Queries Across All 8 Modules
   const { data: inventoryRows = [], isLoading: inventoryLoading } = useInventoryAudit()
+  const { data: inventoryOverview } = useInventoryOverview({})
   const { data: inventoryItems = [] } = useQuery({ queryKey: ['inventory-items'], queryFn: getInventoryItems })
   const { data: warehouses = [] } = useWarehouses()
   const { data: transactionsRaw = [] } = useInventoryTransactions({})
@@ -145,8 +147,11 @@ export function DashboardPage() {
 
   // Executive KPI Computations
   const inventoryValue = useMemo(() => {
+    if (selectedWarehouse === 'all') {
+      return Number(inventoryOverview?.summary?.totalValue ?? 0)
+    }
     return filteredInventoryRows.reduce((sum, row) => sum + Number(row.stockValue || 0), 0)
-  }, [filteredInventoryRows])
+  }, [filteredInventoryRows, inventoryOverview, selectedWarehouse])
 
   const lowStockItems = useMemo(() => {
     return inventoryItems.filter((item: any) => {
