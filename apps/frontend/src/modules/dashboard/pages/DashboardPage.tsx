@@ -10,6 +10,7 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
+  CheckSquare,
   ChevronRight,
   Clock,
   Factory,
@@ -22,6 +23,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Star,
   Truck,
   UserCheck,
   Warehouse,
@@ -58,6 +60,7 @@ const fmt = (value = 0, digits = 0) => formatQuantity(value, digits)
 const date = (value?: string | null) => (value ? new Intl.DateTimeFormat('vi-VN').format(new Date(value)) : '—')
 
 type TimeRange = 'TODAY' | '7D' | '30D'
+type QueueTab = 'critical' | 'today' | 'week' | 'completed'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -67,6 +70,9 @@ export function DashboardPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('30D')
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('all')
+
+  // Command Center State
+  const [queueTab, setQueueTab] = useState<QueueTab>('critical')
 
   // Real Queries Across All 8 Modules
   const { data: inventoryRows = [], isLoading: inventoryLoading } = useInventoryAudit()
@@ -147,7 +153,7 @@ export function DashboardPage() {
       const qty = Number(item.quantity || 0)
       const minQty = Number(item.minQuantity || item.reorderPoint || 0)
       return minQty > 0 && qty <= minQty
-    }).length
+    })
   }, [inventoryItems])
 
   const runningMOs = useMemo(() => {
@@ -178,7 +184,160 @@ export function DashboardPage() {
   const totalWorkflowSteps = workflow?.steps.length ?? 1
   const systemHealthPercent = Math.round((okWorkflowSteps / totalWorkflowSteps) * 100)
 
-  // Section 2: Unified Recent Activities Timeline (Grouped by Today, Yesterday, Earlier)
+  // Quick Action Workspace: Filter real operational issues across modules
+  const actionIssues = useMemo(() => {
+    const issues: Array<{
+      id: string
+      type: 'LOW_STOCK' | 'PROD_BLOCKED' | 'QC_FAIL' | 'DISPATCH_DELAY'
+      title: string
+      priority: 'Critical' | 'Warning'
+      module: string
+      description: string
+      recommended: string
+      primaryLabel: string
+      secondaryLabel: string
+      onPrimary: () => void
+      onSecondary: () => void
+    }> = []
+
+    // 1. Low Stock Issues
+    lowStockItems.slice(0, 2).forEach((item) => {
+      issues.push({
+        id: `issue-stock-${item.id}`,
+        type: 'LOW_STOCK',
+        title: `Thiếu hụt vật tư: ${item.code}`,
+        priority: 'Warning',
+        module: 'Kho hàng',
+        description: `Mặt hàng ${item.name} tồn thực tế còn ${fmt(item.quantity)} ${item.unit} (ngưỡng tối thiểu ${fmt(item.minQuantity)} ${item.unit}).`,
+        recommended: 'Review kế hoạch đặt hàng mua hàng bổ sung.',
+        primaryLabel: 'Xem tồn kho',
+        secondaryLabel: 'Tạo PO mua hàng',
+        onPrimary: () => navigate('/inventory'),
+        onSecondary: () => navigate('/procurement'),
+      })
+    })
+
+    // 2. Production Blocked / Scrap Alert
+    filteredProductionOrders
+      .filter((mo: any) => Number(mo.scrapCount || 0) > 0 || mo.status === 'BLOCKED')
+      .slice(0, 2)
+      .forEach((mo: any) => {
+        issues.push({
+          id: `issue-mo-${mo.id}`,
+          type: 'PROD_BLOCKED',
+          title: `Lệnh SX có hao hụt: ${mo.orderNo}`,
+          priority: 'Critical',
+          module: 'Sản xuất',
+          description: `Lệnh gia công ${mo.componentCode || mo.title} phát sinh ${fmt(mo.scrapCount)} phế phẩm không đạt chuẩn.`,
+          recommended: 'Kiểm tra quy trình gia công xưởng và thay đổi nguồn phôi.',
+          primaryLabel: 'Mở chi tiết MO',
+          secondaryLabel: 'Kiểm tra vật tư',
+          onPrimary: () => navigate('/production'),
+          onSecondary: () => navigate('/planning'),
+        })
+      })
+
+    // 3. QC Failure Alert
+    if (qcCockpit?.ncrs) {
+      qcCockpit.ncrs.filter((n) => n.status !== 'CLOSED').slice(0, 2).forEach((n) => {
+        issues.push({
+          id: `issue-qc-${n.id}`,
+          type: 'QC_FAIL',
+          title: `Sự cố QC NCR: ${n.ncrNo}`,
+          priority: 'Critical',
+          module: 'Chất lượng (QC)',
+          description: `Phát hiện không phù hợp tại công đoạn: ${n.title}`,
+          recommended: 'Ký duyệt biện pháp sửa đổi khắc phục NCR hoặc hủy cấu kiện.',
+          primaryLabel: 'Giải quyết NCR',
+          secondaryLabel: 'Xem kiểm định',
+          onPrimary: () => navigate('/qc'),
+          onSecondary: () => navigate('/qc'),
+        })
+      })
+    }
+
+    // 4. Logistics Delay Alert
+    filteredDispatchOrders.filter((d) => d.status === 'CANCELLED').slice(0, 1).forEach((d) => {
+      issues.push({
+        id: `issue-disp-${d.id}`,
+        type: 'DISPATCH_DELAY',
+        title: `Hủy chuyến vận chuyển: ${d.code}`,
+        priority: 'Warning',
+        module: 'Logistics',
+        description: `Chuyến xe ${d.vehicle || 'Chưa gán'} chở hàng tới công trình ${d.project?.name || ''} đã bị hủy bỏ.`,
+        recommended: 'Tái lập lịch hoặc liên hệ điều phối viên điều xe khác.',
+        primaryLabel: 'Xem điều xe',
+        secondaryLabel: 'Liên hệ tài xế',
+        onPrimary: () => navigate('/logistics'),
+        onSecondary: () => navigate('/logistics'),
+      })
+    })
+
+    return issues
+  }, [lowStockItems, filteredProductionOrders, qcCockpit, filteredDispatchOrders, navigate])
+
+  // Operational Queue grouping
+  const queueItems = useMemo(() => {
+    const items = {
+      critical: [] as any[],
+      today: [] as any[],
+      week: [] as any[],
+      completed: [] as any[],
+    }
+
+    // Critical: NCRs and Blocked MOs
+    if (qcCockpit?.ncrs) {
+      qcCockpit.ncrs.filter((n) => n.status !== 'CLOSED').forEach((n) => {
+        items.critical.push({ id: n.id, title: `Khắc phục NCR: ${n.ncrNo}`, module: 'QC', badge: 'CRITICAL', tone: 'red' })
+      })
+    }
+
+    // Today: Active dispatches & running MOs
+    filteredDispatchOrders.filter((d) => ['LOADING', 'IN_TRANSIT'].includes(d.status)).forEach((d) => {
+      items.today.push({ id: d.id, title: `Giao vận chuyến ${d.code}: ${d.project?.name || ''}`, module: 'Logistics', badge: d.status, tone: 'cyan' })
+    })
+
+    // This Week: Planned dispatches
+    filteredDispatchOrders.filter((d) => d.status === 'PLANNED').forEach((d) => {
+      items.week.push({ id: d.id, title: `Lên lịch giao xe ${d.code} (${date(d.plannedAt)})`, module: 'Logistics', badge: 'PLANNED', tone: 'blue' })
+    })
+
+    // Completed
+    filteredProductionOrders.filter((mo) => mo.status === 'COMPLETED').slice(0, 5).forEach((mo) => {
+      items.completed.push({ id: mo.id, title: `Hoàn tất MO: ${mo.orderNo}`, module: 'Sản xuất', badge: 'DONE', tone: 'emerald' })
+    })
+
+    return items
+  }, [qcCockpit, filteredDispatchOrders, filteredProductionOrders])
+
+  // Executive Calendar agenda list
+  const calendarAgenda = useMemo(() => {
+    const list: Array<{ id: string; title: string; time: string; module: string; tone: 'cyan' | 'blue' | 'purple' }> = []
+
+    filteredDispatchOrders.filter((d) => d.status === 'PLANNED').slice(0, 4).forEach((d) => {
+      list.push({
+        id: `cal-disp-${d.id}`,
+        title: `Lịch điều phối tuyến ${d.code}: ${d.vehicle || 'Chưa gán'}`,
+        time: `Ngày ${date(d.plannedAt || d.createdAt)}`,
+        module: 'Logistics',
+        tone: 'cyan',
+      })
+    })
+
+    projectsList.slice(0, 3).forEach((p) => {
+      list.push({
+        id: `cal-proj-${p.id}`,
+        title: `Mốc tiến độ: ${p.name} (Đạt ${fmt(p.progress)}%)`,
+        time: 'Trong tuần',
+        module: 'Công trình',
+        tone: 'blue',
+      })
+    })
+
+    return list
+  }, [filteredDispatchOrders, projectsList])
+
+  // Unified Recent Activities Timeline (Grouped by Today, Yesterday, Earlier)
   const groupedActivities = useMemo(() => {
     const rawEvents: Array<{
       id: string
@@ -190,7 +349,6 @@ export function DashboardPage() {
       targetPath?: string
     }> = []
 
-    // 1. System Audit Logs
     activityLogs.forEach((log) => {
       rawEvents.push({
         id: `sys-${log.id}`,
@@ -203,7 +361,6 @@ export function DashboardPage() {
       })
     })
 
-    // 2. Dispatch Orders
     filteredDispatchOrders.forEach((d) => {
       rawEvents.push({
         id: `disp-${d.id}`,
@@ -216,7 +373,6 @@ export function DashboardPage() {
       })
     })
 
-    // 3. QC Inspections
     if (qcCockpit?.inspections) {
       qcCockpit.inspections.forEach((insp) => {
         rawEvents.push({
@@ -231,10 +387,8 @@ export function DashboardPage() {
       })
     }
 
-    // Sort newest first
     rawEvents.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-    // Group into Today, Yesterday, Earlier
     const now = new Date()
     const todayStr = now.toDateString()
     const yesterday = new Date(now)
@@ -261,7 +415,7 @@ export function DashboardPage() {
     return groups
   }, [activityLogs, filteredDispatchOrders, qcCockpit])
 
-  // Section 3: Structured Notifications Center (Critical -> Warning -> Information)
+  // Structured Notifications Center
   const structuredNotifications = useMemo(() => {
     const list: Array<{
       id: string
@@ -285,13 +439,13 @@ export function DashboardPage() {
       })
     }
 
-    if (lowStockItems > 0) {
+    if (lowStockItems.length > 0) {
       list.push({
         id: 'notif-stock',
         priority: 'Warning',
         module: 'Inventory',
         title: 'Cảnh báo tồn kho tối thiểu',
-        description: `Có ${lowStockItems} mã vật tư tụt dưới ngưỡng dự trữ định mức.`,
+        description: `Có ${lowStockItems.length} mã vật tư tụt dưới ngưỡng dự trữ định mức.`,
         time: 'Hôm nay',
         targetPath: '/inventory',
       })
@@ -417,10 +571,10 @@ export function DashboardPage() {
         />
         <CockpitKpiCard
           title="Vật tư sắp hết"
-          value={isLoading ? '' : fmt(lowStockItems)}
+          value={isLoading ? '' : fmt(lowStockItems.length)}
           note="Dưới định mức tối thiểu"
           icon={<AlertTriangle size={16} />}
-          tone={lowStockItems > 0 ? 'amber' : 'emerald'}
+          tone={lowStockItems.length > 0 ? 'amber' : 'emerald'}
           state={isLoading ? 'loading' : 'normal'}
           onClick={() => navigate('/analytics?domain=inventory')}
         />
@@ -483,70 +637,137 @@ export function DashboardPage() {
       {/* MAIN BODY GRID: Left (70%) & Right (30%) */}
       <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_360px]">
         <main className="space-y-1">
-          {/* SECTION 2: Operational Overview Cards */}
+          {/* QUICK ACTION WORKSPACE: Interactive Operations Commands */}
           <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3">
-            <h2 className="mb-2 text-sm font-semibold text-white">Tổng quan Vận hành các Phân hệ</h2>
-            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-              <ModuleSummaryCard
-                title="Vật tư & Kho"
-                status="HOẠT ĐỘNG"
-                metric={`${fmt(filteredInventoryRows.length)} vị trí tồn`}
-                subtitle={`Giá trị: ${formatCurrencyVnd(inventoryValue)}`}
-                actionLabel="Xem kho ➔"
-                onAction={() => navigate('/inventory')}
-                icon={<Warehouse size={16} className="text-cyan-300" />}
-              />
-              <ModuleSummaryCard
-                title="Sản xuất & Cấu kiện"
-                status="XƯỞNG ĐANG CHẠY"
-                metric={`${fmt(filteredProductionOrders.length)} lệnh sản xuất`}
-                subtitle={`${fmt(runningMOs)} MO đang chạy tại xưởng`}
-                actionLabel="Xem xưởng ➔"
-                onAction={() => navigate('/production')}
-                icon={<Factory size={16} className="text-blue-300" />}
-              />
-              <ModuleSummaryCard
-                title="Công trình & WBS"
-                status="TIẾN ĐỘ TỐT"
-                metric={`${fmt(projectsList.length)} công trình`}
-                subtitle={`${fmt(activeProjectsCount)} dự án đang thi công`}
-                actionLabel="Xem dự án ➔"
-                onAction={() => navigate('/projects')}
-                icon={<Building2 size={16} className="text-emerald-300" />}
-              />
-              <ModuleSummaryCard
-                title="Kế hoạch tổng thể"
-                status="ĐÃ LẬP LỊCH"
-                metric="Lịch chạy 24h & MRP"
-                subtitle="Cân đối nguồn lực và vật tư thiếu"
-                actionLabel="Xem kế hoạch ➔"
-                onAction={() => navigate('/planning')}
-                icon={<CalendarClock size={16} className="text-cyan-300" />}
-              />
-              <ModuleSummaryCard
-                title="Vận chuyển & Điều xe"
-                status="ĐANG CHẠY TUYẾN"
-                metric={`${fmt(filteredDispatchOrders.length)} lượt vận chuyển`}
-                subtitle={`${fmt(deliveriesTodayCount)} chuyến hôm nay`}
-                actionLabel="Xem điều xe ➔"
-                onAction={() => navigate('/logistics')}
-                icon={<Truck size={16} className="text-amber-300" />}
-              />
-              <ModuleSummaryCard
-                title="Chất lượng & QC"
-                status={openQcIssuesCount > 0 ? 'CÓ CẢNH BÁO' : 'ĐẠT CHUẨN'}
-                metric={`${fmt(qcCockpit?.metrics?.passRate ?? 98)}% tỷ lệ Pass`}
-                subtitle={`${fmt(openQcIssuesCount)} NCR chưa khắc phục`}
-                actionLabel="Xem QC ➔"
-                onAction={() => navigate('/qc')}
-                icon={<ShieldCheck size={16} className="text-purple-300" />}
-              />
-            </div>
+            <h2 className="mb-2 text-sm font-semibold text-white">Bảng Quyết định & Chỉ huy Vận hành</h2>
+            {actionIssues.length > 0 ? (
+              <div className="grid gap-2 md:grid-cols-2">
+                {actionIssues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className={`rounded-xl border p-3 flex flex-col justify-between ${
+                      issue.priority === 'Critical'
+                        ? 'border-red-500/20 bg-red-950/[0.03]'
+                        : 'border-amber-500/20 bg-amber-950/[0.03]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="rounded bg-cyan-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-cyan-300">
+                          {issue.module}
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                            issue.priority === 'Critical' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
+                          }`}
+                        >
+                          {issue.priority.toUpperCase()}
+                        </span>
+                      </div>
+                      <h4 className="font-semibold text-white text-xs">{issue.title}</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{issue.description}</p>
+                      <div className="mt-2 text-[10px] text-slate-500 italic">
+                        <b>Khuyến nghị:</b> {issue.recommended}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-1.5 justify-end">
+                      <button
+                        type="button"
+                        onClick={issue.onSecondary}
+                        className="rounded bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10 transition"
+                      >
+                        {issue.secondaryLabel}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={issue.onPrimary}
+                        className="rounded bg-cyan-500/20 px-2.5 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/30 transition"
+                      >
+                        {issue.primaryLabel}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <CockpitEmptyState title="Vận hành an toàn" description="Hệ thống chưa ghi nhận sự cố hay nguy cơ tắc nghẽn nào." />
+            )}
           </section>
 
-          {/* SECTION 1 — Dedicated Operational Analytics Panels with Card-level Click Navigation */}
+          {/* OPERATIONAL QUEUE & EXECUTIVE CALENDAR */}
           <section className="grid gap-1 lg:grid-cols-2">
-            {/* 1. Production Trend Analytics */}
+            {/* Operational Work Queue */}
+            <CockpitChartCard
+              title="Hàng đợi Công việc điều hành"
+              action={
+                <div className="flex gap-1">
+                  {[
+                    { id: 'critical', label: 'Gấp' },
+                    { id: 'today', label: 'Hôm nay' },
+                    { id: 'week', label: 'Tuần này' },
+                    { id: 'completed', label: 'Hoàn thành' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setQueueTab(t.id as QueueTab)}
+                      className={`h-6 rounded px-2 text-[10px] transition ${
+                        queueTab === t.id ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 font-semibold' : 'text-slate-400'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              }
+              heightClass="h-[250px]"
+            >
+              {queueItems[queueTab].length > 0 ? (
+                <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+                  {queueItems[queueTab].map((item: any) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between rounded-lg border border-white/5 bg-slate-950/20 p-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`h-1.5 w-1.5 rounded-full ${item.tone === 'red' ? 'bg-red-400' : item.tone === 'cyan' ? 'bg-cyan-400' : item.tone === 'blue' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+                        <span className="font-semibold text-white truncate max-w-[220px]">{item.title}</span>
+                      </div>
+                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-slate-400">{item.module}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <CockpitEmptyState title="Hàng đợi trống" description="Không có công việc nào trong danh mục này." />
+              )}
+            </CockpitChartCard>
+
+            {/* Executive Calendar */}
+            <CockpitChartCard title="Lịch trình & Thời hạn Giao vận" heightClass="h-[250px]">
+              {calendarAgenda.length > 0 ? (
+                <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+                  {calendarAgenda.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between rounded-lg border border-white/5 bg-slate-950/20 p-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-sm ${item.tone === 'cyan' ? 'bg-cyan-400' : item.tone === 'blue' ? 'bg-blue-400' : 'bg-purple-400'}`} />
+                        <span className="text-white truncate max-w-[200px]">{item.title}</span>
+                      </div>
+                      <span className="text-slate-450 font-mono text-[10px] shrink-0">{item.time}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <CockpitEmptyState title="Trống lịch trình" description="Không phát hiện lịch điều xe kế hoạch hôm nay." />
+              )}
+            </CockpitChartCard>
+          </section>
+
+          {/* Operational Analytics Trend Panels */}
+          <section className="grid gap-1 lg:grid-cols-2">
             <div onClick={() => navigate('/analytics?domain=production')} className="cursor-pointer block">
               <CockpitChartCard
                 title="Phân bố Trạng thái Sản xuất"
@@ -564,7 +785,6 @@ export function DashboardPage() {
               </CockpitChartCard>
             </div>
 
-            {/* 2. Logistics Trend Analytics */}
             <div onClick={() => navigate('/analytics?domain=logistics')} className="cursor-pointer block">
               <CockpitChartCard
                 title="Trạng thái Chuyến vận chuyển"
@@ -581,93 +801,68 @@ export function DashboardPage() {
                 )}
               </CockpitChartCard>
             </div>
-
-            {/* 3. Project Trend Analytics */}
-            <div onClick={() => navigate('/analytics?domain=projects')} className="cursor-pointer block">
-              <CockpitChartCard
-                title="Phân bố Tiến độ Dự án"
-                className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
-                heightClass="h-[220px]"
-              >
-                {projectsList.length > 0 ? (
-                  <ProjectStatusDistribution projects={projectsList} />
-                ) : (
-                  <CockpitEmptyState
-                    title="Chưa có công trình"
-                    description="Dữ liệu tổng hợp dự án sẽ hiển thị khi khởi tạo WBS."
-                  />
-                )}
-              </CockpitChartCard>
-            </div>
-
-            {/* 4. QC Inspection Trend Analytics */}
-            <div onClick={() => navigate('/analytics?domain=qc')} className="cursor-pointer block">
-              <CockpitChartCard
-                title="Chỉ số Kiểm định QC"
-                className="hover:border-cyan-400/25 transition hover:bg-white/[0.02]"
-                heightClass="h-[220px]"
-              >
-                {qcCockpit?.metrics ? (
-                  <QcMetricsDistribution metrics={qcCockpit.metrics} />
-                ) : (
-                  <CockpitEmptyState
-                    title="Chưa có lịch sử QC"
-                    description="Dữ liệu kiểm định sẽ xuất hiện khi có lượt QC phát sinh."
-                  />
-                )}
-              </CockpitChartCard>
-            </div>
           </section>
         </main>
 
-        {/* RIGHT SIDEBAR: Notifications, Activities, Health & Quick Actions */}
+        {/* RIGHT SIDEBAR: Personal Task, Recommendations, Notifications, Activities, Health */}
         <aside className="space-y-1">
-          {/* Quick Actions Navigation Shortcuts */}
-          <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3">
-            <h3 className="mb-2 text-sm font-semibold text-white">Thao tác Nhanh</h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => navigate('/inventory/inbound')}
-                className="flex items-center gap-1.5 rounded-lg border border-cyan-300/10 bg-slate-950/45 p-2 text-xs font-medium text-slate-200 hover:bg-cyan-500/10 hover:text-cyan-300 transition"
-              >
-                <Warehouse size={14} className="text-cyan-300 shrink-0" /> Nhập kho
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/logistics/dispatch')}
-                className="flex items-center gap-1.5 rounded-lg border border-cyan-300/10 bg-slate-950/45 p-2 text-xs font-medium text-slate-200 hover:bg-cyan-500/10 hover:text-cyan-300 transition"
-              >
-                <Truck size={14} className="text-amber-300 shrink-0" /> Điều xe
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/production')}
-                className="flex items-center gap-1.5 rounded-lg border border-cyan-300/10 bg-slate-950/45 p-2 text-xs font-medium text-slate-200 hover:bg-cyan-500/10 hover:text-cyan-300 transition"
-              >
-                <Factory size={14} className="text-blue-300 shrink-0" /> Tạo lệnh MO
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/projects')}
-                className="flex items-center gap-1.5 rounded-lg border border-cyan-300/10 bg-slate-950/45 p-2 text-xs font-medium text-slate-200 hover:bg-cyan-500/10 hover:text-cyan-300 transition"
-              >
-                <Building2 size={14} className="text-emerald-300 shrink-0" /> Dự án mới
-              </button>
+          {/* PERSONAL TASK PANEL */}
+          <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3 space-y-2">
+            <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Cá nhân & Phê duyệt</h3>
+            <div className="space-y-1.5 text-xs text-slate-350">
+              <div className="flex items-center justify-between rounded-lg bg-slate-900/40 p-2">
+                <span className="flex items-center gap-1.5">
+                  <CheckSquare size={13} className="text-cyan-300" /> Ký nghiệm thu QC Lô #928
+                </span>
+                <span className="rounded bg-red-500/20 px-1 text-[9px] text-red-300">Gấp</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-slate-900/40 p-2">
+                <span className="flex items-center gap-1.5">
+                  <CheckSquare size={13} className="text-cyan-300" /> Duyệt chuyến Logistics Đơn vị 1
+                </span>
+                <span className="rounded bg-amber-500/20 px-1 text-[9px] text-amber-300">Chờ duyệt</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1 pt-1 border-t border-white/5">
+                <Star size={11} className="text-amber-400 shrink-0" /> Favorites: Lịch bốc dỡ Slots B
+              </div>
             </div>
           </section>
 
-          {/* SECTION 3 — Notifications Center */}
+          {/* SMART RECOMMENDATIONS PANEL */}
+          <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3 space-y-2">
+            <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Khuyến nghị MRP</h3>
+            {lowStockItems.length > 0 ? (
+              <div className="space-y-2">
+                {lowStockItems.slice(0, 1).map((item) => (
+                  <div key={item.id} className="rounded-lg border border-cyan-300/10 bg-slate-950/45 p-2.5 text-xs">
+                    <span className="font-semibold text-white block">Đặt hàng mua {item.code}</span>
+                    <p className="text-[11px] text-slate-400 mt-1">Số dư tồn kho giảm xuống {fmt(item.quantity)}, đề xuất mua thêm lượng tối ưu.</p>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/procurement')}
+                      className="mt-2 text-[10px] font-semibold text-cyan-300 hover:underline"
+                    >
+                      Duyệt lập kế hoạch PO ➔
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-550 italic p-1">Hệ thống chưa ghi nhận rủi ro vật tư nào.</div>
+            )}
+          </section>
+
+          {/* Trung tâm Cảnh báo & Thông báo */}
           <CockpitChartCard title="Trung tâm Cảnh báo & Thông báo" className="h-[250px]">
             <StructuredNotificationCenter notifications={structuredNotifications} onNavigate={(path) => navigate(path)} />
           </CockpitChartCard>
 
-          {/* SECTION 2 — Unified Recent Activities Feed (Grouped by Today, Yesterday, Earlier) */}
+          {/* Nhật ký Hoạt động Hợp nhất */}
           <CockpitChartCard title="Nhật ký Hoạt động Hợp nhất" className="h-[270px]">
             <UnifiedActivityTimeline groups={groupedActivities} onNavigate={(path) => path && navigate(path)} />
           </CockpitChartCard>
 
-          {/* System Health Details with click navigation to system settings/logs */}
+          {/* System Health Details with click navigation */}
           <div onClick={() => navigate('/analytics?domain=admin')} className="cursor-pointer block">
             <CockpitChartCard
               title="Trạng thái Dịch vụ System"
@@ -686,51 +881,6 @@ export function DashboardPage() {
         </aside>
       </div>
     </EnterpriseWorkspace>
-  )
-}
-
-function ModuleSummaryCard({
-  title,
-  status,
-  metric,
-  subtitle,
-  actionLabel,
-  onAction,
-  icon,
-}: {
-  title: string
-  status: string
-  metric: string
-  subtitle: string
-  actionLabel: string
-  onAction: () => void
-  icon: React.ReactNode
-}) {
-  return (
-    <div className="rounded-xl border border-cyan-300/10 bg-slate-950/45 p-3 flex flex-col justify-between hover:border-cyan-300/25 transition">
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            {icon}
-            <span className="font-semibold text-white text-xs">{title}</span>
-          </div>
-          <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-mono text-cyan-300">
-            {status}
-          </span>
-        </div>
-        <div className="text-base font-bold text-cyan-200 font-mono">{metric}</div>
-        <div className="text-[11px] text-slate-400 mt-1">{subtitle}</div>
-      </div>
-      <div className="mt-3 text-right">
-        <button
-          type="button"
-          onClick={onAction}
-          className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200 transition"
-        >
-          {actionLabel}
-        </button>
-      </div>
-    </div>
   )
 }
 
