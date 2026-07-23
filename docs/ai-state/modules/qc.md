@@ -1,5 +1,18 @@
 # QC Module
 
+## Production Defect Recording Additive Fields
+
+Implemented on 2026-07-23.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+QC NCR creation now accepts additive defect context for production failures:
+defect type, defect category, root cause, responsible party, machine,
+workstation, shift, image URLs and disposition (`REWORK`, `SCRAP`,
+`USE_AS_IS`). The data is persisted in existing NCR fields/metadata and uses
+existing attachments for traceability. No schema, migration, Production
+redesign, Inventory redesign or Component lifecycle redesign was introduced.
+
 ## EPIC QC001 Enterprise Quality Command Center
 
 Status: **IMPLEMENTED - VISUAL QA PENDING** (2026-07-18)

@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
-import { ComponentStatus, Prisma, ProductionOrderStatus } from '@prisma/client';
+import {
+  ComponentLifecycleState,
+  ComponentStatus,
+  Prisma,
+  ProductionOrderStatus,
+} from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import type {
@@ -240,6 +245,27 @@ export class ComponentsReadModelRepository {
   ): Prisma.ComponentWhereInput {
     const search = query.search || query.q;
     const statuses = this.componentStatuses(query.status);
+    const and: Prisma.ComponentWhereInput[] = [];
+
+    if (query.status === 'Tồn kho') {
+      and.push({
+        OR: [
+          { lifecycleState: null },
+          { lifecycleState: { not: ComponentLifecycleState.DRAFT } },
+        ],
+      });
+    }
+
+    if (query.location) {
+      and.push({
+        OR: [
+          { floor: { contains: query.location, mode: 'insensitive' } },
+          { zone: { contains: query.location, mode: 'insensitive' } },
+          { position: { contains: query.location, mode: 'insensitive' } },
+        ],
+      });
+    }
+
     return {
       status: statuses?.length ? { in: statuses } : undefined,
       project: query.project
@@ -253,17 +279,7 @@ export class ComponentsReadModelRepository {
       description: query.type
         ? { contains: query.type, mode: 'insensitive' }
         : undefined,
-      AND: query.location
-        ? [
-            {
-              OR: [
-                { floor: { contains: query.location, mode: 'insensitive' } },
-                { zone: { contains: query.location, mode: 'insensitive' } },
-                { position: { contains: query.location, mode: 'insensitive' } },
-              ],
-            },
-          ]
-        : undefined,
+      AND: and.length ? and : undefined,
       OR: search
         ? [
             { code: { contains: search, mode: 'insensitive' } },
@@ -367,7 +383,7 @@ export class ComponentsReadModelRepository {
         installAxis: source.installAxis,
         installLevel: source.installLevel,
         installPosition: source.installPosition,
-        status: this.listStatus(source.status),
+        status: this.listStatus(source.status, source.lifecycleState),
         rawStatus: source.status,
         qty: quantity,
         qc:
@@ -411,7 +427,7 @@ export class ComponentsReadModelRepository {
           : [source.floor, source.zone, source.position]
               .filter(Boolean)
               .join(' / ') || 'Kho cấu kiện',
-        status: this.overviewStatus(source.status),
+        status: this.overviewStatus(source.status, source.lifecycleState),
         rawStatus: source.status,
         quantity: Number(metadata.quantity ?? 1),
         qcQuantity: Number(
@@ -609,6 +625,7 @@ export class ComponentsReadModelRepository {
   private async overviewAggregatesFromDb() {
     const [
       statusGroups,
+      finishedGoods,
       metadataGroups,
       projects,
       floors,
@@ -616,6 +633,15 @@ export class ComponentsReadModelRepository {
       activity,
     ] = await Promise.all([
       this.prisma.component.groupBy({ by: ['status'], _count: true }),
+      this.prisma.component.count({
+        where: {
+          status: ComponentStatus.STOCK,
+          OR: [
+            { lifecycleState: null },
+            { lifecycleState: { not: ComponentLifecycleState.DRAFT } },
+          ],
+        },
+      }),
       this.prisma.$queryRaw<
         Array<{ type: string; profile: string; quantity: number }>
       >`
@@ -675,7 +701,7 @@ export class ComponentsReadModelRepository {
           ComponentStatus.WELDING,
           ComponentStatus.PAINTING,
         ]),
-        stock: count([ComponentStatus.STOCK]),
+        stock: finishedGoods,
         qcPass: count([ComponentStatus.READY]),
         qcFail: 0,
         transferring: count([ComponentStatus.SHIPPED]),
@@ -717,7 +743,11 @@ export class ComponentsReadModelRepository {
     }
   }
 
-  private listStatus(status: ComponentStatus) {
+  private listStatus(
+    status: ComponentStatus,
+    lifecycleState?: ComponentLifecycleState | null,
+  ) {
+    if (lifecycleState === ComponentLifecycleState.DRAFT) return 'Draft';
     return {
       STOCK: 'Tồn kho',
       CUTTING: 'Đang SX',
@@ -730,7 +760,11 @@ export class ComponentsReadModelRepository {
     }[status];
   }
 
-  private overviewStatus(status: ComponentStatus) {
+  private overviewStatus(
+    status: ComponentStatus,
+    lifecycleState?: ComponentLifecycleState | null,
+  ) {
+    if (lifecycleState === ComponentLifecycleState.DRAFT) return 'Draft';
     return {
       STOCK: 'Tồn kho',
       CUTTING: 'Đang SX',

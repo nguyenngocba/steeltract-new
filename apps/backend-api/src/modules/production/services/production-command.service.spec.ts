@@ -1,5 +1,8 @@
 import { ConflictException } from '@nestjs/common';
 import {
+  ComponentBomDefinitionState,
+  ComponentLifecycleState,
+  ComponentRevisionState,
   ProductionExecutionState,
   ProductionOrderKind,
   ProductionOrderStatus,
@@ -9,6 +12,22 @@ import {
 import { InventoryPostingService } from '../../inventory/inventory-posting.service';
 import { ProductionOrderRepository } from '../repositories/production-order.repository';
 import { ProductionCommandService } from './production-command.service';
+
+const releasedEngineeringBasis = {
+  id: 'component-1',
+  lifecycleState: ComponentLifecycleState.ACTIVE,
+  currentRevisionId: 'revision-1',
+  currentRevision: {
+    id: 'revision-1',
+    state: ComponentRevisionState.RELEASED,
+    contentHash: 'a'.repeat(64),
+    bomDefinition: {
+      id: 'bom-definition-1',
+      state: ComponentBomDefinitionState.RELEASED,
+      contentHash: 'a'.repeat(64),
+    },
+  },
+};
 
 describe('ProductionCommandService', () => {
   it('creates the aggregate, timeline, audit and canonical Outbox atomically', async () => {
@@ -26,6 +45,9 @@ describe('ProductionCommandService', () => {
     const repository = {
       transaction: jest.fn(async (callback) => callback(tx)),
       findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReleasedEngineeringBasis: jest
+        .fn()
+        .mockResolvedValue(releasedEngineeringBasis),
       createAggregateOrder: jest.fn().mockResolvedValue(order),
       createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
       createActivity: jest.fn().mockResolvedValue({ id: 'activity-1' }),
@@ -98,6 +120,17 @@ describe('ProductionCommandService', () => {
     const repository = {
       transaction: jest.fn(async (callback) => callback(tx)),
       findOutboxEvent: jest.fn(async (key: string) => outbox.get(key) ?? null),
+      findReleasedEngineeringBasis: jest.fn().mockResolvedValue({
+        ...releasedEngineeringBasis,
+        currentRevision: {
+          ...releasedEngineeringBasis.currentRevision,
+          contentHash: 'b'.repeat(64),
+          bomDefinition: {
+            ...releasedEngineeringBasis.currentRevision.bomDefinition,
+            contentHash: 'b'.repeat(64),
+          },
+        },
+      }),
       findAggregate: jest.fn().mockResolvedValue(order),
       createAggregateOrder: jest.fn().mockResolvedValue(order),
       createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
@@ -138,6 +171,48 @@ describe('ProductionCommandService', () => {
     await expect(
       service.createOrder({ ...command, title: 'Different command' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects Production Order creation before Engineering release', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReleasedEngineeringBasis: jest.fn().mockResolvedValue({
+        ...releasedEngineeringBasis,
+        lifecycleState: ComponentLifecycleState.DRAFT,
+        currentRevisionId: null,
+        currentRevision: null,
+      }),
+      createAggregateOrder: jest.fn(),
+      createOutboxEvent: jest.fn(),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+    );
+
+    await expect(
+      service.createOrder({
+        orderNo: 'PO-DRAFT',
+        title: 'Draft component order',
+        quantity: 1,
+        unit: 'pcs',
+        actorId: 'operator-1',
+        idempotencyKey: 'create-po-draft',
+        engineeringBasis: {
+          componentId: 'component-1',
+          componentRevisionId: 'revision-1',
+          bomDefinitionId: 'bom-definition-1',
+          contentHash: 'a'.repeat(64),
+          verifiedAt: '2026-07-17T08:00:00.000Z',
+        },
+      }),
+    ).rejects.toThrow(
+      'Component must be released by Engineering before Production Order creation',
+    );
+    expect(repository.createAggregateOrder).not.toHaveBeenCalled();
+    expect(repository.createOutboxEvent).not.toHaveBeenCalled();
   });
 
   it('returns Conflict and writes no event when expectedVersion is stale', async () => {

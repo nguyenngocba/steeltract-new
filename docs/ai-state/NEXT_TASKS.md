@@ -1,5 +1,74 @@
 # Next Tasks
 
+- **Component Manufacturing Workflow Sprint B**: formalize Engineering BOM line
+  payloads for raw material, plate, bolt, paint, consumables, waste,
+  alternatives, revision and effective date using existing Component BOM
+  definition storage where possible.
+- **Component Manufacturing Workflow Sprint C-D**: connect Production Order
+  creation to material reservation and issue gates. Reservation should reduce
+  available quantity only; production start must require issued material.
+- **Component Manufacturing Workflow Sprint E-H**: harden Production execution,
+  QC disposition and Finished Goods gating so only QC-passed components enter
+  Component Inventory.
+- **Component Manufacturing Workflow Sprint I-J**: align Yard and Delivery
+  movement gates for finished goods through Yard location, loading, delivery
+  and installation.
+- **Components UI polish Sprint 5**: refactor Create/Edit Component,
+  Production Order, QC and Component Detail forms with shared Enterprise Form
+  primitives. Keep backend/API/schema unchanged.
+- **Component operational lifecycle schema decision**: decide whether the
+  requested full operational states (`WAITING_BOM`, `READY_FOR_PRODUCTION`,
+  `QC_FAILED`, `REWORK`, `FINISHED_GOODS`, `YARD`) should become a new enum or
+  remain mapped through existing status plus lifecycle metadata.
+- **QC defect analytics follow-up**: after real NCR defect metadata is used in
+  operations, design read-model aggregation for top defect types, machines,
+  workstations and shifts.
+- **Executive Historical Dashboard browser QA**: open `/history` with an
+  authenticated session and seeded snapshots. Verify every tab, filter,
+  empty-state path, pagination control and snapshot-job status table against
+  real Historical API responses.
+- **Executive Historical Dashboard data coverage review**: identify which
+  requested charts still render empty because the Historical API exposes only a
+  single daily snapshot lookup rather than a daily range endpoint. Do not add
+  synthetic trend data.
+- **Historical Dashboard Read API staging QA**: call every `/history/*`
+  endpoint with seeded snapshots and real JWT auth, verifying 404 behavior for
+  missing dates, latest authoritative lookup, warehouse scope filtering,
+  pagination and safe Decimal/BigInt JSON serialization.
+- **Historical Dashboard frontend adoption planning**: after API staging QA,
+  define the frontend date-filter integration plan. Do not wire Executive
+  Dashboard historical mode until read API responses are validated against
+  seeded production-like snapshots.
+- **Historical Snapshot Engine staging hardening QA**: run two or more backend
+  worker instances against PostgreSQL with seeded `SnapshotMetadata`, then
+  verify advisory-lock scheduling, `snapshotType` job coexistence, failed-job
+  retry backoff, expired lease recovery and forward-only metadata under real
+  concurrency.
+- **Historical Snapshot Engine historical correctness QA**: verify dashboards
+  only treat current-day read-model snapshots as authoritative until true
+  historical reconstruction is implemented. Historical snapshots generated
+  from current read models must remain stale/non-authoritative.
+- **Historical Snapshot Engine batch-size tuning**: tune
+  `HISTORICAL_SNAPSHOT_BATCH_SIZE` in staging using real inventory volume and
+  monitor query latency, lease renewal cadence and memory usage.
+- **Historical Dashboard metadata seed/migration gate**: before enabling the
+  engine in a real environment, deploy the reviewed schema migration and seed
+  `SnapshotMetadata` rows for `dashboard_daily`,
+  `inventory_balance_daily`, `monthly_rollup` and
+  `inventory_monthly_rollup`.
+- **Historical Dashboard engine integration QA**: run the worker against a
+  staging database with seeded metadata and verify lease recovery, failed job
+  retry, idempotent snapshot upserts and monthly rollup creation on a month
+  boundary.
+- **Historical Dashboard create-only migration**: generate a create-only Prisma
+  migration from the hardened schema, then replace/review generated DDL for
+  PostgreSQL partitioning before deployment. Preserve the new enum-backed
+  fields and non-null inventory bucket keys.
+- **Historical Dashboard raw SQL migration review**: generate the Prisma
+  migration with `--create-only`, then add/review PostgreSQL partition DDL,
+  CHECK constraints, partial indexes, covering indexes and GIN indexes from
+  `docs/runtime/historical-dashboard-prisma-migration-plan.md` before any
+  deployment.
 - **Inventory Add Material date QA**: create a new material with a backdated
   `Ngày thêm` value and confirm Materials analytics use the persisted
   `createdAt` fallback when no transaction history exists.
@@ -957,3 +1026,28 @@ Backlog after the locked order:
    the documented sequence.
 2. Treat P0 items in `MASTER_BACKLOG.md` as blockers before certifying any
    downstream module as visually production-ready.
+
+# Sprint 5 Historical Dashboard QA Follow-up
+
+1. Run authenticated live smoke against a seeded staging API for:
+   `/history/dashboard`, `/history/dashboard/latest`,
+   `/history/dashboard/monthly`, `/history/inventory`,
+   `/history/inventory/monthly` and `/history/jobs`.
+2. Capture browser runtime console/network traces for `/history` once staging
+   snapshots exist, including 404/500/offline retry behavior.
+3. Decide whether Historical tables need server-side sorting/sticky-header
+   parity in a later UI/API sprint; Sprint 5 intentionally did not change API
+   contracts.
+4. Clean the project-wide frontend ESLint baseline separately, especially
+   archived/legacy parse errors, so future sprint lint gates can run globally.
+
+# Warehouse Realtime Follow-up
+
+1. Add a dedicated realtime Inventory read endpoint only if staging shows the
+   current three-endpoint polling path is too expensive.
+2. Define and approve a lightweight WebSocket signal contract before replacing
+   polling with push updates.
+3. Add authoritative warehouse capacity and slot/zone utilization read models
+   before certifying over-capacity alerts as operationally authoritative.
+4. Continue reducing the remaining frontend lint warnings so legacy-debt rules
+   can be promoted from warning back to error over time.

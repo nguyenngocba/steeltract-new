@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { ComponentStatus, Prisma } from '@prisma/client';
+import { ComponentLifecycleState, ComponentStatus, Prisma } from '@prisma/client';
 
 import {
   CreateComponentDto,
@@ -126,7 +126,7 @@ export class ComponentsService {
         this.repository.countByProject(projectId),
         this.repository.countByProject(projectId, ComponentStatus.INSTALLED),
         this.repository.countByProject(projectId, ComponentStatus.DELIVERED),
-        this.repository.countByProject(projectId, ComponentStatus.STOCK),
+        this.repository.countFinishedGoodsByProject(projectId),
         this.repository.countInstalledTodayByProject(projectId, today),
       ]);
 
@@ -149,7 +149,9 @@ export class ComponentsService {
           floor: dto.floor,
           zone: dto.zone,
           position: dto.position,
-          status: dto.status,
+          status: dto.status ?? ComponentStatus.STOCK,
+          lifecycleState: ComponentLifecycleState.DRAFT,
+          aggregateVersion: 1,
           installedDate:
             dto.status === ComponentStatus.INSTALLED ? new Date() : undefined,
           imageUrl: dto.imageUrl,

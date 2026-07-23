@@ -1,5 +1,82 @@
 # Project Status
 
+On 2026-07-23 started the Component Manufacturing Workflow epic and completed
+Sprint A. Production Order creation is now gated by Engineering Release:
+component-bound orders require an ACTIVE engineering-released Component with a
+current released revision, and the canonical command API validates the released
+BOM definition plus content hash before creating the order. This reuses the
+existing Component aggregate/revision/BOM schema and introduces no migration,
+Inventory redesign, Production UI redesign, Historical Dashboard change,
+Snapshot Engine change or Warehouse Realtime change.
+
+On 2026-07-23 completed Production Order creation and Component lifecycle
+hardening. The Production create form now submits new orders as canonical
+`DRAFT` orders, matching backend validation and AD-017 lifecycle rules. Legacy
+Component creation now assigns canonical draft lifecycle metadata, and
+Components read models no longer count draft components as finished-goods
+stock. QC NCR creation accepts additive defect context fields and stores them
+in existing metadata for traceability. No schema, migration, Inventory,
+Historical Dashboard, Snapshot Engine or Historical API changes were made.
+
+On 2026-07-23 completed Sprint 4 Executive Historical Dashboard UI. Added the
+frontend `/history` workspace with typed Historical API client functions,
+TanStack Query hooks, Overview/Inventory/Production/Projects/Suppliers/Snapshot
+Jobs tabs, date range/module/warehouse/authoritative filters, KPI cards,
+historical chart panels, inventory/monthly rollup tables and snapshot job
+monitoring. The page uses existing Industrial Cockpit/shared UI components and
+does not use mock data; unavailable datasets render standard empty states.
+Backend, Prisma, Snapshot Engine, Scheduler and Job Queue were not changed.
+
+On 2026-07-23 completed the Project Maintenance and Warehouse Realtime
+Dashboard sprint. Frontend CI now has a working Vitest setup, jsdom test
+environment, Historical Dashboard smoke tests, active-source lint traversal and
+Vite vendor chunk splitting. Archived/backup/quarantine frontend code no
+longer blocks lint. A new frontend-only `/warehouse-realtime` cockpit reads the
+existing Inventory overview, material and transaction endpoints with polling
+for realtime KPIs, warehouse utilization, recent movement, alerts and timeline.
+No backend, schema, Historical Dashboard, Snapshot Engine or Historical API
+code changed.
+
+On 2026-07-22 completed Sprint 3 Historical Dashboard Read API. Added a
+read-only `/history` backend module with controller, service, repository and
+strict Zod query DTOs for dashboard snapshots, latest authoritative snapshots,
+monthly rollups, inventory historical snapshots, inventory monthly rollups and
+snapshot jobs. Responses are DTO-safe and serialize Date, Decimal and BigInt
+values. Snapshot Engine, Scheduler, Job Queue, Prisma schema, migrations,
+frontend and business behavior were not changed.
+
+On 2026-07-22 completed Sprint 2.2 Historical Snapshot Engine Production
+Hardening. The backend engine now uses `snapshotType` in job identity, atomic
+advisory-lock scheduling, retry-aware failed job reuse, forward-only metadata
+updates, non-authoritative marking for stale historical snapshots, one-job
+lease-safe processing, expired max-attempt cleanup and cursor-batched inventory
+snapshot generation. No schema, migration, API, controller, frontend,
+authentication or business behavior changed.
+
+On 2026-07-22 implemented Sprint 2 of the Historical Dashboard: the Snapshot
+Engine. The backend now has a metadata-driven historical snapshot worker that
+schedules daily jobs, claims `SnapshotJob` rows with leases, recovers expired
+leases, retries failures up to `maxAttempts`, logs to `SnapshotJobLog`, updates
+job metrics and idempotently writes dashboard, inventory balance and monthly
+rollup snapshots. No schema, migration, API, controller, service contract,
+frontend or business workflow changed.
+
+On 2026-07-22 hardened the Historical Dashboard Prisma schema. Historical
+Dashboard free-text lifecycle/module fields now use dedicated Prisma enums,
+daily historical tables use single-column UUID primary keys for Prisma Client
+stability, and inventory daily/monthly uniqueness now uses non-null bucket keys
+instead of nullable location/warehouse fields. No Snapshot Engine, API,
+services, frontend code or existing business tables were changed.
+
+On 2026-07-22 implemented the Historical Dashboard Prisma Schema Foundation.
+The backend Prisma schema now has additive models for the approved Historical
+Executive Dashboard storage layer: dashboard snapshots, inventory balance
+snapshots, monthly rollups, snapshot jobs, job logs, rebuild requests and
+snapshot metadata. Existing business tables, services, APIs and frontend code
+were not changed. PostgreSQL-specific partitioning, check constraints, partial
+indexes, covering indexes and GIN indexes remain documented raw SQL migration
+steps.
+
 On 2026-07-22 implemented the Inventory Material Created Date input. The Add
 Material drawer now shows a compact `Ngày thêm` date-time picker beside the
 `Thêm vật tư mới` header, and create-material requests persist that value to
@@ -1180,3 +1257,24 @@ available; EPIC144 did not invent missing workflows.
 - Hero grid/right rail/bottom analytics structural parity: PASS.
 - Final source-level visual parity checklist: PASS.
 - Backend/API/query/business changes: NONE.
+
+# Sprint 5 Historical Dashboard Integration QA
+
+- `/history` route load/build integration: PASS.
+- Historical API DTO/client/query wiring: PASS by source audit and build.
+- Active-tab TanStack Query gating: PASS; jobs tab no longer fans out to
+  dashboard/inventory reads.
+- Loading/empty states: PASS for visible module states; skeleton-specific polish
+  remains optional UI debt.
+- Error handling: PASS; active failed queries render a retryable error panel.
+- Charts empty-data crash safety: PASS by source audit; empty arrays are stable.
+- Tables pagination: PASS; sorting/sticky-header certification remains
+  WARNING because the current read API/UI does not expose a full sortable table
+  contract.
+- Backend regression: PASS, 74/74 suites and 201/201 tests.
+- Backend build: PASS.
+- Frontend build: PASS.
+- Scoped Historical Dashboard lint: PASS.
+- Full frontend lint: WARNING, blocked by pre-existing archived/legacy baseline
+  errors outside Historical Dashboard.
+- Prisma/schema/migration changes: NONE in Sprint 5.

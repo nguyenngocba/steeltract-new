@@ -19,7 +19,17 @@
 🚧 Logistics
 🚧 Users / Roles / System Logs
 🚧 Operations Center
+🚧 Historical Dashboard
+🚧 Warehouse Realtime Dashboard
 
+- Historical Dashboard now has a frontend `/history` workspace consuming the
+  read-only Historical API. It provides historical filters, KPI cards, chart
+  panels, inventory/monthly rollup tables and snapshot job visibility. Browser
+  QA with seeded snapshots remains pending.
+- Warehouse Realtime Dashboard now has a frontend `/warehouse-realtime`
+  cockpit under Inventory navigation. It reads existing Inventory overview,
+  material and transaction endpoints with TanStack Query polling; no backend,
+  schema, Historical Dashboard, Snapshot Engine or Historical API code changed.
 - Projects is now a Core Platform Architecture Freeze Candidate after EPIC115: Project service persistence routes through `ProjectsRepository`, dashboard/runtime reads are snapshot-first with fallback, mutations publish persistent `project.*` events, and Operations Center exposes Project Platform Health. Final freeze remains pending persisted Project Detail tab snapshots.
 - Production now exposes its AD-017/019 aggregate through the additive
   `/production/commands` API with durable idempotency and optimistic

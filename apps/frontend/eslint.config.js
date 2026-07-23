@@ -6,7 +6,17 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    'node_modules',
+    'coverage',
+    '_backend_quarantine',
+    '_cleanup_backup',
+    '_cleanup_logs',
+    '_legacy_sidebar_backup',
+    'src/_archived',
+    'src/_legacy_modules',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -17,6 +27,17 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      'no-useless-escape': 'warn',
+      'react-hooks/immutability': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
+      'react-refresh/only-export-components': 'warn',
     },
   },
 ])

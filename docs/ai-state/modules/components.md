@@ -1,5 +1,38 @@
 # Components Module
 
+## Component Manufacturing Workflow Sprint A
+
+Implemented on 2026-07-23.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+- Existing Component aggregate lifecycle is now used as the Engineering Release
+  authority for manufacturing.
+- `ComponentLifecycleState.DRAFT` represents unreleased engineering work.
+- `ComponentLifecycleState.ACTIVE` with a current released Component Revision
+  and released BOM definition represents `Released for Production`.
+- Production Order creation now refuses unreleased Components, preventing Draft
+  engineering records from entering manufacturing.
+- No Component schema change was required for Sprint A; later workflow states
+  remain scheduled for Sprint B-J decisions/implementation.
+
+## Component Draft Lifecycle Hardening
+
+Implemented on 2026-07-23.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+- Legacy Component creation now assigns `ComponentLifecycleState.DRAFT` and
+  `aggregateVersion=1`, aligning it with the canonical Components command
+  service.
+- Components read models now label draft components as `Draft`.
+- Draft components are excluded from finished-goods stock counts in Components
+  overview/project KPI paths.
+- Existing legacy components with `lifecycleState=null` remain readable for
+  compatibility.
+- Full operational lifecycle states beyond the current schema remain a pending
+  architecture/schema decision.
+
 ## EPIC 2 Components Completion
 
 Implemented on 2026-07-21.

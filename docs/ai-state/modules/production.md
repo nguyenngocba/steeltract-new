@@ -1,5 +1,40 @@
 # Production Module
 
+## Component Manufacturing Workflow Sprint A
+
+Implemented on 2026-07-23.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+- Production Order creation now enforces the Engineering Release gate for
+  component-bound orders.
+- Legacy `POST /production` requires the selected Component to be
+  engineering-released (`ComponentLifecycleState.ACTIVE`) with a current
+  revision before order creation.
+- Canonical `/production/commands/orders` validates the released engineering
+  basis: Component lifecycle, current revision, released revision, released BOM
+  definition and matching content hash.
+- This preserves the approved Production lifecycle and keeps new orders in
+  `DRAFT`; release/start remain separate lifecycle commands.
+- No Inventory, Historical Dashboard, Snapshot Engine, Warehouse Realtime,
+  Prisma schema or Production UI changes were made.
+
+## Production Order Creation Fix
+
+Implemented on 2026-07-23.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+- Production create UI now sends canonical `DRAFT` status to the legacy
+  `POST /production` endpoint.
+- Backend create validation remains unchanged and still rejects non-DRAFT
+  create requests.
+- Root cause was a frontend/backend lifecycle contract mismatch:
+  `ManufacturingOrderModal` sent legacy `PLANNED`, while AD-017 state machine
+  requires `DRAFT -> RELEASED -> READY -> IN_PROGRESS`.
+- No Production schema, repository redesign, Inventory workflow or API route
+  changes were made.
+
 ## EPIC 3.1 Production UI Polish
 
 Implemented on 2026-07-21.

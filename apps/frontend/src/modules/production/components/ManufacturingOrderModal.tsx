@@ -58,7 +58,7 @@ export function ManufacturingOrderModal({ components, boms, initialComponentId =
         bomId: selectedBom.id,
         quantity: parsedQuantity,
         priority,
-        status: 'PLANNED',
+        status: 'DRAFT',
         plannedStartAt: start || undefined,
         plannedEndAt: due || undefined,
       })

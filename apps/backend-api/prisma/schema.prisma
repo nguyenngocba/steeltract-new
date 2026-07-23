@@ -553,6 +553,92 @@ enum AnalyticsPredictionStatus {
   EXPIRED
 }
 
+enum HistoricalDashboardModule {
+  ERP
+  INVENTORY
+  COMPONENTS
+  PRODUCTION
+  PROJECTS
+  SUPPLIERS
+  QC
+  DISPATCH
+  LOGISTICS
+  YARD
+}
+
+enum HistoricalSnapshotScopeType {
+  GLOBAL
+  MODULE
+  WAREHOUSE
+  PROJECT
+  SUPPLIER
+  PRODUCTION_AREA
+  QUALITY_AREA
+  DISPATCH_AREA
+  CUSTOM
+}
+
+enum HistoricalSnapshotGranularity {
+  DAY
+  MONTH
+  RANGE
+}
+
+enum HistoricalSnapshotSource {
+  SNAPSHOT
+  ROLLUP
+  REPLAY
+  READ_MODEL
+  MANUAL_REBUILD
+}
+
+enum HistoricalSnapshotStockStatus {
+  NORMAL
+  LOW
+  OUT_OF_STOCK
+  NEGATIVE
+  OVERSTOCK
+}
+
+enum SnapshotJobType {
+  DAILY_SNAPSHOT
+  MONTHLY_ROLLUP
+  REBUILD
+  VALIDATION
+  ARCHIVE
+  RETENTION
+}
+
+enum SnapshotJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SnapshotJobLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum SnapshotFrequency {
+  HOURLY
+  DAILY
+  MONTHLY
+  MANUAL
+}
+
+enum SnapshotReadinessStatus {
+  READY
+  WARNING
+  STALE
+  REBUILD_REQUIRED
+  DISABLED
+}
+
 //
 // USER
 //
@@ -4029,4 +4115,310 @@ model ProductionRework {
 
   @@index([qcNcrId])
   @@index([originalProductionOrderId, state])
+}
+
+//
+// HISTORICAL EXECUTIVE DASHBOARD SNAPSHOTS
+//
+
+/// Historical Executive Dashboard daily module snapshots.
+/// TODO(raw SQL migration): convert this table to RANGE partitioning by "snapshot_date" with monthly partitions.
+/// TODO(raw SQL migration): if the physical table is partitioned, PostgreSQL primary/unique constraints must include "snapshot_date".
+/// TODO(raw SQL migration): add CHECK constraints for warning_count and row_count.
+/// TODO(raw SQL migration): add partial indexes for stale snapshots and non-authoritative snapshots.
+model DashboardSnapshot {
+  id               String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotDate     DateTime                      @map("snapshot_date") @db.Date
+  module           HistoricalDashboardModule
+  scopeKey         String                        @default("ALL") @map("scope_key")
+  scopeType        HistoricalSnapshotScopeType   @default(GLOBAL) @map("scope_type")
+  scopeId          String?                       @map("scope_id")
+  granularity      HistoricalSnapshotGranularity @default(DAY)
+  source           HistoricalSnapshotSource      @default(SNAPSHOT)
+  authoritative    Boolean                       @default(true)
+  kpis             Json                          @default("{}") @db.JsonB
+  charts           Json                          @default("{}") @db.JsonB
+  tables           Json                          @default("{}") @db.JsonB
+  warnings         Json                          @default("[]") @db.JsonB
+  metadata         Json                          @default("{}") @db.JsonB
+  sourceWatermark  String?                       @map("source_watermark")
+  sourceMinAt      DateTime?                     @map("source_min_at")
+  sourceMaxAt      DateTime?                     @map("source_max_at")
+  rowCount         Int                           @default(0) @map("row_count")
+  warningCount     Int                           @default(0) @map("warning_count")
+  stale            Boolean                       @default(false)
+  generatedByJobId String?                       @map("generated_by_job_id") @db.Uuid
+  generatedAt      DateTime                      @default(now()) @map("generated_at")
+  createdAt        DateTime                      @default(now()) @map("created_at")
+  updatedAt        DateTime                      @updatedAt @map("updated_at")
+
+  generatedByJob SnapshotJob? @relation(fields: [generatedByJobId], references: [id], onDelete: SetNull)
+
+  @@unique([module, scopeKey, snapshotDate], map: "dashboard_snapshots_module_scope_date_key")
+  @@index([snapshotDate], map: "dashboard_snapshots_snapshot_date_idx")
+  @@index([module, snapshotDate(sort: Desc)], map: "dashboard_snapshots_module_date_idx")
+  @@index([module, scopeKey, snapshotDate(sort: Desc)], map: "dashboard_snapshots_module_scope_date_idx")
+  @@index([authoritative, snapshotDate], map: "dashboard_snapshots_authoritative_date_idx")
+  @@index([generatedByJobId], map: "dashboard_snapshots_generated_by_job_idx")
+  @@map("dashboard_snapshots")
+}
+
+/// Exact daily inventory balance/value by material-location bucket.
+/// TODO(raw SQL migration): convert this table to RANGE partitioning by "snapshot_date" with monthly partitions.
+/// TODO(raw SQL migration): if the physical table is partitioned, PostgreSQL primary/unique constraints must include "snapshot_date".
+/// TODO(raw SQL migration): add CHECK constraints for non-negative reserved quantities.
+/// TODO(raw SQL migration): add partial low/out/negative stock alert indexes.
+/// TODO(raw SQL migration): consider covering indexes with INCLUDE(quantity_on_hand, inventory_value).
+model InventoryBalanceSnapshot {
+  id                String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotDate      DateTime                      @map("snapshot_date") @db.Date
+  materialId        String                        @map("material_id")
+  materialCode      String                        @map("material_code")
+  materialName      String                        @map("material_name")
+  materialTypeId    String?                       @map("material_type_id")
+  materialTypeName  String?                       @map("material_type_name")
+  categoryId        String?                       @map("category_id")
+  categoryName      String?                       @map("category_name")
+  warehouseId       String?                       @map("warehouse_id")
+  warehouseCode     String?                       @map("warehouse_code")
+  zoneId            String?                       @map("zone_id")
+  zoneCode          String?                       @map("zone_code")
+  slotId            String?                       @map("slot_id")
+  level             String?
+  unit              String?
+  quantityOnHand    Decimal                       @default(0) @map("quantity_on_hand") @db.Decimal(18, 4)
+  availableQuantity Decimal                       @default(0) @map("available_quantity") @db.Decimal(18, 4)
+  reservedQuantity  Decimal                       @default(0) @map("reserved_quantity") @db.Decimal(18, 4)
+  minimumStock      Decimal                       @default(0) @map("minimum_stock") @db.Decimal(18, 4)
+  unitCost          Decimal                       @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  inventoryValue    Decimal                       @default(0) @map("inventory_value") @db.Decimal(20, 2)
+  stockStatus       HistoricalSnapshotStockStatus @default(NORMAL) @map("stock_status")
+  source            HistoricalSnapshotSource      @default(SNAPSHOT)
+  locationBucketKey String                        @default("ALL") @map("location_bucket_key")
+  sourceWatermark   String?                       @map("source_watermark")
+  metadata          Json                          @default("{}") @db.JsonB
+  generatedByJobId  String?                       @map("generated_by_job_id") @db.Uuid
+  generatedAt       DateTime                      @default(now()) @map("generated_at")
+  createdAt         DateTime                      @default(now()) @map("created_at")
+
+  generatedByJob SnapshotJob? @relation(fields: [generatedByJobId], references: [id], onDelete: SetNull)
+
+  @@unique([snapshotDate, materialId, locationBucketKey], map: "inventory_balance_snapshots_bucket_key")
+  @@index([snapshotDate, warehouseId], map: "inventory_balance_snapshots_date_warehouse_idx")
+  @@index([snapshotDate, materialTypeId], map: "inventory_balance_snapshots_date_material_type_idx")
+  @@index([materialId, snapshotDate(sort: Desc)], map: "inventory_balance_snapshots_material_date_idx")
+  @@index([warehouseId, zoneId, snapshotDate], map: "inventory_balance_snapshots_location_date_idx")
+  @@index([locationBucketKey, snapshotDate(sort: Desc)], map: "inventory_balance_snapshots_bucket_date_idx")
+  @@index([snapshotDate, stockStatus], map: "inventory_balance_snapshots_date_stock_status_idx")
+  @@index([generatedByJobId], map: "inventory_balance_snapshots_generated_by_job_idx")
+  @@map("inventory_balance_snapshots")
+}
+
+/// Compact monthly rollup of module-level Executive Dashboard snapshots.
+/// TODO(raw SQL migration): optionally partition yearly by "month_start".
+/// TODO(raw SQL migration): add CHECK constraint month_start = date_trunc('month', month_start)::date.
+/// TODO(raw SQL migration): add CHECK constraint days_covered BETWEEN 0 AND 31.
+model DashboardMonthlyRollup {
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  monthStart       DateTime                    @map("month_start") @db.Date
+  module           HistoricalDashboardModule
+  scopeKey         String                      @default("ALL") @map("scope_key")
+  scopeType        HistoricalSnapshotScopeType @default(GLOBAL) @map("scope_type")
+  scopeId          String?                     @map("scope_id")
+  kpiOpen          Json                        @default("{}") @map("kpi_open") @db.JsonB
+  kpiClose         Json                        @default("{}") @map("kpi_close") @db.JsonB
+  kpiMin           Json                        @default("{}") @map("kpi_min") @db.JsonB
+  kpiMax           Json                        @default("{}") @map("kpi_max") @db.JsonB
+  kpiAvg           Json                        @default("{}") @map("kpi_avg") @db.JsonB
+  charts           Json                        @default("{}") @db.JsonB
+  warnings         Json                        @default("[]") @db.JsonB
+  daysCovered      Int                         @default(0) @map("days_covered")
+  authoritative    Boolean                     @default(true)
+  sourceWatermark  String?                     @map("source_watermark")
+  generatedByJobId String?                     @map("generated_by_job_id") @db.Uuid
+  generatedAt      DateTime                    @default(now()) @map("generated_at")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+
+  generatedByJob SnapshotJob? @relation(fields: [generatedByJobId], references: [id], onDelete: SetNull)
+
+  @@unique([module, scopeKey, monthStart], map: "dashboard_monthly_rollups_module_scope_month_key")
+  @@index([module, monthStart(sort: Desc)], map: "dashboard_monthly_rollups_module_month_idx")
+  @@index([monthStart], map: "dashboard_monthly_rollups_month_start_idx")
+  @@index([generatedByJobId], map: "dashboard_monthly_rollups_generated_by_job_idx")
+  @@map("dashboard_monthly_rollups")
+}
+
+/// Compact monthly inventory balance rollup by material and warehouse.
+/// TODO(raw SQL migration): optionally partition yearly by "month_start".
+/// TODO(raw SQL migration): add CHECK constraint month_start = date_trunc('month', month_start)::date.
+/// TODO(raw SQL migration): add CHECK constraints for days_covered and *_stock_days.
+model InventoryMonthlyRollup {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  monthStart        DateTime @map("month_start") @db.Date
+  materialId        String   @map("material_id")
+  materialCode      String   @map("material_code")
+  materialName      String   @map("material_name")
+  materialTypeId    String?  @map("material_type_id")
+  materialTypeName  String?  @map("material_type_name")
+  categoryId        String?  @map("category_id")
+  categoryName      String?  @map("category_name")
+  warehouseId       String?  @map("warehouse_id")
+  warehouseCode     String?  @map("warehouse_code")
+  warehouseKey      String   @default("ALL") @map("warehouse_key")
+  openingQuantity   Decimal  @default(0) @map("opening_quantity") @db.Decimal(18, 4)
+  closingQuantity   Decimal  @default(0) @map("closing_quantity") @db.Decimal(18, 4)
+  minQuantity       Decimal  @default(0) @map("min_quantity") @db.Decimal(18, 4)
+  maxQuantity       Decimal  @default(0) @map("max_quantity") @db.Decimal(18, 4)
+  avgQuantity       Decimal  @default(0) @map("avg_quantity") @db.Decimal(18, 4)
+  openingValue      Decimal  @default(0) @map("opening_value") @db.Decimal(20, 2)
+  closingValue      Decimal  @default(0) @map("closing_value") @db.Decimal(20, 2)
+  minValue          Decimal  @default(0) @map("min_value") @db.Decimal(20, 2)
+  maxValue          Decimal  @default(0) @map("max_value") @db.Decimal(20, 2)
+  avgValue          Decimal  @default(0) @map("avg_value") @db.Decimal(20, 2)
+  lowStockDays      Int      @default(0) @map("low_stock_days")
+  outStockDays      Int      @default(0) @map("out_stock_days")
+  negativeStockDays Int      @default(0) @map("negative_stock_days")
+  daysCovered       Int      @default(0) @map("days_covered")
+  metadata          Json     @default("{}") @db.JsonB
+  generatedByJobId  String?  @map("generated_by_job_id") @db.Uuid
+  generatedAt       DateTime @default(now()) @map("generated_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  generatedByJob SnapshotJob? @relation(fields: [generatedByJobId], references: [id], onDelete: SetNull)
+
+  @@unique([monthStart, materialId, warehouseKey], map: "inventory_monthly_rollups_material_warehouse_month_key")
+  @@index([monthStart, warehouseId], map: "inventory_monthly_rollups_month_warehouse_idx")
+  @@index([monthStart, warehouseKey], map: "inventory_monthly_rollups_month_warehouse_key_idx")
+  @@index([monthStart, materialTypeId], map: "inventory_monthly_rollups_month_material_type_idx")
+  @@index([materialId, monthStart(sort: Desc)], map: "inventory_monthly_rollups_material_month_idx")
+  @@index([generatedByJobId], map: "inventory_monthly_rollups_generated_by_job_idx")
+  @@map("inventory_monthly_rollups")
+}
+
+/// Tracks snapshot generation, validation, rollup, archive and rebuild jobs.
+/// TODO(raw SQL migration): add CHECK constraints for priority, attempt, max_attempts and date ranges.
+/// TODO(raw SQL migration): add partial indexes for RUNNING lease recovery and FAILED job diagnostics.
+model SnapshotJob {
+  id                   String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobType              SnapshotJobType            @map("job_type")
+  module               HistoricalDashboardModule?
+  scopeKey             String                     @default("ALL") @map("scope_key")
+  snapshotDate         DateTime?                  @map("snapshot_date") @db.Date
+  fromDate             DateTime?                  @map("from_date") @db.Date
+  toDate               DateTime?                  @map("to_date") @db.Date
+  status               SnapshotJobStatus          @default(PENDING)
+  priority             Int                        @default(50)
+  attempt              Int                        @default(0)
+  maxAttempts          Int                        @default(3) @map("max_attempts")
+  requestedBy          String?                    @map("requested_by")
+  rebuildRequestId     String?                    @map("rebuild_request_id") @db.Uuid
+  leaseOwner           String?                    @map("lease_owner")
+  leaseExpiresAt       DateTime?                  @map("lease_expires_at")
+  startedAt            DateTime?                  @map("started_at")
+  completedAt          DateTime?                  @map("completed_at")
+  failedAt             DateTime?                  @map("failed_at")
+  errorCode            String?                    @map("error_code")
+  errorMessage         String?                    @map("error_message")
+  rowsRead             BigInt                     @default(0) @map("rows_read")
+  rowsWritten          BigInt                     @default(0) @map("rows_written")
+  sourceWatermarkStart String?                    @map("source_watermark_start")
+  sourceWatermarkEnd   String?                    @map("source_watermark_end")
+  metadata             Json                       @default("{}") @db.JsonB
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+
+  rebuildRequest            SnapshotRebuildRequest?    @relation(fields: [rebuildRequestId], references: [id], onDelete: SetNull)
+  logs                      SnapshotJobLog[]
+  dashboardSnapshots        DashboardSnapshot[]
+  inventoryBalanceSnapshots InventoryBalanceSnapshot[]
+  dashboardMonthlyRollups   DashboardMonthlyRollup[]
+  inventoryMonthlyRollups   InventoryMonthlyRollup[]
+  metadataRecords           SnapshotMetadata[]         @relation("SnapshotMetadataLastSuccessfulJob")
+
+  @@index([status, priority(sort: Desc), createdAt], map: "snapshot_jobs_queue_idx")
+  @@index([leaseExpiresAt], map: "snapshot_jobs_lease_expires_idx")
+  @@index([jobType, module, snapshotDate], map: "snapshot_jobs_type_module_date_idx")
+  @@index([rebuildRequestId], map: "snapshot_jobs_rebuild_request_idx")
+  @@index([createdAt(sort: Desc)], map: "snapshot_jobs_created_at_idx")
+  @@map("snapshot_jobs")
+}
+
+/// Structured operational logs for snapshot jobs.
+/// TODO(raw SQL migration): optionally partition by "created_at" and add WARN/ERROR partial index.
+model SnapshotJobLog {
+  id        String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId     String                     @map("job_id") @db.Uuid
+  level     SnapshotJobLogLevel        @default(INFO)
+  message   String
+  step      String?
+  module    HistoricalDashboardModule?
+  details   Json                       @default("{}") @db.JsonB
+  createdAt DateTime                   @default(now()) @map("created_at")
+
+  job SnapshotJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt], map: "snapshot_job_logs_job_created_at_idx")
+  @@index([level, createdAt(sort: Desc)], map: "snapshot_job_logs_level_created_at_idx")
+  @@map("snapshot_job_logs")
+}
+
+/// Manual or automatic requests to rebuild historical dashboard snapshots.
+/// TODO(raw SQL migration): optionally partition yearly by "created_at".
+/// TODO(raw SQL migration): add CHECK constraints for priority, from_date <= to_date and non-empty modules.
+/// TODO(raw SQL migration): add GIN index on modules.
+model SnapshotRebuildRequest {
+  id           String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestNo    String                      @unique @map("request_no")
+  reason       String
+  requestedBy  String?                     @map("requested_by")
+  modules      HistoricalDashboardModule[]
+  fromDate     DateTime                    @map("from_date") @db.Date
+  toDate       DateTime                    @map("to_date") @db.Date
+  status       SnapshotJobStatus           @default(PENDING)
+  priority     Int                         @default(50)
+  approvedBy   String?                     @map("approved_by")
+  approvedAt   DateTime?                   @map("approved_at")
+  startedAt    DateTime?                   @map("started_at")
+  completedAt  DateTime?                   @map("completed_at")
+  cancelledAt  DateTime?                   @map("cancelled_at")
+  errorMessage String?                     @map("error_message")
+  metadata     Json                        @default("{}") @db.JsonB
+  createdAt    DateTime                    @default(now()) @map("created_at")
+  updatedAt    DateTime                    @updatedAt @map("updated_at")
+
+  jobs SnapshotJob[]
+
+  @@index([status, priority(sort: Desc), createdAt], map: "snapshot_rebuild_requests_queue_idx")
+  @@index([fromDate, toDate], map: "snapshot_rebuild_requests_range_idx")
+  @@map("snapshot_rebuild_requests")
+}
+
+/// Module-level historical snapshot configuration, readiness and watermarks.
+/// TODO(raw SQL migration): add CHECK constraints for positive retention values.
+model SnapshotMetadata {
+  id                         String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  module                     HistoricalDashboardModule
+  snapshotType               String                    @map("snapshot_type")
+  enabled                    Boolean                   @default(true)
+  frequency                  SnapshotFrequency         @default(DAILY)
+  retentionDays              Int                       @default(730) @map("retention_days")
+  archiveAfterDays           Int                       @default(730) @map("archive_after_days")
+  rollupAfterDays            Int                       @default(730) @map("rollup_after_days")
+  lastSuccessfulSnapshotDate DateTime?                 @map("last_successful_snapshot_date") @db.Date
+  lastSuccessfulJobId        String?                   @map("last_successful_job_id") @db.Uuid
+  lastSourceWatermark        String?                   @map("last_source_watermark")
+  staleFromDate              DateTime?                 @map("stale_from_date") @db.Date
+  readinessStatus            SnapshotReadinessStatus   @default(READY) @map("readiness_status")
+  settings                   Json                      @default("{}") @db.JsonB
+  createdAt                  DateTime                  @default(now()) @map("created_at")
+  updatedAt                  DateTime                  @updatedAt @map("updated_at")
+
+  lastSuccessfulJob SnapshotJob? @relation("SnapshotMetadataLastSuccessfulJob", fields: [lastSuccessfulJobId], references: [id], onDelete: SetNull)
+
+  @@unique([module, snapshotType], map: "snapshot_metadata_module_type_key")
+  @@index([readinessStatus], map: "snapshot_metadata_readiness_status_idx")
+  @@index([staleFromDate], map: "snapshot_metadata_stale_from_date_idx")
+  @@index([lastSuccessfulJobId], map: "snapshot_metadata_last_successful_job_idx")
+  @@map("snapshot_metadata")
 }

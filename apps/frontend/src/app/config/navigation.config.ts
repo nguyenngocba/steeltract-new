@@ -173,38 +173,49 @@ export const navigation = [
       },
 
       {
-        title: 'Sản xuất',
+        title: 'Sản xuất (Lệnh SX)',
         path: '/components/production',
       },
 
       {
-        title: 'Vật tư sử dụng',
-        path: '/components/material-stock',
-      },
-
-      {
-        title: 'Tồn kho cấu kiện',
+        title: 'Kho thành phẩm',
         path: '/components/stock',
       },
 
       {
-        title: 'Chuyển cấu kiện',
-        path: '/components/transfers',
-      },
+        id: 'components-advanced-operations',
+        title: 'Nghiệp vụ nâng cao',
+        children: [
+          {
+            id: 'components-material-stock',
+            title: 'Vật tư sử dụng',
+            path: '/components/material-stock',
+          },
 
-      {
-        title: 'QC nội bộ',
-        path: '/components/qc',
-      },
+          {
+            id: 'components-transfers',
+            title: 'Chuyển cấu kiện',
+            path: '/components/transfers',
+          },
 
-      {
-        title: 'Lịch sử gia công',
-        path: '/components/history',
-      },
+          {
+            id: 'components-qc',
+            title: 'QC nội bộ',
+            path: '/components/qc',
+          },
 
-      {
-        title: 'Báo cáo',
-        path: '/components/reports',
+          {
+            id: 'components-history',
+            title: 'Lịch sử gia công',
+            path: '/components/history',
+          },
+
+          {
+            id: 'components-reports',
+            title: 'Báo cáo',
+            path: '/components/reports',
+          },
+        ],
       },
     ],
   },

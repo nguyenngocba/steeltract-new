@@ -1,5 +1,153 @@
 # SteelTrack AI Changelog
 
+## 2026-07-23 Component Manufacturing Workflow Sprint A
+
+Completed:
+
+- Started the Component Manufacturing Workflow epic with Sprint A:
+  Engineering Release gate.
+- Enforced that Production Order creation requires an Engineering-released
+  Component before manufacturing can begin.
+- Legacy `POST /production` now rejects component-bound orders unless the
+  Component has `lifecycleState=ACTIVE` and a current released revision.
+- Canonical `/production/commands/orders` now validates the released
+  engineering basis: Component lifecycle, current revision, released revision,
+  released BOM definition and content hash all must match the command payload.
+- Added unit coverage for rejecting Production Order creation before
+  Engineering release.
+- Reused existing Component aggregate states and released BOM/revision models;
+  no Prisma schema or migration was required for Sprint A.
+- Historical Dashboard, Snapshot Engine, Warehouse Realtime, Inventory module
+  and Production UI were not modified.
+
+## 2026-07-23 Production Order Creation and Component Lifecycle Hardening
+
+Completed:
+
+- Fixed the Production Order creation mismatch where the frontend sent legacy
+  `PLANNED` status to `POST /production` while the approved Production
+  lifecycle requires new orders to start as `DRAFT`.
+- Kept backend Production validation intact; invalid create requests still fail
+  through the existing Zod/service checks.
+- Hardened legacy Component creation to assign `lifecycleState=DRAFT` and
+  `aggregateVersion=1`, matching the canonical Components command side.
+- Updated Components read models so draft components are labelled `Draft` and
+  are not counted as finished-goods stock in the Components dashboard/project
+  KPI paths.
+- Added additive QC NCR defect context fields and persisted them in existing
+  NCR metadata for traceability without schema changes.
+- No Prisma schema, migrations, Inventory workflow, Historical Dashboard,
+  Snapshot Engine or Historical API changes were made.
+
+## 2026-07-23 Executive Historical Dashboard UI
+
+Completed:
+
+- Added the frontend `/history` Executive Historical Dashboard page.
+- Added a typed Historical Dashboard API client using the standard
+  authenticated `lib/api` request pipeline.
+- Added TanStack Query hooks for historical dashboard snapshots, latest
+  authoritative snapshot, monthly rollups, inventory snapshots, inventory
+  monthly rollups and snapshot jobs.
+- Built the Industrial Cockpit UI with existing shared components:
+  `EnterpriseModulePage`, `CockpitKpiCard`, `CockpitChartCard`,
+  `CockpitTableShell`, `DataTablePagination`, `InventoryPanel` and shared
+  module empty/loading states.
+- Added tabs for Overview, Inventory, Production, Projects, Suppliers and
+  Snapshot Jobs.
+- Added date/from/to/warehouse/module/authoritative filters and snapshot job
+  status filtering.
+- Added route and sidebar entry for `/history`.
+- Kept backend, Prisma, Snapshot Engine, Scheduler and Job Queue unchanged.
+
+## 2026-07-22 Historical Dashboard Read API
+
+Completed:
+
+- Added a backend read-only Historical Dashboard REST API under `/history`.
+- Implemented `HistoricalDashboardModule`, controller, service and repository
+  following Controller -> Service -> Repository -> Prisma.
+- Exposed read endpoints for daily dashboard snapshots, latest authoritative
+  dashboard snapshots, dashboard monthly rollups, inventory daily snapshots,
+  inventory monthly rollups and snapshot jobs.
+- Added strict Zod query DTOs for date/module/warehouse/authoritative/status
+  and pagination filters.
+- Returned serialized DTO responses instead of Prisma model instances,
+  including safe Date, Decimal and BigInt conversion.
+- Kept Snapshot Engine, Scheduler, Job Queue, Prisma schema, migrations,
+  frontend and business logic unchanged.
+- Added service tests for dashboard lookup, not-found handling and paginated
+  job serialization.
+
+## 2026-07-22 Historical Snapshot Engine Production Hardening
+
+Completed:
+
+- Hardened the Historical Snapshot Engine without changing Prisma schema,
+  migrations, APIs, controllers, frontend or business workflows.
+- Added `snapshotType` to deterministic job identity so different snapshot
+  types for the same module/date/scope can coexist safely.
+- Made scheduling atomic with a PostgreSQL advisory transaction lock around
+  job identity checks and creation.
+- Prevented retryable failed jobs from being recreated by the scheduler.
+- Ensured snapshot metadata only advances and cannot be moved backwards by an
+  older job finishing later.
+- Marked non-current-day snapshot generation as stale/non-authoritative when
+  the current read model cannot reconstruct historical state.
+- Changed job processing to claim one job at a time and added expired
+  max-attempt RUNNING cleanup.
+- Reduced inventory snapshot memory pressure with cursor batching and lease
+  checks between batches.
+
+## 2026-07-22 Historical Dashboard Snapshot Engine
+
+Completed:
+
+- Implemented the backend-only Historical Snapshot Engine.
+- Added metadata-driven daily scheduling from `SnapshotMetadata`.
+- Added `SnapshotJob` queue processing with pending/running/completed/failed
+  lifecycle, worker leases, expired lease recovery and retry attempts.
+- Added structured `SnapshotJobLog` writes for start, completion, failure and
+  snapshot write stages.
+- Added idempotent upserts for `DashboardSnapshot`,
+  `InventoryBalanceSnapshot`, `DashboardMonthlyRollup` and
+  `InventoryMonthlyRollup`.
+- Added monthly rollup generation triggered by month-change metadata.
+- Stored job duration and snapshot type in existing `SnapshotJob.metadata`
+  because schema is frozen.
+- Added unit coverage for metadata scheduling and duplicate job suppression.
+
+## 2026-07-22 Historical Dashboard Prisma Schema Hardening
+
+Completed:
+
+- Hardened the new Historical Dashboard Prisma models before business logic is
+  added.
+- Replaced historical free-text module/status/source/scope/granularity fields
+  with dedicated Prisma enums where appropriate.
+- Changed daily historical snapshot tables from composite Prisma IDs to
+  single-column UUID primary keys for simpler Prisma Client usage, while
+  keeping raw SQL partition caveats documented.
+- Added non-null inventory bucket keys for daily and monthly inventory
+  snapshots to avoid PostgreSQL nullable-unique duplicate risk.
+- Updated migration notes to reflect enum-backed validation and remaining raw
+  SQL requirements.
+
+## 2026-07-22 Historical Dashboard Prisma Schema Foundation
+
+Completed:
+
+- Added Prisma models for the approved Historical Executive Dashboard database
+  design: dashboard snapshots, inventory balance snapshots, monthly rollups,
+  snapshot jobs, job logs, rebuild requests and snapshot metadata.
+- Preserved existing business tables and did not add services, APIs or frontend
+  code.
+- Added schema TODOs for PostgreSQL features Prisma cannot express directly:
+  partitioning, check constraints, partial indexes, covering indexes and GIN
+  indexes.
+- Created `docs/runtime/historical-dashboard-prisma-migration-plan.md` with the
+  raw SQL migration notes and metadata seed plan.
+
 ## 2026-07-22 Inventory Material Created Date Input
 
 Completed:
@@ -4976,3 +5124,33 @@ Notes:
 - Added module completion percentages and a nine-phase execution plan from
   Inventory through Admin.
 - Kept the work documentation-only; no frontend/backend source code changed.
+
+# 2026-07-23 - Sprint 5 Historical Dashboard Integration QA
+
+- Audited the `/history` Executive Historical Dashboard frontend integration
+  against the read-only Historical API surface.
+- Gated TanStack Query calls by active tab so Snapshot Jobs no longer triggers
+  dashboard/inventory/monthly reads, and non-job tabs no longer fetch jobs.
+- Added a visible Historical Dashboard error panel with retry for active failed
+  queries, covering 404/500/offline/network failures without changing API
+  contracts.
+- Removed scoped lint issues in the Historical Dashboard page by moving
+  pagination reset behavior into filter/tab event handlers and stabilizing empty
+  row fallbacks.
+- Preserved Prisma schema, Snapshot Engine, Historical API architecture,
+  backend behavior and UI design.
+
+# 2026-07-23 - Project Maintenance and Warehouse Realtime Dashboard
+
+- Removed archived/backup/quarantine frontend folders from active ESLint
+  traversal and converted legacy-only strict rules into warnings so CI lint can
+  run against active source without being blocked by old debt.
+- Added Vitest, jsdom and Testing Library setup, plus smoke coverage for the
+  Historical Dashboard route without modifying Historical Dashboard behavior.
+- Split Vite vendor chunks by package/manual groups to reduce the previous
+  oversized monolithic vendor output.
+- Added the frontend-only `/warehouse-realtime` operational cockpit under
+  Inventory navigation, using existing Inventory overview/material/transaction
+  endpoints with TanStack Query polling.
+- No backend, schema, migration, Historical Dashboard, Snapshot Engine or
+  Historical API code changed.

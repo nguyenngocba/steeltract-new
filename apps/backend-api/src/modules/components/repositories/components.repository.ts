@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { ComponentStatus, Prisma } from '@prisma/client';
+import { ComponentLifecycleState, ComponentStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
@@ -172,6 +172,19 @@ export class ComponentsRepository {
       where: {
         projectId,
         status,
+      },
+    });
+  }
+
+  countFinishedGoodsByProject(projectId: string) {
+    return this.prisma.component.count({
+      where: {
+        projectId,
+        status: ComponentStatus.STOCK,
+        OR: [
+          { lifecycleState: null },
+          { lifecycleState: { not: ComponentLifecycleState.DRAFT } },
+        ],
       },
     });
   }

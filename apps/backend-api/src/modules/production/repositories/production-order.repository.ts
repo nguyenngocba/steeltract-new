@@ -82,6 +82,34 @@ export class ProductionOrderRepository {
     return tx.outboxEvent.findUnique({ where: { idempotencyKey } });
   }
 
+  findReleasedEngineeringBasis(
+    componentId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.component.findUnique({
+      where: { id: componentId },
+      select: {
+        id: true,
+        lifecycleState: true,
+        currentRevisionId: true,
+        currentRevision: {
+          select: {
+            id: true,
+            state: true,
+            contentHash: true,
+            bomDefinition: {
+              select: {
+                id: true,
+                state: true,
+                contentHash: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   create(
     data: Prisma.ProductionOrderCreateInput,
     tx: Prisma.TransactionClient,

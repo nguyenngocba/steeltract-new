@@ -732,7 +732,7 @@ export function InventoryMaterialsPage() {
     const prev = (kpiTrend.low.at(-2) ?? 0) + (kpiTrend.out.at(-2) ?? 0);
     const diff = curr - prev;
     const absDiff = Math.abs(diff);
-    let text = '';
+    let text: string;
     let color = 'text-slate-400';
 
     if (diff === 0) {

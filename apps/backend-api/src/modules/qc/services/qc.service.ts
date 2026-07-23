@@ -658,7 +658,18 @@ export class QcService {
           correctiveAction: dto.correctiveAction,
           disposition: dto.disposition,
           raisedById: actorId,
-          metadata: this.toJson(dto.metadata),
+          metadata: this.toJson({
+            ...(dto.metadata ?? {}),
+            defect: {
+              type: dto.defectType,
+              category: dto.defectCategory,
+              responsible: dto.responsible,
+              machine: dto.machine,
+              workstation: dto.workstation,
+              shift: dto.shift,
+              imageUrls: dto.imageUrls ?? [],
+            },
+          }),
         },
         tx,
       );
@@ -685,6 +696,9 @@ export class QcService {
             ncrNo: created.ncrNo,
             inspectionId,
             severity: created.severity,
+            defectType: dto.defectType,
+            defectCategory: dto.defectCategory,
+            disposition: dto.disposition,
           },
         },
       );

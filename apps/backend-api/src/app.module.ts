@@ -49,6 +49,8 @@ import { OperationsCenterModule } from './modules/operations-center/operations-c
 import { ProjectionModule } from './core/projections/projection.module';
 import { EnterpriseProcessModule } from './modules/process-orchestration/enterprise-process.module';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
+import { HistoricalSnapshotEngineModule } from './core/historical-snapshots/historical-snapshot-engine.module';
+import { HistoricalDashboardModule } from './core/historical-dashboard/historical-dashboard.module';
 @Module({
   imports: [
     EventsModule,
@@ -98,6 +100,8 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
     OperationsCenterModule,
     ProjectionModule,
     EnterpriseProcessModule,
+    HistoricalSnapshotEngineModule,
+    HistoricalDashboardModule,
   ],
   controllers: [AppController],
   providers: [

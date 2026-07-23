@@ -10,7 +10,6 @@ import {
   Settings,
   Factory,
   CalendarClock,
-  Bell,
   MonitorCog,
 } from 'lucide-react'
 
@@ -24,6 +23,11 @@ export const navigation = [
       {
         title: 'Bảng KPI chính',
         path: '/',
+      },
+
+      {
+        title: 'Dashboard lịch sử',
+        path: '/history',
       },
 
       {
@@ -71,6 +75,10 @@ export const navigation = [
       {
         title: 'Tổng quan kho',
         path: '/inventory',
+      },
+      {
+        title: 'Cockpit realtime',
+        path: '/warehouse-realtime',
       },
       {
         title: 'Giao dịch',
@@ -132,39 +140,40 @@ export const navigation = [
       },
       {
         title:
-          'Tồn kho cấu kiện',
+          'Kho thành phẩm',
         path:
           '/components/stock',
       },
       {
-        title:
-          'Vật tư sử dụng',
-        path:
-          '/components/material-stock',
-      },
-      {
-        title:
-          'Chuyển cấu kiện',
-        path:
-          '/components/transfers',
-      },
-      {
-        title:
-          'QC nội bộ',
-        path:
-          '/components/qc',
-      },
-      {
-        title:
-          'Lịch sử gia công',
-        path:
-          '/components/history',
-      },
-      {
-        title:
-          'Báo cáo',
-        path:
-          '/components/reports',
+        id: 'components-advanced-operations',
+        title: 'Nghiệp vụ nâng cao',
+        children: [
+          {
+            id: 'components-material-stock',
+            title: 'Vật tư sử dụng',
+            path: '/components/material-stock',
+          },
+          {
+            id: 'components-transfers',
+            title: 'Chuyển cấu kiện',
+            path: '/components/transfers',
+          },
+          {
+            id: 'components-qc',
+            title: 'QC nội bộ',
+            path: '/components/qc',
+          },
+          {
+            id: 'components-history',
+            title: 'Lịch sử gia công',
+            path: '/components/history',
+          },
+          {
+            id: 'components-reports',
+            title: 'Báo cáo',
+            path: '/components/reports',
+          },
+        ],
       },
     ],
   },

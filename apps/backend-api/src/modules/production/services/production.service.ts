@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import {
+  ComponentLifecycleState,
   ComponentStatus,
   Prisma,
   ProductionLogType,
@@ -195,6 +196,16 @@ export class ProductionService {
       if (component && bom && bom.productCode !== component.code) {
         throw new BadRequestException(
           'Selected BOM does not belong to the selected component',
+        );
+      }
+
+      if (
+        component &&
+        (component.lifecycleState !== ComponentLifecycleState.ACTIVE ||
+          !component.currentRevisionId)
+      ) {
+        throw new BadRequestException(
+          'Component must be released by Engineering before Production Order creation',
         );
       }
 

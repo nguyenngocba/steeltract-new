@@ -1,4 +1,5 @@
 import {
+  type ComponentType,
   lazy,
   Suspense,
 } from 'react'
@@ -12,13 +13,20 @@ import {
 import { useAuthStore } from '@/store/auth.store'
 import { ModuleLoadingState } from '@/shared/ui/modules'
 
-const lazyNamed = <T extends Record<string, any>, K extends keyof T>(
+const lazyNamed = <T extends Record<string, unknown>, K extends keyof T>(
   loader: () => Promise<T>,
   exportName: K,
-) => lazy(() => loader().then((module) => ({ default: module[exportName] })))
+) =>
+  lazy(() =>
+    loader().then((module) => ({
+      default: module[exportName] as ComponentType,
+    })),
+  )
 
 const LoginPage = lazyNamed(() => import('@/modules/auth/pages/LoginPage'), 'LoginPage')
 const DashboardPage = lazyNamed(() => import('@/modules/dashboard/pages/DashboardPage'), 'DashboardPage')
+const HistoricalDashboardPage = lazyNamed(() => import('@/modules/history/pages/HistoricalDashboardPage'), 'HistoricalDashboardPage')
+const WarehouseRealtimeDashboardPage = lazyNamed(() => import('@/modules/warehouse-realtime/pages/WarehouseRealtimeDashboardPage'), 'WarehouseRealtimeDashboardPage')
 const InventoryOverviewPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryOverviewPage'), 'InventoryOverviewPage')
 const InventoryMaterialsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryMaterialsPage'), 'InventoryMaterialsPage')
 const InventoryLocationsPage = lazyNamed(() => import('@/modules/inventory/pages/tabs/InventoryLocationsPage'), 'InventoryLocationsPage')
@@ -113,8 +121,18 @@ export function AppRouter() {
       />
 
       <Route
+        path="/history"
+        element={<HistoricalDashboardPage />}
+      />
+
+      <Route
         path="/inventory"
         element={<InventoryOverviewPage />}
+      />
+
+      <Route
+        path="/warehouse-realtime"
+        element={<WarehouseRealtimeDashboardPage />}
       />
 
       <Route

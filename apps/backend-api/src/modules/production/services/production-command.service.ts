@@ -7,6 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ComponentBomDefinitionState,
+  ComponentLifecycleState,
+  ComponentRevisionState,
   Prisma,
   ProductionCompletionState,
   ProductionMaterialLedgerEventType,
@@ -99,6 +102,7 @@ export class ProductionCommandService {
           'Production Order quantity must be positive',
         );
       }
+      await this.assertReleasedEngineeringBasis(command, tx);
       const order = await this.repository.createAggregateOrder(
         {
           orderNo: command.orderNo,
@@ -129,6 +133,51 @@ export class ProductionCommandService {
       );
       return order;
     });
+  }
+
+  private async assertReleasedEngineeringBasis(
+    command: CreateProductionOrderCommand,
+    tx: Tx,
+  ) {
+    const basis = await this.repository.findReleasedEngineeringBasis(
+      command.engineeringBasis.componentId,
+      tx,
+    );
+    if (!basis) {
+      throw new NotFoundException('Component not found');
+    }
+    if (
+      basis.lifecycleState !== ComponentLifecycleState.ACTIVE ||
+      !basis.currentRevision ||
+      basis.currentRevisionId !== command.engineeringBasis.componentRevisionId
+    ) {
+      throw new BadRequestException(
+        'Component must be released by Engineering before Production Order creation',
+      );
+    }
+    if (basis.currentRevision.state !== ComponentRevisionState.RELEASED) {
+      throw new BadRequestException(
+        'Component revision must be released before Production Order creation',
+      );
+    }
+    const bom = basis.currentRevision.bomDefinition;
+    if (
+      !bom ||
+      bom.id !== command.engineeringBasis.bomDefinitionId ||
+      bom.state !== ComponentBomDefinitionState.RELEASED
+    ) {
+      throw new BadRequestException(
+        'Released Component BOM is required before Production Order creation',
+      );
+    }
+    if (
+      basis.currentRevision.contentHash !== command.engineeringBasis.contentHash ||
+      bom.contentHash !== command.engineeringBasis.contentHash
+    ) {
+      throw new ConflictException(
+        'Engineering basis content hash does not match released Component revision',
+      );
+    }
   }
 
   releaseOrder(command: ReleaseProductionOrderCommand) {

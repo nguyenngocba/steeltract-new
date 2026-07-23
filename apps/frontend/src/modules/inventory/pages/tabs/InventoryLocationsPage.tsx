@@ -253,14 +253,13 @@ function getDeltaNote(current: number, previous: number, unit: string, isCurrenc
   const sign = diff > 0 ? '▲' : diff < 0 ? '▼' : ''
   const colorClass = diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-400'
   
-  let formattedDiff = ''
-  if (isCurrency) {
-    formattedDiff = formatCurrency(Math.abs(diff))
-  } else {
-    const decimals = (unit === 'tấn' || unit === '%') ? 1 : 0
-    const space = (unit === '%' || unit === '') ? '' : ' '
-    formattedDiff = `${formatQuantity(Math.abs(diff), decimals)}${space}${unit}`
-  }
+  const formattedDiff = isCurrency
+    ? formatCurrency(Math.abs(diff))
+    : (() => {
+        const decimals = (unit === 'tấn' || unit === '%') ? 1 : 0
+        const space = (unit === '%' || unit === '') ? '' : ' '
+        return `${formatQuantity(Math.abs(diff), decimals)}${space}${unit}`
+      })()
   
   const formattedPercent = percent >= 0 ? `+${percent.toFixed(1)}%` : `${percent.toFixed(1)}%`
   
