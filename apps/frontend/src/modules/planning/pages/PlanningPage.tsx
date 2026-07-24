@@ -1,21 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   Boxes,
-  Calendar,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
   Factory,
-  Filter,
-  Layers,
-  Plus,
-  RefreshCw,
-  Search,
-  Truck,
-  X,
 } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 
@@ -24,21 +17,23 @@ import { getProjectsRuntime, type ProjectsRuntime } from '@/modules/projects/api
 import { productionApi, type ProductionOrder } from '@/modules/production/api/production.api'
 import { getInventoryItems } from '@/modules/inventory/api/inventory.api'
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { EnterprisePanel } from '@/shared/ui/enterprise-components'
+import {
+  inventoryGridGap,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '@/modules/inventory/components/InventoryVisuals'
 import {
   CockpitChartCard,
   CockpitEmptyState,
-  CockpitKpiCard,
-  CockpitRecentList,
-  CockpitStatusList,
-  CockpitTableShell,
   DataTablePagination,
+  EnterpriseKpiCard,
 } from '@/shared/ui/cockpit'
 import {
   ModuleDetailDrawer,
+  ModuleEmptyState,
   ModuleLoadingState,
-  moduleInput,
   moduleMutedButton,
-  modulePrimaryButton,
 } from '@/shared/ui/modules'
 import { formatQuantity } from '@/shared/utils/number-format'
 
@@ -88,6 +83,7 @@ type PlanRow = {
   title: string
   projectCode?: string
   projectName?: string
+  customerName?: string
   category: 'PRODUCTION' | 'MATERIAL' | 'LOGISTICS' | 'CAPACITY'
   status: 'DRAFT' | 'PLANNED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
   plannedStartDate?: string
@@ -99,14 +95,21 @@ type PlanRow = {
 }
 
 export function PlanningPage() {
+  return <PlanningPageContent />
+}
+
+function PlanningPageContent() {
   const location = useLocation()
   const queryClient = useQueryClient()
 
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [projectFilter, setProjectFilter] = useState<string>('ALL')
+  const [customerFilter, setCustomerFilter] = useState<string>('ALL')
+  const [monthFilter, setMonthFilter] = useState<string>('ALL')
   const [selectedPlan, setSelectedPlan] = useState<PlanRow | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
 
   const tab = getTabFromPath(location.pathname)
 
@@ -133,19 +136,38 @@ export function PlanningPage() {
 
   const isLoading = productionLoading || projectsLoading || inventoryLoading || dispatchLoading
 
-  // Aggregated Plan Rows derived from authoritative production orders and projects
+  // Dynamic dropdown option lists derived from authoritative data
+  const projects = projectsRuntime?.projects ?? []
+
+  const customers = useMemo(() => {
+    const set = new Set<string>()
+    projects.forEach((p: any) => {
+      if (p.customerName) set.add(p.customerName)
+      if (p.customer?.name) set.add(p.customer.name)
+    })
+    productionOrders.forEach((mo: any) => {
+      if (mo.customerName) set.add(mo.customerName)
+      if (mo.project?.customerName) set.add(mo.project.customerName)
+      if (mo.project?.customer?.name) set.add(mo.project.customer.name)
+    })
+    return Array.from(set)
+  }, [projects, productionOrders])
+
+  // Aggregated Plan Rows
   const planRows = useMemo<PlanRow[]>(() => {
     const rows: PlanRow[] = []
 
-    // 1. Map Production Orders into Production Plans
+    // 1. Production Orders -> Production Plans
     productionOrders.forEach((mo: any) => {
       const isBlocked = Number(mo.scrapCount) > 0 || String(mo.notes || '').toLowerCase().includes('lỗi')
+      const custName = mo.customerName || mo.project?.customerName || mo.project?.customer?.name || 'Khách hàng SteelTrack'
       rows.push({
         id: `mo-${mo.id}`,
         code: mo.code || `MO-${mo.id.slice(0, 6)}`,
         title: `Lệnh sản xuất cấu kiện: ${mo.component?.name || mo.code}`,
         projectCode: mo.project?.code,
         projectName: mo.project?.name,
+        customerName: custName,
         category: 'PRODUCTION',
         status: isBlocked
           ? 'BLOCKED'
@@ -163,15 +185,16 @@ export function PlanningPage() {
       })
     })
 
-    // 2. Map Projects into Master Plans
-    const projects = projectsRuntime?.projects ?? []
+    // 2. Projects -> Master Plans
     projects.forEach((proj: any) => {
+      const custName = proj.customerName || proj.customer?.name || 'Khách hàng SteelTrack'
       rows.push({
         id: `proj-${proj.id}`,
         code: proj.code,
         title: `Tiến độ công trình: ${proj.name}`,
         projectCode: proj.code,
         projectName: proj.name,
+        customerName: custName,
         category: 'PRODUCTION',
         status: proj.status === 'COMPLETED' ? 'COMPLETED' : proj.status === 'ACTIVE' ? 'IN_PROGRESS' : 'PLANNED',
         plannedStartDate: proj.startedAt || proj.createdAt,
@@ -180,14 +203,16 @@ export function PlanningPage() {
       })
     })
 
-    // 3. Map Logistics Dispatch Schedule into Logistics Plans
-    dispatchOrders.forEach((d) => {
+    // 3. Logistics Dispatch Schedule -> Logistics Plans
+    dispatchOrders.forEach((d: any) => {
+      const custName = d.project?.customerName || d.project?.customer?.name || d.customerName || 'Khách hàng SteelTrack'
       rows.push({
         id: `dispatch-${d.id}`,
         code: d.code,
         title: `Kế hoạch vận chuyển đến ${d.project?.name || 'Công trình'}`,
         projectCode: d.project?.code,
         projectName: d.project?.name,
+        customerName: custName,
         category: 'LOGISTICS',
         status: d.status === 'COMPLETED' ? 'COMPLETED' : ['LOADING', 'IN_TRANSIT'].includes(d.status) ? 'IN_PROGRESS' : 'PLANNED',
         plannedStartDate: d.plannedAt || d.createdAt,
@@ -196,7 +221,7 @@ export function PlanningPage() {
       })
     })
 
-    // 4. Map Material Shortages into Material Plans (MRP)
+    // 4. Material Shortages -> Material Plans (MRP)
     inventoryItems.forEach((m: any) => {
       const qty = Number(m.quantity || 0)
       const minQty = Number(m.minQuantity || m.reorderPoint || 0)
@@ -215,9 +240,9 @@ export function PlanningPage() {
     })
 
     return rows
-  }, [productionOrders, projectsRuntime, dispatchOrders, inventoryItems])
+  }, [productionOrders, projects, dispatchOrders, inventoryItems])
 
-  // Contextual filtering based on Tab, Status, Project, and Search
+  // Contextual filtering based on Tab, Status, Project, Customer, Month, and Search
   const filteredPlans = useMemo(() => {
     let source = planRows
 
@@ -243,17 +268,37 @@ export function PlanningPage() {
       source = source.filter((p) => p.projectCode === projectFilter || p.projectName === projectFilter)
     }
 
+    if (customerFilter !== 'ALL') {
+      source = source.filter((p) => p.customerName === customerFilter)
+    }
+
+    if (monthFilter !== 'ALL') {
+      const monthNum = Number(monthFilter)
+      source = source.filter((p) => {
+        if (!p.plannedStartDate) return false
+        const d = new Date(p.plannedStartDate)
+        return !Number.isNaN(d.getTime()) && d.getMonth() + 1 === monthNum
+      })
+    }
+
     const keyword = query.trim().toLowerCase()
     if (!keyword) return source
 
     return source.filter((p) =>
-      [p.code, p.title, p.projectCode, p.projectName, p.category]
+      [p.code, p.title, p.projectCode, p.projectName, p.customerName, p.category]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
         .includes(keyword),
     )
-  }, [planRows, tab, statusFilter, projectFilter, query])
+  }, [planRows, tab, statusFilter, projectFilter, customerFilter, monthFilter, query])
+
+  const pageSize = 14
+  const pagedPlans = filteredPlans.slice((page - 1) * pageSize, page * pageSize)
+
+  useEffect(() => {
+    setPage(1)
+  }, [filteredPlans.length, query, statusFilter, projectFilter, customerFilter, monthFilter])
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['production-cockpit'] })
@@ -262,181 +307,12 @@ export function PlanningPage() {
     queryClient.invalidateQueries({ queryKey: ['logistics-dispatch-orders'] })
   }
 
-  const projects = projectsRuntime?.projects ?? []
-  const isFiltered = Boolean(query || statusFilter !== 'ALL' || projectFilter !== 'ALL')
-
   // Operational KPIs
   const totalPlanned = planRows.filter((p) => p.status === 'PLANNED' || p.status === 'SCHEDULED').length
   const totalInProgress = planRows.filter((p) => p.status === 'IN_PROGRESS').length
   const totalBlocked = planRows.filter((p) => p.status === 'BLOCKED' || Boolean(p.blockerReason)).length
   const totalCompleted = planRows.filter((p) => p.status === 'COMPLETED').length
 
-  return (
-    <EnterpriseWorkspace
-      eyebrow="Planning"
-      title="Kế hoạch tổng thể"
-      description="Lập lịch sản xuất, cân đối nguồn lực, vật tư MRP và tiến độ giao vận."
-      breadcrumbs={['Vận hành', 'Kế hoạch']}
-      tabs={tabs}
-      activeTab={tab}
-      actions={
-        <div className="flex items-center gap-2">
-          <button className={moduleMutedButton} onClick={refresh} type="button">
-            <RefreshCw size={14} /> Làm mới
-          </button>
-          <button className={modulePrimaryButton} onClick={() => setCreating(true)} type="button">
-            <Plus size={14} /> Lập kế hoạch mới
-          </button>
-        </div>
-      }
-    >
-      {/* 1. KPI Cards Row */}
-      <section className="grid gap-1 md:grid-cols-2 xl:grid-cols-4">
-        <CockpitKpiCard
-          title="Kế hoạch chờ chạy"
-          value={fmt(totalPlanned)}
-          note="Đã lập lịch / chưa phát lệnh"
-          icon={<CalendarClock size={18} />}
-          tone="cyan"
-          state={isLoading ? 'loading' : 'normal'}
-        />
-        <CockpitKpiCard
-          title="Đang thực hiện"
-          value={fmt(totalInProgress)}
-          note="Đang chạy xưởng & giao vận"
-          icon={<Factory size={18} />}
-          tone="blue"
-          state={isLoading ? 'loading' : 'normal'}
-        />
-        <CockpitKpiCard
-          title="Điểm nghẽn / Nghẽn MRP"
-          value={fmt(totalBlocked)}
-          note="Vượt định mức / thiếu vật tư"
-          icon={<AlertTriangle size={18} />}
-          tone="amber"
-          state={isLoading ? 'loading' : 'normal'}
-        />
-        <CockpitKpiCard
-          title="Hoàn thành mục tiêu"
-          value={fmt(totalCompleted)}
-          note="Đã đóng chu kỳ kế hoạch"
-          icon={<CheckCircle2 size={18} />}
-          tone="emerald"
-          state={isLoading ? 'loading' : 'normal'}
-        />
-      </section>
-
-      {/* 2. Search & Filter Toolbar */}
-      <section className="my-1 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-2">
-        <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2">
-          <Search size={14} className="text-cyan-300 shrink-0" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm mã kế hoạch, hạng mục, công trình..."
-            className="h-8 w-full bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-500"
-          />
-        </div>
-
-        {/* Quick Status Chips */}
-        <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-          {[
-            { id: 'ALL', label: 'Tất cả' },
-            { id: 'PLANNED', label: 'Chờ thực hiện' },
-            { id: 'IN_PROGRESS', label: 'Đang chạy' },
-            { id: 'BLOCKED', label: 'Điểm nghẽn' },
-            { id: 'COMPLETED', label: 'Hoàn thành' },
-          ].map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              onClick={() => setStatusFilter(chip.id)}
-              className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-xs transition ${
-                statusFilter === chip.id
-                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 font-semibold'
-                  : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200 border border-white/5'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-slate-400">
-            <Filter size={14} className="text-slate-400" />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="PLANNED">Chờ thực hiện</option>
-            <option value="IN_PROGRESS">Đang chạy</option>
-            <option value="BLOCKED">Điểm nghẽn</option>
-            <option value="COMPLETED">Hoàn thành</option>
-          </select>
-
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="h-8 max-w-[180px] truncate rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
-          >
-            <option value="ALL">Tất cả dự án</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.code}>
-                {p.code} · {p.name}
-              </option>
-            ))}
-          </select>
-
-          {isFiltered && (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery('')
-                setStatusFilter('ALL')
-                setProjectFilter('ALL')
-              }}
-              className="h-8 rounded-lg border border-red-500/30 bg-red-500/10 px-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition flex items-center gap-1 shrink-0"
-              title="Xóa bộ lọc"
-            >
-              <X size={12} /> Xóa lọc
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* 3. Hero Workspace & Supporting Analytics */}
-      <MainPlanningWorkspace
-        tab={tab}
-        plans={filteredPlans}
-        allPlans={planRows}
-        onSelect={setSelectedPlan}
-        loading={isLoading}
-      />
-
-      {/* Drawers */}
-      <PlanningDetailDrawer plan={selectedPlan} onClose={() => setSelectedPlan(null)} />
-      {creating ? <CreatePlanDrawer onClose={() => setCreating(false)} /> : null}
-    </EnterpriseWorkspace>
-  )
-}
-
-function MainPlanningWorkspace({
-  tab,
-  plans,
-  allPlans,
-  onSelect,
-  loading,
-}: {
-  tab: PlanningTab
-  plans: PlanRow[]
-  allPlans: PlanRow[]
-  onSelect: (plan: PlanRow) => void
-  loading: boolean
-}) {
   const getQuestionTitle = (currentTab: PlanningTab) => {
     switch (currentTab) {
       case 'master':
@@ -458,169 +334,388 @@ function MainPlanningWorkspace({
       case 'reports':
         return 'Báo cáo tổng kết hoàn thành kế hoạch'
       default:
-        return 'Hạng mục kế hoạch cần điều phối hôm nay'
+        return 'Hạng mục kế hoạch cần điều phối (Planning Overview)'
     }
   }
 
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {}
-    allPlans.forEach((p) => {
+    planRows.forEach((p) => {
       map[p.category] = (map[p.category] || 0) + 1
     })
     return map
-  }, [allPlans])
+  }, [planRows])
 
   const blockers = useMemo(() => {
-    return allPlans.filter((p) => p.status === 'BLOCKED' || Boolean(p.blockerReason))
-  }, [allPlans])
+    return planRows.filter((p) => p.status === 'BLOCKED' || Boolean(p.blockerReason))
+  }, [planRows])
 
   return (
-    <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <PlanningTable plans={plans} onSelect={onSelect} loading={loading} title={getQuestionTitle(tab)} />
-
-      <aside className="space-y-1">
-        <CockpitChartCard title="Phân loại Hạng mục Kế hoạch" className="h-[170px]">
-          <PlanningCategoryBars counts={categoryCounts} />
-        </CockpitChartCard>
-
-        <CockpitChartCard title="Cảnh báo Điểm nghẽn / Khóa" className="h-[260px]">
-          {blockers.length > 0 ? (
-            <div className="space-y-2 overflow-y-auto max-h-[200px]">
-              {blockers.slice(0, 5).map((p) => (
-                <div key={p.id} className="rounded-lg border border-red-500/20 bg-red-500/10 p-2 text-xs">
-                  <div className="flex items-center justify-between font-semibold text-red-200">
-                    <span>{p.code}</span>
-                    <span className="text-[10px] text-red-300">BLOCKED</span>
-                  </div>
-                  <p className="mt-1 text-slate-300 truncate">{p.title}</p>
-                  <p className="mt-1 text-[11px] text-red-300 font-mono">{p.blockerReason || 'Rào cản tiến độ'}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <CockpitEmptyState title="Không có điểm nghẽn" description="Mọi hạng mục kế hoạch đang vận hành đúng tiến độ." />
-          )}
-        </CockpitChartCard>
-
-        <CockpitStatusList
-          items={allPlans.slice(0, 5).map((p) => ({
-            id: p.id,
-            label: `${p.code} · ${p.title}`,
-            value: p.progress ? `${p.progress}%` : p.status,
-            statusTone: p.status === 'COMPLETED' ? 'emerald' : p.status === 'BLOCKED' ? 'red' : 'cyan',
-          }))}
-          emptyMessage="Chưa có dữ liệu kế hoạch."
-        />
-      </aside>
-    </div>
-  )
-}
-
-function PlanningTable({
-  plans,
-  onSelect,
-  loading,
-  title = 'Danh sách kế hoạch',
-}: {
-  plans: PlanRow[]
-  onSelect: (plan: PlanRow) => void
-  loading: boolean
-  title?: string
-}) {
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-
-  const paginatedPlans = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return plans.slice(start, start + pageSize)
-  }, [plans, page, pageSize])
-
-  if (loading) {
-    return <ModuleLoadingState label="Đang đọc dữ liệu kế hoạch..." />
-  }
-
-  return (
-    <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3 flex flex-col justify-between">
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">{title}</h2>
-          <span className="text-xs text-slate-500">{fmt(plans.length)} hạng mục</span>
+    <EnterpriseWorkspace
+      eyebrow="Planning"
+      title="Kế hoạch tổng thể"
+      description="Lập lịch sản xuất, cân đối nguồn lực, vật tư MRP và tiến độ giao vận."
+      breadcrumbs={['Vận hành', 'Kế hoạch']}
+      tabs={tabs}
+      activeTab={tab}
+    >
+      <div className="space-y-2 text-xs -mt-2">
+        {/* Phase 1: ENTERPRISE KPI CARDS */}
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+          <EnterpriseKpiCard
+            title="Chờ thực hiện (Planned)"
+            value={fmt(totalPlanned)}
+            tone="cyan"
+            icon={<CalendarClock size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Đang thực hiện (In Progress)"
+            value={fmt(totalInProgress)}
+            tone="blue"
+            icon={<Factory size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Điểm nghẽn / Cảnh báo"
+            value={fmt(totalBlocked)}
+            tone="amber"
+            icon={<AlertTriangle size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Hoàn thành mục tiêu"
+            value={fmt(totalCompleted)}
+            tone="emerald"
+            icon={<CheckCircle2 size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Tổng số kế hoạch"
+            value={fmt(planRows.length)}
+            tone="purple"
+            icon={<ClipboardList size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Dự án đang theo dõi"
+            value={fmt(projects.length)}
+            tone="cyan"
+            icon={<Boxes size={15} />}
+          />
         </div>
-        <CockpitTableShell className="min-h-[480px]">
-          {plans.length > 0 ? (
-            <table className="w-full min-w-[1100px] table-fixed text-[13px]">
-              <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
-                <tr>
-                  {['Mã kế hoạch', 'Hạng mục nội dung', 'Dự án', 'Phân loại', 'Số lượng / Tiến độ', 'Thời gian', 'Trạng thái', 'Thao tác'].map(
-                    (header, idx) => (
-                      <th
-                        key={header}
-                        className={`px-2 py-2 font-medium ${idx === 7 ? 'text-right' : 'text-left'}`}
-                      >
-                        {header}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedPlans.map((plan) => (
-                  <tr
-                    key={plan.id}
-                    onClick={() => onSelect(plan)}
-                    className="cursor-pointer border-b border-cyan-300/10 text-slate-300 hover:bg-cyan-300/[0.055] transition"
-                  >
-                    <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{plan.code}</td>
-                    <td className="px-2 py-2 text-white truncate font-medium">{plan.title}</td>
-                    <td className="px-2 py-2 truncate text-slate-300">{plan.projectName || plan.projectCode || '—'}</td>
-                    <td className="px-2 py-2 text-xs font-mono">{plan.category}</td>
-                    <td className="px-2 py-2 font-mono">
-                      {plan.progress != null
-                        ? `${plan.progress}%`
-                        : plan.quantity
-                          ? `${fmt(plan.quantity)} ${plan.unit || ''}`
-                          : '—'}
-                    </td>
-                    <td className="px-2 py-2 font-mono text-slate-400 text-xs">{formatDate(plan.plannedStartDate)}</td>
-                    <td className="px-2 py-2">
-                      <PlanStatusBadge status={plan.status} />
-                    </td>
-                    <td className="px-2 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onSelect(plan)
-                        }}
-                        className="inline-flex items-center gap-0.5 rounded bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/20 transition"
-                      >
-                        Chi tiết <ChevronRight size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <CockpitEmptyState
-              title="Chưa có dữ liệu kế hoạch"
-              description="Không tìm thấy mục kế hoạch nào thỏa mãn điều kiện lọc hiện tại."
-            />
-          )}
-        </CockpitTableShell>
-      </div>
 
-      {plans.length > 0 && (
-        <DataTablePagination
-          page={page}
-          pageSize={pageSize}
-          total={plans.length}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          pageSizeOptions={[10, 20, 50]}
-        />
-      )}
-    </section>
+        {/* Phase 3: COMPACT TOOLBAR */}
+        <EnterprisePanel className="rounded-xl -mt-1">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_150px_160px_160px_130px_110px_110px]">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setPage(1)
+              }}
+              placeholder="Tìm mã kế hoạch, hạng mục nội dung, dự án, khách hàng..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="PLANNED">Chờ thực hiện</option>
+              <option value="SCHEDULED">Đã lên lịch</option>
+              <option value="IN_PROGRESS">Đang chạy</option>
+              <option value="BLOCKED">Điểm nghẽn</option>
+              <option value="COMPLETED">Hoàn thành</option>
+              <option value="DRAFT">Nháp</option>
+            </select>
+
+            <select
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả dự án</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.code}>
+                  {p.code} · {p.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả khách hàng</option>
+              {customers.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={monthFilter}
+              onChange={(e) => {
+                setMonthFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả tháng</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={String(m)}>Tháng {m}</option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setPage(1)}
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('')
+                setStatusFilter('ALL')
+                setProjectFilter('ALL')
+                setCustomerFilter('ALL')
+                setMonthFilter('ALL')
+                setPage(1)
+                refresh()
+              }}
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
+          </div>
+        </EnterprisePanel>
+
+        {/* Phase 4: HERO TABLE & ANALYTICS DASHBOARD */}
+        <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+          <div className="xl:col-span-8">
+            <EnterprisePanel className="rounded-xl">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">{getQuestionTitle(tab)}</h3>
+                  <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                    {filteredPlans.length} hạng mục
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedModalOpen(true)}
+                  className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+                >
+                  Xem tất cả
+                </button>
+              </div>
+
+              <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+                {isLoading ? (
+                  <ModuleLoadingState label="Đang nạp dữ liệu kế hoạch..." />
+                ) : (
+                  <table className="w-full min-w-[1100px] table-fixed text-sm border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>
+                        {['Mã kế hoạch', 'Hạng mục nội dung', 'Dự án', 'Khách hàng', 'Phân loại', 'Số lượng / Tiến độ', 'Thời gian', 'Trạng thái', 'Thao tác'].map(
+                          (header, idx) => (
+                            <th
+                              key={header}
+                              className={`px-2 py-2 text-xs font-semibold text-slate-300 ${idx === 8 ? 'text-right' : 'text-left'}`}
+                            >
+                              {header}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedPlans.map((plan) => (
+                        <tr
+                          key={plan.id}
+                          onClick={() => setSelectedPlan(plan)}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                        >
+                          <td className="px-2 py-1.5 font-mono font-semibold text-cyan-300 text-xs">{plan.code}</td>
+                          <td className="px-2 py-1.5 text-white truncate font-medium">{plan.title}</td>
+                          <td className="px-2 py-1.5 truncate text-slate-300 text-xs">{plan.projectName || plan.projectCode || '—'}</td>
+                          <td className="px-2 py-1.5 truncate text-slate-400 text-xs">{plan.customerName || '—'}</td>
+                          <td className="px-2 py-1.5 text-xs font-mono text-cyan-200">{plan.category}</td>
+                          <td className="px-2 py-1.5 font-mono text-slate-200 text-xs">
+                            {plan.progress != null
+                              ? `${plan.progress}%`
+                              : plan.quantity
+                                ? `${fmt(plan.quantity)} ${plan.unit || ''}`
+                                : '—'}
+                          </td>
+                          <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{formatDate(plan.plannedStartDate)}</td>
+                          <td className="px-2 py-1.5">
+                            <PlanStatusBadge status={plan.status} />
+                          </td>
+                          <td className="px-2 py-1.5 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedPlan(plan)
+                              }}
+                              className="inline-flex items-center gap-0.5 rounded bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/20 transition"
+                            >
+                              Chi tiết <ChevronRight size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {!pagedPlans.length ? (
+                        <tr>
+                          <td colSpan={9} className="px-2 py-10">
+                            <ModuleEmptyState
+                              icon={<ClipboardList size={18} />}
+                              title="Chưa có dữ liệu kế hoạch"
+                              description="Không tìm thấy mục kế hoạch nào thỏa mãn điều kiện lọc hiện tại."
+                            />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <DataTablePagination page={page} pageSize={pageSize} total={filteredPlans.length} onPageChange={setPage} />
+            </EnterprisePanel>
+          </div>
+
+          <aside className="space-y-1 xl:col-span-4">
+            <CockpitChartCard title="Phân loại Hạng mục Kế hoạch" className="h-[210px]">
+              <PlanningCategoryBars counts={categoryCounts} />
+            </CockpitChartCard>
+
+            <CockpitChartCard title="Cảnh báo Điểm nghẽn / Rào cản" className="h-[260px]">
+              {blockers.length > 0 ? (
+                <div className="space-y-2 overflow-y-auto max-h-[200px]">
+                  {blockers.slice(0, 5).map((p) => (
+                    <div key={p.id} className="rounded-lg border border-red-500/20 bg-red-500/10 p-2 text-xs">
+                      <div className="flex items-center justify-between font-semibold text-red-200">
+                        <span>{p.code}</span>
+                        <span className="text-[10px] text-red-300 font-mono">BLOCKED</span>
+                      </div>
+                      <p className="mt-1 text-slate-300 truncate">{p.title}</p>
+                      <p className="mt-1 text-[11px] text-red-300 font-mono">{p.blockerReason || 'Rào cản tiến độ'}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <CockpitEmptyState title="Không có điểm nghẽn" description="Mọi hạng mục kế hoạch đang vận hành đúng tiến độ." />
+              )}
+            </CockpitChartCard>
+          </aside>
+        </div>
+
+        {/* Phase 5: EXPANDED TABLE MODAL */}
+        {expandedModalOpen
+          ? createPortal(
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div>
+                      <h2 className="text-base font-bold text-white">Toàn bộ danh sách kế hoạch (Planning Overview)</h2>
+                      <p className="text-xs text-slate-400">Tổng cộng {filteredPlans.length} hạng mục kế hoạch trong hệ thống</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedModalOpen(false)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+
+                  <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                    <table className="w-full min-w-[1100px] text-xs table-fixed border-collapse">
+                      <thead
+                        className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                        style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                      >
+                        <tr>
+                          {['Mã kế hoạch', 'Hạng mục nội dung', 'Dự án', 'Khách hàng', 'Phân loại', 'Số lượng / Tiến độ', 'Thời gian', 'Trạng thái', 'Thao tác'].map(
+                            (header, idx) => (
+                              <th
+                                key={header}
+                                className={`px-2 py-2 text-left font-semibold text-slate-300 ${idx === 8 ? 'text-right' : ''}`}
+                              >
+                                {header}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPlans.map((plan) => (
+                          <tr
+                            key={plan.id}
+                            onClick={() => {
+                              setSelectedPlan(plan)
+                              setExpandedModalOpen(false)
+                            }}
+                            className={`${inventoryTableRow} cursor-pointer`}
+                          >
+                            <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{plan.code}</td>
+                            <td className="px-2 py-2 text-white font-medium truncate">{plan.title}</td>
+                            <td className="px-2 py-2 truncate text-slate-300">{plan.projectName || plan.projectCode || '—'}</td>
+                            <td className="px-2 py-2 truncate text-slate-400">{plan.customerName || '—'}</td>
+                            <td className="px-2 py-2 text-xs font-mono text-cyan-200">{plan.category}</td>
+                            <td className="px-2 py-2 font-mono text-slate-200">
+                              {plan.progress != null
+                                ? `${plan.progress}%`
+                                : plan.quantity
+                                  ? `${fmt(plan.quantity)} ${plan.unit || ''}`
+                                  : '—'}
+                            </td>
+                            <td className="px-2 py-2 font-mono text-slate-300">{formatDate(plan.plannedStartDate)}</td>
+                            <td className="px-2 py-2">
+                              <PlanStatusBadge status={plan.status} />
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedPlan(plan)
+                                  setExpandedModalOpen(false)
+                                }}
+                                className="inline-flex items-center gap-0.5 rounded bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/20 transition"
+                              >
+                                Chi tiết <ChevronRight size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <DataTablePagination page={page} pageSize={pageSize} total={filteredPlans.length} onPageChange={setPage} />
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
+
+        {/* Phase 6: DETAIL DRAWER */}
+        <PlanningDetailDrawer plan={selectedPlan} onClose={() => setSelectedPlan(null)} />
+      </div>
+    </EnterpriseWorkspace>
   )
 }
 
@@ -640,6 +735,7 @@ function PlanningDetailDrawer({ plan, onClose }: { plan: PlanRow | null; onClose
           <Info label="Mã kế hoạch" value={plan.code} />
           <Info label="Phân loại" value={plan.category} />
           <Info label="Dự án" value={plan.projectName || plan.projectCode} />
+          <Info label="Khách hàng" value={plan.customerName} />
           <Info label="Trạng thái" value={plan.status} />
           <Info label="Thời gian kế hoạch" value={formatDate(plan.plannedStartDate)} />
           <Info label="Khối lượng / Tiến độ" value={plan.progress ? `${plan.progress}%` : plan.quantity ? `${fmt(plan.quantity)} ${plan.unit || ''}` : '—'} />
@@ -669,43 +765,6 @@ function PlanningDetailDrawer({ plan, onClose }: { plan: PlanRow | null; onClose
   )
 }
 
-function CreatePlanDrawer({ onClose }: { onClose: () => void }) {
-  return (
-    <ModuleDetailDrawer
-      open
-      onClose={onClose}
-      title="Lập kế hoạch mới"
-      subtitle="Tạo kế hoạch điều phối sản xuất, vật tư hoặc giao vận"
-      size="md"
-    >
-      <div className="space-y-3 text-sm text-slate-300">
-        <label className="space-y-1 text-xs text-slate-400">
-          Mã kế hoạch
-          <input className={`${moduleInput} w-full`} placeholder="VD: PLN-2026-001" />
-        </label>
-        <label className="space-y-1 text-xs text-slate-400">
-          Tên kế hoạch
-          <input className={`${moduleInput} w-full`} placeholder="Tên kế hoạch điều phối" />
-        </label>
-
-        <CockpitEmptyState
-          title="Form tạo kế hoạch mới"
-          description="Nghiệp vụ lập kế hoạch mới sẽ đồng bộ tự động với lệnh sản xuất và lịch giao nhận."
-        />
-
-        <footer className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-cyan-300/10 bg-[#07111f]/95 px-1 py-3 backdrop-blur">
-          <button className={moduleMutedButton} onClick={onClose} type="button">
-            Hủy
-          </button>
-          <button className={modulePrimaryButton} onClick={onClose} type="button">
-            Xác nhận tạo kế hoạch
-          </button>
-        </footer>
-      </div>
-    </ModuleDetailDrawer>
-  )
-}
-
 function PlanningCategoryBars({ counts }: { counts: Record<string, number> }) {
   const rows = Object.entries(counts)
   if (!rows.length)
@@ -716,7 +775,7 @@ function PlanningCategoryBars({ counts }: { counts: Record<string, number> }) {
       {rows.map(([category, value]) => (
         <div key={category}>
           <div className="mb-1 flex justify-between">
-            <span className="text-slate-300">{category}</span>
+            <span className="text-slate-300 font-medium">{category}</span>
             <span className="font-mono font-semibold text-cyan-300">{fmt(value)}</span>
           </div>
           <div className="h-2 rounded bg-white/10">
@@ -734,11 +793,11 @@ function PlanningCategoryBars({ counts }: { counts: Record<string, number> }) {
 function PlanStatusBadge({ status }: { status: PlanRow['status'] }) {
   const tones: Record<PlanRow['status'], string> = {
     DRAFT: 'border-slate-500/30 bg-slate-500/10 text-slate-300',
-    PLANNED: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
+    PLANNED: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-semibold',
     SCHEDULED: 'border-blue-500/30 bg-blue-500/10 text-blue-300',
-    IN_PROGRESS: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-    COMPLETED: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-    BLOCKED: 'border-red-500/30 bg-red-500/10 text-red-300',
+    IN_PROGRESS: 'border-amber-500/30 bg-amber-500/10 text-amber-300 font-semibold',
+    COMPLETED: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 font-semibold',
+    BLOCKED: 'border-red-500/30 bg-red-500/10 text-red-300 font-semibold',
   }
   const labels: Record<PlanRow['status'], string> = {
     DRAFT: 'Nháp',

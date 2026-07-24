@@ -1,5 +1,31 @@
 # Current State
 
+## Planning Overview Action Provider Fix Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, two key Action Provider bugs were resolved:
+- **BUG 1**: Removed all duplicate `+ Lập kế hoạch mới` buttons from local page headers, hero tables, toolbars, and tab content. The primary creation action now exists **ONLY in the global `AppTopbar`**.
+- **BUG 2**: Fixed provider hierarchy by wrapping `OperationalShell` (`src/shared/layouts/OperationalShell.tsx`) with `PlanningActionProvider` (and `ProductionActionProvider`). `AppTopbar` is now inside `PlanningActionProvider`, allowing `PlanningGlobalActionBar` to trigger `openCreatePlan()` properly. Mounts `CreatePlanModal` via `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Planning Overview UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, Planning Overview (`/planning`) was standardized according to the 6-phase Golden Reference UI Polish specification:
+- **Task 1**: Moved primary creation action `+ Lập kế hoạch mới` to page topbar via `PlanningActionContext` & `PlanningGlobalActionBar` registered in `AppTopbar`. Toolbar now strictly contains search and filter controls.
+- **Task 2**:
+  - Phase 1: 6 `<EnterpriseKpiCard />` items (`Chờ thực hiện`, `Đang thực hiện`, `Điểm nghẽn / Cảnh báo`, `Hoàn thành mục tiêu`, `Tổng số kế hoạch`, `Dự án đang theo dõi`).
+  - Phase 2: Refactored category breakdown & bottleneck constraint analytics cards.
+  - Phase 3: Compact `EnterprisePanel` toolbar with search input, status dropdown, project dropdown, customer dropdown, month dropdown, search button, and refresh button.
+  - Phase 4: Sticky table header (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredPlans.length} hạng mục`, pagination via `DataTablePagination`.
+  - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+  - Phase 6: Standardized `PlanningDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
 ## Production Advanced Operations UI Polish Sprint
 
 Status: **IMPLEMENTED - TEST/BUILD PASS**

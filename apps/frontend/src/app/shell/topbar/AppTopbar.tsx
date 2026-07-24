@@ -12,6 +12,7 @@ import { useAuthStore } from '../../../store/auth.store'
 import { InventoryGlobalActionBar } from '../../../modules/inventory/components/InventoryGlobalActionBar'
 import { ComponentsGlobalActionBar } from '../../../modules/components/components/ComponentsGlobalActionBar'
 import { ProductionGlobalActionBar } from '../../../modules/production/components/ProductionGlobalActionBar'
+import { PlanningGlobalActionBar } from '../../../modules/planning/components/PlanningGlobalActionBar'
 
 export function AppTopbar() {
   const user = useAuthStore((s) => s.user)
@@ -24,6 +25,7 @@ export function AppTopbar() {
   const isInventoryRoute = location.pathname.startsWith('/inventory')
   const isComponentsRoute = location.pathname.startsWith('/components')
   const isProductionRoute = location.pathname.startsWith('/production')
+  const isPlanningRoute = location.pathname.startsWith('/planning')
 
   function handleLogout() {
     logout()
@@ -42,6 +44,7 @@ export function AppTopbar() {
         {isInventoryRoute ? <InventoryGlobalActionBar /> : null}
         {isComponentsRoute ? <ComponentsGlobalActionBar /> : null}
         {isProductionRoute ? <ProductionGlobalActionBar /> : null}
+        {isPlanningRoute ? <PlanningGlobalActionBar /> : null}
 
         <div className="hidden items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-2.5 lg:flex">
           <Search size={15} className="text-zinc-500" />

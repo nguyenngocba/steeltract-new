@@ -1,5 +1,9 @@
 # Project Status
 
+On 2026-07-24 completed **Planning Overview Action Provider Fix Sprint**. Wrapped `OperationalShell` with `PlanningActionProvider` so `AppTopbar` has access to `PlanningActionContext`. Clicking `+ Lập kế hoạch mới` in `AppTopbar` now triggers `CreatePlanModal` mounted via `createPortal(..., document.body)`. Removed all duplicate creation buttons across local headers, hero tables, toolbars, and tab content.
+
+On 2026-07-24 completed **Planning Overview UI Polish Sprint**. The primary creation action `+ Lập kế hoạch mới` was moved to the page header topbar via `PlanningActionContext` and `PlanningGlobalActionBar`. The Planning Overview page (`/planning`) was standardized across all 6 phases (`EnterpriseKpiCard` strip, `CockpitChartCard` analytics, compact toolbar with dropdowns for Status, Project, Customer, Month, sticky Hero Table with count pill, expanded table modal via `createPortal`, and detail drawer). Both frontend and backend builds compile with 0 errors.
+
 On 2026-07-24 completed **Production Advanced Operations UI Polish Sprint**. All 9 low-frequency Advanced Operations pages (`/production/advanced`: Machines, Production Warehouse, Material Reservations, Material Ledger, Material Issues, Material Consumptions, Incidents/Rework, Machine Logs, Advanced Reports) have been standardized across all 6 phases (`EnterpriseKpiCard`, compact toolbar, sticky Hero Table with count pill, expanded modal via `createPortal`, and detail drawers). Both frontend and backend builds compile with 0 errors.
 
 On 2026-07-23 started the Component Manufacturing Workflow epic and completed

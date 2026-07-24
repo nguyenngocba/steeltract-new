@@ -1,5 +1,47 @@
 # SteelTrack AI Changelog
 
+## 2026-07-24 Planning Overview Action Provider Fix Sprint
+
+Completed:
+
+- **BUG 1 Fix: Single Primary Action Enforcement**:
+  - Removed duplicate `+ Lập kế hoạch mới` buttons from local page header actions (`EnterpriseWorkspace` props), hero table, toolbar, and tab content.
+  - Enforced that `+ Lập kế hoạch mới` exists **ONLY in the global `AppTopbar`**.
+
+- **BUG 2 Fix: Action Chain & Provider Hierarchy**:
+  - Moved `PlanningActionProvider` (and `ProductionActionProvider`) to wrap `OperationalShell` (`src/shared/layouts/OperationalShell.tsx`).
+  - This ensures `AppTopbar` is rendered INSIDE `PlanningActionProvider`, allowing `PlanningGlobalActionBar` in `AppTopbar` to consume the real `PlanningActionContext` instead of a fallback dummy context.
+  - Implemented `CreatePlanModal` inside `PlanningActionContext.tsx` mounted via `createPortal(..., document.body)` with high z-index (`z-[9999]`) and backdrop blur (`backdrop-blur-sm`).
+  - Verified full action chain: `PlanningGlobalActionBar` -> `PlanningActionContext` -> `PlanningActionProvider` -> `createPlanOpen: true` -> `CreatePlanModal` -> `createPortal` -> visible modal.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Planning Overview UI Polish Sprint
+
+Completed:
+
+- **Task 1: Page Header Primary Action Migration**:
+  - Created `PlanningActionContext` & `PlanningActionProvider` (`src/modules/planning/context/PlanningActionContext.tsx`).
+  - Created `PlanningGlobalActionBar` (`src/modules/planning/components/PlanningGlobalActionBar.tsx`) with the primary `+ Lập kế hoạch mới` button.
+  - Registered `PlanningGlobalActionBar` in `AppTopbar` (`src/app/shell/topbar/AppTopbar.tsx`) for `/planning` routes and passed it to `EnterpriseWorkspace` actions.
+  - Cleared primary action buttons from the toolbar so it contains **only search and filtering controls**.
+
+- **Task 2: Standardize Planning Overview (`PlanningPage.tsx`)**:
+  - **Phase 1: Enterprise KPI Cards**: Refactored top KPI strip to 6 `<EnterpriseKpiCard />` items (`Chờ thực hiện (Planned)`, `Đang thực hiện (In Progress)`, `Điểm nghẽn / Cảnh báo`, `Hoàn thành mục tiêu`, `Tổng số kế hoạch`, `Dự án đang theo dõi`).
+  - **Phase 2: Analytics Dashboard**: Standardized planning category breakdown & constraint bottleneck warning chart cards (`CockpitChartCard`).
+  - **Phase 3: Compact Toolbar**: Refactored `EnterprisePanel` toolbar containing search input, `statusFilter` dropdown, `projectFilter` dropdown, `customerFilter` dropdown, `monthFilter` dropdown, `Tìm kiếm` button, and `Làm mới` button. All categorical filters use predefined dropdown selectors.
+  - **Phase 4: Hero Table**: Added sticky table header (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredPlans.length} hạng mục`, typography polish, and `DataTablePagination`.
+  - **Phase 5: Expanded Modal**: Implemented full-screen table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+  - **Phase 6: Detail Drawer**: Standardized `PlanningDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
 ## 2026-07-24 Production Advanced Operations UI Polish Sprint
 
 Completed:
