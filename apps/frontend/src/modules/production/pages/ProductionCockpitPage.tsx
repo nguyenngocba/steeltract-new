@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
-import { Archive, Boxes, ClipboardList, Factory, FileStack, Search, Wrench } from 'lucide-react'
+import { Activity, AlertTriangle, Archive, BarChart3, Boxes, CheckCircle2, ClipboardList, Clock, Cpu, Eye, Factory, FileStack, FileText, Gauge, Layers, Package, RotateCcw, Search, SlidersHorizontal, Wrench } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
@@ -12,10 +13,12 @@ import {
   enterprisePrimaryButton,
 } from '@/shared/forms'
 import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleFilterBar, ModuleKpiStrip } from '@/shared/ui/modules'
-import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '@/shared/ui/cockpit'
+import { CockpitChartCard, CockpitKpiCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination, EnterpriseKpiCard } from '@/shared/ui/cockpit'
+import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
 import {
   EnterpriseChartCard as InventoryChartCard,
   EnterpriseKpi as InventoryKpi,
+  EnterprisePanel,
   enterpriseGridGap as inventoryGridGap,
   enterpriseInput as inventoryInput,
   enterpriseMutedButton as inventoryMutedButton,
@@ -43,6 +46,7 @@ import {
 } from '../components/ProductionMaterialCommandModals'
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
+import { InventoryPanel } from '@/modules/inventory/components/InventoryVisuals'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import {
   useMaterialRequirements,
@@ -247,56 +251,86 @@ export function ProductionCockpitPage() {
     setCockpitPage(1)
   }, [deferredSearch, mode, statusFilter])
 
-  return <EnterpriseWorkspace>
-      <div className="w-full min-w-0 flex-1 space-y-1">
-
-      <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-        {mode === 'machines' ? (
-          <>
-            <CockpitKpiCard title="Tổng máy" value={number(machines.length)} note="Theo endpoint Production Machines" tone="blue" state="normal" />
-            <CockpitKpiCard title="Online" value={number(machineOnline)} note="Không OFFLINE/DOWN" tone="emerald" state="normal" />
-            <CockpitKpiCard title="Bảo trì" value={number(machineMaintenance)} note="MAINTENANCE" tone="amber" state="normal" />
-            <CockpitKpiCard title="Utilization TB" value={`${formatQuantity(machineAverageUtilization, 0)}%`} note="Trung bình utilization" tone="cyan" state="normal" />
-            <CockpitKpiCard title="Work Centers" value={number(cockpit?.workCenters.length ?? 0)} note="Từ read model sản xuất" tone="purple" state="normal" />
-            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="MO đang chạy" tone="blue" state="normal" />
-          </>
-        ) : isWorkOrderMode ? (
-          <>
-            <CockpitKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} note="Tất cả WO/MO" tone="blue" state="normal" />
-            <CockpitKpiCard title="Planned" value={number(planned)} note="Đã lập kế hoạch" tone="purple" state="normal" />
-            <CockpitKpiCard title="Released" value={number(released)} note="Sẵn sàng phát hành" tone="cyan" state="normal" />
-            <CockpitKpiCard title="In Progress" value={number(inProgress)} note="Đang sản xuất" tone="emerald" state="normal" />
-            <CockpitKpiCard title="Completed" value={number(completed)} note="Đã hoàn thành" tone="emerald" state="normal" />
-            <CockpitKpiCard title="Delayed" value={number(delayed)} note="Quá hạn/chậm tiến độ" tone="red" state="normal" />
-          </>
-        ) : (
-          <>
-            <CockpitKpiCard title="Đang sản xuất" value={number(inProgress)} note="Đang chạy tại xưởng" tone="cyan" state="normal" active={statusFilter === 'IN_PROGRESS'} onClick={() => setStatusFilter('IN_PROGRESS')} />
-            <CockpitKpiCard title="Hoàn thành hôm nay" value={number(completedToday)} note={`${number(completed)} hoàn thành tổng`} tone="emerald" state="normal" active={statusFilter === 'COMPLETED'} onClick={() => setStatusFilter('COMPLETED')} />
-            <CockpitKpiCard title="Chờ vật tư" value={number(waitingMaterial)} note="MO chưa có issue" tone="amber" state="normal" />
-            <CockpitKpiCard title="Trễ tiến độ" value={number(delayed)} note="Quá hạn hoặc delayed" tone="red" state="normal" active={statusFilter === 'DELAYED'} onClick={() => setStatusFilter('DELAYED')} />
-            <CockpitKpiCard title="Cấu kiện đang chạy" value={number(runningComponents)} note="Đang sản xuất" tone="purple" state="normal" />
-            <CockpitKpiCard title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} note="Theo BOM x MO" tone="blue" state="normal" />
-          </>
-        )}
-      </div>
-
-      <ModuleFilterBar className="my-1">
-        <div className="flex min-w-64 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-5">
-          <Search size={15} className="text-cyan-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm mã, kết cấu, BOM, trạng thái..." className={`${inventoryInput} w-full border-0 bg-transparent px-0 focus:border-0 focus:bg-transparent`} />
+  return (
+    <EnterpriseModulePage>
+      <div className="space-y-2 text-xs -mt-2">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+          {mode === 'machines' ? (
+            <>
+              <EnterpriseKpiCard title="Tổng máy" value={number(machines.length)} tone="blue" icon={<Factory size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Online" value={number(machineOnline)} tone="emerald" icon={<CheckCircle2 size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Bảo trì" value={number(machineMaintenance)} tone="amber" icon={<AlertTriangle size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Utilization TB" value={`${formatQuantity(machineAverageUtilization, 0)}%`} tone="cyan" icon={<Wrench size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Work Centers" value={number(cockpit?.workCenters.length ?? 0)} tone="purple" icon={<Layers size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Đang sản xuất" value={number(inProgress)} tone="blue" icon={<Factory size={15} />} isLoading={workspacePending} />
+            </>
+          ) : isWorkOrderMode ? (
+            <>
+              <EnterpriseKpiCard title="Total Work Orders" value={number(summary?.total ?? 0)} tone="blue" icon={<ClipboardList size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Planned" value={number(planned)} tone="purple" icon={<Layers size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Released" value={number(released)} tone="cyan" icon={<CheckCircle2 size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="In Progress" value={number(inProgress)} tone="emerald" icon={<Factory size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Completed" value={number(completed)} tone="emerald" icon={<CheckCircle2 size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Delayed" value={number(delayed)} tone="red" icon={<AlertTriangle size={15} />} isLoading={workspacePending} />
+            </>
+          ) : (
+            <>
+              <EnterpriseKpiCard title="Đang sản xuất" value={number(inProgress)} tone="cyan" icon={<Factory size={15} />} isLoading={workspacePending} onClick={() => setStatusFilter(statusFilter === 'IN_PROGRESS' ? '' : 'IN_PROGRESS')} />
+              <EnterpriseKpiCard title="Hoàn thành hôm nay" value={number(completedToday)} tone="emerald" icon={<CheckCircle2 size={15} />} isLoading={workspacePending} onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? '' : 'COMPLETED')} />
+              <EnterpriseKpiCard title="Chờ vật tư" value={number(waitingMaterial)} tone="amber" icon={<Boxes size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Trễ tiến độ" value={number(delayed)} tone="red" icon={<AlertTriangle size={15} />} isLoading={workspacePending} onClick={() => setStatusFilter(statusFilter === 'DELAYED' ? '' : 'DELAYED')} />
+              <EnterpriseKpiCard title="Cấu kiện đang chạy" value={number(runningComponents)} tone="purple" icon={<Wrench size={15} />} isLoading={workspacePending} />
+              <EnterpriseKpiCard title="Khối lượng sản xuất" value={`${number(productionWeight)} kg`} tone="blue" icon={<FileStack size={15} />} isLoading={workspacePending} />
+            </>
+          )}
         </div>
-        <button onClick={() => setStatusFilter('')} className={`${inventoryMutedButton} xl:col-span-1 ${!statusFilter ? 'border-cyan-400/50 text-cyan-200' : ''}`}>Tất cả</button>
-        {[
-          ['IN_PROGRESS', 'Đang chạy'],
-          ['COMPLETED', 'Hoàn thành'],
-          ['DELAYED', 'Trễ'],
-        ].map(([value, label]) =>
-          <button key={value} onClick={() => setStatusFilter(value)} className={`${inventoryMutedButton} xl:col-span-1 ${statusFilter === value ? 'border-cyan-400/50 text-cyan-200' : ''}`}>{label}</button>)}
-        <button onClick={() => setCreateOrderOpen(true)} className={`${inventoryMutedButton} xl:col-span-1`}>+ Lệnh SX</button>
-        <button onClick={() => setCreateBomOpen(true)} className={`${inventoryMutedButton} xl:col-span-1`}>+ BOM</button>
-      </ModuleFilterBar>
+
+        <EnterprisePanel className="rounded-xl -mt-1">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setCockpitPage(1)
+              }}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="IN_PROGRESS">Đang sản xuất</option>
+              <option value="COMPLETED">Hoàn thành</option>
+              <option value="DELAYED">Trễ tiến độ</option>
+            </select>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setCockpitPage(1)
+              }}
+              placeholder="Tìm mã, kết cấu, BOM, trạng thái..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setCockpitPage(1)
+              }}
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('')
+                setStatusFilter('')
+                setCockpitPage(1)
+              }}
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
+          </div>
+        </EnterprisePanel>
 
       {workspacePending ? <ProductionWorkspaceState state="loading" /> : workspaceError ? <ProductionWorkspaceState state="error" /> : <>
       {mode === 'overview' && cockpit && <Overview readModel={cockpit} logs={logs} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
@@ -304,6 +338,7 @@ export function ProductionCockpitPage() {
       {mode === 'orders' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'planning' && cockpit && <Orders readModel={cockpit} onOpen={setSelectedOrder} onPageChange={setCockpitPage} />}
       {mode === 'execution' && <ProductionExecutionBoard orders={orders} issues={issues} reservations={reservations} />}
+      {mode === 'advanced' && <ProductionAdvancedWorkspace />}
       {mode === 'machines' && <MachinesWorkspace machines={machines} workCenters={cockpit?.workCenters ?? []} search={search} />}
       {mode === 'reservations' && <Reservations rows={reservations} orders={orders} onOpen={setSelectedOrder} />}
       {mode === 'warehouse' && <ProductionWarehouseCockpit inventoryItems={inventoryItems as InventoryItemLike[]} auditRows={inventoryAudit as InventoryAuditLike[]} orders={orders} reservations={reservations} consumptions={consumptions} />}
@@ -320,7 +355,8 @@ export function ProductionCockpitPage() {
       {createOrderOpen && <ManufacturingOrderModal components={components} boms={boms} onClose={() => setCreateOrderOpen(false)} />}
       {createBomOpen && <ProductionBomModal components={components} onClose={() => setCreateBomOpen(false)} />}
       </div>
-  </EnterpriseWorkspace>
+    </EnterpriseModulePage>
+  )
 }
 
 function ProductionWorkspaceState({
@@ -397,14 +433,17 @@ function ProductionWorkspaceState({
 function MachinesWorkspace({
   machines,
   workCenters,
-  search,
+  search: propSearch,
 }: {
   machines: ProductionMachine[]
-  workCenters: ProductionCockpitReadModel['workCenters']
-  search: string
+  workCenters: Array<{ id: string; code: string; name: string; status: string; _count: { machines: number } }>
+  search?: string
 }) {
-  const [status, setStatus] = useState('')
+  const [search, setSearch] = useState(propSearch ?? '')
+  const [status, setStatus] = useState<string>('')
   const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
   const pageSize = 14
   const normalizedSearch = search.trim().toLowerCase()
   const rows = useMemo(() => machines.filter((machine) => {
@@ -414,18 +453,22 @@ function MachinesWorkspace({
       .toLowerCase()
       .includes(normalizedSearch)
   }), [machines, normalizedSearch, status])
+
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
   const statusOptions = Array.from(new Set(machines.map((machine) => machine.status).filter(Boolean))).sort()
   const averageUtilization = machines.length
     ? machines.reduce((sum, machine) => sum + Number(machine.utilization ?? 0), 0) / machines.length
     : 0
   const online = machines.filter((machine) => !['OFFLINE', 'DOWN'].includes(machine.status)).length
+  const offline = machines.filter((machine) => machine.status === 'OFFLINE' || machine.status === 'DOWN').length
+  const maintenance = machines.filter((machine) => machine.status === 'MAINTENANCE').length
+
   const statusSegments = statusOptions.map((label, index) => ({
     label,
     value: machines.filter((machine) => machine.status === label).length,
     color: ['#14c987', '#06b6d4', '#f59e0b', '#ef4444', '#7c3aed', '#64748b'][index % 6],
   }))
+
   const workCenterRows = workCenters
     .map((workCenter) => ({
       id: workCenter.id,
@@ -436,77 +479,123 @@ function MachinesWorkspace({
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
     .map((workCenter) => ({ ...workCenter, value: formatQuantity(workCenter.count, 0) }))
+
   const topUtilization = [...machines]
     .sort((a, b) => Number(b.utilization ?? 0) - Number(a.utilization ?? 0))
     .slice(0, 5)
 
   useEffect(() => {
     setPage(1)
-  }, [rows.length, status])
+  }, [rows.length, status, search])
 
   return (
-    <div className="w-full min-w-0 flex-1 space-y-1">
-      <ModuleFilterBar className="my-1">
-        <button
-          type="button"
-          onClick={() => setStatus('')}
-          className={`${inventoryMutedButton} xl:col-span-1 ${!status ? 'border-cyan-400/50 text-cyan-200' : ''}`}
-        >
-          Máy: Tất cả
-        </button>
-        {statusOptions.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => setStatus(option)}
-            className={`${inventoryMutedButton} xl:col-span-1 ${status === option ? 'border-cyan-400/50 text-cyan-200' : ''}`}
-          >
-            {option}
-          </button>
-        ))}
-      </ModuleFilterBar>
+    <div className="space-y-2 text-xs -mt-2">
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng số máy móc" value={formatQuantity(machines.length, 0)} tone="blue" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Máy Online / Sẵn sàng" value={formatQuantity(online, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Máy Offline / Dừng" value={formatQuantity(offline, 0)} tone="red" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Utilization trung bình" value={`${formatQuantity(averageUtilization, 0)}%`} tone="cyan" icon={<Gauge size={15} />} />
+        <EnterpriseKpiCard title="Work Centers" value={formatQuantity(workCenters.length, 0)} tone="purple" icon={<Factory size={15} />} />
+        <EnterpriseKpiCard title="Máy đang bảo trì" value={formatQuantity(maintenance, 0)} tone="amber" icon={<SlidersHorizontal size={15} />} />
+      </div>
 
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-        <div className="xl:col-span-9">
-          <CockpitChartCard
-            title="Machine Status Registry"
-            subtitle="Máy móc, work center, trạng thái và utilization"
-            action={<span className="text-[11px] text-cyan-300">{rows.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, rows.length)} / {rows.length}</span>}
-            heightClass={COCKPIT_HEIGHTS.TABLE_MD}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
           >
-            <div className="flex h-full min-h-0 flex-col">
-              <CockpitTableShell className="min-h-0 flex-1">
-                <table className="w-full min-w-[980px] table-fixed text-left text-[13px]">
-                  <thead className={inventoryTableHead}>
-                    <tr>{['Machine', 'Work Center', 'Status', 'Utilization', 'Code'].map((head) => <th key={head} className="px-1.5 py-0.5 text-left font-medium">{head}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {pagedRows.map((machine) => (
-                      <tr key={machine.id} className={inventoryTableRow}>
-                        <td className="px-2 py-2 text-cyan-300">{machine.name}<div className="mt-0.5 truncate text-[10px] text-slate-500">{machine.code}</div></td>
-                        <td className="px-2 py-2 text-slate-300">{machine.workCenter ? `${machine.workCenter.code} · ${machine.workCenter.name}` : '-'}</td>
-                        <td className="px-2 py-2"><StatusChip status={machine.status} /></td>
-                        <td className="w-44 px-2 py-2">
-                          <Meter value={Number(machine.utilization ?? 0)} tone={Number(machine.utilization ?? 0) >= 80 ? 'bg-emerald-500' : Number(machine.utilization ?? 0) >= 50 ? 'bg-cyan-500' : 'bg-amber-500'} />
-                          <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(machine.utilization ?? 0, 0)}%</div>
-                        </td>
-                        <td className="px-2 py-2 font-mono text-slate-400">{machine.id}</td>
-                      </tr>
-                    ))}
-                    {emptyRows.map((_, index) => (
-                      <tr key={`machine-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                        <td colSpan={5} className="h-[46px] px-2 py-2">
-                          <div className="h-px w-full bg-white/[0.035]" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!pagedRows.length ? <ModuleEmptyState icon={<Wrench size={18} />} title="Chưa có dữ liệu máy móc" description="Danh sách máy sẽ hiển thị khi backend trả machine telemetry." /> : null}
-              </CockpitTableShell>
-              <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+            <option value="">Tất cả trạng thái máy</option>
+            {statusOptions.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm máy theo mã máy, tên máy, work center..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setStatus('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách máy móc & Work Center</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {rows.length} máy
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
             </div>
-          </CockpitChartCard>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[980px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['Mã / Tên máy', 'Work Center', 'Trạng thái', 'Utilization', 'ID'].map((head) => <th key={head} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{head}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((machine) => (
+                    <tr key={machine.id} className={inventoryTableRow}>
+                      <td className="px-2 py-1.5 text-cyan-300 font-semibold font-mono">{machine.name}<div className="mt-0.5 truncate text-[10px] text-slate-400 font-normal">{machine.code}</div></td>
+                      <td className="px-2 py-1.5 text-slate-300 font-mono text-xs">{machine.workCenter ? `${machine.workCenter.code} · ${machine.workCenter.name}` : '-'}</td>
+                      <td className="px-2 py-1.5"><StatusChip status={machine.status} /></td>
+                      <td className="w-44 px-2 py-1.5">
+                        <Meter value={Number(machine.utilization ?? 0)} tone={Number(machine.utilization ?? 0) >= 80 ? 'bg-emerald-500' : Number(machine.utilization ?? 0) >= 50 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                        <div className="mt-1 text-[10px] font-mono text-slate-400">{formatQuantity(machine.utilization ?? 0, 0)}%</div>
+                      </td>
+                      <td className="px-2 py-1.5 font-mono text-slate-400 text-xs">{machine.id}</td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={5} className="px-2 py-10">
+                        <ModuleEmptyState icon={<Wrench size={18} />} title="Chưa có dữ liệu máy móc" description="Danh sách máy sẽ hiển thị khi backend trả machine telemetry." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+          </EnterprisePanel>
         </div>
         <aside className="space-y-1 xl:col-span-3">
           <CockpitChartCard title="Trạng thái máy" subtitle="Theo machine status" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
@@ -537,7 +626,7 @@ function MachinesWorkspace({
           }))} empty="Chưa có utilization" />
         </CockpitChartCard>
         <CockpitChartCard title="Machine health" subtitle="Online / offline thật" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-          {machines.length ? <ProductionMiniBars values={[online, Math.max(0, machines.length - online), machines.filter((machine) => machine.status === 'MAINTENANCE').length]} /> : (
+          {machines.length ? <ProductionMiniBars values={[online, Math.max(0, machines.length - online), maintenance]} /> : (
             <ModuleEmptyState icon={<Wrench size={18} />} title="Chưa có health telemetry" description="Không hiển thị bar chart khi chưa có máy." />
           )}
         </CockpitChartCard>
@@ -545,6 +634,57 @@ function MachinesWorkspace({
           <RankList rows={workCenterRows} empty="Chưa có capacity" />
         </CockpitChartCard>
       </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách máy móc sản xuất</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {rows.length} máy trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[980px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['Mã / Tên máy', 'Work Center', 'Trạng thái', 'Utilization', 'ID'].map((head) => <th key={head} className="px-2 py-2 text-left font-semibold text-slate-300">{head}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((machine) => (
+                        <tr key={machine.id} className={inventoryTableRow}>
+                          <td className="px-2 py-2 text-cyan-300 font-semibold font-mono">{machine.name}<div className="mt-0.5 truncate text-[10px] text-slate-400 font-normal">{machine.code}</div></td>
+                          <td className="px-2 py-2 text-slate-300 font-mono text-xs">{machine.workCenter ? `${machine.workCenter.code} · ${machine.workCenter.name}` : '-'}</td>
+                          <td className="px-2 py-2"><StatusChip status={machine.status} /></td>
+                          <td className="w-44 px-2 py-2">
+                            <Meter value={Number(machine.utilization ?? 0)} tone={Number(machine.utilization ?? 0) >= 80 ? 'bg-emerald-500' : Number(machine.utilization ?? 0) >= 50 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                            <div className="mt-1 text-[10px] font-mono text-slate-400">{formatQuantity(machine.utilization ?? 0, 0)}%</div>
+                          </td>
+                          <td className="px-2 py-2 font-mono text-slate-400 text-xs">{machine.id}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }
@@ -556,6 +696,11 @@ function ProductionIncidentsWorkspace({
   orders: ProductionOrder[]
   logs: ProductionLog[]
 }) {
+  const [search, setSearch] = useState('')
+  const [sourceFilter, setSourceFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
   const delayedRows = orders.filter((order) => isDelayedOrder(order))
   const incidentLogs = logs.filter((log) => /delay|incident|error|fail|cancel|scrap/i.test(`${log.type} ${log.message}`))
   const incidentRows = [
@@ -578,69 +723,206 @@ function ProductionIncidentsWorkspace({
       tone: 'text-amber-300',
     })),
   ]
-  const [page, setPage] = useState(1)
+
+  const filteredRows = useMemo(() => {
+    return incidentRows.filter((row) => {
+      const matchSearch = !search || `${row.code} ${row.description} ${row.source}`.toLowerCase().includes(search.toLowerCase())
+      const matchSource = !sourceFilter || row.source === sourceFilter
+      return matchSearch && matchSource
+    })
+  }, [incidentRows, search, sourceFilter])
+
   const pageSize = 14
-  const pagedRows = incidentRows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
 
   useEffect(() => {
     setPage(1)
-  }, [incidentRows.length])
+  }, [filteredRows.length, search, sourceFilter])
 
-  return <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_320px]">
-    <CockpitChartCard title={`Sự cố / cảnh báo sản xuất (${incidentRows.length})`} subtitle="Delayed orders và log cảnh báo hiện có" heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-      <div className="flex h-full min-h-0 flex-col">
-      <CockpitTableShell className="min-h-0 flex-1">
-        <table className="w-full min-w-[780px] table-fixed text-[13px]">
-          <thead className={inventoryTableHead}>
-            <tr>
-              {['Nguồn', 'Mã', 'Trạng thái', 'Mô tả', 'Thời gian'].map((heading) => (
-                <th key={heading} className="px-3 py-2 text-left font-semibold">{heading}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {pagedRows.map((row) => (
-              <tr key={row.id} className={inventoryTableRow}>
-                <td className={`px-3 py-2 ${row.tone}`}>{row.source}</td>
-                <td className="truncate px-3 py-2 font-mono text-cyan-300">{row.code}</td>
-                <td className="px-3 py-2">{row.status}</td>
-                <td className="truncate px-3 py-2">{row.description}</td>
-                <td className="px-3 py-2">{row.time}</td>
-              </tr>
-            ))}
-            {emptyRows.map((_, index) => (
-              <tr key={`incident-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                <td colSpan={5} className="h-[46px] px-2 py-2">
-                  <div className="h-px w-full bg-white/[0.035]" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </CockpitTableShell>
-      {!pagedRows.length ? <div className="p-3"><ModuleEmptyState title="Không có sự cố đang mở" description="Workspace sẽ hiển thị delayed order hoặc log cảnh báo khi phát sinh." icon={<Wrench size={18} />} /></div> : null}
-      <DataTablePagination page={page} pageSize={pageSize} total={incidentRows.length} onPageChange={setPage} />
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng số cảnh báo/sự cố" value={formatQuantity(incidentRows.length, 0)} tone="amber" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Đơn hàng trễ (Delayed)" value={formatQuantity(delayedRows.length, 0)} tone="red" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Cảnh báo Log hệ thống" value={formatQuantity(incidentLogs.length, 0)} tone="amber" icon={<Activity size={15} />} />
+        <EnterpriseKpiCard title="Sự cố Order" value={formatQuantity(delayedRows.length, 0)} tone="purple" icon={<Factory size={15} />} />
+        <EnterpriseKpiCard title="Sự cố từ máy/process" value={formatQuantity(incidentLogs.length, 0)} tone="cyan" icon={<Cpu size={15} />} />
+        <EnterpriseKpiCard title="Mức độ nghiêm trọng" value="High Risk" tone="red" icon={<Wrench size={15} />} />
       </div>
-    </CockpitChartCard>
-    <aside className="space-y-1">
-      <CockpitChartCard title="Đơn hàng trễ" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <div className="text-3xl font-semibold text-red-300">{formatQuantity(delayedRows.length, 0)}</div>
-        <p className="mt-2 text-xs text-slate-400">Tính từ Production Order quá hạn hoặc trạng thái delayed.</p>
-      </CockpitChartCard>
-      <CockpitChartCard title="Log cảnh báo" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <div className="text-3xl font-semibold text-amber-300">{formatQuantity(incidentLogs.length, 0)}</div>
-        <p className="mt-2 text-xs text-slate-400">Dựa trên action/description hiện có trong production log.</p>
-      </CockpitChartCard>
-      <CockpitChartCard title="Tổng cảnh báo" subtitle="Delayed + warning logs" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <div className="space-y-2 text-xs text-slate-300">
-          <Info k="Open items" v={formatQuantity(incidentRows.length, 0)} />
-          <Info k="Delayed orders" v={formatQuantity(delayedRows.length, 0)} />
-          <Info k="Warning logs" v={formatQuantity(incidentLogs.length, 0)} />
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={sourceFilter}
+            onChange={(e) => {
+              setSourceFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả nguồn phát sinh</option>
+            <option value="Order">Lệnh sản xuất (Order)</option>
+            <option value="Log">Nhật ký sản xuất (Log)</option>
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã đơn hàng, nội dung sự cố, trạng thái..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setSourceFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
         </div>
-      </CockpitChartCard>
-    </aside>
-  </div>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Sự cố & cảnh báo sản xuất (Incidents & Rework)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredRows.length} cảnh báo
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[780px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>
+                    {['Nguồn', 'Mã đối tượng', 'Trạng thái', 'Mô tả chi tiết', 'Thời gian phát sinh'].map((heading) => (
+                      <th key={heading} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => (
+                    <tr key={row.id} className={inventoryTableRow}>
+                      <td className={`px-2 py-1.5 font-semibold text-xs ${row.tone}`}>{row.source}</td>
+                      <td className="truncate px-2 py-1.5 font-mono text-cyan-300 font-semibold">{row.code}</td>
+                      <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
+                      <td className="truncate px-2 py-1.5 text-white">{row.description}</td>
+                      <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{row.time}</td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={5} className="px-2 py-10">
+                        <ModuleEmptyState icon={<AlertTriangle size={18} />} title="Không có sự cố đang mở" description="Workspace sẽ hiển thị delayed order hoặc log cảnh báo khi phát sinh." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
+        </div>
+
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Đơn hàng trễ" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="text-3xl font-semibold text-red-300 font-mono">{formatQuantity(delayedRows.length, 0)}</div>
+            <p className="mt-2 text-xs text-slate-400">Tính từ Production Order quá hạn hoặc trạng thái delayed.</p>
+          </CockpitChartCard>
+          <CockpitChartCard title="Log cảnh báo" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="text-3xl font-semibold text-amber-300 font-mono">{formatQuantity(incidentLogs.length, 0)}</div>
+            <p className="mt-2 text-xs text-slate-400">Dựa trên action/description hiện có trong production log.</p>
+          </CockpitChartCard>
+          <CockpitChartCard title="Tổng cảnh báo" subtitle="Delayed + warning logs" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="space-y-2 text-xs text-slate-300">
+              <Info k="Open items" v={formatQuantity(incidentRows.length, 0)} />
+              <Info k="Delayed orders" v={formatQuantity(delayedRows.length, 0)} />
+              <Info k="Warning logs" v={formatQuantity(incidentLogs.length, 0)} />
+            </div>
+          </CockpitChartCard>
+        </aside>
+      </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ sự cố & cảnh báo sản xuất (Incidents)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredRows.length} ghi nhận sự cố / cảnh báo</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[780px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>
+                        {['Nguồn', 'Mã đối tượng', 'Trạng thái', 'Mô tả chi tiết', 'Thời gian phát sinh'].map((heading) => (
+                          <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => (
+                        <tr key={row.id} className={inventoryTableRow}>
+                          <td className={`px-2 py-2 font-semibold ${row.tone}`}>{row.source}</td>
+                          <td className="truncate px-2 py-2 font-mono text-cyan-300 font-semibold">{row.code}</td>
+                          <td className="px-2 py-2"><StatusChip status={row.status} /></td>
+                          <td className="truncate px-2 py-2 text-white">{row.description}</td>
+                          <td className="px-2 py-2 font-mono text-slate-300">{row.time}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  )
 }
 
 function ProductionReportsWorkspace({
@@ -667,15 +949,18 @@ function ProductionReportsWorkspace({
   const hasMaterialFlow = issuedQty > 0 || consumedQty > 0 || reservedQty > 0
 
   return (
-    <div className="space-y-1">
-      <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-        <CockpitKpiCard title="Lệnh sản xuất" value={number(summary?.total ?? orders.length)} note="MO / WO hiện có" tone="blue" state="normal" />
-        <CockpitKpiCard title="Đang chạy xưởng" value={number(inProgress)} note="In progress" tone="cyan" state="normal" />
-        <CockpitKpiCard title="Hoàn thành" value={number(completed)} note="Completed" tone="emerald" state="normal" />
-        <CockpitKpiCard title="Steel issued" value={number(issuedQty)} note="Material issue" tone="purple" state="normal" />
-        <CockpitKpiCard title="Steel consumed" value={number(consumedQty)} note="Consumption" tone="amber" state="normal" />
-        <CockpitKpiCard title="Đang giữ chỗ" value={number(reservedQty)} note="Reservation" tone="red" state="normal" />
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Lệnh sản xuất (MO/WO)" value={number(summary?.total ?? orders.length)} tone="blue" icon={<Factory size={15} />} />
+        <EnterpriseKpiCard title="Đang chạy xưởng" value={number(inProgress)} tone="cyan" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Đã hoàn thành" value={number(completed)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng Steel Issued" value={number(issuedQty)} tone="purple" icon={<Package size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng Steel Consumed" value={number(consumedQty)} tone="amber" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Vật tư đang giữ chỗ" value={number(reservedQty)} tone="blue" icon={<FileStack size={15} />} />
       </div>
+
+      {/* Phase 2: ANALYTICS CARDS */}
       <div className="grid gap-1 xl:grid-cols-12">
         <CockpitChartCard title="Hiệu suất sản xuất" subtitle="Status distribution" className={`${COCKPIT_HEIGHTS.CHART_LG} xl:col-span-4`}>
           <ProductionDonut centerValue={number(orders.length)} centerLabel="orders" segments={[
@@ -690,13 +975,15 @@ function ProductionReportsWorkspace({
           )}
         </CockpitChartCard>
         <CockpitChartCard title="Hoạt động gần đây" subtitle="Production logs" className={`${COCKPIT_HEIGHTS.CHART_LG} xl:col-span-4`}>
-          {logs.slice(0, 6).map((log) => (
-            <div key={log.id} className="mb-1 flex justify-between gap-2 text-xs text-slate-300">
-              <span className="truncate text-cyan-300">{log.type}</span>
-              <span className="shrink-0">{formatDateTime(log.createdAt)}</span>
-            </div>
-          ))}
-          {!logs.length ? <ModuleEmptyState icon={<FileStack size={18} />} title="Chưa có log sản xuất" description="Báo cáo sẽ có hoạt động khi phát sinh log." /> : null}
+          <div className="space-y-2">
+            {logs.slice(0, 6).map((log) => (
+              <div key={log.id} className="flex justify-between gap-2 rounded-lg border border-white/5 bg-white/[0.02] p-2 text-xs text-slate-300">
+                <span className="truncate text-cyan-300 font-semibold">{log.type}</span>
+                <span className="shrink-0 font-mono text-[10px] text-slate-400">{formatDateTime(log.createdAt)}</span>
+              </div>
+            ))}
+            {!logs.length ? <ModuleEmptyState icon={<FileStack size={18} />} title="Chưa có log sản xuất" description="Báo cáo sẽ có hoạt động khi phát sinh log." /> : null}
+          </div>
         </CockpitChartCard>
       </div>
     </div>
@@ -902,6 +1189,7 @@ function Orders({
   maxRows?: number
   onViewAll?: () => void
 }) {
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const rows = readModel.data
   const enriched = rows.map((row) => {
     const materialReadiness = row.cockpit?.materialReadiness ?? {
@@ -931,60 +1219,144 @@ function Orders({
   const { page, limit: pageSize, total } = readModel.meta
   const pageStart = total ? (page - 1) * pageSize + 1 : 0
   const pageEnd = embedded ? Math.min(pagedRows.length, total) : Math.min(page * pageSize, total)
-  const tableHeight = COCKPIT_HEIGHTS.TABLE_MD
-  const orderEmptyRows = Array.from({ length: Math.max(0, (embedded ? 8 : pageSize) - pagedRows.length) })
 
   const grid = (
-    <CockpitChartCard
-      title={embedded ? `Top ${Math.min(maxRows ?? pagedRows.length, pagedRows.length)} lệnh sản xuất` : 'Manufacturing order registry'}
-      subtitle="MO/WO, cấu kiện, dự án, vật tư, tiến độ, hạn giao"
-      action={embedded && onViewAll ? (
-        <button type="button" onClick={onViewAll} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">
+    <InventoryPanel className="rounded-xl">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">
+            {embedded ? `Top ${Math.min(maxRows ?? pagedRows.length, pagedRows.length)} lệnh sản xuất` : 'Danh sách lệnh sản xuất'}
+          </h3>
+          <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+            {total} lệnh
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpandedModalOpen(true)}
+          className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+        >
           Xem tất cả
         </button>
-      ) : <span className="text-[11px] text-cyan-300">{pageStart}-{pageEnd} / {total}</span>}
-      heightClass={tableHeight}
-    >
-      <div className="flex h-full min-h-0 flex-col">
-        <CockpitTableShell className="min-h-0 flex-1">
-          <table className="w-full min-w-[1180px] table-fixed text-left text-[13px]">
-            <thead className={inventoryTableHead}><tr>{['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((x) => <th key={x} className="px-1.5 py-0.5 text-left font-medium">{x}</th>)}</tr></thead>
-            <tbody>{pagedRows.map(({ row, readiness, progress }) => (
+      </div>
+
+      <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+        <table className="w-full min-w-[1180px] table-fixed text-sm">
+          <thead
+            className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+            style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+          >
+            <tr>
+              {['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((x) => (
+                <th key={x} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{x}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {pagedRows.length ? pagedRows.map(({ row, readiness, progress }) => (
               <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}>
-                <td className="px-2 py-2 font-semibold text-cyan-300">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500">{row.title}</div></td>
-                <td className="px-2 py-2 text-slate-200">{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
-                <td className="px-2 py-2 text-slate-300">{row.projectId ?? row.component?.project?.code ?? '-'}</td>
-                <td className="px-2 py-2 font-mono tabular-nums">{number(row.quantity)}</td>
-                <td className="w-44 px-2 py-2">
+                <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500 font-normal">{row.title}</div></td>
+                <td className="px-2 py-1.5 text-slate-200 truncate">{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
+                <td className="px-2 py-1.5 text-slate-300 font-mono">{row.projectId ?? row.component?.project?.code ?? '-'}</td>
+                <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{number(row.quantity)}</td>
+                <td className="w-44 px-2 py-1.5">
                   <Meter value={readiness.readiness.readinessPercent} tone={readinessBarClass(readiness.readiness.readinessPercent)} />
-                  <div className={`mt-1 text-[10px] ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                  <div className={`mt-1 text-[10px] font-mono ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
                     {formatQuantity(readiness.readiness.readinessPercent, 0)}% · {readiness.label}
                   </div>
                 </td>
-                <td className="w-40 px-2 py-2">
+                <td className="w-40 px-2 py-1.5">
                   <Meter value={progress} tone={orderStatusTone(row)} />
-                  <div className="mt-1 text-[10px] text-slate-500">{progress}%</div>
+                  <div className="mt-1 text-[10px] font-mono text-slate-400">{progress}%</div>
                 </td>
-                <td className="px-2 py-2 text-slate-300">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-1 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
-                <td className="px-2 py-2"><StatusChip status={row.status} /></td>
+                <td className="px-2 py-1.5 text-slate-300 font-mono text-xs">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-0.5 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
+                <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
               </tr>
-            ))}
-            {orderEmptyRows.map((_, index) => (
-              <tr key={`order-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                <td colSpan={8} className="h-[46px] px-2 py-2">
-                  <div className="h-px w-full bg-white/[0.035]" />
+            )) : (
+              <tr>
+                <td colSpan={8} className="px-2 py-10">
+                  <ModuleEmptyState icon={<Factory size={18} />} title="Chưa có lệnh sản xuất" description="Tạo lệnh sản xuất để theo dõi tiến độ, vật tư và hoàn thành." />
                 </td>
               </tr>
-            ))}
-            </tbody>
-          </table>
-          {!pagedRows.length ? (
-            <ModuleEmptyState icon={<span>⚙️</span>} title="Chưa có lệnh sản xuất" description="Tạo lệnh sản xuất để theo dõi tiến độ, vật tư và hoàn thành." />
-          ) : null}
-        </CockpitTableShell>
-        {!embedded ? <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} /> : null}
+            )}
+          </tbody>
+        </table>
       </div>
-    </CockpitChartCard>
+
+      {!embedded ? (
+        <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
+      ) : null}
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách lệnh sản xuất</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {total} lệnh sản xuất trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1180px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>
+                        {['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((x) => (
+                          <th key={x} className="px-2 py-2 text-left font-semibold text-slate-300">{x}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enriched.map(({ row, readiness, progress }) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => {
+                            onOpen(row)
+                            setExpandedModalOpen(false)
+                          }}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                        >
+                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500 font-normal">{row.title}</div></td>
+                          <td className="px-2 py-2 text-slate-200 truncate">{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
+                          <td className="px-2 py-2 text-slate-300 font-mono">{row.projectId ?? row.component?.project?.code ?? '-'}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{number(row.quantity)}</td>
+                          <td className="w-44 px-2 py-2">
+                            <Meter value={readiness.readiness.readinessPercent} tone={readinessBarClass(readiness.readiness.readinessPercent)} />
+                            <div className={`mt-1 text-[10px] font-mono ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                              {formatQuantity(readiness.readiness.readinessPercent, 0)}% · {readiness.label}
+                            </div>
+                          </td>
+                          <td className="w-40 px-2 py-2">
+                            <Meter value={progress} tone={orderStatusTone(row)} />
+                            <div className="mt-1 text-[10px] font-mono text-slate-400">{progress}%</div>
+                          </td>
+                          <td className="px-2 py-2 text-slate-300 font-mono text-xs">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-0.5 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
+                          <td className="px-2 py-2"><StatusChip status={row.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </InventoryPanel>
   )
 
   if (embedded) return grid
@@ -1027,36 +1399,49 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
   const clone = useCloneProductionBom()
   const archive = useArchiveProductionBom()
 
-  async function cloneBom(id: string) {
+  const cloneBom = async (id: string) => {
     try {
-      await clone.mutateAsync(id)
-      toast.success('Đã nhân bản Production BOM')
+      const created = (await clone.mutateAsync(id)) as ProductionBom
+      toast.success(`Đã sao chép thành BOM ${created.bomNo}`)
+      onOpen(created)
     } catch {
-      toast.error('Không thể nhân bản Production BOM')
+      toast.error('Không thể sao chép BOM.')
     }
   }
 
-  async function archiveBom(id: string) {
+  const archiveBom = async (id: string) => {
     try {
       await archive.mutateAsync(id)
-      toast.success('Đã lưu trữ Production BOM')
+      toast.success('Đã lưu trữ BOM.')
     } catch {
-      toast.error('Không thể lưu trữ Production BOM')
+      toast.error('Không thể lưu trữ BOM.')
     }
   }
 
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchSearch = !search || `${row.bomNo} ${row.productCode} ${row.productName} ${row.projectId}`.toLowerCase().includes(search.toLowerCase())
+      const matchType = !typeFilter || row.structureType === typeFilter
+      return matchSearch && matchType
+    })
+  }, [rows, search, typeFilter])
+
   const active = rows.filter((row) => row.status !== 'ARCHIVED').length
+  const archived = rows.length - active
   const totalMaterials = rows.reduce((sum, row) => sum + row.items.length, 0)
   const totalWeight = rows.reduce((sum, row) => sum + Number(row.estimatedWeight ?? 0), 0)
-  const [page, setPage] = useState(1)
+  const projectCount = new Set(rows.map((r) => r.projectId).filter(Boolean)).size
+
   const pageSize = 14
-  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
-  const pageStart = rows.length ? (page - 1) * pageSize + 1 : 0
-  const pageEnd = Math.min(page * pageSize, rows.length)
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const statusSegments = [
     { label: 'Active', value: active, color: '#14c987' },
-    { label: 'Archived', value: rows.length - active, color: '#64748b' },
+    { label: 'Archived', value: archived, color: '#64748b' },
   ]
   const typeSegments = Array.from(rows.reduce((map, row) => {
     const key = row.structureType ?? 'Chưa phân loại'
@@ -1064,75 +1449,213 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
     return map
   }, new Map<string, number>()).entries())
     .map(([label, value], index) => ({ label, value, color: ['#1d7cff', '#14c987', '#f59e0b', '#7c3aed', '#06b6d4'][index % 5] }))
-  const recentRows = [...rows].sort((a, b) => new Date(b.createdAt ?? '').getTime() - new Date(a.createdAt ?? '').getTime()).slice(0, 5)
+
+  const availableTypes = Array.from(new Set(rows.map((r) => r.structureType).filter(Boolean))) as string[]
 
   useEffect(() => {
     setPage(1)
-  }, [rows.length])
+  }, [filteredRows.length, search, typeFilter])
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
-      <CockpitKpiCard title="Tổng BOM" value={formatQuantity(rows.length, 0)} note="Định mức sản xuất" tone="blue" state="normal" />
-      <CockpitKpiCard title="Đang dùng" value={formatQuantity(active, 0)} note="Không archive" tone="emerald" state="normal" />
-      <CockpitKpiCard title="Dòng vật tư" value={formatQuantity(totalMaterials, 0)} note="Tổng BOM items" tone="cyan" state="normal" />
-      <CockpitKpiCard title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} note="Tổng estimated weight" tone="purple" state="normal" />
-    </div>
-    <div className="flex items-center justify-end gap-1">
-      <button onClick={onCreate} className={`${inventoryMutedButton} h-9 rounded-xl`}>+ Tạo BOM</button>
-    </div>
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-      <div className="xl:col-span-9">
-        <CockpitChartCard title="Production BOM Registry" subtitle="Danh sách định mức sản xuất" action={<span className="text-[11px] text-cyan-300">{pageStart}-{pageEnd} / {rows.length}</span>} heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-          <div className="flex h-full min-h-0 flex-col">
-            <CockpitTableShell className="min-h-0 flex-1">
-              <table className="w-full min-w-[1050px] table-fixed text-left text-[13px]">
-                <thead className={inventoryTableHead}>
-                  <tr>{['STT','BOM Code','Structure Code','Structure Name','Structure Type','Project','Unit','Materials','Estimated Weight','Status','Created','Actions'].map((x)=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr>
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng Production BOM" value={formatQuantity(rows.length, 0)} tone="blue" icon={<FileStack size={15} />} />
+        <EnterpriseKpiCard title="BOM đang sử dụng" value={formatQuantity(active, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Dòng định mức VT" value={formatQuantity(totalMaterials, 0)} tone="cyan" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng ước tính" value={`${number(totalWeight)} kg`} tone="purple" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Dự án áp dụng" value={formatQuantity(projectCount, 0)} tone="blue" icon={<Factory size={15} />} />
+        <EnterpriseKpiCard title="BOM đã lưu trữ" value={formatQuantity(archived, 0)} tone="amber" icon={<Archive size={15} />} />
+      </div>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả phân loại BOM</option>
+            {availableTypes.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã BOM, mã cấu kiện, tên sản phẩm, dự án..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setTypeFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách định mức sản xuất (BOM)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredRows.length} BOM
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1050px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['STT','BOM Code','Structure Code','Structure Name','Type','Project','Unit','Materials','Weight','Status','Actions'].map((x)=><th className="px-2 py-2 text-left text-xs font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
                 </thead>
-                <tbody>{pagedRows.map((row,index)=><tr key={row.id} onClick={()=>onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}>
-                  <td className="px-2 py-2">{(page - 1) * pageSize + index + 1}</td>
-                  <td className="px-2 py-2 font-semibold text-cyan-300">{row.bomNo}</td>
-                  <td className="px-2 py-2 text-slate-300">{row.productCode}</td>
-                  <td className="px-2 py-2 text-white">{row.productName}</td>
-                  <td className="px-2 py-2 text-slate-300">{row.structureType??'-'}</td>
-                  <td className="px-2 py-2 text-slate-300">{row.projectId??'-'}</td>
-                  <td className="px-2 py-2 text-slate-300">{row.unit??'-'}</td>
-                  <td className="px-2 py-2 font-mono tabular-nums">{row.items.length}</td>
-                  <td className="px-2 py-2 font-mono tabular-nums">{number(row.estimatedWeight)} kg</td>
-                  <td className="px-2 py-2"><StatusChip status={row.status}/></td>
-                  <td className="px-2 py-2 text-slate-300">{date(row.createdAt)}</td>
-                  <td className="px-2 py-2"><div className="flex gap-1 text-cyan-300"><button onClick={(event) => { event.stopPropagation(); onOpen(row) }}>Xem</button><button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }}>Clone</button>{row.status !== 'ARCHIVED' && <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300">Archive</button>}</div></td>
-                </tr>)}
-                {emptyRows.map((_, index) => (
-                  <tr key={`bom-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                    <td colSpan={12} className="h-[46px] px-2 py-2">
-                      <div className="h-px w-full bg-white/[0.035]" />
-                    </td>
-                  </tr>
-                ))}
+                <tbody>
+                  {pagedRows.map((row, index) => (
+                    <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+                      <td className="px-2 py-1.5 font-mono text-slate-400 text-xs">{(page - 1) * pageSize + index + 1}</td>
+                      <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.bomNo}</td>
+                      <td className="px-2 py-1.5 text-slate-300 font-mono">{row.productCode}</td>
+                      <td className="px-2 py-1.5 text-white font-medium truncate">{row.productName}</td>
+                      <td className="px-2 py-1.5 text-slate-300 text-xs">{row.structureType ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-300 font-mono">{row.projectId ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-300 text-xs">{row.unit ?? '-'}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{row.items.length}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-cyan-300">{number(row.estimatedWeight)} kg</td>
+                      <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
+                      <td className="px-2 py-1.5">
+                        <div className="flex gap-2 text-xs">
+                          <button onClick={(event) => { event.stopPropagation(); onOpen(row) }} className="text-cyan-300 hover:underline">Xem</button>
+                          <button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }} className="text-blue-300 hover:underline">Clone</button>
+                          {row.status !== 'ARCHIVED' && (
+                            <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300 hover:underline">Archive</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={11} className="px-2 py-10">
+                        <ModuleEmptyState icon={<FileStack size={18} />} title="Chưa có dữ liệu BOM" description="Tạo Production BOM để chuẩn hóa định mức vật tư cho sản xuất." />
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
-              {!pagedRows.length ? <ModuleEmptyState icon={<span>⚙️</span>} title="Chưa có dữ liệu BOM" description="Tạo Production BOM để chuẩn hóa định mức vật tư cho sản xuất." /> : null}
-            </CockpitTableShell>
-            <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
-          </div>
-        </CockpitChartCard>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
+        </div>
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Theo trạng thái" subtitle="Active / archived" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={statusSegments} />
+          </CockpitChartCard>
+          <CockpitChartCard title="Phân loại BOM" subtitle="Theo structureType" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            {typeSegments.length ? <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={typeSegments} /> : (
+              <ModuleEmptyState icon={<Factory size={18} />} title="Chưa có phân loại" description="Structure type sẽ hiển thị khi BOM có dữ liệu phân loại." />
+            )}
+          </CockpitChartCard>
+        </aside>
       </div>
-      <aside className="space-y-1 xl:col-span-3">
-        <CockpitChartCard title="Theo trạng thái" subtitle="Active / archived" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={statusSegments} />
-        </CockpitChartCard>
-        <CockpitChartCard title="Phân loại BOM" subtitle="Theo structureType" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          {typeSegments.length ? <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="BOM" segments={typeSegments} /> : (
-            <ModuleEmptyState icon={<span>🏭</span>} title="Chưa có phân loại" description="Structure type sẽ hiển thị khi BOM có dữ liệu phân loại." />
-          )}
-        </CockpitChartCard>
-        <CockpitChartCard title="Gần đây" subtitle="BOM mới tạo" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <RankList rows={recentRows.map((row) => ({ id: row.id, title: row.bomNo, subtitle: row.productName, value: date(row.createdAt) }))} empty="Chưa có BOM gần đây" />
-        </CockpitChartCard>
-      </aside>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách định mức sản xuất (BOM)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredRows.length} định mức sản xuất trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1050px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['STT','BOM Code','Structure Code','Structure Name','Type','Project','Unit','Materials','Weight','Status','Actions'].map((x)=><th className="px-2 py-2 text-left font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row, index) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => {
+                            onOpen(row)
+                            setExpandedModalOpen(false)
+                          }}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                        >
+                          <td className="px-2 py-2 font-mono text-slate-400">{index + 1}</td>
+                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.bomNo}</td>
+                          <td className="px-2 py-2 text-slate-300 font-mono">{row.productCode}</td>
+                          <td className="px-2 py-2 text-white font-medium truncate">{row.productName}</td>
+                          <td className="px-2 py-2 text-slate-300">{row.structureType ?? '-'}</td>
+                          <td className="px-2 py-2 text-slate-300 font-mono">{row.projectId ?? '-'}</td>
+                          <td className="px-2 py-2 text-slate-300">{row.unit ?? '-'}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{row.items.length}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-cyan-300">{number(row.estimatedWeight)} kg</td>
+                          <td className="px-2 py-2"><StatusChip status={row.status} /></td>
+                          <td className="px-2 py-2">
+                            <div className="flex gap-2">
+                              <button onClick={(event) => { event.stopPropagation(); onOpen(row); setExpandedModalOpen(false) }} className="text-cyan-300 hover:underline">Xem</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
-  </div>
+  )
 }
 
 type LocationBalanceLike = {
@@ -1315,16 +1838,45 @@ function ProductionWarehouseCockpit({
   consumptions: ProductionMaterialConsumption[]
 }) {
   const [selectedRow, setSelectedRow] = useState<ProductionWarehouseMaterialRow | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
   const rows = useMemo(
     () => buildProductionWarehouseRows({ inventoryItems, auditRows, orders, reservations }),
     [inventoryItems, auditRows, orders, reservations],
   )
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchSearch = !search || `${row.code} ${row.name} ${row.unit}`.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = !statusFilter || row.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [rows, search, statusFilter])
+
   const productionStock = rows.reduce((sum, row) => sum + row.productionStock, 0)
   const reserved = rows.reduce((sum, row) => sum + row.reserved, 0)
   const available = rows.reduce((sum, row) => sum + row.available, 0)
+  const required = rows.reduce((sum, row) => sum + row.required, 0)
   const shortageRisk = rows.filter((row) => row.shortage > 0 || row.status === 'OUT').length
   const inventoryValue = rows.reduce((sum, row) => sum + row.inventoryValue, 0)
   const materialCount = rows.filter((row) => row.productionStock > 0).length
+
+  const productionLocations = useMemo(() => {
+    return rows.flatMap((row) =>
+      row.locations.map((loc) => ({
+        id: `${row.id}-${loc.zoneId}-${loc.slotId}-${loc.level}`,
+        material: `${row.code} · ${row.name}`,
+        location: productionLocationLabel(loc),
+        quantity: numeric(loc.quantity),
+        unit: row.unit,
+        value: numeric(loc.quantity) * (row.averageCost ?? 0),
+      }))
+    )
+  }, [rows])
+
   const orderById = new Map(orders.map((order) => [order.id, order]))
   const topWoConsumption = Array.from(consumptions.reduce((map, row) => {
     const current = map.get(row.productionOrderId) ?? 0
@@ -1334,25 +1886,15 @@ function ProductionWarehouseCockpit({
     .map(([id, value]) => ({ id, title: orderById.get(id)?.orderNo ?? id, subtitle: orderById.get(id)?.title ?? 'Production consumption', value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 5)
+
   const readinessRows = [...rows]
     .sort((a, b) => a.readiness - b.readiness)
     .slice(0, 5)
-  const productionLocations = rows
-    .flatMap((row) => row.locations.map((location) => ({
-      id: `${row.id}-${location.zoneId ?? 'zone'}-${location.slotId ?? 'slot'}-${location.level ?? 'level'}`,
-      material: `${row.code} · ${row.name}`,
-      location: productionLocationLabel(location),
-      quantity: numeric(location.quantity),
-      unit: row.unit,
-      value: numeric(location.quantity) * row.averageCost,
-    })))
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 10)
+
   const shortageRows = rows.filter((row) => row.shortage > 0).sort((a, b) => b.shortage - a.shortage).slice(0, 8)
-  const [page, setPage] = useState(1)
   const pageSize = 14
-  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+
   const statusSegments = [
     { label: 'OUT', value: rows.filter((row) => row.status === 'OUT').length, color: '#ef4444' },
     { label: 'LOW', value: rows.filter((row) => row.status === 'LOW').length, color: '#f59e0b' },
@@ -1361,47 +1903,129 @@ function ProductionWarehouseCockpit({
 
   useEffect(() => {
     setPage(1)
-  }, [rows.length])
+  }, [filteredRows.length, search, statusFilter])
 
   return (
-    <div className="w-full min-w-0 flex-1 space-y-1">
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-        <div className="xl:col-span-9">
-          <CockpitChartCard title="Production Warehouse Material Grid" subtitle="Trạng thái dựa trên Available tại Kho vật tư SX" heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-            <div className="flex h-full min-h-0 flex-col">
-            <CockpitTableShell className="min-h-0 flex-1">
-            <table className="w-full min-w-[1280px] table-fixed text-left text-[13px]">
-              <thead className={inventoryTableHead}>
-                <tr>{['Material', 'Main Stock', 'Production Stock', 'Reserved', 'Available', 'Required', 'Shortage', 'Status'].map((head) => <th key={head} className="px-1.5 py-0.5 text-left font-medium">{head}</th>)}</tr>
-              </thead>
-              <tbody>
-                {pagedRows.map((row) => (
-                  <tr key={row.id} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
-                    <td className="px-2 py-2 text-cyan-300">{row.code}<div className="mt-0.5 truncate text-[10px] text-slate-500">{row.name}</div></td>
-                    <td className="px-2 py-2 font-mono tabular-nums">{number(row.mainStock)} {row.unit}</td>
-                    <td className="px-2 py-2 font-mono tabular-nums text-cyan-300">{number(row.productionStock)} {row.unit}</td>
-                    <td className="px-2 py-2 font-mono tabular-nums text-purple-300">{number(row.reserved)} {row.unit}</td>
-                    <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{number(row.available)} {row.unit}</td>
-                    <td className="px-2 py-2 font-mono tabular-nums">{number(row.required)} {row.unit}</td>
-                    <td className={row.shortage > 0 ? 'px-2 py-2 font-mono tabular-nums text-red-300' : 'px-2 py-2 font-mono tabular-nums text-slate-500'}>{number(row.shortage)} {row.unit}</td>
-                    <td className="px-2 py-2"><span className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${statusToneClass(row.status)}`}>{statusText(row.status)}</span></td>
-                  </tr>
-                ))}
-                {emptyRows.map((_, index) => (
-                  <tr key={`production-warehouse-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                    <td colSpan={8} className="h-[46px] px-2 py-2">
-                      <div className="h-px w-full bg-white/[0.035]" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Kho sản xuất chưa có tồn, nhu cầu BOM hoặc reservation đang mở." /> : null}
-            </CockpitTableShell>
-            <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
-            </div>
-          </CockpitChartCard>
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tồn kho sản xuất" value={number(productionStock)} tone="blue" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Giá trị tồn kho SX" value={formatCurrencyVnd(inventoryValue)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Mã vật tư có tồn" value={formatQuantity(materialCount, 0)} tone="cyan" icon={<Package size={15} />} />
+        <EnterpriseKpiCard title="Nhu cầu sản xuất" value={number(required)} tone="purple" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Vật tư giữ chỗ (Reserved)" value={number(reserved)} tone="blue" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Cảnh báo thiếu hụt" value={formatQuantity(shortageRisk, 0)} tone="amber" icon={<AlertTriangle size={15} />} />
+      </div>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả trạng thái kho</option>
+            <option value="NORMAL">Khả dụng (NORMAL)</option>
+            <option value="LOW">Sắp hết (LOW)</option>
+            <option value="OUT">Hết hàng (OUT)</option>
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã vật tư, tên vật tư, đơn vị..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setStatusFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
         </div>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Bảng tồn kho sản xuất (Production Warehouse Grid)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredRows.length} vật tư
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1150px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>
+                    {['Material Code', 'Material Name', 'Unit', 'Production Stock', 'Reserved', 'Available', 'Required', 'Shortage', 'Readiness', 'Status'].map((head) => (
+                      <th key={head} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{head}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => (
+                    <tr key={row.id} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+                      <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.code}</td>
+                      <td className="truncate px-2 py-1.5 text-white font-medium">{row.name}</td>
+                      <td className="px-2 py-1.5 text-slate-300 text-xs">{row.unit}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{number(row.productionStock)}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-amber-300">{number(row.reserved)}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-emerald-300">{number(row.available)}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-cyan-300">{number(row.required)}</td>
+                      <td className={row.shortage > 0 ? 'px-2 py-1.5 font-mono tabular-nums text-red-300 font-bold' : 'px-2 py-1.5 font-mono tabular-nums text-slate-400'}>{number(row.shortage)}</td>
+                      <td className="w-32 px-2 py-1.5">
+                        <Meter value={row.readiness} tone={row.readiness >= 100 ? 'bg-emerald-500' : row.readiness >= 50 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                        <div className="mt-0.5 text-[10px] font-mono text-slate-400">{formatQuantity(row.readiness, 0)}%</div>
+                      </td>
+                      <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={10} className="px-2 py-10">
+                        <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có dữ liệu vật tư" description="Kho sản xuất chưa có tồn, nhu cầu BOM hoặc reservation đang mở." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
+        </div>
+
         <aside className="space-y-1 xl:col-span-3">
           <CockpitChartCard title="Tồn sản xuất" subtitle="Production stock" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
             <div className="space-y-2 text-xs text-slate-300">
@@ -1422,12 +2046,6 @@ function ProductionWarehouseCockpit({
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-3">
         <CockpitChartCard title="Top WO tiêu thụ vật tư" subtitle="Consumed + Scrap" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
           <RankList rows={topWoConsumption.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có tiêu hao vật tư" />
-        </CockpitChartCard>
-        <CockpitChartCard title="Readiness theo vật tư" subtitle="Available / Required" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-          <RankList rows={readinessRows.map((row) => ({ id: row.id, title: row.code, subtitle: row.name, value: `${formatQuantity(row.readiness, 0)}%` }))} empty="Chưa có nhu cầu BOM" />
-        </CockpitChartCard>
-        <CockpitChartCard title="Production Locations" subtitle="Production Zone / Slot / Level" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-          <RankList rows={productionLocations.slice(0, 5).map((row) => ({ id: row.id, title: row.location, subtitle: row.material, value: `${number(row.quantity)} ${row.unit}` }))} empty="Chưa có vị trí SX" />
         </CockpitChartCard>
       </div>
 
@@ -1629,6 +2247,11 @@ function Issues({
 }) {
   const [selectedIssue, setSelectedIssue] = useState<IssueControlRow | null>(null)
   const [returnTarget, setReturnTarget] = useState<IssueControlRow | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
   const consumptionRows = useMemo(
     () => buildConsumptionRows(rows ?? [], consumptions),
     [rows, consumptions],
@@ -1640,20 +2263,29 @@ function Issues({
     })
     return map
   }, [consumptionRows])
+
   const issueRows = useMemo(
     () => buildIssueControlRows(rows ?? [], orders, remainingByMaterial),
     [rows, orders, remainingByMaterial],
   )
+
+  const filteredIssueRows = useMemo(() => {
+    return issueRows.filter((row) => {
+      const matchSearch = !search || `${row.issueNo} ${row.orderNo} ${row.component} ${row.material}`.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = !statusFilter || row.issue.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [issueRows, search, statusFilter])
 
   const issuedTotal = (rows ?? []).reduce((sum, row) => sum + Number(row.issuedQty ?? 0), 0)
   const returnedTotal = (rows ?? []).reduce((sum, row) => sum + Number(row.returnedQty ?? 0), 0)
   const returnableTotal = (rows ?? []).reduce((sum, row) => sum + getIssueReturnableQty(row, remainingByMaterial), 0)
   const requiredTotal = issueRows.reduce((sum, row) => sum + row.requiredQty, 0)
   const remainingTotal = issueRows.reduce((sum, row) => sum + row.remainingQty, 0)
-  const issuedOrders = new Set(issueRows.map((row) => row.issue.productionOrderId)).size
   const completionRate = requiredTotal > 0
     ? Math.min(100, (issueRows.reduce((sum, row) => sum + row.netIssuedQty, 0) / requiredTotal) * 100)
     : 0
+
   const topIssuedMaterials = aggregateIssueRows(issueRows, 'issuedQty').slice(0, 5)
   const topReturnedMaterials = aggregateIssueRows(issueRows, 'returnedQty').filter((row) => row.value > 0).slice(0, 5)
   const shortageWorkOrders = aggregateShortageWorkOrders(issueRows).slice(0, 5)
@@ -1665,103 +2297,239 @@ function Issues({
     { label: '80-99%', value: issueRows.filter((row) => row.readinessPercent >= 80 && row.readinessPercent < 100).length, color: '#06b6d4' },
     { label: '100%', value: issueRows.filter((row) => row.readinessPercent >= 100).length, color: '#14c987' },
   ]
-  const [page, setPage] = useState(1)
+
   const pageSize = 14
-  const pagedRows = issueRows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const pagedRows = filteredIssueRows.slice((page - 1) * pageSize, page * pageSize)
 
   useEffect(() => {
     setPage(1)
-  }, [issueRows.length])
+  }, [filteredIssueRows.length, search, statusFilter])
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="flex items-center justify-end gap-1">
-      <button className={`${inventoryMutedButton} h-9 rounded-xl`}>+ Tạo phiếu cấp</button>
-    </div>
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-      <div className="xl:col-span-9">
-    <CockpitChartCard title="Production Material Control Center" subtitle="Issue No, Work Order, Component, Required, Issued, Returned, Remaining, Readiness" heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-      <div className="flex h-full min-h-0 flex-col">
-      <CockpitTableShell className="min-h-0 flex-1">
-      <table className="w-full min-w-[1320px] table-fixed text-left text-[13px]">
-        <thead className={inventoryTableHead}><tr>{['Issue No','Date','Work Order','Component','Required','Issued','Returned','Remaining','Readiness','Status','Action'].map(x=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-        <tbody>{pagedRows.map(row=>{
-          const issue = row.issue
-          return <tr className={`cursor-pointer ${inventoryTableRow}`} key={issue.id} onClick={() => setSelectedIssue(row)}>
-            <td className="px-2 py-2 text-cyan-300">{row.issueNo}</td>
-            <td className="px-2 py-2">{date(issue.issuedDate)}</td>
-            <td className="px-2 py-2">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500">{row.orderTitle}</div></td>
-            <td className="px-2 py-2">{row.component}</td>
-            <td className="px-2 py-2 font-mono tabular-nums">{number(row.requiredQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums text-cyan-300">{number(row.issuedQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums text-amber-300">{number(row.returnedQty)}</td>
-            <td className={row.remainingQty > 0 ? 'px-2 py-2 font-mono tabular-nums text-red-300' : 'px-2 py-2 font-mono tabular-nums text-emerald-300'}>{number(row.remainingQty)}</td>
-            <td className="w-44 px-2 py-2">
-              <Meter value={row.readinessPercent} tone={readinessBarClass(row.readinessPercent)} />
-              <div className={`mt-1 text-[10px] ${row.readinessPercent >= 100 ? 'text-emerald-300' : row.readinessPercent >= 80 ? 'text-cyan-300' : row.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>{formatQuantity(row.readinessPercent, 0)}%</div>
-            </td>
-            <td className="px-2 py-2"><StatusChip status={issue.status}/></td>
-            <td className="px-2 py-2">{row.returnableQty > 0 ? <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row) }} className="text-amber-300">Return</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
-          </tr>
-        })}
-        {emptyRows.map((_, index) => (
-          <tr key={`issue-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-            <td colSpan={11} className="h-[46px] px-2 py-2">
-              <div className="h-px w-full bg-white/[0.035]" />
-            </td>
-          </tr>
-        ))}
-        </tbody>
-      </table>
-      {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Phiếu cấp phát vật tư sản xuất sẽ hiển thị tại đây." /> : null}
-      </CockpitTableShell>
-      <DataTablePagination page={page} pageSize={pageSize} total={issueRows.length} onPageChange={setPage} />
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng số phiếu cấp" value={formatQuantity(issueRows.length, 0)} tone="blue" icon={<Package size={15} />} />
+        <EnterpriseKpiCard title="Nhu cầu cấp phát" value={number(requiredTotal)} tone="emerald" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng đã cấp" value={number(issuedTotal)} tone="cyan" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng hoàn trả" value={number(returnedTotal)} tone="purple" icon={<RotateCcw size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng còn thiếu" value={number(remainingTotal)} tone="red" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Tỷ lệ hoàn thành cấp" value={`${formatQuantity(completionRate, 0)}%`} tone="blue" icon={<CheckCircle2 size={15} />} />
       </div>
-    </CockpitChartCard>
-      </div>
-      <aside className="space-y-1 xl:col-span-3">
-        <CockpitChartCard title="Thiếu vật tư" subtitle="Remaining = Required - NetIssued" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <RankList rows={shortageWorkOrders.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Không có WO thiếu vật tư" />
-        </CockpitChartCard>
-        <CockpitChartCard title="Theo ưu tiên" subtitle="API issue chưa có priority" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <ModuleEmptyState icon={<span>🏭</span>} title="Chưa có dữ liệu ưu tiên" description="Cần backend trả priority theo issue hoặc WO để phân tích ưu tiên." />
-        </CockpitChartCard>
-        <CockpitChartCard title="Gần đây" subtitle="Phiếu cấp mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <RankList rows={issueRows.slice(0, 5).map((row) => ({ id: row.issue.id, title: row.issueNo, subtitle: row.orderNo, value: date(row.issue.issuedDate) }))} empty="Chưa có phiếu cấp phát" />
-        </CockpitChartCard>
-      </aside>
-    </div>
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-5">
-      <CockpitChartCard title="Top vật tư được cấp phát" subtitle="Xếp theo issued qty" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <RankList rows={topIssuedMaterials.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} />
-      </CockpitChartCard>
-      <CockpitChartCard title="Top vật tư hoàn trả" subtitle="Xếp theo returned qty" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <RankList rows={topReturnedMaterials.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có vật tư hoàn trả" />
-      </CockpitChartCard>
-      <CockpitChartCard title="Readiness theo WO" subtitle="NetIssued / Required" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <RankList rows={readinessByWorkOrder.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: `${formatQuantity(row.value, 0)}%` }))} empty="Chưa có dữ liệu readiness" />
-      </CockpitChartCard>
-      <CockpitChartCard title="Nguồn xuất kho sản xuất" subtitle="Warehouse / Zone / Slot / Level" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <RankList rows={sourceLocations.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có vị trí xuất" />
-      </CockpitChartCard>
-      <CockpitChartCard title="Readiness distribution" subtitle="Theo dòng cấp phát" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <ProductionDonut centerValue={`${formatQuantity(completionRate, 0)}%`} centerLabel="ready" segments={readinessSegments} />
-      </CockpitChartCard>
-      <CockpitChartCard title="Business indicators" subtitle="NetIssued = Issued - Returned" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <div className="space-y-2 text-xs text-slate-300">
-          <Info k="Required" v={number(requiredTotal)} />
-          <Info k="Net issued" v={number(issuedTotal - returnedTotal)} />
-          <Info k="Remaining" v={number(remainingTotal)} />
-          <Info k="Returnable" v={number(returnableTotal)} />
-          <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-slate-400">
-            Giá trị cấp phát chưa tính được từ frontend vì API material issue hiện chưa trả unit cost/totalAmount.
-          </div>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả trạng thái phiếu</option>
+            <option value="COMPLETED">Hoàn tất (COMPLETED)</option>
+            <option value="ISSUED">Đã cấp (ISSUED)</option>
+            <option value="PARTIAL">Cấp 1 phần (PARTIAL)</option>
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã phiếu cấp, WO, cấu kiện, vật tư..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setStatusFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
         </div>
-      </CockpitChartCard>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Trung tâm kiểm soát cấp phát vật tư (Material Issues)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredIssueRows.length} phiếu cấp
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1320px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['Issue No','Date','Work Order','Component','Required','Issued','Returned','Remaining','Readiness','Status','Action'].map(x=><th className="px-2 py-2 text-left text-xs font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => {
+                    const issue = row.issue
+                    return (
+                      <tr className={`cursor-pointer ${inventoryTableRow}`} key={issue.id} onClick={() => setSelectedIssue(row)}>
+                        <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.issueNo}</td>
+                        <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{date(issue.issuedDate)}</td>
+                        <td className="px-2 py-1.5 font-mono text-xs">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-400 font-normal">{row.orderTitle}</div></td>
+                        <td className="px-2 py-1.5 text-white font-medium truncate">{row.component}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{number(row.requiredQty)}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-cyan-300">{number(row.issuedQty)}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-amber-300">{number(row.returnedQty)}</td>
+                        <td className={row.remainingQty > 0 ? 'px-2 py-1.5 font-mono tabular-nums text-red-300 font-bold' : 'px-2 py-1.5 font-mono tabular-nums text-emerald-300 font-bold'}>{number(row.remainingQty)}</td>
+                        <td className="w-44 px-2 py-1.5">
+                          <Meter value={row.readinessPercent} tone={readinessBarClass(row.readinessPercent)} />
+                          <div className={`mt-0.5 text-[10px] font-mono ${row.readinessPercent >= 100 ? 'text-emerald-300' : row.readinessPercent >= 80 ? 'text-cyan-300' : row.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>{formatQuantity(row.readinessPercent, 0)}%</div>
+                        </td>
+                        <td className="px-2 py-1.5"><StatusChip status={issue.status} /></td>
+                        <td className="px-2 py-1.5">
+                          {row.returnableQty > 0 ? (
+                            <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row) }} className="text-amber-300 hover:underline text-xs font-semibold">Return</button>
+                          ) : (
+                            <span className="text-slate-500 text-xs">Đã cân bằng</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={11} className="px-2 py-10">
+                        <ModuleEmptyState icon={<Package size={18} />} title="Chưa có dữ liệu vật tư" description="Phiếu cấp phát vật tư sản xuất sẽ hiển thị tại đây." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredIssueRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
+        </div>
+
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Thiếu vật tư" subtitle="Remaining = Required - NetIssued" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={shortageWorkOrders.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Không có WO thiếu vật tư" />
+          </CockpitChartCard>
+          <CockpitChartCard title="Gần đây" subtitle="Phiếu cấp mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={issueRows.slice(0, 5).map((row) => ({ id: row.issue.id, title: row.issueNo, subtitle: row.orderNo, value: date(row.issue.issuedDate) }))} empty="Chưa có phiếu cấp phát" />
+          </CockpitChartCard>
+        </aside>
+      </div>
+
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-5">
+        <CockpitChartCard title="Top vật tư cấp phát" subtitle="Xếp theo issued qty" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <RankList rows={topIssuedMaterials.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Top vật tư hoàn trả" subtitle="Xếp theo returned qty" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <RankList rows={topReturnedMaterials.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có vật tư hoàn trả" />
+        </CockpitChartCard>
+        <CockpitChartCard title="Readiness theo WO" subtitle="NetIssued / Required" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <RankList rows={readinessByWorkOrder.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: `${formatQuantity(row.value, 0)}%` }))} empty="Chưa có dữ liệu readiness" />
+        </CockpitChartCard>
+        <CockpitChartCard title="Nguồn xuất kho SX" subtitle="Warehouse / Zone / Slot" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <RankList rows={sourceLocations.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, value: number(row.value) }))} empty="Chưa có vị trí xuất" />
+        </CockpitChartCard>
+        <CockpitChartCard title="Readiness distribution" subtitle="Theo dòng cấp phát" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
+          <ProductionDonut centerValue={`${formatQuantity(completionRate, 0)}%`} centerLabel="ready" segments={readinessSegments} />
+        </CockpitChartCard>
+      </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách cấp phát vật tư (Material Issues)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredIssueRows.length} phiếu cấp phát trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1320px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['Issue No','Date','Work Order','Component','Required','Issued','Returned','Remaining','Readiness','Status','Action'].map(x=><th className="px-2 py-2 text-left font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {filteredIssueRows.map((row) => {
+                        const issue = row.issue
+                        return (
+                          <tr className={`cursor-pointer ${inventoryTableRow}`} key={issue.id} onClick={() => { setSelectedIssue(row); setExpandedModalOpen(false) }}>
+                            <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.issueNo}</td>
+                            <td className="px-2 py-2 font-mono text-slate-300 text-xs">{date(issue.issuedDate)}</td>
+                            <td className="px-2 py-2 font-mono text-xs">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-400 font-normal">{row.orderTitle}</div></td>
+                            <td className="px-2 py-2 text-white font-medium truncate">{row.component}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{number(row.requiredQty)}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-cyan-300">{number(row.issuedQty)}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-amber-300">{number(row.returnedQty)}</td>
+                            <td className={row.remainingQty > 0 ? 'px-2 py-2 font-mono tabular-nums text-red-300 font-bold' : 'px-2 py-2 font-mono tabular-nums text-emerald-300 font-bold'}>{number(row.remainingQty)}</td>
+                            <td className="w-44 px-2 py-2">
+                              <Meter value={row.readinessPercent} tone={readinessBarClass(row.readinessPercent)} />
+                              <div className={`mt-0.5 text-[10px] font-mono ${row.readinessPercent >= 100 ? 'text-emerald-300' : row.readinessPercent >= 80 ? 'text-cyan-300' : row.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>{formatQuantity(row.readinessPercent, 0)}%</div>
+                            </td>
+                            <td className="px-2 py-2"><StatusChip status={issue.status} /></td>
+                            <td className="px-2 py-2">
+                              {row.returnableQty > 0 ? (
+                                <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row); setExpandedModalOpen(false) }} className="text-amber-300 hover:underline text-xs font-semibold">Return</button>
+                              ) : (
+                                <span className="text-slate-500 text-xs">Đã cân bằng</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={filteredIssueRows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      <IssueDetailDrawer row={selectedIssue} onClose={() => setSelectedIssue(null)} />
+      {returnTarget ? <ProductionMaterialReturnModal issue={returnTarget.issue} returnableQty={returnTarget.returnableQty} onClose={() => setReturnTarget(null)} /> : null}
     </div>
-    <IssueDetailDrawer row={selectedIssue} onClose={() => setSelectedIssue(null)} />
-    {returnTarget ? <ProductionMaterialReturnModal issue={returnTarget.issue} returnableQty={returnTarget.returnableQty} onClose={() => setReturnTarget(null)} /> : null}
-  </div>
+  )
 }
 
 function IssueDetailDrawer({
@@ -1846,91 +2614,227 @@ type ConsumptionSummaryRow = {
 
 function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssue[]; consumptions: ProductionMaterialConsumption[] }) {
   const [consumeTarget, setConsumeTarget] = useState<ProductionConsumptionTarget | null>(null)
-  const rows = useMemo(() => buildConsumptionRows(issues, consumptions), [issues, consumptions])
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const pageSize = 14
-  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const rows = useMemo(() => buildConsumptionRows(issues, consumptions), [issues, consumptions])
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      return !search || `${row.orderNo} ${row.title} ${row.material}`.toLowerCase().includes(search.toLowerCase())
+    })
+  }, [rows, search])
+
   const issued = rows.reduce((sum, row) => sum + row.issuedQty, 0)
   const returned = rows.reduce((sum, row) => sum + row.returnedQty, 0)
   const consumed = rows.reduce((sum, row) => sum + row.consumedQty, 0)
   const scrap = rows.reduce((sum, row) => sum + row.scrapQty, 0)
   const remaining = rows.reduce((sum, row) => sum + row.remainingQty, 0)
 
+  const pageSize = 14
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+
   useEffect(() => {
     setPage(1)
-  }, [rows.length])
+  }, [filteredRows.length, search])
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-        <InventoryKpi title="Issued" value={number(issued)} note="Đã cấp phát" tone="blue" />
-        <InventoryKpi title="Returned" value={number(returned)} note="Đã hoàn trả" tone="amber" />
-        <InventoryKpi title="Consumed" value={number(consumed)} note="Đã tiêu hao" tone="emerald" />
-        <InventoryKpi title="Scrap" value={number(scrap)} note="Phế phẩm" tone="red" />
-        <InventoryKpi title="Remaining" value={number(remaining)} note="Còn treo tại sản xuất" tone="purple" />
-    </div>
-    <div className="grid gap-1 xl:grid-cols-[minmax(0,1fr)_330px]">
-    <CockpitChartCard title="Production Consumption" subtitle="Issued = Returned + Consumed + Scrap + Remaining" action={<span className="text-[11px] text-cyan-300">{rows.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, rows.length)} / {rows.length}</span>} heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-      <div className="flex h-full min-h-0 flex-col">
-      <CockpitTableShell className="min-h-0 flex-1">
-        <table className="w-full min-w-[1080px] table-fixed text-left text-[13px]">
-          <thead className={inventoryTableHead}><tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-          <tbody>{pagedRows.map(row=><tr className={inventoryTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
-            <td className="px-2 py-2 text-cyan-300">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500">{row.title}</div></td>
-            <td className="px-2 py-2">{row.material}</td>
-            <td className="px-2 py-2 font-mono tabular-nums">{number(row.issuedQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums">{number(row.returnedQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{number(row.consumedQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums text-red-300">{number(row.scrapQty)}</td>
-            <td className={`px-2 py-2 font-mono tabular-nums ${row.remainingQty > 0 ? 'text-amber-300' : 'text-slate-500'}`}>{number(row.remainingQty)}</td>
-            <td className="px-2 py-2">{row.unit ?? '-'}</td>
-            <td className="px-2 py-2">{row.remainingQty > 0 ? <button type="button" onClick={() => setConsumeTarget(row)} className="text-cyan-300">Consume</button> : <span className="text-slate-500">Đã cân bằng</span>}</td>
-          </tr>)}
-          {emptyRows.map((_, index) => (
-            <tr key={`consumption-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-              <td colSpan={9} className="h-[46px] px-2 py-2">
-                <div className="h-px w-full bg-white/[0.035]" />
-              </td>
-            </tr>
-          ))}
-          </tbody>
-        </table>
-        {!pagedRows.length ? <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có dữ liệu tiêu hao" description="Consumption sẽ hiển thị khi vật tư đã issue được consume hoặc scrap." /> : null}
-      </CockpitTableShell>
-      <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng dòng tiêu hao" value={formatQuantity(rows.length, 0)} tone="blue" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng đã cấp" value={number(issued)} tone="cyan" icon={<Package size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng hoàn trả" value={number(returned)} tone="amber" icon={<RotateCcw size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng tiêu hao" value={number(consumed)} tone="emerald" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng phế phẩm" value={number(scrap)} tone="red" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Còn treo tại SX" value={number(remaining)} tone="purple" icon={<FileStack size={15} />} />
       </div>
-    </CockpitChartCard>
-    <aside className="space-y-1">
-      <CockpitChartCard title="Nguyên tắc tiêu hao" subtitle="Production consumption rule" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <div className="space-y-3 text-xs text-slate-300">
-          <div>Chỉ consume vật tư đã issue cho MO.</div>
-          <div className="text-cyan-300">Remaining = Issued - Returned - Consumed - Scrap.</div>
-          <div>Ghi consume sẽ tạo ledger event CONSUME.</div>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_130px_120px]">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã lệnh SX (MO), tên sản phẩm, tên/mã vật tư..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
         </div>
-      </CockpitChartCard>
-      <CockpitChartCard title="Phân bổ tiêu hao" subtitle="Returned / Consumed / Scrap / Remaining" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        {issued > 0 ? (
-          <ProductionDonut centerValue={number(issued)} centerLabel="issued" segments={[
-            { label: 'Returned', value: returned, color: '#f59e0b' },
-            { label: 'Consumed', value: consumed, color: '#14c987' },
-            { label: 'Scrap', value: scrap, color: '#ef4444' },
-            { label: 'Remaining', value: remaining, color: '#7c3aed' },
-          ]} />
-        ) : (
-          <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có phân bổ tiêu hao" description="Biểu đồ sẽ hiển thị khi có vật tư đã issue." />
-        )}
-      </CockpitChartCard>
-      <CockpitChartCard title="Cân bằng vật tư" subtitle="Issued - Returned - Consumed - Scrap" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <div className="space-y-2 text-xs text-slate-300">
-          <Info k="Issued" v={number(issued)} />
-          <Info k="Settled" v={number(returned + consumed + scrap)} />
-          <Info k="Remaining" v={number(remaining)} />
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Bảng tiêu hao vật tư sản xuất (Production Consumption)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredRows.length} dòng
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1080px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-2 py-2 text-left text-xs font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => (
+                    <tr className={inventoryTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
+                      <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-400 font-normal">{row.title}</div></td>
+                      <td className="px-2 py-1.5 text-white font-medium truncate">{row.material}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{number(row.issuedQty)}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-amber-300">{number(row.returnedQty)}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-emerald-300 font-semibold">{number(row.consumedQty)}</td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-red-300">{number(row.scrapQty)}</td>
+                      <td className={`px-2 py-1.5 font-mono tabular-nums ${row.remainingQty > 0 ? 'text-amber-300 font-semibold' : 'text-slate-500'}`}>{number(row.remainingQty)}</td>
+                      <td className="px-2 py-1.5 text-slate-300 text-xs">{row.unit ?? '-'}</td>
+                      <td className="px-2 py-1.5">
+                        {row.remainingQty > 0 ? (
+                          <button type="button" onClick={() => setConsumeTarget(row)} className="text-cyan-300 hover:underline text-xs font-semibold">Consume</button>
+                        ) : (
+                          <span className="text-slate-500 text-xs">Đã cân bằng</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={9} className="px-2 py-10">
+                        <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có dữ liệu tiêu hao" description="Consumption sẽ hiển thị khi vật tư đã issue được consume hoặc scrap." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
         </div>
-      </CockpitChartCard>
-    </aside>
+
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Nguyên tắc tiêu hao" subtitle="Production consumption rule" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="space-y-3 text-xs text-slate-300">
+              <div>Chỉ consume vật tư đã issue cho MO.</div>
+              <div className="text-cyan-300 font-mono">Remaining = Issued - Returned - Consumed - Scrap.</div>
+              <div>Ghi consume sẽ tạo ledger event CONSUME.</div>
+            </div>
+          </CockpitChartCard>
+          <CockpitChartCard title="Phân bổ tiêu hao" subtitle="Returned / Consumed / Scrap / Remaining" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            {issued > 0 ? (
+              <ProductionDonut centerValue={number(issued)} centerLabel="issued" segments={[
+                { label: 'Returned', value: returned, color: '#f59e0b' },
+                { label: 'Consumed', value: consumed, color: '#14c987' },
+                { label: 'Scrap', value: scrap, color: '#ef4444' },
+                { label: 'Remaining', value: remaining, color: '#7c3aed' },
+              ]} />
+            ) : (
+              <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có phân bổ tiêu hao" description="Biểu đồ sẽ hiển thị khi có vật tư đã issue." />
+            )}
+          </CockpitChartCard>
+          <CockpitChartCard title="Cân bằng vật tư" subtitle="Issued - Returned - Consumed - Scrap" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="space-y-2 text-xs text-slate-300">
+              <Info k="Issued" v={number(issued)} />
+              <Info k="Settled" v={number(returned + consumed + scrap)} />
+              <Info k="Remaining" v={number(remaining)} />
+            </div>
+          </CockpitChartCard>
+        </aside>
+      </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ bảng tiêu hao vật tư (Material Consumptions)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredRows.length} dòng tiêu hao trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1080px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['MO Number','Material','Issued','Returned','Consumed','Scrap','Remaining','Unit','Action'].map(x=><th className="px-2 py-2 text-left font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => (
+                        <tr className={inventoryTableRow} key={`${row.productionOrderId}-${row.inventoryItemId}`}>
+                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-400 font-normal">{row.title}</div></td>
+                          <td className="px-2 py-2 text-white font-medium truncate">{row.material}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{number(row.issuedQty)}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-amber-300">{number(row.returnedQty)}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-emerald-300 font-semibold">{number(row.consumedQty)}</td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-red-300">{number(row.scrapQty)}</td>
+                          <td className={`px-2 py-2 font-mono tabular-nums ${row.remainingQty > 0 ? 'text-amber-300 font-semibold' : 'text-slate-500'}`}>{number(row.remainingQty)}</td>
+                          <td className="px-2 py-2 text-slate-300 text-xs">{row.unit ?? '-'}</td>
+                          <td className="px-2 py-2">
+                            {row.remainingQty > 0 ? (
+                              <button type="button" onClick={() => { setConsumeTarget(row); setExpandedModalOpen(false) }} className="text-cyan-300 hover:underline text-xs font-semibold">Consume</button>
+                            ) : (
+                              <span className="text-slate-500 text-xs">Đã cân bằng</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {consumeTarget ? <ProductionConsumptionModal target={consumeTarget} onClose={() => setConsumeTarget(null)} /> : null}
     </div>
-    {consumeTarget ? <ProductionConsumptionModal target={consumeTarget} onClose={() => setConsumeTarget(null)} /> : null}
-  </div>
+  )
 }
 
 function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[]; orders: ProductionOrder[]; onOpen: (row: ProductionOrder) => void }) {
@@ -1938,6 +2842,11 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
   const issue = useIssueProductionReservation()
   const release = useReleaseProductionReservation()
   const expire = useExpireProductionReservation()
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
 
   async function run(action: () => Promise<unknown>, message: string) {
     try {
@@ -1949,91 +2858,249 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
     }
   }
 
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchSearch = !search || `${row.reservationNo} ${row.productionOrder?.orderNo} ${row.bom?.bomNo}`.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = !statusFilter || row.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [rows, search, statusFilter])
+
   const requiredTotal = rows.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.requiredQty ?? 0), 0), 0)
   const reservedTotal = rows.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.reservedQty ?? 0), 0), 0)
   const issuedTotal = rows.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.issuedQty ?? 0), 0), 0)
-  const [page, setPage] = useState(1)
+  const reservedCount = rows.filter((row) => row.status === 'RESERVED').length
+  const draftCount = rows.filter((row) => row.status === 'DRAFT').length
+  const expiredCount = rows.filter((row) => row.status === 'EXPIRED').length
+
   const pageSize = 14
-  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+
   const statusSegments = [
-    { label: 'Reserved', value: rows.filter((row) => row.status === 'RESERVED').length, color: '#14c987' },
-    { label: 'Draft', value: rows.filter((row) => row.status === 'DRAFT').length, color: '#1d7cff' },
+    { label: 'Reserved', value: reservedCount, color: '#14c987' },
+    { label: 'Draft', value: draftCount, color: '#1d7cff' },
     { label: 'Cancelled', value: rows.filter((row) => row.status === 'CANCELLED').length, color: '#f59e0b' },
-    { label: 'Expired', value: rows.filter((row) => row.status === 'EXPIRED').length, color: '#ef4444' },
+    { label: 'Expired', value: expiredCount, color: '#ef4444' },
   ]
 
   useEffect(() => {
     setPage(1)
-  }, [rows.length])
+  }, [filteredRows.length, search, statusFilter])
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-    <div className="xl:col-span-9">
-    <CockpitChartCard title="Giữ chỗ vật tư sản xuất" subtitle="Reservation theo kho sản xuất" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} reservation</span>} heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-      <div className="flex h-full min-h-0 flex-col">
-      <CockpitTableShell className="min-h-0 flex-1">
-      <table className="w-full min-w-[1120px] table-fixed text-left text-[13px]">
-        <thead className={inventoryTableHead}><tr>{['Reservation','MO Number','BOM','Dòng VT','Required','Reserved','Issued','Vị trí','Ngày giữ','Trạng thái','Thao tác'].map((x)=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-        <tbody>{pagedRows.map((row)=>{
-          const requiredQty = row.lines.reduce((sum, line) => sum + Number(line.requiredQty ?? 0), 0)
-          const reservedQty = row.lines.reduce((sum, line) => sum + Number(line.reservedQty ?? 0), 0)
-          const issuedQty = row.lines.reduce((sum, line) => sum + Number(line.issuedQty ?? 0), 0)
-          const locations = new Set(row.lines.map((line) => [line.warehouse?.code, line.zone?.code, line.slotId, line.level].filter(Boolean).join('/')).filter(Boolean))
-          const order = orders.find((item) => item.id === row.productionOrderId)
-          return <tr className={inventoryTableRow} key={row.id}>
-            <td className="px-2 py-2 text-cyan-300">{row.reservationNo}</td>
-            <td className="px-2 py-2">{order ? <button className="text-left text-cyan-300" onClick={() => onOpen(order)}>{row.productionOrder?.orderNo ?? order.orderNo}</button> : row.productionOrder?.orderNo}</td>
-            <td className="px-2 py-2">{row.bom?.bomNo ?? '-'}</td>
-            <td className="px-2 py-2">{row.lines.length}</td>
-            <td className="px-2 py-2 font-mono tabular-nums">{number(requiredQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{number(reservedQty)}</td>
-            <td className="px-2 py-2 font-mono tabular-nums">{number(issuedQty)}</td>
-            <td className="px-2 py-2">{locations.size ? Array.from(locations).slice(0,2).join(', ') : '-'}</td>
-            <td className="px-2 py-2">{row.reservedAt ? formatDateTime(row.reservedAt) : '-'}</td>
-            <td className="px-2 py-2"><StatusChip status={row.status}/></td>
-            <td className="px-2 py-2"><div className="flex flex-wrap gap-2">
-              {row.status === 'DRAFT' && <button className="text-cyan-300" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
-              {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
-              {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-amber-300" onClick={() => run(() => release.mutateAsync({ id: row.id }), 'Đã hủy giữ chỗ')}>Release</button>}
-              {['DRAFT','RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-red-300" onClick={() => run(() => expire.mutateAsync({ id: row.id }), 'Đã hết hạn giữ chỗ')}>Expire</button>}
-            </div></td>
-          </tr>
-        })}
-        {emptyRows.map((_, index) => (
-          <tr key={`reservation-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-            <td colSpan={11} className="h-[46px] px-2 py-2">
-              <div className="h-px w-full bg-white/[0.035]" />
-            </td>
-          </tr>
-        ))}
-        </tbody>
-      </table>
-      {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Reservation vật tư sản xuất sẽ hiển thị khi tạo giữ chỗ cho WO." /> : null}
-      </CockpitTableShell>
-      <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng số Reservation" value={formatQuantity(rows.length, 0)} tone="blue" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Đang giữ chỗ (Reserved)" value={formatQuantity(reservedCount, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng nhu cầu VT" value={number(requiredTotal)} tone="cyan" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng đã giữ chỗ" value={number(reservedTotal)} tone="purple" icon={<FileStack size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng đã cấp phát" value={number(issuedTotal)} tone="blue" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Giữ chỗ hết hạn/hủy" value={formatQuantity(expiredCount, 0)} tone="amber" icon={<AlertTriangle size={15} />} />
       </div>
-    </CockpitChartCard>
-    </div>
-    <aside className="space-y-1 xl:col-span-3">
-      <CockpitChartCard title="Chờ cấp vật tư" subtitle="Reserved chưa issue" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <div className="space-y-2 text-xs text-slate-300">
-          <Info k="Required" v={number(requiredTotal)} />
-          <Info k="Reserved" v={number(reservedTotal)} />
-          <Info k="Issued" v={number(issuedTotal)} />
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả trạng thái giữ chỗ</option>
+            <option value="RESERVED">Đã giữ chỗ (RESERVED)</option>
+            <option value="DRAFT">Nháp (DRAFT)</option>
+            <option value="PARTIALLY_ISSUED">Cấp phát 1 phần</option>
+            <option value="EXPIRED">Hết hạn (EXPIRED)</option>
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã Reservation, mã lệnh sản xuất, BOM..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setStatusFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
         </div>
-      </CockpitChartCard>
-      <CockpitChartCard title="Theo trạng thái" subtitle="Reservation status" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="RSV" segments={[
-          ...statusSegments,
-        ]} />
-      </CockpitChartCard>
-      <CockpitChartCard title="Gần đây" subtitle="Reservation mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <RankList rows={rows.slice(0, 5).map((row) => ({ id: row.id, title: row.reservationNo, subtitle: row.productionOrder?.orderNo ?? row.productionOrderId, value: row.status }))} empty="Chưa có reservation" />
-      </CockpitChartCard>
-    </aside>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách giữ chỗ vật tư sản xuất (Reservations)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredRows.length} giữ chỗ
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1120px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['Reservation','MO Number','BOM','Dòng VT','Required','Reserved','Issued','Vị trí','Ngày giữ','Trạng thái','Thao tác'].map((x)=><th className="px-2 py-2 text-left text-xs font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => {
+                    const requiredQty = row.lines.reduce((sum, line) => sum + Number(line.requiredQty ?? 0), 0)
+                    const reservedQty = row.lines.reduce((sum, line) => sum + Number(line.reservedQty ?? 0), 0)
+                    const issuedQty = row.lines.reduce((sum, line) => sum + Number(line.issuedQty ?? 0), 0)
+                    const locations = new Set(row.lines.map((line) => [line.warehouse?.code, line.zone?.code, line.slotId, line.level].filter(Boolean).join('/')).filter(Boolean))
+                    const order = orders.find((item) => item.id === row.productionOrderId)
+                    return (
+                      <tr className={inventoryTableRow} key={row.id}>
+                        <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.reservationNo}</td>
+                        <td className="px-2 py-1.5 font-mono text-xs">{order ? <button className="text-left text-cyan-300 hover:underline font-mono" onClick={() => onOpen(order)}>{row.productionOrder?.orderNo ?? order.orderNo}</button> : row.productionOrder?.orderNo}</td>
+                        <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{row.bom?.bomNo ?? '-'}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-slate-300 text-xs">{row.lines.length}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{number(requiredQty)}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-emerald-300">{number(reservedQty)}</td>
+                        <td className="px-2 py-1.5 font-mono tabular-nums text-cyan-300">{number(issuedQty)}</td>
+                        <td className="px-2 py-1.5 text-slate-300 text-xs truncate">{locations.size ? Array.from(locations).slice(0,2).join(', ') : '-'}</td>
+                        <td className="px-2 py-1.5 text-slate-300 font-mono text-xs">{row.reservedAt ? formatDateTime(row.reservedAt) : '-'}</td>
+                        <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
+                            {row.status === 'DRAFT' && <button className="text-cyan-300 hover:underline" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
+                            {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300 hover:underline" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
+                            {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-amber-300 hover:underline" onClick={() => run(() => release.mutateAsync({ id: row.id }), 'Đã hủy giữ chỗ')}>Release</button>}
+                            {['DRAFT','RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-red-300 hover:underline" onClick={() => run(() => expire.mutateAsync({ id: row.id }), 'Đã hết hạn giữ chỗ')}>Expire</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={11} className="px-2 py-10">
+                        <ModuleEmptyState icon={<SlidersHorizontal size={18} />} title="Chưa có dữ liệu giữ chỗ" description="Reservation vật tư sản xuất sẽ hiển thị khi tạo giữ chỗ cho WO." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
+        </div>
+
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Chờ cấp vật tư" subtitle="Reserved chưa issue" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="space-y-2 text-xs text-slate-300">
+              <Info k="Required" v={number(requiredTotal)} />
+              <Info k="Reserved" v={number(reservedTotal)} />
+              <Info k="Issued" v={number(issuedTotal)} />
+            </div>
+          </CockpitChartCard>
+          <CockpitChartCard title="Theo trạng thái" subtitle="Reservation status" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="RSV" segments={statusSegments} />
+          </CockpitChartCard>
+          <CockpitChartCard title="Gần đây" subtitle="Reservation mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={rows.slice(0, 5).map((row) => ({ id: row.id, title: row.reservationNo, subtitle: row.productionOrder?.orderNo ?? row.productionOrderId, value: row.status }))} empty="Chưa có reservation" />
+          </CockpitChartCard>
+        </aside>
+      </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách giữ chỗ vật tư (Reservations)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredRows.length} lượt giữ chỗ trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1120px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['Reservation','MO Number','BOM','Dòng VT','Required','Reserved','Issued','Vị trí','Ngày giữ','Trạng thái','Thao tác'].map((x)=><th className="px-2 py-2 text-left font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => {
+                        const requiredQty = row.lines.reduce((sum, line) => sum + Number(line.requiredQty ?? 0), 0)
+                        const reservedQty = row.lines.reduce((sum, line) => sum + Number(line.reservedQty ?? 0), 0)
+                        const issuedQty = row.lines.reduce((sum, line) => sum + Number(line.issuedQty ?? 0), 0)
+                        const locations = new Set(row.lines.map((line) => [line.warehouse?.code, line.zone?.code, line.slotId, line.level].filter(Boolean).join('/')).filter(Boolean))
+                        const order = orders.find((item) => item.id === row.productionOrderId)
+                        return (
+                          <tr className={inventoryTableRow} key={row.id}>
+                            <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.reservationNo}</td>
+                            <td className="px-2 py-2 font-mono text-xs">{order ? <button className="text-left text-cyan-300 hover:underline font-mono" onClick={() => { onOpen(order); setExpandedModalOpen(false) }}>{row.productionOrder?.orderNo ?? order.orderNo}</button> : row.productionOrder?.orderNo}</td>
+                            <td className="px-2 py-2 font-mono text-slate-300">{row.bom?.bomNo ?? '-'}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-slate-300">{row.lines.length}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{number(requiredQty)}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{number(reservedQty)}</td>
+                            <td className="px-2 py-2 font-mono tabular-nums text-cyan-300">{number(issuedQty)}</td>
+                            <td className="px-2 py-2 text-slate-300 truncate">{locations.size ? Array.from(locations).slice(0,2).join(', ') : '-'}</td>
+                            <td className="px-2 py-2 text-slate-300 font-mono">{row.reservedAt ? formatDateTime(row.reservedAt) : '-'}</td>
+                            <td className="px-2 py-2"><StatusChip status={row.status} /></td>
+                            <td className="px-2 py-2">
+                              <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
+                                {row.status === 'DRAFT' && <button className="text-cyan-300 hover:underline" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
+                                {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300 hover:underline" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
-  </div>
+  )
 }
 
 function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: ProductionMaterialLedger[]; orders: ProductionOrder[]; filters: ProductionMaterialLedgerParams; onFiltersChange: (filters: ProductionMaterialLedgerParams) => void }) {
@@ -2044,14 +3111,19 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
     })
     return Array.from(byId.values()).sort((a, b) => a.code.localeCompare(b.code))
   }, [rows])
+
   const reserveQty = rows.filter((row) => row.eventType === 'RESERVE').reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)
   const releaseQty = rows.filter((row) => row.eventType === 'RELEASE').reduce((sum, row) => sum + Math.abs(Number(row.quantity ?? 0)), 0)
+  const issueQty = rows.filter((row) => row.eventType === 'ISSUE').reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)
+  const consumeQty = rows.filter((row) => row.eventType === 'CONSUME').reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)
   const netQty = rows.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)
   const eventTypes: Array<ProductionMaterialLedger['eventType']> = ['RESERVE', 'RELEASE', 'ISSUE', 'RETURN', 'CONSUME', 'ADJUST']
+
   const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const pageSize = 14
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+
   const warehouseRows = Array.from(rows.reduce((map, row) => {
     const key = row.warehouse?.code ?? row.warehouseId ?? 'Chưa rõ kho'
     map.set(key, (map.get(key) ?? 0) + Math.abs(Number(row.quantity ?? 0)))
@@ -2066,96 +3138,218 @@ function MaterialLedger({ rows, orders, filters, onFiltersChange }: { rows: Prod
 
   function update(key: keyof ProductionMaterialLedgerParams, value: string) {
     onFiltersChange({ ...filters, [key]: value || undefined })
+    setPage(1)
   }
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-      <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-          <select value={filters.productionOrderId ?? ''} onChange={(event) => update('productionOrderId', event.target.value)} className={inventoryInput}>
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng dòng Ledger" value={formatQuantity(rows.length, 0)} tone="blue" icon={<FileText size={15} />} />
+        <EnterpriseKpiCard title="Biến động ròng (Net)" value={number(netQty)} tone="emerald" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng Reserve" value={number(reserveQty)} tone="cyan" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng Release" value={number(releaseQty)} tone="amber" icon={<RotateCcw size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng Issue" value={number(issueQty)} tone="blue" icon={<Package size={15} />} />
+        <EnterpriseKpiCard title="Khối lượng Consume" value={number(consumeQty)} tone="purple" icon={<Wrench size={15} />} />
+      </div>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_1fr_120px]">
+          <select
+            value={filters.productionOrderId ?? ''}
+            onChange={(event) => update('productionOrderId', event.target.value)}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
             <option value="">Tất cả lệnh SX</option>
-            {orders.map((order) => <option key={order.id} value={order.id}>{order.orderNo} · {order.title}</option>)}
+            {orders.map((order) => (
+              <option key={order.id} value={order.id}>{order.orderNo} · {order.title}</option>
+            ))}
           </select>
-          <select value={filters.inventoryItemId ?? ''} onChange={(event) => update('inventoryItemId', event.target.value)} className={inventoryInput}>
+          <select
+            value={filters.inventoryItemId ?? ''}
+            onChange={(event) => update('inventoryItemId', event.target.value)}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
             <option value="">Tất cả vật tư</option>
-            {materials.map((material) => <option key={material.id} value={material.id}>{material.code} · {material.name}</option>)}
+            {materials.map((material) => (
+              <option key={material.id} value={material.id}>{material.code} · {material.name}</option>
+            ))}
           </select>
-          <select value={filters.eventType ?? ''} onChange={(event) => update('eventType', event.target.value)} className={inventoryInput}>
-            <option value="">Tất cả event</option>
-            {eventTypes.map((eventType) => <option key={eventType} value={eventType}>{eventType}</option>)}
+          <select
+            value={filters.eventType ?? ''}
+            onChange={(event) => update('eventType', event.target.value)}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả Event</option>
+            {eventTypes.map((eventType) => (
+              <option key={eventType} value={eventType}>{eventType}</option>
+            ))}
           </select>
-          <input type="date" value={filters.fromDate ?? ''} onChange={(event) => update('fromDate', event.target.value)} className={inventoryInput} />
-          <input type="date" value={filters.toDate ?? ''} onChange={(event) => update('toDate', event.target.value)} className={inventoryInput} />
-      </div>
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
+          <div className="flex gap-1">
+            <input
+              type="date"
+              value={filters.fromDate ?? ''}
+              onChange={(event) => update('fromDate', event.target.value)}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+            <input
+              type="date"
+              value={filters.toDate ?? ''}
+              onChange={(event) => update('toDate', event.target.value)}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onFiltersChange({})}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
         <div className="xl:col-span-9">
-      <CockpitChartCard title="Production Material Ledger" subtitle="Sổ vật tư sản xuất theo event" action={<span className="text-[11px] text-cyan-300">{formatQuantity(rows.length, 0)} dòng</span>} heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-        <div className="flex h-full min-h-0 flex-col">
-        <CockpitTableShell className="min-h-0 flex-1">
-        <table className="w-full min-w-[1060px] table-fixed text-left text-[13px]">
-          <thead className={inventoryTableHead}><tr>{['Thời gian','Event','MO','Reservation','Material','Vị trí','Quantity','Created By','Remark'].map((x)=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead>
-          <tbody>{pagedRows.map((row)=><tr key={row.id} className={inventoryTableRow}>
-            <td className="px-2 py-2">{formatDateTime(row.eventDate)}</td>
-            <td className="px-2 py-2"><StatusChip status={row.eventType}/></td>
-            <td className="px-2 py-2 text-cyan-300">{row.productionOrder?.orderNo ?? row.productionOrderId}</td>
-            <td className="px-2 py-2">{row.reservation?.reservationNo ?? '-'}</td>
-            <td className="px-2 py-2">{row.inventoryItem ? `${row.inventoryItem.code} · ${row.inventoryItem.name}` : row.inventoryItemId}</td>
-            <td className="px-2 py-2">{[row.warehouse?.code, row.zone?.code, row.slotId, row.level ? `L${row.level}` : undefined].filter(Boolean).join('/') || '-'}</td>
-            <td className={Number(row.quantity) < 0 ? 'px-2 py-2 font-mono tabular-nums text-amber-300' : 'px-2 py-2 font-mono tabular-nums text-emerald-300'}>{number(row.quantity)}</td>
-            <td className="px-2 py-2">{row.createdBy ?? '-'}</td>
-            <td className="px-2 py-2">{row.remark ?? '-'}</td>
-          </tr>)}
-          {emptyRows.map((_, index) => (
-            <tr key={`ledger-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-              <td colSpan={9} className="h-[46px] px-2 py-2">
-                <div className="h-px w-full bg-white/[0.035]" />
-              </td>
-            </tr>
-          ))}
-          </tbody>
-        </table>
-        {!pagedRows.length ? <ModuleEmptyState icon={<span>📦</span>} title="Chưa có dữ liệu vật tư" description="Ledger sẽ có dữ liệu khi reservation, issue, return, consume hoặc adjust phát sinh." /> : null}
-        </CockpitTableShell>
-        <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Sổ vật tư sản xuất (Production Material Ledger)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {rows.length} dòng
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1060px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['Thời gian','Event','MO','Reservation','Material','Vị trí','Quantity','Created By','Remark'].map((x)=><th className="px-2 py-2 text-left text-xs font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => (
+                    <tr key={row.id} className={inventoryTableRow}>
+                      <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{formatDateTime(row.eventDate)}</td>
+                      <td className="px-2 py-1.5"><StatusChip status={row.eventType} /></td>
+                      <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.productionOrder?.orderNo ?? row.productionOrderId}</td>
+                      <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{row.reservation?.reservationNo ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-white font-medium truncate">{row.inventoryItem ? `${row.inventoryItem.code} · ${row.inventoryItem.name}` : row.inventoryItemId}</td>
+                      <td className="px-2 py-1.5 text-slate-300 font-mono text-xs truncate">{[row.warehouse?.code, row.zone?.code, row.slotId, row.level ? `L${row.level}` : undefined].filter(Boolean).join('/') || '-'}</td>
+                      <td className={Number(row.quantity) < 0 ? 'px-2 py-1.5 font-mono tabular-nums text-amber-300 font-semibold' : 'px-2 py-1.5 font-mono tabular-nums text-emerald-300 font-semibold'}>{number(row.quantity)}</td>
+                      <td className="px-2 py-1.5 text-slate-300 text-xs">{row.createdBy ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-400 text-xs truncate">{row.remark ?? '-'}</td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={9} className="px-2 py-10">
+                        <ModuleEmptyState icon={<FileText size={18} />} title="Chưa có dữ liệu vật tư" description="Ledger sẽ có dữ liệu khi reservation, issue, return, consume hoặc adjust phát sinh." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+          </EnterprisePanel>
         </div>
-      </CockpitChartCard>
-        </div>
-    <aside className="space-y-1 xl:col-span-3">
-      <CockpitChartCard title="Giá trị xuất" subtitle="Ledger chưa có unit cost" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <ModuleEmptyState icon={<span>📦</span>} title="Chưa có giá trị xuất" description="Cần cost trên ledger/material issue để hiển thị giá trị." />
-      </CockpitChartCard>
-      <CockpitChartCard title="Theo kho" subtitle="Quantity movement" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <RankList rows={warehouseRows.slice(0, 5)} empty="Chưa có dữ liệu kho" />
-      </CockpitChartCard>
-      <CockpitChartCard title="Gần đây" subtitle="Event mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-        <RankList rows={rows.slice(0, 5).map((row) => ({ id: row.id, title: row.eventType, subtitle: row.productionOrder?.orderNo ?? row.productionOrderId, value: formatDateTime(row.eventDate) }))} empty="Chưa có ledger event" />
-      </CockpitChartCard>
-    </aside>
+
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Giá trị xuất" subtitle="Ledger chưa có unit cost" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <ModuleEmptyState icon={<Boxes size={18} />} title="Chưa có giá trị xuất" description="Cần cost trên ledger/material issue để hiển thị giá trị." />
+          </CockpitChartCard>
+          <CockpitChartCard title="Theo kho" subtitle="Quantity movement" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={warehouseRows.slice(0, 5)} empty="Chưa có dữ liệu kho" />
+          </CockpitChartCard>
+          <CockpitChartCard title="Gần đây" subtitle="Event mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={rows.slice(0, 5).map((row) => ({ id: row.id, title: row.eventType, subtitle: row.productionOrder?.orderNo ?? row.productionOrderId, value: formatDateTime(row.eventDate) }))} empty="Chưa có ledger event" />
+          </CockpitChartCard>
+        </aside>
       </div>
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-2">
-      <CockpitChartCard title="Tổng quan ledger" subtitle="Quantity movement" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <div className="space-y-2 text-xs">
-          <Info k="Reserve" v={number(reserveQty)} />
-          <Info k="Release" v={number(releaseQty)} />
-          <Info k="Net" v={number(netQty)} />
-          <Info k="Số dòng" v={formatQuantity(rows.length, 0)} />
-        </div>
-      </CockpitChartCard>
-      <CockpitChartCard title="Phân bổ event" subtitle="Event type distribution" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        <ProductionDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="events" segments={eventTypes.map((eventType, index) => ({
-          label: eventType,
-          value: rows.filter((row) => row.eventType === eventType).length,
-          color: ['#1d7cff', '#f59e0b', '#14c987', '#06b6d4', '#7c3aed', '#ef4444'][index],
-        }))} />
-      </CockpitChartCard>
-      </div>
-  </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ sổ vật tư sản xuất (Material Ledger)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {rows.length} nhật ký biến động vật tư</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1060px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['Thời gian','Event','MO','Reservation','Material','Vị trí','Quantity','Created By','Remark'].map((x)=><th className="px-2 py-2 text-left font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.id} className={inventoryTableRow}>
+                          <td className="px-2 py-2 font-mono text-slate-300 text-xs">{formatDateTime(row.eventDate)}</td>
+                          <td className="px-2 py-2"><StatusChip status={row.eventType} /></td>
+                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.productionOrder?.orderNo ?? row.productionOrderId}</td>
+                          <td className="px-2 py-2 font-mono text-slate-300">{row.reservation?.reservationNo ?? '-'}</td>
+                          <td className="px-2 py-2 text-white font-medium truncate">{row.inventoryItem ? `${row.inventoryItem.code} · ${row.inventoryItem.name}` : row.inventoryItemId}</td>
+                          <td className="px-2 py-2 text-slate-300 font-mono text-xs truncate">{[row.warehouse?.code, row.zone?.code, row.slotId, row.level ? `L${row.level}` : undefined].filter(Boolean).join('/') || '-'}</td>
+                          <td className={Number(row.quantity) < 0 ? 'px-2 py-2 font-mono tabular-nums text-amber-300 font-semibold' : 'px-2 py-2 font-mono tabular-nums text-emerald-300 font-semibold'}>{number(row.quantity)}</td>
+                          <td className="px-2 py-2 text-slate-300">{row.createdBy ?? '-'}</td>
+                          <td className="px-2 py-2 text-slate-400 truncate">{row.remark ?? '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  )
 }
 
 function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) {
   const logs = rows ?? []
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const filteredRows = useMemo(() => {
+    return logs.filter((row) => {
+      const matchSearch = !search || `${row.productionOrder.orderNo} ${row.productionOrder.title} ${row.message} ${row.workerId}`.toLowerCase().includes(search.toLowerCase())
+      const matchType = !typeFilter || row.type === typeFilter
+      return matchSearch && matchType
+    })
+  }, [logs, search, typeFilter])
+
   const pageSize = 14
-  const pagedRows = logs.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedRows.length) })
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const todayRows = logs.filter((row) => sameDay(row.createdAt))
   const typeRows = Array.from(logs.reduce((map, row) => {
     map.set(row.type, (map.get(row.type) ?? 0) + 1)
@@ -2163,48 +3357,193 @@ function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) 
   }, new Map<string, number>()).entries())
     .map(([id, value]) => ({ id, title: id, subtitle: 'Log type', value: formatQuantity(value, 0) }))
 
+  const logTypes = Array.from(new Set(logs.map((log) => log.type)))
+
   useEffect(() => {
     setPage(1)
-  }, [logs.length])
+  }, [filteredRows.length, search, typeFilter])
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-      <div className="xl:col-span-9">
-  <CockpitChartCard title="Nhật ký thực thi sản xuất" subtitle="Production logs" heightClass={COCKPIT_HEIGHTS.TABLE_MD}>
-    <div className="flex h-full min-h-0 flex-col">
-    <CockpitTableShell className="min-h-0 flex-1">
-    <table className="w-full min-w-[900px] table-fixed text-left text-[13px]"><thead className={inventoryTableHead}><tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-1.5 py-0.5 text-left font-medium" key={x}>{x}</th>)}</tr></thead><tbody>{pagedRows.map(row=><tr className={inventoryTableRow} key={row.id}><td className="px-2 py-2">{formatDateTime(row.createdAt)}</td><td className="px-2 py-2 text-cyan-300">{row.productionOrder.orderNo}</td><td className="px-2 py-2">{row.productionOrder.title}</td><td className="px-2 py-2">{row.stage?.name??row.type}</td><td className="px-2 py-2">{row.workerId??'-'}</td><td className="px-2 py-2">{row.stage?.name??'-'}</td><td className="px-2 py-2"><StatusChip status={row.type}/></td><td className="px-2 py-2">{row.message}</td></tr>)}
-    {emptyRows.map((_, index) => (
-      <tr key={`log-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-        <td colSpan={8} className="h-[46px] px-2 py-2">
-          <div className="h-px w-full bg-white/[0.035]" />
-        </td>
-      </tr>
-    ))}
-    </tbody></table>
-    {!pagedRows.length ? <ModuleEmptyState icon={<span>🕒</span>} title="Chưa có nhật ký" description="Nhật ký sản xuất sẽ hiển thị khi có thao tác production." /> : null}
-    </CockpitTableShell>
-    <DataTablePagination page={page} pageSize={pageSize} total={logs.length} onPageChange={setPage} />
-    </div>
-  </CockpitChartCard>
+  return (
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng số nhật ký (Logs)" value={formatQuantity(logs.length, 0)} tone="blue" icon={<FileText size={15} />} />
+        <EnterpriseKpiCard title="Hoạt động hôm nay" value={formatQuantity(todayRows.length, 0)} tone="emerald" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Phân loại nhật ký" value={formatQuantity(typeRows.length, 0)} tone="cyan" icon={<Layers size={15} />} />
+        <EnterpriseKpiCard title="Lệnh SX liên quan" value={formatQuantity(new Set(logs.map((l) => l.productionOrder.orderNo)).size, 0)} tone="purple" icon={<Factory size={15} />} />
+        <EnterpriseKpiCard title="Công đoạn vận hành" value={formatQuantity(new Set(logs.map((l) => l.stage?.name).filter(Boolean)).size, 0)} tone="blue" icon={<Cpu size={15} />} />
+        <EnterpriseKpiCard title="Trạng thái hệ thống" value="Live Streaming" tone="emerald" icon={<Activity size={15} />} />
       </div>
-      <aside className="space-y-1 xl:col-span-3">
-        <CockpitChartCard title="Hoạt động hôm nay" subtitle="Log count" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <div className="space-y-2 text-xs text-slate-300">
-            <Info k="Hôm nay" v={formatQuantity(todayRows.length, 0)} />
-            <Info k="Tổng log" v={formatQuantity(logs.length, 0)} />
-            <Info k="Operator" v="API chưa có user profile" />
-          </div>
-        </CockpitChartCard>
-        <CockpitChartCard title="Theo loại" subtitle="Log type" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <RankList rows={typeRows.slice(0, 5)} empty="Chưa có loại nhật ký" />
-        </CockpitChartCard>
-        <CockpitChartCard title="Gần đây" subtitle="Logs mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
-          <RankList rows={logs.slice(0, 5).map((row) => ({ id: row.id, title: row.productionOrder.orderNo, subtitle: row.message, value: formatDateTime(row.createdAt) }))} empty="Chưa có nhật ký gần đây" />
-        </CockpitChartCard>
-      </aside>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả loại Log</option>
+            {logTypes.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo mã MO, tiêu đề, nội dung ghi nhận, operator..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setTypeFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+        <div className="xl:col-span-9">
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Nhật ký thực thi sản xuất (Machine / Production Logs)</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {filteredRows.length} nhật ký
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[900px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-2 py-2 text-left text-xs font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((row) => (
+                    <tr className={inventoryTableRow} key={row.id}>
+                      <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">{formatDateTime(row.createdAt)}</td>
+                      <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.productionOrder.orderNo}</td>
+                      <td className="px-2 py-1.5 text-white font-medium truncate">{row.productionOrder.title}</td>
+                      <td className="px-2 py-1.5 text-slate-300 truncate">{row.stage?.name ?? row.type}</td>
+                      <td className="px-2 py-1.5 text-slate-300 font-mono text-xs">{row.workerId ?? '-'}</td>
+                      <td className="px-2 py-1.5 text-slate-300 text-xs">{row.stage?.name ?? '-'}</td>
+                      <td className="px-2 py-1.5"><StatusChip status={row.type} /></td>
+                      <td className="px-2 py-1.5 text-slate-400 text-xs truncate">{row.message}</td>
+                    </tr>
+                  ))}
+                  {!pagedRows.length ? (
+                    <tr>
+                      <td colSpan={8} className="px-2 py-10">
+                        <ModuleEmptyState icon={<FileText size={18} />} title="Chưa có nhật ký" description="Nhật ký sản xuất sẽ hiển thị khi có thao tác production." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+          </EnterprisePanel>
+        </div>
+
+        <aside className="space-y-1 xl:col-span-3">
+          <CockpitChartCard title="Hoạt động hôm nay" subtitle="Log count" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <div className="space-y-2 text-xs text-slate-300">
+              <Info k="Hôm nay" v={formatQuantity(todayRows.length, 0)} />
+              <Info k="Tổng log" v={formatQuantity(logs.length, 0)} />
+              <Info k="Operator" v="API chưa có user profile" />
+            </div>
+          </CockpitChartCard>
+          <CockpitChartCard title="Theo loại" subtitle="Log type" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={typeRows.slice(0, 5)} empty="Chưa có loại nhật ký" />
+          </CockpitChartCard>
+          <CockpitChartCard title="Gần đây" subtitle="Logs mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
+            <RankList rows={logs.slice(0, 5).map((row) => ({ id: row.id, title: row.productionOrder.orderNo, subtitle: row.message, value: formatDateTime(row.createdAt) }))} empty="Chưa có nhật ký gần đây" />
+          </CockpitChartCard>
+        </aside>
+      </div>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ nhật ký thực thi sản xuất (Machine Logs)</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredRows.length} dòng nhật ký vận hành</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[900px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['Timestamp','MO','Structure','Operation','Operator','Workshop','Status','Remarks'].map(x=><th className="px-2 py-2 text-left font-semibold text-slate-300" key={x}>{x}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row) => (
+                        <tr className={inventoryTableRow} key={row.id}>
+                          <td className="px-2 py-2 font-mono text-slate-300 text-xs">{formatDateTime(row.createdAt)}</td>
+                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.productionOrder.orderNo}</td>
+                          <td className="px-2 py-2 text-white font-medium truncate">{row.productionOrder.title}</td>
+                          <td className="px-2 py-2 text-slate-300 truncate">{row.stage?.name ?? row.type}</td>
+                          <td className="px-2 py-2 text-slate-300 font-mono">{row.workerId ?? '-'}</td>
+                          <td className="px-2 py-2 text-slate-300">{row.stage?.name ?? '-'}</td>
+                          <td className="px-2 py-2"><StatusChip status={row.type} /></td>
+                          <td className="px-2 py-2 text-slate-400 truncate">{row.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={filteredRows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
-  </div>
+  )
 }
 
 function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: () => void }) {
@@ -2615,6 +3954,116 @@ function RankList({
           <div className="font-mono tabular-nums text-slate-200 text-right">{row.value}</div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function ProductionAdvancedWorkspace() {
+  const navigate = useNavigate()
+
+  const operations = [
+    {
+      title: 'Điều độ & Máy móc (OEE)',
+      path: '/production/machines',
+      icon: Cpu,
+      desc: 'Quản lý máy móc, trung tâm gia công (Work Centers), chỉ số utilization và OEE xưởng.',
+      tone: 'text-cyan-300 border-cyan-500/20 bg-cyan-500/5',
+    },
+    {
+      title: 'Kho sản xuất',
+      path: '/production/warehouse',
+      icon: Boxes,
+      desc: 'Tồn kho vật tư sản xuất tại xưởng, theo dõi kiểm kê và cân bằng hạn mức.',
+      tone: 'text-blue-300 border-blue-500/20 bg-blue-500/5',
+    },
+    {
+      title: 'Giữ chỗ vật tư (Reservations)',
+      path: '/production/reservations',
+      icon: Archive,
+      desc: 'Đặt giữ trước vật tư cho lệnh sản xuất trước khi chính thức phát hành cấp phát.',
+      tone: 'text-amber-300 border-amber-500/20 bg-amber-500/5',
+    },
+    {
+      title: 'Sổ vật tư sản xuất (Ledger)',
+      path: '/production/material-ledger',
+      icon: FileStack,
+      desc: 'Nhật ký biến động nhập - xuất - cấp phát - hoàn trả vật tư sản xuất.',
+      tone: 'text-purple-300 border-purple-500/20 bg-purple-500/5',
+    },
+    {
+      title: 'Cấp phát vật tư (Issues)',
+      path: '/production/material-issues',
+      icon: ClipboardList,
+      desc: 'Quản lý danh sách phiếu cấp phát vật tư trực tiếp cho các công đoạn sản xuất.',
+      tone: 'text-emerald-300 border-emerald-500/20 bg-emerald-500/5',
+    },
+    {
+      title: 'Tiêu hao vật tư (Consumptions)',
+      path: '/production/consumptions',
+      icon: Activity,
+      desc: 'Theo dõi lượng vật tư thực tế tiêu hao so với định mức BOM của lệnh sản xuất.',
+      tone: 'text-cyan-300 border-cyan-500/20 bg-cyan-500/5',
+    },
+    {
+      title: 'Sự cố & Rework',
+      path: '/production/incidents',
+      icon: AlertTriangle,
+      desc: 'Ghi nhận sự cố kỹ thuật, hư hỏng thiết bị và theo dõi lệnh sửa chữa/làm lại.',
+      tone: 'text-red-300 border-red-500/20 bg-red-500/5',
+    },
+    {
+      title: 'Nhật ký vận hành',
+      path: '/production/logs',
+      icon: Clock,
+      desc: 'Tra cứu toàn bộ timeline lịch sử thao tác, sự kiện và biến động trong xưởng.',
+      tone: 'text-slate-300 border-white/10 bg-white/[0.03]',
+    },
+    {
+      title: 'Báo cáo nâng cao',
+      path: '/production/reports',
+      icon: BarChart3,
+      desc: 'Báo cáo tổng hợp hiệu suất sản xuất, tiến độ WO và thống kê phân bổ vật tư.',
+      tone: 'text-blue-300 border-blue-500/20 bg-blue-500/5',
+    },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+        <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <Wrench className="text-cyan-400" size={18} />
+          Nghiệp vụ nâng cao (Advanced Operations)
+        </h2>
+        <p className="mt-1 text-xs text-slate-400">
+          Khu vực tập trung các chức năng điều độ, quản lý vật tư chuyên sâu, theo dõi thiết bị OEE, nhật ký vận hành và báo cáo nâng cao.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {operations.map((op) => {
+          const Icon = op.icon
+          return (
+            <div
+              key={op.path}
+              onClick={() => navigate(op.path)}
+              className={`group flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition hover:border-cyan-400/40 hover:bg-white/[0.06] ${op.tone}`}
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold text-white">
+                    <Icon size={16} />
+                    <span>{op.title}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">{op.desc}</p>
+              </div>
+              <div className="mt-3 flex items-center justify-end text-xs font-semibold text-cyan-300 group-hover:text-cyan-200">
+                <span>Truy cập nghiệp vụ →</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { AlertTriangle, Boxes, CheckCircle2, Factory, FileStack, Search, Wrench } from 'lucide-react'
 
 import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
   EnterpriseChartCard as InventoryChartCard,
   EnterpriseKpi as InventoryKpi,
+  EnterprisePanel,
   enterpriseGridGap as inventoryGridGap,
   enterprisePageStack as inventoryPageStack,
   enterpriseTableHead as inventoryTableHead,
   enterpriseTableRow as inventoryTableRow,
 } from '@/shared/ui/enterprise-components'
-import { CockpitChartCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination } from '@/shared/ui/cockpit'
+import { CockpitChartCard, CockpitTableShell, COCKPIT_HEIGHTS, DataTablePagination, EnterpriseKpiCard } from '@/shared/ui/cockpit'
 import { ModuleDataGrid, ModuleDetailDrawer, ModuleEmptyState, ModuleKpiStrip } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 
@@ -155,81 +158,152 @@ export function ProductionExecutionBoard({
 }) {
   const [selected, setSelected] = useState<ExecutionCard | null>(null)
   const [page, setPage] = useState(1)
-  const cards = useMemo(() => buildCards(orders, issues, reservations), [orders, issues, reservations])
+  const [search, setSearch] = useState('')
+  const [stageFilter, setStageFilter] = useState('')
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const rawCards = useMemo(() => buildCards(orders, issues, reservations), [orders, issues, reservations])
+  const cards = useMemo(() => {
+    return rawCards.filter((card) => {
+      const matchSearch = !search || `${card.order.orderNo} ${card.order.title} ${componentLabel(card.order)}`.toLowerCase().includes(search.toLowerCase())
+      const matchStage = !stageFilter || card.stage === stageFilter
+      return matchSearch && matchStage
+    })
+  }, [rawCards, search, stageFilter])
+
   const pageSize = 14
   const pagedCards = cards.slice((page - 1) * pageSize, page * pageSize)
-  const emptyRows = Array.from({ length: Math.max(0, pageSize - pagedCards.length) })
   const grouped = stages.map((stage) => ({
     ...stage,
     cards: cards.filter((card) => card.stage === stage.key),
   }))
   const bottleneck = [...grouped].sort((a, b) => b.cards.length - a.cards.length)[0]
-  const delayedCount = cards.filter((card) => card.delayed).length
-  const waitingMaterial = cards.filter((card) => card.readiness.readinessPercent < 100 && card.stage !== 'Completed').length
+  const delayedCount = rawCards.filter((card) => card.delayed).length
+  const waitingMaterial = rawCards.filter((card) => card.readiness.readinessPercent < 100 && card.stage !== 'Completed').length
+  const completedCount = rawCards.filter((card) => card.stage === 'Completed').length
 
   useEffect(() => {
     setPage(1)
-  }, [cards.length])
+  }, [cards.length, search, stageFilter])
 
   return (
-    <div className={inventoryPageStack}>
-      <ModuleKpiStrip className="grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
-        {grouped.map((stage) => (
-          <InventoryKpi key={stage.key} title={stage.key} value={formatQuantity(stage.cards.length, 0)} note={stage.key === bottleneck?.key ? 'Current bottleneck' : 'Work Orders'} tone={stage.key === bottleneck?.key ? 'red' : 'blue'} />
-        ))}
-      </ModuleKpiStrip>
+    <div className="space-y-2 text-xs -mt-2">
+      {/* Phase 1: KPI SECTION */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Lệnh đang thực thi" value={formatQuantity(rawCards.length, 0)} tone="blue" icon={<Factory size={15} />} />
+        <EnterpriseKpiCard title="Chờ cấp vật tư" value={formatQuantity(waitingMaterial, 0)} tone="amber" icon={<Boxes size={15} />} />
+        <EnterpriseKpiCard title="Cắt & Chuẩn bị" value={formatQuantity((grouped.find(g => g.key === 'Cutting')?.cards.length ?? 0), 0)} tone="cyan" icon={<Wrench size={15} />} />
+        <EnterpriseKpiCard title="Gá & Hàn xưởng" value={formatQuantity((grouped.find(g => g.key === 'Assembly')?.cards.length ?? 0) + (grouped.find(g => g.key === 'Welding')?.cards.length ?? 0), 0)} tone="purple" icon={<FileStack size={15} />} />
+        <EnterpriseKpiCard title="Trễ tiến độ" value={formatQuantity(delayedCount, 0)} tone="red" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Hoàn thành công đoạn" value={formatQuantity(completedCount, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+      </div>
+
+      {/* Phase 3: TOOLBAR */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_1fr_130px_120px]">
+          <select
+            value={stageFilter}
+            onChange={(e) => {
+              setStageFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="">Tất cả công đoạn</option>
+            {stages.map((st) => (
+              <option key={st.key} value={st.key}>{st.key}</option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setPage(1)
+            }}
+            placeholder="Tìm theo WO, tên cấu kiện, dự án..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setStageFilter('')
+              setPage(1)
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
 
       <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
         <div className="xl:col-span-9">
-          <CockpitChartCard
-            title="Production Queue Registry"
-            subtitle="Work order, stage, material readiness, progress and delay status"
-            action={<span className="text-[11px] text-cyan-300">{cards.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, cards.length)} / {cards.length}</span>}
-            heightClass={COCKPIT_HEIGHTS.TABLE_MD}
-          >
-            <div className="flex h-full min-h-0 flex-col">
-              <CockpitTableShell className="min-h-0 flex-1">
-                <table className="w-full min-w-[1160px] table-fixed text-left text-[13px]">
-                  <thead className={inventoryTableHead}>
-                    <tr>{['WO', 'Component', 'Stage', 'Material Ready', 'Progress', 'Reservations', 'Due', 'Status'].map((head) => (
-                      <th key={head} className="px-1.5 py-0.5 text-left font-medium">{head}</th>
-                    ))}</tr>
-                  </thead>
-                  <tbody>
-                    {pagedCards.map((card) => (
-                      <tr key={card.order.id} onClick={() => setSelected(card)} className={`cursor-pointer ${inventoryTableRow}`}>
-                        <td className="px-2 py-2 font-semibold text-cyan-300">{card.order.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500">{card.order.title}</div></td>
-                        <td className="truncate px-2 py-2 text-slate-200">{componentLabel(card.order)}</td>
-                        <td className="px-2 py-2 text-slate-300">{card.currentStage}</td>
-                        <td className="w-44 px-2 py-2">
-                          <Meter value={card.readiness.readinessPercent} tone={readinessBar(card.readiness.readinessPercent)} />
-                          <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(card.readiness.readinessPercent, 0)}%</div>
-                        </td>
-                        <td className="w-40 px-2 py-2">
-                          <Meter value={card.progress} tone={card.progress >= 80 ? 'bg-emerald-500' : card.progress >= 45 ? 'bg-cyan-500' : 'bg-amber-500'} />
-                          <div className="mt-1 text-[10px] text-slate-500">{formatQuantity(card.progress, 0)}%</div>
-                        </td>
-                        <td className="px-2 py-2 font-mono tabular-nums">{formatQuantity(card.reservations.length, 0)}</td>
-                        <td className={card.delayed ? 'px-2 py-2 text-red-300' : 'px-2 py-2 text-slate-300'}>{date(card.order.plannedEndAt)}</td>
-                        <td className="px-2 py-2"><StatusChip status={card.order.status} /></td>
-                      </tr>
-                    ))}
-                    {emptyRows.map((_, index) => (
-                      <tr key={`execution-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                        <td colSpan={8} className="h-[46px] px-2 py-2">
-                          <div className="h-px w-full bg-white/[0.035]" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!pagedCards.length ? (
-                  <ModuleEmptyState title="Chưa có work order trong queue" description="Work order sẽ xuất hiện khi Production có lệnh sản xuất thật." />
-                ) : null}
-              </CockpitTableShell>
-              <DataTablePagination page={page} pageSize={pageSize} total={cards.length} onPageChange={setPage} />
+          <EnterprisePanel className="rounded-xl">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách thực thi sản xuất</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {cards.length} lệnh thực thi
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
             </div>
-          </CockpitChartCard>
+
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+              <table className="w-full min-w-[1160px] table-fixed text-sm border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>{['WO', 'Component', 'Stage', 'Material Ready', 'Progress', 'Reservations', 'Due', 'Status'].map((head) => (
+                    <th key={head} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{head}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {pagedCards.map((card) => (
+                    <tr key={card.order.id} onClick={() => setSelected(card)} className={`cursor-pointer ${inventoryTableRow}`}>
+                      <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{card.order.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500 font-normal">{card.order.title}</div></td>
+                      <td className="truncate px-2 py-1.5 text-slate-200">{componentLabel(card.order)}</td>
+                      <td className="px-2 py-1.5 text-slate-300 font-mono text-xs">{card.currentStage}</td>
+                      <td className="w-44 px-2 py-1.5">
+                        <Meter value={card.readiness.readinessPercent} tone={readinessBar(card.readiness.readinessPercent)} />
+                        <div className="mt-1 text-[10px] font-mono text-slate-400">{formatQuantity(card.readiness.readinessPercent, 0)}%</div>
+                      </td>
+                      <td className="w-40 px-2 py-1.5">
+                        <Meter value={card.progress} tone={card.progress >= 80 ? 'bg-emerald-500' : card.progress >= 45 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                        <div className="mt-1 text-[10px] font-mono text-slate-400">{formatQuantity(card.progress, 0)}%</div>
+                      </td>
+                      <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{formatQuantity(card.reservations.length, 0)}</td>
+                      <td className={card.delayed ? 'px-2 py-1.5 text-red-300 font-mono text-xs' : 'px-2 py-1.5 text-slate-300 font-mono text-xs'}>{date(card.order.plannedEndAt)}</td>
+                      <td className="px-2 py-1.5"><StatusChip status={card.order.status} /></td>
+                    </tr>
+                  ))}
+                  {!pagedCards.length ? (
+                    <tr>
+                      <td colSpan={8} className="px-2 py-10">
+                        <ModuleEmptyState title="Chưa có work order trong queue" description="Work order sẽ xuất hiện khi Production có lệnh sản xuất thật." />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <DataTablePagination page={page} pageSize={pageSize} total={cards.length} onPageChange={setPage} />
+          </EnterprisePanel>
         </div>
         <aside className="space-y-1 xl:col-span-3">
         <CockpitChartCard title="Stage Distribution" subtitle="Planning → Completed" heightClass={COCKPIT_HEIGHTS.CHART_SM}>
@@ -321,6 +395,72 @@ export function ProductionExecutionBoard({
         </div>
       </div>
       </InventoryChartCard>
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách thực thi sản xuất</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {cards.length} lệnh thực thi trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1160px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>{['WO', 'Component', 'Stage', 'Material Ready', 'Progress', 'Reservations', 'Due', 'Status'].map((head) => (
+                        <th key={head} className="px-2 py-2 text-left font-semibold text-slate-300">{head}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {cards.map((card) => (
+                        <tr
+                          key={card.order.id}
+                          onClick={() => {
+                            setSelected(card)
+                            setExpandedModalOpen(false)
+                          }}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                        >
+                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{card.order.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500 font-normal">{card.order.title}</div></td>
+                          <td className="truncate px-2 py-2 text-slate-200">{componentLabel(card.order)}</td>
+                          <td className="px-2 py-2 text-slate-300 font-mono">{card.currentStage}</td>
+                          <td className="w-44 px-2 py-2">
+                            <Meter value={card.readiness.readinessPercent} tone={readinessBar(card.readiness.readinessPercent)} />
+                            <div className="mt-1 text-[10px] font-mono text-slate-400">{formatQuantity(card.readiness.readinessPercent, 0)}%</div>
+                          </td>
+                          <td className="w-40 px-2 py-2">
+                            <Meter value={card.progress} tone={card.progress >= 80 ? 'bg-emerald-500' : card.progress >= 45 ? 'bg-cyan-500' : 'bg-amber-500'} />
+                            <div className="mt-1 text-[10px] font-mono text-slate-400">{formatQuantity(card.progress, 0)}%</div>
+                          </td>
+                          <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{formatQuantity(card.reservations.length, 0)}</td>
+                          <td className={card.delayed ? 'px-2 py-2 text-red-300 font-mono text-xs' : 'px-2 py-2 text-slate-300 font-mono text-xs'}>{date(card.order.plannedEndAt)}</td>
+                          <td className="px-2 py-2"><StatusChip status={card.order.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={cards.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       <ExecutionDrawer card={selected} onClose={() => setSelected(null)} />
     </div>

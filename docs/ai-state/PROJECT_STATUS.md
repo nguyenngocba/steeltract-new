@@ -1,5 +1,7 @@
 # Project Status
 
+On 2026-07-24 completed **Production Advanced Operations UI Polish Sprint**. All 9 low-frequency Advanced Operations pages (`/production/advanced`: Machines, Production Warehouse, Material Reservations, Material Ledger, Material Issues, Material Consumptions, Incidents/Rework, Machine Logs, Advanced Reports) have been standardized across all 6 phases (`EnterpriseKpiCard`, compact toolbar, sticky Hero Table with count pill, expanded modal via `createPortal`, and detail drawers). Both frontend and backend builds compile with 0 errors.
+
 On 2026-07-23 started the Component Manufacturing Workflow epic and completed
 Sprint A. Production Order creation is now gated by Engineering Release:
 component-bound orders require an ACTIVE engineering-released Component with a

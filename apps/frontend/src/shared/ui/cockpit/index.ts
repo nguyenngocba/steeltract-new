@@ -1,5 +1,6 @@
 export { CockpitChartCard } from './CockpitChartCard'
 export { CockpitKpiCard } from './CockpitKpiCard'
+export { EnterpriseKpiCard, type EnterpriseKpiCardProps } from './EnterpriseKpiCard'
 export { CockpitTableShell } from './CockpitTableShell'
 export { DataTablePagination } from './DataTablePagination'
 export { COCKPIT_HEIGHTS, COCKPIT_LAYOUT } from './cockpit-tokens'

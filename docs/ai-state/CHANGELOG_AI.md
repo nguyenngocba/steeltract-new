@@ -1,5 +1,205 @@
 # SteelTrack AI Changelog
 
+## 2026-07-24 Production Advanced Operations UI Polish Sprint
+
+Completed:
+
+- **All 9 Advanced Operations Views (`ProductionCockpitPage.tsx`) Fully Standardized**:
+  - **1. Dispatching / Machines (`MachinesWorkspace`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng số máy móc`, `Máy Online / Sẵn sàng`, `Máy Offline / Dừng`, `Utilization trung bình`, `Work Centers`, `Máy đang bảo trì`).
+    - Phase 3: Compact `EnterprisePanel` search & status toolbar. Primary actions (`+ Lệnh SX`, `+ BOM`) elevated to Topbar (`ProductionGlobalActionBar`).
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{rows.length} máy`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999]`.
+  - **2. Production Warehouse (`ProductionWarehouseCockpit`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tồn kho sản xuất`, `Giá trị tồn kho SX`, `Mã vật tư có tồn`, `Nhu cầu sản xuất`, `Vật tư giữ chỗ`, `Cảnh báo thiếu hụt`).
+    - Phase 3: Compact `EnterprisePanel` search & status filter toolbar.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredRows.length} vật tư`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+  - **3. Material Reservations (`Reservations`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng số Reservation`, `Đang giữ chỗ`, `Khối lượng nhu cầu VT`, `Khối lượng đã giữ chỗ`, `Khối lượng đã cấp phát`, `Giữ chỗ hết hạn/hủy`).
+    - Phase 3: Compact `EnterprisePanel` toolbar with status select (`RESERVED`, `DRAFT`, `PARTIALLY_ISSUED`, `EXPIRED`) and search.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredRows.length} giữ chỗ`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+  - **4. Material Ledger (`MaterialLedger`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng dòng Ledger`, `Biến động ròng`, `KL Reserve`, `KL Release`, `KL Issue`, `KL Consume`).
+    - Phase 3: Compact `EnterprisePanel` toolbar with MO select, Material select, EventType select, date filters.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{rows.length} dòng`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+  - **5. Material Issues (`Issues`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng số phiếu cấp`, `Nhu cầu cấp phát`, `Khối lượng đã cấp`, `Khối lượng hoàn trả`, `Khối lượng còn thiếu`, `Tỷ lệ hoàn thành cấp`).
+    - Phase 3: Compact `EnterprisePanel` toolbar with status filter (`COMPLETED`, `ISSUED`, `PARTIAL`) and search.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredIssueRows.length} phiếu cấp`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+    - Phase 6: Standardized `IssueDetailDrawer`.
+  - **6. Material Consumptions (`Consumptions`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng dòng tiêu hao`, `Khối lượng đã cấp`, `Khối lượng hoàn trả`, `Khối lượng tiêu hao`, `Khối lượng phế phẩm`, `Còn treo tại SX`).
+    - Phase 3: Compact `EnterprisePanel` toolbar with search input.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredRows.length} dòng`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+  - **7. Incidents & Rework (`ProductionIncidentsWorkspace`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng số cảnh báo/sự cố`, `Đơn hàng trễ`, `Cảnh báo Log hệ thống`, `Sự cố Order`, `Sự cố từ máy/process`, `Mức độ nghiêm trọng`).
+    - Phase 3: Compact `EnterprisePanel` toolbar with source filter (`Order`, `Log`) and search input.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredRows.length} cảnh báo`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+  - **8. Machine Logs (`Logs`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng số nhật ký`, `Hoạt động hôm nay`, `Phân loại nhật ký`, `Lệnh SX liên quan`, `Công đoạn vận hành`, `Trạng thái hệ thống`).
+    - Phase 3: Compact `EnterprisePanel` toolbar with log type select filter and search input.
+    - Phase 4: Sticky header `Hero Table` (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredRows.length} nhật ký`, pagination.
+    - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) via `createPortal(..., document.body)`.
+  - **9. Advanced Reports (`ProductionReportsWorkspace`)**:
+    - Phase 1: 6 `<EnterpriseKpiCard />` items (`Lệnh sản xuất`, `Đang chạy xưởng`, `Đã hoàn thành`, `Khối lượng Steel Issued`, `Khối lượng Steel Consumed`, `Vật tư đang giữ chỗ`).
+    - Phase 2: Refactored analytics card presentation matching Components & Production Overview.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-23 Production Core Workflow UI Polish Sprint
+
+Completed:
+
+- **PART 1: Production Planning (`ProductionCockpitPage.tsx`)**:
+  - Phase 1: Standardized KPI strip with 6 `<EnterpriseKpiCard />` items (`Tổng kế hoạch`, `Kế hoạch chưa phát hành`, `Đã duyệt / Phát hành`, `Chờ cấp vật tư`, `Trễ tiến độ KH`, `Khối lượng KH`).
+  - Phase 2: Refactored planning analytics dashboard & charts.
+  - Phase 3: Standardized compact Search & Filter toolbar (`compactInput`, status select dropdown, `Tìm kiếm` button, `Làm mới` button).
+  - Phase 4: Refactored Planning Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, `{total} kế hoạch` count pill badge).
+  - Phase 5: Standardized full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)` & `z-[9999]`.
+  - Phase 6: Standardized detail drawer (`OrderWorkspace`).
+- **PART 2: Production Execution (`ProductionExecutionBoard.tsx`)**:
+  - Phase 1: Refactored KPI strip with 6 `<EnterpriseKpiCard />` items (`Lệnh đang thực thi`, `Chờ cấp vật tư`, `Cắt & Chuẩn bị`, `Gá & Hàn xưởng`, `Trễ tiến độ`, `Hoàn thành công đoạn`).
+  - Phase 2: Standardized stage distribution and bottleneck chart cards.
+  - Phase 3: Added compact Search & Filter toolbar with stage select filter (`Cutting`, `Assembly`, `Welding`, `Painting`, `Completed`).
+  - Phase 4: Refactored Execution Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, `{cards.length} lệnh thực thi` count pill badge).
+  - Phase 5: Implemented full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)`.
+  - Phase 6: Standardized detail drawer (`ExecutionDrawer`).
+- **PART 3: BOM & Material Supply (`ProductionCockpitPage.tsx`)**:
+  - Phase 1: Standardized KPI strip with 6 `<EnterpriseKpiCard />` items (`Tổng Production BOM`, `BOM đang sử dụng`, `Dòng định mức VT`, `Khối lượng ước tính`, `Dự án áp dụng`, `BOM đã lưu trữ`).
+  - Phase 2: Refactored BOM analytics cards (structure type distribution & status breakdown).
+  - Phase 3: Added compact Search & Filter toolbar with structure type filter select. Primary action button `+ BOM` moved to topbar via `ProductionGlobalActionBar`.
+  - Phase 4: Refactored BOM Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, `{filteredRows.length} BOM` count pill badge).
+  - Phase 5: Implemented full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)`.
+  - Phase 6: Standardized detail drawer (`BomWorkspace`).
+- **PART 4: Production QC (`QcPage.tsx`)**:
+  - Phase 1: Standardized QC KPI strip (`Pending`, `In Progress`, `Passed`, `Failed / Rework`, `NCR mở`, `MO chờ QC xuất bãi`).
+  - Phase 2: Refactored QC pass rate trend and project defect analytics.
+  - Phase 3: Standardized compact Search & Filter toolbar with QC status filter (`READY`, `IN_PROGRESS`, `PASSED`, `FAILED`, `REWORK_REQUIRED`).
+  - Phase 4: Refactored QC Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, `{total} phiếu QC` count pill badge).
+  - Phase 5: Implemented full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)`.
+  - Phase 6: Standardized detail drawer (`InspectionDetail`).
+- **Verification**: `pnpm -C apps/frontend build` & `tsc -b` compile 100% cleanly with 0 errors.
+
+## 2026-07-23 Production Navigation Architecture Refactor Sprint
+
+Completed:
+
+- **Sidebar Navigation Streamlining (`navigation.config.ts`)**:
+  - Reorganized Production module sidebar items into 6 core workflow top-level items (`Tổng quan sản xuất`, `Lệnh sản xuất (MO)`, `Kế hoạch sản xuất`, `Thực thi sản xuất`, `BOM & Vật tư sản xuất`, `QC Sản xuất`).
+  - Created a dedicated 7th top-level navigation item **Nghiệp vụ nâng cao** (`/production/advanced`) to group low-frequency feature pages as children (`Điều độ & Máy móc (OEE)`, `Kho sản xuất`, `Giữ chỗ vật tư`, `Sổ vật tư SX`, `Cấp phát vật tư`, `Tiêu hao vật tư`, `Sự cố & Rework`, `Nhật ký vận hành`, `Báo cáo nâng cao`).
+- **Route & Workspace Integration (`AppRouter.tsx`, `ProductionCockpitPage.tsx`)**:
+  - Added route `<Route path="/production/advanced" element={<ProductionPage />} />` preserving all URL structures, permissions, and business logic.
+  - Implemented `<ProductionAdvancedWorkspace />` dashboard component inside `ProductionCockpitPage.tsx` with quick-access cards and action links to all 9 advanced operations.
+- **Verification**: `pnpm -C apps/frontend build` & `tsc -b` compile 100% cleanly with 0 errors.
+
+## 2026-07-23 Production Overview UI Consistency Fix Sprint
+
+Completed:
+
+- **BUG 1 – Compact Toolbar Alignment (`ProductionCockpitPage.tsx`)**:
+  - Replaced uncompact fixed-column layout with compact grid layout (`xl:grid-cols-[180px_1fr_130px_120px]`).
+  - Removed empty reserved grid space for unused filter controls.
+  - Implemented usable Status dropdown select (`Tất cả trạng thái`, `Đang sản xuất`, `Hoàn thành`, `Trễ tiến độ`) + responsive search input (`1fr`), primary blue "Tìm kiếm" button (`130px`), and glassmorphic "Làm mới" button (`120px`) matching `Components Overview` 100%.
+- **BUG 2 – "Xem tất cả" Expanded Modal Portal Fix (`ProductionCockpitPage.tsx`)**:
+  - Refactored `expandedModalOpen` modal rendering to use `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm fixed inset-0 flex items-center justify-center bg-black/75`.
+  - Ensured clicking "Xem tất cả" immediately mounts the full-screen expanded table modal onto `document.body` without child element clipping, unmounting, or navigation side effects.
+- **Verification**: `pnpm -C apps/frontend build` & `tsc -b` compile 100% cleanly with 0 errors.
+
+## 2026-07-23 Production Overview Layout Alignment Sprint
+
+Completed:
+
+- **Task 1 – Page Header Action Buttons**: Created `ProductionGlobalActionBar` and `ProductionActionProvider` (`ProductionActionContext.tsx`) to move `+ Lệnh SX` and `+ BOM` action buttons from the lower toolbar into the top header action area (`AppTopbar.tsx`), matching the exact header action layout of `Components Overview`.
+- **Task 2 – Production Overview Layout Alignment (`ProductionCockpitPage.tsx`)**:
+  - Matched page wrapper & container spacing (`<EnterpriseModulePage><div className="space-y-2 text-xs -mt-2">`).
+  - Matched KPI grid column counts (`md:grid-cols-2 xl:grid-cols-6`), margins, and padding.
+  - Aligned Search & Filter toolbar styling (`<EnterprisePanel className="rounded-xl -mt-1">`), primary blue "Tìm kiếm" button, and glassmorphic "Làm mới" button matching `Components Overview`.
+  - Matched Hero Table container shell (`h-[430px] overflow-auto scrollbar-none`), sticky headers (`sticky top-0 z-10 bg-[#1e293b]`), count pill badges, and pagination.
+  - Verified drawer (`OrderWorkspace`), expanded modal (`expandedModalOpen`), hover states, and empty states.
+- **Verification**: `pnpm -C apps/frontend build` & `tsc -b` compile 100% cleanly with 0 errors.
+
+## 2026-07-23 Production Overview UI Polish Sprint
+
+Completed:
+
+- **Production Overview UI Polish (`ProductionCockpitPage.tsx`)**:
+  - Phase 1: Upgraded KPI section using 6 `<EnterpriseKpiCard />` items (`Đang sản xuất`, `Hoàn thành hôm nay`, `Chờ vật tư`, `Trễ tiến độ`, `Cấu kiện đang chạy`, `Khối lượng sản xuất`) with HSL tones, 32x32px icon badges, vector sparklines, and skeleton loading states.
+  - Phase 2: Standardized analytics dashboard cards (`Tiến độ sản xuất`, `Vật tư cấp phát`, `Cần chú ý hôm nay`, `Công đoạn sản xuất`, `Cấu kiện đang sản xuất`) aligned with Components Overview.
+  - Phase 3: Standardized Search & Refresh toolbar (`compactInput`, primary blue `+ Lệnh SX` & `+ BOM` buttons, status filters `IN_PROGRESS`, `COMPLETED`, `DELAYED`).
+  - Phase 4: Refactored Production Orders Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, count pill badge, pagination).
+  - Phase 5: Added in-place full-screen expanded table modal (`expandedModalOpen`) for "Xem tất cả".
+  - Phase 6: Standardized Production Detail Workspace Drawer (`OrderWorkspace`) with material readiness, stage execution timeline, and yard placement integration.
+- **Verification**: `pnpm -C apps/frontend build` & `tsc -b` compile 100% cleanly with 0 errors.
+
+## 2026-07-23 Components Module UI Polish Sprint (All 7 Tabs Completed: List, Production, Finished Goods, Materials Usage, Transfer, Internal QC, History & Reports)
+
+Completed:
+
+- **Components Global Action Bar & Context**: Created `ComponentsGlobalActionBar` and `ComponentsActionProvider` to decouple creation dialogs (`+ Cấu kiện`, `+ Lệnh SX`, `+ BOM`) from local pages and make topbar action buttons available across all Components sub-tabs.
+- **Components List Tab UI Polish (`ComponentsListPage.tsx`)**:
+  - Phase 1: Upgraded KPI section with `<EnterpriseKpiCard />` (sparklines, icons, deltas, loading states).
+  - Phase 2: Aligned Search & Refresh toolbar to match Inventory Overview Golden Reference (`compactInput`, primary blue button, glassmorphic reset button).
+  - Phase 3: Refactored "Danh sách cấu kiện" Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, count pill badge).
+  - Phase 4: Added in-place full-screen expanded modal (`expandedModalOpen`) for "Xem tất cả".
+- **Components Production Tab UI Polish (`ComponentsProductionPage.tsx`)**:
+  - Phase 1: Upgraded KPI strip with 6 `<EnterpriseKpiCard />` items (`Tổng lệnh SX`, `Đang sản xuất`, `Chờ sản xuất`, `Hoàn thành`, `Quá hạn`, `Tỷ lệ hoàn thành`).
+  - Phase 2: Refactored analytics right rail cards.
+  - Phase 3: Aligned Search & Refresh toolbar (`compactInput`, `searchDraft`, status filter).
+  - Phase 4: Refactored Production Orders Hero Table (`h-[430px]` scroll container, sticky header).
+  - Phase 5: Implemented in-place full-screen expanded table modal (`expandedModalOpen`).
+  - Phase 6: Standardized row click interaction to open `ModuleDetailDrawer`.
+- **Components Finished Goods Stock Tab UI Polish (`ComponentsStockPage.tsx`)**:
+  - Phase 1: Refactored KPI section using 5 `<EnterpriseKpiCard />` items (`Tổng cấu kiện`, `READY`, `SHIPPED`, `DELIVERED`, `INSTALLED`).
+  - Phase 2: Standardized analytics cards in right rail (`Thông số tồn kho`, `Phân bố vị trí`, `Cảnh báo bãi`).
+  - Phase 3: Aligned Search & Refresh toolbar (`compactInput`, `searchDraft`, primary blue button, glassmorphic reset button).
+  - Phase 4: Refactored Finished Goods Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, count pill badge, pagination).
+  - Phase 5: Added in-place full-screen expanded modal (`expandedModalOpen`) for "Xem tất cả".
+  - Phase 6: Standardized Finished Goods Detail Drawer with direct navigation to Yard map (`/yard#map-2d`).
+- **Components Materials Usage Tab UI Polish (`ComponentsMaterialStockPage.tsx`)**:
+  - Phase 1: Refactored KPI strip with 6 `<EnterpriseKpiCard />` items (`Tổng mã vật tư SX`, `Giá trị tồn kho SX`, `Giao dịch SX`, `Khả dụng sản xuất`, `Cảnh báo thiếu BOM`, `Vị trí có vật tư`).
+  - Phase 2: Standardized analytics cards in right rail (`Thiếu vật tư`, `Giá trị tồn kho`, `Giao dịch gần đây`, `Top vật tư khả dụng`).
+  - Phase 3: Aligned Search & Refresh toolbar (`compactInput`, `searchDraft`, status filter, primary blue button, glassmorphic reset button).
+  - Phase 4: Refactored Materials Usage Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, count pill badge, pagination).
+  - Phase 5: Added in-place full-screen expanded modal (`expandedModalOpen`) for "Xem tất cả".
+  - Phase 6: Standardized Material Usage Detail Drawer with material transaction history & return to main warehouse form (`returnToMainWarehouse`).
+- **Components Transfer Tab UI Polish (`ComponentsTransfersPage.tsx`)**:
+  - Phase 1: Refactored KPI strip with 4 `<EnterpriseKpiCard />` items (`Tổng lệnh chuyển`, `Hoàn thành`, `Hôm nay`, `Gần nhất`).
+  - Phase 2: Standardized analytics cards in right rail (`Điều chuyển hôm nay`, `Trạng thái thực thi`, `Gần đây`).
+  - Phase 3: Aligned Search & Refresh toolbar (`compactInput`, `searchDraft`, primary blue button, glassmorphic reset button).
+  - Phase 4: Refactored Transfer Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, count pill badge, pagination).
+  - Phase 5: Added in-place full-screen expanded modal (`expandedModalOpen`) for "Xem tất cả".
+  - Phase 6: Standardized Transfer Detail Drawer (`ModuleDetailDrawer`) to display transfer movement metrics upon row click.
+- **Components Internal QC Tab UI Polish (`ComponentsInternalQcPage.tsx`)**:
+  - Phase 1: Refactored KPI strip with 6 `<EnterpriseKpiCard />` items (`Cấu kiện cần QC`, `QC đạt`, `Đang kiểm`, `Chờ dữ liệu`, `Ready to ship`, `Cập nhật gần nhất`).
+  - Phase 2: Standardized analytics cards in right rail (`Phân bổ kết quả QC`, `Sự cố NCR`, `Gần đây`).
+  - Phase 3: Aligned Search & Refresh toolbar (`compactInput`, `searchDraft`, status filter, primary blue button, glassmorphic reset button).
+  - Phase 4: Refactored QC Hero Table (`h-[430px]` scroll container, `sticky top-0 z-10 bg-[#1e293b]` header, count pill badge, standardized QC status badges `Đạt` / `Đang kiểm` / `Chờ dữ liệu`, pagination).
+  - Phase 5: Added in-place full-screen expanded modal (`expandedModalOpen`) for "Xem tất cả".
+  - Phase 6: Standardized QC Detail Drawer (`ModuleDetailDrawer`) to display component QC & production progress metrics upon row click.
+- **Components Processing History Tab UI Polish (`ComponentsHistoryPage.tsx`)**:
+  - Phase 1: Refactored KPI strip with 6 `<EnterpriseKpiCard />` items (`Tổng cấu kiện gia công`, `Hoàn thành`, `Đang gia công`, `Chờ gia công`, `Lỗi / Làm lại`, `Kết quả đạt`).
+  - Phase 2: Standardized analytics right rail cards (`Hoạt động hôm nay`, `Theo trạng thái`, `Lịch sử gần đây`).
+  - Phase 3: Aligned Search & Refresh toolbar (`compactInput`, `searchDraft`, công đoạn action filter).
+  - Phase 4: Refactored Processing History Hero Table (`h-[430px]` scroll container, sticky header, count pill badge, pagination).
+  - Phase 5: Added in-place full-screen expanded modal (`expandedModalOpen`) for "Xem tất cả".
+  - Phase 6: Standardized Processing History Detail Drawer (`ModuleDetailDrawer`) displaying stage execution details.
+- **Components Reports Tab UI Polish (`ComponentsReportsPage.tsx`)**:
+  - Phase 1: Refactored KPI strip with 6 `<EnterpriseKpiCard />` items (`Tổng cấu kiện`, `Đang gia công`, `Trong kho`, `Ready to ship`, `Đã xuất bãi`, `Thay đổi`).
+  - Phase 2: Standardized analytics dashboard cards (`Phân bổ lifecycle`, `Biến động lifecycle`).
+  - Phase 3 & 5: Aligned toolbar with search input & "Xuất Báo Cáo" export action presentation button.
+  - Phase 4: Refactored Report Hero Table (`Cấu kiện báo cáo`) & quick stats strip.
+  - Phase 6: Standardized Report Detail Drawer (`ModuleDetailDrawer`) displaying snapshot metrics upon row click.
+- **Verification**: `pnpm -C apps/frontend build` & `tsc -b` compile 100% cleanly with 0 errors.
+
 ## 2026-07-23 Component Manufacturing Workflow Sprint A
 
 Completed:

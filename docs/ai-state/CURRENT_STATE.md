@@ -1,5 +1,22 @@
 # Current State
 
+## Production Advanced Operations UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, all 9 low-frequency Advanced Operations pages (`/production/advanced`) were standardized according to the 6-phase Golden Reference UI Polish specification:
+1. **Dispatching / Machines (`MachinesWorkspace`)**: Refactored 6 EnterpriseKpiCard items, compact toolbar, sticky Hero Table with `{rows.length} máy` pill badge, and full-screen expanded modal via `createPortal`. Primary action buttons (`+ Lệnh SX`, `+ BOM`) elevated to Topbar (`ProductionGlobalActionBar`).
+2. **Production Warehouse (`ProductionWarehouseCockpit`)**: Standardized 6 EnterpriseKpiCard items, compact search & status filter toolbar, sticky Hero Table with count pill badge, and expanded modal.
+3. **Material Reservations (`Reservations`)**: Standardized 6 EnterpriseKpiCard items, compact toolbar with status filter (`RESERVED`, `DRAFT`, `PARTIALLY_ISSUED`, `EXPIRED`), sticky Hero Table with count pill badge, and expanded modal.
+4. **Material Ledger (`MaterialLedger`)**: Standardized 6 EnterpriseKpiCard items, compact toolbar with MO select, Material select, EventType select, date range filters, sticky Hero Table with count pill badge, and expanded modal.
+5. **Material Issues (`Issues`)**: Standardized 6 EnterpriseKpiCard items, compact toolbar with status filter (`COMPLETED`, `ISSUED`, `PARTIAL`), sticky Hero Table with count pill badge, expanded modal, and `IssueDetailDrawer`.
+6. **Material Consumptions (`Consumptions`)**: Standardized 6 EnterpriseKpiCard items, compact search toolbar, sticky Hero Table with count pill badge, and expanded modal.
+7. **Incidents & Rework (`ProductionIncidentsWorkspace`)**: Standardized 6 EnterpriseKpiCard items, compact toolbar with source filter (`Order`, `Log`), sticky Hero Table with count pill badge, and expanded modal.
+8. **Machine Logs (`Logs`)**: Standardized 6 EnterpriseKpiCard items, compact toolbar with log type filter, sticky Hero Table with count pill badge, and expanded modal.
+9. **Advanced Reports (`ProductionReportsWorkspace`)**: Standardized 6 EnterpriseKpiCard items and CockpitChartCard presentation matching Components & Production Overview.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
 ## Component Manufacturing Workflow
 
 Status: **SPRINT A IMPLEMENTED - TEST/BUILD PASS**

@@ -180,23 +180,29 @@ export const navigation = [
 
   {
     title: 'SẢN XUẤT',
-
     icon: Factory,
-
     children: [
       { title: 'Tổng quan sản xuất', path: '/production' },
       { title: 'Lệnh sản xuất (MO)', path: '/production/orders' },
-      { title: 'Kế hoạch', path: '/production/planning' },
-      { title: 'Production BOM', path: '/production/boms' },
-      { title: 'Kho sản xuất', path: '/production/warehouse' },
-      { title: 'Theo dõi thực hiện', path: '/production/execution' },
-      { title: 'Giữ chỗ vật tư', path: '/production/reservations' },
-      { title: 'Sổ vật tư SX', path: '/production/material-ledger' },
-      { title: 'Cấp phát vật tư', path: '/production/material-issues' },
-      { title: 'Tiêu hao vật tư', path: '/production/consumptions' },
-      { title: 'Sự cố', path: '/production/incidents' },
-      { title: 'Nhật ký sản xuất', path: '/production/logs' },
-      { title: 'Báo cáo', path: '/production/reports' },
+      { title: 'Kế hoạch sản xuất', path: '/production/planning' },
+      { title: 'Thực thi sản xuất', path: '/production/execution' },
+      { title: 'BOM & Vật tư sản xuất', path: '/production/boms' },
+      { title: 'QC Sản xuất', path: '/qc/production' },
+      {
+        title: 'Nghiệp vụ nâng cao',
+        path: '/production/advanced',
+        children: [
+          { title: 'Điều độ & Máy móc (OEE)', path: '/production/machines' },
+          { title: 'Kho sản xuất', path: '/production/warehouse' },
+          { title: 'Giữ chỗ vật tư (Reservations)', path: '/production/reservations' },
+          { title: 'Sổ vật tư SX (Ledger)', path: '/production/material-ledger' },
+          { title: 'Cấp phát vật tư (Issues)', path: '/production/material-issues' },
+          { title: 'Tiêu hao vật tư (Consumptions)', path: '/production/consumptions' },
+          { title: 'Sự cố & Rework', path: '/production/incidents' },
+          { title: 'Nhật ký vận hành', path: '/production/logs' },
+          { title: 'Báo cáo nâng cao', path: '/production/reports' },
+        ],
+      },
     ],
   },
 

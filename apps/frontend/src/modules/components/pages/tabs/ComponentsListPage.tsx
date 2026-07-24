@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
-import { Package } from "lucide-react";
+import { Package, Layers, Wrench, CheckCircle2, Clock, AlertTriangle, Eye } from "lucide-react";
 
 import { EnterpriseModulePage } from "@/shared/runtime-tabs/EnterpriseModulePage";
 import {
@@ -12,6 +12,7 @@ import {
 } from "../../../../shared/ui/modules";
 import {
   CockpitKpiCard,
+  EnterpriseKpiCard,
 } from "../../../../shared/ui/cockpit";
 import { nextLocalCode } from "@/shared/utils/code-format";
 import { useProjects } from "../../../inventory/hooks/useProjects";
@@ -78,57 +79,97 @@ function componentStatusBadgeClass(status: string) {
       "CUTTING",
       "WELDING",
       "PAINTING",
-      "IN_PROGRESS",
-      "RUNNING",
-      "ACTIVE",
+      "FABRICATING",
+      "PRODUCING",
+      "PROCESSING",
+      "ĐANG SX",
     ].includes(normalized)
   ) {
     return "border-cyan-400/30 bg-cyan-400/10 text-cyan-300";
   }
-  if (["SHIPPED", "DELIVERED"].includes(normalized)) {
-    return "border-blue-400/30 bg-blue-400/10 text-blue-300";
+  if (["QC_WAITING", "CHỜ QC", "QC_PENDING"].includes(normalized)) {
+    return "border-amber-400/30 bg-amber-400/10 text-amber-300";
   }
-  if (["FAILED", "REJECTED", "NCR"].includes(normalized)) {
+  if (["QC_FAILED", "REJECTED", "KHÔNG ĐẠT"].includes(normalized)) {
     return "border-red-400/30 bg-red-400/10 text-red-300";
   }
-  return "border-amber-400/30 bg-amber-400/10 text-amber-300";
+  return "border-slate-400/20 bg-slate-400/10 text-slate-300";
+}
+
+function componentStatusLabel(status: string) {
+  const normalized = String(status ?? "").toUpperCase();
+  if (
+    ["READY", "COMPLETED", "DONE", "FINISHED", "INSTALLED"].includes(normalized)
+  ) {
+    return "Ready / Sẵn sàng";
+  }
+  if (
+    [
+      "CUTTING",
+      "WELDING",
+      "PAINTING",
+      "FABRICATING",
+      "PRODUCING",
+      "PROCESSING",
+      "ĐANG SX",
+    ].includes(normalized)
+  ) {
+    return "Đang gia công";
+  }
+  if (["QC_WAITING", "CHỜ QC", "QC_PENDING"].includes(normalized)) {
+    return "Chờ QC";
+  }
+  if (["QC_FAILED", "REJECTED", "KHÔNG ĐẠT"].includes(normalized)) {
+    return "QC Không đạt";
+  }
+  return status || "Tồn kho";
 }
 
 function InventoryMetricCard({
   title,
   value,
   note,
-  tone = "blue",
-  trend,
-  onClick,
+  tone,
+  delta,
+  chartHeightClass = "h-[42px]",
+  children,
 }: {
   title: string;
-  value: React.ReactNode;
-  note?: React.ReactNode;
-  tone?:
-    | "blue"
-    | "emerald"
-    | "cyan"
-    | "amber"
-    | "red"
-    | "purple"
-    | "indigo"
-    | "violet"
-    | "orange";
-  trend?: number[];
-  onClick?: () => void;
+  value: string;
+  note?: string;
+  tone?: string;
+  delta?: string;
+  chartHeightClass?: string;
+  children?: React.ReactNode;
 }) {
+  const toneColorClass =
+    tone === "cyan"
+      ? "text-cyan-300"
+      : tone === "amber"
+      ? "text-amber-300"
+      : tone === "emerald"
+      ? "text-emerald-300"
+      : tone === "red"
+      ? "text-red-300"
+      : "text-blue-300";
+
+  const deltaColorClass =
+    delta && delta.startsWith("+")
+      ? "text-emerald-400"
+      : delta && delta.startsWith("-")
+      ? "text-red-400"
+      : "text-slate-400";
+
   return (
-    <CockpitKpiCard
-      title={title}
-      value={value}
-      note={note}
-      tone={tone}
-      state="normal"
-      trendData={trend}
-      onClick={onClick}
-      className="!h-[92px] !p-3"
-    />
+    <InventoryChartCard title={title} note={note}>
+      <div className="flex items-baseline justify-between gap-1 mb-1">
+        <div className={`text-xl font-bold font-mono tracking-tight ${toneColorClass}`}>
+          {value}
+        </div>
+        {delta !== undefined ? <div className={`text-[10px] ${deltaColorClass}`}>{delta}</div> : null}
+      </div>
+      <div className={chartHeightClass}>{children}</div>
+    </InventoryChartCard>
   );
 }
 
@@ -180,8 +221,26 @@ export function ComponentsListPage() {
   const [type, setType] = useState("");
   const [location, setLocation] = useState("");
   const [query, setQuery] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 14;
+
+  function applySearch() {
+    setQuery(searchDraft);
+    setPage(1);
+  }
+
+  function resetFilters() {
+    setSearchDraft("");
+    setQuery("");
+    setProject("");
+    setStatus("");
+    setType("");
+    setLocation("");
+    setPage(1);
+  }
+
   const { data: workspace, isLoading } = useComponentsWorkspace({
     page,
     limit: PAGE_SIZE,
@@ -191,6 +250,10 @@ export function ComponentsListPage() {
     type: type || undefined,
     location: location || undefined,
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [project, status, type, location, query]);
 
   useEffect(() => {
     setPage(1);
@@ -432,66 +495,56 @@ export function ComponentsListPage() {
   return (
     <EnterpriseModulePage>
       <div className="space-y-1 -mt-2">
-        {/* KPI Cards */}
+        {/* Phase 1: KPI Cards matching EnterpriseKpiCard */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-          <InventoryMetricCard
+          <EnterpriseKpiCard
             title="Tổng cấu kiện"
             value={formatQuantity(cockpitKpis.total, 0)}
-            note="Theo lifecycle"
             tone="blue"
+            icon={<Layers size={15} />}
+            isLoading={isLoading}
           />
-          <InventoryMetricCard
+          <EnterpriseKpiCard
             title="Đang gia công"
             value={formatQuantity(cockpitKpis.running, 0)}
-            note="Cut / Weld / Paint"
-            tone="cyan"
+            tone="purple"
+            icon={<Wrench size={15} />}
+            isLoading={isLoading}
           />
-          <InventoryMetricCard
+          <EnterpriseKpiCard
             title="Ready to ship"
             value={formatQuantity(cockpitKpis.completed, 0)}
-            note="QC đạt / sẵn sàng"
             tone="emerald"
+            icon={<CheckCircle2 size={15} />}
+            isLoading={isLoading}
           />
-          <InventoryMetricCard
-            title="Chờ vật tư"
+          <EnterpriseKpiCard
+            title="Chờ cấp vật tư"
             value={formatQuantity(cockpitKpis.waitingMaterial, 0)}
-            note="Cấp phát chưa đủ"
             tone="amber"
+            icon={<Clock size={15} />}
+            isLoading={isLoading}
           />
-          <InventoryMetricCard
+          <EnterpriseKpiCard
             title="Trễ tiến độ"
             value={formatQuantity(cockpitKpis.delayed, 0)}
-            note="Cần xử lý"
             tone="red"
+            icon={<AlertTriangle size={15} />}
+            isLoading={isLoading}
           />
         </div>
 
-        <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px_120px]">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tìm theo mã, tên, profile, dự án, vị trí..."
-              className={`${inventoryFilterControl} xl:col-span-2`}
-            />
-            <ComponentsSelect
-              value={project}
-              onChange={setProject}
-              className={inventoryFilterControl}
-            >
-              <option value="">Dự án</option>
+        {/* Phase 2: Search & Filter Toolbar Immediately Below KPI Strip (Golden Reference Match) */}
+        <InventoryPanel className="rounded-xl -mt-1">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+            <ComponentsSelect value={project} onChange={(v) => { setProject(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
+              <option value="">Tất cả dự án</option>
               {projects.map((item) => (
-                <option key={item.id} value={item.code ?? item.name}>
-                  {item.code ?? item.name}
-                </option>
+                <option key={item.id} value={item.code ?? item.name}>{item.code ?? item.name}</option>
               ))}
             </ComponentsSelect>
-            <ComponentsSelect
-              value={status}
-              onChange={setStatus}
-              className={inventoryFilterControl}
-            >
-              <option value="">Trạng thái</option>
+            <ComponentsSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
+              <option value="">Tất cả trạng thái</option>
               <option value="Tồn kho">Tồn kho</option>
               <option value="Đang SX">Đang SX</option>
               <option value="Đã QC">Đã QC</option>
@@ -502,60 +555,63 @@ export function ComponentsListPage() {
               <option value="Chờ QC">Chờ QC</option>
               <option value="Không đạt">Không đạt</option>
             </ComponentsSelect>
-            <ComponentsSelect
-              value={type}
-              onChange={setType}
-              className={inventoryFilterControl}
-            >
-              <option value="">Loại cấu kiện</option>
+            <ComponentsSelect value={type} onChange={(v) => { setType(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
+              <option value="">Tất cả loại</option>
               <option value="Dầm (Beam)">Dầm (Beam)</option>
               <option value="Cột (Column)">Cột (Column)</option>
               <option value="Bản mã (Plate)">Bản mã (Plate)</option>
             </ComponentsSelect>
-            <ComponentsSelect
-              value={location}
-              onChange={setLocation}
-              className={inventoryFilterControl}
-            >
-              <option value="">Vị trí</option>
+            <ComponentsSelect value={location} onChange={(v) => { setLocation(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
+              <option value="">Tất cả vị trí</option>
               <option value="Kho cấu kiện">Kho cấu kiện</option>
               <option value="Workshop A">Workshop A</option>
               <option value="QC nội bộ">QC nội bộ</option>
             </ComponentsSelect>
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applySearch();
+              }}
+              placeholder="Tìm theo mã, tên, profile, dự án..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
             <button
-              onClick={() => setCreateOpen(true)}
-              className={componentsPrimaryButton}
+              type="button"
+              onClick={applySearch}
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
             >
-              + Cấu kiện
+              Tìm kiếm
             </button>
             <button
-              onClick={() => openProductionFor()}
-              className="h-9 rounded-lg border border-emerald-400/30 bg-emerald-600 px-3 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500"
+              type="button"
+              onClick={resetFilters}
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
             >
-              + Lệnh SX
-            </button>
-            <button
-              onClick={() => openBomFor()}
-              className={componentsMutedButton}
-            >
-              + BOM
+              Làm mới
             </button>
           </div>
         </InventoryPanel>
 
+        {/* Phase 3: Hero Table "Danh sách cấu kiện" */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-1 items-start">
           <InventoryPanel className="xl:col-span-9">
-            <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-white">
-                Danh sách cấu kiện
-              </h3>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span>{workspace?.meta.total ?? 0} cấu kiện</span>
-                <span className="hidden text-cyan-300 md:inline">Read model</span>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách cấu kiện</h3>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                  {workspace?.meta.total ?? rows.length} cấu kiện
+                </span>
               </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(true)}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                Xem tất cả
+              </button>
             </div>
-            <div className="rounded-lg border border-white/10 overflow-hidden">
-            <div className="h-[clamp(400px,60vh,520px)] min-h-[400px] overflow-auto">
+            <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
               <table className="w-full min-w-[1050px] text-sm table-fixed">
                 <colgroup>
                   <col className="w-[110px]" />
@@ -709,7 +765,6 @@ export function ComponentsListPage() {
                 </tbody>
               </table>
             </div>
-            </div>
             {!isLoading && !rows.length ? (
               <div className="p-3">
                 <ModuleEmptyState
@@ -787,6 +842,93 @@ export function ComponentsListPage() {
           </div>
         </InventoryChartCard>
       </div>
+
+      {/* Phase 4: EXPANDED TABLE MODAL ("Xem tất cả" interaction matching Inventory Golden Reference) */}
+      {expandedModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách cấu kiện</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {workspace?.meta.total ?? rows.length} cấu kiện trong hệ thống</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(false)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: "rgba(30, 41, 59, 1)" }}
+                >
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold w-[130px]">Mã cấu kiện</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[180px]">Tên cấu kiện</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[140px]">Profile/Kích thước</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[120px]">Loại</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[140px]">Dự án</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[130px]">Vị trí</th>
+                    <th className="px-3 py-2 text-center font-semibold w-[120px]">Trạng thái</th>
+                    <th className="px-3 py-2 text-center font-semibold w-[100px]">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => {
+                        setSelected(row);
+                        setDetailOpen(true);
+                      }}
+                      className={`${inventoryTableRow} cursor-pointer`}
+                    >
+                      <td className="truncate px-3 py-2 text-cyan-300 font-mono font-medium">{row.code}</td>
+                      <td className="truncate px-3 py-2 text-white font-medium">{row.name}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.profile || "N/A"}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.type || "Dầm"}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.project || "Chưa gán"}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.location || "Kho cấu kiện"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.status)}`}>
+                          {componentStatusLabel(row.status)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelected(row);
+                            setDetailOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300 hover:bg-cyan-500/20"
+                        >
+                          <Eye size={12} />
+                          Xem
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <InventoryPagination
+              page={page}
+              pageCount={Math.max(1, Math.ceil((workspace?.meta.total ?? 0) / PAGE_SIZE))}
+              total={workspace?.meta.total ?? 0}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              containerClassName="border-t-0"
+            />
+          </div>
+        </div>
+      ) : null}
 
       {createOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">

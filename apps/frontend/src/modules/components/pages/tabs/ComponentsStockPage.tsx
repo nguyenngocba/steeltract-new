@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Package } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Layers, Package, Truck, Wrench } from 'lucide-react'
 
 import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
 import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
-import { CockpitKpiCard } from '../../../../shared/ui/cockpit'
+import { CockpitKpiCard, EnterpriseKpiCard } from '../../../../shared/ui/cockpit'
 import {
   InventoryChartCard,
   InventoryPagination,
@@ -23,6 +23,13 @@ import {
   componentsPrimaryButton,
 } from './ComponentsCockpitShared'
 
+const statusBadgeTone: Record<string, string> = {
+  READY: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
+  SHIPPED: 'border-purple-400/30 bg-purple-400/10 text-purple-300',
+  DELIVERED: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300',
+  INSTALLED: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
+}
+
 export function ComponentsStockPage() {
   const navigate = useNavigate()
   const { data: components = [], isLoading } = useComponents()
@@ -31,9 +38,23 @@ export function ComponentsStockPage() {
   const { data: boms = [] } = useProductionBoms()
   const { data: auditRows = [] } = useInventoryAudit()
   const [query, setQuery] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [selectedRow, setSelectedRow] = useState<any | null>(null)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  function applySearch() {
+    setQuery(searchDraft)
+    setPage(1)
+  }
+
+  function resetFilters() {
+    setSearchDraft('')
+    setQuery('')
+    setStatusFilter('')
+    setPage(1)
+  }
 
   useEffect(() => {
     setPage(1)
@@ -98,7 +119,6 @@ export function ComponentsStockPage() {
 
   const filtered = rows.filter((row) => {
     if (statusFilter && row.status !== statusFilter) return false
-    if (!query.trim()) return true
     return `${row.code} ${row.name} ${row.zone} ${row.slot}`.toLowerCase().includes(query.toLowerCase())
   })
   const inYard = rows.filter((row) => yardByComponentId.has(row.id)).length
@@ -116,74 +136,159 @@ export function ComponentsStockPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className="w-full min-w-0 flex-1 space-y-1">
+      <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-          <CockpitKpiCard title="Tổng cấu kiện" value={formatQuantity(lifecycleCounts.total, 0)} note="Tất cả lifecycle" tone="blue" state="normal" onClick={() => setStatusFilter('')} className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="READY" value={formatQuantity(lifecycleCounts.ready, 0)} note="Sẵn sàng" tone="emerald" state="normal" onClick={() => setStatusFilter('READY')} className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="SHIPPED" value={formatQuantity(lifecycleCounts.shipped, 0)} note="Đã xuất bãi" tone="cyan" state="normal" onClick={() => setStatusFilter('SHIPPED')} className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="DELIVERED" value={formatQuantity(lifecycleCounts.delivered, 0)} note="Đã nhận" tone="purple" state="normal" onClick={() => setStatusFilter('DELIVERED')} className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="INSTALLED" value={formatQuantity(lifecycleCounts.installed, 0)} note="Đã lắp đặt" tone="amber" state="normal" onClick={() => setStatusFilter('INSTALLED')} className="!h-[92px] !p-3" />
+          <EnterpriseKpiCard
+            title="Tổng cấu kiện"
+            value={formatQuantity(lifecycleCounts.total, 0)}
+            tone="blue"
+            icon={<Layers size={15} />}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('')}
+          />
+          <EnterpriseKpiCard
+            title="READY"
+            value={formatQuantity(lifecycleCounts.ready, 0)}
+            tone="emerald"
+            icon={<CheckCircle2 size={15} />}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('READY')}
+          />
+          <EnterpriseKpiCard
+            title="SHIPPED"
+            value={formatQuantity(lifecycleCounts.shipped, 0)}
+            tone="purple"
+            icon={<Truck size={15} />}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('SHIPPED')}
+          />
+          <EnterpriseKpiCard
+            title="DELIVERED"
+            value={formatQuantity(lifecycleCounts.delivered, 0)}
+            tone="cyan"
+            icon={<Package size={15} />}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('DELIVERED')}
+          />
+          <EnterpriseKpiCard
+            title="INSTALLED"
+            value={formatQuantity(lifecycleCounts.installed, 0)}
+            tone="amber"
+            icon={<Wrench size={15} />}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('INSTALLED')}
+          />
         </div>
 
-        <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-8">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên cấu kiện, zone, slot..." className={`${componentsInput} xl:col-span-6`} />
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${componentsInput} xl:col-span-2`}>
-            <option value="">Trạng thái: Tất cả</option>
-            <option value="READY">READY</option>
-            <option value="SHIPPED">SHIPPED</option>
-            <option value="DELIVERED">DELIVERED</option>
-            <option value="INSTALLED">INSTALLED</option>
-          </select>
+        <InventoryPanel className="rounded-xl -mt-1">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_220px_130px_120px]">
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch()
+              }}
+              placeholder="Tìm mã, tên cấu kiện, zone, slot..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="">Trạng thái: Tất cả</option>
+              <option value="READY">READY</option>
+              <option value="SHIPPED">SHIPPED</option>
+              <option value="DELIVERED">DELIVERED</option>
+              <option value="INSTALLED">INSTALLED</option>
+            </select>
+            <button
+              type="button"
+              onClick={applySearch}
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
           </div>
         </InventoryPanel>
 
-        <div className="grid grid-cols-12 gap-1">
+        <div className="grid grid-cols-12 gap-1 items-start">
           <div className="col-span-12 xl:col-span-9">
-            <InventoryPanel
-              title={<h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">{`Danh sách tồn kho cấu kiện (${filtered.length})`}</h3>}
-              className="h-[520px]"
-            >
-              <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
+            <InventoryPanel className="rounded-xl">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách tồn kho cấu kiện</h3>
+                  <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                    {filtered.length} cấu kiện
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedModalOpen(true)}
+                  className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+                >
+                  Xem tất cả
+                </button>
+              </div>
+
+              <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
                 <table className="w-full min-w-[980px] table-fixed text-sm">
-                  <thead className={inventoryTableHead}>
+                  <thead
+                    className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                    style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                  >
                     <tr>
                       {['Mã cấu kiện', 'Tên', 'Dự án', 'Zone/kho', 'Vị trí', 'Trọng lượng', 'Trạng thái', 'Ngày tạo'].map((heading) => (
-                        <th key={heading} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300 border-b border-cyan-400/10">{heading}</th>
+                        <th key={heading} className="px-3 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={8} className="px-4 py-6"><ModuleLoadingState label="Đang tải tồn kho cấu kiện..." /></td></tr>
+                      <tr><td colSpan={8} className="px-4 py-6 text-center"><ModuleLoadingState label="Đang tải tồn kho cấu kiện..." /></td></tr>
                     ) : paginatedRows.map((row) => (
-                      <tr key={row.id} onClick={() => setSelectedRow(row)} className={inventoryTableRow}>
-                        <td className="truncate px-4 py-2.5 text-cyan-300 font-mono">{row.code}</td>
-                        <td className="truncate px-4 py-2.5 text-white">{row.name}</td>
-                        <td className="truncate px-4 py-2.5 text-slate-300">{row.project}</td>
-                        <td className="truncate px-4 py-2.5 text-slate-300">{row.zone}</td>
-                        <td className="truncate px-4 py-2.5 text-slate-300">{row.slot}</td>
-                        <td className="px-4 py-2.5 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
-                        <td className="px-4 py-2.5 text-slate-300">{row.status}</td>
-                        <td className="px-4 py-2.5 text-slate-300">{row.createdAt}</td>
+                      <tr key={row.id} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+                        <td className="truncate px-3 py-1.5 text-cyan-300 font-mono font-medium">{row.code}</td>
+                        <td className="truncate px-3 py-1.5 text-white font-medium">{row.name}</td>
+                        <td className="truncate px-3 py-1.5 text-slate-300">{row.project}</td>
+                        <td className="truncate px-3 py-1.5 text-slate-300">{row.zone}</td>
+                        <td className="truncate px-3 py-1.5 text-slate-300">{row.slot}</td>
+                        <td className="px-3 py-1.5 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
+                        <td className="px-3 py-1.5">
+                          <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${statusBadgeTone[row.status] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-300">{row.createdAt}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState icon={<Package size={18} />} title="Chưa có dữ liệu cấu kiện" description="Thử đổi từ khóa hoặc trạng thái lọc." /></div> : null}
+              <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))} total={filtered.length} onPageChange={setPage} containerClassName="border-t-0" />
             </InventoryPanel>
-            <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))} total={filtered.length} onPageChange={setPage} />
           </div>
+
           <div className="col-span-12 space-y-1 xl:col-span-3">
-            <InventoryChartCard title="Giá trị tồn" className="h-[170px]">
-              <div className="space-y-1 text-xs text-slate-300">
-                <div className="flex justify-between"><span>Cấu kiện có vị trí bãi</span><b className="text-emerald-300">{inYard}</b></div>
-                <div className="flex justify-between"><span>Trọng lượng đang lưu</span><b className="text-cyan-300">{formatQuantity(totalWeight, 1)} tấn</b></div>
-                <div className="flex justify-between"><span>Tổng cấu kiện</span><b className="text-white">{formatQuantity(components.length, 0)}</b></div>
+            <InventoryChartCard title="Thông số tồn kho" className="h-[170px]">
+              <div className="space-y-1.5 text-xs text-slate-300">
+                <div className="flex items-center justify-between"><span>Cấu kiện có vị trí bãi</span><b className="font-mono text-emerald-300">{inYard}</b></div>
+                <div className="flex items-center justify-between"><span>Trọng lượng đang lưu</span><b className="font-mono text-cyan-300">{formatQuantity(totalWeight, 1)} tấn</b></div>
+                <div className="flex items-center justify-between"><span>Tổng cấu kiện</span><b className="font-mono text-white">{formatQuantity(components.length, 0)}</b></div>
               </div>
             </InventoryChartCard>
-            <InventoryChartCard title="Theo trạng thái" className="h-[170px]">
+            <InventoryChartCard title="Phân bố vị trí" className="h-[170px]">
               <ComponentsDonut
                 centerValue={formatQuantity(rows.length, 0)}
                 centerLabel="cấu kiện"
@@ -194,16 +299,85 @@ export function ComponentsStockPage() {
                 ]}
               />
             </InventoryChartCard>
-            <InventoryChartCard title="Cảnh báo" className="h-[170px]">
-              <div className="space-y-1 text-xs text-slate-300">
-                <div className="flex justify-between"><span>READY chưa vào bãi</span><b className="text-amber-300">{ready}</b></div>
-                <div className="flex justify-between"><span>Chưa có vị trí bãi</span><b className="text-red-300">{Math.max(0, components.length - inYard)}</b></div>
+            <InventoryChartCard title="Cảnh báo bãi" className="h-[170px]">
+              <div className="space-y-1.5 text-xs text-slate-300">
+                <div className="flex items-center justify-between"><span>READY chưa vào bãi</span><b className="font-mono text-amber-300">{ready}</b></div>
+                <div className="flex items-center justify-between"><span>Chưa có vị trí bãi</span><b className="font-mono text-red-300">{Math.max(0, components.length - inYard)}</b></div>
                 {!components.length ? <ModuleEmptyState icon={<AlertTriangle size={18} />} title="Chưa có cảnh báo" description="Cảnh báo tồn kho cấu kiện sẽ hiển thị tại đây." /> : null}
               </div>
             </InventoryChartCard>
           </div>
         </div>
       </div>
+
+      {expandedModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ tồn kho cấu kiện thành phẩm</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} cấu kiện thành phẩm trong bãi/kho</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(false)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>
+                    {['Mã cấu kiện', 'Tên', 'Dự án', 'Zone/kho', 'Vị trí', 'Trọng lượng', 'Trạng thái', 'Ngày tạo'].map((heading) => (
+                      <th key={heading} className="px-3 py-2 text-left font-semibold text-slate-300">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => {
+                        setSelectedRow(row)
+                        setExpandedModalOpen(false)
+                      }}
+                      className={`${inventoryTableRow} cursor-pointer`}
+                    >
+                      <td className="truncate px-3 py-2 text-cyan-300 font-mono font-medium">{row.code}</td>
+                      <td className="truncate px-3 py-2 text-white font-medium">{row.name}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.project}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.zone}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.slot}</td>
+                      <td className="px-3 py-2 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${statusBadgeTone[row.status] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">{row.createdAt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <InventoryPagination
+              page={page}
+              pageSize={pageSize}
+              pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))}
+              total={filtered.length}
+              onPageChange={setPage}
+              containerClassName="border-t-0"
+            />
+          </div>
+        </div>
+      ) : null}
 
       <ModuleDetailDrawer
         open={Boolean(selectedRow)}
@@ -219,11 +393,17 @@ export function ComponentsStockPage() {
               <CockpitKpiCard title="Đơn giá" value={formatCurrencyVnd(selectedRow.unitPrice)} state="normal" tone="emerald" />
               <CockpitKpiCard title="Tổng tiền" value={formatCurrencyVnd(selectedRow.totalAmount)} state="normal" tone="amber" />
             </div>
-            <div className="mt-1 flex justify-end gap-1">
-              <button onClick={() => {
-                window.sessionStorage.setItem('yard-focus-component-id', selectedRow.id)
-                navigate('/yard#map-2d')
-              }} className={componentsPrimaryButton}>Xem vị trí trong bãi</button>
+            <div className="mt-2 flex justify-end gap-1 border-t border-white/10 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  window.sessionStorage.setItem('yard-focus-component-id', selectedRow.id)
+                  navigate('/yard#map-2d')
+                }}
+                className={componentsPrimaryButton}
+              >
+                Xem vị trí trong bãi
+              </button>
             </div>
           </>
         ) : null}

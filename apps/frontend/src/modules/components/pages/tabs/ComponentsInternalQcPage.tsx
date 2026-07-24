@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ClipboardCheck, Search, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, ClipboardCheck, Eye, Search, ShieldAlert } from 'lucide-react'
 
 import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
-import { CockpitKpiCard } from '../../../../shared/ui/cockpit'
-import { ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
+import { CockpitKpiCard, EnterpriseKpiCard } from '../../../../shared/ui/cockpit'
+import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
 import {
   InventoryChartCard,
   InventoryPagination,
@@ -13,7 +13,7 @@ import {
 } from '../../../inventory/components/InventoryVisuals'
 import { useComponents } from '../../hooks/queries/useComponents'
 import { formatQuantity } from '@/shared/utils/number-format'
-import { ComponentsDonut, componentsInput, componentsMutedButton } from './ComponentsCockpitShared'
+import { ComponentsDonut } from './ComponentsCockpitShared'
 
 function qcDisposition(status: string) {
   if (['READY', 'SHIPPED', 'DELIVERED', 'INSTALLED'].includes(status)) return 'Đạt'
@@ -31,13 +31,24 @@ function qcArea(status: string) {
 export function ComponentsInternalQcPage() {
   const { data: components = [], isLoading, isError } = useComponents()
   const [query, setQuery] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
+  const [selectedRow, setSelectedRow] = useState<any | null>(null)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const pageSize = 14
 
-  useEffect(() => {
+  function applySearch() {
+    setQuery(searchDraft)
     setPage(1)
-  }, [query, status])
+  }
+
+  function resetFilters() {
+    setSearchDraft('')
+    setQuery('')
+    setStatus('')
+    setPage(1)
+  }
 
   const rows = useMemo(() => components.map((component) => ({
     id: component.id,
@@ -66,49 +77,124 @@ export function ComponentsInternalQcPage() {
 
   return (
     <EnterpriseModulePage>
-      <div className="w-full min-w-0 flex-1 space-y-1">
+      <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
+        {/* Phase 1: KPI Cards */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-3 xl:grid-cols-6">
-          <CockpitKpiCard title="Cấu kiện cần QC" value={formatQuantity(rows.length, 0)} note="Dữ liệu cấu kiện" state="normal" tone="cyan" className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="QC đạt" value={formatQuantity(passedCount, 0)} note="READY trở lên" state="normal" tone="emerald" className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="Đang kiểm" value={formatQuantity(activeCount, 0)} note="Cut / Weld / Paint" state="normal" tone="blue" className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="Chờ dữ liệu" value={formatQuantity(waitingCount, 0)} note="Chưa có QC fact" state="normal" tone="amber" className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="Ready to ship" value={formatQuantity(readyToShipCount, 0)} note="Có thể chuyển bãi" state="normal" tone="purple" className="!h-[92px] !p-3" />
-          <CockpitKpiCard title="Cập nhật gần nhất" value={latestUpdatedAt} note="Theo component row" state="normal" tone="blue" className="!h-[92px] !p-3" />
+          <EnterpriseKpiCard
+            title="Cấu kiện cần QC"
+            value={formatQuantity(rows.length, 0)}
+            tone="cyan"
+            icon={<ClipboardCheck size={15} />}
+            isLoading={isLoading}
+          />
+          <EnterpriseKpiCard
+            title="QC đạt"
+            value={formatQuantity(passedCount, 0)}
+            tone="emerald"
+            icon={<CheckCircle2 size={15} />}
+            isLoading={isLoading}
+          />
+          <EnterpriseKpiCard
+            title="Đang kiểm"
+            value={formatQuantity(activeCount, 0)}
+            tone="blue"
+            icon={<Search size={15} />}
+            isLoading={isLoading}
+          />
+          <EnterpriseKpiCard
+            title="Chờ dữ liệu"
+            value={formatQuantity(waitingCount, 0)}
+            tone="amber"
+            icon={<ShieldAlert size={15} />}
+            isLoading={isLoading}
+          />
+          <EnterpriseKpiCard
+            title="Ready to ship"
+            value={formatQuantity(readyToShipCount, 0)}
+            tone="purple"
+            icon={<CheckCircle2 size={15} />}
+            isLoading={isLoading}
+          />
+          <EnterpriseKpiCard
+            title="Cập nhật gần nhất"
+            value={latestUpdatedAt}
+            tone="cyan"
+            icon={<ClipboardCheck size={15} />}
+            isLoading={isLoading}
+          />
         </div>
 
-        <InventoryPanel className="rounded-xl">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-11">
-          <div className="flex min-w-64 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-6">
-            <Search size={15} className="text-cyan-400" />
+        {/* Phase 3: Search & Refresh Toolbar (Golden Reference Match) */}
+        <InventoryPanel className="rounded-xl -mt-1">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_220px_130px_120px]">
             <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch()
+              }}
               placeholder="Tìm mã cấu kiện, tên, dự án, khu vực QC..."
-              className={`${componentsInput} w-full border-0 bg-transparent px-0 focus:border-0 focus:bg-transparent`}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
             />
-          </div>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className={`${componentsInput} xl:col-span-3`}>
-            <option value="">Kết quả: Tất cả</option>
-            <option value="Đạt">Đạt</option>
-            <option value="Đang kiểm">Đang kiểm</option>
-            <option value="Chờ dữ liệu">Chờ dữ liệu</option>
-          </select>
-          <button type="button" onClick={() => { setQuery(''); setStatus('') }} className={`${componentsMutedButton} xl:col-span-2`}>Làm mới</button>
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="">Kết quả: Tất cả</option>
+              <option value="Đạt">Đạt</option>
+              <option value="Đang kiểm">Đang kiểm</option>
+              <option value="Chờ dữ liệu">Chờ dữ liệu</option>
+            </select>
+            <button
+              type="button"
+              onClick={applySearch}
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
           </div>
         </InventoryPanel>
 
         {isError ? (
           <ModuleEmptyState icon={<ShieldAlert size={18} />} title="Không thể tải dữ liệu QC cấu kiện" description="Kiểm tra kết nối hoặc quyền truy cập Components." />
         ) : (
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-12 items-start">
+            {/* Phase 4: QC Hero Table */}
             <div className="xl:col-span-9">
-              <InventoryPanel
-                title={<h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">{`Hàng đợi QC cấu kiện (${rows.length})`}</h3>}
-                className="h-[520px]"
-              >
-                <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
+              <InventoryPanel className="rounded-xl">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Hàng đợi QC cấu kiện</h3>
+                    <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                      {rows.length} cấu kiện
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(true)}
+                    className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+                  >
+                    Xem tất cả
+                  </button>
+                </div>
+
+                <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
                   <table className="w-full min-w-[960px] table-fixed text-sm">
-                    <thead className={inventoryTableHead}>
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
                       <tr>
                         {['Mã cấu kiện', 'Tên', 'Dự án', 'Khu vực QC', 'Lifecycle', 'Kết quả', 'Vị trí', 'Cập nhật'].map((heading) => (
                           <th key={heading} className="px-3 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
@@ -117,17 +203,27 @@ export function ComponentsInternalQcPage() {
                     </thead>
                     <tbody>
                       {isLoading ? (
-                        <tr><td colSpan={8} className="px-3 py-8"><ModuleLoadingState label="Đang tải QC cấu kiện..." /></td></tr>
+                        <tr><td colSpan={8} className="px-3 py-8 text-center"><ModuleLoadingState label="Đang tải QC cấu kiện..." /></td></tr>
                       ) : pageRows.length ? pageRows.map((row) => (
-                        <tr key={row.id} className={inventoryTableRow}>
-                          <td className="truncate px-3 py-2 font-mono text-cyan-300">{row.code}</td>
-                          <td className="truncate px-3 py-2 text-white">{row.name}</td>
-                          <td className="truncate px-3 py-2">{row.project}</td>
-                          <td className="px-3 py-2">{row.area}</td>
-                          <td className="px-3 py-2">{row.status}</td>
-                          <td className={`px-3 py-2 ${row.result === 'Đạt' ? 'text-emerald-300' : row.result === 'Đang kiểm' ? 'text-cyan-300' : 'text-amber-300'}`}>{row.result}</td>
-                          <td className="truncate px-3 py-2">{row.location}</td>
-                          <td className="px-3 py-2">{row.updatedAt}</td>
+                        <tr key={row.id} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+                          <td className="truncate px-3 py-1.5 font-mono font-medium text-cyan-300">{row.code}</td>
+                          <td className="truncate px-3 py-1.5 text-white font-medium">{row.name}</td>
+                          <td className="truncate px-3 py-1.5 text-slate-300">{row.project}</td>
+                          <td className="px-3 py-1.5 text-slate-300">{row.area}</td>
+                          <td className="px-3 py-1.5 text-slate-300 font-mono text-xs">{row.status}</td>
+                          <td className="px-3 py-1.5">
+                            <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs font-medium ${
+                              row.result === 'Đạt'
+                                ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                                : row.result === 'Đang kiểm'
+                                  ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+                                  : 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+                            }`}>
+                              {row.result}
+                            </span>
+                          </td>
+                          <td className="truncate px-3 py-1.5 text-slate-300 font-mono">{row.location}</td>
+                          <td className="px-3 py-1.5 text-slate-400 font-mono text-xs">{row.updatedAt}</td>
                         </tr>
                       )) : (
                         <tr>
@@ -139,26 +235,29 @@ export function ComponentsInternalQcPage() {
                     </tbody>
                   </table>
                 </div>
-                <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(rows.length / pageSize))} total={rows.length} onPageChange={setPage} />
+                <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(rows.length / pageSize))} total={rows.length} onPageChange={setPage} containerClassName="border-t-0" />
               </InventoryPanel>
             </div>
 
+            {/* Phase 2: Analytics Right Rail */}
             <div className="space-y-1 xl:col-span-3">
-              <InventoryChartCard title="Phân bổ QC" className="h-[170px]">
+              <InventoryChartCard title="Phân bổ kết quả QC" className="h-[170px]">
                 <ComponentsDonut centerValue={formatQuantity(rows.length, 0)} centerLabel="QC" segments={[
                   { label: 'Đạt', value: passedCount, color: '#14c987' },
                   { label: 'Đang kiểm', value: activeCount, color: '#06b6d4' },
                   { label: 'Chờ', value: waitingCount, color: '#f59e0b' },
                 ]} />
               </InventoryChartCard>
-              <InventoryChartCard title="NCR" className="h-[170px]">
+              <InventoryChartCard title="Sự cố NCR" className="h-[170px]">
                 <ModuleEmptyState icon={<ShieldAlert size={18} />} title="Chưa có NCR từ API" description="NCR thật sẽ hiển thị khi QC domain cung cấp contract." />
               </InventoryChartCard>
               <InventoryChartCard title="Gần đây" className="h-[170px]">
                 {rows.slice(0, 5).map((row) => (
                   <div key={row.id} className="mb-1 flex justify-between gap-2 text-xs text-slate-300">
-                    <span className="truncate text-cyan-300">{row.code}</span>
-                    <span className="shrink-0">{row.result}</span>
+                    <span className="truncate text-cyan-300 font-mono">{row.code}</span>
+                    <span className={`shrink-0 font-mono ${
+                      row.result === 'Đạt' ? 'text-emerald-300' : row.result === 'Đang kiểm' ? 'text-cyan-300' : 'text-amber-300'
+                    }`}>{row.result}</span>
                   </div>
                 ))}
                 {!rows.length ? <ModuleEmptyState icon={<CheckCircle2 size={18} />} title="Chưa có hoạt động" description="Không có cấu kiện trong bộ lọc hiện tại." /> : null}
@@ -167,6 +266,116 @@ export function ComponentsInternalQcPage() {
           </div>
         )}
       </div>
+
+      {/* Phase 5: EXPANDED TABLE MODAL ("Xem tất cả" interaction matching Inventory Golden Reference) */}
+      {expandedModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ hàng đợi QC cấu kiện</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {rows.length} cấu kiện trong danh sách QC</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(false)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead
+                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                >
+                  <tr>
+                    {['Mã cấu kiện', 'Tên', 'Dự án', 'Khu vực QC', 'Lifecycle', 'Kết quả', 'Vị trí', 'Cập nhật'].map((heading) => (
+                      <th key={heading} className="px-3 py-2 text-left font-semibold text-slate-300">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => {
+                        setSelectedRow(row)
+                        setExpandedModalOpen(false)
+                      }}
+                      className={`${inventoryTableRow} cursor-pointer`}
+                    >
+                      <td className="truncate px-3 py-2 font-mono font-medium text-cyan-300">{row.code}</td>
+                      <td className="truncate px-3 py-2 text-white font-medium">{row.name}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.project}</td>
+                      <td className="px-3 py-2 text-slate-300">{row.area}</td>
+                      <td className="px-3 py-2 text-slate-300 font-mono text-xs">{row.status}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs font-medium ${
+                          row.result === 'Đạt'
+                            ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                            : row.result === 'Đang kiểm'
+                              ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+                              : 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+                        }`}>
+                          {row.result}
+                        </span>
+                      </td>
+                      <td className="truncate px-3 py-2 text-slate-300 font-mono">{row.location}</td>
+                      <td className="px-3 py-2 text-slate-400 font-mono text-xs">{row.updatedAt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <InventoryPagination
+              page={page}
+              pageSize={pageSize}
+              pageCount={Math.max(1, Math.ceil(rows.length / pageSize))}
+              total={rows.length}
+              onPageChange={setPage}
+              containerClassName="border-t-0"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Phase 6: QC Detail Drawer */}
+      <ModuleDetailDrawer
+        open={Boolean(selectedRow)}
+        title={selectedRow ? `QC Cấu kiện · ${selectedRow.code}` : 'Chi tiết QC'}
+        subtitle={selectedRow ? `${selectedRow.name} (${selectedRow.project})` : undefined}
+        onClose={() => setSelectedRow(null)}
+      >
+        {selectedRow ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <CockpitKpiCard title="Mã cấu kiện" value={selectedRow.code} state="normal" tone="cyan" />
+              <CockpitKpiCard title="Kết quả QC" value={selectedRow.result} state="normal" tone={selectedRow.result === 'Đạt' ? 'emerald' : selectedRow.result === 'Đang kiểm' ? 'blue' : 'amber'} />
+              <CockpitKpiCard title="Khu vực QC" value={selectedRow.area} state="normal" tone="purple" />
+              <CockpitKpiCard title="Vị trí bãi" value={selectedRow.location} state="normal" tone="cyan" />
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-xs space-y-2">
+              <div className="font-semibold uppercase tracking-wider text-cyan-300">Thông tin QC & Tiến độ sản xuất</div>
+              <div className="flex justify-between text-slate-300 border-b border-white/5 pb-1.5">
+                <span>Dự án</span>
+                <span className="text-white">{selectedRow.project}</span>
+              </div>
+              <div className="flex justify-between text-slate-300 border-b border-white/5 pb-1.5">
+                <span>Trạng thái Lifecycle</span>
+                <span className="font-mono text-cyan-300">{selectedRow.status}</span>
+              </div>
+              <div className="flex justify-between text-slate-300 border-b border-white/5 pb-1.5">
+                <span>Ngày cập nhật mới nhất</span>
+                <span className="font-mono text-white">{selectedRow.updatedAt}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </ModuleDetailDrawer>
     </EnterpriseModulePage>
   )
 }

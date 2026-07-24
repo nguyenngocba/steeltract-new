@@ -10,6 +10,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuthStore } from '../../../store/auth.store'
 import { InventoryGlobalActionBar } from '../../../modules/inventory/components/InventoryGlobalActionBar'
+import { ComponentsGlobalActionBar } from '../../../modules/components/components/ComponentsGlobalActionBar'
+import { ProductionGlobalActionBar } from '../../../modules/production/components/ProductionGlobalActionBar'
 
 export function AppTopbar() {
   const user = useAuthStore((s) => s.user)
@@ -20,6 +22,8 @@ export function AppTopbar() {
   const moduleTitle = getModuleTitle(location.pathname)
   const workspaceTitle = getWorkspaceTitle(location.pathname, location.search)
   const isInventoryRoute = location.pathname.startsWith('/inventory')
+  const isComponentsRoute = location.pathname.startsWith('/components')
+  const isProductionRoute = location.pathname.startsWith('/production')
 
   function handleLogout() {
     logout()
@@ -36,6 +40,8 @@ export function AppTopbar() {
 
       <div className="flex items-center gap-2">
         {isInventoryRoute ? <InventoryGlobalActionBar /> : null}
+        {isComponentsRoute ? <ComponentsGlobalActionBar /> : null}
+        {isProductionRoute ? <ProductionGlobalActionBar /> : null}
 
         <div className="hidden items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-2.5 lg:flex">
           <Search size={15} className="text-zinc-500" />

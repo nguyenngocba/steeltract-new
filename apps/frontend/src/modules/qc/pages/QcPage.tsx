@@ -1,16 +1,21 @@
 import { useDeferredValue, useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
-import { CockpitEmptyState, CockpitKpiCard, CockpitTableShell, DataTablePagination } from '@/shared/ui/cockpit'
+import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
+import { CockpitEmptyState, CockpitKpiCard, CockpitTableShell, DataTablePagination, EnterpriseKpiCard } from '@/shared/ui/cockpit'
+import {
+  EnterprisePanel,
+  enterpriseTableHead as tableHead,
+  enterpriseTableRow as tableRow,
+} from '@/shared/ui/enterprise-components'
 import {
   moduleInput,
   modulePanel,
   modulePrimaryButton,
-  moduleTableHead,
-  moduleTableRow,
 } from '@/shared/ui/modules'
 import { approveInspection, completeInspection, createInspection, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
 import { queryKeys } from '@/lib/query/query-keys'
@@ -33,8 +38,6 @@ const tabs: Array<{ id: QcTab; label: string; path: string }> = [
 const panel = modulePanel
 const input = moduleInput
 const primaryButton = modulePrimaryButton
-const tableHead = moduleTableHead
-const tableRow = moduleTableRow
 const pageSizeOptions = [10, 20, 50, 100]
 const fmt = (value = 0) => formatQuantity(value, 1)
 const date = (value?: string | null) => value ? formatDateTime(value) : '-'
@@ -446,10 +449,147 @@ function InspectionTable({
   onPageSizeChange?: (pageSize: number) => void
   paginated?: boolean
 }) {
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const total = paginated ? meta?.total ?? rows.length : rows.length
-  const stableRows = Math.min(pageSize, 10)
-  const emptyRows = Array.from({ length: Math.max(0, stableRows - rows.length) })
-  return <div className={`${panel} flex min-h-[620px] flex-col overflow-hidden`}><div className="flex min-h-[48px] justify-between border-b border-white/10 px-4 py-3"><h2 className="text-sm font-semibold">{title}</h2><div className="flex items-center gap-3"><span className="text-xs text-slate-500">{fmt(total)} phiếu</span>{action}</div></div><CockpitTableShell className="max-h-[560px] rounded-none border-0"><table className="w-full min-w-[980px] text-left text-sm"><thead className={tableHead}><tr>{['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}><td className="px-4 py-3 text-cyan-300">{row.inspectionNo}</td><td className="px-4 py-3">{date(row.date)}</td><td className="px-4 py-3">{row.projectName}</td><td className="px-4 py-3">{row.componentCode}</td><td className="px-4 py-3">{row.productionOrderNo}</td><td className="px-4 py-3">{row.category}</td><td className="px-4 py-3"><ResultBadge value={row.result} /></td><td className="px-4 py-3"><StatusBadge value={row.status} /></td><td className="px-4 py-3"><div className="flex gap-1"><button type="button" onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700 px-2 py-1 text-[10px] text-emerald-300">Đạt</button><button type="button" onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300">NCR</button></div></td></tr>)}{emptyRows.map((_, index) => <tr key={`qc-empty-${index}`} aria-hidden="true" className="border-t border-white/[0.04]"><td colSpan={9} className="h-[45px] px-4 py-3"><div className="h-px w-full bg-white/[0.035]" /></td></tr>)}</tbody></table>{!rows.length ? <Empty title="Chưa có phiếu kiểm tra." /> : null}</CockpitTableShell>{paginated && total > pageSize && onPageChange && onPageSizeChange ? <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} pageSizeOptions={pageSizeOptions} /> : null}</div>
+
+  return (
+    <EnterprisePanel className="flex min-h-[580px] flex-col rounded-xl p-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">{title}</h3>
+          <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+            {fmt(total)} phiếu QC
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {action}
+          <button
+            type="button"
+            onClick={() => setExpandedModalOpen(true)}
+            className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+          >
+            Xem tất cả
+          </button>
+        </div>
+      </div>
+
+      <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+        <table className="w-full min-w-[980px] text-xs table-fixed border-collapse">
+          <thead
+            className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+            style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+          >
+            <tr>
+              {['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => (
+                <th key={h} className="px-3 py-2 text-left font-semibold text-slate-300">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}>
+                <td className="px-3 py-2 text-cyan-300 font-mono font-semibold">{row.inspectionNo}</td>
+                <td className="px-3 py-2 text-slate-300 font-mono text-xs">{date(row.date)}</td>
+                <td className="px-3 py-2 text-slate-300 font-mono">{row.projectName}</td>
+                <td className="px-3 py-2 text-white font-medium">{row.componentCode}</td>
+                <td className="px-3 py-2 text-slate-300 font-mono">{row.productionOrderNo}</td>
+                <td className="px-3 py-2 text-slate-300">{row.category}</td>
+                <td className="px-3 py-2"><ResultBadge value={row.result} /></td>
+                <td className="px-3 py-2"><StatusBadge value={row.status} /></td>
+                <td className="px-3 py-2">
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onPass?.(row) }} className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-900/50">Đạt</button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onFail?.(row) }} className="rounded border border-red-700/60 bg-red-950/40 px-2 py-0.5 text-[10px] font-semibold text-red-300 hover:bg-red-900/50">NCR</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {!rows.length ? (
+              <tr>
+                <td colSpan={9} className="px-3 py-10">
+                  <Empty title="Chưa có phiếu kiểm tra." />
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      {paginated && total > pageSize && onPageChange && onPageSizeChange ? (
+        <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} pageSizeOptions={pageSizeOptions} />
+      ) : null}
+
+      {/* EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách phiếu kiểm tra QC</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {total} phiếu kiểm tra trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[980px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>
+                        {['Mã phiếu', 'Ngày kiểm tra', 'Dự án', 'Cấu kiện', 'MO', 'Loại kiểm tra', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-left font-semibold text-slate-300">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => {
+                            onOpen(row)
+                            setExpandedModalOpen(false)
+                          }}
+                          className={`${tableRow} cursor-pointer`}
+                        >
+                          <td className="px-3 py-2 text-cyan-300 font-mono font-semibold">{row.inspectionNo}</td>
+                          <td className="px-3 py-2 text-slate-300 font-mono text-xs">{date(row.date)}</td>
+                          <td className="px-3 py-2 text-slate-300 font-mono">{row.projectName}</td>
+                          <td className="px-3 py-2 text-white font-medium">{row.componentCode}</td>
+                          <td className="px-3 py-2 text-slate-300 font-mono">{row.productionOrderNo}</td>
+                          <td className="px-3 py-2 text-slate-300">{row.category}</td>
+                          <td className="px-3 py-2"><ResultBadge value={row.result} /></td>
+                          <td className="px-3 py-2"><StatusBadge value={row.status} /></td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1.5">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); onPass?.(row); setExpandedModalOpen(false) }} className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">Đạt</button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); onFail?.(row); setExpandedModalOpen(false) }} className="rounded border border-red-700/60 bg-red-950/40 px-2 py-0.5 text-[10px] font-semibold text-red-300">NCR</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {paginated && total > pageSize && onPageChange && onPageSizeChange ? (
+                  <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} pageSizeOptions={pageSizeOptions} />
+                ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </EnterprisePanel>
+  )
 }
 
 function ProductionQueue({ rows, onOpen, onCreate, onQuickApprove, compact = false, action }: { rows: QcProductionQueueRow[]; onOpen: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void; compact?: boolean; action?: ReactNode }) {
