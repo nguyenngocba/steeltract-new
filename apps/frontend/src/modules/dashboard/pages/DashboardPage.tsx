@@ -985,7 +985,7 @@ function ExecutiveAnalyticsPortal({ domain, context, page, onPageChange, onDomai
   const pageSize = 8
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/72 p-4 backdrop-blur-sm">
-      <section className="grid max-h-[90vh] w-full max-w-[1360px] overflow-hidden rounded-3xl border border-cyan-300/20 bg-[#07111f] text-slate-100 shadow-[0_32px_120px_rgba(2,8,23,0.54)] xl:grid-cols-[240px_1fr]">
+      <section className="grid max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-3xl border border-cyan-300/20 bg-[#07111f] text-slate-100 shadow-[0_32px_120px_rgba(2,8,23,0.54)] xl:grid-cols-[200px_1fr]">
         <aside className="max-h-[90vh] overflow-y-auto border-r border-cyan-300/10 bg-slate-950/55 p-4">
           <button type="button" onClick={onClose} className="mb-4 inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-500/8 px-3 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/14">
             <ArrowLeft size={14} /> Quay lại
@@ -1008,22 +1008,21 @@ function ExecutiveAnalyticsPortal({ domain, context, page, onPageChange, onDomai
             </div>
           </div>
         </aside>
-        <main className="max-h-[90vh] overflow-y-auto p-4">
-          <AnalyticsHeader
-            Icon={spec.icon}
-            theme={theme}
-            eyebrow={spec.eyebrow}
-            title={spec.title}
-            subtitle={spec.subtitle}
-            actions={
-              <div className="flex items-center gap-2">
-                <span className="rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2 text-xs font-medium text-slate-400">{dateTime(new Date().toISOString())}</span>
-                <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:bg-white/[0.08]"><X size={16} /></button>
-              </div>
-            }
-          />
+        {domain === 'inventory' ? null : (
+           <AnalyticsHeader
+             Icon={spec.icon}
+             theme={theme}
+             eyebrow={spec.eyebrow}
+             title={spec.title}
+             subtitle={spec.subtitle}
+             actions={
+               <div className="flex items-center gap-2">
+                 <span className="rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2 text-xs font-medium text-slate-400">{dateTime(new Date().toISOString())}</span>
+               </div>
+             }
+           />
+         )}
           <DomainAnalyticsLayout spec={spec} domain={domain} page={page} pageSize={pageSize} onPageChange={onPageChange} />
-        </main>
       </section>
     </div>
   )
@@ -1054,24 +1053,24 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'inventory') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-2 pt-2">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
-          <AnalyticsSection title="Sức chứa và sử dụng kho" theme={theme} className="min-h-[400px]">
+        <section className="grid gap-2 xl:grid-cols-[1.15fr_0.85fr]">
+          <AnalyticsSection title="Sức chứa và sử dụng kho" theme={theme} className="min-h-[200px]">
             <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="Kho" total={spec.distributionTotal} variant="donut" />
           </AnalyticsSection>
-          <AnalyticsSection title="Phân tích ABC theo giá trị tồn" theme={theme} className="min-h-[400px]">
+          <AnalyticsSection title="Phân tích ABC theo giá trị tồn" theme={theme} className="min-h-[200px]">
             <AnalyticsDistributionCard rows={spec.matrix} theme={theme} centerLabel="ABC" total={spec.summary[0]?.value ?? ''} variant="heatmap" />
           </AnalyticsSection>
         </section>
-        <section className="grid gap-3 xl:grid-cols-[0.9fr_1.1fr_360px]">
-          <AnalyticsSection title="Tuổi tồn kho" theme={theme} className="min-h-[300px]">
+        <section className="grid gap-2 xl:grid-cols-[0.9fr_1.1fr_360px]">
+          <AnalyticsSection title="Tuổi tồn kho" theme={theme} className="min-h-[200px]">
             <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Aging" total={spec.summary[2]?.value ?? ''} variant="list" />
           </AnalyticsSection>
-          <AnalyticsSection title={spec.trendTitle} theme={theme} className="min-h-[330px]">
+          <AnalyticsSection title={spec.trendTitle} theme={theme} className="min-h-[200px]">
             <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="line" />
           </AnalyticsSection>
-          <AnalyticsSection title={spec.rankingTitle} theme={theme} className="min-h-[300px]">
+          <AnalyticsSection title={spec.rankingTitle} theme={theme} className="min-h-[200px]">
             <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
           </AnalyticsSection>
         </section>
@@ -1082,7 +1081,7 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'inbound') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-1 pt-2">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
         <section className="grid gap-3 xl:grid-cols-[360px_1fr]">
           <AnalyticsSection title="Nhập theo nhà cung cấp" theme={theme} className="min-h-[410px]">
@@ -1110,7 +1109,7 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'outbound') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 pt-2">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
         <section className="grid gap-3 xl:grid-cols-[1fr_420px]">
           <AnalyticsSection title="Dòng giá trị xuất kho" theme={theme} className="min-h-[410px]">
@@ -1138,7 +1137,7 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'production') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 pt-2">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
         <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
           <AnalyticsSection title="Công suất và trạng thái lệnh" theme={theme} className="min-h-[410px]">
@@ -1166,7 +1165,7 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'qc') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 pt-2">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
         <section className="grid gap-3 xl:grid-cols-[420px_1fr]">
           <AnalyticsSection title="Pareto NCR / mức độ lỗi" theme={theme} className="min-h-[410px]">
@@ -1194,7 +1193,7 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'projects') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 pt-2">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
         <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
           <AnalyticsSection title="Tiến độ mốc dự án" theme={theme} className="min-h-[410px]">
@@ -1221,7 +1220,7 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pt-2">
       <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
       <section className="grid gap-3 xl:grid-cols-[380px_1fr_380px]">
         <AnalyticsSection title="Bảng chuyến hôm nay" theme={theme} className="min-h-[410px]">

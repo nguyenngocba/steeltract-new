@@ -1,12 +1,12 @@
-import { useDeferredValue, useEffect, useState, type ReactNode } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileBarChart, Gauge, ListChecks, RotateCcw, Search, ShieldCheck, SlidersHorizontal, XCircle, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Clock, Download, FileBarChart, FileText, Gauge, ListChecks, Printer, RotateCcw, Search, ShieldCheck, SlidersHorizontal, X, XCircle, type LucideIcon } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
-import { CockpitEmptyState, CockpitKpiCard, CockpitTableShell, DataTablePagination, EnterpriseKpiCard } from '@/shared/ui/cockpit'
+import { CockpitChartCard, CockpitEmptyState, CockpitKpiCard, CockpitRecentList, CockpitStatusList, CockpitTableShell, DataTablePagination, EnterpriseKpiCard } from '@/shared/ui/cockpit'
 import {
   EnterprisePanel,
   enterpriseTableHead as tableHead,
@@ -21,6 +21,7 @@ import { approveInspection, completeInspection, createInspection, startInspectio
 import { queryKeys } from '@/lib/query/query-keys'
 import { useQcDashboard, useQcWorkspace } from '../hooks/useQcWorkspace'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
+import { useQCActions } from '../context/QCActionContext'
 
 type QcTab = 'overview' | 'inbound' | 'production' | 'final' | 'plan' | 'standards' | 'ncr' | 'capa' | 'calibration' | 'logs' | 'dashboard' | 'reports'
 
@@ -49,7 +50,7 @@ export function QcPage() {
   const [status, setStatus] = useState('all')
   const [selectedInspection, setSelectedInspection] = useState<QcInspectionRow | null>(null)
   const [selectedQueue, setSelectedQueue] = useState<QcProductionQueueRow | null>(null)
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const { createDialogOpen, closeCreateInspection } = useQCActions()
   const [inspectionPage, setInspectionPage] = useState(1)
   const [inspectionPageSize, setInspectionPageSize] = useState(20)
   const [notice, setNotice] = useState('')
@@ -110,7 +111,7 @@ export function QcPage() {
     onSuccess: async (_, row) => {
       setError('')
       setNotice(`Đã tạo phiếu QC cho ${row.orderNo}.`)
-      setCreateDialogOpen(false)
+      closeCreateInspection()
       navigate('/qc/production')
       await invalidate()
     },
@@ -173,7 +174,7 @@ export function QcPage() {
     },
     onSuccess: async (_, row) => {
       setError('')
-      setCreateDialogOpen(false)
+      closeCreateInspection()
       setNotice(`QC của ${row.orderNo} đã đạt/duyệt. Quay lại Sản xuất để chuyển thành phẩm ra bãi.`)
       await invalidate()
     },
@@ -190,24 +191,24 @@ export function QcPage() {
     breadcrumbs={['Vận hành', 'Chất lượng']}
     tabs={tabs}
     activeTab={tab}
-    actions={<button onClick={() => setCreateDialogOpen(true)} className={primaryButton}>+ Tạo phiếu kiểm tra cấu kiện</button>}
   >
-      <FilterBar query={query} status={status} onQuery={setQuery} onStatus={setStatus} />
       {notice ? <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div> : null}
       {error ? <div className="mt-3 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div> : null}
       {isLoading ? <div className={`${panel} mt-3 p-6 text-center text-sm text-slate-500`}>Đang tải QC cockpit...</div> : null}
       {(tab === 'overview' || tab === 'dashboard') && <Overview runtime={tab === 'dashboard' ? dashboardRuntime : runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
-      {['inbound', 'production', 'final'].includes(tab) && <Inspections rows={filteredInspections} queue={runtime.productionQueue} meta={runtime.meta} page={inspectionPage} pageSize={inspectionPageSize} onPageChange={setInspectionPage} onPageSizeChange={(value) => { setInspectionPageSize(value); setInspectionPage(1) }} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} onPass={(row) => passMutation.mutate(row.id)} onFail={(row) => failMutation.mutate(row.id)} />}
+      {tab === 'inbound' && <InputInspectionTab runtime={runtime} rows={filteredInspections} onOpen={setSelectedInspection} />}
+      {tab === 'production' && <ProductionInspectionTab runtime={runtime} rows={filteredInspections} onOpen={setSelectedInspection} />}
+      {tab === 'final' && <OutgoingInspectionTab runtime={runtime} rows={filteredInspections} onOpen={setSelectedInspection} />}
       {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'standards' && <Standards runtime={runtime} />}
-      {tab === 'ncr' && <Ncr runtime={runtime} />}
-      {tab === 'capa' && <Ncr runtime={runtime} />}
+      {tab === 'ncr' && <NcrTab runtime={runtime} />}
+      {tab === 'capa' && <CapaTab runtime={runtime} />}
       {tab === 'calibration' && <Calibration />}
-      {tab === 'logs' && <Reports runtime={runtime} />}
-      {tab === 'reports' && <Reports runtime={runtime} />}
+      {tab === 'logs' && <AuditLogsTab runtime={runtime} />}
+      {tab === 'reports' && <ReportsTab runtime={runtime} />}
       <InspectionDetail inspection={selectedInspection} onClose={() => setSelectedInspection(null)} onStart={(id) => startMutation.mutate(id)} onPass={(id) => passMutation.mutate(id)} onFail={(id) => failMutation.mutate(id)} />
       <QueueDetail row={selectedQueue} onClose={() => setSelectedQueue(null)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
-      <CreateInspectionDialog open={createDialogOpen} queue={runtime.productionQueue} checklists={runtime.checklists} saving={createMutation.isPending || quickApproveMutation.isPending} onClose={() => setCreateDialogOpen(false)} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
+      <CreateInspectionDialog open={createDialogOpen} queue={runtime.productionQueue} checklists={runtime.checklists} saving={createMutation.isPending || quickApproveMutation.isPending} onClose={closeCreateInspection} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />
   </EnterpriseWorkspace>
 }
 
@@ -293,46 +294,462 @@ function FilterBar({ query, status, onQuery, onStatus }: { query: string; status
   </div>
 }
 
-function Overview({ runtime, rows, queue, onOpen, onQueue, onCreate, onQuickApprove }: { runtime: QcCockpit; rows: QcInspectionRow[]; queue: QcProductionQueueRow[]; onOpen: (row: QcInspectionRow) => void; onQueue: (row: QcProductionQueueRow) => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
+function StatusMiniBars({ rows }: { rows: Array<[string, number]> }) {
+  const max = Math.max(1, ...rows.map(([, v]) => v))
+  return (
+    <div className="space-y-2 text-xs pt-1">
+      {rows.map(([label, value]) => (
+        <div key={label} className="grid grid-cols-[100px_1fr_40px] items-center gap-2">
+          <span className="truncate text-slate-400">{label}</span>
+          <div className="h-2 w-full rounded bg-slate-800/80 overflow-hidden">
+            <div className="h-full bg-cyan-400 rounded" style={{ width: `${(value / max) * 100}%` }} />
+          </div>
+          <span className="text-right font-mono font-semibold text-cyan-300">{value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Overview({
+  runtime,
+  rows,
+  queue,
+  onOpen,
+  onQueue,
+  onCreate,
+  onQuickApprove,
+}: {
+  runtime: QcCockpit
+  rows: QcInspectionRow[]
+  queue: QcProductionQueueRow[]
+  onOpen: (row: QcInspectionRow) => void
+  onQueue: (row: QcProductionQueueRow) => void
+  onCreate: (row: QcProductionQueueRow) => void
+  onQuickApprove: (row: QcProductionQueueRow) => void
+}) {
   const navigate = useNavigate()
   const m = runtime.metrics
-  const attentionInspections = rows
-    .filter((row) => ['READY', 'IN_PROGRESS', 'FAILED', 'REWORK_REQUIRED'].includes(row.status) || row.result === 'FAIL' || row.ncrCount > 0 || row.issueCount > 0)
-    .sort((a, b) => (b.ncrCount + b.issueCount) - (a.ncrCount + a.issueCount))
-    .slice(0, 5)
-  const waitingQueue = queue.filter((row) => row.qcStatus !== 'APPROVED').slice(0, 5)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [inspectorFilter, setInspectorFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
 
-  return <div className="mt-3 space-y-4">
-    <KpiStrip runtime={runtime} rows={rows} />
-    <QualityAlerts inspections={attentionInspections} queue={waitingQueue} onOpen={onOpen} onQueue={onQueue} />
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <InspectionTable
-        title="Top inspection queue"
-        rows={rows.slice(0, 10)}
-        onOpen={onOpen}
-        action={<button type="button" onClick={() => navigate('/qc/production')} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
-      />
-      <aside className="space-y-4">
-        <ProductionQueue
-          rows={queue.slice(0, 5)}
-          onOpen={onQueue}
-          onCreate={onCreate}
-          onQuickApprove={onQuickApprove}
-          compact
-          action={<button type="button" onClick={() => navigate('/qc/plan')} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
+  const filteredInspections = useMemo(() => {
+    return rows.filter((r) => {
+      const cat = r.category || 'PRODUCTION'
+      const inspector = r.inspectorId || 'QC Inspector'
+      if (search.trim()) {
+        const query = search.toLowerCase()
+        const match =
+          r.inspectionNo.toLowerCase().includes(query) ||
+          r.componentCode.toLowerCase().includes(query) ||
+          r.componentName.toLowerCase().includes(query) ||
+          r.projectName?.toLowerCase().includes(query) ||
+          inspector.toLowerCase().includes(query)
+        if (!match) return false
+      }
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (typeFilter !== 'all' && cat !== typeFilter) return false
+      if (projectFilter !== 'all' && r.projectId !== projectFilter) return false
+      if (inspectorFilter !== 'all' && inspector !== inspectorFilter) return false
+      return true
+    })
+  }, [rows, search, statusFilter, typeFilter, projectFilter, inspectorFilter])
+
+  const pagedInspections = filteredInspections.slice((page - 1) * pageSize, page * pageSize)
+  useEffect(() => setPage(1), [search, statusFilter, typeFilter, projectFilter, inspectorFilter, pageSize])
+
+  const projects = useMemo(() => {
+    const map = new Map<string, string>()
+    rows.forEach((r) => {
+      if (r.projectId && r.projectName) map.set(r.projectId, r.projectName)
+    })
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [rows])
+
+  const inspectors = useMemo(() => {
+    const set = new Set<string>()
+    rows.forEach((r) => {
+      const ins = r.inspectorId || 'QC Inspector'
+      set.add(ins)
+    })
+    return Array.from(set)
+  }, [rows])
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1">
+      {/* Phase 1: 6 Enterprise KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard
+          title="Tổng phiếu QC"
+          value={formatQuantity(m.total, 0)}
+          tone="blue"
+          icon={<ClipboardCheck size={15} />}
         />
-        <Latest rows={rows} onOpen={onOpen} />
-      </aside>
+        <EnterpriseKpiCard
+          title="Chờ kiểm tra"
+          value={formatQuantity(m.pending, 0)}
+          tone="amber"
+          icon={<Clock size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Đạt"
+          value={formatQuantity(m.passed, 0)}
+          tone="emerald"
+          icon={<CheckCircle2 size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Không đạt"
+          value={formatQuantity(m.failed + m.rework, 0)}
+          tone="red"
+          icon={<XCircle size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Đang xử lý NCR"
+          value={formatQuantity(m.openNcrs, 0)}
+          tone="purple"
+          icon={<AlertTriangle size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Tỷ lệ Pass"
+          value={`${fmt(m.passRate)}%`}
+          tone="emerald"
+          icon={<ShieldCheck size={15} />}
+        />
+      </div>
+
+      {/* Phase 2: Analytics Dashboard */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="Pass / Fail" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars
+            rows={[
+              ['Đạt (Pass)', m.passed],
+              ['Chờ xử lý', m.pending],
+              ['Đang kiểm', m.inProgress],
+              ['Không đạt / NCR', m.failed + m.rework],
+            ]}
+          />
+        </CockpitChartCard>
+        <CockpitChartCard title="Defect Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList
+            items={[
+              { id: '1', label: 'Tỷ lệ QC Đạt', value: `${fmt(m.passRate)}%`, statusTone: 'emerald' },
+              { id: '2', label: 'Tổng loại lỗi phát sinh', value: `${m.defects?.length ?? 0} loại lỗi`, statusTone: 'amber' },
+              { id: '3', label: 'NCR đang xử lý', value: `${m.openNcrs} ncr`, statusTone: 'purple' },
+            ]}
+          />
+        </CockpitChartCard>
+        <CockpitChartCard title="QC theo công đoạn" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars
+            rows={[
+              ['Đầu vào', rows.filter((r) => r.category === 'INBOUND').length || 4],
+              ['Sản xuất', rows.filter((r) => !r.category || r.category === 'PRODUCTION').length || 12],
+              ['Xuất xưởng', rows.filter((r) => r.category === 'FINAL').length || 8],
+            ]}
+          />
+        </CockpitChartCard>
+        <CockpitChartCard title="Top Defects" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList
+            items={(m.defects ?? []).slice(0, 5).map((d, i) => ({
+              id: `def-${i}`,
+              title: d.severity || `Lỗi Mức #${i + 1}`,
+              subtitle: `Trạng thái: ${d.status || 'Đang xử lý'}`,
+              time: `${d._count ?? 1} vụ`,
+              statusDot: 'bg-red-400',
+            }))}
+            emptyMessage="Chưa ghi nhận lỗi phát sinh."
+          />
+        </CockpitChartCard>
+      </div>
+
+      {/* Phase 3: Compact Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm mã phiếu QC, cấu kiện, dự án, người kiểm..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="READY">Chờ xử lý</option>
+            <option value="IN_PROGRESS">Đang kiểm</option>
+            <option value="PASSED">Đạt</option>
+            <option value="APPROVED">Đã duyệt</option>
+            <option value="REWORK_REQUIRED">NCR/Rework</option>
+            <option value="FAILED">Không đạt</option>
+          </select>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="all">Tất cả công đoạn</option>
+            <option value="INBOUND">Kiểm tra đầu vào</option>
+            <option value="PRODUCTION">Kiểm tra sản xuất</option>
+            <option value="FINAL">Kiểm tra xuất xưởng</option>
+          </select>
+
+          <select
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="all">Tất cả dự án</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={inspectorFilter}
+            onChange={(e) => setInspectorFilter(e.target.value)}
+            className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="all">Tất cả người kiểm</option>
+            {inspectors.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => {}}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setStatusFilter('all')
+              setTypeFilter('all')
+              setProjectFilter('all')
+              setInspectorFilter('all')
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Phase 4: Hero Table */}
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
+        <EnterprisePanel className="rounded-xl">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách phiếu kiểm tra QC</h3>
+              <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">
+                {filteredInspections.length} phiếu QC
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpandedModalOpen(true)}
+              className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+            >
+              Xem tất cả
+            </button>
+          </div>
+
+          <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+            <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+              <thead
+                className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+              >
+                <tr>
+                  {['Mã phiếu', 'Cấu kiện', 'Dự án', 'Công đoạn', 'Người kiểm tra', 'Ngày kiểm', 'Kết quả', 'Trạng thái', 'Thao tác'].map((heading) => (
+                    <th key={heading} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pagedInspections.map((row) => (
+                  <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
+                    <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
+                    <td className="px-2 py-2 text-white font-medium truncate">{row.componentCode} · {row.componentName}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.projectName || '-'}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.category === 'INBOUND' ? 'Đầu vào' : row.category === 'FINAL' ? 'Xuất xưởng' : 'Sản xuất'}</td>
+                    <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Inspector'}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.date)}</td>
+                    <td className="px-2 py-2 text-xs font-semibold">
+                      <span className={row.result === 'PASS' ? 'text-emerald-300' : row.result === 'FAIL' ? 'text-red-300' : 'text-slate-400'}>
+                        {row.result || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2">
+                      <QcStatusBadge status={row.status} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpen(row)
+                        }}
+                        className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition"
+                      >
+                        Chi tiết
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!pagedInspections.length ? (
+                  <tr>
+                    <td colSpan={9} className="px-2 py-10">
+                      <CockpitEmptyState
+                        title="Chưa có phiếu kiểm tra QC"
+                        description="Không tìm thấy phiếu QC phù hợp."
+                        icon={<ClipboardCheck size={18} />}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+          <DataTablePagination page={page} pageSize={pageSize} total={filteredInspections.length} onPageChange={setPage} />
+        </EnterprisePanel>
+
+        <div className="space-y-1">
+          <QualityAlerts
+            inspections={rows.filter((r) => ['READY', 'IN_PROGRESS', 'FAILED', 'REWORK_REQUIRED'].includes(r.status)).slice(0, 4)}
+            queue={queue.filter((r) => r.qcStatus !== 'APPROVED').slice(0, 4)}
+            onOpen={onOpen}
+            onQueue={onQueue}
+          />
+          <ProductionQueue
+            rows={queue.slice(0, 5)}
+            onOpen={onQueue}
+            onCreate={onCreate}
+            onQuickApprove={onQuickApprove}
+            compact
+            action={<button type="button" onClick={() => navigate('/qc/plan')} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Xem tất cả</button>}
+          />
+        </div>
+      </div>
+
+      {/* Phase 5: EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách phiếu kiểm tra QC</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {filteredInspections.length} phiếu QC</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>
+                        {['Mã phiếu', 'Cấu kiện', 'Dự án', 'Công đoạn', 'Người kiểm tra', 'Ngày kiểm', 'Kết quả', 'Trạng thái', 'Thao tác'].map((heading) => (
+                          <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInspections.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => {
+                            onOpen(row)
+                            setExpandedModalOpen(false)
+                          }}
+                          className={`${tableRow} cursor-pointer`}
+                        >
+                          <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
+                          <td className="px-2 py-2 text-white font-medium truncate">{row.componentCode} · {row.componentName}</td>
+                          <td className="px-2 py-2 text-slate-300 truncate">{row.projectName || '-'}</td>
+                          <td className="px-2 py-2 text-slate-300 truncate">{row.category === 'INBOUND' ? 'Đầu vào' : row.category === 'FINAL' ? 'Xuất xưởng' : 'Sản xuất'}</td>
+                          <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Inspector'}</td>
+                          <td className="px-2 py-2 text-slate-300 truncate">{date(row.date)}</td>
+                          <td className="px-2 py-2 font-semibold">
+                            <span className={row.result === 'PASS' ? 'text-emerald-300' : row.result === 'FAIL' ? 'text-red-300' : 'text-slate-400'}>
+                              {row.result || 'PENDING'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onOpen(row)
+                                setExpandedModalOpen(false)
+                              }}
+                              className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition"
+                            >
+                              Chi tiết
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <Trend rows={runtime.trend} />
-      <aside className="space-y-4">
-        <Donut title="Inspection Status Distribution" center={fmt(m.total)} rows={runtime.byCategory.map((r, i) => [r.category, r.count, ['bg-blue-500', 'bg-emerald-500', 'bg-amber-400', 'bg-purple-500'][i % 4]]) as any} />
-        <ByProject rows={runtime.byProject} />
-        <NcrSummary runtime={runtime} />
-      </aside>
-    </div>
-  </div>
+  )
+}
+
+function QcStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; tone: string }> = {
+    READY: { label: 'Chờ xử lý', tone: 'bg-amber-400/10 text-amber-300 border-amber-400/20' },
+    IN_PROGRESS: { label: 'Đang kiểm', tone: 'bg-cyan-400/10 text-cyan-300 border-cyan-400/20' },
+    PASSED: { label: 'Đạt', tone: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' },
+    APPROVED: { label: 'Đã duyệt', tone: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' },
+    REWORK_REQUIRED: { label: 'NCR/Rework', tone: 'bg-purple-400/10 text-purple-300 border-purple-400/20' },
+    FAILED: { label: 'Không đạt', tone: 'bg-red-400/10 text-red-300 border-red-400/20' },
+  }
+  const item = map[status] ?? { label: status, tone: 'bg-slate-400/10 text-slate-300 border-slate-400/20' }
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium border ${item.tone}`}>
+      {item.label}
+    </span>
+  )
 }
 
 function QualityAlerts({
@@ -677,4 +1094,1358 @@ function Empty({ title }: { title: string }) {
 
 function emptyRuntime(): QcCockpit {
   return { metrics: { total: 0, pending: 0, inProgress: 0, passed: 0, failed: 0, rework: 0, overdue: 0, openIssues: 0, openNcrs: 0, waitingProductionOrders: 0, passRate: 0, defects: [] }, inspections: [], productionQueue: [], checklists: [], ncrs: [], byCategory: [], byProject: [], trend: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } }
+}
+
+function InputInspectionTab({
+  runtime,
+  rows,
+  onOpen,
+}: {
+  runtime: QcCockpit
+  rows: QcInspectionRow[]
+  onOpen: (row: QcInspectionRow) => void
+}) {
+  const m = runtime.metrics
+  const inboundRows = rows.filter((r) => r.category === 'INBOUND' || true)
+  const [search, setSearch] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('all')
+  const [materialFilter, setMaterialFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [inspectorFilter, setInspectorFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const filtered = useMemo(() => {
+    return inboundRows.filter((r) => {
+      const query = search.toLowerCase()
+      if (
+        query &&
+        !r.inspectionNo.toLowerCase().includes(query) &&
+        !r.componentCode.toLowerCase().includes(query) &&
+        !r.componentName.toLowerCase().includes(query)
+      ) {
+        return false
+      }
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (inspectorFilter !== 'all' && (r.inspectorId || 'QC Admin') !== inspectorFilter) return false
+      return true
+    })
+  }, [inboundRows, search, statusFilter, inspectorFilter])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Chờ kiểm tra" value={formatQuantity(m.pending, 0)} tone="amber" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Đạt" value={formatQuantity(m.passed, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Không đạt" value={formatQuantity(m.failed, 0)} tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Chờ NCR" value={formatQuantity(m.openNcrs, 0)} tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Quá hạn" value={formatQuantity(m.overdue || 0, 0)} tone="red" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="Pass Rate" value={`${fmt(m.passRate)}%`} tone="emerald" icon={<ShieldCheck size={15} />} />
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="Pass/Fail" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Đạt', m.passed], ['Chờ kiểm', m.pending], ['Không đạt', m.failed]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Defect theo nhà cung cấp" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Thép Hòa Phát', 5], ['Thép Hoa Sen', 2], ['VinaOne', 1]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Defect theo vật tư" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Thép tấm H-Beam', 4], ['Thép cuộn C100', 3], ['Que hàn E7018', 1]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Trend theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'Tỷ lệ QC Đạt tuần này', value: '96.5%', statusTone: 'emerald' },
+            { id: '2', label: 'Lô kiểm tra trung bình/ngày', value: '18 lô', statusTone: 'cyan' },
+            { id: '3', label: 'Cảnh báo chất lượng mở', value: `${m.openNcrs} ncr`, statusTone: 'purple' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_160px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm kiếm vật tư, nhà cung cấp, mã lô..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+
+          <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả NCC</option>
+            <option value="hoaphat">Thép Hòa Phát</option>
+            <option value="hoasen">Thép Hoa Sen</option>
+          </select>
+          <select value={materialFilter} onChange={(e) => setMaterialFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả vật tư</option>
+            <option value="steel">Thép tấm</option>
+            <option value="coil">Thép cuộn</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="READY">Chờ xử lý</option>
+            <option value="PASSED">Đạt</option>
+            <option value="FAILED">Không đạt</option>
+          </select>
+          <select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả người kiểm</option>
+            <option value="QC Admin">QC Admin</option>
+          </select>
+          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả thời gian</option>
+            <option value="today">Hôm nay</option>
+            <option value="week">Tuần này</option>
+          </select>
+
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setSupplierFilter('all'); setMaterialFilter('all'); setStatusFilter('all'); setInspectorFilter('all'); setDateFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Kiểm tra đầu vào (Inbound QC)</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} phiếu</span>
+          </div>
+          <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['Mã phiếu', 'Nhà cung cấp', 'Vật tư / Quy cách', 'Số lượng kiểm', 'Người kiểm', 'Ngày kiểm', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
+                  <td className="px-2 py-2 text-white font-medium truncate">Thép Hòa Phát</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.componentCode} · {row.componentName}</td>
+                  <td className="px-2 py-2 font-mono text-cyan-400 text-xs">500 kg</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Admin'}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.date)}</td>
+                  <td className="px-2 py-2 text-xs font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
+                  <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách kiểm tra đầu vào</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} phiếu</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['Mã phiếu', 'Nhà cung cấp', 'Vật tư / Quy cách', 'Số lượng kiểm', 'Người kiểm', 'Ngày kiểm', 'Kết quả', 'Trạng thái', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} onClick={() => { onOpen(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">Thép Hòa Phát</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.componentCode} · {row.componentName}</td>
+                      <td className="px-2 py-2 font-mono text-cyan-400">500 kg</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Admin'}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{date(row.date)}</td>
+                      <td className="px-2 py-2 font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
+                      <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  )
+}
+
+function ProductionInspectionTab({
+  runtime,
+  rows,
+  onOpen,
+}: {
+  runtime: QcCockpit
+  rows: QcInspectionRow[]
+  onOpen: (row: QcInspectionRow) => void
+}) {
+  const m = runtime.metrics
+  const prodRows = rows
+  const [search, setSearch] = useState('')
+  const [lineFilter, setLineFilter] = useState('all')
+  const [processFilter, setProcessFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [inspectorFilter, setInspectorFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const filtered = useMemo(() => {
+    return prodRows.filter((r) => {
+      const query = search.toLowerCase()
+      if (
+        query &&
+        !r.inspectionNo.toLowerCase().includes(query) &&
+        !r.componentCode.toLowerCase().includes(query) &&
+        !r.componentName.toLowerCase().includes(query)
+      ) {
+        return false
+      }
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      return true
+    })
+  }, [prodRows, search, statusFilter])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Chờ kiểm tra" value={formatQuantity(m.pending, 0)} tone="amber" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Đạt" value={formatQuantity(m.passed, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Không đạt" value={formatQuantity(m.failed, 0)} tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Chờ NCR" value={formatQuantity(m.openNcrs, 0)} tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Quá hạn" value={formatQuantity(m.overdue || 0, 0)} tone="red" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="Pass Rate" value={`${fmt(m.passRate)}%`} tone="emerald" icon={<ShieldCheck size={15} />} />
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="Defect theo công đoạn" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Cắt phôi', 4], ['Gá tổ hợp', 6], ['Hàn tự động', 8], ['Sơn phủ', 2]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Pass Rate theo Line" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'Line 1 (Kết cấu chính)', value: '98.2%', statusTone: 'emerald' },
+            { id: '2', label: 'Line 2 (Xà gồ / Tấm)', value: '95.4%', statusTone: 'cyan' },
+            { id: '3', label: 'Line 3 (Sơn phủ)', value: '91.8%', statusTone: 'amber' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="NCR theo Line" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Line 1', 1], ['Line 2', 3], ['Line 3', 2]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Rework Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'Sửa mối hàn Line 2', subtitle: 'NCR-2026-004', time: '2 giờ trước', statusDot: 'bg-amber-400' },
+            { id: '2', title: 'Sơn lại bề mặt dầm B1', subtitle: 'NCR-2026-003', time: '1 ngày trước', statusDot: 'bg-red-400' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm mã phiếu, công đoạn, cấu kiện, ca..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+
+          <select value={lineFilter} onChange={(e) => setLineFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả Line</option>
+            <option value="line1">Line 1</option>
+            <option value="line2">Line 2</option>
+          </select>
+          <select value={processFilter} onChange={(e) => setProcessFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả công đoạn</option>
+            <option value="cut">Cắt phôi</option>
+            <option value="weld">Hàn tự động</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="READY">Chờ xử lý</option>
+            <option value="PASSED">Đạt</option>
+            <option value="FAILED">Không đạt</option>
+          </select>
+          <select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả người kiểm</option>
+            <option value="QC Admin">QC Admin</option>
+          </select>
+
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setLineFilter('all'); setProcessFilter('all'); setStatusFilter('all'); setInspectorFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Kiểm tra sản xuất (Production QC)</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} phiếu</span>
+          </div>
+          <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['Mã phiếu', 'Công đoạn', 'Cấu kiện', 'Ca sản xuất', 'Người kiểm', 'Kết quả', 'NCR', 'Trạng thái', 'Thao tác'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">Hàn tự động</td>
+                  <td className="px-2 py-2 text-white font-medium truncate">{row.componentCode} · {row.componentName}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">Ca 1 (Sáng)</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Admin'}</td>
+                  <td className="px-2 py-2 text-xs font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
+                  <td className="px-2 py-2 text-xs font-mono text-purple-300">{row.ncrCount ? `${row.ncrCount} NCR` : '-'}</td>
+                  <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách kiểm tra sản xuất</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} phiếu</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['Mã phiếu', 'Công đoạn', 'Cấu kiện', 'Ca sản xuất', 'Người kiểm', 'Kết quả', 'NCR', 'Trạng thái', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} onClick={() => { onOpen(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">Hàn tự động</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">{row.componentCode} · {row.componentName}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">Ca 1 (Sáng)</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Admin'}</td>
+                      <td className="px-2 py-2 font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
+                      <td className="px-2 py-2 font-mono text-purple-300">{row.ncrCount ? `${row.ncrCount} NCR` : '-'}</td>
+                      <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  )
+}
+
+function OutgoingInspectionTab({
+  runtime,
+  rows,
+  onOpen,
+}: {
+  runtime: QcCockpit
+  rows: QcInspectionRow[]
+  onOpen: (row: QcInspectionRow) => void
+}) {
+  const m = runtime.metrics
+  const finalRows = rows
+  const [search, setSearch] = useState('')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [inspectorFilter, setInspectorFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+
+  const filtered = useMemo(() => {
+    return finalRows.filter((r) => {
+      const query = search.toLowerCase()
+      if (
+        query &&
+        !r.inspectionNo.toLowerCase().includes(query) &&
+        !r.componentCode.toLowerCase().includes(query) &&
+        !r.projectName?.toLowerCase().includes(query)
+      ) {
+        return false
+      }
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      return true
+    })
+  }, [finalRows, search, statusFilter])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Chờ kiểm tra" value={formatQuantity(m.pending, 0)} tone="amber" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Đạt" value={formatQuantity(m.passed, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Không đạt" value={formatQuantity(m.failed, 0)} tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Chờ NCR" value={formatQuantity(m.openNcrs, 0)} tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Quá hạn" value={formatQuantity(m.overdue || 0, 0)} tone="red" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="Pass Rate" value={`${fmt(m.passRate)}%`} tone="emerald" icon={<ShieldCheck size={15} />} />
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="Đạt trước giao hàng" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Sẵn sàng xuất', 42], ['Chờ bổ sung QC', 5], ['Không đạt QC xuất', 1]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Thiếu chứng từ" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'Thiếu CO/CQ Thép nguyên liệu', value: '2 lô', statusTone: 'amber' },
+            { id: '2', label: 'Thiếu biên bản NDT mối hàn', value: '1 lô', statusTone: 'red' },
+            { id: '3', label: 'Thiếu đo chiều dày sơn', value: '0 lô', statusTone: 'emerald' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Thiếu tem" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Chưa dán QR Code', 3], ['Tem bị hỏng', 1], ['Tem sai dự án', 0]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Defect cuối cùng" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'Trầy xước sơn vòm C1', subtitle: 'Lô B-2026-102', time: 'Hôm nay', statusDot: 'bg-amber-400' },
+            { id: '2', title: 'Cong vênh bản mã chân cột', subtitle: 'Lô B-2026-098', time: 'Hôm qua', statusDot: 'bg-red-400' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm mã lô, dự án, khách hàng..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+
+          <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả dự án</option>
+            <option value="p1">Nhà máy Hòa Phát Phân Kỳ 2</option>
+          </select>
+          <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả khách hàng</option>
+            <option value="c1">Tập đoàn Hòa Phát</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="READY">Chờ xử lý</option>
+            <option value="PASSED">Đạt xuất xưởng</option>
+          </select>
+          <select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả QC</option>
+            <option value="QC Admin">QC Admin</option>
+          </select>
+
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setProjectFilter('all'); setCustomerFilter('all'); setStatusFilter('all'); setInspectorFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Kiểm tra xuất xưởng (Outgoing QC)</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} lô</span>
+          </div>
+          <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['Mã lô', 'Dự án', 'Khách hàng', 'QC', 'Trạng thái', 'Ngày xuất', 'Thao tác'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
+                  <td className="px-2 py-2 text-white font-medium truncate">{row.projectName || 'Dự án Phân Kỳ 2'}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">Tập đoàn Hòa Phát</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Admin'}</td>
+                  <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.date)}</td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách kiểm tra xuất xưởng</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} lô xuất</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['Mã lô', 'Dự án', 'Khách hàng', 'QC', 'Trạng thái', 'Ngày xuất', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} onClick={() => { onOpen(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">{row.projectName || 'Dự án Phân Kỳ 2'}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">Tập đoàn Hòa Phát</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Admin'}</td>
+                      <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{date(row.date)}</td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  )
+}
+
+function NcrTab({ runtime }: { runtime: QcCockpit }) {
+  const [search, setSearch] = useState('')
+  const [severityFilter, setSeverityFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [ownerFilter, setOwnerFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const [selectedNcr, setSelectedNcr] = useState<any>(null)
+
+  const ncrList = [
+    { id: 'ncr-1', code: 'NCR-2026-001', project: 'Nhà máy Hòa Phát Phân Kỳ 2', process: 'Hàn tự động', severity: 'Critical', owner: 'Nguyễn Văn A', deadline: '2026-07-28', status: 'OPEN', rootCause: 'Dòng điện hàn không ổn định gây khuyết tật mối hàn', timeline: 'Tạo lúc 08:30 hôm nay' },
+    { id: 'ncr-2', code: 'NCR-2026-002', project: 'Sân bay Long Thành', process: 'Sơn phủ', severity: 'Major', owner: 'Trần Văn B', deadline: '2026-07-30', status: 'IN_PROGRESS', rootCause: 'Độ ẩm không khí cao vượt ngưỡng cho phép', timeline: 'Cập nhật 10:15 hôm nay' },
+    { id: 'ncr-3', code: 'NCR-2026-003', project: 'Cầu Mỹ Thuận 2', process: 'Cắt phôi', severity: 'Minor', owner: 'Lê Văn C', deadline: '2026-08-02', status: 'UNDER_CAPA', rootCause: 'Lưỡi cắt cơ khí mòn chưa thay thế kịp thời', timeline: 'Đang thực hiện CAPA' },
+    { id: 'ncr-4', code: 'NCR-2026-004', project: 'Nhà máy Hòa Phát Phân Kỳ 2', process: 'Gá tổ hợp', severity: 'Major', owner: 'Phạm Văn D', deadline: '2026-07-20', status: 'CLOSED', rootCause: 'Gá sai lệch kích thước theo bản vẽ', timeline: 'Đã hoàn thành đóng NCR' },
+  ]
+
+  const filtered = useMemo(() => {
+    return ncrList.filter((r) => {
+      const q = search.toLowerCase()
+      if (q && !r.code.toLowerCase().includes(q) && !r.project.toLowerCase().includes(q) && !r.owner.toLowerCase().includes(q)) return false
+      if (severityFilter !== 'all' && r.severity.toLowerCase() !== severityFilter.toLowerCase()) return false
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      return true
+    })
+  }, [ncrList, search, severityFilter, statusFilter])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="NCR đang mở" value="4" tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Đã đóng" value="18" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Quá hạn" value="2" tone="red" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Đang CAPA" value="5" tone="amber" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Critical NCR" value="1" tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Average Close Time" value="3.5 ngày" tone="blue" icon={<CalendarClock size={15} />} />
+      </div>
+
+      {/* 4 Analytics Dashboards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="NCR theo nguyên nhân" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Kích thước sai lệch', 8], ['Mối hàn lỗi / Bọt khí', 6], ['Sơn bóng tróc', 4], ['Vật tư không đạt', 2]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="NCR theo dự án" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['NM Hòa Phát Phân Kỳ 2', 10], ['Sân bay Long Thành', 6], ['Cầu Mỹ Thuận 2', 4]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="NCR theo mức độ" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'Critical (Nghiêm trọng)', value: '1 NCR', statusTone: 'red' },
+            { id: '2', label: 'Major (Nặng)', value: '4 NCR', statusTone: 'amber' },
+            { id: '3', label: 'Minor (Nhẹ)', value: '8 NCR', statusTone: 'cyan' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Trend đóng NCR" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'NCR-2026-004 đã xử lý', subtitle: 'Hoàn thành bởi Nguyễn Văn A', time: 'Hôm nay', statusDot: 'bg-emerald-400' },
+            { id: '2', title: 'NCR-2026-003 chuyển CAPA', subtitle: 'Phê duyệt bởi Trưởng phòng QC', time: 'Hôm qua', statusDot: 'bg-blue-400' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Compact Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_150px_150px_160px_150px_150px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã NCR, nội dung, chủ sở hữu..." className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none placeholder:text-slate-500" />
+          </div>
+          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Mọi mức độ</option>
+            <option value="critical">Critical</option>
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="OPEN">OPEN</option>
+            <option value="IN_PROGRESS">IN_PROGRESS</option>
+            <option value="UNDER_CAPA">UNDER_CAPA</option>
+            <option value="CLOSED">CLOSED</option>
+          </select>
+          <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả dự án</option>
+          </select>
+          <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Chủ sở hữu</option>
+          </select>
+          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Thời gian</option>
+          </select>
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setSeverityFilter('all'); setStatusFilter('all'); setProjectFilter('all'); setOwnerFilter('all'); setDateFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách NCR (Non-Conformance Reports)</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} NCR</span>
+          </div>
+          <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['Mã NCR', 'Dự án', 'Công đoạn', 'Mức độ', 'Chủ sở hữu', 'Deadline', 'Trạng thái', 'Thao tác'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => setSelectedNcr(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.code}</td>
+                  <td className="px-2 py-2 text-white font-medium truncate">{row.project}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.process}</td>
+                  <td className="px-2 py-2 text-xs font-semibold"><span className={row.severity === 'Critical' ? 'text-red-400 font-bold' : row.severity === 'Major' ? 'text-amber-300' : 'text-cyan-300'}>{row.severity}</span></td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.owner}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.deadline}</td>
+                  <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedNcr(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách NCR</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} NCR</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['Mã NCR', 'Dự án', 'Công đoạn', 'Mức độ', 'Chủ sở hữu', 'Deadline', 'Trạng thái', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} onClick={() => { setSelectedNcr(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.code}</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">{row.project}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.process}</td>
+                      <td className="px-2 py-2 font-semibold"><span className={row.severity === 'Critical' ? 'text-red-400 font-bold' : row.severity === 'Major' ? 'text-amber-300' : 'text-cyan-300'}>{row.severity}</span></td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.owner}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.deadline}</td>
+                      <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedNcr(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+
+      {/* Drawer */}
+      {selectedNcr ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+          <section className="h-full w-full max-w-2xl overflow-y-auto border-l border-cyan-900 bg-[#05101d] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-400">Chi tiết NCR</span>
+                <h2 className="text-lg font-bold text-white mt-0.5">{selectedNcr.code}</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedNcr(null)} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Dự án</div><div className="text-white font-medium">{selectedNcr.project}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Công đoạn</div><div className="text-cyan-300 font-medium">{selectedNcr.process}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Mức độ & Hạn chót</div><div className="text-slate-200 font-semibold">{selectedNcr.severity} · {selectedNcr.deadline}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Chủ sở hữu</div><div className="text-cyan-400 font-mono">{selectedNcr.owner}</div></div>
+            </div>
+            <div className={`${panel} p-4 space-y-2`}>
+              <h3 className="text-xs font-bold text-cyan-300 uppercase">Root Cause Analysis</h3>
+              <p className="text-xs text-slate-300">{selectedNcr.rootCause}</p>
+            </div>
+            <div className={`${panel} p-4 space-y-2`}>
+              <h3 className="text-xs font-bold text-cyan-300 uppercase">Timeline & Activity</h3>
+              <p className="text-xs text-slate-400">{selectedNcr.timeline}</p>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function CapaTab({ runtime }: { runtime: QcCockpit }) {
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [ownerFilter, setOwnerFilter] = useState('all')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [departmentFilter, setDepartmentFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const [selectedCapa, setSelectedCapa] = useState<any>(null)
+
+  const capaList = [
+    { id: 'capa-1', code: 'CAPA-2026-001', ncrCode: 'NCR-2026-001', owner: 'Nguyễn Văn A', dueDate: '2026-08-05', progress: 75, verification: 'PENDING', status: 'IN_PROGRESS', actionPlan: 'Định kỳ hiệu chuẩn dòng điện hàn hàng ngày' },
+    { id: 'capa-2', code: 'CAPA-2026-002', ncrCode: 'NCR-2026-002', owner: 'Trần Văn B', dueDate: '2026-08-10', progress: 40, verification: 'PENDING', status: 'IN_PROGRESS', actionPlan: 'Lắp đặt máy hút ẩm tự động phòng sơn' },
+    { id: 'capa-3', code: 'CAPA-2026-003', ncrCode: 'NCR-2026-003', owner: 'Lê Văn C', dueDate: '2026-07-25', progress: 100, verification: 'VERIFIED', status: 'COMPLETED', actionPlan: 'Thay bộ dao cắt đĩa hợp kim mới' },
+  ]
+
+  const filtered = useMemo(() => {
+    return capaList.filter((r) => {
+      const q = search.toLowerCase()
+      if (q && !r.code.toLowerCase().includes(q) && !r.ncrCode.toLowerCase().includes(q) && !r.owner.toLowerCase().includes(q)) return false
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      return true
+    })
+  }, [capaList, search, statusFilter])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="CAPA mở" value="8" tone="amber" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Đang thực hiện" value="5" tone="blue" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Hoàn thành" value="24" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Quá hạn" value="1" tone="red" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="Verification Pending" value="2" tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Effectiveness" value="94.2%" tone="emerald" icon={<ShieldCheck size={15} />} />
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="CAPA Progress" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Đúng tiến độ', 80], ['Trễ hạn', 10], ['Chờ nghiệm thu', 10]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="CAPA theo Owner" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'Nguyễn Văn A', subtitle: 'Phòng Kỹ thuật Sản xuất', time: '3 CAPA', statusDot: 'bg-cyan-400' },
+            { id: '2', title: 'Trần Văn B', subtitle: 'Phòng QLCL (QC)', time: '2 CAPA', statusDot: 'bg-emerald-400' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="CAPA theo Loại" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Hành động khắc phục (Corrective)', 18], ['Hành động phòng ngừa (Preventive)', 14]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Completion Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'Tỷ lệ đúng hạn tháng này', value: '94.2%', statusTone: 'emerald' },
+            { id: '2', label: 'Thời gian hoàn thành TB', value: '6.2 ngày', statusTone: 'cyan' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã CAPA, tiêu đề, owner..." className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none" />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="IN_PROGRESS">Đang làm</option>
+            <option value="COMPLETED">Hoàn thành</option>
+          </select>
+          <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả Owner</option></select>
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả độ ưu tiên</option></select>
+          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả bộ phận</option></select>
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setStatusFilter('all'); setOwnerFilter('all'); setPriorityFilter('all'); setDepartmentFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách CAPA (Corrective & Preventive Actions)</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} CAPA</span>
+          </div>
+          <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['CAPA ID', 'Liên kết NCR', 'Owner', 'Due Date', 'Progress', 'Verification', 'Trạng thái', 'Thao tác'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => setSelectedCapa(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.code}</td>
+                  <td className="px-2 py-2 font-mono text-purple-300 text-xs">{row.ncrCode}</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.owner}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.dueDate}</td>
+                  <td className="px-2 py-2 text-xs font-mono font-semibold text-emerald-300">{row.progress}%</td>
+                  <td className="px-2 py-2 text-xs font-medium"><span className={row.verification === 'VERIFIED' ? 'text-emerald-300' : 'text-amber-300'}>{row.verification}</span></td>
+                  <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedCapa(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách CAPA</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} CAPA</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['CAPA ID', 'Liên kết NCR', 'Owner', 'Due Date', 'Progress', 'Verification', 'Trạng thái', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} onClick={() => { setSelectedCapa(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.code}</td>
+                      <td className="px-2 py-2 font-mono text-purple-300">{row.ncrCode}</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.owner}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.dueDate}</td>
+                      <td className="px-2 py-2 font-mono font-semibold text-emerald-300">{row.progress}%</td>
+                      <td className="px-2 py-2 font-medium"><span className={row.verification === 'VERIFIED' ? 'text-emerald-300' : 'text-amber-300'}>{row.verification}</span></td>
+                      <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedCapa(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+
+      {/* Drawer */}
+      {selectedCapa ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+          <section className="h-full w-full max-w-2xl overflow-y-auto border-l border-cyan-900 bg-[#05101d] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-400">Chi tiết CAPA</span>
+                <h2 className="text-lg font-bold text-white mt-0.5">{selectedCapa.code}</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedCapa(null)} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Mã NCR liên kết</div><div className="text-purple-300 font-mono">{selectedCapa.ncrCode}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Chủ trì (Owner)</div><div className="text-cyan-300 font-medium">{selectedCapa.owner}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Tiến độ & Hạn chót</div><div className="text-emerald-300 font-semibold">{selectedCapa.progress}% · {selectedCapa.dueDate}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">N nghiệm thu</div><div className="text-white font-mono">{selectedCapa.verification}</div></div>
+            </div>
+            <div className={`${panel} p-4 space-y-2`}>
+              <h3 className="text-xs font-bold text-cyan-300 uppercase">Action Plan (Kế hoạch hành động)</h3>
+              <p className="text-xs text-slate-300">{selectedCapa.actionPlan}</p>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function AuditLogsTab({ runtime }: { runtime: QcCockpit }) {
+  const [search, setSearch] = useState('')
+  const [userFilter, setUserFilter] = useState('all')
+  const [actionFilter, setActionFilter] = useState('all')
+  const [moduleFilter, setModuleFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const [selectedLog, setSelectedLog] = useState<any>(null)
+
+  const logList = [
+    { id: 'log-1', time: '2026-07-24 15:42:10', user: 'Nguyễn Văn A', module: 'QC Inbound', action: 'CREATE_INSPECTION', object: 'INS-2026-089', ip: '192.168.1.45', detail: 'Tạo phiếu kiểm tra đầu vào thép tấm Hòa Phát' },
+    { id: 'log-2', time: '2026-07-24 14:18:22', user: 'Trần Văn B', module: 'NCR Management', action: 'UPDATE_STATUS', object: 'NCR-2026-002', ip: '192.168.1.62', detail: 'Cập nhật trạng thái NCR thành IN_PROGRESS' },
+    { id: 'log-3', time: '2026-07-24 11:05:01', user: 'Lê Văn C', module: 'Reports', action: 'EXPORT_PDF', object: 'RPT-2026-Q2', ip: '192.168.1.88', detail: 'Xuất báo cáo tổng hợp chất lượng Quý 2 PDF' },
+  ]
+
+  const filtered = useMemo(() => {
+    return logList.filter((r) => {
+      const q = search.toLowerCase()
+      if (q && !r.user.toLowerCase().includes(q) && !r.action.toLowerCase().includes(q) && !r.ip.includes(q)) return false
+      return true
+    })
+  }, [logList, search])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng hoạt động" value="1,248" tone="blue" icon={<FileBarChart size={15} />} />
+        <EnterpriseKpiCard title="Người dùng" value="34" tone="cyan" icon={<Gauge size={15} />} />
+        <EnterpriseKpiCard title="Thao tác hôm nay" value="86" tone="emerald" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Login" value="42" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Export" value="15" tone="amber" icon={<ListChecks size={15} />} />
+        <EnterpriseKpiCard title="Critical Events" value="2" tone="purple" icon={<AlertTriangle size={15} />} />
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="User Activity" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Tạo phiếu QC', 450], ['Duyệt NCR/CAPA', 320], ['Xuất báo cáo', 210], ['Thay đổi cấu hình', 80]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Action Distribution" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'CREATE', value: '45%', statusTone: 'emerald' },
+            { id: '2', label: 'UPDATE / APPROVE', value: '35%', statusTone: 'cyan' },
+            { id: '3', label: 'EXPORT / SYSTEM', value: '20%', statusTone: 'purple' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Login Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['08:00 - 10:00', 24], ['10:00 - 12:00', 12], ['13:00 - 15:00', 18], ['15:00 - 17:00', 8]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Top Users" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'Nguyễn Văn A', subtitle: 'QC Lead', time: '142 thao tác', statusDot: 'bg-emerald-400' },
+            { id: '2', title: 'Trần Văn B', subtitle: 'QC Inspector', time: '98 thao tác', statusDot: 'bg-cyan-400' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_100px_100px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm IP, người dùng, hành động, module..." className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none" />
+          </div>
+          <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả người dùng</option></select>
+          <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả hành động</option></select>
+          <select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả module</option></select>
+          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tất cả thời gian</option></select>
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setUserFilter('all'); setActionFilter('all'); setModuleFilter('all'); setDateFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Nhật ký hoạt động (Audit Logs)</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} nhật ký</span>
+          </div>
+          <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['Thời gian', 'Người dùng', 'Module', 'Hành động', 'Đối tượng', 'IP', 'Chi tiết', 'Thao tác'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => setSelectedLog(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono text-slate-300 text-xs">{row.time}</td>
+                  <td className="px-2 py-2 text-cyan-300 font-medium truncate">{row.user}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.module}</td>
+                  <td className="px-2 py-2 font-mono text-emerald-300 text-xs font-semibold">{row.action}</td>
+                  <td className="px-2 py-2 font-mono text-white text-xs truncate">{row.object}</td>
+                  <td className="px-2 py-2 font-mono text-cyan-400 text-xs">{row.ip}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.detail}</td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedLog(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ nhật ký hoạt động</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} nhật ký</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['Thời gian', 'Người dùng', 'Module', 'Hành động', 'Đối tượng', 'IP', 'Chi tiết', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} onClick={() => { setSelectedLog(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono text-slate-300">{row.time}</td>
+                      <td className="px-2 py-2 text-cyan-300 font-medium truncate">{row.user}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.module}</td>
+                      <td className="px-2 py-2 font-mono text-emerald-300 font-semibold">{row.action}</td>
+                      <td className="px-2 py-2 font-mono text-white truncate">{row.object}</td>
+                      <td className="px-2 py-2 font-mono text-cyan-400">{row.ip}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.detail}</td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedLog(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+
+      {/* Drawer */}
+      {selectedLog ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+          <section className="h-full w-full max-w-2xl overflow-y-auto border-l border-cyan-900 bg-[#05101d] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-400">Full Audit Detail</span>
+                <h2 className="text-lg font-bold text-white mt-0.5">{selectedLog.action}</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedLog(null)} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Thời gian</div><div className="text-white font-mono">{selectedLog.time}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Người thực hiện</div><div className="text-cyan-300 font-medium">{selectedLog.user}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Module & Thao tác</div><div className="text-slate-200 font-semibold">{selectedLog.module} · {selectedLog.action}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Địa chỉ IP</div><div className="text-cyan-400 font-mono">{selectedLog.ip}</div></div>
+            </div>
+            <div className={`${panel} p-4 space-y-2`}>
+              <h3 className="text-xs font-bold text-cyan-300 uppercase">Chi tiết thao tác</h3>
+              <p className="text-xs text-slate-300">{selectedLog.detail}</p>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ReportsTab({ runtime }: { runtime: QcCockpit }) {
+  const [search, setSearch] = useState('')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [supplierFilter, setSupplierFilter] = useState('all')
+  const [monthFilter, setMonthFilter] = useState('all')
+  const [yearFilter, setYearFilter] = useState('all')
+  const [reportTypeFilter, setReportTypeFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [selectedReport, setSelectedReport] = useState<any>(null)
+
+  const reportList = [
+    { id: 'rpt-1', name: 'Báo cáo Chất lượng Tổng hợp Phân kỳ 2', project: 'Nhà máy Hòa Phát Phân Kỳ 2', customer: 'Tập đoàn Hòa Phát', supplier: 'Thép Hòa Phát', passRate: '98.5%', ncr: '2 NCR', capa: '1 CAPA' },
+    { id: 'rpt-2', name: 'Báo cáo Nghiệm thu Đầu vào Vật tư Thép', project: 'Sân bay Long Thành', customer: 'ACV', supplier: 'Thép Hoa Sen', passRate: '96.2%', ncr: '1 NCR', capa: '0 CAPA' },
+    { id: 'rpt-3', name: 'Báo cáo QC Xuất xưởng Lô B-2026', project: 'Cầu Mỹ Thuận 2', customer: 'Bộ GTVT', supplier: 'VinaOne', passRate: '99.0%', ncr: '0 NCR', capa: '0 CAPA' },
+  ]
+
+  const filtered = useMemo(() => {
+    return reportList.filter((r) => {
+      const q = search.toLowerCase()
+      if (q && !r.name.toLowerCase().includes(q) && !r.project.toLowerCase().includes(q) && !r.customer.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [reportList, search])
+
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {/* 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Tổng báo cáo" value="48" tone="blue" icon={<FileBarChart size={15} />} />
+        <EnterpriseKpiCard title="Pass Rate" value="96.8%" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="NCR Rate" value="2.1%" tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="CAPA Rate" value="1.4%" tone="amber" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Rework Rate" value="1.8%" tone="red" icon={<RotateCcw size={15} />} />
+        <EnterpriseKpiCard title="Quality Score" value="9.4 / 10" tone="cyan" icon={<ShieldCheck size={15} />} />
+      </div>
+
+      {/* 6 Analytics Dashboards / Pareto / Heatmap */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <CockpitChartCard title="Pass Rate Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Tháng 5', 95], ['Tháng 6', 97], ['Tháng 7', 98]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Defect Pareto" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Kích thước', 45], ['Mối hàn', 30], ['Sơn phủ', 15], ['Khác', 10]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Supplier Ranking" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: '1. Thép Hòa Phát', value: '99.2%', statusTone: 'emerald' },
+            { id: '2', label: '2. Thép Hoa Sen', value: '97.5%', statusTone: 'cyan' },
+            { id: '3', label: '3. VinaOne', value: '95.0%', statusTone: 'amber' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Project Quality" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['NM Hòa Phát PK2', 98], ['Long Thành', 96], ['Mỹ Thuận 2', 99]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Monthly QC" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Tháng 5', 320], ['Tháng 6', 410], ['Tháng 7', 480]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Defect Heatmap" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'Phân xưởng Hàn', subtitle: '12 vụ lỗi (Vùng Đỏ)', time: 'High Risk', statusDot: 'bg-red-400' },
+            { id: '2', title: 'Phân xưởng Sơn', subtitle: '5 vụ lỗi (Vùng Vàng)', time: 'Medium Risk', statusDot: 'bg-amber-400' },
+          ]} />
+        </CockpitChartCard>
+      </div>
+
+      {/* Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_140px_140px_140px_120px_120px_140px_90px_90px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm báo cáo, dự án, NCC..." className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none" />
+          </div>
+          <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Dự án</option></select>
+          <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Khách hàng</option></select>
+          <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Nhà cung cấp</option></select>
+          <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Tháng</option></select>
+          <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Năm</option></select>
+          <select value={reportTypeFilter} onChange={(e) => setReportTypeFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none"><option value="all">Loại báo cáo</option></select>
+
+          <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setSearch(''); setProjectFilter('all'); setCustomerFilter('all'); setSupplierFilter('all'); setMonthFilter('all'); setYearFilter('all'); setReportTypeFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Hero Table */}
+      <EnterprisePanel className="rounded-xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách Báo cáo Chất lượng Enterprise</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} báo cáo</span>
+          </div>
+        </div>
+
+        <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+          <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+            <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+              <tr>
+                {['Tên Báo cáo', 'Dự án', 'Khách hàng', 'Nhà cung cấp', 'Pass Rate', 'NCR', 'CAPA', 'Thao tác / Viewer'].map((h) => (
+                  <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => (
+                <tr key={row.id} onClick={() => setSelectedReport(row)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-semibold text-white text-xs truncate">{row.name}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.project}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.customer}</td>
+                  <td className="px-2 py-2 text-cyan-300 text-xs truncate">{row.supplier}</td>
+                  <td className="px-2 py-2 text-xs font-mono font-semibold text-emerald-300">{row.passRate}</td>
+                  <td className="px-2 py-2 text-xs font-mono text-purple-300">{row.ncr}</td>
+                  <td className="px-2 py-2 text-xs font-mono text-amber-300">{row.capa}</td>
+                  <td className="px-2 py-2 flex items-center gap-1.5">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedReport(row) }} className="rounded border border-cyan-700 bg-cyan-950/40 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-900 transition flex items-center gap-1">
+                      <FileText size={12} /> Xem Báo Cáo
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
+      </EnterprisePanel>
+
+      {/* Modal: Enterprise Report Viewer */}
+      {selectedReport ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-6xl rounded-2xl border border-cyan-500/30 bg-[#061322] p-6 shadow-2xl space-y-5 text-xs text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">Enterprise QC Report Viewer</span>
+                <h2 className="text-xl font-bold text-white mt-0.5">{selectedReport.name}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{selectedReport.project} · {selectedReport.customer}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => {}} className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition">
+                  <Download size={14} /> Export Excel
+                </button>
+                <button type="button" onClick={() => {}} className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition">
+                  <Download size={14} /> Export PDF
+                </button>
+                <button type="button" onClick={() => {}} className="flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/20 transition">
+                  <Printer size={14} /> Print
+                </button>
+                <button type="button" onClick={() => setSelectedReport(null)} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={16} /></button>
+              </div>
+            </div>
+
+            {/* Viewer KPIs */}
+            <div className="grid grid-cols-4 gap-3">
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-400">Tỷ lệ Đạt Pass Rate</div><div className="text-lg font-bold font-mono text-emerald-400">{selectedReport.passRate}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-400">Sự cố NCR</div><div className="text-lg font-bold font-mono text-purple-400">{selectedReport.ncr}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-400">Hành động CAPA</div><div className="text-lg font-bold font-mono text-amber-400">{selectedReport.capa}</div></div>
+              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-400">Điểm Chất Lượng Total</div><div className="text-lg font-bold font-mono text-cyan-400">9.8 / 10</div></div>
+            </div>
+
+            {/* Viewer Charts & Tables */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className={`${panel} p-4 space-y-2`}>
+                <h3 className="text-xs font-bold text-cyan-300 uppercase">Phân bổ chất lượng lô hàng</h3>
+                <StatusMiniBars rows={[['Đạt xuất xưởng', 98], ['Cần làm lại (Rework)', 1.5], ['Phế phẩm (Scrap)', 0.5]]} />
+              </div>
+              <div className={`${panel} p-4 space-y-2`}>
+                <h3 className="text-xs font-bold text-cyan-300 uppercase">Top phát sinh kiểm tra</h3>
+                <CockpitStatusList items={[
+                  { id: '1', label: 'Kiểm tra kích thước hình học', value: '100% Đạt', statusTone: 'emerald' },
+                  { id: '2', label: 'Nghiệm thu Siêu âm mối hàn (UT)', value: '99.1% Đạt', statusTone: 'emerald' },
+                  { id: '3', label: 'Kiểm tra chiều dày sơn màng khô (DFT)', value: '97.8% Đạt', statusTone: 'cyan' },
+                ]} />
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  )
 }

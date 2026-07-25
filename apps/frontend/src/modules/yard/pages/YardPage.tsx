@@ -1,48 +1,50 @@
-import { useEffect, useState } from 'react'
-import { Activity, Boxes, Construction, MapPinned, Radio, Search, Truck, Warehouse, type LucideIcon } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  Activity,
+  Boxes,
+  ChevronRight,
+  Construction,
+  MapPinned,
+  Radio,
+  Search,
+  Truck,
+  Warehouse,
+} from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useComponents } from '@/modules/components/hooks/queries/useComponents'
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
-import { ModuleFilterBar, moduleInput, moduleMutedButton, modulePanel, modulePrimaryButton } from '@/shared/ui/modules'
-import { CockpitChartCard, CockpitKpiCard } from '@/shared/ui/cockpit'
+import { EnterprisePanel } from '@/shared/ui/enterprise-components'
+import {
+  inventoryGridGap,
+  inventoryTableHead,
+  inventoryTableRow,
+} from '@/modules/inventory/components/InventoryVisuals'
+import {
+  CockpitChartCard,
+  CockpitEmptyState,
+  DataTablePagination,
+  EnterpriseKpiCard,
+} from '@/shared/ui/cockpit'
+import { ModuleDetailDrawer, ModuleEmptyState } from '@/shared/ui/modules'
+import { formatQuantity } from '@/shared/utils/number-format'
 import { YardTabWorkspace } from '../components/YardTabWorkspace'
 import { YardZoneDetailDialog } from '../components/YardZoneDetailDialog'
-import { yardTabs, type YardTab } from '../config/yard-tabs'
+import { yardTabs } from '../config/yard-tabs'
 import { YardOperationDialog, type YardOperationMode } from '../dialogs/YardOperationDialog'
-import { useCreateYardSlot, useCreateYardZone, useDeleteYardZone, useUpdateYardZone, useYardDashboard, useYardWorkspace } from '../hooks/queries/useYardRuntime'
-import type { YardZoneRuntime } from '../services/api/yard.api'
-import { formatQuantity } from '@/shared/utils/number-format'
+import {
+  useCreateYardSlot,
+  useCreateYardZone,
+  useDeleteYardZone,
+  useUpdateYardZone,
+  useYardDashboard,
+  useYardWorkspace,
+} from '../hooks/queries/useYardRuntime'
+import type { YardSlotRuntime, YardZoneRuntime } from '../services/api/yard.api'
+import { useYardActions } from '../context/YardActionContext'
 
 const fmt = (value = 0) => formatQuantity(value, 2)
-const panel = modulePanel
-const input = moduleInput
-const mutedButton = moduleMutedButton
-const primaryButton = modulePrimaryButton
-
-function YardKpiCard({
-  icon: Icon,
-  label,
-  value,
-  note,
-  tone = 'cyan',
-}: {
-  icon: LucideIcon
-  label: string
-  value: string | number
-  note: string
-  tone?: 'cyan' | 'emerald' | 'amber' | 'red' | 'purple' | 'blue'
-}) {
-  return (
-    <CockpitKpiCard
-      title={label}
-      value={value}
-      note={note}
-      tone={tone as any}
-      icon={<Icon size={15} />}
-    />
-  )
-}
 
 function YardDonut({
   segments,
@@ -55,12 +57,14 @@ function YardDonut({
 }) {
   const total = Math.max(1, segments.reduce((sum, item) => sum + item.value, 0))
   let cursor = 0
-  const gradient = segments.map((item) => {
-    const start = cursor
-    const end = cursor + item.value / total * 100
-    cursor = end
-    return `${item.color} ${start}% ${end}%`
-  }).join(', ')
+  const gradient = segments
+    .map((item) => {
+      const start = cursor
+      const end = cursor + (item.value / total) * 100
+      cursor = end
+      return `${item.color} ${start}% ${end}%`
+    })
+    .join(', ')
 
   return (
     <div className="grid min-h-[150px] grid-cols-[126px_1fr] items-center gap-3">
@@ -95,91 +99,80 @@ function YardMiniTrend({ values, tone = 'blue' }: { values: number[]; tone?: 'bl
   return (
     <div className="flex h-32 items-end gap-2">
       {values.map((value, index) => (
-        <div key={index} className={`flex-1 rounded-t-lg bg-gradient-to-t ${color}`} style={{ height: `${Math.max(8, value / max * 100)}%` }} />
+        <div key={index} className={`flex-1 rounded-t-lg bg-gradient-to-t ${color}`} style={{ height: `${Math.max(8, (value / max) * 100)}%` }} />
       ))}
     </div>
   )
 }
 
-type ZoneForm = {
-  code: string
-  name: string
-  description: string
-  width: string
-  height: string
-  color: string
-}
-
-type SlotForm = {
-  zoneId: string
-  code: string
-  maxStackLevel: string
-  x: string
-  y: string
-}
-
-const defaultZoneForm = (index: number): ZoneForm => ({
-  code: `ST-YARD-${String(index + 1).padStart(2, '0')}`,
-  name: `Zone ${index + 1}`,
-  description: '',
-  width: '24',
-  height: '18',
-  color: '#06b6d4',
-})
-
-const makeSlotCode = (zone?: YardZoneRuntime, next = 1) => {
-  const shortZone = zone?.code.replace(/^ST-YARD-/, '').replace(/^ZONE-/, '') || 'ZONE'
-  return `${shortZone}-${String(next).padStart(2, '0')}`
-}
-
 export function YardPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const actions = useYardActions()
+
   const [selectedSlotId, setSelectedSlotId] = useState<string>()
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>()
   const [selectedZoneId, setSelectedZoneId] = useState<string>()
   const [zoneDetailId, setZoneDetailId] = useState<string>()
   const [operation, setOperation] = useState<YardOperationMode>()
-  const [zoneForm, setZoneForm] = useState<ZoneForm | null>(null)
-  const [slotForm, setSlotForm] = useState<SlotForm | null>(null)
+
+  // Filter state for Toolbar
+  const [search, setSearch] = useState('')
+  const [warehouseFilter, setWarehouseFilter] = useState('ALL')
+  const [zoneFilter, setZoneFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [projectFilter, setProjectFilter] = useState('ALL')
+  const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const [detailDrawerSlot, setDetailDrawerSlot] = useState<YardSlotRuntime | null>(null)
+
   const { data: components = [] } = useComponents()
   const { data: workspace } = useYardWorkspace()
   const { data: dashboard } = useYardDashboard()
+
   const zones = workspace?.zones ?? []
   const slots = workspace?.slots ?? []
   const movements = workspace?.movements ?? []
   const cranes = workspace?.cranes ?? []
   const dashboardData = dashboard?.data
   const dashboardMovementCounts = dashboardData?.payload?.movementCounts
+
   const normalizedMovementCounts = Array.isArray(dashboardMovementCounts)
-    ? dashboardMovementCounts.reduce((counts, row) => {
-        const key = row.type.toLowerCase()
-        if (key === 'place' || key === 'move' || key === 'remove' || key === 'adjust') counts[key] += row.count
-        return counts
-      }, { place: 0, move: 0, remove: 0, adjust: 0 })
+    ? dashboardMovementCounts.reduce(
+        (counts, row) => {
+          const key = row.type.toLowerCase()
+          if (key === 'place' || key === 'move' || key === 'remove' || key === 'adjust') counts[key] += row.count
+          return counts
+        },
+        { place: 0, move: 0, remove: 0, adjust: 0 },
+      )
     : dashboardMovementCounts
-  const metrics = dashboardData ? {
-    zones: dashboardData.totalZones,
-    totalSlots: dashboardData.totalSlots,
-    occupiedSlots: dashboardData.occupiedSlots,
-    placements: dashboardData.activePlacementCount,
-    occupancyRate: dashboardData.totalSlots
-      ? Math.round(dashboardData.occupiedSlots / dashboardData.totalSlots * 100)
-      : 0,
-    zoneUtilization: dashboardData.payload?.zoneUtilization ?? [],
-    totalWeight: dashboardData.totalWeight,
-    availableSlots: dashboardData.availableSlots,
-    movementsToday: dashboardData.movementToday,
-    movementCounts: normalizedMovementCounts,
-    craneAvailableCount: dashboardData.availableCraneCount,
-  } : undefined
+
+  const metrics = dashboardData
+    ? {
+        zones: dashboardData.totalZones,
+        totalSlots: dashboardData.totalSlots,
+        occupiedSlots: dashboardData.occupiedSlots,
+        placements: dashboardData.activePlacementCount,
+        occupancyRate: dashboardData.totalSlots
+          ? Math.round((dashboardData.occupiedSlots / dashboardData.totalSlots) * 100)
+          : 0,
+        zoneUtilization: dashboardData.payload?.zoneUtilization ?? [],
+        totalWeight: dashboardData.totalWeight,
+        availableSlots: dashboardData.availableSlots,
+        movementsToday: dashboardData.movementToday,
+        movementCounts: normalizedMovementCounts,
+        craneAvailableCount: dashboardData.availableCraneCount,
+      }
+    : undefined
+
   const updateZone = useUpdateYardZone()
   const deleteZone = useDeleteYardZone()
-  const createZone = useCreateYardZone()
-  const createSlot = useCreateYardSlot()
+
   const tab = yardTabs.find((item) => item[2] === location.pathname)?.[0] ?? 'overview'
   const selectedSlot = slots.find((item) => item.id === selectedSlotId) ?? slots[0]
   const selectedPlacement = selectedSlot?.placements.find((item) => item.id === selectedPlacementId) ?? selectedSlot?.placements[0]
+
   useEffect(() => {
     const focusComponentId = window.sessionStorage.getItem('yard-focus-component-id')
     if (!focusComponentId || !slots.length) return
@@ -209,69 +202,47 @@ export function YardPage() {
     if (selectedZoneId === zone.id) setSelectedZoneId(undefined)
   }
 
-  function openCreateZone() {
-    setZoneForm(defaultZoneForm(zones.length))
-  }
-
-  function openCreateSlot(zoneId = selectedZoneId) {
-    const zone = zones.find((item) => item.id === zoneId) ?? zones[0]
-    const zoneSlots = slots.filter((slot) => slot.zone.id === zone?.id)
-    const next = zoneSlots.length + 1
-    setSlotForm({
-      zoneId: zone?.id ?? '',
-      code: makeSlotCode(zone, next),
-      maxStackLevel: '4',
-      x: String((next - 1) % 8),
-      y: String(Math.floor((next - 1) / 8)),
+  // Dynamic filter option lists
+  const warehouses = ['Bãi tập kết chính (Main Yard)', 'Bãi kết cấu phụ (Aux Yard)']
+  const projectCodes = useMemo(() => {
+    const set = new Set<string>()
+    slots.forEach((s) => {
+      s.placements.forEach((p) => {
+        if (p.itemCode) set.add(p.itemCode.split('-')[0])
+      })
     })
-  }
+    return Array.from(set)
+  }, [slots])
 
-  async function submitZoneForm() {
-    if (!zoneForm?.code.trim() || !zoneForm.name.trim()) return
-    const zone = await createZone.mutateAsync({
-      code: zoneForm.code.trim(),
-      name: zoneForm.name.trim(),
-      description: zoneForm.description.trim() || undefined,
-      status: 'ACTIVE',
-      originX: 0,
-      originY: 0,
-      width: Number(zoneForm.width) || 24,
-      height: Number(zoneForm.height) || 18,
-      color: zoneForm.color || '#06b6d4',
-    }) as YardZoneRuntime
-    setZoneForm(null)
-    setSelectedZoneId(zone.id)
-    navigate('/yard/map-2d')
-  }
+  // Contextual Slot filtering
+  const filteredSlots = useMemo(() => {
+    return slots.filter((slot) => {
+      const matchSearch =
+        !search ||
+        `${slot.code} ${slot.zone.name} ${slot.zone.code} ${slot.placements.map((p) => p.itemCode).join(' ')}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
 
-  async function submitSlotForm() {
-    if (!slotForm?.zoneId || !slotForm.code.trim()) return
-    await createSlot.mutateAsync({
-      zoneId: slotForm.zoneId,
-      code: slotForm.code.trim(),
-      status: 'AVAILABLE',
-      x: Number(slotForm.x) || 0,
-      y: Number(slotForm.y) || 0,
-      width: 1,
-      height: 1,
-      maxStackLevel: Number(slotForm.maxStackLevel) || 4,
+      const matchZone = zoneFilter === 'ALL' || slot.zone.code === zoneFilter || slot.zone.id === zoneFilter
+      const matchStatus = statusFilter === 'ALL' || slot.status === statusFilter
+      const matchProject =
+        projectFilter === 'ALL' || slot.placements.some((p) => p.itemCode?.startsWith(projectFilter))
+
+      return matchSearch && matchZone && matchStatus && matchProject
     })
-    setSelectedZoneId(slotForm.zoneId)
-    setSlotForm(null)
-    navigate('/yard/map-2d')
-  }
+  }, [slots, search, zoneFilter, statusFilter, projectFilter])
+
+  const pageSize = 14
+  const pagedSlots = filteredSlots.slice((page - 1) * pageSize, page * pageSize)
+
+  useEffect(() => {
+    setPage(1)
+  }, [filteredSlots.length, search, zoneFilter, statusFilter, projectFilter])
 
   const movementsToday = dashboardData?.movementToday ?? 0
   const overloadedZones = dashboardData?.overloadedZoneCount ?? 0
-  const movementTrend: number[] = []
-  const stat = [
-    [Warehouse, 'Occupied Slots', metrics?.occupiedSlots ?? 0, `${metrics?.totalSlots ?? 0} slot`, 'blue'],
-    [MapPinned, 'Available Capacity', Math.max(0, (metrics?.totalSlots ?? 0) - (metrics?.occupiedSlots ?? 0)), 'slot trống', 'cyan'],
-    [Boxes, 'Components In Yard', metrics?.placements ?? 0, 'cấu kiện', 'emerald'],
-    [Activity, 'Movements Today', movementsToday, 'yard_movements', 'purple'],
-    [Radio, 'Overloaded Zones', overloadedZones, '>= 90% capacity', overloadedZones ? 'red' : 'amber'],
-  ] as const
   const emptySlots = Math.max(0, (metrics?.totalSlots ?? 0) - (metrics?.occupiedSlots ?? 0))
+
   const movementSegments = [
     { label: 'Nhập bãi', value: normalizedMovementCounts?.place ?? 0, color: '#14c987' },
     { label: 'Di chuyển', value: normalizedMovementCounts?.move ?? 0, color: '#1d7cff' },
@@ -291,35 +262,143 @@ export function YardPage() {
       breadcrumbs={['Vận hành', 'Bãi tập kết']}
       tabs={yardTabs.map(([id, label, path]) => ({ id, label, path }))}
       activeTab={tab}
-      actions={<>
-              <button onClick={openCreateZone} className={mutedButton}>+ Zone</button>
-              <button onClick={() => openCreateSlot()} className={mutedButton}>+ Slot</button>
-              <button onClick={() => setOperation('inbound')} className={primaryButton}>+ Nhập bãi</button>
-              <button onClick={() => setOperation('outbound')} className={mutedButton}>Xuất bãi</button>
-              <button onClick={() => setOperation('transfer')} className={mutedButton}>+ Chuyển nội bộ</button>
-            </>}
     >
-
-        {/* Unified 5-column grid KPI Strip with h-[108px] cards */}
-        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-5">
-          {stat.map(([Icon, label, value, note, tone]) => (
-            <YardKpiCard key={label} icon={Icon} label={label} value={value} note={note} tone={tone} />
-          ))}
+      <div className="space-y-2 text-xs -mt-2">
+        {/* Phase 1: ENTERPRISE KPI CARDS */}
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+          <EnterpriseKpiCard
+            title="Sức chứa bãi Tập kết"
+            value={`${metrics?.occupiedSlots ?? 0}/${metrics?.totalSlots ?? 0}`}
+            tone="blue"
+            icon={<Warehouse size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Sức chứa khả dụng"
+            value={`${emptySlots} slot trống`}
+            tone="cyan"
+            icon={<MapPinned size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Cấu kiện lưu bãi"
+            value={formatQuantity(metrics?.placements ?? 0, 0)}
+            tone="emerald"
+            icon={<Boxes size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Giao dịch bãi hôm nay"
+            value={formatQuantity(movementsToday, 0)}
+            tone="purple"
+            icon={<Activity size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Zone quá tải (>=90%)"
+            value={formatQuantity(overloadedZones, 0)}
+            tone={overloadedZones ? 'red' : 'amber'}
+            icon={<Radio size={15} />}
+          />
+          <EnterpriseKpiCard
+            title="Cầu trục vận hành"
+            value={`${metrics?.craneAvailableCount ?? 0}/${cranes.length}`}
+            tone="cyan"
+            icon={<Construction size={15} />}
+          />
         </div>
 
-        <ModuleFilterBar className="my-1">
-          <div className="flex min-w-72 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2 xl:col-span-5">
-            <Search size={15} className="text-cyan-400" />
-            <input className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-slate-500" placeholder="Tìm vị trí, cấu kiện, zone..." />
-          </div>
-          <button className={`${mutedButton} xl:col-span-1`}>Tất cả zone</button>
-          <button className={`${mutedButton} xl:col-span-1`}>Tất cả trạng thái</button>
-          <button className={`${mutedButton} xl:col-span-1`}>Lớp hiển thị</button>
-          <button className={`${mutedButton} xl:col-span-1`}>Làm mới</button>
-        </ModuleFilterBar>
+        {/* Phase 3: COMPACT TOOLBAR */}
+        <EnterprisePanel className="rounded-xl -mt-1">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_110px_110px]">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setPage(1)
+              }}
+              placeholder="Tìm mã slot, tên zone, mã cấu kiện, dự án..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
 
-        {/* Unified Analytics Widget Grid using gap-1, h-[170px] cards, and h-[74px] charts */}
-        <section className="mb-1 grid gap-1 grid-cols-1 md:grid-cols-3">
+            <select
+              value={warehouseFilter}
+              onChange={(e) => {
+                setWarehouseFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả bãi tập kết</option>
+              {warehouses.map((w) => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+
+            <select
+              value={zoneFilter}
+              onChange={(e) => {
+                setZoneFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả Zone</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.code}>{z.code} · {z.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="AVAILABLE">AVAILABLE (Sẵn sàng)</option>
+              <option value="OCCUPIED">OCCUPIED (Đang dùng)</option>
+              <option value="BLOCKED">BLOCKED (Tạm khóa)</option>
+            </select>
+
+            <select
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value)
+                setPage(1)
+              }}
+              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="ALL">Tất cả dự án</option>
+              {projectCodes.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setPage(1)}
+              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            >
+              Tìm kiếm
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('')
+                setWarehouseFilter('ALL')
+                setZoneFilter('ALL')
+                setStatusFilter('ALL')
+                setProjectFilter('ALL')
+                setPage(1)
+              }}
+              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Làm mới
+            </button>
+          </div>
+        </EnterprisePanel>
+
+        {/* Phase 2: ANALYTICS DASHBOARD WIDGETS */}
+        <section className="grid gap-1 grid-cols-1 md:grid-cols-3">
           <CockpitChartCard title="Sức chứa bãi" heightClass="h-[170px]" chartHeightClass="h-[74px]">
             <YardDonut centerValue={`${metrics?.occupancyRate ?? 0}%`} centerLabel="Occupancy" segments={slotSegments} />
           </CockpitChartCard>
@@ -327,13 +406,114 @@ export function YardPage() {
             <YardDonut centerValue={formatQuantity(dashboardData?.movementMonth ?? 0, 0)} centerLabel="giao dịch" segments={movementSegments} />
           </CockpitChartCard>
           <CockpitChartCard title="Biến động bãi" heightClass="h-[170px]" chartHeightClass="h-[74px]" action={<span className="text-[10px] text-slate-500">Tháng này</span>}>
-            <YardMiniTrend values={movementTrend} tone="emerald" />
+            <YardMiniTrend values={[]} tone="emerald" />
           </CockpitChartCard>
         </section>
 
-        {/* Main content grid using gap-1 */}
-        <div className="grid gap-1 xl:grid-cols-[1fr_330px]">
-          <section className="space-y-1">
+        {/* Phase 4: HERO TABLE & TAB WORKSPACE */}
+        <div className={`grid ${inventoryGridGap} xl:grid-cols-12`}>
+          <div className="xl:col-span-8 space-y-1">
+            <EnterprisePanel className="rounded-xl">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách vị trí Slot bãi tập kết (Yard Slots)</h3>
+                  <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+                    {filteredSlots.length} slot bãi
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedModalOpen(true)}
+                  className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+                >
+                  Xem tất cả
+                </button>
+              </div>
+
+              <div className="h-[380px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+                <table className="w-full min-w-[900px] table-fixed text-sm border-collapse">
+                  <thead
+                    className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                    style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                  >
+                    <tr>
+                      {['Vị trí Slot', 'Zone', 'Tầng khả dụng', 'Cấu kiện lưu bãi', 'Khối lượng (tấn)', 'Trạng thái', 'Thao tác'].map(
+                        (header, idx) => (
+                          <th
+                            key={header}
+                            className={`px-2 py-2 text-xs font-semibold text-slate-300 ${idx === 6 ? 'text-right' : 'text-left'}`}
+                          >
+                            {header}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedSlots.map((slot) => (
+                      <tr
+                        key={slot.id}
+                        onClick={() => {
+                          setSelectedSlotId(slot.id)
+                          setSelectedZoneId(slot.zone.id)
+                        }}
+                        className={`${inventoryTableRow} cursor-pointer`}
+                      >
+                        <td className="px-2 py-1.5 font-mono font-semibold text-cyan-300 text-xs">{slot.code}</td>
+                        <td className="px-2 py-1.5 text-white truncate font-medium">{slot.zone.name}</td>
+                        <td className="px-2 py-1.5 font-mono text-slate-300 text-xs">
+                          {slot.currentStackLevel}/{slot.maxStackLevel} tầng
+                        </td>
+                        <td className="px-2 py-1.5 text-slate-300 text-xs truncate">
+                          {slot.placements.map((p) => p.itemCode).join(', ') || '—'}
+                        </td>
+                        <td className="px-2 py-1.5 font-mono text-slate-200 text-xs">
+                          {fmt(slot.placements.reduce((sum, p) => sum + Number(p.weight || 0), 0))}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <span
+                            className={`rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${
+                              slot.status === 'AVAILABLE'
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                                : slot.status === 'OCCUPIED'
+                                  ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
+                                  : 'border-red-500/30 bg-red-500/10 text-red-300'
+                            }`}
+                          >
+                            {slot.status}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDetailDrawerSlot(slot)
+                            }}
+                            className="inline-flex items-center gap-0.5 rounded bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/20 transition"
+                          >
+                            Chi tiết <ChevronRight size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!pagedSlots.length ? (
+                      <tr>
+                        <td colSpan={7} className="px-2 py-10">
+                          <ModuleEmptyState
+                            icon={<Warehouse size={18} />}
+                            title="Chưa có dữ liệu slot bãi"
+                            description="Không tìm thấy slot nào thỏa mãn điều kiện lọc hiện tại."
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+              <DataTablePagination page={page} pageSize={pageSize} total={filteredSlots.length} onPageChange={setPage} />
+            </EnterprisePanel>
+
             <YardTabWorkspace
               tab={tab}
               zones={zones}
@@ -348,56 +528,15 @@ export function YardPage() {
               onOpenZoneDetail={setZoneDetailId}
               onEditZone={editZone}
               onDeleteZone={removeZone}
-              onCreateZone={openCreateZone}
-              onCreateSlot={openCreateSlot}
+              onCreateZone={actions.openCreateZone}
+              onCreateSlot={actions.openCreateSlot}
               onOpenOperation={setOperation}
             />
-            {/* Drawers standard spacing: gap-1, space-y-1 */}
-            <div className="grid gap-1 lg:grid-cols-2">
-              <div className={`${panel} p-3 flex flex-col gap-y-1`}>
-                <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Chi tiết tầng · {selectedSlot?.code ?? '--'}</h2>
-                <div className="mt-1 grid grid-cols-4 gap-1">
-                  {Array.from({ length: selectedSlot?.maxStackLevel ?? 4 }, (_, index) => (
-                    <div
-                      key={index}
-                      className={`rounded-xl border p-2 text-center text-xs font-mono ${
-                        index < (selectedSlot?.currentStackLevel ?? 0)
-                          ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,0.12)]'
-                          : 'border-white/10 bg-white/[0.035] text-slate-500'
-                      }`}
-                    >
-                      L{index + 1}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-1 text-[11px] text-slate-500 font-mono">Đang dùng {selectedSlot?.currentStackLevel ?? 0}/{selectedSlot?.maxStackLevel ?? 0} tầng</div>
-              </div>
-              <div className={`${panel} p-3 flex flex-col gap-y-1`}>
-                <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Cấu kiện trong vị trí</h2>
-                <div className="mt-1 space-y-1">
-                  {selectedSlot?.placements.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setSelectedPlacementId(item.id)}
-                      className={`flex w-full justify-between rounded-xl border px-3 py-1.5 text-left text-xs transition ${
-                        selectedPlacement?.id === item.id
-                          ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-100'
-                          : 'border-white/10 bg-white/[0.035] text-slate-300 hover:border-cyan-400/40'
-                      }`}
-                    >
-                      <span className="text-cyan-300 font-mono">{item.itemCode}</span>
-                      <span className="font-mono tabular-nums">L{item.stackLevel} · {fmt(item.quantity)}</span>
-                    </button>
-                  ))}
-                  {!selectedSlot?.placements.length && <p className="text-xs text-slate-500 py-1">Vị trí đang trống.</p>}
-                </div>
-              </div>
-            </div>
-          </section>
+          </div>
 
-          <aside className="space-y-1">
-            <div className={`${panel} p-3 flex flex-col gap-y-1`}>
-              <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Thông tin vị trí</h2>
+          <aside className="space-y-1 xl:col-span-4">
+            <div className="rounded-xl border border-white/10 bg-[#08111f] p-3 flex flex-col gap-y-1">
+              <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Thông tin vị trí Slot</h2>
               <div className="mt-1 space-y-1 text-xs text-slate-400">
                 <div className="flex justify-between"><span>Zone</span><b className="text-slate-200">{selectedSlot?.zone.name ?? '--'}</b></div>
                 <div className="flex justify-between"><span>Vị trí</span><b className="text-cyan-300 font-mono">{selectedSlot?.code ?? '--'}</b></div>
@@ -405,7 +544,8 @@ export function YardPage() {
                 <div className="flex justify-between"><span>Cấu kiện</span><b className="text-slate-200 font-mono">{selectedSlot?.placements.length ?? 0}</b></div>
               </div>
             </div>
-            <div className={`${panel} p-3 flex flex-col gap-y-1`}>
+
+            <div className="rounded-xl border border-white/10 bg-[#08111f] p-3 flex flex-col gap-y-1">
               <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Chi tiết cấu kiện</h2>
               {selectedPlacement ? (
                 <div className="mt-1 space-y-1 text-xs text-slate-400">
@@ -418,19 +558,21 @@ export function YardPage() {
                 <p className="mt-1 text-xs text-slate-500 py-1">Chọn cấu kiện trên sơ đồ.</p>
               )}
             </div>
-            <div className={`${panel} p-3 flex flex-col gap-y-1`}>
-              <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Cầu trục</h2>
+
+            <div className="rounded-xl border border-white/10 bg-[#08111f] p-3 flex flex-col gap-y-1">
+              <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Cầu trục vận hành</h2>
               <div className="mt-1 space-y-1">
                 {cranes.slice(0, 4).map((crane) => (
                   <div key={crane.id} className="flex justify-between rounded-xl border border-white/10 bg-white/[0.035] px-3 py-1.5 text-xs text-slate-400">
                     <span className="flex gap-2"><Construction size={14} />{crane.code}</span>
-                    <span className="text-emerald-300">{crane.status}</span>
+                    <span className="text-emerald-300 font-semibold">{crane.status}</span>
                   </div>
                 ))}
                 {!cranes.length && <p className="text-xs text-slate-500 py-1">Chưa cấu hình cầu trục.</p>}
               </div>
             </div>
-            <div className={`${panel} p-3 flex flex-col gap-y-1`}>
+
+            <div className="rounded-xl border border-white/10 bg-[#08111f] p-3 flex flex-col gap-y-1">
               <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Hoạt động gần đây</h2>
               <div className="mt-1 space-y-2">
                 {movements.slice(0, 5).map((item) => (
@@ -443,64 +585,185 @@ export function YardPage() {
             </div>
           </aside>
         </div>
-        <footer className={`${panel} mt-1 flex flex-wrap gap-5 p-3 text-xs text-slate-400`}>
+
+        <footer className="rounded-xl border border-white/10 bg-[#08111f] mt-1 flex flex-wrap gap-5 p-3 text-xs text-slate-400">
           <span><Truck size={14} className="mr-1 inline text-cyan-400"/> Luồng bãi realtime</span>
           <span>Occupied {metrics?.occupiedSlots ?? 0}/{metrics?.totalSlots ?? 0}</span>
           <span className="text-emerald-400">Cập nhật 5 giây/lần</span>
         </footer>
-        <YardOperationDialog mode={operation ?? 'inbound'} open={Boolean(operation)} onClose={() => setOperation(undefined)} slots={slots} cranes={cranes} components={components}/>
-        <YardZoneDetailDialog zoneId={zoneDetailId} slots={slots} selectedSlotId={selectedSlotId} onSelectSlot={(id) => setSelectedSlotId(id)} onClose={() => setZoneDetailId(undefined)} />
-        {zoneForm ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-2xl overflow-hidden ${panel}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div><h2 className="text-base font-semibold">Tạo zone bãi</h2><p className="mt-1 text-xs text-slate-500">Zone sẽ hiển thị ngay trên sơ đồ 2D và nhận slot mới.</p></div>
-              <button type="button" onClick={() => setZoneForm(null)} className={mutedButton}>Đóng</button>
-            </div>
-            <div className="grid gap-3 p-5 md:grid-cols-2">
-              <input value={zoneForm.code} onChange={(event) => setZoneForm({ ...zoneForm, code: event.target.value })} className={input} placeholder="Mã zone" />
-              <input value={zoneForm.name} onChange={(event) => setZoneForm({ ...zoneForm, name: event.target.value })} className={input} placeholder="Tên zone" />
-              <input value={zoneForm.width} onChange={(event) => setZoneForm({ ...zoneForm, width: event.target.value })} className={input} placeholder="Chiều rộng sơ đồ" type="number" />
-              <input value={zoneForm.height} onChange={(event) => setZoneForm({ ...zoneForm, height: event.target.value })} className={input} placeholder="Chiều cao sơ đồ" type="number" />
-              <input value={zoneForm.color} onChange={(event) => setZoneForm({ ...zoneForm, color: event.target.value })} className={input} placeholder="Màu zone" type="color" />
-              <textarea value={zoneForm.description} onChange={(event) => setZoneForm({ ...zoneForm, description: event.target.value })} className={`${input} h-24 py-2 md:col-span-2`} placeholder="Ghi chú zone" />
-            </div>
-            <footer className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
-              <button type="button" onClick={() => setZoneForm(null)} className={mutedButton}>Hủy</button>
-              <button type="button" onClick={submitZoneForm} disabled={createZone.isPending} className={primaryButton}>{createZone.isPending ? 'Đang tạo...' : 'Tạo zone'}</button>
-            </footer>
-          </div>
-        </div> : null}
-        {slotForm ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-2xl overflow-hidden ${panel}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div><h2 className="text-base font-semibold">Tạo slot trong bãi</h2><p className="mt-1 text-xs text-slate-500">Slot mới sẽ được dùng để chuyển thành phẩm từ sản xuất/QC ra bãi.</p></div>
-              <button type="button" onClick={() => setSlotForm(null)} className={mutedButton}>Đóng</button>
-            </div>
-            <div className="grid gap-3 p-5 md:grid-cols-2">
-              <select value={slotForm.zoneId} onChange={(event) => {
-                const zone = zones.find((item) => item.id === event.target.value)
-                const next = slots.filter((slot) => slot.zone.id === event.target.value).length + 1
-                setSlotForm({ ...slotForm, zoneId: event.target.value, code: makeSlotCode(zone, next) })
-              }} className={input}>
-                <option value="">Chọn zone</option>
-                {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}
-              </select>
-              <input value={slotForm.code} onChange={(event) => setSlotForm({ ...slotForm, code: event.target.value })} className={input} placeholder="Mã slot" />
-              <input value={slotForm.maxStackLevel} onChange={(event) => setSlotForm({ ...slotForm, maxStackLevel: event.target.value })} className={input} placeholder="Số tầng tối đa" type="number" min={1} />
-              <div className="grid grid-cols-2 gap-3">
-                <input value={slotForm.x} onChange={(event) => setSlotForm({ ...slotForm, x: event.target.value })} className={input} placeholder="Tọa độ X" type="number" />
-                <input value={slotForm.y} onChange={(event) => setSlotForm({ ...slotForm, y: event.target.value })} className={input} placeholder="Tọa độ Y" type="number" />
-              </div>
-              <div className="rounded border border-slate-800 bg-[#050d18] p-3 text-xs text-slate-400 md:col-span-2">
-                Slot trạng thái mặc định là <b className="text-emerald-300">AVAILABLE</b>; khi sản xuất chuyển thành phẩm ra bãi, dropdown sẽ thấy slot này nếu còn tầng trống.
-              </div>
-            </div>
-            <footer className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
-              <button type="button" onClick={() => setSlotForm(null)} className={mutedButton}>Hủy</button>
-              <button type="button" onClick={submitSlotForm} disabled={createSlot.isPending || !slotForm.zoneId} className={primaryButton}>{createSlot.isPending ? 'Đang tạo...' : 'Tạo slot'}</button>
-            </footer>
-          </div>
-        </div> : null}
+
+        {/* Phase 5: EXPANDED TABLE MODAL */}
+        {expandedModalOpen
+          ? createPortal(
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div>
+                      <h2 className="text-base font-bold text-white">Toàn bộ vị trí Slot bãi tập kết (Yard Slots)</h2>
+                      <p className="text-xs text-slate-400">Tổng cộng {filteredSlots.length} slot bãi trong hệ thống</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedModalOpen(false)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+
+                  <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                    <table className="w-full min-w-[900px] text-xs table-fixed border-collapse">
+                      <thead
+                        className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                        style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                      >
+                        <tr>
+                          {['Vị trí Slot', 'Zone', 'Tầng khả dụng', 'Cấu kiện lưu bãi', 'Khối lượng (tấn)', 'Trạng thái', 'Thao tác'].map(
+                            (header, idx) => (
+                              <th
+                                key={header}
+                                className={`px-2 py-2 text-left font-semibold text-slate-300 ${idx === 6 ? 'text-right' : ''}`}
+                              >
+                                {header}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSlots.map((slot) => (
+                          <tr
+                            key={slot.id}
+                            onClick={() => {
+                              setSelectedSlotId(slot.id)
+                              setSelectedZoneId(slot.zone.id)
+                              setExpandedModalOpen(false)
+                            }}
+                            className={`${inventoryTableRow} cursor-pointer`}
+                          >
+                            <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{slot.code}</td>
+                            <td className="px-2 py-2 text-white font-medium truncate">{slot.zone.name}</td>
+                            <td className="px-2 py-2 font-mono text-slate-300">
+                              {slot.currentStackLevel}/{slot.maxStackLevel} tầng
+                            </td>
+                            <td className="px-2 py-2 text-slate-300 truncate">
+                              {slot.placements.map((p) => p.itemCode).join(', ') || '—'}
+                            </td>
+                            <td className="px-2 py-2 font-mono text-slate-200">
+                              {fmt(slot.placements.reduce((sum, p) => sum + Number(p.weight || 0), 0))}
+                            </td>
+                            <td className="px-2 py-2">
+                              <span
+                                className={`rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${
+                                  slot.status === 'AVAILABLE'
+                                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                                    : slot.status === 'OCCUPIED'
+                                      ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
+                                      : 'border-red-500/30 bg-red-500/10 text-red-300'
+                                }`}
+                              >
+                                {slot.status}
+                              </span>
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDetailDrawerSlot(slot)
+                                  setExpandedModalOpen(false)
+                                }}
+                                className="inline-flex items-center gap-0.5 rounded bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/20 transition"
+                              >
+                                Chi tiết <ChevronRight size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <DataTablePagination page={page} pageSize={pageSize} total={filteredSlots.length} onPageChange={setPage} />
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
+
+        {/* Phase 6: DETAIL DRAWER */}
+        <YardDetailDrawer slot={detailDrawerSlot} onClose={() => setDetailDrawerSlot(null)} />
+
+        <YardOperationDialog
+          mode={operation ?? 'inbound'}
+          open={Boolean(operation)}
+          onClose={() => setOperation(undefined)}
+          slots={slots}
+          cranes={cranes}
+          components={components}
+        />
+        <YardZoneDetailDialog
+          zoneId={zoneDetailId}
+          slots={slots}
+          selectedSlotId={selectedSlotId}
+          onSelectSlot={(id) => setSelectedSlotId(id)}
+          onClose={() => setZoneDetailId(undefined)}
+        />
+      </div>
     </EnterpriseWorkspace>
+  )
+}
+
+function YardDetailDrawer({ slot, onClose }: { slot: YardSlotRuntime | null; onClose: () => void }) {
+  if (!slot) return null
+
+  return (
+    <ModuleDetailDrawer
+      open={Boolean(slot)}
+      onClose={onClose}
+      title={`Vị trí Slot ${slot.code}`}
+      subtitle={`Thuộc Zone: ${slot.zone.name} (${slot.zone.code})`}
+      size="md"
+    >
+      <div className="space-y-3 text-sm text-slate-300">
+        <section className="grid gap-2 md:grid-cols-2">
+          <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2">
+            <p className="text-[11px] text-slate-500">Mã Slot</p>
+            <p className="mt-1 text-sm text-white font-semibold font-mono">{slot.code}</p>
+          </div>
+          <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2">
+            <p className="text-[11px] text-slate-500">Zone tập kết</p>
+            <p className="mt-1 text-sm text-white font-medium">{slot.zone.name}</p>
+          </div>
+          <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2">
+            <p className="text-[11px] text-slate-500">Sức chứa tầng</p>
+            <p className="mt-1 text-sm text-white font-medium font-mono">{slot.currentStackLevel}/{slot.maxStackLevel} tầng</p>
+          </div>
+          <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2">
+            <p className="text-[11px] text-slate-500">Trạng thái Slot</p>
+            <p className="mt-1 text-sm text-emerald-400 font-semibold">{slot.status}</p>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2">
+          <h3 className="text-sm font-semibold text-white">Danh sách cấu kiện đang lưu giữ ({slot.placements.length})</h3>
+          <div className="space-y-1.5">
+            {slot.placements.map((item) => (
+              <div key={item.id} className="flex justify-between items-center rounded-xl border border-white/10 bg-white/5 p-2 text-xs">
+                <div>
+                  <div className="text-cyan-300 font-mono font-semibold">{item.itemCode}</div>
+                  <div className="text-slate-400 text-[10px]">{item.itemName || item.itemType}</div>
+                </div>
+                <div className="text-right font-mono">
+                  <div className="text-white">Tầng L{item.stackLevel}</div>
+                  <div className="text-slate-400 text-[10px]">{fmt(item.weight)} tấn</div>
+                </div>
+              </div>
+            ))}
+            {!slot.placements.length && <ModuleEmptyState title="Slot đang trống" description="Chưa có cấu kiện xếp chồng tại slot này." />}
+          </div>
+        </section>
+      </div>
+    </ModuleDetailDrawer>
   )
 }

@@ -1,5 +1,45 @@
 # Project Status
 
+On 2026-07-24 completed **SPRINT INVENTORY.3 – Inventory Audit Enterprise UI Standardization**. Standardized the Inventory Audit workspace (`/inventory/audit`) across all 6 Enterprise layout phases with global topbar actions, 6 Enterprise KPIs, 4 CockpitChartCards, compact toolbar, hero table with sticky headers & `[Xem tất cả]`, expanded portal modal, and slide-over detail drawer. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **SPRINT INVENTORY.2 – Inventory Transactions Enterprise UI Standardization**. Standardized the Inventory Transactions workspace (`/inventory/transactions`) across all 6 Enterprise layout phases with global topbar actions, 6 Enterprise KPIs, 4 CockpitChartCards, compact toolbar, hero table with sticky headers & `[Xem tất cả]`, expanded portal modal, and slide-over detail drawer. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **SPRINT DISPATCH.1 – Dispatch Overview Enterprise Workspace Standardization**. Moved primary action `+ Tạo điều xe` to global AppTopbar via `DispatchActionProvider`. Standardized Dispatch Overview (`/logistics`) across all 6 Enterprise Design System layout phases. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Sprint QC.5, QC.6, QC.7, QC.8 UI Polish Sprint**. Standardized NCR, CAPA, Audit Logs, and QC Reports workspaces (`/qc/ncr`, `/qc/capa`, `/qc/logs`, `/qc/reports`) across all 6 Enterprise Design System layout phases. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Sprint QC.2, QC.3, QC.4 UI Polish Sprint**. Standardized 3 QC inspection tabs (`/qc/inbound`, `/qc/production`, `/qc/final`) across all 6 Enterprise Design System layout phases. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **QC Overview UI Polish Sprint**. Standardized QC Overview (`/qc`) across all 6 Enterprise Design System layout phases. Moved primary action `+ Tạo phiếu kiểm tra cấu kiện` to global AppTopbar via `QCActionProvider`. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Suppliers Quality, Finance, Activity & Reports UI Polish Sprint**. Standardized 4 Suppliers secondary tabs (`/suppliers/quality`, `/suppliers/payables`, `/suppliers/logs`, `/suppliers/reports`) across all 6 Enterprise Design System layout phases. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Suppliers Business Tabs UI Polish Sprint**. Standardized 3 Suppliers business tabs (`/suppliers/quotes`, `/suppliers/purchase-orders`, `/suppliers/deliveries`) across all 6 Enterprise Design System layout phases. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Suppliers Overview UI Polish Sprint**. Standardized Suppliers Overview (`/suppliers`) to match the Enterprise Design System and Inventory Overview layout sequence. Moved primary action `+ Thêm nhà cung cấp` to global AppTopbar using `SuppliersActionProvider` and aligned all 6 layout phases. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Restore Hero Table View All Pattern Sprint**. Restored standard `[Xem tất cả]` header button and Expanded Modals in Hero Tables for both Project Components (`/projects/components`) and Project Materials (`/projects/materials`). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Project Components & Materials Tabs Standardization Sprint**. Standardized both Project Components (`/projects/components`) and Project Materials (`/projects/materials`) tabs across all 6 phases (`EnterpriseKpiCard` strip, compact toolbar with search icon & dropdowns, sticky Hero Table with count pill, pagination, and side widgets). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Progress Tab Standardization Sprint**. Standardized Project Progress tab (`/projects/progress`) section sequence (KPI Cards → Compact Toolbar → Hero Table → Progress Analytics & Risk Alert Widgets). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Project List Tab Standardization Sprint**. Standardized Project List tab (`/projects/list`) section sequence (KPI Cards → Compact Toolbar → Hero Table → Summary Analytics Widgets). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Projects Toolbar Position Fix**. Fixed Projects Overview (`/projects`) section order to position Compact Toolbar (`FilterBar`) immediately after the Analytics Dashboard and above the Hero Table, moving secondary overview widgets below the Hero Table. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Restore Search Input Sprint**. Restored visual Search Input with search icon in Projects Overview (`/projects`) toolbar. Restored exact Enterprise toolbar control sequence (Search Input → Status ▼ → Customer ▼ → PM ▼ → Region/Type ▼ → `[Tìm kiếm]` → `[Làm mới]`). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Projects Layout Alignment Sprint**. Re-ordered Projects Overview (`/projects`) layout to place the Compact Toolbar (`FilterBar`) immediately below the Analytics Dashboard and above the Hero Table (Header → KPI Cards → Analytics → Toolbar → Hero Table → Expanded Modal → Detail Drawer). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Shared Project Form Sprint**. Consolidated all project creation and editing UI into a single `ProjectFormDialog` component supporting `mode="create"` and `mode="edit"`. Both `+ Thêm công trình` and `"Sửa công trình"` use the same dialog managed by `ProjectsActionContext`. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Projects Overview UI Polish Sprint**. Primary creation action `+ Thêm công trình` moved to `AppTopbar` via `ProjectsGlobalActionBar` and `ProjectsActionProvider`. Standardized Projects Overview (`/projects`) across all 6 phases (`EnterpriseKpiCard` strip, `CockpitChartCard` analytics, compact toolbar with dropdowns for Status, Customer, Manager, Type/Region, sticky Hero Table with count pill, expanded table modal via `createPortal`, and detail drawer). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Yard Module UI Polish Sprint**. Standardized all remaining 6 Yard pages (`Yard 2D Map`, `Yard 3D Map`, `Heatmap`, `Timeline`, `Movement History`, `Reports / Locations / Tracking`) across all 6 phases. Header actions strictly maintain `+ Nhập bãi` (Primary), `Xuất bãi` (Secondary), and `Khác ▼` dropdown menu via `YardActionProvider` and `YardGlobalActionBar` in `AppTopbar`. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-24 completed **Yard Overview UI Polish Sprint**. Standardized Yard Overview (`/yard`) across all 6 phases (`EnterpriseKpiCard` strip, `CockpitChartCard` analytics, compact toolbar with dropdowns for Warehouse, Zone, Status, Project, sticky Hero Table with count pill, expanded table modal via `createPortal`, and detail drawer). Header actions moved to `AppTopbar` via `YardGlobalActionBar` and `YardActionProvider` containing `+ Nhập bãi` (Primary), `Xuất bãi` (Secondary), and `Khác ▼` dropdown menu (`Quản lý Zone`, `Quản lý Slot`, `Chuyển nội bộ`). Both frontend and backend builds compile with 0 errors.
+
 On 2026-07-24 completed **Planning Overview Action Provider Fix Sprint**. Wrapped `OperationalShell` with `PlanningActionProvider` so `AppTopbar` has access to `PlanningActionContext`. Clicking `+ Lập kế hoạch mới` in `AppTopbar` now triggers `CreatePlanModal` mounted via `createPortal(..., document.body)`. Removed all duplicate creation buttons across local headers, hero tables, toolbars, and tab content.
 
 On 2026-07-24 completed **Planning Overview UI Polish Sprint**. The primary creation action `+ Lập kế hoạch mới` was moved to the page header topbar via `PlanningActionContext` and `PlanningGlobalActionBar`. The Planning Overview page (`/planning`) was standardized across all 6 phases (`EnterpriseKpiCard` strip, `CockpitChartCard` analytics, compact toolbar with dropdowns for Status, Project, Customer, Month, sticky Hero Table with count pill, expanded table modal via `createPortal`, and detail drawer). Both frontend and backend builds compile with 0 errors.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3,
@@ -18,7 +19,9 @@ import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
+import { EnterprisePanel } from '@/shared/ui/enterprise-components'
 import { ModuleDetailDrawer, moduleInput, moduleMutedButton, modulePrimaryButton } from '@/shared/ui/modules'
+import { inventoryGridGap, inventoryTableHead, inventoryTableRow } from '@/modules/inventory/components/InventoryVisuals'
 import {
   CockpitChartCard,
   CockpitEmptyState,
@@ -27,7 +30,9 @@ import {
   CockpitStatusList,
   CockpitTableShell,
   DataTablePagination,
+  EnterpriseKpiCard,
 } from '@/shared/ui/cockpit'
+import { useProjectsActions } from '../context/ProjectsActionContext'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format'
 import { invalidateInventoryReadState } from '../../inventory/hooks/invalidateInventoryReadState'
@@ -105,12 +110,16 @@ const tabs: Array<{ id: ProjectTab; label: string; path: string }> = [
 const componentStatusOptions: Array<'ALL' | ProjectComponentStatus> = ['ALL', 'STOCK', 'READY', 'SHIPPED', 'DELIVERED', 'INSTALLED']
 
 export function ProjectsPage() {
+  const projectActions = useProjectsActions()
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [managerFilter, setManagerFilter] = useState('all')
+  const [regionFilter, setRegionFilter] = useState('all')
   const [selectedProject, setSelectedProject] = useState<ProjectRuntimeRow | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [editProject, setEditProject] = useState<ProjectRuntimeRow | null>(null)
@@ -305,17 +314,51 @@ export function ProjectsPage() {
 
   const runtime = data ?? emptyRuntime()
   const currentTab = tabs.find((item) => item.path === location.pathname)?.id ?? 'overview'
+  const customerList = useMemo(() => Array.from(new Set(runtime.projects.map((p) => p.owner))).filter(Boolean), [runtime.projects])
+  const managerList = useMemo(() => Array.from(new Set(runtime.projects.map((p) => (p as any).manager || (p as any).pm))).filter(Boolean), [runtime.projects])
+
   const rows = useMemo(() => runtime.projects.filter((project) => {
     if (status !== 'all' && project.status !== status) return false
     if (type !== 'all' && project.type !== type) return false
+    if (customerFilter !== 'all' && project.owner !== customerFilter) return false
+    if (managerFilter !== 'all' && (project as any).manager !== managerFilter) return false
     return `${project.code} ${project.name} ${project.owner} ${project.location}`.toLowerCase().includes(query.toLowerCase())
-  }), [query, runtime.projects, status, type])
+  }), [query, runtime.projects, status, type, customerFilter, managerFilter])
+
   const projectTypes = Array.from(new Set(runtime.projects.map((project) => project.type))).filter(Boolean)
   const pendingComponentId = deliverMutation.isPending
     ? deliverMutation.variables ?? null
     : installMutation.isPending
       ? installMutation.variables?.id ?? null
       : null
+
+  const filterBarNode = (
+    <FilterBar
+      query={query}
+      status={status}
+      type={type}
+      projectTypes={projectTypes}
+      customerFilter={customerFilter}
+      managerFilter={managerFilter}
+      regionFilter={regionFilter}
+      customerList={customerList}
+      managerList={managerList}
+      onQuery={setQuery}
+      onStatus={setStatus}
+      onType={setType}
+      onCustomer={setCustomerFilter}
+      onManager={setManagerFilter}
+      onRegion={setRegionFilter}
+      onReset={() => {
+        setQuery('')
+        setStatus('all')
+        setType('all')
+        setCustomerFilter('all')
+        setManagerFilter('all')
+        setRegionFilter('all')
+      }}
+    />
+  )
 
   return (
     <EnterpriseWorkspace
@@ -325,19 +368,13 @@ export function ProjectsPage() {
       breadcrumbs={['Điều hành', 'Dự án']}
       tabs={tabs}
       activeTab={currentTab}
-      actions={<div className="flex shrink-0 gap-1">
-            <button type="button" onClick={() => setCreateOpen(true)} className={primaryButton}>+ Thêm công trình</button>
-            <button type="button" className={mutedButton}>Xuất Excel</button>
-          </div>}
     >
-
-        <FilterBar query={query} status={status} type={type} projectTypes={projectTypes} onQuery={setQuery} onStatus={setStatus} onType={setType} />
         {isLoading ? <CockpitEmptyState title="Đang tải dữ liệu công trình" description="Dữ liệu sẽ xuất hiện khi API trả kết quả." /> : null}
         {isError ? <CockpitEmptyState title="Không tải được dữ liệu công trình" description="Kiểm tra backend Projects API và trạng thái migration trước khi thao tác tiếp." /> : null}
         {templatesError && currentTab === 'templates' ? <CockpitEmptyState title="Không tải được template" description="Template Library sẽ hiển thị sau khi API /projects/templates hoạt động." /> : null}
 
-        {currentTab === 'overview' && <OverviewTab runtime={runtime} rows={rows} status={status} onStatus={setStatus} onOpen={setSelectedProject} />}
-        {currentTab === 'list' && <ProjectListTab runtime={runtime} rows={rows} onOpen={setSelectedProject} />}
+        {currentTab === 'overview' && <OverviewTab runtime={runtime} rows={rows} status={status} onStatus={setStatus} onOpen={setSelectedProject} filterBar={filterBarNode} />}
+        {currentTab === 'list' && <ProjectListTab runtime={runtime} rows={rows} onOpen={setSelectedProject} filterBar={filterBarNode} />}
         {currentTab === 'templates' && (
           <ProjectTemplatesTab
             templates={templates}
@@ -349,7 +386,7 @@ export function ProjectsPage() {
             onDefault={(template) => defaultTemplateMutation.mutate(template.id)}
           />
         )}
-        {currentTab === 'progress' && <ProgressTab runtime={runtime} rows={rows} onOpen={setSelectedProject} />}
+        {currentTab === 'progress' && <ProgressTab runtime={runtime} rows={rows} onOpen={setSelectedProject} filterBar={filterBarNode} />}
         {currentTab === 'components' && (
           <ProjectComponentsTab
             rows={filterComponents(runtime.components, rows)}
@@ -389,7 +426,7 @@ export function ProjectsPage() {
           savingWbs={createWbsMutation.isPending || updateWbsMutation.isPending || moveWbsMutation.isPending || deleteWbsMutation.isPending}
           savingSite={siteUpdateMutation.isPending}
           onClose={() => setSelectedProject(null)}
-          onEditProject={setEditProject}
+          onEditProject={(project) => projectActions.openEditProject(project)}
           onReturnMaterial={setReturnMaterialTarget}
           onOpenPendingReturn={setPendingReturnTarget}
           onReturnComponent={setReturnComponentTarget}
@@ -401,8 +438,6 @@ export function ProjectsPage() {
           onBulkWbs={(payload) => selectedProject ? bulkWbsMutation.mutate({ projectId: selectedProject.id, payload }) : undefined}
           onSiteUpdate={(payload) => selectedProject ? siteUpdateMutation.mutate({ projectId: selectedProject.id, payload }) : undefined}
         />
-        <CreateProjectDialog open={createOpen} templates={templates} saving={createMutation.isPending} error={createMutation.error} onClose={() => setCreateOpen(false)} onSubmit={(payload) => createMutation.mutate(payload)} />
-        <EditProjectDialog project={editProject} templates={templates} saving={updateProjectMutation.isPending} onClose={() => setEditProject(null)} onSubmit={(id, payload) => updateProjectMutation.mutate({ id, payload })} />
         <TemplateEditorDialog
           template={templateEditor}
           saving={createTemplateMutation.isPending || updateTemplateMutation.isPending}
@@ -434,30 +469,133 @@ export function ProjectsPage() {
   )
 }
 
-function FilterBar({ query, status, type, projectTypes, onQuery, onStatus, onType }: { query: string; status: string; type: string; projectTypes: string[]; onQuery: (value: string) => void; onStatus: (value: string) => void; onType: (value: string) => void }) {
+function FilterBar({
+  query,
+  status,
+  type,
+  projectTypes,
+  customerFilter,
+  managerFilter,
+  regionFilter,
+  customerList,
+  managerList,
+  onQuery,
+  onStatus,
+  onType,
+  onCustomer,
+  onManager,
+  onRegion,
+  onReset,
+}: {
+  query: string
+  status: string
+  type: string
+  projectTypes: string[]
+  customerFilter: string
+  managerFilter: string
+  regionFilter: string
+  customerList: string[]
+  managerList: string[]
+  onQuery: (value: string) => void
+  onStatus: (value: string) => void
+  onType: (value: string) => void
+  onCustomer: (value: string) => void
+  onManager: (value: string) => void
+  onRegion: (value: string) => void
+  onReset: () => void
+}) {
   return (
-    <section className="grid grid-cols-1 gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1 md:grid-cols-12">
-      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/65 px-3 md:col-span-6">
-        <Search size={15} className="text-cyan-400" />
-        <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Tìm kiếm công trình, chủ đầu tư, địa điểm..." className="h-9 w-full bg-transparent text-xs text-slate-100 outline-none" />
+    <EnterprisePanel className="rounded-xl -mt-1">
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_110px_110px]">
+        <div className="relative flex items-center">
+          <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+          <input
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder="Tìm mã dự án, tên công trình, địa điểm..."
+            className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+          />
+        </div>
+
+        <select
+          value={status}
+          onChange={(e) => onStatus(e.target.value)}
+          className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+        >
+          <option value="all">Tất cả trạng thái</option>
+          <option value="ACTIVE">Đang thi công (ACTIVE)</option>
+          <option value="PLANNING">Chưa khởi công (PLANNING)</option>
+          <option value="COMPLETED">Hoàn thành (COMPLETED)</option>
+          <option value="ON_HOLD">Tạm dừng (ON_HOLD)</option>
+        </select>
+
+        <select
+          value={customerFilter}
+          onChange={(e) => onCustomer(e.target.value)}
+          className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+        >
+          <option value="all">Tất cả chủ đầu tư</option>
+          {customerList.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+
+        <select
+          value={managerFilter}
+          onChange={(e) => onManager(e.target.value)}
+          className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+        >
+          <option value="all">Tất cả PM</option>
+          {managerList.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+
+        <select
+          value={type}
+          onChange={(e) => onType(e.target.value)}
+          className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+        >
+          <option value="all">Tất cả loại dự án</option>
+          {projectTypes.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={() => {}}
+          className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+        >
+          Tìm kiếm
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+        >
+          Làm mới
+        </button>
       </div>
-      <select value={status} onChange={(event) => onStatus(event.target.value)} className={`${input} md:col-span-3`}>
-        <option value="all">Trạng thái: Tất cả</option>
-        <option value="ACTIVE">Đang thi công</option>
-        <option value="PLANNING">Chưa khởi công</option>
-        <option value="COMPLETED">Hoàn thành</option>
-        <option value="ON_HOLD">Tạm dừng</option>
-      </select>
-      <select value={type} onChange={(event) => onType(event.target.value)} className={`${input} md:col-span-2`}>
-        <option value="all">Loại: Tất cả</option>
-        {projectTypes.map((item) => <option key={item} value={item}>{item}</option>)}
-      </select>
-      <button type="button" className={`${mutedButton} md:col-span-1`}>Làm mới</button>
-    </section>
+    </EnterprisePanel>
   )
 }
 
-function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; status: string; onStatus: (value: string) => void; onOpen: (row: ProjectRuntimeRow) => void }) {
+function OverviewTab({
+  runtime,
+  rows,
+  status,
+  onStatus,
+  onOpen,
+  filterBar,
+}: {
+  runtime: ProjectsRuntime
+  rows: ProjectRuntimeRow[]
+  status: string
+  onStatus: (value: string) => void
+  onOpen: (row: ProjectRuntimeRow) => void
+  filterBar?: ReactNode
+}) {
   const completedSoon = [...rows].filter((row) => row.status !== 'COMPLETED' && row.progress >= 80).sort((a, b) => b.progress - a.progress)
   const delayed = rows.filter((row) => isDelayed(row))
   const recent = [...rows]
@@ -466,15 +604,10 @@ function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: Pro
 
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
+      {/* Phase 1: Enterprise KPI Cards */}
       <KpiStrip runtime={runtime} delayed={delayed.length} status={status} onStatus={onStatus} />
-      <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
-        <ProjectTable rows={rows} onOpen={onOpen} />
-        <div className="space-y-1">
-          <StatusWidget runtime={runtime} />
-          <ProgressWidget rows={rows} />
-          <ValueWidget rows={rows} />
-        </div>
-      </div>
+
+      {/* Phase 2: Analytics Dashboard */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="Tiến độ theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
           <ProjectLineChart series={buildProgressSeries(rows)} />
@@ -489,6 +622,21 @@ function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: Pro
           <CockpitStatusList items={riskRows(runtime.health)} emptyMessage="Không có rủi ro nổi bật." />
         </CockpitChartCard>
       </div>
+
+      {/* Phase 3: Compact Toolbar */}
+      {filterBar}
+
+      {/* Phase 4: Hero Table */}
+      <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
+        <ProjectTable rows={rows} onOpen={onOpen} />
+        <div className="space-y-1">
+          <StatusWidget runtime={runtime} />
+          <ProgressWidget rows={rows} />
+          <ValueWidget rows={rows} />
+        </div>
+      </div>
+
+      {/* Secondary Overview Widgets */}
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-3">
         <CockpitChartCard title="Công trình sắp hoàn thành" heightClass="h-[170px]" chartHeightClass="h-[98px]">
           <CockpitStatusList items={completedSoon.slice(0, 4).map((row) => ({ id: row.id, label: row.name, value: `${fmt(row.progress)}%`, statusTone: 'emerald' }))} emptyMessage="Chưa có công trình nào trên 80%." />
@@ -506,22 +654,75 @@ function OverviewTab({ runtime, rows, status, onStatus, onOpen }: { runtime: Pro
 
 function KpiStrip({ runtime, delayed, status, onStatus }: { runtime: ProjectsRuntime; delayed: number; status?: string; onStatus?: (value: string) => void }) {
   const m = runtime.metrics
+  const totalProjects = m.totalProjects || runtime.projects.length
+  const activeProjects = m.activeProjects || runtime.projects.filter(p => p.status === 'ACTIVE').length
+  const completedProjects = m.completedProjects || runtime.projects.filter(p => p.status === 'COMPLETED').length
+  const contractVal = m.contractValue || m.actualValue
+  const avgCompletion = m.contractValue ? Math.round((m.actualValue / m.contractValue) * 100) : 0
+
   return (
-    <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-5">
-      <CockpitKpiCard title="Tổng công trình" value={fmt(m.totalProjects, 0)} note="Tất cả công trình" tone="cyan" active={!status || status === 'all'} onClick={onStatus ? () => onStatus('all') : undefined} trend={projectTrend(m.totalProjects)} />
-      <CockpitKpiCard title="Đang triển khai" value={fmt(m.activeProjects, 0)} note="ACTIVE" tone="emerald" active={status === 'ACTIVE'} onClick={onStatus ? () => onStatus('ACTIVE') : undefined} trend={projectTrend(m.activeProjects)} />
-      <CockpitKpiCard title="Hoàn thành" value={fmt(m.completedProjects, 0)} note="COMPLETED" tone="purple" active={status === 'COMPLETED'} onClick={onStatus ? () => onStatus('COMPLETED') : undefined} trend={projectTrend(m.completedProjects)} />
-      <CockpitKpiCard title="Quá hạn tiến độ" value={fmt(delayed, 0)} note="Cần rà soát" tone={delayed ? 'red' : 'emerald'} trend={projectTrend(delayed)} />
-      <CockpitKpiCard title="Giá trị thực hiện" value={formatCurrencyVnd(m.actualValue)} note={`${fmt(m.contractValue ? (m.actualValue / m.contractValue) * 100 : 0)}% hợp đồng`} tone="blue" trend={projectTrend(m.actualValue)} />
+    <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+      <EnterpriseKpiCard
+        title="Tổng số công trình"
+        value={formatQuantity(totalProjects, 0)}
+        tone="blue"
+        icon={<Building2 size={15} />}
+      />
+      <EnterpriseKpiCard
+        title="Đang triển khai"
+        value={formatQuantity(activeProjects, 0)}
+        tone="emerald"
+        icon={<Clock size={15} />}
+      />
+      <EnterpriseKpiCard
+        title="Hoàn thành"
+        value={formatQuantity(completedProjects, 0)}
+        tone="purple"
+        icon={<CheckCircle2 size={15} />}
+      />
+      <EnterpriseKpiCard
+        title="Chậm tiến độ / Rủi ro"
+        value={formatQuantity(delayed, 0)}
+        tone={delayed ? 'red' : 'emerald'}
+        icon={<CalendarClock size={15} />}
+      />
+      <EnterpriseKpiCard
+        title="Giá trị hợp đồng"
+        value={formatCurrencyVnd(contractVal)}
+        tone="cyan"
+        icon={<TrendingUp size={15} />}
+      />
+      <EnterpriseKpiCard
+        title="Tỷ lệ hoàn thành TB"
+        value={`${avgCompletion}%`}
+        tone="blue"
+        icon={<BarChart3 size={15} />}
+      />
     </div>
   )
 }
 
-function ProjectListTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
+function ProjectListTab({
+  runtime,
+  rows,
+  onOpen,
+  filterBar,
+}: {
+  runtime: ProjectsRuntime
+  rows: ProjectRuntimeRow[]
+  onOpen: (row: ProjectRuntimeRow) => void
+  filterBar?: ReactNode
+}) {
   const delayed = rows.filter((row) => isDelayed(row))
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
+      {/* Phase 1: Enterprise KPI Cards */}
       <KpiStrip runtime={runtime} delayed={delayed.length} />
+
+      {/* Phase 3: Compact Toolbar */}
+      {filterBar}
+
+      {/* Phase 4: Hero Table */}
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
         <ProjectTable rows={rows} onOpen={onOpen} />
         <div className="space-y-1">
@@ -534,6 +735,8 @@ function ProjectListTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; r
           </CockpitChartCard>
         </div>
       </div>
+
+      {/* Phase 2: Analytics & Summary Widgets */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <ProgressWidget rows={rows} />
         <ValueWidget rows={rows} />
@@ -641,50 +844,168 @@ function ProjectTemplatesTab({
 
 function ProjectTable({ rows, onOpen }: { rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
   const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const pageSize = 16
   useEffect(() => setPage(1), [rows])
   const paged = rows.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3">
-      <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-white">Danh sách công trình</h2>
-        <span className="text-xs text-slate-500">{formatQuantity(rows.length, 0)} công trình</span>
+    <EnterprisePanel className="rounded-xl">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách công trình & dự án</h3>
+          <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">
+            {rows.length} công trình
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpandedModalOpen(true)}
+          className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+        >
+          Xem tất cả
+        </button>
       </div>
-      <CockpitTableShell className="h-[520px]">
-        <table className="w-full min-w-[1150px] table-fixed text-sm">
-          <thead className={tableHead}>
-            <tr>{['Mã', 'Tên công trình', 'Khách hàng', 'Địa điểm', 'Loại', 'Giá trị', 'Tiến độ', 'Cấu kiện', 'Trạng thái', 'Kết thúc'].map((heading) => <th key={heading} className="px-1.5 py-1 text-left font-medium">{heading}</th>)}</tr>
+
+      <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+        <table className="w-full min-w-[1150px] table-fixed text-sm border-collapse">
+          <thead
+            className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+            style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+          >
+            <tr>
+              {['Mã dự án', 'Tên công trình', 'Chủ đầu tư / Khách hàng', 'Địa điểm', 'Loại', 'Giá trị (VNĐ)', 'Tiến độ', 'Cấu kiện', 'Trạng thái', 'Kết thúc'].map(
+                (heading) => (
+                  <th key={heading} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">
+                    {heading}
+                  </th>
+                ),
+              )}
+            </tr>
           </thead>
           <tbody>
             {paged.map((row) => (
-              <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}>
-                <td className="truncate px-1.5 py-2 font-mono text-cyan-300">{row.code}</td>
-                <td className="truncate px-1.5 py-2 text-white">{row.name}</td>
-                <td className="truncate px-1.5 py-2">{row.owner}</td>
-                <td className="truncate px-1.5 py-2">{row.location}</td>
-                <td className="truncate px-1.5 py-2">{row.type}</td>
-                <td className="truncate px-1.5 py-2 text-right font-mono tabular-nums text-cyan-300">{compactMoney(row.contractValue)}</td>
-                <td className="px-1.5 py-2"><Progress value={row.progress} /></td>
-                <td className="truncate px-1.5 py-2 text-right font-mono tabular-nums">{formatQuantity(row.componentCount, 0)}</td>
-                <td className="px-1.5 py-2"><StatusBadge status={row.status} /></td>
-                <td className="truncate px-1.5 py-2 text-slate-400">{date(row.plannedEndAt)}</td>
+              <tr key={row.id} onClick={() => onOpen(row)} className={`${inventoryTableRow} cursor-pointer`}>
+                <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.code}</td>
+                <td className="px-2 py-2 text-white font-medium truncate">{row.name}</td>
+                <td className="px-2 py-2 text-slate-300 truncate">{row.owner || '—'}</td>
+                <td className="px-2 py-2 text-slate-300 truncate">{row.location || '—'}</td>
+                <td className="px-2 py-2 text-slate-300 text-xs">{row.type}</td>
+                <td className="px-2 py-2 font-mono text-cyan-300 text-xs tabular-nums">{compactMoney(row.contractValue)}</td>
+                <td className="px-2 py-2"><Progress value={row.progress} /></td>
+                <td className="px-2 py-2 font-mono text-slate-200 text-xs text-right tabular-nums">{formatQuantity(row.componentCount, 0)}</td>
+                <td className="px-2 py-2"><StatusBadge status={row.status} /></td>
+                <td className="px-2 py-2 text-slate-400 text-xs truncate">{date(row.plannedEndAt)}</td>
               </tr>
             ))}
+            {!paged.length ? (
+              <tr>
+                <td colSpan={10} className="px-2 py-10">
+                  <CockpitEmptyState
+                    title="Chưa có dữ liệu công trình"
+                    description="Không tìm thấy công trình nào thỏa mãn điều kiện lọc hiện tại."
+                    icon={<Building2 size={18} />}
+                  />
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
-        {!paged.length ? <CockpitEmptyState title="Chưa có công trình" description="Dữ liệu sẽ xuất hiện khi tạo hoặc import công trình." icon={<Building2 size={18} />} /> : null}
-      </CockpitTableShell>
+      </div>
       <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
-    </section>
+
+      {/* Phase 5: EXPANDED TABLE MODAL */}
+      {expandedModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách công trình & dự án</h2>
+                    <p className="text-xs text-slate-400">Tổng cộng {rows.length} công trình trong hệ thống</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedModalOpen(false)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1150px] text-xs table-fixed border-collapse">
+                    <thead
+                      className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                      style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                    >
+                      <tr>
+                        {['Mã dự án', 'Tên công trình', 'Chủ đầu tư / Khách hàng', 'Địa điểm', 'Loại', 'Giá trị (VNĐ)', 'Tiến độ', 'Cấu kiện', 'Trạng thái', 'Kết thúc'].map(
+                          (heading) => (
+                            <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">
+                              {heading}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => {
+                            onOpen(row)
+                            setExpandedModalOpen(false)
+                          }}
+                          className={`${inventoryTableRow} cursor-pointer`}
+                        >
+                          <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.code}</td>
+                          <td className="px-2 py-2 text-white font-medium truncate">{row.name}</td>
+                          <td className="px-2 py-2 text-slate-300 truncate">{row.owner || '—'}</td>
+                          <td className="px-2 py-2 text-slate-300 truncate">{row.location || '—'}</td>
+                          <td className="px-2 py-2 text-slate-300">{row.type}</td>
+                          <td className="px-2 py-2 font-mono text-cyan-300 tabular-nums">{compactMoney(row.contractValue)}</td>
+                          <td className="px-2 py-2"><Progress value={row.progress} /></td>
+                          <td className="px-2 py-2 font-mono text-slate-200 text-right tabular-nums">{formatQuantity(row.componentCount, 0)}</td>
+                          <td className="px-2 py-2"><StatusBadge status={row.status} /></td>
+                          <td className="px-2 py-2 text-slate-400 truncate">{date(row.plannedEndAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <DataTablePagination page={page} pageSize={pageSize} total={rows.length} onPageChange={setPage} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </EnterprisePanel>
   )
 }
 
-function ProgressTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows: ProjectRuntimeRow[]; onOpen: (row: ProjectRuntimeRow) => void }) {
+function ProgressTab({
+  runtime,
+  rows,
+  onOpen,
+  filterBar,
+}: {
+  runtime: ProjectsRuntime
+  rows: ProjectRuntimeRow[]
+  onOpen: (row: ProjectRuntimeRow) => void
+  filterBar?: ReactNode
+}) {
   const delayed = rows.filter((row) => isDelayed(row))
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
+      {/* Phase 1: Enterprise KPI Cards */}
       <KpiStrip runtime={runtime} delayed={delayed.length} />
+
+      {/* Phase 3: Compact Toolbar */}
+      {filterBar}
+
+      {/* Phase 4: Hero Table */}
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
         <ProjectTable rows={rows} onOpen={onOpen} />
         <div className="space-y-1">
@@ -696,6 +1017,16 @@ function ProgressTab({ runtime, rows, onOpen }: { runtime: ProjectsRuntime; rows
             <StatusMiniBars rows={runtime.reports.byStatus.map((row) => [statusLabel(row.status), row.count])} />
           </CockpitChartCard>
         </div>
+      </div>
+
+      {/* Phase 2: Progress Analytics */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
+        <CockpitChartCard title="Tiến độ theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <ProjectLineChart series={buildProgressSeries(rows)} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Cảnh báo & Rủi ro" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={riskRows(runtime.health)} emptyMessage="Không có rủi ro nổi bật." />
+        </CockpitChartCard>
       </div>
     </div>
   )
@@ -715,71 +1046,282 @@ function MaterialsTab({
   onOpenPendingReturn: (row: ProjectMaterialRuntime) => void
 }) {
   const [projectId, setProjectId] = useState('all')
+  const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const pageSize = 15
-  const filtered = rows.filter((row) => projectId === 'all' || row.projectId === projectId)
+
+  const filtered = rows.filter((row) => {
+    if (projectId !== 'all' && row.projectId !== projectId) return false
+    if (query.trim()) {
+      const q = query.toLowerCase()
+      return (
+        row.materialCode?.toLowerCase().includes(q) ||
+        row.materialName?.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
   const returnableRows = filtered.filter((row) => Number(row.availableReturnQuantity ?? 0) > 0)
-  useEffect(() => setPage(1), [projectId, rows])
+  useEffect(() => setPage(1), [projectId, query, rows])
+
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
   const allocated = filtered.reduce((sum, row) => sum + Number(row.allocatedQuantity ?? 0), 0)
   const pendingReturn = filtered.reduce((sum, row) => sum + Number(row.pendingReturnQuantity ?? 0), 0)
   const returned = filtered.reduce((sum, row) => sum + Number(row.returnedQuantity ?? 0), 0)
-  const value = filtered.reduce((sum, row) => sum + Math.abs(row.totalAmount), 0)
+  const availableReturn = filtered.reduce((sum, row) => sum + Number(row.availableReturnQuantity ?? 0), 0)
+  const totalValue = filtered.reduce((sum, row) => sum + Math.abs(row.totalAmount), 0)
 
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
-      <div className="flex flex-wrap gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1">
-        <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={input}>
-          <option value="all">Tất cả công trình</option>
-          {projects.map((project) => <option key={project.id} value={project.id}>{project.code} · {project.name}</option>)}
-        </select>
-        <button type="button" className={primaryButton}>Xuất vật tư</button>
-        <button type="button" onClick={() => returnableRows[0] ? onReturn(returnableRows[0]) : toast('Không còn vật tư có thể trả')} className={mutedButton}>Trả vật tư</button>
+      {/* Phase 1: Enterprise KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard
+          title="Tổng dòng vật tư"
+          value={formatQuantity(filtered.length, 0)}
+          tone="blue"
+          icon={<PackageOpen size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Đã cấp phát (Allocated)"
+          value={formatQuantity(Math.abs(allocated), 0)}
+          tone="amber"
+          icon={<Layers size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Chờ nhận trả (Pending)"
+          value={formatQuantity(Math.abs(pendingReturn), 0)}
+          tone="purple"
+          icon={<Clock size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Đã nhận trả (Returned)"
+          value={formatQuantity(Math.abs(returned), 0)}
+          tone="emerald"
+          icon={<CheckCircle2 size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Khả dụng trả (Available)"
+          value={formatQuantity(Math.abs(availableReturn), 0)}
+          tone="cyan"
+          icon={<Building2 size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Tổng giá trị"
+          value={formatCurrencyVnd(totalValue)}
+          tone="blue"
+          icon={<TrendingUp size={15} />}
+        />
       </div>
-      <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-        <CockpitKpiCard title="Dòng vật tư" value={fmt(filtered.length, 0)} note="Giao dịch" tone="cyan" />
-        <CockpitKpiCard title="Allocated" value={fmt(Math.abs(allocated))} note="Đã cấp phát" tone="amber" />
-        <CockpitKpiCard title="Pending Return" value={fmt(Math.abs(pendingReturn))} note="Đang chờ nhận" tone="purple" />
-        <CockpitKpiCard title="Returned" value={fmt(Math.abs(returned))} note="Đã nhận trả" tone="emerald" />
-        <CockpitKpiCard title="Giá trị" value={formatCurrencyVnd(value)} note="Tổng giá trị" tone="blue" />
-      </div>
+
+      {/* Phase 3: Compact Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_220px_110px_110px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm mã vật tư, tên vật tư..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="all">Tất cả công trình</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code} · {project.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => {}}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('')
+              setProjectId('all')
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Phase 4: Hero Table */}
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
-        <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3">
-          <div className="mb-1 flex items-center justify-between"><h2 className="text-sm font-semibold">Vật tư công trình</h2><span className="text-xs text-slate-500">{formatQuantity(filtered.length, 0)} dòng</span></div>
-          <CockpitTableShell className="h-[520px]">
-            <table className="w-full min-w-[1150px] table-fixed text-sm">
-              <thead className={tableHead}><tr>{['Mã vật tư', 'Tên vật tư', 'Đơn vị', 'Allocated', 'Used', 'Pending Return', 'Returned', 'Available Return', 'Giá trị', 'Ngày', 'Thao tác'].map((heading) => <th key={heading} className="px-1.5 py-1 text-left font-medium">{heading}</th>)}</tr></thead>
-              <tbody>{paged.map((row) => <tr key={row.id} className={tableRow}>
-                <td className="truncate px-1.5 py-2 font-mono text-cyan-300">{row.materialCode}</td>
-                <td className="truncate px-1.5 py-2 text-white">{row.materialName}</td>
-                <td className="truncate px-1.5 py-2">{row.unit ?? '-'}</td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums">{fmt(row.allocatedQuantity ?? 0)}</td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums">{fmt(row.usedQuantity ?? 0)}</td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums text-amber-200">
-                  {Number(row.pendingReturnQuantity ?? 0) > 0 && row.projectId ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenPendingReturn(row)}
-                      className="underline decoration-amber-300/40 underline-offset-4 hover:text-amber-100"
-                      title={`${pendingReturnRequestsFor(row, returnRequests).length} phiếu trả đang liên quan`}
-                    >
-                      {fmt(row.pendingReturnQuantity ?? 0)}
-                    </button>
-                  ) : (
-                    fmt(row.pendingReturnQuantity ?? 0)
+        <EnterprisePanel className="rounded-xl">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Vật tư công trình</h3>
+              <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">
+                {filtered.length} dòng
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpandedModalOpen(true)}
+              className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+            >
+              Xem tất cả
+            </button>
+          </div>
+
+          <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+            <table className="w-full min-w-[1150px] table-fixed text-sm border-collapse">
+              <thead
+                className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+              >
+                <tr>
+                  {['Mã vật tư', 'Tên vật tư', 'Đơn vị', 'Allocated', 'Used', 'Pending Return', 'Returned', 'Available Return', 'Giá trị (VNĐ)', 'Ngày', 'Thao tác'].map(
+                    (heading) => (
+                      <th key={heading} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">
+                        {heading}
+                      </th>
+                    ),
                   )}
-                </td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums text-emerald-200">{fmt(row.returnedQuantity ?? 0)}</td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums text-cyan-200">{fmt(row.availableReturnQuantity ?? 0)}</td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums text-cyan-300">{formatCurrencyVnd(Math.abs(row.totalAmount))}</td>
-                <td className="truncate px-1.5 py-2 text-slate-400">{date(row.date)}</td>
-                <td className="px-1.5 py-2"><button type="button" disabled={Number(row.availableReturnQuantity ?? 0) <= 0} onClick={() => onReturn(row)} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200 disabled:cursor-not-allowed disabled:opacity-40">Trả</button></td>
-              </tr>)}</tbody>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((row) => (
+                  <tr key={row.id} className={`${inventoryTableRow}`}>
+                    <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.materialCode}</td>
+                    <td className="px-2 py-2 text-white font-medium truncate">{row.materialName}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs">{row.unit ?? '-'}</td>
+                    <td className="px-2 py-2 font-mono text-slate-200 text-xs text-right tabular-nums">{fmt(row.allocatedQuantity ?? 0)}</td>
+                    <td className="px-2 py-2 font-mono text-slate-200 text-xs text-right tabular-nums">{fmt(row.usedQuantity ?? 0)}</td>
+                    <td className="px-2 py-2 font-mono text-amber-300 text-xs text-right tabular-nums">
+                      {Number(row.pendingReturnQuantity ?? 0) > 0 && row.projectId ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenPendingReturn(row)}
+                          className="underline decoration-amber-300/40 underline-offset-4 hover:text-amber-100"
+                          title={`${pendingReturnRequestsFor(row, returnRequests).length} phiếu trả đang liên quan`}
+                        >
+                          {fmt(row.pendingReturnQuantity ?? 0)}
+                        </button>
+                      ) : (
+                        fmt(row.pendingReturnQuantity ?? 0)
+                      )}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-emerald-300 text-xs text-right tabular-nums">{fmt(row.returnedQuantity ?? 0)}</td>
+                    <td className="px-2 py-2 font-mono text-cyan-300 text-xs text-right tabular-nums">{fmt(row.availableReturnQuantity ?? 0)}</td>
+                    <td className="px-2 py-2 font-mono text-cyan-300 text-xs text-right tabular-nums">{formatCurrencyVnd(Math.abs(row.totalAmount))}</td>
+                    <td className="px-2 py-2 text-slate-400 text-xs truncate">{date(row.date)}</td>
+                    <td className="px-2 py-2">
+                      <button
+                        type="button"
+                        disabled={Number(row.availableReturnQuantity ?? 0) <= 0}
+                        onClick={() => onReturn(row)}
+                        className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40 transition"
+                      >
+                        Trả
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!paged.length ? (
+                  <tr>
+                    <td colSpan={11} className="px-2 py-10">
+                      <CockpitEmptyState
+                        title="Chưa có vật tư công trình"
+                        description="Các giao dịch Inventory có projectId sẽ hiển thị tại đây."
+                        icon={<PackageOpen size={18} />}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
             </table>
-            {!paged.length ? <CockpitEmptyState title="Chưa có vật tư công trình" description="Các giao dịch Inventory có projectId sẽ hiển thị tại đây." icon={<PackageOpen size={18} />} /> : null}
-          </CockpitTableShell>
+          </div>
           <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
-        </section>
+
+          {/* Phase 5: EXPANDED TABLE MODAL */}
+          {expandedModalOpen
+            ? createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <h2 className="text-base font-bold text-white">Toàn bộ vật tư công trình</h2>
+                        <p className="text-xs text-slate-400">Tổng cộng {filtered.length} dòng vật tư</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedModalOpen(false)}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                      >
+                        Đóng
+                      </button>
+                    </div>
+
+                    <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                      <table className="w-full min-w-[1150px] text-xs table-fixed border-collapse">
+                        <thead
+                          className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                          style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                        >
+                          <tr>
+                            {['Mã vật tư', 'Tên vật tư', 'Đơn vị', 'Allocated', 'Used', 'Pending Return', 'Returned', 'Available Return', 'Giá trị (VNĐ)', 'Ngày', 'Thao tác'].map(
+                              (heading) => (
+                                <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">
+                                  {heading}
+                                </th>
+                              ),
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map((row) => (
+                            <tr key={row.id} className={`${inventoryTableRow}`}>
+                              <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.materialCode}</td>
+                              <td className="px-2 py-2 text-white font-medium truncate">{row.materialName}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs">{row.unit ?? '-'}</td>
+                              <td className="px-2 py-2 font-mono text-slate-200 text-xs text-right tabular-nums">{fmt(row.allocatedQuantity ?? 0)}</td>
+                              <td className="px-2 py-2 font-mono text-slate-200 text-xs text-right tabular-nums">{fmt(row.usedQuantity ?? 0)}</td>
+                              <td className="px-2 py-2 font-mono text-amber-300 text-xs text-right tabular-nums">{fmt(row.pendingReturnQuantity ?? 0)}</td>
+                              <td className="px-2 py-2 font-mono text-emerald-300 text-xs text-right tabular-nums">{fmt(row.returnedQuantity ?? 0)}</td>
+                              <td className="px-2 py-2 font-mono text-cyan-300 text-xs text-right tabular-nums">{fmt(row.availableReturnQuantity ?? 0)}</td>
+                              <td className="px-2 py-2 font-mono text-cyan-300 text-xs text-right tabular-nums">{formatCurrencyVnd(Math.abs(row.totalAmount))}</td>
+                              <td className="px-2 py-2 text-slate-400 text-xs truncate">{date(row.date)}</td>
+                              <td className="px-2 py-2">
+                                <button
+                                  type="button"
+                                  disabled={Number(row.availableReturnQuantity ?? 0) <= 0}
+                                  onClick={() => {
+                                    onReturn(row)
+                                    setExpandedModalOpen(false)
+                                  }}
+                                  className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40 transition"
+                                >
+                                  Trả
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
+        </EnterprisePanel>
         <div className="space-y-1">
           <CockpitChartCard title="Top vật tư sử dụng" heightClass="h-[170px]" chartHeightClass="h-[98px]"><StatusMiniBars rows={topMaterials(filtered).map((row) => [row.label, row.value])} /></CockpitChartCard>
           <CockpitChartCard title="Giá trị theo nhóm" heightClass="h-[170px]" chartHeightClass="h-[98px]"><StatusMiniBars rows={topMaterialValue(filtered).map((row) => [row.label, row.value])} /></CockpitChartCard>
@@ -789,60 +1331,286 @@ function MaterialsTab({
   )
 }
 
-function ProjectComponentsTab({ rows, projects, pendingId, onDeliver, onInstall, onReturn, onOpen }: { rows: ProjectComponentRuntime[]; projects: ProjectRuntimeRow[]; pendingId: string | null; onDeliver: (row: ProjectComponentRuntime) => void; onInstall: (row: ProjectComponentRuntime) => void; onReturn: (row: ProjectComponentRuntime) => void; onOpen: (row: ProjectComponentRuntime) => void }) {
+function ProjectComponentsTab({
+  rows,
+  projects,
+  pendingId,
+  onDeliver,
+  onInstall,
+  onReturn,
+  onOpen,
+}: {
+  rows: ProjectComponentRuntime[]
+  projects: ProjectRuntimeRow[]
+  pendingId: string | null
+  onDeliver: (row: ProjectComponentRuntime) => void
+  onInstall: (row: ProjectComponentRuntime) => void
+  onReturn: (row: ProjectComponentRuntime) => void
+  onOpen: (row: ProjectComponentRuntime) => void
+}) {
   const [projectId, setProjectId] = useState('all')
   const [status, setStatus] = useState<'ALL' | ProjectComponentStatus>('ALL')
+  const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const pageSize = 15
-  const filtered = rows.filter((row) => (projectId === 'all' || row.projectId === projectId) && (status === 'ALL' || row.status === status))
+
+  const filtered = rows.filter((row) => {
+    if (projectId !== 'all' && row.projectId !== projectId) return false
+    if (status !== 'ALL' && row.status !== status) return false
+    if (query.trim()) {
+      const q = query.toLowerCase()
+      return (
+        row.code?.toLowerCase().includes(q) ||
+        row.name?.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
-  useEffect(() => setPage(1), [projectId, rows, status])
-  const count = (value: ProjectComponentStatus) => filtered.filter((row) => row.status === value).length
+  useEffect(() => setPage(1), [projectId, query, rows, status])
+  const count = (val: ProjectComponentStatus) => filtered.filter((row) => row.status === val).length
 
   return (
     <div className="w-full min-w-0 flex-1 space-y-1">
-      <div className="flex flex-wrap gap-1 rounded-2xl border border-cyan-300/15 bg-slate-950/45 p-1">
-        <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={input}>
-          <option value="all">Tất cả công trình</option>
-          {projects.map((project) => <option key={project.id} value={project.id}>{project.code} · {project.name}</option>)}
-        </select>
-        <select value={status} onChange={(event) => setStatus(event.target.value as 'ALL' | ProjectComponentStatus)} className={input}>
-          {componentStatusOptions.map((option) => <option key={option} value={option}>Trạng thái: {option}</option>)}
-        </select>
-        <button type="button" className={primaryButton}>Xuất cấu kiện</button>
-        <button type="button" onClick={() => filtered[0] ? onReturn(filtered[0]) : toast('Chưa chọn cấu kiện để trả')} className={mutedButton}>Trả cấu kiện</button>
+      {/* Phase 1: Enterprise KPI Cards */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard
+          title="Tổng cấu kiện"
+          value={formatQuantity(filtered.length, 0)}
+          tone="blue"
+          icon={<Layers size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="READY (Sẵn sàng)"
+          value={formatQuantity(count('READY'), 0)}
+          tone="emerald"
+          icon={<CheckCircle2 size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="SHIPPED (Đã xuất)"
+          value={formatQuantity(count('SHIPPED'), 0)}
+          tone="cyan"
+          icon={<Clock size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="DELIVERED (Đã giao)"
+          value={formatQuantity(count('DELIVERED'), 0)}
+          tone="purple"
+          icon={<PackageOpen size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="INSTALLED (Đã lắp)"
+          value={formatQuantity(count('INSTALLED'), 0)}
+          tone="amber"
+          icon={<Building2 size={15} />}
+        />
+        <EnterpriseKpiCard
+          title="Tỷ lệ lắp đặt"
+          value={`${filtered.length ? Math.round((count('INSTALLED') / filtered.length) * 100) : 0}%`}
+          tone="emerald"
+          icon={<TrendingUp size={15} />}
+        />
       </div>
-      <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
-        <CockpitKpiCard title="Tổng cấu kiện" value={fmt(filtered.length, 0)} note="Tất cả" tone="cyan" active={status === 'ALL'} onClick={() => setStatus('ALL')} />
-        <CockpitKpiCard title="READY" value={fmt(count('READY'), 0)} note="Sẵn sàng" tone="emerald" active={status === 'READY'} onClick={() => setStatus('READY')} />
-        <CockpitKpiCard title="SHIPPED" value={fmt(count('SHIPPED'), 0)} note="Đã xuất" tone="blue" active={status === 'SHIPPED'} onClick={() => setStatus('SHIPPED')} />
-        <CockpitKpiCard title="DELIVERED" value={fmt(count('DELIVERED'), 0)} note="Đã giao" tone="purple" active={status === 'DELIVERED'} onClick={() => setStatus('DELIVERED')} />
-        <CockpitKpiCard title="INSTALLED" value={fmt(count('INSTALLED'), 0)} note="Đã lắp" tone="amber" active={status === 'INSTALLED'} onClick={() => setStatus('INSTALLED')} />
-      </div>
+
+      {/* Phase 3: Compact Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_200px_200px_110px_110px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm mã cấu kiện, tên cấu kiện..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
+          </div>
+
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            <option value="all">Tất cả công trình</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code} · {project.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as 'ALL' | ProjectComponentStatus)}
+            className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+          >
+            {componentStatusOptions.map((option) => (
+              <option key={option} value={option}>
+                Trạng thái: {option}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => {}}
+            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+          >
+            Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('')
+              setProjectId('all')
+              setStatus('ALL')
+            }}
+            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EnterprisePanel>
+
+      {/* Phase 4: Hero Table */}
       <div className="grid grid-cols-1 gap-1 xl:grid-cols-[2fr_1fr]">
-        <section className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3">
-          <div className="mb-1 flex items-center justify-between"><h2 className="text-sm font-semibold">Cấu kiện công trình</h2><span className="text-xs text-slate-500">{formatQuantity(filtered.length, 0)} cấu kiện</span></div>
-          <CockpitTableShell className="h-[520px]">
-            <table className="w-full min-w-[1300px] table-fixed text-sm">
-              <thead className={tableHead}><tr>{['Mã cấu kiện', 'Tên cấu kiện', 'Trạng thái', 'Khối lượng', 'Ngày cấp', 'Hạng mục', 'Zone', 'Axis', 'Level', 'Position', 'Thao tác'].map((heading) => <th key={heading} className="px-1.5 py-1 text-left font-medium">{heading}</th>)}</tr></thead>
-              <tbody>{paged.map((row) => <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${tableRow}`}>
-                <td className="truncate px-1.5 py-2 font-mono text-cyan-300">{row.code}</td>
-                <td className="truncate px-1.5 py-2 text-white">{row.name}</td>
-                <td className="px-1.5 py-2"><ComponentStatusBadge status={row.status} /></td>
-                <td className="px-1.5 py-2 text-right font-mono tabular-nums">{formatCurrencyVnd(row.actualCost || row.estimatedCost)}</td>
-                <td className="truncate px-1.5 py-2">{date(row.plannedDate)}</td>
-                <td className="truncate px-1.5 py-2">{row.installZone ?? row.projectCode}</td>
-                <td className="truncate px-1.5 py-2">{row.installZone ?? '-'}</td>
-                <td className="truncate px-1.5 py-2">{row.installAxis ?? '-'}</td>
-                <td className="truncate px-1.5 py-2">{row.installLevel ?? '-'}</td>
-                <td className="truncate px-1.5 py-2">{row.installPosition ?? '-'}</td>
-                <td className="px-1.5 py-2"><ComponentProjectAction row={row} pending={pendingId === row.id} onDeliver={onDeliver} onInstall={onInstall} /></td>
-              </tr>)}</tbody>
+        <EnterprisePanel className="rounded-xl">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Cấu kiện công trình</h3>
+              <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">
+                {filtered.length} cấu kiện
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpandedModalOpen(true)}
+              className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+            >
+              Xem tất cả
+            </button>
+          </div>
+
+          <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+            <table className="w-full min-w-[1300px] table-fixed text-sm border-collapse">
+              <thead
+                className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+              >
+                <tr>
+                  {['Mã cấu kiện', 'Tên cấu kiện', 'Trạng thái', 'Khối lượng / Giá trị', 'Ngày cấp', 'Hạng mục', 'Zone', 'Axis', 'Level', 'Position', 'Thao tác'].map(
+                    (heading) => (
+                      <th key={heading} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">
+                        {heading}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((row) => (
+                  <tr key={row.id} onClick={() => onOpen(row)} className={`${inventoryTableRow} cursor-pointer`}>
+                    <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.code}</td>
+                    <td className="px-2 py-2 text-white font-medium truncate">{row.name}</td>
+                    <td className="px-2 py-2"><ComponentStatusBadge status={row.status} /></td>
+                    <td className="px-2 py-2 font-mono text-cyan-300 text-xs text-right tabular-nums">{formatCurrencyVnd(row.actualCost || row.estimatedCost)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.plannedDate)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installZone ?? row.projectCode}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installZone ?? '-'}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installAxis ?? '-'}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installLevel ?? '-'}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installPosition ?? '-'}</td>
+                    <td className="px-2 py-2">
+                      <ComponentProjectAction row={row} pending={pendingId === row.id} onDeliver={onDeliver} onInstall={onInstall} />
+                    </td>
+                  </tr>
+                ))}
+                {!paged.length ? (
+                  <tr>
+                    <td colSpan={11} className="px-2 py-10">
+                      <CockpitEmptyState
+                        title="Chưa có cấu kiện công trình"
+                        description="Cấu kiện có projectId sẽ hiển thị tại đây."
+                        icon={<Layers size={18} />}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
             </table>
-            {!paged.length ? <CockpitEmptyState title="Chưa có cấu kiện công trình" description="Cấu kiện có projectId sẽ hiển thị tại đây." icon={<Layers size={18} />} /> : null}
-          </CockpitTableShell>
+          </div>
           <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} />
-        </section>
+
+          {/* Phase 5: EXPANDED TABLE MODAL */}
+          {expandedModalOpen
+            ? createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <h2 className="text-base font-bold text-white">Toàn bộ danh sách cấu kiện công trình</h2>
+                        <p className="text-xs text-slate-400">Tổng cộng {filtered.length} cấu kiện</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedModalOpen(false)}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                      >
+                        Đóng
+                      </button>
+                    </div>
+
+                    <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+                      <table className="w-full min-w-[1300px] text-xs table-fixed border-collapse">
+                        <thead
+                          className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
+                          style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+                        >
+                          <tr>
+                            {['Mã cấu kiện', 'Tên cấu kiện', 'Trạng thái', 'Khối lượng / Giá trị', 'Ngày cấp', 'Hạng mục', 'Zone', 'Axis', 'Level', 'Position', 'Thao tác'].map(
+                              (heading) => (
+                                <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">
+                                  {heading}
+                                </th>
+                              ),
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map((row) => (
+                            <tr
+                              key={row.id}
+                              onClick={() => {
+                                onOpen(row)
+                                setExpandedModalOpen(false)
+                              }}
+                              className={`${inventoryTableRow} cursor-pointer`}
+                            >
+                              <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.code}</td>
+                              <td className="px-2 py-2 text-white font-medium truncate">{row.name}</td>
+                              <td className="px-2 py-2"><ComponentStatusBadge status={row.status} /></td>
+                              <td className="px-2 py-2 font-mono text-cyan-300 text-xs text-right tabular-nums">{formatCurrencyVnd(row.actualCost || row.estimatedCost)}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.plannedDate)}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installZone ?? row.projectCode}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installZone ?? '-'}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installAxis ?? '-'}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installLevel ?? '-'}</td>
+                              <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.installPosition ?? '-'}</td>
+                              <td className="px-2 py-2">
+                                <ComponentProjectAction row={row} pending={pendingId === row.id} onDeliver={onDeliver} onInstall={onInstall} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
+        </EnterprisePanel>
         <div className="space-y-1">
           <CockpitChartCard title="Cấu kiện theo trạng thái" heightClass="h-[170px]" chartHeightClass="h-[98px]"><StatusMiniBars rows={componentStatusOptions.filter((item) => item !== 'ALL').map((item) => [item, count(item)])} /></CockpitChartCard>
           <CockpitChartCard title="Cấu kiện theo hạng mục" heightClass="h-[170px]" chartHeightClass="h-[98px]"><StatusMiniBars rows={topComponentZones(filtered)} /></CockpitChartCard>
@@ -2232,148 +3000,6 @@ function TemplateEditorDialog({ template, saving, onClose, onSubmit }: { templat
           <button type="button" onClick={onClose} className={mutedButton}>Hủy</button>
           <button type="button" disabled={saving || !code.trim() || !name.trim()} onClick={submit} className={primaryButton}>{saving ? 'Đang lưu...' : 'Lưu template'}</button>
         </footer>
-      </section>
-    </div>
-  )
-}
-
-function CreateProjectDialog({ open, templates, saving, error, onClose, onSubmit }: { open: boolean; templates: ProjectTemplate[]; saving: boolean; error: unknown; onClose: () => void; onSubmit: (payload: { code: string; name: string; description?: string; status?: ProjectStatus; customerName?: string; location?: string; projectType?: string; startDate?: string | null; handoverDate?: string | null; contractValue?: number; templateId?: string }) => void }) {
-  const [code, setCode] = useState(nextLocalCode('CT'))
-  const [name, setName] = useState('')
-  const [owner, setOwner] = useState('')
-  const [location, setLocation] = useState('')
-  const [type, setType] = useState('Nhà xưởng')
-  const [status, setStatus] = useState<ProjectStatus>('PLANNING')
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
-  const [handoverDate, setHandoverDate] = useState('')
-  const [contractValue, setContractValue] = useState('')
-  const [templateId, setTemplateId] = useState('')
-  const [note, setNote] = useState('')
-  const publishedTemplates = templates.filter((template) => template.status === 'PUBLISHED')
-
-  useEffect(() => {
-    if (open) {
-      setCode(nextLocalCode('CT'))
-      setStartDate(new Date().toISOString().slice(0, 10))
-      setTemplateId(publishedTemplates.find((template) => template.isDefault)?.id ?? publishedTemplates[0]?.id ?? '')
-    }
-  }, [open, templates])
-
-  if (!open) return null
-
-  const submit = () => {
-    if (!code.trim() || !name.trim()) return
-    onSubmit({
-      code: code.trim(),
-      name: name.trim(),
-      status,
-      description: note.trim(),
-      customerName: owner.trim(),
-      location: location.trim(),
-      projectType: type.trim(),
-      startDate: startDate || null,
-      handoverDate: handoverDate || null,
-      contractValue: parseLocaleNumber(contractValue),
-      templateId: templateId || undefined,
-    })
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <section className="w-[min(920px,94vw)] overflow-hidden rounded-xl border border-cyan-900 bg-[#061321] text-slate-100 shadow-2xl">
-        <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4">
-          <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Low Data Entry</p><h2 className="mt-1 text-xl font-semibold">Tạo công trình từ template</h2></div>
-          <button type="button" onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
-        </header>
-        <div className="grid gap-1 p-5 md:grid-cols-2">
-          <Field label="Mã công trình"><input value={code} onChange={(event) => setCode(event.target.value)} className={`${input} w-full`} /></Field>
-          <Field label="Tên công trình"><input value={name} onChange={(event) => setName(event.target.value)} className={`${input} w-full`} placeholder="Nhà máy kết cấu thép..." /></Field>
-          <Field label="Khách hàng"><input value={owner} onChange={(event) => setOwner(event.target.value)} className={`${input} w-full`} /></Field>
-          <Field label="Địa điểm"><input value={location} onChange={(event) => setLocation(event.target.value)} className={`${input} w-full`} /></Field>
-          <Field label="Ngày khởi công"><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className={`${input} w-full`} /></Field>
-          <Field label="Ngày bàn giao"><input type="date" value={handoverDate} onChange={(event) => setHandoverDate(event.target.value)} className={`${input} w-full`} /></Field>
-          <Field label="Giá trị hợp đồng"><input value={contractValue} onFocus={() => setContractValue(String(parseLocaleNumber(contractValue) || ''))} onBlur={() => setContractValue(parseLocaleNumber(contractValue) ? formatCurrencyVnd(parseLocaleNumber(contractValue)).replace(' đ', '') : '')} onChange={(event) => setContractValue(event.target.value)} inputMode="decimal" className={`${input} w-full`} /></Field>
-          <Field label="Template"><select value={templateId} onChange={(event) => setTemplateId(event.target.value)} className={`${input} w-full`}><option value="">Không dùng template</option>{publishedTemplates.map((template) => <option key={template.id} value={template.id}>{template.isDefault ? '★ ' : ''}{template.code} · {template.name}</option>)}</select></Field>
-          <Field label="Loại"><select value={type} onChange={(event) => setType(event.target.value)} className={`${input} w-full`}>{['Nhà xưởng', 'Kho bãi', 'Tòa nhà', 'Hạ tầng', 'Văn phòng'].map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
-          <Field label="Trạng thái"><select value={status} onChange={(event) => setStatus(event.target.value as ProjectStatus)} className={`${input} w-full`}><option value="PLANNING">Chưa khởi công</option><option value="ACTIVE">Đang thi công</option><option value="ON_HOLD">Tạm dừng</option><option value="COMPLETED">Hoàn thành</option></select></Field>
-          <label className="text-xs text-slate-400 md:col-span-2">Ghi chú<textarea value={note} onChange={(event) => setNote(event.target.value)} className={`${input} mt-1 min-h-24 w-full py-2`} /></label>
-          {error ? <p className="rounded border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-200 md:col-span-2">Không thể tạo công trình. Vui lòng kiểm tra mã trùng hoặc dữ liệu nhập.</p> : null}
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
-          <button type="button" onClick={onClose} className={mutedButton}>Hủy</button>
-          <button type="button" disabled={saving || !code.trim() || !name.trim()} onClick={submit} className={primaryButton}>{saving ? 'Đang tạo...' : 'Tạo công trình'}</button>
-        </footer>
-      </section>
-    </div>
-  )
-}
-
-function EditProjectDialog({ project, templates, saving, onClose, onSubmit }: { project: ProjectRuntimeRow | null; templates: ProjectTemplate[]; saving: boolean; onClose: () => void; onSubmit: (id: string, payload: Partial<{ code: string; name: string; description?: string; status?: ProjectStatus; customerName?: string; location?: string; projectType?: string; startDate?: string | null; handoverDate?: string | null; contractValue?: number; templateId?: string }>) => void }) {
-  const [name, setName] = useState('')
-  const [owner, setOwner] = useState('')
-  const [location, setLocation] = useState('')
-  const [type, setType] = useState('')
-  const [status, setStatus] = useState<ProjectStatus>('PLANNING')
-  const [startDate, setStartDate] = useState('')
-  const [handoverDate, setHandoverDate] = useState('')
-  const [contractValue, setContractValue] = useState('')
-  const [templateId, setTemplateId] = useState('')
-  const [description, setDescription] = useState('')
-
-  useEffect(() => {
-    if (!project) return
-    setName(project.name)
-    setOwner(project.owner === '-' ? '' : project.owner)
-    setLocation(project.location === '-' ? '' : project.location)
-    setType(project.type === '-' ? '' : project.type)
-    setStatus(project.status)
-    setStartDate(toDateInput(project.startedAt))
-    setHandoverDate(toDateInput(project.plannedEndAt))
-    setContractValue(project.contractValue ? formatCurrencyVnd(project.contractValue).replace(' đ', '') : '')
-    setTemplateId('')
-    setDescription(project.description ?? '')
-  }, [project?.id])
-
-  if (!project) return null
-  const publishedTemplates = templates.filter((template) => template.status === 'PUBLISHED')
-  const submit = () => {
-    if (!name.trim()) return
-    onSubmit(project.id, {
-      name: name.trim(),
-      status,
-      description,
-      customerName: owner.trim(),
-      location: location.trim(),
-      projectType: type.trim(),
-      startDate: startDate || null,
-      handoverDate: handoverDate || null,
-      contractValue: parseLocaleNumber(contractValue),
-      templateId: templateId || undefined,
-    })
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <section className="w-[min(820px,90vw)] max-h-[90vh] overflow-hidden rounded-2xl border border-cyan-900 bg-[#061321] text-slate-100 shadow-2xl">
-        <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4">
-          <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Edit Project</p><h2 className="mt-1 text-xl font-semibold">Sửa công trình</h2><p className="mt-1 text-xs text-slate-500">{project.code}</p></div>
-          <button type="button" onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
-        </header>
-        <div className="max-h-[calc(90vh-136px)] overflow-y-auto p-5">
-          <div className="grid gap-1 md:grid-cols-2">
-            <Field label="Tên công trình"><input value={name} onChange={(event) => setName(event.target.value)} className={`${input} w-full`} /></Field>
-            <Field label="Khách hàng"><input value={owner} onChange={(event) => setOwner(event.target.value)} className={`${input} w-full`} /></Field>
-            <Field label="Địa điểm"><input value={location} onChange={(event) => setLocation(event.target.value)} className={`${input} w-full`} /></Field>
-            <Field label="Loại"><input value={type} onChange={(event) => setType(event.target.value)} className={`${input} w-full`} /></Field>
-            <Field label="Ngày khởi công"><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className={`${input} w-full`} /></Field>
-            <Field label="Ngày bàn giao"><input type="date" value={handoverDate} onChange={(event) => setHandoverDate(event.target.value)} className={`${input} w-full`} /></Field>
-            <Field label="Giá trị hợp đồng"><input value={contractValue} onFocus={() => setContractValue(String(parseLocaleNumber(contractValue) || ''))} onBlur={() => setContractValue(parseLocaleNumber(contractValue) ? formatCurrencyVnd(parseLocaleNumber(contractValue)).replace(' đ', '') : '')} onChange={(event) => setContractValue(event.target.value)} inputMode="decimal" className={`${input} w-full`} /></Field>
-            <Field label="Trạng thái"><select value={status} onChange={(event) => setStatus(event.target.value as ProjectStatus)} className={`${input} w-full`}><option value="PLANNING">Chưa khởi công</option><option value="ACTIVE">Đang thi công</option><option value="ON_HOLD">Tạm dừng</option><option value="COMPLETED">Hoàn thành</option></select></Field>
-            <Field label="Template"><select value={templateId} onChange={(event) => setTemplateId(event.target.value)} className={`${input} w-full`}><option value="">Không đổi / Không áp dụng</option>{publishedTemplates.map((template) => <option key={template.id} value={template.id}>{template.code} · {template.name}</option>)}</select></Field>
-            <label className="text-xs text-slate-400 md:col-span-2">Ghi chú<textarea value={description} onChange={(event) => setDescription(event.target.value)} className={`${input} mt-1 min-h-24 w-full py-2`} /></label>
-          </div>
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4"><button type="button" onClick={onClose} className={mutedButton}>Hủy</button><button type="button" disabled={saving || !name.trim()} onClick={submit} className={primaryButton}>{saving ? 'Đang lưu...' : 'Lưu công trình'}</button></footer>
       </section>
     </div>
   )

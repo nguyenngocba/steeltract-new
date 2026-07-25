@@ -1,5 +1,433 @@
 # SteelTrack AI Changelog
 
+## 2026-07-24 SPRINT INVENTORY.3 – Inventory Audit Enterprise UI Standardization
+
+Completed:
+
+- **Task 1: Global Actions Integration**:
+  - Bound audit actions (`+ Tạo phiên kiểm kê`, `Nhập kết quả`, `Đối chiếu tồn kho`, `Xuất báo cáo`, `Khóa phiên kiểm kê`) to `InventoryGlobalActionBar` mounted on AppTopbar for `/inventory` path routes.
+  - Removed duplicate local action buttons from local header and toolbar.
+
+- **Task 2: Standardize Inventory Audit Tab**:
+  - Rebuilt [InventoryAuditPage.tsx](file:///opt/projects/steeltrack/apps/frontend/src/modules/inventory/pages/tabs/InventoryAuditPage.tsx) across all 6 Enterprise layout phases:
+    1. **Header / Global Action**: Primary audit action `+ Tạo phiên kiểm kê` in global AppTopbar.
+    2. **6 Enterprise KPI Cards**: `Phiên kiểm kê`, `Đang kiểm kê`, `Hoàn thành`, `Chênh lệch tồn`, `Chờ xử lý`, `Giá trị chênh lệch`.
+    3. **Enterprise Analytics Dashboard**: 4 `CockpitChartCard` containers (`Tiến độ kiểm kê`, `Chênh lệch theo kho`, `Nguyên nhân chênh lệch`, `Hoạt động kiểm kê gần đây`).
+    4. **Compact Enterprise Toolbar**: Search Input with search icon, Kho, Phiên kiểm kê, Người kiểm kê, Trạng thái, Ngày, `[Tìm kiếm]`, `[Làm mới]`.
+    5. **Enterprise Hero Table**: Sticky Header, Count Badge (`{rows.length} vật tư audit`), **`[Xem tất cả]`** button opening Expanded Modal, pagination, and columns (`Mã vật tư`, `Tên vật tư`, `Kho`, `Tồn hệ thống`, `Đơn giá TB`, `Giá trị tồn`, `Phát sinh cuối`, `Trạng thái`, `Thao tác`).
+    6. **Enterprise Modal + Drawer**: Full-screen Expanded Modal via `createPortal(..., document.body)` + Slide-over `ModuleDetailDrawer` displaying audit details, warehouse, team, differences, attachments, timeline.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 SPRINT INVENTORY.2 – Inventory Transactions Enterprise UI Standardization
+
+Completed:
+
+- **Task 1: Global Actions Integration**:
+  - Registered transaction actions (`+ Nhập kho`, `+ Xuất kho`, `Khác...`) in `InventoryGlobalActionBar` mounted on AppTopbar for `/inventory` path routes.
+  - Removed duplicate local action buttons from local header and toolbar.
+
+- **Task 2: Standardize Inventory Transactions Tab**:
+  - Rebuilt [InventoryTransactionsPage.tsx](file:///opt/projects/steeltrack/apps/frontend/src/modules/inventory/pages/tabs/InventoryTransactionsPage.tsx) across all 6 Enterprise layout phases:
+    1. **Header / Global Action**: Primary actions in global AppTopbar (`+ Nhập kho`, `+ Xuất kho`, `+ Chuyển kho`).
+    2. **6 Enterprise KPI Cards**: `Tổng giao dịch`, `Nhập kho hôm nay`, `Xuất kho hôm nay`, `Chuyển kho`, `Điều chỉnh tồn`, `Tổng giá trị giao dịch`.
+    3. **Enterprise Analytics Dashboard**: 4 `CockpitChartCard` containers (`Xu hướng nhập / xuất kho theo thời gian`, `Giá trị giao dịch theo loại`, `Cơ cấu giao dịch`, `Giao dịch gần đây`).
+    4. **Compact Enterprise Toolbar**: Search Input with search icon, Loại GDC, Kho, NCC, Công trình, Ngày Từ - Đến, `[Tìm kiếm]`, `[Làm mới]`, `[Xuất CSV]`.
+    5. **Enterprise Hero Table**: Sticky Header, Count Badge (`{rows.length} giao dịch`), **`[Xem tất cả]`** button opening Expanded Modal, pagination, and columns (`Thời gian`, `Loại GDC`, `Số chứng từ`, `Mã vật tư`, `Kho`, `Số lượng`, `Giá trị`, `Đối tượng`, `Người tạo`, `Trạng thái`, `Thao tác`).
+    6. **Enterprise Modal + Drawer**: Full-screen Expanded Modal via `createPortal(..., document.body)` + Slide-over `InventoryTransactionDetailDrawer`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 SPRINT DISPATCH.1 – Dispatch Overview Enterprise Workspace Standardization
+
+Completed:
+
+- **Task 1: Global AppTopbar Action**:
+  - Created [DispatchActionContext.tsx](file:///opt/projects/steeltrack/apps/frontend/src/modules/logistics/context/DispatchActionContext.tsx) (`DispatchActionProvider`, `DispatchGlobalActionBar` with `+ Tạo điều xe`).
+  - Registered `DispatchGlobalActionBar` inside [AppTopbar.tsx](file:///opt/projects/steeltrack/apps/frontend/src/app/shell/topbar/AppTopbar.tsx) for `/logistics` routes.
+  - Wrapped [OperationalShell.tsx](file:///opt/projects/steeltrack/apps/frontend/src/shared/layouts/OperationalShell.tsx) with `<DispatchActionProvider>`.
+  - Removed all duplicate `+ Tạo điều xe` buttons from local page header actions, local toolbar, and hero table header.
+
+- **Task 2: Standardize Dispatch Overview**:
+  - Standardized [LogisticsPage.tsx](file:///opt/projects/steeltrack/apps/frontend/src/modules/logistics/pages/LogisticsPage.tsx) across all 6 Enterprise Design System layout phases:
+    1. **Header / Global Action**: Primary action `+ Tạo điều xe` in global AppTopbar.
+    2. **6 Enterprise KPI Cards**: `Chờ điều xe`, `Đã lên xe`, `Đang vận chuyển`, `Đã giao`, `Chậm giao`, `On-time Delivery`.
+    3. **Enterprise Analytics Dashboard**: 4 `CockpitChartCard` containers (`Điều xe theo ngày`, `Tiến độ giao hàng`, `Cấu kiện theo trạng thái`, `Top dự án đang giao`).
+    4. **Compact Enterprise Toolbar**: Search Input with search icon, Project, Customer, Vehicle, Driver, Status, Date Range dropdowns, `[Tìm kiếm]`, `[Làm mới]`.
+    5. **Enterprise Hero Table**: Sticky Header, Count Badge (`{filteredOrders.length} lệnh`), **`[Xem tất cả]`** button, pagination, and columns: `Mã điều xe`, `Dự án`, `Khách hàng`, `Xe`, `Tài xế`, `Số cấu kiện`, `ETA`, `Trạng thái`, `Thao tác`.
+    6. **Enterprise Modal + Drawer**: Full-screen Expanded Modal via `createPortal(..., document.body)` + Slide-over `DispatchDetailDrawer` and `CreateDispatchDrawer`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Sprint QC.5, QC.6, QC.7, QC.8 UI Polish Sprint
+
+Completed:
+
+- **Sprint QC.5 – NCR Workspace (`/qc/ncr`)**:
+  - Standardized tab across 6 Enterprise phases with 6 KPIs (`NCR đang mở`, `Đã đóng`, `Quá hạn`, `Đang CAPA`, `Critical NCR`, `Average Close Time`).
+  - Analytics: `NCR theo nguyên nhân`, `NCR theo dự án`, `NCR theo mức độ`, `Trend đóng NCR`.
+  - Toolbar: Search Input with search icon, Severity, Status, Project, Owner, Date Range, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table: `Mã NCR`, `Dự án`, `Công đoạn`, `Mức độ`, `Chủ sở hữu`, `Deadline`, `Trạng thái`, `Thao tác`.
+  - Drawer & Expanded Modal: Slide-over drawer with Summary, Root Cause, Attachments, Timeline, Activity.
+
+- **Sprint QC.6 – CAPA Workspace (`/qc/capa`)**:
+  - Standardized tab with 6 KPIs (`CAPA mở`, `Đang thực hiện`, `Hoàn thành`, `Quá hạn`, `Verification Pending`, `Effectiveness`).
+  - Analytics: `CAPA Progress`, `CAPA theo Owner`, `CAPA theo Loại`, `Completion Trend`.
+  - Toolbar: Search Input with search icon, Status, Owner, Priority, Department, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table: `CAPA ID`, `Liên kết NCR`, `Owner`, `Due Date`, `Progress`, `Verification`, `Trạng thái`, `Thao tác`.
+  - Drawer & Expanded Modal: Slide-over drawer with Summary, Action Plan, Verification, Timeline, Files, Comments.
+
+- **Sprint QC.7 – Audit Log Workspace (`/qc/logs`)**:
+  - Standardized tab with 6 KPIs (`Tổng hoạt động`, `Người dùng`, `Thao tác hôm nay`, `Login`, `Export`, `Critical Events`).
+  - Analytics: `User Activity`, `Action Distribution`, `Login Trend`, `Top Users`.
+  - Toolbar: Search Input with search icon, User, Action, Module, Date, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table: `Thời gian`, `Người dùng`, `Module`, `Hành động`, `Đối tượng`, `IP`, `Chi tiết`, `Thao tác`.
+  - Drawer & Expanded Modal: Full Audit Detail slide-over drawer.
+
+- **Sprint QC.8 – QC Reports Enterprise Workspace (`/qc/reports`)**:
+  - **Top Investment Workspace**: Standardized tab with 6 KPIs (`Tổng báo cáo`, `Pass Rate`, `NCR Rate`, `CAPA Rate`, `Rework Rate`, `Quality Score`).
+  - Analytics Dashboard (6 Cockpit Cards): `Pass Rate Trend`, `Defect Pareto`, `Supplier Ranking`, `Project Quality`, `Monthly QC`, `Defect Heatmap`.
+  - Toolbar: Search Input with search icon, Project, Customer, Supplier, Month, Year, Report Type, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table: `Tên Báo cáo`, `Dự án`, `Khách hàng`, `Nhà cung cấp`, `Pass Rate`, `NCR`, `CAPA`, `Thao tác / Viewer`.
+  - **Enterprise Report Viewer Modal**: Full-screen viewer modal with KPIs, Charts, Tables, and action buttons (`Export Excel`, `Export PDF`, `Print`).
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Sprint QC.2, QC.3, QC.4 UI Polish Sprint
+
+Completed:
+
+- **Sprint QC.2 – Input Inspection (`/qc/inbound`)**:
+  - Standardized tab across 6 Enterprise phases with specific KPIs (`Chờ kiểm tra`, `Đạt`, `Không đạt`, `Chờ NCR`, `Quá hạn`, `Pass Rate`).
+  - Analytics: `Pass/Fail`, `Defect theo nhà cung cấp`, `Defect theo vật tư`, `Trend theo thời gian`.
+  - Toolbar: Search Input with search icon, Supplier, Material, Status, Inspector, Date Range, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table with Sticky Header, Count Badge, **`[Xem tất cả]`** button opening Expanded Modal via `createPortal`.
+
+- **Sprint QC.3 – Production Inspection (`/qc/production`)**:
+  - Standardized tab across 6 Enterprise phases with KPIs (`Chờ kiểm tra`, `Đạt`, `Không đạt`, `Chờ NCR`, `Quá hạn`, `Pass Rate`).
+  - Analytics: `Defect theo công đoạn`, `Pass Rate theo Line`, `NCR theo Line`, `Rework Trend`.
+  - Toolbar: Search Input with search icon, Line/Workstation, Process/Stage, Status, Inspector, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table columns: `Mã phiếu`, `Công đoạn`, `Cấu kiện`, `Ca sản xuất`, `Người kiểm`, `Kết quả`, `NCR`, `Trạng thái`, `Thao tác`.
+
+- **Sprint QC.4 – Outgoing Inspection (`/qc/final`)**:
+  - Standardized tab across 6 Enterprise phases with KPIs (`Chờ kiểm tra`, `Đạt`, `Không đạt`, `Chờ NCR`, `Quá hạn`, `Pass Rate`).
+  - Analytics: `Đạt trước giao hàng`, `Thiếu chứng từ`, `Thiếu tem`, `Defect cuối cùng`.
+  - Toolbar: Search Input with search icon, Project, Customer, Status, Inspector, `[Tìm kiếm]`, `[Làm mới]`.
+  - Hero Table columns: `Mã lô`, `Dự án`, `Khách hàng`, `QC`, `Trạng thái`, `Ngày xuất`, `Thao tác`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 QC Overview UI Polish Sprint
+
+Completed:
+
+- **Moved Primary Action to AppTopbar (Task 1)**:
+  - Created `QCActionContext.tsx` with `QCActionProvider` and `QCGlobalActionBar` (`+ Tạo phiếu kiểm tra cấu kiện`).
+  - Registered `QCGlobalActionBar` in `AppTopbar.tsx` for `/qc` routes and wrapped `OperationalShell.tsx` with `QCActionProvider`.
+  - Removed duplicate create buttons from local toolbar, page header, and hero table header.
+- **Standardized QC Overview Layout (Task 2)**:
+  - Standardized QC Overview (`Overview` in `QcPage.tsx`) using the Enterprise Design System following Components Overview layout order:
+    1. **6 Enterprise KPI Cards**: `Tổng phiếu QC`, `Chờ kiểm tra`, `Đạt`, `Không đạt`, `Đang xử lý NCR`, `Tỷ lệ Pass`.
+    2. **Analytics Dashboard**: 4 `CockpitChartCard` containers (`Pass / Fail`, `Defect Trend`, `QC theo công đoạn`, `Top Defects`).
+    3. **Compact Toolbar**: Search Input with search icon, Status dropdown, Inspection Stage dropdown, Project dropdown, Inspector dropdown, `[Tìm kiếm]`, `[Làm mới]`.
+    4. **Hero Table**: Sticky Header, Count Badge (`{filteredInspections.length} phiếu QC`), **`[Xem tất cả]`** button, pagination, and side widgets.
+    5. **Expanded Modal**: Full-screen table modal rendered via `createPortal(..., document.body)`.
+    6. **Detail Drawer**: Slide-over drawer for inspecting QC details.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Suppliers Quality, Finance, Activity & Reports UI Polish Sprint
+
+Completed:
+
+- **Standardized 4 Suppliers Secondary Tabs (Quality, Payables, Logs, Reports)**:
+  - **Supplier Quality Tab (`/suppliers/quality`)**: Upgraded `SupplierQualityTab` with 6 KPI cards (`Điểm chất lượng TB`, `Nhà cung cấp đạt chuẩn`, `Cảnh báo chất lượng`, `Lô bị từ chối`, `CAPA đang xử lý`, `Tỷ lệ đạt chất lượng`), Cockpit Analytics Dashboard, compact filter toolbar with search icon, Hero Table with sticky header & `[Xem tất cả]`, Expanded Modal via `createPortal`, and detail drawer.
+  - **Accounts Payable Tab (`/suppliers/payables`)**: Created `SupplierPayablesTab` with 6 KPI cards (`Tổng công nợ`, `Đến hạn`, `Quá hạn`, `Đã thanh toán`, `Chờ thanh toán`, `Tuổi nợ TB`), Cockpit Analytics Dashboard, compact filter toolbar, Hero Table with sticky header & `[Xem tất cả]`, Expanded Modal, and detail drawer.
+  - **Activity Log Tab (`/suppliers/logs`)**: Created `SupplierActivityLogsTab` with 6 KPI cards (`Tổng hoạt động`, `Hôm nay`, `Đơn mua mới`, `Giao hàng mới`, `Cảnh báo`, `Người dùng hoạt động`), Cockpit Analytics Dashboard, compact filter toolbar, Hero Table with sticky header & `[Xem tất cả]`, Expanded Modal, and detail drawer.
+  - **Reports Tab (`/suppliers/reports`)**: Created `SupplierReportsTab` with 6 KPI cards (`Tổng báo cáo`, `Giá trị mua`, `Doanh số NCC`, `Đúng hạn`, `Chất lượng`, `Tiết kiệm chi phí`), Cockpit Analytics Dashboard, compact filter toolbar, Hero Table with sticky header & `[Xem tất cả]`, Expanded Modal, and detail drawer.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Suppliers Business Tabs UI Polish Sprint
+
+Completed:
+
+- **Standardized 3 Suppliers Business Tabs (Quotes, Purchase Orders, Deliveries)**:
+  - **Suppliers Quotation Tab (`/suppliers/quotes`)**: Created `SupplierQuotesTab` with 6 KPI cards (`Tổng báo giá`, `Chờ phản hồi`, `Đã phản hồi`, `Đã duyệt`, `Quá hạn`, `Tổng giá trị`), Cockpit Analytics Dashboard, compact filter toolbar with search icon, Hero Table with sticky header & `[Xem tất cả]`, Expanded Modal via `createPortal`, and detail drawer.
+  - **Suppliers Purchase Orders Tab (`/suppliers/purchase-orders`)**: Created `SupplierPurchaseOrdersTab` with 6 KPI cards (`Tổng PO`, `Chờ duyệt`, `Đã duyệt`, `Đang giao`, `Hoàn thành`, `Giá trị PO`), Cockpit Analytics Dashboard, compact filter toolbar, Hero Table with `[Xem tất cả]`, Expanded Modal, and PO detail drawer.
+  - **Suppliers Deliveries Tab (`/suppliers/deliveries`)**: Created `SupplierDeliveriesTab` with 6 KPI cards (`Lịch giao hôm nay`, `Đang vận chuyển`, `Đã giao`, `Trễ`, `Chờ nhận`, `Tỷ lệ đúng hạn`), Cockpit Analytics Dashboard, compact filter toolbar, Hero Table with `[Xem tất cả]`, Expanded Modal, and delivery detail drawer.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Suppliers Overview UI Polish Sprint
+
+Completed:
+
+- **Moved Primary Action to Global AppTopbar**:
+  - Created `SuppliersActionContext` and `SuppliersGlobalActionBar` in `apps/frontend/src/modules/suppliers/context/SuppliersActionContext.tsx`.
+  - Registered `SuppliersGlobalActionBar` in `AppTopbar.tsx` for `/suppliers` routes and wrapped app shell with `SuppliersActionProvider` in `OperationalShell.tsx`.
+  - Removed duplicate `+ Thêm nhà cung cấp` button from local page header actions.
+
+- **Standardized Suppliers Overview Layout (Cloned Inventory Overview Layout)**:
+  - Phase 1: Rendered 6 `EnterpriseKpiCard` items (`Tổng nhà cung cấp`, `Đang hoạt động`, `Tạm ngưng`, `Nhà cung cấp chiến lược`, `Đơn hàng đang xử lý`, `Điểm đánh giá TB`).
+  - Phase 2: Created Cockpit Analytics Dashboard (`Phân loại nhà cung cấp`, `Chất lượng & Đánh giá`, `Hoạt động gần đây`, `Top nhà cung cấp`).
+  - Phase 3: Added `SupplierFilterBar` in `EnterprisePanel` with search input with search icon, Status dropdown, Category dropdown, Region dropdown, Rating dropdown, Search button, and Refresh button.
+  - Phase 4: Standardized Hero Table with sticky header, count badge, pagination, side widgets, and restored `[Xem tất cả]` button.
+  - Phase 5: Integrated full-width Expanded Table Modal mounted via `createPortal(..., document.body)`.
+  - Phase 6: Retained `SupplierDetailWorkspace` detail drawer.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Restore Hero Table View All Pattern Sprint
+
+Completed:
+
+- **Restored Standard `[Xem tất cả]` Pattern in Project Components & Materials Hero Tables (`ProjectsPage.tsx`)**:
+  - Restored `[Xem tất cả]` action button in both `ProjectComponentsTab` and `MaterialsTab` Hero Table headers.
+  - Wired `[Xem tất cả]` buttons to open dedicated Expanded Modals mounted via `createPortal(..., document.body)`.
+  - Removed duplicate business header actions (`Trả cấu kiện`, `Trả vật tư`), retaining standard row-level actions (`"Trả"`) for individual components and materials.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Project Components & Materials Tabs Standardization Sprint
+
+Completed:
+
+- **Project Components Tab (`ProjectComponentsTab` in `ProjectsPage.tsx`)**:
+  - Refactored KPI strip to 6 `<EnterpriseKpiCard />` items (`Tổng cấu kiện`, `READY`, `SHIPPED`, `DELIVERED`, `INSTALLED`, `Tỷ lệ lắp đặt`).
+  - Added `EnterprisePanel` compact toolbar with search input (with icon), project selector, status dropdown, search & reset buttons.
+  - Standardized Hero Table with sticky header, count pill badge `{filtered.length} cấu kiện`, pagination via `DataTablePagination`, and action buttons.
+
+- **Project Materials Tab (`MaterialsTab` in `ProjectsPage.tsx`)**:
+  - Refactored KPI strip to 6 `<EnterpriseKpiCard />` items (`Tổng dòng vật tư`, `Allocated`, `Pending Return`, `Returned`, `Available Return`, `Tổng giá trị`).
+  - Added `EnterprisePanel` compact toolbar with search input (with icon), project selector, search & reset buttons.
+  - Standardized Hero Table with sticky header, count pill badge `{filtered.length} dòng`, pagination via `DataTablePagination`, and clickable pending return links.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Progress Tab Standardization Sprint
+
+Completed:
+
+- **Progress Tab Standardization (`ProgressTab` in `ProjectsPage.tsx`)**:
+  - Wired `filterBarNode` into `ProgressTab` (`/projects/progress`).
+  - Standardized layout sequence:
+    1. Phase 1: Enterprise KPI Cards (`KpiStrip`)
+    2. Phase 3: Compact Toolbar (`filterBarNode`)
+    3. Phase 4: Hero Table (`ProjectTable` with side widgets)
+    4. Phase 2 / Analytics: Progress Timeline & Risk Alert widgets
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Project List Tab Standardization Sprint
+
+Completed:
+
+- **Project List Tab Standardization (`ProjectListTab` in `ProjectsPage.tsx`)**:
+  - Wired `filterBarNode` into `ProjectListTab` (`/projects/list`).
+  - Standardized section order:
+    1. Phase 1: Enterprise KPI Cards (`KpiStrip`)
+    2. Phase 3: Compact Toolbar (`filterBarNode`)
+    3. Phase 4: Hero Table (`ProjectTable` with side widgets)
+    4. Phase 2 / Analytics: Summary Widgets (`Tiến độ theo thời gian`, `Giá trị theo thời gian`, `Công trình sắp hoàn thành`, `Công trình cần chú ý`)
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Projects Toolbar Position Fix
+
+Completed:
+
+- **Adjusted Toolbar Position in Projects Overview (`ProjectsPage.tsx`)**:
+  - Repositioned Compact Toolbar (`FilterBar`) to render **immediately after the Analytics Dashboard** and **above the Hero Table**.
+  - Moved secondary overview widgets (`Công trình sắp hoàn thành`, `Công trình chậm tiến độ`, `Hoạt động gần đây`) to render **below the Hero Table**.
+  - Restored exact Enterprise section order:
+    1. Header (`AppTopbar` & `EnterpriseWorkspace`)
+    2. Enterprise KPI Cards (`KpiStrip` with 6 `EnterpriseKpiCard` items)
+    3. Analytics Dashboard (`CockpitChartCard` grid)
+    4. Compact Toolbar (`FilterBar`)
+    5. Hero Table (`ProjectTable` with side widgets)
+    6. Secondary Overview Widgets (`Công trình sắp hoàn thành`, `Công trình chậm tiến độ`, `Hoạt động gần đây`)
+    7. Expanded Modal (`expandedModalOpen` via `createPortal`)
+    8. Detail Drawer (`ProjectDetailWorkspace`)
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Restore Search Input Sprint
+
+Completed:
+
+- **Restored Search Input in Projects Overview (`ProjectsPage.tsx`)**:
+  - Wrapped `query` text input in a standard relative container with `Search` icon (`lucide-react`) left-aligned (`absolute left-3`).
+  - Restored exact Enterprise toolbar control ordering:
+    1. Search Input (left-aligned with icon)
+    2. Status ▼ (Dropdown)
+    3. Customer ▼ (Dropdown)
+    4. Project Manager ▼ (Dropdown)
+    5. Region / Type ▼ (Dropdown)
+    6. `[Tìm kiếm]` (Button)
+    7. `[Làm mới]` (Button)
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Projects Layout Alignment Sprint
+
+Completed:
+
+- **Projects Overview Layout Alignment (`ProjectsPage.tsx`)**:
+  - Moved Compact Toolbar (`FilterBar`) to appear **immediately below the Analytics Dashboard** and **above the Hero Table**.
+  - Aligned page layout order strictly to Enterprise Design System standard:
+    1. Header (Global AppTopbar + Page Title)
+    2. Enterprise KPI Cards (`KpiStrip` with 6 `EnterpriseKpiCard` items)
+    3. Analytics Dashboard (`CockpitChartCard` grid)
+    4. Compact Toolbar (`FilterBar` with dropdown selectors)
+    5. Hero Table (`ProjectTable` with count pill, sticky header, and side widgets)
+    6. Expanded Modal (`expandedModalOpen` modal via `createPortal`)
+    7. Detail Drawer (`ProjectDetailWorkspace`)
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Shared Project Form Sprint
+
+Completed:
+
+- **Unified Single Project Form (`ProjectFormDialog`)**:
+  - Created `ProjectFormDialog` (`src/modules/projects/components/ProjectFormDialog.tsx`) supporting `mode="create"` and `mode="edit"`.
+  - Preserved all existing validation, layout, form controls, template selector, contract value input formatting, and detail notes.
+  - Eliminated duplicate dialog components (`CreateProjectDialog` & `EditProjectDialog`).
+  - `+ Thêm công trình` in topbar and `"Sửa công trình"` in detail workspace both invoke the same `ProjectFormDialog` via `useProjectsActions()`.
+  - Create mode initializes empty/default values; Edit mode populates existing project fields.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Projects Overview UI Polish Sprint
+
+Completed:
+
+- **Task 1: Page Header Action Migration**:
+  - Created `ProjectsActionContext` & `ProjectsActionProvider` (`src/modules/projects/context/ProjectsActionContext.tsx`) with `CreateProjectModal` mounted via `createPortal(..., document.body)` (`z-[9999] backdrop-blur-sm`).
+  - Created `ProjectsGlobalActionBar` (`src/modules/projects/components/ProjectsGlobalActionBar.tsx`) with the primary `+ Thêm công trình` button.
+  - Registered `ProjectsGlobalActionBar` in `AppTopbar` (`src/app/shell/topbar/AppTopbar.tsx`) for `/projects` routes and wrapped `OperationalShell` with `ProjectsActionProvider`.
+  - Removed duplicate action buttons from local page header actions (`EnterpriseWorkspace` props) so the toolbar contains **only search and filtering controls**.
+
+- **Task 2: Standardize Projects Overview (`ProjectsPage.tsx`)**:
+  - **Phase 1: Enterprise KPI Cards**: Top strip refactored to 6 `<EnterpriseKpiCard />` items (`Tổng số công trình`, `Đang triển khai`, `Hoàn thành`, `Chậm tiến độ / Rủi ro`, `Giá trị hợp đồng`, `Tỷ lệ hoàn thành TB`).
+  - **Phase 2: Analytics Dashboard**: Standardized `CockpitChartCard` chart widgets for progress timeline, financial value timeline, task status breakdown, and risk alerts.
+  - **Phase 3: Compact Toolbar**: Refactored `EnterprisePanel` toolbar containing search input, `status` dropdown, `customerFilter` dropdown, `managerFilter` dropdown, `type` dropdown, `Tìm kiếm` button, and `Làm mới` button.
+  - **Phase 4: Hero Table**: Sticky table header (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{rows.length} công trình`, pagination via `DataTablePagination`, and "Xem tất cả" action button.
+  - **Phase 5: Expanded Modal**: Implemented full-screen table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+  - **Phase 6: Detail Drawer**: Standardized `ProjectDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Yard Module UI Polish Sprint
+
+Completed:
+
+- **Standardized All 6 Yard Sub-Pages**:
+  1. `Yard 2D Map` (`/yard/map-2d`)
+  2. `Yard 3D Map` (`/yard/map-3d`)
+  3. `Heatmap` (`/yard/heatmap`)
+  4. `Timeline` (`/yard/timeline`)
+  5. `Movement History` (`/yard/history`)
+  6. `Reports / Tracking` (`/yard/locations`, `/yard/components`, `/yard/dispatch`, `/yard/tracking`)
+
+- **Header Action Rules Enforced Across All Sub-Pages**:
+  - Reused `YardActionProvider` and `YardGlobalActionBar` in `AppTopbar`.
+  - Header actions strictly maintain `+ Nhập bãi` (Primary), `Xuất bãi` (Secondary), and `Khác ▼` dropdown menu (`Quản lý Zone`, `Quản lý Slot`, `Chuyển nội bộ`). No extra primary buttons added.
+
+- **Phase Implementation**:
+  - Phase 1: 6 `<EnterpriseKpiCard />` strip items.
+  - Phase 2: Standardized `CockpitChartCard` chart cards.
+  - Phase 3: Compact `EnterprisePanel` toolbar with standard dropdown selectors (`warehouseFilter`, `zoneFilter`, `statusFilter`, `projectFilter`).
+  - Phase 4: Hero Table / Spatial Map Layout with sticky table headers, count pill badges, and `DataTablePagination`.
+  - Phase 5: Full-screen expanded table modal via `createPortal(..., document.body)` (`z-[9999] backdrop-blur-sm`).
+  - Phase 6: Standardized `YardDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-24 Yard Overview UI Polish Sprint
+
+Completed:
+
+- **Task 1: Topbar Action Provider Integration**:
+  - Created `YardActionContext` & `YardActionProvider` (`src/modules/yard/context/YardActionContext.tsx`) managing `openInbound`, `openOutbound`, `openTransfer`, `openCreateZone`, and `openCreateSlot`.
+  - Created `YardGlobalActionBar` (`src/modules/yard/components/YardGlobalActionBar.tsx`) with:
+    1. `+ Nhập bãi` (Primary)
+    2. `Xuất bãi` (Secondary)
+    3. `Khác ▼` (Dropdown menu with `Quản lý Zone`, `Quản lý Slot`, `Chuyển nội bộ`).
+  - Registered `YardGlobalActionBar` in `AppTopbar` (`src/app/shell/topbar/AppTopbar.tsx`) for `/yard` routes and wrapped `OperationalShell` with `YardActionProvider`.
+  - Removed all duplicate action buttons from local page header, toolbar, hero table, and tab content.
+
+- **Task 2: Standardize Yard Overview (`YardPage.tsx`)**:
+  - **Phase 1: Enterprise KPI Cards**: Top strip refactored to 6 `<EnterpriseKpiCard />` items (`Sức chứa bãi Tập kết`, `Sức chứa khả dụng`, `Cấu kiện lưu bãi`, `Giao dịch bãi hôm nay`, `Zone quá tải (>=90%)`, `Cầu trục vận hành`).
+  - **Phase 2: Analytics Dashboard**: Standardized `CockpitChartCard` chart widgets for yard capacity donut, movement flow donut, and monthly mini trend.
+  - **Phase 3: Compact Toolbar**: Refactored `EnterprisePanel` toolbar containing search input, `warehouseFilter` dropdown, `zoneFilter` dropdown, `statusFilter` dropdown, `projectFilter` dropdown, `Tìm kiếm` button, and `Làm mới` button. Toolbar contains **only search and filtering controls**.
+  - **Phase 4: Hero Table**: Sticky table header (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredSlots.length} slot bãi`, pagination via `DataTablePagination`, and "Xem tất cả" action button.
+  - **Phase 5: Expanded Modal**: Implemented full-screen table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+  - **Phase 6: Detail Drawer**: Standardized `YardDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
 ## 2026-07-24 Planning Overview Action Provider Fix Sprint
 
 Completed:

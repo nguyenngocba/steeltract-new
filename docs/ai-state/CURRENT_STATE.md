@@ -1,5 +1,197 @@
 # Current State
 
+## SPRINT INVENTORY.3 – Inventory Audit Enterprise UI Standardization
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized the Inventory Audit workspace (`/inventory/audit`) using the Enterprise Design System following the Inventory Overview & Transactions Golden Reference layout order. Primary audit actions (`+ Tạo phiên kiểm kê`) bound to the global AppTopbar via `InventoryGlobalActionBar`. Built 6 Enterprise KPI cards, 4 Analytics CockpitChartCard containers, a Compact Enterprise Toolbar with search icon & filter dropdowns, an Enterprise Hero Table with sticky headers & count badge & `[Xem tất cả]`, an Expanded Modal rendered via `createPortal`, and slide-over Detail Drawer.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## SPRINT INVENTORY.2 – Inventory Transactions Enterprise UI Standardization
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized the Inventory Transactions workspace (`/inventory/transactions`) using the Enterprise Design System following the Inventory Overview & Dispatch Golden Reference layout order. Wired primary actions (`+ Nhập kho`, `+ Xuất kho`, `+ Chuyển kho`) to the global AppTopbar via `InventoryGlobalActionBar`. Built 6 Enterprise KPI cards, 4 Analytics CockpitChartCard containers, a Compact Enterprise Toolbar with search icon & filter dropdowns, an Enterprise Hero Table with sticky headers & count badge & `[Xem tất cả]`, an Expanded Modal rendered via `createPortal`, and slide-over Detail Drawer.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## SPRINT DISPATCH.1 – Dispatch Overview Enterprise Workspace Standardization
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized the Dispatch / Logistics Overview workspace (`/logistics`) using the Enterprise Design System following the Inventory & Components Overview layout order. Moved primary action `+ Tạo điều xe` to global AppTopbar using `DispatchActionProvider` & `DispatchGlobalActionBar`. Built 6 Enterprise KPI cards, 4 Analytics CockpitChartCard containers, a Compact Enterprise Toolbar with search icon & filter dropdowns, an Enterprise Hero Table with sticky headers & count badge & `[Xem tất cả]`, an Expanded Modal rendered via `createPortal`, and slide-over Detail / Create Drawers.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Sprint QC.5, QC.6, QC.7, QC.8 UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized the remaining 4 QC workspaces (`/qc/ncr`, `/qc/capa`, `/qc/logs`, `/qc/reports`) using the Enterprise Design System following the Inventory & Components Overview layout order. Built dedicated KPI Strips, Analytics Dashboards (including Pareto & Heatmap for Reports), Compact Toolbars with search icons, Hero Tables with exact requested columns & sticky headers & `[Xem tất cả]`, Expanded Modals via `createPortal`, Slide-over Drawers, and a dedicated **Enterprise Report Viewer Modal** supporting PDF/Excel export and Printing.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Sprint QC.2, QC.3, QC.4 UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized the 3 core inspection tabs in QC module (`/qc/inbound`, `/qc/production`, `/qc/final`) using the Enterprise Design System following the Inventory & Components Overview layout order. Built dedicated KPI Strips, Analytics Dashboards, Compact Toolbars with search icons, Hero Tables with exact requested columns & sticky headers & `[Xem tất cả]`, Expanded Modals via `createPortal`, and Detail Drawers.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## QC Overview UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized QC Overview (`/qc`) using the Enterprise Design System following the Components Overview layout order. Moved primary action `+ Tạo phiếu kiểm tra cấu kiện` to global AppTopbar using `QCActionProvider` & `QCGlobalActionBar`. Standardized all 6 layout phases (6 KPI Cards, Cockpit Analytics Dashboard, Compact Toolbar with search icon, Hero Table with sticky header & `[Xem tất cả]`, Expanded Modal via `createPortal`, and Detail Drawer).
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Suppliers Quality, Finance, Activity & Reports UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized all 4 remaining Suppliers tabs (`/suppliers/quality`, `/suppliers/payables`, `/suppliers/logs`, `/suppliers/reports`) following the Inventory Overview Golden Reference layout. Aligned all 6 Enterprise layout phases per tab with strict KPI definitions, Cockpit analytics, compact toolbars with search icon, Hero Tables with `[Xem tất cả]`, Expanded Modals via `createPortal`, and detail drawers.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Suppliers Business Tabs UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized all 3 Suppliers business tabs (`/suppliers/quotes`, `/suppliers/purchase-orders`, `/suppliers/deliveries`) following the Inventory Overview Golden Reference layout. Aligned all 6 Enterprise layout phases per tab with strict KPI definitions, Cockpit analytics, compact toolbars with search icon, Hero Tables with `[Xem tất cả]`, Expanded Modals via `createPortal`, and detail drawers.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Suppliers Overview UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized Suppliers Overview (`/suppliers`) layout following the Inventory Overview Golden Reference. Moved `+ Thêm nhà cung cấp` to global AppTopbar using `SuppliersActionProvider`, aligned 6-phase layout (KPI strip, Cockpit analytics, compact filter toolbar with search input, Hero Table with `[Xem tất cả]`, Expanded Modal via `createPortal`, and detail drawer).
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Restore Hero Table View All Pattern Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, restored standard `[Xem tất cả]` button and Expanded Modals (`createPortal`) in Hero Table headers for both Project Components (`/projects/components`) and Project Materials (`/projects/materials`).
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Project Components & Materials Tabs Standardization Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized **Project Components** tab (`/projects/components`) and **Project Materials** tab (`/projects/materials`):
+- Refactored KPI strips into 6 `<EnterpriseKpiCard />` cards.
+- Integrated search input with search icon, project dropdowns, status dropdowns, search & reset buttons.
+- Standardized Hero Tables with count pill badges, sticky table headers, and `DataTablePagination`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Progress Tab Standardization Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized **Project Progress** tab (`/projects/progress`) according to the Enterprise Design System:
+- Order: KPI Cards → Compact Toolbar → Hero Table → Progress Analytics & Risk Alert Widgets.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Project List Tab Standardization Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, standardized **Project List** tab (`/projects/list`) according to the Enterprise Design System:
+- Order: KPI Cards → Compact Toolbar → Hero Table → Summary Analytics Widgets.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Projects Toolbar Position Fix
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, fixed Projects Overview (`/projects`) toolbar position:
+- Compact Toolbar (`FilterBar`) is now positioned immediately after the Analytics Dashboard and before the Hero Table.
+- Secondary overview widgets (`Công trình sắp hoàn thành`, `Công trình chậm tiến độ`, `Hoạt động gần đây`) render below the Hero Table.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Restore Search Input Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, restored visual Search Input in Projects Overview (`/projects`) toolbar:
+- Added left-aligned `Search` icon inside input container (`relative flex items-center`).
+- Controls order: Search Input → Status ▼ → Customer ▼ → Project Manager ▼ → Region/Type ▼ → `[Tìm kiếm]` → `[Làm mới]`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Projects Layout Alignment Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, adjusted Projects Overview (`/projects`) layout sequence to strictly follow the Enterprise Design System:
+- Moved Compact Toolbar (`FilterBar`) immediately below the Analytics Dashboard and above the Hero Table.
+- Exact page order: Header → Enterprise KPI Cards → Analytics Dashboard → Compact Toolbar → Hero Table → Expanded Modal → Detail Drawer.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Shared Project Form Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, unified project form architecture to use a single shared `ProjectFormDialog` component:
+- Both `+ Thêm công trình` (Create mode) and `"Sửa công trình"` (Edit mode) open the same `ProjectFormDialog` component.
+- Removed duplicated `CreateProjectDialog` and `EditProjectDialog` implementations.
+- Maintained all existing layout, form controls, styling, template selector, contract value input formatting, and detail notes.
+- Managed centrally in `ProjectsActionContext` via `useProjectsActions()`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Projects Overview UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, Projects Overview (`/projects`) was standardized according to the 6-phase Golden Reference UI Polish specification:
+- **Task 1**: Moved primary creation action `+ Thêm công trình` to page topbar via `ProjectsActionContext` & `ProjectsGlobalActionBar` registered in `AppTopbar`. Toolbar now strictly contains search and filter controls.
+- **Task 2**:
+  - Phase 1: 6 `<EnterpriseKpiCard />` items (`Tổng số công trình`, `Đang triển khai`, `Hoàn thành`, `Chậm tiến độ / Rủi ro`, `Giá trị hợp đồng`, `Tỷ lệ hoàn thành TB`).
+  - Phase 2: Standardized chart cards (`CockpitChartCard`) for progress timeline, contract value timeline, task status, and risk alerts.
+  - Phase 3: Compact `EnterprisePanel` toolbar with search input, status dropdown, customer dropdown, PM manager dropdown, type dropdown, search button, and refresh button.
+  - Phase 4: Sticky table header (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{rows.length} công trình`, pagination via `DataTablePagination`.
+  - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+  - Phase 6: Standardized `ProjectDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Yard Module UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, all remaining sub-pages in the Yard Module (`Yard 2D Map`, `Yard 3D Map`, `Heatmap`, `Timeline`, `Movement History`, `Reports / Locations / Tracking`) were standardized across all 6 Golden Reference UI Polish phases.
+Header actions strictly enforce `+ Nhập bãi` (Primary), `Xuất bãi` (Secondary), and `Khác ▼` dropdown menu via `YardActionProvider` and `YardGlobalActionBar`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## Yard Overview UI Polish Sprint
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-24, Yard Overview (`/yard`) was standardized according to the 6-phase Golden Reference UI Polish specification:
+- **Task 1**: Created `YardActionContext`, `YardActionProvider`, and `YardGlobalActionBar` displaying ONLY `+ Nhập bãi` (Primary), `Xuất bãi` (Secondary), and `Khác ▼` dropdown (`Quản lý Zone`, `Quản lý Slot`, `Chuyển nội bộ`). Registered in `AppTopbar` and `OperationalShell`. Toolbar stripped of all action buttons.
+- **Task 2**:
+  - Phase 1: 6 `<EnterpriseKpiCard />` items (`Sức chứa bãi Tập kết`, `Sức chứa khả dụng`, `Cấu kiện lưu bãi`, `Giao dịch bãi hôm nay`, `Zone quá tải`, `Cầu trục vận hành`).
+  - Phase 2: Refactored chart cards (`CockpitChartCard`) for yard capacity, movement flow, and mini trend.
+  - Phase 3: Compact `EnterprisePanel` toolbar with search input, warehouse dropdown, zone dropdown, status dropdown, project dropdown, search button, and refresh button.
+  - Phase 4: Sticky table header (`sticky top-0 z-10 bg-[#1e293b]`), count pill badge `{filteredSlots.length} slot bãi`, pagination via `DataTablePagination`.
+  - Phase 5: Full-screen expanded table modal (`expandedModalOpen`) using `createPortal(..., document.body)` with `z-[9999] backdrop-blur-sm`.
+  - Phase 6: Standardized `YardDetailDrawer` via `ModuleDetailDrawer`.
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
 ## Planning Overview Action Provider Fix Sprint
 
 Status: **IMPLEMENTED - TEST/BUILD PASS**

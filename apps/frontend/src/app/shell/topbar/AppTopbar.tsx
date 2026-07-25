@@ -13,6 +13,11 @@ import { InventoryGlobalActionBar } from '../../../modules/inventory/components/
 import { ComponentsGlobalActionBar } from '../../../modules/components/components/ComponentsGlobalActionBar'
 import { ProductionGlobalActionBar } from '../../../modules/production/components/ProductionGlobalActionBar'
 import { PlanningGlobalActionBar } from '../../../modules/planning/components/PlanningGlobalActionBar'
+import { YardGlobalActionBar } from '../../../modules/yard/components/YardGlobalActionBar'
+import { ProjectsGlobalActionBar } from '../../../modules/projects/components/ProjectsGlobalActionBar'
+import { SuppliersGlobalActionBar } from '../../../modules/suppliers/context/SuppliersActionContext'
+import { QCGlobalActionBar } from '../../../modules/qc/context/QCActionContext'
+import { DispatchGlobalActionBar } from '../../../modules/logistics/context/DispatchActionContext'
 
 export function AppTopbar() {
   const user = useAuthStore((s) => s.user)
@@ -26,6 +31,11 @@ export function AppTopbar() {
   const isComponentsRoute = location.pathname.startsWith('/components')
   const isProductionRoute = location.pathname.startsWith('/production')
   const isPlanningRoute = location.pathname.startsWith('/planning')
+  const isYardRoute = location.pathname.startsWith('/yard')
+  const isProjectsRoute = location.pathname.startsWith('/projects')
+  const isSuppliersRoute = location.pathname.startsWith('/suppliers')
+  const isQcRoute = location.pathname.startsWith('/qc')
+  const isLogisticsRoute = location.pathname.startsWith('/logistics')
 
   function handleLogout() {
     logout()
@@ -45,6 +55,11 @@ export function AppTopbar() {
         {isComponentsRoute ? <ComponentsGlobalActionBar /> : null}
         {isProductionRoute ? <ProductionGlobalActionBar /> : null}
         {isPlanningRoute ? <PlanningGlobalActionBar /> : null}
+        {isYardRoute ? <YardGlobalActionBar /> : null}
+        {isProjectsRoute ? <ProjectsGlobalActionBar /> : null}
+        {isSuppliersRoute ? <SuppliersGlobalActionBar /> : null}
+        {isQcRoute ? <QCGlobalActionBar /> : null}
+        {isLogisticsRoute ? <DispatchGlobalActionBar /> : null}
 
         <div className="hidden items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-2.5 lg:flex">
           <Search size={15} className="text-zinc-500" />

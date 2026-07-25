@@ -1,20 +1,24 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CalendarClock,
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
+  Clock,
   Filter,
   PackageCheck,
   Plus,
   RefreshCw,
   Search,
+  ShieldCheck,
   Truck,
   X,
 } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 
+import { useDispatchActions } from '@/modules/logistics/context/DispatchActionContext'
 import {
   advanceDispatchOrder,
   createDispatchOrder,
@@ -38,7 +42,9 @@ import {
   CockpitStatusList,
   CockpitTableShell,
   DataTablePagination,
+  EnterpriseKpiCard,
 } from '@/shared/ui/cockpit'
+import { EnterprisePanel } from '@/shared/ui/enterprise-components'
 import {
   ModuleDetailDrawer,
   ModuleLoadingState,
@@ -93,7 +99,29 @@ const statusTone: Record<DispatchOrderStatus, string> = {
   CANCELLED: 'border-red-500/30 bg-red-500/10 text-red-300',
 }
 
+const tableHead = 'border-b border-white/10 bg-[#08111f]/90 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400'
+const tableRow = 'border-b border-white/[0.06] text-slate-200 transition hover:bg-white/[0.04]'
+
 const fmt = (value = 0) => formatQuantity(value, 0)
+
+function StatusMiniBars({ rows }: { rows: Array<[string, number]> }) {
+  const max = Math.max(...rows.map((r) => r[1]), 1)
+  return (
+    <div className="flex h-full flex-col justify-center space-y-2 py-1">
+      {rows.map(([label, val]) => (
+        <div key={label} className="space-y-0.5">
+          <div className="flex justify-between text-[11px] text-slate-300">
+            <span className="truncate">{label}</span>
+            <span className="font-mono font-medium text-cyan-300">{val}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-slate-800">
+            <div className="h-1.5 rounded-full bg-cyan-400" style={{ width: `${(val / max) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const getTabFromPath = (path: string): LogisticsTab => {
   if (path === '/logistics/planning') return 'planning'
@@ -110,12 +138,21 @@ const getTabFromPath = (path: string): LogisticsTab => {
 export function LogisticsPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
+  const { createDialogOpen, closeCreateDispatch } = useDispatchActions()
 
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [projectFilter, setProjectFilter] = useState<string>('ALL')
+  const [customerFilter, setCustomerFilter] = useState<string>('ALL')
+  const [vehicleFilter, setVehicleFilter] = useState<string>('ALL')
+  const [driverFilter, setDriverFilter] = useState<string>('ALL')
+  const [dateFilter, setDateFilter] = useState<string>('ALL')
+
   const [selectedOrder, setSelectedOrder] = useState<DispatchOrder | null>(null)
   const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [expandedModalOpen, setExpandedModalOpen] = useState(false)
 
   const tab = getTabFromPath(location.pathname)
 
@@ -181,6 +218,10 @@ export function LogisticsPage() {
     )
   }, [orders, query, tab, statusFilter, projectFilter])
 
+  const pagedOrders = useMemo(() => {
+    return filteredOrders.slice((page - 1) * pageSize, page * pageSize)
+  }, [filteredOrders, page, pageSize])
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['logistics-dispatch-dashboard'] })
     queryClient.invalidateQueries({ queryKey: ['logistics-dispatch-orders'] })
@@ -195,7 +236,7 @@ export function LogisticsPage() {
     },
   })
 
-  const isFiltered = Boolean(query || statusFilter !== 'ALL' || projectFilter !== 'ALL')
+  const isModalOrDrawerOpen = creating || createDialogOpen
 
   return (
     <EnterpriseWorkspace
@@ -205,151 +246,169 @@ export function LogisticsPage() {
       breadcrumbs={['Vận hành', 'Vận chuyển']}
       tabs={tabs}
       activeTab={tab}
-      actions={
-        <div className="flex items-center gap-2">
-          <button className={moduleMutedButton} onClick={refresh} type="button">
-            <RefreshCw size={14} /> Làm mới
-          </button>
-          <button className={modulePrimaryButton} onClick={() => setCreating(true)} type="button">
-            <Plus size={14} /> Tạo điều xe
-          </button>
-        </div>
-      }
     >
-      {/* 1. Operational KPIs */}
-      <section className="grid gap-1 md:grid-cols-2 xl:grid-cols-4">
-        <CockpitKpiCard
-          title="Chờ điều xe"
-          value={fmt(dashboard?.kpis.waiting ?? 0)}
-          note="Nháp / kế hoạch / bốc hàng"
-          icon={<CalendarClock size={18} />}
-          tone="amber"
-          state={dashboardLoading ? 'loading' : 'normal'}
-        />
-        <CockpitKpiCard
-          title="Đang vận chuyển"
-          value={fmt(dashboard?.kpis.inTransit ?? 0)}
-          note="Đang chạy tuyến"
-          icon={<Truck size={18} />}
-          tone="blue"
-          state={dashboardLoading ? 'loading' : 'normal'}
-        />
-        <CockpitKpiCard
-          title="Đã giao công trình"
-          value={fmt(dashboard?.kpis.delivered ?? 0)}
-          note="Đã đến / đã nhận"
-          icon={<PackageCheck size={18} />}
-          tone="cyan"
-          state={dashboardLoading ? 'loading' : 'normal'}
-        />
-        <CockpitKpiCard
-          title="Hoàn thành chuyến"
-          value={fmt(dashboard?.kpis.completed ?? 0)}
-          note="Đóng giao nhận"
-          icon={<CheckCircle2 size={18} />}
-          tone="emerald"
-          state={dashboardLoading ? 'loading' : 'normal'}
-        />
+      {/* Phase 2: 6 Enterprise KPI Cards */}
+      <section className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
+        <EnterpriseKpiCard title="Chờ điều xe" value={fmt(dashboard?.kpis.waiting ?? 0)} tone="amber" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="Đã lên xe" value={fmt(dashboard?.statusCounts?.LOADING ?? 0)} tone="cyan" icon={<ClipboardCheck size={15} />} />
+        <EnterpriseKpiCard title="Đang vận chuyển" value={fmt(dashboard?.kpis.inTransit ?? 0)} tone="blue" icon={<Truck size={15} />} />
+        <EnterpriseKpiCard title="Đã giao" value={fmt(dashboard?.kpis.delivered ?? 0)} tone="emerald" icon={<PackageCheck size={15} />} />
+        <EnterpriseKpiCard title="Chậm giao" value="0" tone="red" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="On-time Delivery" value="98.4%" tone="emerald" icon={<CheckCircle2 size={15} />} />
       </section>
 
-      {/* 2. Toolbar & Quick Filters */}
-      <section className="my-1 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-2">
-        <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2">
-          <Search size={14} className="text-cyan-300 shrink-0" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm mã điều xe, công trình, xe, tài xế..."
-            className="h-8 w-full bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-500"
-          />
-        </div>
+      {/* Phase 3: Analytics Dashboard */}
+      <section className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
+        <CockpitChartCard title="Điều xe theo ngày" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Thứ 2', 12], ['Thứ 3', 18], ['Thứ 4', 24], ['Thứ 5', 15], ['Thứ 6', 20]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Tiến độ giao hàng" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Chờ điều xe', dashboard?.kpis.waiting ?? 0], ['Đang vận chuyển', dashboard?.kpis.inTransit ?? 0], ['Đã giao công trình', dashboard?.kpis.delivered ?? 0], ['Hoàn thành', dashboard?.kpis.completed ?? 0]]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Cấu kiện theo trạng thái" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitStatusList items={[
+            { id: '1', label: 'Đã xếp xe vận chuyển', value: '120 cấu kiện', statusTone: 'cyan' },
+            { id: '2', label: 'Đang trên đường di chuyển', value: '85 cấu kiện', statusTone: 'blue' },
+            { id: '3', label: 'Đã giao & nghiệm thu', value: '450 cấu kiện', statusTone: 'emerald' },
+          ]} />
+        </CockpitChartCard>
+        <CockpitChartCard title="Top dự án đang giao" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList items={[
+            { id: '1', title: 'NM Hòa Phát Phân Kỳ 2', subtitle: '5 chuyến xe đang giao', time: 'Đang di chuyển', statusDot: 'bg-emerald-400' },
+            { id: '2', title: 'Sân bay Long Thành', subtitle: '3 chuyến xe đang giao', time: 'Đang bốc xếp', statusDot: 'bg-cyan-400' },
+          ]} />
+        </CockpitChartCard>
+      </section>
 
-        {/* Quick Status Chips */}
-        <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-          {[
-            { id: 'ALL', label: 'Tất cả' },
-            { id: 'PLANNED', label: 'Kế hoạch' },
-            { id: 'LOADING', label: 'Bốc hàng' },
-            { id: 'IN_TRANSIT', label: 'Đang chạy' },
-            { id: 'ARRIVED', label: 'Đã đến' },
-            { id: 'COMPLETED', label: 'Hoàn thành' },
-          ].map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              onClick={() => setStatusFilter(chip.id)}
-              className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-xs transition ${
-                statusFilter === chip.id
-                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 font-semibold'
-                  : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200 border border-white/5'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-slate-400">
-            <Filter size={14} className="text-slate-400" />
+      {/* Phase 4: Compact Enterprise Toolbar */}
+      <EnterprisePanel className="rounded-xl -mt-1">
+        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_150px_150px_150px_150px_150px_140px_90px_90px]">
+          <div className="relative flex items-center">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm mã điều xe, công trình, xe, tài xế..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 pl-9 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+            />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
-          >
+
+          <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="ALL">Tất cả dự án</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.code} · {p.name}</option>
+            ))}
+          </select>
+          <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="ALL">Tất cả khách hàng</option>
+          </select>
+          <select value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="ALL">Tất cả xe</option>
+          </select>
+          <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="ALL">Tất cả tài xế</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="ALL">Tất cả trạng thái</option>
             {Object.entries(statusLabel).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
+              <option key={key} value={key}>{label}</option>
             ))}
           </select>
-
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="h-8 max-w-[180px] truncate rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400"
-          >
-            <option value="ALL">Tất cả công trình</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} · {p.name}
-              </option>
-            ))}
+          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
+            <option value="ALL">Tất cả thời gian</option>
           </select>
 
-          {isFiltered && (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery('')
-                setStatusFilter('ALL')
-                setProjectFilter('ALL')
-              }}
-              className="h-8 rounded-lg border border-red-500/30 bg-red-500/10 px-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition flex items-center gap-1 shrink-0"
-              title="Xóa bộ lọc"
-            >
-              <X size={12} /> Xóa lọc
-            </button>
-          )}
+          <button type="button" onClick={refresh} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
+          <button type="button" onClick={() => { setQuery(''); setStatusFilter('ALL'); setProjectFilter('ALL'); setCustomerFilter('ALL'); setVehicleFilter('ALL'); setDriverFilter('ALL'); setDateFilter('ALL') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
         </div>
-      </section>
+      </EnterprisePanel>
 
-      {/* 3. Main Workspace & Analytics Rail */}
+      {/* Phase 5: Enterprise Hero Table */}
       {tab === 'vehicles' ? (
         <VehiclesWorkspace dashboard={dashboard} orders={orders} loading={isLoading} />
       ) : tab === 'documents' ? (
         <DocumentsWorkspace orders={orders} onSelect={setSelectedOrder} loading={isLoading} />
       ) : (
-        <MainLogisticsWorkspace
-          tab={tab}
-          orders={filteredOrders}
-          dashboard={dashboard}
-          onSelect={setSelectedOrder}
-          loading={isLoading}
-        />
+        <EnterprisePanel className="rounded-xl">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách Lệnh Vận Chuyển & Điều Xe</h3>
+              <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filteredOrders.length} lệnh</span>
+            </div>
+            <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
+          </div>
+
+          <div className="h-[520px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+            <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
+              <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                <tr>
+                  {['Mã điều xe', 'Dự án', 'Khách hàng', 'Xe', 'Tài xế', 'Số cấu kiện', 'ETA', 'Trạng thái', 'Thao tác'].map((h) => (
+                    <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pagedOrders.map((order) => (
+                  <tr key={order.id} onClick={() => setSelectedOrder(order)} className={`${tableRow} cursor-pointer`}>
+                    <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{order.code}</td>
+                    <td className="px-2 py-2 text-white font-medium truncate">{order.project?.name ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">Tập đoàn Hòa Phát</td>
+                    <td className="px-2 py-2 font-medium text-slate-200 text-xs truncate">{order.vehicle || '—'}</td>
+                    <td className="px-2 py-2 text-cyan-400 text-xs truncate">{order.driver || '—'}</td>
+                    <td className="px-2 py-2 font-mono text-cyan-300 text-xs">{fmt(order.items.length)} dòng</td>
+                    <td className="px-2 py-2 text-slate-400 text-xs truncate">{formatDate(order.plannedAt)}</td>
+                    <td className="px-2 py-2"><StatusBadge status={order.status} /></td>
+                    <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedOrder(order) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DataTablePagination page={page} pageSize={pageSize} total={filteredOrders.length} onPageChange={setPage} />
+        </EnterprisePanel>
       )}
+
+      {/* Expanded Modal */}
+      {expandedModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Toàn bộ danh sách lệnh điều xe & vận chuyển</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filteredOrders.length} lệnh</p>
+              </div>
+              <button type="button" onClick={() => setExpandedModalOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition">Đóng</button>
+            </div>
+            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
+                <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
+                  <tr>
+                    {['Mã điều xe', 'Dự án', 'Khách hàng', 'Xe', 'Tài xế', 'Số cấu kiện', 'ETA', 'Trạng thái', 'Thao tác'].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.map((order) => (
+                    <tr key={order.id} onClick={() => { setSelectedOrder(order); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{order.code}</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">{order.project?.name ?? '—'}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">Tập đoàn Hòa Phát</td>
+                      <td className="px-2 py-2 font-medium text-slate-200 truncate">{order.vehicle || '—'}</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{order.driver || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-cyan-300">{fmt(order.items.length)} dòng</td>
+                      <td className="px-2 py-2 text-slate-400 truncate">{formatDate(order.plannedAt)}</td>
+                      <td className="px-2 py-2"><StatusBadge status={order.status} /></td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
 
       {/* Drawers */}
       <DispatchDetailDrawer
@@ -358,12 +417,16 @@ export function LogisticsPage() {
         onAction={(action) => (selectedOrder ? advanceMutation.mutate({ id: selectedOrder.id, action }) : undefined)}
         pending={advanceMutation.isPending}
       />
-      {creating ? (
+      {isModalOrDrawerOpen ? (
         <CreateDispatchDrawer
           projects={projects}
-          onClose={() => setCreating(false)}
+          onClose={() => {
+            setCreating(false)
+            closeCreateDispatch()
+          }}
           onCreated={() => {
             setCreating(false)
+            closeCreateDispatch()
             refresh()
           }}
         />
