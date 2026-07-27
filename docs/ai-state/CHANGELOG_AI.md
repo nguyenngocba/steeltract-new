@@ -1,5 +1,158 @@
 # SteelTrack AI Changelog
 
+## 2026-07-25 SPRINT EXECUTIVE BI.7 – Standardize All Executive BI Domains
+
+Completed:
+
+- **Task 1: Removed Redundant Hero Header**:
+  - Removed `<AnalyticsHeader>` from `ExecutiveAnalyticsPortal` in `DashboardPage.tsx` across all domains (`inbound`, `outbound`, `production`, `qc`, `projects`, `dispatch`).
+  - Eliminated duplicate title, eyebrow text, description, and timestamp banner.
+
+- **Task 2 & 3: Adopted Inventory Executive Master Layout**:
+  - Standardized all 6 non-inventory domains (`Nhập kho`, `Xuất kho`, `Sản xuất`, `Chất lượng`, `Dự án`, `Giao nhận`) to use the exact same 6-level vertical structure:
+    1. KPI Strip (`AnalyticsMetricGrid` with `h-[92px]` cards)
+    2. Executive Insight Panel (`ExecutiveInsightPanel` with domain-specific C-level insights)
+    3. Analytics Row 1 (60/40 ratio grid `xl:grid-cols-[1.2fr_0.8fr]`)
+    4. Analytics Row 2 (3-column grid `xl:grid-cols-3` with `h-[300px]` cards)
+    5. Executive Alert & Recommendation Center (`ExecutiveAlertsAndRecommendations`)
+    6. Operations Data Table (`AnalyticsTable`)
+
+- **Task 4 & 5: Visual & Navigation Consistency**:
+  - Ensured uniform spacing (`space-y-2.5`, `gap-2.5`), card radius (`rounded-2xl`), border styling (`border-white/10`), sticky sidebar, and back navigation.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-25 SPRINT EXECUTIVE BI.5 – Premium Enterprise UX Polish
+
+Completed:
+
+- **Task 1: Premium KPI Cards**:
+  - Polished KPI card micro-interactions in `AnalyticsMetricGrid` (`transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg`). Added halo scaling on hover (`group-hover:scale-125`) and refined number typography (`font-bold text-lg tracking-tight`).
+
+- **Task 2 & 3: Analytics Card & Rhythm Polish**:
+  - Unified title hierarchy (`text-xs font-bold uppercase tracking-[0.14em] text-white`) and subtitle typography (`text-[10px] text-slate-400`).
+  - Standardized card inner padding (`p-3.5`), equal card margins (`gap-2.5`), and visual rhythm.
+
+- **Task 4: Executive Color Consistency**:
+  - Verified semantic color enforcement: Blue (Financial), Emerald (Healthy), Amber (Warning), Red (Critical), Purple (Analysis), Cyan (Realtime).
+
+- **Task 5, 6 & 7: Micro-Interactions, Accessibility & Final Audit**:
+  - Configured 150–200ms smooth transitions across all cards, buttons, alert banners, and recommendation prompts.
+  - Enhanced text contrast, icon visibility, focus outlines (`focus-visible:ring-1 focus-visible:ring-cyan-400/60`), and verified zero visual artifacts.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-25 SPRINT EXECUTIVE BI.4 – Executive Insights & Professional Dashboard Polish
+
+Completed:
+
+- **Task 1: Executive Insight Panel**:
+  - Mounted `<ExecutiveInsightPanel />` below the top KPI strip featuring concise business insights: Inventory Value trend (+4.2%), Category A capital allocation (78.4%), Warehouse Yard occupancy (84.5%), and Aging inventory >90D (12.8%).
+
+- **Task 2 & 3: Executive Alert Center & Recommendation Panel**:
+  - Mounted `<ExecutiveAlertsAndRecommendations />` below analytics charts.
+  - **Alert Center**: Grouped into Critical (Red: low stock items), Warning (Amber: yard capacity tiệm cận 85%), and Information (Blue: audit vouchers approved).
+  - **Recommendations**: Actionable C-level prompts (15t steel plate transfer to Yard, 60D aging stock issuance priority, reorder point auto-purchasing).
+
+- **Task 4: Chart Header Improvements**:
+  - Enhanced `AnalyticsSection` headers with domain titles, descriptive subtitles, real-time update timestamp badges (`Cập nhật 10m trước`), and compact action triggers.
+
+- **Task 5 & 6: Empty State & Visual Hierarchy Polish**:
+  - Refined `CockpitEmptyState` text to business-specific messages with Lucide iconography.
+  - Preserved sticky navigation, 60/40 Row 1 composition, and consistent Enterprise surface tokens.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-25 SPRINT EXECUTIVE BI.3 – Dashboard Layout & Analytics Composition
+
+Completed:
+
+- **Task 1: KPI Strip Optimization**:
+  - Eliminated horizontal whitespace by aligning 5 KPI cards in equal `grid-cols-5 gap-2` grid proportions with `h-[92px]` height.
+
+- **Task 2: Analytics Composition (60/40 Ratio Optimization)**:
+  - Updated Row 1 grid layout from 50/50 (`xl:grid-cols-2`) to **60/40 ratio (`xl:grid-cols-[1.2fr_0.8fr]`)**.
+  - Expanded `"Sức chứa và sử dụng kho"` drawing area so the Donut SVG chart and legend fit comfortably without clipping, while keeping `"Phân tích ABC theo giá trị tồn"` compact.
+
+- **Task 3: Chart Internal Layout Optimization**:
+  - Resized Donut SVG container to `h-36 w-36` and optimized inner legend item spacing.
+  - Refined Heatmap cards to `h-[155px]` with clear percentage progress indicators (`text-cyan-300`).
+  - Reduced `AnalyticsSection` header margin from `mb-3` to `mb-2` to maximize chart drawing height.
+
+- **Task 4, 5 & 6: Information Density, Scroll Experience & Consistency**:
+  - Increased above-the-fold information density by eliminating unused whitespace.
+  - Maintained sticky sidebar (`sticky top-0 z-10`), sticky top header, and `max-h-[90vh] overflow-y-auto` main scrolling.
+  - Standardized Enterprise surface tokens (`rounded-2xl`, `border-white/10`, `bg-slate-950/40`).
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-25 SPRINT EXECUTIVE BI.2 – Enterprise Visual Polish & Color System
+
+Completed:
+
+- **Task 1: Remove KPI Left Accent Artifact**:
+  - Removed decorative left accent stripe (`span` pseudo-element) from all KPI cards in `AnalyticsMetricGrid`.
+  - Replaced with a clean, unified `border border-white/10 rounded-xl` container with subtle background hover glow.
+
+- **Task 2: Enterprise KPI Color System**:
+  - Implemented semantic color mapping for Executive KPI cards:
+    - **Inventory Value**: Blue (`text-blue-300`, `border-blue-500/25 bg-blue-500/10`)
+    - **Inventory Quantity**: Emerald (`text-emerald-300`, `border-emerald-500/25 bg-emerald-500/10`)
+    - **Warning Materials**: Amber (`text-amber-300`, `border-amber-500/25 bg-amber-500/10`)
+    - **Warehouse Status**: Purple (`text-purple-300`, `border-purple-500/25 bg-purple-500/10`)
+    - **Recent Transactions**: Cyan (`text-cyan-300`, `border-cyan-500/25 bg-cyan-500/10`)
+
+- **Task 3: Chart Color Refresh**:
+  - **ABC Analysis**: Mapped A to Emerald (`#10b981`), B to Amber (`#f59e0b`), C to Red (`#ef4444`).
+  - **Inventory Aging**: Mapped 0-30d to Blue (`#3b82f6`), 31-60d to Cyan (`#06b6d4`), 61-90d to Amber (`#f59e0b`), >90d to Red (`#ef4444`).
+  - **Dual Trend Bars**: Mapped Inbound to Emerald (`#34d399`) and Outbound to Amber (`#f59e0b`).
+  - **Top Inventory Gradient Bars**: Updated `colorAt()` sequence to a semantic spectrum (`Blue -> Cyan -> Emerald -> Amber -> Orange -> Purple -> Pink -> Slate`).
+
+- **Task 4, 5 & 6: Typography, Chart Surface & Visual Balance**:
+  - Enhanced contrast with `text-white font-semibold` titles, `text-slate-400` labels, and `text-slate-500` secondary text.
+  - Eliminated monochrome purple clutter across all sections.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-25 SPRINT EXECUTIVE BI.1 – Executive BI Popup UI Polish
+
+Completed:
+
+- **Task 1: Reduce KPI Card Height**:
+  - Standardized `AnalyticsMetricGrid` card height to `90–92px` with `p-2.5` vertical padding, compact spacing, and `text-lg font-bold` typography for dense information display.
+
+- **Task 2: Analytics Layout & 2-Column Proportions Optimization**:
+  - Kept 2-column grid layout strictly intact (`xl:grid-cols-2`).
+  - Optimized target height for top row charts ("Sức chứa và sử dụng kho" & "Phân tích ABC theo giá trị tồn") to `h-[230px]` (within `220–240px`).
+  - Completely removed unintended purple border / right edge glow decorations by unifying clean cyan borders (`border-cyan-300/18`).
+
+- **Task 3: Lower Analytics Row Height Optimization**:
+  - Reduced height of lower row charts ("Tuổi tồn kho", "Biến động tồn kho theo giao dịch", "Top vật tư theo tồn") to `h-[300px]` (within `280–320px`), preserving high readability while showing more information per viewport.
+
+- **Task 4: Scrolling Experience & Fixed Navigation**:
+  - Made the Left Sidebar fixed on scroll (`sticky top-0 max-h-[90vh] overflow-y-auto`).
+  - Made the Main Content scrollable independently (`max-h-[90vh] overflow-y-auto scrollbar-none`) with clean header positioning.
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
 ## 2026-07-24 SPRINT INVENTORY.3 – Inventory Audit Enterprise UI Standardization
 
 Completed:

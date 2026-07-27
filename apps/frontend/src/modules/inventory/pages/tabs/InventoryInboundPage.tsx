@@ -706,17 +706,17 @@ export function InventoryInboundPage() {
                   <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
                   <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
                     <colgroup>
-                      <col className="w-[100px]" /> {/* Mã phiếu nhập */}
-                      <col className="w-[120px]" /> {/* Ngày nhập */}
+                      <col className="w-[90px]" /> {/* Mã phiếu nhập */}
+                      <col className="w-[110px]" /> {/* Ngày nhập */}
                       <col className="w-[110px]" /> {/* Nhà cung cấp */}
-                      <col className="w-[110px]" /> {/* Vị trí */}
-                      <col className="w-[100px]" /> {/* Số lượng */}
-                      <col className="w-[70px]" />  {/* ĐVT */}
-                      <col className="w-[100px]" /> {/* Đơn giá */}
+                      <col className="w-[70px]" /> {/* Vị trí */}
+                      <col className="w-[110px]" /> {/* Số lượng */}
+                      <col className="w-[90px]" />  {/* ĐVT */}
+                      <col className="w-[120px]" /> {/* Đơn giá */}
                       <col className="w-[120px]" /> {/* Tổng giá trị */}
-                      <col className="w-[80px]" />  {/* Hồ sơ */}
-                      <col className="w-[120px]" /> {/* Trạng thái */}
-                      <col className="w-[100px]" /> {/* Người tạo */}
+                      <col className="w-[60px]" />  {/* Hồ sơ */}
+                      <col className="w-[60px]" /> {/* Sl Mã */}
+                      <col className="w-[120px]" /> {/* Người tạo */}
                     </colgroup>
                     <thead
                       className={`${inventoryTableHead}
@@ -725,7 +725,7 @@ export function InventoryInboundPage() {
                       style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                     >
                       <tr>
-                        {['Ngày nhập', 'Mã phiếu nhập', 'Nhà cung cấp', 'Vị trí', 'Số lượng', 'ĐVT', 'Đơn giá', 'Tổng giá trị', 'Hồ sơ', 'SL mã vật tư', 'Người tạo'].map((h) => (
+                        {['Ngày Nhập', 'Mã Phiếu Nhập', 'Nhà Cung Cấp', 'Vị Trí', 'Số Lượng', 'ĐVT', 'Đơn Giá', 'Tổng Giá Trị', 'Hồ Sơ', 'SL Mã', 'Người Tạo'].map((h) => (
                           <th key={h} className="px-4 py-2 text-left font-medium">
                             {h}
                           </th>

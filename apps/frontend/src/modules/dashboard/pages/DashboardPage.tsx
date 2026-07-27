@@ -33,6 +33,7 @@ import { getQcCockpit, type QcCockpit } from '@/modules/qc/api/qc.api'
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { CockpitEmptyState, CockpitTableShell, DataTablePagination } from '@/shared/ui/cockpit'
 import {
+  AbcAnalysisCard,
   AnalyticsActivityPanel,
   AnalyticsDistributionCard,
   AnalyticsHeader,
@@ -42,6 +43,12 @@ import {
   AnalyticsSection,
   AnalyticsTable,
   AnalyticsTrendChart,
+  ExecutiveAlertsAndRecommendations,
+  ExecutiveInsightPanel,
+  InventoryAgingCard,
+  TopInventoryRankingCard,
+  TransactionTrendCard,
+  WarehouseCapacityCard,
   type AnalyticsActivityRow,
   type DomainTheme,
   domainThemes,
@@ -984,18 +991,18 @@ function ExecutiveAnalyticsPortal({ domain, context, page, onPageChange, onDomai
   const theme = calmTheme(domainThemes[domain])
   const pageSize = 8
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/72 p-4 backdrop-blur-sm">
-      <section className="grid max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-3xl border border-cyan-300/20 bg-[#07111f] text-slate-100 shadow-[0_32px_120px_rgba(2,8,23,0.54)] xl:grid-cols-[200px_1fr]">
-        <aside className="max-h-[90vh] overflow-y-auto border-r border-cyan-300/10 bg-slate-950/55 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm">
+      <section className="grid max-h-[90vh] w-full max-w-[95vw] overflow-hidden rounded-3xl border border-cyan-300/20 bg-[#07111f] text-slate-100 shadow-[0_32px_120px_rgba(2,8,23,0.54)] xl:grid-cols-[210px_1fr]">
+        <aside className="max-h-[90vh] overflow-y-auto border-r border-cyan-300/10 bg-slate-950/65 p-4 sticky top-0 z-10 scrollbar-none">
           <button type="button" onClick={onClose} className="mb-4 inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-500/8 px-3 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/14">
             <ArrowLeft size={14} /> Quay lại
           </button>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-cyan-300">Executive BI</p>
             {domainTabs.map((tab) => {
               const Icon = tab.icon
               return (
-                <button key={tab.id} type="button" onClick={() => onDomainChange(tab.id)} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs ${tab.id === domain ? 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>
+                <button key={tab.id} type="button" onClick={() => onDomainChange(tab.id)} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-medium transition ${tab.id === domain ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100 shadow-sm' : 'border-white/5 bg-white/[0.02] text-slate-400 hover:border-white/10 hover:text-slate-200'}`}>
                   <Icon size={14} /> {tab.label}
                 </button>
               )
@@ -1003,26 +1010,15 @@ function ExecutiveAnalyticsPortal({ domain, context, page, onPageChange, onDomai
           </div>
           <div className={`mt-4 rounded-2xl border ${theme.border} bg-gradient-to-br ${theme.panel} p-3`}>
             <h3 className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">Tổng quan</h3>
-            <div className="mt-3 space-y-2">
+            <div className="mt-2.5 space-y-2">
               {spec.summary.map((row) => <SummaryLine key={row.label} label={row.label} value={row.value} />)}
             </div>
           </div>
         </aside>
-        {domain === 'inventory' ? null : (
-           <AnalyticsHeader
-             Icon={spec.icon}
-             theme={theme}
-             eyebrow={spec.eyebrow}
-             title={spec.title}
-             subtitle={spec.subtitle}
-             actions={
-               <div className="flex items-center gap-2">
-                 <span className="rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2 text-xs font-medium text-slate-400">{dateTime(new Date().toISOString())}</span>
-               </div>
-             }
-           />
-         )}
+
+        <main className="max-h-[90vh] overflow-y-auto p-4 scrollbar-none space-y-2.5">
           <DomainAnalyticsLayout spec={spec} domain={domain} page={page} pageSize={pageSize} onPageChange={onPageChange} />
+        </main>
       </section>
     </div>
   )
@@ -1053,27 +1049,29 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'inventory') {
     return (
-      <div className="space-y-2 pt-2">
+      <div className="space-y-2.5">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-2 xl:grid-cols-[1.15fr_0.85fr]">
-          <AnalyticsSection title="Sức chứa và sử dụng kho" theme={theme} className="min-h-[200px]">
-            <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="Kho" total={spec.distributionTotal} variant="donut" />
+        <ExecutiveInsightPanel domain={domain} />
+        <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+          <AnalyticsSection title="Sức chứa và sử dụng kho" subtitle="Phân bổ tổng sức chứa & tỷ lệ sử dụng hiện tại" theme={theme} className="h-[230px] min-h-[230px]">
+            <WarehouseCapacityCard rows={spec.distribution} total={spec.distributionTotal} />
           </AnalyticsSection>
-          <AnalyticsSection title="Phân tích ABC theo giá trị tồn" theme={theme} className="min-h-[200px]">
-            <AnalyticsDistributionCard rows={spec.matrix} theme={theme} centerLabel="ABC" total={spec.summary[0]?.value ?? ''} variant="heatmap" />
-          </AnalyticsSection>
-        </section>
-        <section className="grid gap-2 xl:grid-cols-[0.9fr_1.1fr_360px]">
-          <AnalyticsSection title="Tuổi tồn kho" theme={theme} className="min-h-[200px]">
-            <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Aging" total={spec.summary[2]?.value ?? ''} variant="list" />
-          </AnalyticsSection>
-          <AnalyticsSection title={spec.trendTitle} theme={theme} className="min-h-[200px]">
-            <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="line" />
-          </AnalyticsSection>
-          <AnalyticsSection title={spec.rankingTitle} theme={theme} className="min-h-[200px]">
-            <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
+          <AnalyticsSection title="Phân tích ABC theo giá trị tồn" subtitle="Phân loại giá trị tồn kho theo quy tắc Pareto A-B-C" theme={theme} className="h-[230px] min-h-[230px]">
+            <AbcAnalysisCard rows={spec.matrix} />
           </AnalyticsSection>
         </section>
+        <section className="grid gap-2.5 xl:grid-cols-3">
+          <AnalyticsSection title="Tuổi tồn kho" subtitle="Phân bổ thời gian lưu kho & tóm tắt tồn lâu ngày" theme={theme} className="h-[300px] min-h-[300px]">
+            <InventoryAgingCard rows={spec.secondaryDistribution} />
+          </AnalyticsSection>
+          <AnalyticsSection title={spec.trendTitle} subtitle="Xu hướng giao dịch nhập, xuất và biến động ròng" theme={theme} className="h-[300px] min-h-[300px]">
+            <TransactionTrendCard rows={analyticsTrendRows(spec)} theme={theme} />
+          </AnalyticsSection>
+          <AnalyticsSection title={spec.rankingTitle} subtitle="Top 10 mã vật tư có tổng khối lượng tồn lớn nhất" theme={theme} className="h-[300px] min-h-[300px]">
+            <TopInventoryRankingCard rows={spec.ranking} theme={theme} />
+          </AnalyticsSection>
+        </section>
+        <ExecutiveAlertsAndRecommendations />
         <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
       </div>
     )
@@ -1081,27 +1079,29 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'inbound') {
     return (
-      <div className="space-y-1 pt-2">
+      <div className="space-y-2.5">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-3 xl:grid-cols-[360px_1fr]">
-          <AnalyticsSection title="Nhập theo nhà cung cấp" theme={theme} className="min-h-[410px]">
-            <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
-          </AnalyticsSection>
-          <AnalyticsSection title="Xu hướng nhập hàng" theme={theme} className="min-h-[410px]">
+        <ExecutiveInsightPanel domain={domain} />
+        <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+          <AnalyticsSection title="Xu hướng nhập hàng" subtitle="Biến động khối lượng và giá trị vật tư nhập kho" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="dual" />
           </AnalyticsSection>
+          <AnalyticsSection title="Nhập theo nhà cung cấp" subtitle="Top các nhà cung cấp kết cấu thép hàng đầu" theme={theme} className="h-[230px] min-h-[230px]">
+            <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
+          </AnalyticsSection>
         </section>
-        <section className="grid gap-3 xl:grid-cols-[1fr_1fr_360px]">
-          <AnalyticsSection title="Lead time nhập hàng" theme={theme}>
+        <section className="grid gap-2.5 xl:grid-cols-3">
+          <AnalyticsSection title="Lead time nhập hàng" subtitle="Thời gian vận chuyển và làm thủ tục thông quan" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Lead" total="—" variant="list" emptyTitle="Dữ liệu lead time chưa khả dụng" />
           </AnalyticsSection>
-          <AnalyticsSection title="Kho nhận hàng" theme={theme}>
+          <AnalyticsSection title="Kho nhận hàng" subtitle="Phân bổ vật tư nhập về các kho bãi" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="Kho" total={spec.distributionTotal} variant="list" />
           </AnalyticsSection>
-          <AnalyticsSection title="Phiếu nhập gần đây" theme={theme}>
+          <AnalyticsSection title="Phiếu nhập gần đây" subtitle="Nhật ký các lô hàng mới hoàn tất kiểm định" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsActivityPanel rows={spec.activities} />
           </AnalyticsSection>
         </section>
+        <ExecutiveAlertsAndRecommendations />
         <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
       </div>
     )
@@ -1109,27 +1109,29 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'outbound') {
     return (
-      <div className="space-y-3 pt-2">
+      <div className="space-y-2.5">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-3 xl:grid-cols-[1fr_420px]">
-          <AnalyticsSection title="Dòng giá trị xuất kho" theme={theme} className="min-h-[410px]">
+        <ExecutiveInsightPanel domain={domain} />
+        <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+          <AnalyticsSection title="Dòng giá trị xuất kho" subtitle="Biến động lượng xuất cấu kiện theo mốc thi công" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="bars" />
           </AnalyticsSection>
-          <AnalyticsSection title="Phân bổ theo dự án/khách hàng" theme={theme} className="min-h-[410px]">
+          <AnalyticsSection title="Phân bổ theo dự án/khách hàng" subtitle="Tỷ lệ cấu kiện xuất cho các công trình trọng điểm" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="Xuất" total={spec.distributionTotal} variant="donut" />
           </AnalyticsSection>
         </section>
-        <section className="grid gap-3 xl:grid-cols-[360px_1fr_360px]">
-          <AnalyticsSection title="Sẵn sàng vận chuyển" theme={theme}>
+        <section className="grid gap-2.5 xl:grid-cols-3">
+          <AnalyticsSection title="Sẵn sàng vận chuyển" subtitle="Chỉ số giao hàng đúng hạn OTD và tình trạng xe" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="OTD" total="—" variant="heatmap" emptyTitle="Dữ liệu carrier/OTD chưa khả dụng" />
           </AnalyticsSection>
-          <AnalyticsSection title={spec.rankingTitle} theme={theme}>
+          <AnalyticsSection title={spec.rankingTitle} subtitle="Danh mục cấu kiện được xuất kho nhiều nhất" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
           </AnalyticsSection>
-          <AnalyticsSection title="Hoạt động xuất kho gần đây" theme={theme}>
+          <AnalyticsSection title="Hoạt động xuất kho gần đây" subtitle="Nhật ký các lệnh điều chuyển hạ bãi mới nhất" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsActivityPanel rows={spec.activities} />
           </AnalyticsSection>
         </section>
+        <ExecutiveAlertsAndRecommendations />
         <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
       </div>
     )
@@ -1137,27 +1139,29 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'production') {
     return (
-      <div className="space-y-3 pt-2">
+      <div className="space-y-2.5">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-          <AnalyticsSection title="Công suất và trạng thái lệnh" theme={theme} className="min-h-[410px]">
-            <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="MO" total={spec.distributionTotal} variant="heatmap" />
-          </AnalyticsSection>
-          <AnalyticsSection title="Xu hướng sản lượng xưởng" theme={theme} className="min-h-[410px]">
+        <ExecutiveInsightPanel domain={domain} />
+        <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+          <AnalyticsSection title="Xu hướng sản lượng xưởng" subtitle="Tổng khối lượng cấu kiện sản xuất qua các ca" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="bars" />
           </AnalyticsSection>
+          <AnalyticsSection title="Công suất và trạng thái lệnh" subtitle="Mức độ hoàn thành các lệnh sản xuất MO" theme={theme} className="h-[230px] min-h-[230px]">
+            <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="MO" total={spec.distributionTotal} variant="heatmap" />
+          </AnalyticsSection>
         </section>
-        <section className="grid gap-3 xl:grid-cols-[1fr_360px_360px]">
-          <AnalyticsSection title="Mức sẵn sàng máy" theme={theme}>
+        <section className="grid gap-2.5 xl:grid-cols-3">
+          <AnalyticsSection title="Mức sẵn sàng máy" subtitle="Tỷ lệ sử dụng máy CNC và máy hàn tự động" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Máy" total="—" variant="list" emptyTitle="Dữ liệu sử dụng máy chưa khả dụng" />
           </AnalyticsSection>
-          <AnalyticsSection title={spec.rankingTitle} theme={theme}>
+          <AnalyticsSection title={spec.rankingTitle} subtitle="Top mã cấu kiện có sản lượng gia công lớn nhất" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
           </AnalyticsSection>
-          <AnalyticsSection title="Hoạt động sản xuất" theme={theme}>
+          <AnalyticsSection title="Hoạt động sản xuất" subtitle="Nhật ký chuyển ca và tổ hợp gá lắp cấu kiện" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsActivityPanel rows={spec.activities} />
           </AnalyticsSection>
         </section>
+        <ExecutiveAlertsAndRecommendations />
         <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
       </div>
     )
@@ -1165,27 +1169,29 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'qc') {
     return (
-      <div className="space-y-3 pt-2">
+      <div className="space-y-2.5">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-3 xl:grid-cols-[420px_1fr]">
-          <AnalyticsSection title="Pareto NCR / mức độ lỗi" theme={theme} className="min-h-[410px]">
-            <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => `${fmt(value, 1)}%`} />
-          </AnalyticsSection>
-          <AnalyticsSection title="Xu hướng chất lượng" theme={theme} className="min-h-[410px]">
+        <ExecutiveInsightPanel domain={domain} />
+        <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+          <AnalyticsSection title="Xu hướng chất lượng" subtitle="Chỉ số nghiệm thu mối hàn và bề mặt sơn" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="line" />
           </AnalyticsSection>
+          <AnalyticsSection title="Pareto NCR / mức độ lỗi" subtitle="Xếp hạng các loại khiếm khuyết chất lượng" theme={theme} className="h-[230px] min-h-[230px]">
+            <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => `${fmt(value, 1)}%`} />
+          </AnalyticsSection>
         </section>
-        <section className="grid gap-3 xl:grid-cols-[1fr_1fr_360px]">
-          <AnalyticsSection title="Phân bổ kết quả QC" theme={theme}>
+        <section className="grid gap-2.5 xl:grid-cols-3">
+          <AnalyticsSection title="Phân bổ kết quả QC" subtitle="Tỷ lệ đạt, làm lại và phế phẩm trong kỳ" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="QC" total={spec.distributionTotal} variant="donut" />
           </AnalyticsSection>
-          <AnalyticsSection title="Root cause" theme={theme}>
+          <AnalyticsSection title="Root cause" subtitle="Phân tích căn nguyên sự cố không phù hợp" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Cause" total="—" variant="heatmap" emptyTitle="Dữ liệu root cause chưa khả dụng" />
           </AnalyticsSection>
-          <AnalyticsSection title="Hoạt động kiểm tra" theme={theme}>
+          <AnalyticsSection title="Hoạt động kiểm tra" subtitle="Nhật ký biên bản nghiệm thu nghiệm thu kỹ thuật" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsActivityPanel rows={spec.activities} />
           </AnalyticsSection>
         </section>
+        <ExecutiveAlertsAndRecommendations />
         <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
       </div>
     )
@@ -1193,54 +1199,58 @@ function DomainAnalyticsLayout({ spec, domain, page, pageSize, onPageChange }: {
 
   if (domain === 'projects') {
     return (
-      <div className="space-y-3 pt-2">
+      <div className="space-y-2.5">
         <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-        <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-          <AnalyticsSection title="Tiến độ mốc dự án" theme={theme} className="min-h-[410px]">
+        <ExecutiveInsightPanel domain={domain} />
+        <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+          <AnalyticsSection title="Tiến độ mốc dự án" subtitle="Khối lượng hoàn thành so với kế hoạch mốc thi công" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant="bars" />
           </AnalyticsSection>
-          <AnalyticsSection title="Xếp hạng ngân sách / hợp đồng" theme={theme} className="min-h-[410px]">
+          <AnalyticsSection title="Xếp hạng ngân sách / hợp đồng" subtitle="Giá trị hợp đồng gia công cấu kiện thép các dự án" theme={theme} className="h-[230px] min-h-[230px]">
             <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => money(value)} />
           </AnalyticsSection>
         </section>
-        <section className="grid gap-3 xl:grid-cols-[1fr_1fr_360px]">
-          <AnalyticsSection title="Rủi ro chậm tiến độ" theme={theme}>
+        <section className="grid gap-2.5 xl:grid-cols-3">
+          <AnalyticsSection title="Rủi ro chậm tiến độ" subtitle="Đánh giá xác suất rủi ro theo phân phân loại mốc" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.matrix} theme={theme} centerLabel="Delay" total={spec.summary[1]?.value ?? ''} variant="heatmap" />
           </AnalyticsSection>
-          <AnalyticsSection title="Tải cấu kiện / nguồn lực" theme={theme}>
+          <AnalyticsSection title="Tải cấu kiện / nguồn lực" subtitle="Phân bổ năng lực kỹ sư & thiết bị bãi thi công" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Resource" total={spec.summary[2]?.value ?? ''} variant="list" />
           </AnalyticsSection>
-          <AnalyticsSection title="Hoạt động dự án" theme={theme}>
+          <AnalyticsSection title="Hoạt động dự án" subtitle="Nhật ký các mốc nghiệm thu hợp đồng mới nhất" theme={theme} className="h-[300px] min-h-[300px]">
             <AnalyticsActivityPanel rows={spec.activities} />
           </AnalyticsSection>
         </section>
+        <ExecutiveAlertsAndRecommendations />
         <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-3 pt-2">
+    <div className="space-y-2.5">
       <AnalyticsMetricGrid items={spec.kpis} theme={theme} />
-      <section className="grid gap-3 xl:grid-cols-[380px_1fr_380px]">
-        <AnalyticsSection title="Bảng chuyến hôm nay" theme={theme} className="min-h-[410px]">
-          <AnalyticsActivityPanel rows={spec.activities} />
-        </AnalyticsSection>
-        <AnalyticsSection title="Luồng tuyến / điều phối" theme={theme} className="min-h-[410px]">
+      <ExecutiveInsightPanel domain={domain} />
+      <section className="grid gap-2.5 xl:grid-cols-[1.2fr_0.8fr]">
+        <AnalyticsSection title="Luồng tuyến / điều phối" subtitle="Tình trạng điều xe siêu trường siêu trọng" theme={theme} className="h-[230px] min-h-[230px]">
           <AnalyticsTrendChart rows={analyticsTrendRows(spec)} theme={theme} variant={trendVariant[domain]} />
         </AnalyticsSection>
-        <AnalyticsSection title="Trạng thái giao hàng" theme={theme} className="min-h-[410px]">
+        <AnalyticsSection title="Trạng thái giao hàng" subtitle="Tỷ lệ giao cấu kiện đến công trường" theme={theme} className="h-[230px] min-h-[230px]">
           <AnalyticsDistributionCard rows={spec.distribution} theme={theme} centerLabel="Chuyến" total={spec.distributionTotal} variant={distributionVariant[domain]} />
         </AnalyticsSection>
       </section>
-      <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-        <AnalyticsSection title="Sử dụng xe" theme={theme}>
+      <section className="grid gap-2.5 xl:grid-cols-3">
+        <AnalyticsSection title="Bảng chuyến hôm nay" subtitle="Danh sách các xe đang bốc dỡ tại bãi" theme={theme} className="h-[300px] min-h-[300px]">
+          <AnalyticsActivityPanel rows={spec.activities} />
+        </AnalyticsSection>
+        <AnalyticsSection title="Sử dụng xe" subtitle="Tần suất khai thác phương tiện vận tải" theme={theme} className="h-[300px] min-h-[300px]">
           <AnalyticsRankingCard rows={spec.ranking} theme={theme} valueFormatter={(value) => fmt(value, 1)} />
         </AnalyticsSection>
-        <AnalyticsSection title="Sẵn sàng nhà vận chuyển" theme={theme}>
+        <AnalyticsSection title="Sẵn sàng nhà vận chuyển" subtitle="Mức độ đáp ứng của đối tác giao nhận" theme={theme} className="h-[300px] min-h-[300px]">
           <AnalyticsDistributionCard rows={spec.secondaryDistribution} theme={theme} centerLabel="Carrier" total="—" variant="list" emptyTitle="Dữ liệu carrier chưa khả dụng" />
         </AnalyticsSection>
       </section>
+      <ExecutiveAlertsAndRecommendations />
       <AnalyticsTable title={spec.tableTitle} headers={spec.tableHeaders} rows={spec.tableRows} page={page} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
@@ -2540,18 +2550,18 @@ function abcDistribution(rows: RecordRow[]): DistributionPoint[] {
     else buckets.C += value
   })
   return [
-    { label: 'A - Giá trị trọng yếu', value: buckets.A, color: '#8b5cf6' },
-    { label: 'B - Giá trị trung bình', value: buckets.B, color: '#38bdf8' },
-    { label: 'C - Giá trị thấp', value: buckets.C, color: '#94a3b8' },
+    { label: 'A - Giá trị trọng yếu', value: buckets.A, color: '#10b981' },
+    { label: 'B - Giá trị trung bình', value: buckets.B, color: '#f59e0b' },
+    { label: 'C - Giá trị thấp', value: buckets.C, color: '#ef4444' },
   ].filter((row) => row.value > 0)
 }
 
 function inventoryAgingDistribution(rows: RecordRow[]): DistributionPoint[] {
   const buckets = [
-    { label: '0-30 ngày', value: 0, color: '#34d399' },
-    { label: '31-60 ngày', value: 0, color: '#38bdf8' },
+    { label: '0-30 ngày', value: 0, color: '#3b82f6' },
+    { label: '31-60 ngày', value: 0, color: '#06b6d4' },
     { label: '61-90 ngày', value: 0, color: '#f59e0b' },
-    { label: '>90 ngày', value: 0, color: '#f87171' },
+    { label: '>90 ngày', value: 0, color: '#ef4444' },
   ]
   const now = Date.now()
   rows.forEach((row) => {
@@ -2678,5 +2688,5 @@ function lateDispatchCount(orders: DispatchOrder[]) {
 }
 
 function colorAt(index: number) {
-  return ['#38bdf8', '#34d399', '#f59e0b', '#a78bfa', '#f87171', '#818cf8', '#fb923c', '#94a3b8'][index % 8]
+  return ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#f97316', '#a855f7', '#ec4899', '#94a3b8'][index % 8]
 }

@@ -250,7 +250,7 @@ export function InventoryTransactionAttachmentButton({
         event.stopPropagation()
         onOpen(attachments)
       }}
-      className={`inline-flex min-w-[68px] items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+      className={`inline-flex h-6 min-w-[40px] items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold transition ${
         attachments.length
           ? 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:border-cyan-300/50 hover:bg-cyan-400/15'
           : 'border-white/10 bg-white/[0.035] text-slate-500 hover:text-slate-300'

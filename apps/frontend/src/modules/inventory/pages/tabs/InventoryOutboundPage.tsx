@@ -799,7 +799,7 @@ export function InventoryOutboundPage() {
                     <col className="w-[120px]" /> {/* Khối lượng */}
                     <col className="w-[140px]" /> {/* Giá trị */}
                     <col className="w-[80px]" /> {/* Hồ sơ */}
-                    <col className="w-[100px]" /> {/* Trạng thái */}
+                    <col className="w-[60px]" /> {/* Trạng thái */}
                     <col className="w-[140px]" /> {/* Người tạo */}
                   </colgroup>
                   <thead
@@ -809,7 +809,7 @@ export function InventoryOutboundPage() {
                     style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                   >
                     <tr>
-                      {['NGÀY XUẤT', 'MÃ PHIẾU XUẤT', 'LOẠI XUẤT', 'ĐƠN VỊ NHẬN', 'KHO XUẤT', 'KHỐI LƯỢNG', 'GIÁ TRỊ', 'HỒ SƠ', 'SL MÃ VẬT TƯ', 'NGƯỜI TẠO'].map((h) => (
+                      {['Ngày Xuất', 'Mã Phiếu Xuất', 'Loại Xuất', 'Đơn Vị Nhận', 'Kho Xuất', 'Khối Lượng', 'Giá Trị', 'Hồ Sơ', 'SL Mã', 'Người Tạo'].map((h) => (
                         <th key={h} className="px-4 py-2 text-left font-medium">
                           {h}
                         </th>
