@@ -1,5 +1,23 @@
 # Components Module
 
+## Component Manufacturing Workflow Sprint B1
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+- Engineering BOM line and routing payloads are now validated through a strict
+  materialization contract before validation/release.
+- Released Component BOM definitions must contain materializable lines:
+  material identity, positive quantity, non-negative waste, normalized material
+  category, optional alternatives, and valid routing steps.
+- `replaceBom` stores normalized Engineering BOM line/routing JSON and computes
+  the content hash from the normalized contract shape.
+- `validateBom` and `releaseRevision` refuse non-materializable Engineering
+  BOM definitions before Production can consume them.
+- No Component UI, Inventory, QC, Yard, Logistics, Projects, Historical
+  Dashboard, Snapshot Engine, or third BOM model was introduced.
+
 ## Component Manufacturing Workflow Sprint A
 
 Implemented on 2026-07-23.

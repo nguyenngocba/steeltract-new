@@ -16,15 +16,74 @@ export class BomRepository {
     });
   }
 
-  findById(id: string) {
-    return this.prisma.bOM.findUnique({
+  findById(id: string, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.bOM.findUnique({
       where: { id },
       include: this.include(),
     });
   }
 
-  create(data: Prisma.BOMCreateInput) {
-    return this.prisma.bOM.create({
+  create(data: Prisma.BOMCreateInput, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.bOM.create({
+      data,
+      include: this.include(),
+    });
+  }
+
+  findMaterializedByBomDefinition(
+    bomDefinitionId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.bOM.findUnique({
+      where: { bomDefinitionId },
+      include: this.include(),
+    });
+  }
+
+  findEngineeringBasisForMaterialization(
+    componentId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.component.findUnique({
+      where: { id: componentId },
+      include: {
+        currentRevision: {
+          include: {
+            bomDefinition: true,
+          },
+        },
+        releaseEvidence: {
+          orderBy: { releasedAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+  }
+
+  findMaterializationMaterials(
+    params: { ids: string[]; codes: string[] },
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const filters: Prisma.InventoryItemWhereInput[] = [];
+    if (params.ids.length) {
+      filters.push({ id: { in: params.ids } });
+    }
+    if (params.codes.length) {
+      filters.push({ code: { in: params.codes } });
+    }
+    return tx.inventoryItem.findMany({
+      where: {
+        OR: filters,
+      },
+      select: { id: true, code: true, name: true },
+    });
+  }
+
+  async createMaterializedBom(
+    data: Prisma.BOMCreateInput,
+    tx: Prisma.TransactionClient,
+  ) {
+    return tx.bOM.create({
       data,
       include: this.include(),
     });
@@ -51,8 +110,8 @@ export class BomRepository {
     });
   }
 
-  nextBomNo() {
-    return nextOperationalCode(this.prisma, 'bOM', 'bomNo', 'BOM');
+  nextBomNo(tx: Prisma.TransactionClient = this.prisma) {
+    return nextOperationalCode(tx, 'bOM', 'bomNo', 'BOM');
   }
 
   findIssuedMaterialIssues(materialIds: string[]) {

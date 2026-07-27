@@ -11,6 +11,10 @@ import {
   SnapshotJobsQueryDto,
 } from './historical-dashboard.dto';
 import { HistoricalDashboardRepository } from './historical-dashboard.repository';
+import {
+  formatSnapshotBusinessDate,
+  parseSnapshotBusinessDate,
+} from '../historical-snapshots/snapshot-business-date';
 
 @Injectable()
 export class HistoricalDashboardService {
@@ -118,7 +122,7 @@ export class HistoricalDashboardService {
   }
 
   private toDate(value: string) {
-    return new Date(`${value}T00:00:00.000Z`);
+    return parseSnapshotBusinessDate(value);
   }
 
   private skip(page: number, pageSize: number) {
@@ -163,7 +167,9 @@ export class HistoricalDashboardService {
       return Object.fromEntries(
         Object.entries(value).map(([key, nested]) => [
           key,
-          this.serialize(nested),
+          this.isBusinessDateField(key, nested)
+            ? formatSnapshotBusinessDate(nested)
+            : this.serialize(nested),
         ]),
       );
     }
@@ -184,6 +190,20 @@ export class HistoricalDashboardService {
       Boolean(value) &&
       typeof value === 'object' &&
       value?.constructor?.name === 'Decimal'
+    );
+  }
+
+  private isBusinessDateField(key: string, value: unknown): value is Date {
+    return (
+      value instanceof Date &&
+      [
+        'snapshotDate',
+        'monthStart',
+        'fromDate',
+        'toDate',
+        'lastSuccessfulSnapshotDate',
+        'staleFromDate',
+      ].includes(key)
     );
   }
 }

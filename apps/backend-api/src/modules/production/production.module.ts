@@ -21,6 +21,7 @@ import { EventsModule } from '../../core/events/events.module';
 import { BOMService } from './services/bom.service';
 import { MaterialIssueService } from './services/material-issue.service';
 import { ProductionConsumptionService } from './services/production-consumption.service';
+import { ProductionBomMaterializationService } from './services/production-bom-materialization.service';
 import { ProductionMaterialLedgerService } from './services/production-material-ledger.service';
 import { ProductionReservationService } from './services/production-reservation.service';
 import { ProductionCommandService } from './services/production-command.service';
@@ -53,6 +54,7 @@ import { YardModule } from '../yard/yard.module';
     ProductionService,
     BOMService,
     MaterialIssueService,
+    ProductionBomMaterializationService,
     ProductionConsumptionService,
     ProductionMaterialLedgerService,
     ProductionReservationService,

@@ -51,8 +51,10 @@ describe('HistoricalSnapshotEngineService', () => {
         jobType: SnapshotJobType.DAILY_SNAPSHOT,
         module: HistoricalDashboardModule.INVENTORY,
         scopeKey: 'ALL',
+        snapshotDate: new Date('2026-07-22T00:00:00.000Z'),
         metadata: expect.objectContaining({
-          identityKey: expect.stringContaining('dashboard_daily'),
+          identityKey:
+            'DAILY_SNAPSHOT|INVENTORY|ALL|dashboard_daily|2026-07-22||',
           snapshotType: 'dashboard_daily',
           scheduledBy: 'SnapshotMetadata',
         }),

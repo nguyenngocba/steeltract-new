@@ -53,6 +53,7 @@ import {
   WorkOrderCommand,
 } from '../domain/production.aggregate';
 import { ProductionOrderRepository } from '../repositories/production-order.repository';
+import { ProductionBomMaterializationService } from './production-bom-materialization.service';
 
 type Tx = Prisma.TransactionClient;
 type OrderEvent =
@@ -86,6 +87,7 @@ export class ProductionCommandService {
   constructor(
     private readonly repository: ProductionOrderRepository,
     private readonly inventoryPosting: InventoryPostingService,
+    private readonly bomMaterialization: ProductionBomMaterializationService,
   ) {}
 
   createOrder(command: CreateProductionOrderCommand) {
@@ -103,6 +105,14 @@ export class ProductionCommandService {
         );
       }
       await this.assertReleasedEngineeringBasis(command, tx);
+      const productionBom =
+        await this.bomMaterialization.materializeReleasedEngineeringBom(
+          {
+            ...command.engineeringBasis,
+            actorId: command.actorId,
+          },
+          tx,
+        );
       const order = await this.repository.createAggregateOrder(
         {
           orderNo: command.orderNo,
@@ -110,6 +120,7 @@ export class ProductionCommandService {
           description: command.description,
           projectId: command.projectId,
           componentId: command.engineeringBasis.componentId,
+          bomId: productionBom.id,
           componentRevisionId: command.engineeringBasis.componentRevisionId,
           bomDefinitionId: command.engineeringBasis.bomDefinitionId,
           reworkOfProductionOrderId: command.reworkOfProductionOrderId,
@@ -121,6 +132,7 @@ export class ProductionCommandService {
             unit: command.unit,
             engineeringContentHash: command.engineeringBasis.contentHash,
             engineeringVerifiedAt: command.engineeringBasis.verifiedAt,
+            productionBomId: productionBom.id,
           }),
         },
         tx,
@@ -136,7 +148,7 @@ export class ProductionCommandService {
   }
 
   private async assertReleasedEngineeringBasis(
-    command: CreateProductionOrderCommand,
+    command: { engineeringBasis: CreateProductionOrderCommand['engineeringBasis'] },
     tx: Tx,
   ) {
     const basis = await this.repository.findReleasedEngineeringBasis(
@@ -1068,6 +1080,15 @@ export class ProductionCommandService {
         );
       }
       this.assertEngineeringBasis(command.engineeringBasis);
+      await this.assertReleasedEngineeringBasis(command, tx);
+      const productionBom =
+        await this.bomMaterialization.materializeReleasedEngineeringBom(
+          {
+            ...command.engineeringBasis,
+            actorId: command.actorId,
+          },
+          tx,
+        );
       const originalOrder = await this.order(
         command.originalProductionOrderId,
         tx,
@@ -1085,6 +1106,7 @@ export class ProductionCommandService {
           title: command.title,
           description: command.reason,
           componentId: command.engineeringBasis.componentId,
+          bomId: productionBom.id,
           componentRevisionId: command.engineeringBasis.componentRevisionId,
           bomDefinitionId: command.engineeringBasis.bomDefinitionId,
           reworkOfProductionOrderId: command.originalProductionOrderId,
@@ -1093,6 +1115,7 @@ export class ProductionCommandService {
           aggregateVersion: 1,
           metadata: this.json({
             engineeringContentHash: command.engineeringBasis.contentHash,
+            productionBomId: productionBom.id,
             qcNcrId: command.qcNcrId,
             routingScope: command.routingScope ?? null,
           }),

@@ -1,5 +1,146 @@
 # SteelTrack AI Changelog
 
+## 2026-07-27 SPRINT STABILITY.7 – B1 Runtime Integration Certification
+
+Completed:
+
+- Ran a controlled runtime fixture under namespace `STABILITY7-1785129145020`.
+- Certified Component DRAFT creation, Revision R1 creation, Engineering BOM
+  replacement, invalid BOM rejection, BOM validation, review, approval and
+  release through `ComponentCommandService`.
+- Certified Sprint A gate: Production Order creation is blocked until the
+  Component is Engineering-released.
+- Certified Production Order creation through `ProductionService` binds to the
+  released Component revision and auto-materializes the Engineering BOM into
+  the Production BOM model.
+- Certified Production BOM lineage:
+  `componentId`, `componentRevisionId`, `bomDefinitionId`,
+  `engineeringContentHash`, materialized items and routing steps.
+- Certified idempotent materialization replay: same Production BOM id returned,
+  no duplicate BOM and no duplicate BOMItem rows.
+- Certified historical binding: after releasing R2, the existing Production
+  Order remained bound to R1 lineage.
+- Created `docs/audits/b1-runtime-integration-certification.md`.
+- Updated `docs/audits/full-system-runtime-certification.md`.
+
+Verification:
+
+- Runtime fixture PASS.
+- `pnpm -C apps/backend-api exec prisma migrate status` passed.
+- `pnpm -C apps/backend-api exec prisma validate` passed.
+- `pnpm -C apps/backend-api test` passed: 76 suites / 215 tests.
+- `pnpm -C apps/backend-api build` passed.
+- `pnpm -C apps/frontend build` passed with existing Vite chunk-size warnings.
+- `git diff --check` passed.
+
+## 2026-07-27 SPRINT STABILITY.6 – Historical Snapshot Date Normalization
+
+Completed:
+
+- Added canonical Historical Snapshot business-date helpers.
+- Replaced Snapshot Engine local date mutation with UTC business-date
+  normalization for daily snapshots, monthly rollups and current-day checks.
+- Standardized Snapshot job identity keys to use `YYYY-MM-DD` business dates.
+- Updated Historical Dashboard API date parsing and serialization so business
+  dates return as `YYYY-MM-DD` while technical timestamps remain ISO strings.
+- Ensured initial DashboardSnapshot creation persists the generated `stale`
+  state.
+- Added targeted regression tests for business-date parsing, leap-day/year
+  boundary handling, scheduler job identity and Historical Dashboard DTO
+  serialization.
+- Verified a controlled `YARD/stability6_dashboard_daily` runtime workflow
+  under `Asia/Ho_Chi_Minh` persisted `snapshot_jobs`, `dashboard_snapshots` and
+  `snapshot_metadata` on `2026-07-29` without timezone drift.
+
+Verification:
+
+- `pnpm -C apps/backend-api exec prisma validate` passed.
+- `pnpm -C apps/backend-api exec prisma generate` passed.
+- `pnpm -C apps/backend-api exec prisma migrate status` passed.
+- `pnpm -C apps/backend-api test` passed: 76 suites / 215 tests.
+- `pnpm -C apps/backend-api build` passed.
+- `pnpm -C apps/frontend build` passed.
+- `git diff --check` passed.
+
+## 2026-07-27 SPRINT STABILITY.5 – Full System Runtime Certification
+
+Completed:
+
+- Created `docs/audits/full-system-runtime-certification.md`.
+- Verified PostgreSQL identity, Prisma migrate status, Prisma validation and Prisma Client generation.
+- Re-ran schema/database drift classification after STABILITY.4.
+- Smoke-tested authenticated runtime APIs for Dashboard/Runtime, Inventory, Components, Production, QC, Projects, Suppliers, Logistics, Yard, UOM, Admin/System and Historical Snapshot.
+- Served the frontend production build through Vite preview and verified major SPA routes return the app shell.
+- Executed controlled Snapshot minimum workflow by seeding `INVENTORY/dashboard_daily` and `INVENTORY/inventory_balance_daily` metadata, scheduling and processing 2 completed jobs, and writing dashboard/inventory snapshots.
+- Verified Snapshot job logs contain INFO entries and no failed jobs.
+- Classified certification as **CERTIFIED WITH CONDITIONS**.
+
+Findings:
+
+- P0: none.
+- P1: Historical Snapshot `@db.Date` timezone/date mismatch must be fixed before exact historical date semantics are production-certified.
+- P1: B1 runtime E2E needs a controlled fixture because the current DB has no released Component revisions/BOM definitions.
+- P1: frontend browser render certification still needs an authenticated Playwright/browser harness.
+
+Verification:
+
+- `pnpm -C apps/backend-api test` passed: 75 suites / 210 tests.
+- `pnpm -C apps/frontend test` passed: 1 file / 2 tests.
+- Targeted backend suites passed: 13 suites / 63 tests.
+- `pnpm -C apps/backend-api build` passed.
+- `pnpm -C apps/frontend build` passed.
+- `git diff --check` passed.
+
+## 2026-07-27 SPRINT STABILITY.4 – Historical Snapshot Corrective Migration
+
+Completed:
+
+- Created backup `/tmp/steeltrack-stability4-20260727-104307.dump` before database modification.
+- Added migration `20260727210000_historical_snapshot_corrective_schema`.
+- Created only the missing Historical Snapshot enums/tables already present in `schema.prisma`.
+- Preserved legacy snapshot tables/data unchanged.
+- Verified `prisma migrate deploy`, `prisma migrate status`, `prisma validate` and `prisma generate`.
+- Verified Snapshot Engine runtime no longer fails on missing `public.snapshot_metadata`.
+- Verified authenticated `/history/*` read endpoints return controlled empty/not-found responses, not schema-level 500s.
+- Verified Inventory, Components and Production read-only smoke endpoints still return `200`.
+
+Verification:
+
+- `pnpm -C apps/backend-api test` passed: 75 suites / 210 tests.
+- `pnpm -C apps/backend-api build` passed.
+- `pnpm -C apps/frontend build` passed.
+- `git diff --check` passed.
+
+## 2026-07-27 COMPONENT MANUFACTURING WORKFLOW Sprint B1 – Engineering BOM Materialization
+
+Completed:
+
+- Added additive Production BOM lineage for Engineering BOM materialization:
+  `componentId`, `componentRevisionId`, `bomDefinitionId`,
+  `engineeringContentHash`, `source`, `materializedAt`, and `materializedBy`.
+- Added a strict Engineering BOM contract parser for material lines and routing
+  steps, including material identity, positive quantity, non-negative waste,
+  category normalization, alternatives, and routing validation.
+- Hardened Components BOM replace/validate/release paths so released
+  Engineering BOM definitions are materializable before Production can consume
+  them.
+- Added `ProductionBomMaterializationService` to materialize the released
+  Component BOM into the existing Production `BOM` / `BOMItem` model without
+  introducing a third BOM model.
+- Connected canonical and legacy Production Order creation to the materialized
+  Production BOM while preserving engineering lineage and content hash checks.
+- Added focused unit coverage for Engineering BOM materialization,
+  idempotency, invalid BOM rejection, missing material rejection, stale content
+  hash rejection, and concurrent unique-conflict recovery.
+
+Verification:
+- `pnpm -C apps/backend-api exec prisma validate` passed.
+- `pnpm -C apps/backend-api exec prisma format` passed.
+- `pnpm -C apps/backend-api exec prisma generate` passed.
+- `pnpm -C apps/backend-api test` passed: 75 suites / 210 tests.
+- `pnpm -C apps/backend-api build` passed.
+- `pnpm -C apps/frontend build` passed with existing Vite warnings only.
+
 ## 2026-07-25 SPRINT EXECUTIVE BI.7 – Standardize All Executive BI Domains
 
 Completed:

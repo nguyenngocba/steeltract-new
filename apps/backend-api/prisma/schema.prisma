@@ -1341,6 +1341,7 @@ model Component {
   currentRevision ComponentRevision?         @relation("ComponentCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
   revisions       ComponentRevision[]        @relation("ComponentRevisions")
   releaseEvidence ComponentReleaseEvidence[]
+  productionBoms  BOM[]                      @relation("ComponentProductionBoms")
 
   costing         ComponentCosting?
   summarySnapshot ComponentSummarySnapshot?
@@ -1381,6 +1382,7 @@ model ComponentRevision {
   bomDefinition        ComponentBomDefinition?
   releaseEvidence      ComponentReleaseEvidence?  @relation("ReleasedRevisionEvidence")
   priorReleaseEvidence ComponentReleaseEvidence[] @relation("PreviousRevisionEvidence")
+  productionBoms       BOM[]                      @relation("ComponentRevisionProductionBoms")
 
   @@unique([componentId, revisionNo])
   @@index([componentId, state])
@@ -1401,7 +1403,8 @@ model ComponentBomDefinition {
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
-  revision ComponentRevision @relation(fields: [componentRevisionId], references: [id], onDelete: Restrict)
+  revision      ComponentRevision @relation(fields: [componentRevisionId], references: [id], onDelete: Restrict)
+  productionBom BOM?              @relation("ComponentBomDefinitionProductionBom")
 
   @@index([state])
   @@map("component_bom_definitions")
@@ -1883,25 +1886,25 @@ model InventoryDashboardSnapshot {
   id                      String   @id @default(cuid())
   warehouseId             String?
   warehouseCode           String?
-  scopeKey                 String
-  snapshotDate             DateTime @db.Date
-  totalMaterials           Int      @default(0)
-  totalStock               Float    @default(0)
-  availableStock           Float    @default(0)
-  reservedStock            Float    @default(0)
-  lowStockCount            Int      @default(0)
-  outOfStockCount          Int?
-  primaryMaterialCount     Int?
-  primaryStock             Float?
-  secondaryMaterialCount   Int?
-  secondaryStock           Float?
-  consumableMaterialCount  Int?
-  consumableStock          Float?
-  movementToday            Float    @default(0)
-  movementMonth            Float    @default(0)
-  inventoryValue           Float    @default(0)
-  updatedAt                DateTime @updatedAt
-  createdAt                DateTime @default(now())
+  scopeKey                String
+  snapshotDate            DateTime @db.Date
+  totalMaterials          Int      @default(0)
+  totalStock              Float    @default(0)
+  availableStock          Float    @default(0)
+  reservedStock           Float    @default(0)
+  lowStockCount           Int      @default(0)
+  outOfStockCount         Int?
+  primaryMaterialCount    Int?
+  primaryStock            Float?
+  secondaryMaterialCount  Int?
+  secondaryStock          Float?
+  consumableMaterialCount Int?
+  consumableStock         Float?
+  movementToday           Float    @default(0)
+  movementMonth           Float    @default(0)
+  inventoryValue          Float    @default(0)
+  updatedAt               DateTime @updatedAt
+  createdAt               DateTime @default(now())
 
   warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
 
@@ -1914,29 +1917,29 @@ model InventoryDashboardSnapshot {
 }
 
 model InventoryMaterialSnapshot {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   materialId          String
   warehouseId         String?
   warehouseCode       String?
   scopeKey            String
-  currentStock        Float    @default(0)
-  availableStock      Float    @default(0)
-  reservedStock       Float    @default(0)
-  allocatedToProjects Float    @default(0)
-  pendingReturn       Float    @default(0)
-  returnedQuantity    Float    @default(0)
-  inboundQuantity     Float    @default(0)
-  outboundQuantity    Float    @default(0)
-  inventoryValue      Float    @default(0)
-  attachmentCount     Int      @default(0)
-  locationCount       Int      @default(0)
+  currentStock        Float     @default(0)
+  availableStock      Float     @default(0)
+  reservedStock       Float     @default(0)
+  allocatedToProjects Float     @default(0)
+  pendingReturn       Float     @default(0)
+  returnedQuantity    Float     @default(0)
+  inboundQuantity     Float     @default(0)
+  outboundQuantity    Float     @default(0)
+  inventoryValue      Float     @default(0)
+  attachmentCount     Int       @default(0)
+  locationCount       Int       @default(0)
   lastInboundAt       DateTime?
   lastOutboundAt      DateTime?
   detailPayload       Json?
   locationPayload     Json?
   transactionPayload  Json?
-  updatedAt           DateTime @updatedAt
-  createdAt           DateTime @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime  @default(now())
 
   material  InventoryItem    @relation(fields: [materialId], references: [id], onDelete: Cascade)
   warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
@@ -1950,22 +1953,22 @@ model InventoryMaterialSnapshot {
 }
 
 model InventoryLocationSnapshot {
-  id            String   @id @default(cuid())
-  locationKey   String   @unique
-  warehouseId   String?
-  warehouseCode String?
-  warehouseName String?
-  zoneId        String?
-  zoneCode      String?
-  zoneName      String?
-  slotId        String?
-  level         String?
-  quantity      Float    @default(0)
-  occupied      Boolean  @default(false)
-  materialCount Int      @default(0)
+  id              String   @id @default(cuid())
+  locationKey     String   @unique
+  warehouseId     String?
+  warehouseCode   String?
+  warehouseName   String?
+  zoneId          String?
+  zoneCode        String?
+  zoneName        String?
+  slotId          String?
+  level           String?
+  quantity        Float    @default(0)
+  occupied        Boolean  @default(false)
+  materialCount   Int      @default(0)
   materialPayload Json?
-  updatedAt     DateTime @updatedAt
-  createdAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
 
   warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id])
   zone      WarehouseZone?   @relation(fields: [zoneId], references: [id])
@@ -3746,6 +3749,20 @@ model BOM {
 
   status String @default("ACTIVE")
 
+  componentId String?
+
+  componentRevisionId String?
+
+  bomDefinitionId String? @unique
+
+  engineeringContentHash String?
+
+  source String @default("MANUAL")
+
+  materializedAt DateTime?
+
+  materializedBy String?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -3757,6 +3774,17 @@ model BOM {
   productionOrders ProductionOrder[]
 
   materialReservations ProductionMaterialReservation[]
+
+  component Component? @relation("ComponentProductionBoms", fields: [componentId], references: [id], onDelete: SetNull)
+
+  componentRevision ComponentRevision? @relation("ComponentRevisionProductionBoms", fields: [componentRevisionId], references: [id], onDelete: SetNull)
+
+  bomDefinition ComponentBomDefinition? @relation("ComponentBomDefinitionProductionBom", fields: [bomDefinitionId], references: [id], onDelete: SetNull)
+
+  @@index([componentId])
+  @@index([componentRevisionId])
+  @@index([engineeringContentHash])
+  @@index([componentId, status])
 }
 
 model BOMItem {

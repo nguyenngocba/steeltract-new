@@ -25,6 +25,14 @@ import {
 
 import { safeErrorMessage } from '../../common/utils/safe-error-message';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  endOfSnapshotBusinessDay,
+  formatSnapshotBusinessDate,
+  previousSnapshotBusinessMonthWindow,
+  snapshotBusinessDateFromLocalCalendar,
+  startOfSnapshotBusinessDay,
+  startOfSnapshotBusinessMonth,
+} from './snapshot-business-date';
 
 type JsonObject = Prisma.InputJsonObject;
 
@@ -139,7 +147,7 @@ export class HistoricalSnapshotEngineService
   }
 
   async scheduleDueJobs(snapshotDate = new Date()) {
-    const day = this.startOfDay(snapshotDate);
+    const day = snapshotBusinessDateFromLocalCalendar(snapshotDate);
     const metadata = await this.prisma.snapshotMetadata.findMany({
       where: {
         enabled: true,
@@ -168,7 +176,7 @@ export class HistoricalSnapshotEngineService
         scheduled += job ? 1 : 0;
       }
 
-      const previousMonth = this.previousMonthWindow(day);
+      const previousMonth = previousSnapshotBusinessMonthWindow(day);
       if (
         this.shouldScheduleMonthlyRollup(
           row.frequency,
@@ -455,7 +463,8 @@ export class HistoricalSnapshotEngineService
     const module = job.module ?? HistoricalDashboardModule.ERP;
     const payload = await this.dashboardPayload(module, snapshotDate);
     const sourceWatermark =
-      payload.sourceMaxAt?.toISOString() ?? snapshotDate.toISOString();
+      payload.sourceMaxAt?.toISOString() ??
+      formatSnapshotBusinessDate(snapshotDate);
 
     await this.prisma.dashboardSnapshot.upsert({
       where: {
@@ -483,6 +492,7 @@ export class HistoricalSnapshotEngineService
         sourceWatermark,
         rowCount: payload.rowCount,
         warningCount: payload.warningCount,
+        stale: payload.stale,
         generatedByJobId: job.id,
       },
       update: {
@@ -510,7 +520,7 @@ export class HistoricalSnapshotEngineService
       'snapshot.dashboard.upserted',
       {
         module,
-        snapshotDate: snapshotDate.toISOString(),
+        snapshotDate: formatSnapshotBusinessDate(snapshotDate),
         rowsRead: payload.rowCount,
       },
     );
@@ -667,7 +677,7 @@ export class HistoricalSnapshotEngineService
       SnapshotJobLogLevel.INFO,
       'snapshot.inventory_balance.upserted',
       {
-        snapshotDate: snapshotDate.toISOString(),
+        snapshotDate: formatSnapshotBusinessDate(snapshotDate),
         rowsRead,
         rowsWritten: written,
       },
@@ -685,12 +695,11 @@ export class HistoricalSnapshotEngineService
   private async generateMonthlyRollups(
     job: SnapshotJob,
   ): Promise<SnapshotRunResult> {
-    const fromDate = this.startOfDay(
-      job.fromDate ?? this.previousMonthWindow(new Date()).fromDate,
+    const defaultWindow = previousSnapshotBusinessMonthWindow(
+      snapshotBusinessDateFromLocalCalendar(new Date()),
     );
-    const toDate = this.startOfDay(
-      job.toDate ?? this.previousMonthWindow(new Date()).toDate,
-    );
+    const fromDate = this.startOfDay(job.fromDate ?? defaultWindow.fromDate);
+    const toDate = this.startOfDay(job.toDate ?? defaultWindow.toDate);
     const module = job.module ?? HistoricalDashboardModule.ERP;
     const metadata = this.readMetadata(job.metadata);
 
@@ -772,7 +781,8 @@ export class HistoricalSnapshotEngineService
     return {
       rowsRead: rows.length,
       rowsWritten: 1,
-      sourceWatermark: last?.sourceWatermark ?? toDate.toISOString(),
+      sourceWatermark:
+        last?.sourceWatermark ?? formatSnapshotBusinessDate(toDate),
     };
   }
 
@@ -951,7 +961,7 @@ export class HistoricalSnapshotEngineService
     return {
       rowsRead,
       rowsWritten: written,
-      sourceWatermark: toDate.toISOString(),
+      sourceWatermark: formatSnapshotBusinessDate(toDate),
     };
   }
 
@@ -1139,7 +1149,10 @@ export class HistoricalSnapshotEngineService
       },
       tables: {},
       warnings: delayed > 0 ? [{ code: 'PROJECT_DELAYED', count: delayed }] : [],
-      metadata: { source: 'projects read model', snapshotDate: snapshotDate.toISOString() },
+      metadata: {
+        source: 'projects read model',
+        snapshotDate: formatSnapshotBusinessDate(snapshotDate),
+      },
     });
   }
 
@@ -1629,9 +1642,9 @@ export class HistoricalSnapshotEngineService
       input.module,
       input.scopeKey,
       input.metadata.snapshotType ?? 'dashboard_daily',
-      input.snapshotDate?.toISOString() ?? '',
-      input.fromDate?.toISOString() ?? '',
-      input.toDate?.toISOString() ?? '',
+      input.snapshotDate ? formatSnapshotBusinessDate(input.snapshotDate) : '',
+      input.fromDate ? formatSnapshotBusinessDate(input.fromDate) : '',
+      input.toDate ? formatSnapshotBusinessDate(input.toDate) : '',
     ].join('|');
   }
 
@@ -1664,7 +1677,7 @@ export class HistoricalSnapshotEngineService
     ) {
       return false;
     }
-    const previousMonth = this.previousMonthWindow(day);
+    const previousMonth = previousSnapshotBusinessMonthWindow(day);
     const targetMonth = this.startOfMonth(previousMonth.fromDate);
     if (!lastSuccessfulSnapshotDate) {
       return true;
@@ -1699,38 +1712,23 @@ export class HistoricalSnapshotEngineService
     ].join(':');
   }
 
-  private previousMonthWindow(day: Date) {
-    const monthStart = this.startOfMonth(day);
-    const fromDate = new Date(monthStart);
-    fromDate.setMonth(fromDate.getMonth() - 1);
-    const toDate = new Date(monthStart);
-    toDate.setDate(toDate.getDate() - 1);
-    return {
-      fromDate,
-      toDate,
-    };
-  }
-
   private startOfDay(date: Date) {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-    return result;
+    return startOfSnapshotBusinessDay(date);
   }
 
   private isCurrentDay(date: Date) {
-    return this.startOfDay(date).getTime() === this.startOfDay(new Date()).getTime();
+    return (
+      this.startOfDay(date).getTime() ===
+      snapshotBusinessDateFromLocalCalendar(new Date()).getTime()
+    );
   }
 
   private endOfDay(date: Date) {
-    const result = new Date(date);
-    result.setHours(23, 59, 59, 999);
-    return result;
+    return endOfSnapshotBusinessDay(date);
   }
 
   private startOfMonth(date: Date) {
-    const result = this.startOfDay(date);
-    result.setDate(1);
-    return result;
+    return startOfSnapshotBusinessMonth(date);
   }
 
   private maxDate(values: Date[]) {

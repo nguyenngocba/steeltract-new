@@ -24,6 +24,7 @@ describe('HistoricalDashboardService', () => {
       module: HistoricalDashboardModule.ERP,
       scopeKey: 'ALL',
       snapshotDate: new Date('2026-07-22T00:00:00.000Z'),
+      generatedAt: new Date('2026-07-22T01:00:00.000Z'),
       authoritative: true,
       kpis: { inventoryValue: new Prisma.Decimal('158.26') },
       rowsRead: BigInt(12),
@@ -45,10 +46,57 @@ describe('HistoricalDashboardService', () => {
       id: 'snapshot-1',
       module: HistoricalDashboardModule.ERP,
       scopeKey: 'ALL',
-      snapshotDate: '2026-07-22T00:00:00.000Z',
+      snapshotDate: '2026-07-22',
+      generatedAt: '2026-07-22T01:00:00.000Z',
       authoritative: true,
       kpis: { inventoryValue: '158.26' },
       rowsRead: '12',
+    });
+  });
+
+  it('parses leap-day and year-boundary business date filters without timezone drift', async () => {
+    const repo = repository();
+    repo.findDashboardSnapshot.mockResolvedValue({
+      id: 'snapshot-2',
+      module: HistoricalDashboardModule.INVENTORY,
+      scopeKey: 'ALL',
+      snapshotDate: new Date('2024-02-29T00:00:00.000Z'),
+      authoritative: true,
+      kpis: {},
+    });
+    const service = new HistoricalDashboardService(repo as any);
+
+    await service.dashboard({
+      date: '2024-02-29',
+      module: HistoricalDashboardModule.INVENTORY,
+    });
+
+    expect(repo.findDashboardSnapshot).toHaveBeenCalledWith({
+      date: new Date('2024-02-29T00:00:00.000Z'),
+      module: HistoricalDashboardModule.INVENTORY,
+      scopeKey: 'ALL',
+      authoritative: undefined,
+    });
+
+    repo.findDashboardSnapshot.mockResolvedValue({
+      id: 'snapshot-3',
+      module: HistoricalDashboardModule.PROJECTS,
+      scopeKey: 'ALL',
+      snapshotDate: new Date('2026-12-31T00:00:00.000Z'),
+      authoritative: true,
+      kpis: {},
+    });
+
+    await service.dashboard({
+      date: '2026-12-31',
+      module: HistoricalDashboardModule.PROJECTS,
+    });
+
+    expect(repo.findDashboardSnapshot).toHaveBeenLastCalledWith({
+      date: new Date('2026-12-31T00:00:00.000Z'),
+      module: HistoricalDashboardModule.PROJECTS,
+      scopeKey: 'ALL',
+      authoritative: undefined,
     });
   });
 

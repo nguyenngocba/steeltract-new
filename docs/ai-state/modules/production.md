@@ -1,5 +1,27 @@
 # Production Module
 
+## Component Manufacturing Workflow Sprint B1
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+- Production now materializes released Engineering BOM definitions into the
+  existing Production `BOM` / `BOMItem` model before creating component-bound
+  Production Orders.
+- The materialized Production BOM stores Engineering lineage:
+  `componentId`, `componentRevisionId`, `bomDefinitionId`,
+  `engineeringContentHash`, `source=ENGINEERING`, `materializedAt`, and
+  `materializedBy`.
+- Canonical command creation and legacy `POST /production` creation both bind
+  component-bound orders to the materialized Production BOM.
+- Stale content hashes, unreleased revisions, unreleased BOM definitions,
+  missing materials, and mismatched caller-selected BOMs are rejected instead
+  of silently creating inconsistent Production Orders.
+- Existing manual/legacy BOM orders without a Component remain compatible.
+- No Production UI, Inventory, QC, Yard, Logistics, Projects, Historical
+  Dashboard, Snapshot Engine, or third BOM model was introduced.
+
 ## Component Manufacturing Workflow Sprint A
 
 Implemented on 2026-07-23.

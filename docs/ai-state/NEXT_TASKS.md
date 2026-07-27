@@ -1,12 +1,24 @@
 # Next Tasks
 
-- **Component Manufacturing Workflow Sprint B**: formalize Engineering BOM line
-  payloads for raw material, plate, bolt, paint, consumables, waste,
-  alternatives, revision and effective date using existing Component BOM
-  definition storage where possible.
-- **Component Manufacturing Workflow Sprint C-D**: connect Production Order
-  creation to material reservation and issue gates. Reservation should reduce
-  available quantity only; production start must require issued material.
+- **Authenticated frontend browser smoke P1**: add a Playwright/browser route
+  harness for `/`, `/inventory`, `/components`, `/production`, `/qc`,
+  `/projects`, `/suppliers`, `/logistics` and `/history`.
+- **Historical Snapshot metadata seed and minimum workflow**: seed controlled
+  `SnapshotMetadata` rows for dashboard, inventory balance and monthly rollup
+  snapshot types, then run a minimum scheduler/job/snapshot workflow in
+  development. Do not backfill historical years or change schema.
+- **Historical Snapshot unrelated drift cleanup decision**: separately review
+  the pre-existing schema diff items left outside STABILITY.4:
+  `inventory_location_stocks_backup`, `updatedAt` defaults on WorkOrder/project
+  tables and the truncated project dependency index name.
+- **Component Manufacturing Workflow Sprint C**: connect released Engineering
+  BOM material demand to Material Reservation. Reservation must reduce
+  available quantity only, preserve on-hand quantity, support partial
+  reservation, and remain owned by the approved Inventory contract.
+- **Component Manufacturing Workflow Sprint D**: connect Material Issue to
+  Production start readiness. Production must record Issue To Production
+  movement through the approved Inventory posting contract and must not reduce
+  stock again during Consumption.
 - **Component Manufacturing Workflow Sprint E-H**: harden Production execution,
   QC disposition and Finished Goods gating so only QC-passed components enter
   Component Inventory.
@@ -51,24 +63,18 @@
 - **Historical Snapshot Engine batch-size tuning**: tune
   `HISTORICAL_SNAPSHOT_BATCH_SIZE` in staging using real inventory volume and
   monitor query latency, lease renewal cadence and memory usage.
-- **Historical Dashboard metadata seed/migration gate**: before enabling the
-  engine in a real environment, deploy the reviewed schema migration and seed
-  `SnapshotMetadata` rows for `dashboard_daily`,
-  `inventory_balance_daily`, `monthly_rollup` and
-  `inventory_monthly_rollup`.
+- **Historical Dashboard metadata seed/migration gate**: schema migration is now
+  deployed. Before enabling the engine in a real environment, seed
+  `SnapshotMetadata` rows for `dashboard_daily`, `inventory_balance_daily`,
+  `monthly_rollup` and `inventory_monthly_rollup`.
 - **Historical Dashboard engine integration QA**: run the worker against a
   staging database with seeded metadata and verify lease recovery, failed job
   retry, idempotent snapshot upserts and monthly rollup creation on a month
   boundary.
-- **Historical Dashboard create-only migration**: generate a create-only Prisma
-  migration from the hardened schema, then replace/review generated DDL for
-  PostgreSQL partitioning before deployment. Preserve the new enum-backed
-  fields and non-null inventory bucket keys.
-- **Historical Dashboard raw SQL migration review**: generate the Prisma
-  migration with `--create-only`, then add/review PostgreSQL partition DDL,
-  CHECK constraints, partial indexes, covering indexes and GIN indexes from
-  `docs/runtime/historical-dashboard-prisma-migration-plan.md` before any
-  deployment.
+- **Historical Dashboard raw SQL hardening review**: after the corrective base
+  schema is stable, separately review PostgreSQL partition DDL, CHECK
+  constraints, partial indexes, covering indexes and GIN indexes from
+  `docs/runtime/historical-dashboard-prisma-migration-plan.md`.
 - **Inventory Add Material date QA**: create a new material with a backdated
   `Ngày thêm` value and confirm Materials analytics use the persisted
   `createdAt` fallback when no transaction history exists.

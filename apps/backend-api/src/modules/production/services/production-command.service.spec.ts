@@ -12,6 +12,7 @@ import {
 import { InventoryPostingService } from '../../inventory/inventory-posting.service';
 import { ProductionOrderRepository } from '../repositories/production-order.repository';
 import { ProductionCommandService } from './production-command.service';
+import { ProductionBomMaterializationService } from './production-bom-materialization.service';
 
 const releasedEngineeringBasis = {
   id: 'component-1',
@@ -56,6 +57,11 @@ describe('ProductionCommandService', () => {
     const service = new ProductionCommandService(
       repository,
       {} as InventoryPostingService,
+      {
+        materializeReleasedEngineeringBom: jest.fn().mockResolvedValue({
+          id: 'bom-1',
+        }),
+      } as unknown as ProductionBomMaterializationService,
     );
 
     await service.createOrder({
@@ -78,6 +84,7 @@ describe('ProductionCommandService', () => {
       expect.objectContaining({
         status: ProductionOrderStatus.DRAFT,
         aggregateVersion: 1,
+        bomId: 'bom-1',
         componentRevisionId: 'revision-1',
       }),
       tx,
@@ -143,6 +150,11 @@ describe('ProductionCommandService', () => {
     const service = new ProductionCommandService(
       repository,
       {} as InventoryPostingService,
+      {
+        materializeReleasedEngineeringBom: jest.fn().mockResolvedValue({
+          id: 'bom-2',
+        }),
+      } as unknown as ProductionBomMaterializationService,
     );
     const command = {
       orderNo: 'PO-002',
@@ -190,6 +202,9 @@ describe('ProductionCommandService', () => {
     const service = new ProductionCommandService(
       repository,
       {} as InventoryPostingService,
+      {
+        materializeReleasedEngineeringBom: jest.fn(),
+      } as unknown as ProductionBomMaterializationService,
     );
 
     await expect(
@@ -239,6 +254,7 @@ describe('ProductionCommandService', () => {
     const service = new ProductionCommandService(
       repository,
       {} as InventoryPostingService,
+      {} as ProductionBomMaterializationService,
     );
 
     await expect(
@@ -307,6 +323,7 @@ describe('ProductionCommandService', () => {
     const service = new ProductionCommandService(
       repository,
       {} as InventoryPostingService,
+      {} as ProductionBomMaterializationService,
     );
 
     const result = await service.startExecution({
@@ -372,6 +389,7 @@ describe('ProductionCommandService', () => {
     const service = new ProductionCommandService(
       repository,
       {} as InventoryPostingService,
+      {} as ProductionBomMaterializationService,
     );
 
     await expect(

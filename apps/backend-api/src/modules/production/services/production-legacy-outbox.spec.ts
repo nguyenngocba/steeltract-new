@@ -60,6 +60,7 @@ describe('ProductionService legacy stage Outbox boundary', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await service.completeStage(stage.id, {

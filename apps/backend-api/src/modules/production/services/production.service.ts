@@ -54,6 +54,7 @@ import {
   ProductionRepository,
   ProductionTx,
 } from '../repositories/production.repository';
+import { ProductionBomMaterializationService } from './production-bom-materialization.service';
 
 const defaultStages: Array<{
   code: ProductionStageCode;
@@ -125,6 +126,7 @@ export class ProductionService {
     private readonly yardService: YardService,
     private readonly materialIssueService: MaterialIssueService,
     private readonly componentCostingService: ComponentCostingService,
+    private readonly bomMaterialization: ProductionBomMaterializationService,
   ) {}
 
   async findAll(query: ListProductionOrdersDto) {
@@ -209,8 +211,24 @@ export class ProductionService {
         );
       }
 
+      let boundBom = bom;
+      if (component) {
+        const materializedBom =
+          await this.bomMaterialization.materializeCurrentReleasedComponent(
+            component.id,
+            actorId,
+            tx,
+          );
+        if (dto.bomId && dto.bomId !== materializedBom.id) {
+          throw new BadRequestException(
+            'Selected BOM does not match the released Engineering BOM',
+          );
+        }
+        boundBom = materializedBom;
+      }
+
       const routingStages =
-        bom?.routingSteps.map((step, index) => ({
+        boundBom?.routingSteps.map((step, index) => ({
           code: this.stageCodeForRouting(step.stepName),
           name: step.stepName,
           sequence: step.stepNo,
@@ -253,6 +271,14 @@ export class ProductionService {
                     : ProductionStageStatus.PENDING,
               }));
 
+      const metadata = { ...(dto.metadata ?? {}) };
+      if (boundBom?.engineeringContentHash) {
+        metadata.engineeringContentHash = boundBom.engineeringContentHash;
+      }
+      if (boundBom?.id) {
+        metadata.productionBomId = boundBom.id;
+      }
+
       const order = await this.repository.createOrder(
         {
           orderNo: dto.orderNo,
@@ -262,14 +288,16 @@ export class ProductionService {
           component: dto.componentId
             ? { connect: { id: dto.componentId } }
             : undefined,
-          bom: dto.bomId ? { connect: { id: dto.bomId } } : undefined,
+          bom: boundBom ? { connect: { id: boundBom.id } } : undefined,
           quantity: dto.quantity,
           priority: dto.priority,
           status: dto.status,
+          componentRevisionId: boundBom?.componentRevisionId,
+          bomDefinitionId: boundBom?.bomDefinitionId,
           currentStageCode: stageInputs[0]?.code,
           plannedStartAt: dto.plannedStartAt,
           plannedEndAt: dto.plannedEndAt,
-          metadata: this.toJson(dto.metadata),
+          metadata: this.toJson(metadata),
           stages: {
             create: stageInputs,
           },

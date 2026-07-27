@@ -1,5 +1,58 @@
 # Project Status
 
+On 2026-07-27 completed **SPRINT STABILITY.7 – B1 Runtime Integration
+Certification** with decision **PASS**. A controlled fixture namespace
+`STABILITY7-1785129145020` certified the runtime path Component DRAFT ->
+Revision -> Engineering BOM replace/validate -> Engineering Release ->
+Production Order -> Production BOM materialization -> Production Order BOM
+binding. The fixture proved Sprint A release gating, invalid BOM rejection,
+lineage preservation, idempotent materialization replay and historical binding
+after a newer Component revision was released. No schema, migration, frontend,
+Inventory workflow, Sprint C-J feature, staging or commit action was performed.
+Backend tests, backend build, frontend build, Prisma migrate status, Prisma
+validate and `git diff --check` passed.
+
+On 2026-07-27 completed **SPRINT STABILITY.6 – Historical Snapshot Date
+Normalization**. Resolved the STABILITY.5 `@db.Date` timezone/date mismatch by
+standardizing Historical Snapshot business dates as strict `YYYY-MM-DD`
+calendar dates persisted as UTC-midnight Date values. Snapshot Engine
+scheduling, job identity, daily/monthly boundaries, metadata advancement and
+Historical Dashboard API serialization now use the same canonical date rule.
+Runtime checks under `UTC` and `Asia/Ho_Chi_Minh` passed, and a controlled
+`YARD/stability6_dashboard_daily` workflow stored and read `2026-07-29`
+consistently through `snapshot_jobs`, `dashboard_snapshots`,
+`snapshot_metadata` and the Historical Dashboard controller/service/repository
+path. Prisma validation/generation/migrate status, backend tests, backend
+build, frontend build and `git diff --check` passed.
+
+On 2026-07-27 completed **SPRINT STABILITY.5 – Full System Runtime
+Certification** with decision **CERTIFIED WITH CONDITIONS**. Verified database
+connectivity, Prisma migration status, Prisma validation/generation, backend
+health, authenticated module APIs, frontend preview route shell, background
+Snapshot Engine behavior, minimum Snapshot workflow, targeted regression suites,
+backend tests/build and frontend tests/build. No P0 remains. Key condition:
+Historical Snapshot date semantics needed a P1 fix because current-day snapshot
+generation stored `@db.Date` rows on `2026-07-25` during Asia/Ho_Chi_Minh
+runtime verification; exact historical day behavior is not production-certified
+until date normalization is fixed. This condition was resolved in
+STABILITY.6. B1 runtime E2E still requires a controlled fixture because the
+current DB lacks released Component revisions/BOM definitions.
+
+On 2026-07-27 completed **SPRINT STABILITY.4 – Historical Snapshot Corrective
+Migration**. Created and deployed one forward-only corrective Prisma migration
+for the Historical Snapshot schema drift identified in STABILITY.3. The new
+migration creates the missing Historical Snapshot enums, generic snapshot
+tables, inventory balance snapshots, monthly rollups, snapshot jobs/logs,
+rebuild requests and snapshot metadata without dropping, renaming, truncating or
+backfilling legacy snapshot data. Runtime smoke confirmed the previous
+`public.snapshot_metadata does not exist` Snapshot Engine startup error is
+resolved, and authenticated `/history/*` read endpoints now return controlled
+empty/not-found responses instead of schema-level failures. Backend tests,
+backend build, frontend build, Prisma validation/generation and git diff check
+passed.
+
+On 2026-07-27 completed **COMPONENT MANUFACTURING WORKFLOW Sprint B1 – Engineering BOM Materialization**. Released Component BOM definitions are now validated with a canonical Engineering BOM contract and materialized into the existing Production BOM/BOMItem model before Production Order creation. Component-bound Production Orders preserve Engineering lineage (`componentId`, `componentRevisionId`, `bomDefinitionId`, `engineeringContentHash`) and reject stale or non-materializable Engineering BOM input. The implementation is additive, introduces no third BOM model, and does not modify Inventory, QC, Yard, Logistics, Projects, Historical Dashboard, Snapshot Engine, Warehouse Realtime, or frontend UI. Backend tests, backend build, frontend build, and Prisma validation passed.
+
 On 2026-07-25 completed **SPRINT EXECUTIVE BI.7 – Standardize All Executive BI Domains**. Standardized all 6 Executive BI domains (`Nhập kho`, `Xuất kho`, `Sản xuất`, `Chất lượng`, `Dự án`, `Giao nhận`) using Inventory Executive BI as the master template. Removed redundant hero headers (`AnalyticsHeader`), added domain-aware Executive Insights and Executive Alert/Recommendation panels, standardized Row 1 (60/40 ratio) and Row 2 (3-column) grid layouts across every domain. Both frontend and backend builds compile with 0 errors.
 
 On 2026-07-25 completed **SPRINT EXECUTIVE BI.5 – Premium Enterprise UX Polish**. Refined micro UX, 150–200ms motion transitions, KPI card hover effects, chart card padding, accessibility contrast, and visual rhythm across the Executive BI Popup. Both frontend and backend builds compile with 0 errors.

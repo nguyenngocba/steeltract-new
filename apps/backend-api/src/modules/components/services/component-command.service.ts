@@ -37,6 +37,11 @@ import {
   ComponentDomainError,
   ComponentRevisionAggregate,
 } from '../domain/component.aggregate';
+import {
+  assertEngineeringBomMaterializable,
+  parseEngineeringBomLines,
+  parseEngineeringBomRouting,
+} from '../domain/engineering-bom-contract';
 import { ComponentsRepository } from '../repositories/components.repository';
 
 type Tx = Prisma.TransactionClient;
@@ -381,7 +386,9 @@ export class ComponentCommandService {
       const revision = await this.revision(command.revisionId, tx);
       this.assertRevisionOwner(revision.componentId, command.componentId);
       this.domain(() => this.revisionAggregate(revision).updateContent());
-      const contentHash = this.bomContentHash(command.lines, command.routing);
+      const lines = parseEngineeringBomLines(command.lines);
+      const routing = parseEngineeringBomRouting(command.routing);
+      const contentHash = this.bomContentHash(lines, routing);
       if (contentHash !== command.contentHash) {
         throw new ConflictException('BOM content hash does not match content');
       }
@@ -429,8 +436,8 @@ export class ComponentCommandService {
         bomWriteVersion,
         {
           state,
-          lines: this.json(command.lines),
-          routing: this.json(command.routing),
+          lines: this.json(lines),
+          routing: this.json(routing),
           contentHash,
           validatedAt: null,
           validatedBy: null,
@@ -474,6 +481,7 @@ export class ComponentCommandService {
         throw new ConflictException('ComponentRevision version conflict');
       }
       const bom = this.requiredBom(revision.id, revision.bomDefinition);
+      assertEngineeringBomMaterializable(bom.lines, bom.routing);
       if (bom.contentHash !== command.contentHash) {
         throw new ConflictException(
           'BOM content hash changed before validation',
@@ -520,6 +528,7 @@ export class ComponentCommandService {
       const revision = await this.revision(command.revisionId, tx);
       this.assertRevisionOwner(revision.componentId, component.id);
       const bom = this.requiredBom(revision.id, revision.bomDefinition);
+      assertEngineeringBomMaterializable(bom.lines, bom.routing);
       const revisionState = this.domain(() =>
         this.revisionAggregate(revision).release(bom.state),
       );
