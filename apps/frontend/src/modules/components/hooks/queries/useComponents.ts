@@ -16,10 +16,14 @@ import {
   getComponentsOverview,
   getComponentsDashboard,
   getComponentsWorkspace,
+  getFinishedGoodsInstances,
   getProductionOrders,
   recalculateComponentCosting,
 } from "../../services/api/components.api";
-import type { ComponentsReadModelParams } from "../../api/contracts/components.contract";
+import type {
+  ComponentsReadModelParams,
+  FinishedGoodsParams,
+} from "../../api/contracts/components.contract";
 import { productionApi } from "../../../production/api/production.api";
 
 export function useComponents(enabled = true) {
@@ -51,6 +55,14 @@ export function useComponentsDashboard() {
   return useQuery({
     queryKey: ["components", "dashboard"],
     queryFn: getComponentsDashboard,
+  });
+}
+
+export function useFinishedGoodsInstances(params: FinishedGoodsParams) {
+  return useQuery({
+    queryKey: ["components", "finished-goods", params],
+    queryFn: () => getFinishedGoodsInstances(params),
+    placeholderData: keepPreviousData,
   });
 }
 

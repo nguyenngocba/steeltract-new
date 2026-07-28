@@ -128,6 +128,12 @@ export class ProductionCommandService {
           bomDefinitionId: command.engineeringBasis.bomDefinitionId,
           reworkOfProductionOrderId: command.reworkOfProductionOrderId,
           quantity: command.quantity,
+          plannedStartAt: command.plannedStartAt
+            ? new Date(command.plannedStartAt)
+            : undefined,
+          plannedEndAt: command.plannedEndAt
+            ? new Date(command.plannedEndAt)
+            : undefined,
           orderKind: command.orderKind ?? ProductionOrderKind.STANDARD,
           status: ProductionOrderStatus.DRAFT,
           aggregateVersion: 1,

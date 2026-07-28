@@ -14,6 +14,8 @@ import type {
   ComponentsOverviewReadModel,
   ComponentsDashboardRead,
   ComponentsReadModelParams,
+  FinishedGoodsParams,
+  FinishedGoodsReadModel,
 } from "../../api/contracts/components.contract";
 
 export async function getComponents() {
@@ -45,6 +47,14 @@ export async function getComponentsOverview(params: ComponentsReadModelParams) {
 export async function getComponentsDashboard() {
   const response = await api.get<ComponentsDashboardRead>(
     "/components/dashboard",
+  );
+  return response.data;
+}
+
+export async function getFinishedGoodsInstances(params: FinishedGoodsParams) {
+  const response = await api.get<FinishedGoodsReadModel>(
+    "/components/instances/finished-goods",
+    { params },
   );
   return response.data;
 }

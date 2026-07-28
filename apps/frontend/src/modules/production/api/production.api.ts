@@ -5,6 +5,8 @@ export type ProductionOrder = {
   orderNo: string
   title: string
   projectId?: string
+  componentRequirementId?: string
+  aggregateVersion?: number
   quantity: number
   priority: string
   status: string
@@ -21,6 +23,137 @@ export type ProductionOrder = {
     delayed: boolean
     materialReadiness: ProductionCockpitMaterialReadiness
   }
+}
+
+export type ComponentRequirementProductionOrder = {
+  id: string
+  orderNo: string
+  title: string
+  quantity: number
+  status: string
+  aggregateVersion?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type ProjectComponentRequirement = {
+  id: string
+  requirementNo: string
+  projectId: string
+  projectTaskId?: string
+  componentId: string
+  componentRevisionId?: string
+  bomDefinitionId?: string
+  requiredQuantity: number
+  producedQuantity?: number
+  acceptedQuantity?: number
+  installedQuantity?: number
+  status: string
+  requiredBy?: string
+  createdAt: string
+  updatedAt: string
+  project?: { id: string; code: string; name: string }
+  projectTask?: { id: string; name: string }
+  component?: { id: string; code: string; name: string; lifecycleState: string }
+  componentRevision?: { id: string; revisionNo: string; state: string }
+  bomDefinition?: { id: string; state: string; contentHash?: string | null }
+  productionOrders?: ComponentRequirementProductionOrder[]
+}
+
+export type ProjectComponentRequirementList = {
+  data: ProjectComponentRequirement[]
+  meta: { page: number; limit: number; total: number; totalPages: number }
+}
+
+export type ComponentInstanceExecution = {
+  id: string
+  status: string
+  startedAt?: string
+  completedAt?: string
+  cancelledAt?: string
+  workOrder?: {
+    id: string
+    workOrderNo: string
+    productCode: string
+    quantity: number
+    status: string
+    lifecycleState?: string
+    sequence?: number
+  }
+  productionExecution?: {
+    id: string
+    state: string
+    workCenterId?: string
+    machineId?: string
+    startedAt?: string
+    completedAt?: string
+  }
+}
+
+export type ComponentInstance = {
+  id: string
+  instanceNo: string
+  componentId: string
+  componentRevisionId: string
+  bomDefinitionId?: string
+  productionOrderId?: string
+  requirementId?: string
+  projectId?: string
+  projectTaskId?: string
+  state: string
+  serialSequence?: number
+  producedAt?: string
+  qcPassedAt?: string
+  scrappedAt?: string
+  installedAt?: string
+  createdAt: string
+  updatedAt: string
+  component?: { id: string; code: string; name: string; lifecycleState: string }
+  componentRevision?: { id: string; revisionNo: string; state: string }
+  bomDefinition?: { id: string; state: string; contentHash?: string | null }
+  productionOrder?: { id: string; orderNo: string; title: string; quantity: number; status: string }
+  requirement?: { id: string; requirementNo: string; requiredQuantity: number }
+  project?: { id: string; code: string; name: string }
+  projectTask?: { id: string; name: string }
+  executions?: ComponentInstanceExecution[]
+}
+
+export type ComponentInstanceList = {
+  data: ComponentInstance[]
+  meta: { page: number; limit: number; total: number; totalPages: number }
+}
+
+export type CreateCanonicalProductionOrderInput = {
+  orderNo: string
+  title: string
+  description?: string
+  projectId?: string
+  componentRequirementId: string
+  quantity: number
+  unit: string
+  orderKind?: string
+  plannedStartAt?: string
+  plannedEndAt?: string
+  engineeringBasis: {
+    componentId: string
+    componentRevisionId: string
+    bomDefinitionId: string
+    contentHash: string
+    verifiedAt: string
+  }
+}
+
+export type ReleaseCanonicalProductionOrderInput = {
+  expectedVersion: number
+  reason?: string
+  workOrders: Array<{
+    routingOperationId: string
+    productCode: string
+    quantity: number
+    sequence: number
+    plannedStart?: string
+    plannedEnd?: string
+  }>
 }
 
 export type ProductionCockpitMaterialReadiness = {
@@ -380,8 +513,28 @@ export const productionApi = {
   machines: () => api.get<ProductionMachine[]>('/production/machines').then((res) => res.data),
   requirements: (id: string) =>
     api.get<MaterialRequirement[]>(`/production/${id}/requirements`).then((res) => res.data),
+  componentRequirements: (params?: Record<string, unknown>) =>
+    api.get<ProjectComponentRequirementList>('/components/foundation/requirements', { params }).then((res) => res.data),
+  componentInstances: (params?: Record<string, unknown>) =>
+    api.get<ComponentInstanceList>('/components/foundation/instances', { params }).then((res) => res.data),
   createOrder: (payload: Record<string, unknown>) =>
     api.post<ProductionOrder>('/production', payload).then((res) => res.data),
+  createCanonicalOrder: (payload: CreateCanonicalProductionOrderInput) =>
+    api.post<ProductionOrder>('/production/commands/orders', payload, {
+      headers: { 'Idempotency-Key': `production-order-${payload.orderNo}` },
+    }).then((res) => res.data),
+  releaseCanonicalOrder: (id: string, payload: ReleaseCanonicalProductionOrderInput) =>
+    api.post<ProductionOrder>(`/production/commands/orders/${id}/release`, payload, {
+      headers: { 'Idempotency-Key': `production-order-release-${id}-${payload.expectedVersion}` },
+    }).then((res) => res.data),
+  assignComponentInstanceExecution: (payload: { productionExecutionId: string; componentInstanceIds: string[] }) =>
+    api.post<ComponentInstanceExecution>('/production/commands/instance-executions/assign', payload).then((res) => res.data),
+  startComponentInstanceExecution: (id: string) =>
+    api.post<ComponentInstanceExecution>(`/production/commands/instance-executions/${id}/start`, {}).then((res) => res.data),
+  completeComponentInstanceExecution: (id: string) =>
+    api.post<ComponentInstanceExecution>(`/production/commands/instance-executions/${id}/complete`, {}).then((res) => res.data),
+  componentInstanceExecutionHistory: (componentInstanceId: string) =>
+    api.get<ComponentInstanceExecution[]>(`/production/commands/component-instances/${componentInstanceId}/executions`).then((res) => res.data),
   startOrder: (id: string) =>
     api.post<ProductionOrder>(`/production/${id}/start`, {}).then((res) => res.data),
   completeStage: (id: string) =>

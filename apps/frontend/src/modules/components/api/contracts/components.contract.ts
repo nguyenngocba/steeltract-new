@@ -8,6 +8,17 @@ export type ComponentStatus =
   | "DELIVERED"
   | "INSTALLED";
 
+export type ComponentInstanceState =
+  | "PLANNED"
+  | "IN_PRODUCTION"
+  | "PRODUCED_WAITING_QC"
+  | "QC_PASSED"
+  | "QC_FAILED"
+  | "REWORK"
+  | "SCRAPPED"
+  | "USE_AS_IS"
+  | "LEGACY_UNKNOWN";
+
 export interface ProjectReference {
   id: string;
   code: string;
@@ -261,6 +272,35 @@ export type ComponentWorkspaceRow = {
   workOrder: string;
   dueDate?: string;
   productionStatus?: string;
+  lifecycleState?: "DRAFT" | "ACTIVE" | "DEPRECATED" | "ARCHIVED" | null;
+  engineeringStatus?: string;
+  revisionNo?: string | null;
+  revisionState?: string | null;
+  bomState?: string | null;
+  requirementCount?: number;
+  requiredQuantity?: number;
+  allocatedProductionQuantity?: number;
+  remainingRequirementQuantity?: number;
+  requirements?: Array<{
+    id: string;
+    requirementNo: string;
+    projectId: string;
+    projectCode: string;
+    projectName: string;
+    requiredQuantity: number;
+    producedQuantity: number;
+    acceptedQuantity: number;
+    installedQuantity: number;
+    allocatedProductionQuantity: number;
+    status: string;
+    requiredBy?: string | null;
+    productionOrders: Array<{
+      id: string;
+      orderNo: string;
+      quantity: number;
+      status: string;
+    }>;
+  }>;
   rawCreatedAt?: string;
   createdAt: string;
 };
@@ -272,11 +312,102 @@ export type PaginationMeta = {
   totalPages: number;
 };
 
+export type FinishedGoodsParams = {
+  page?: number;
+  limit?: number;
+  projectId?: string;
+  componentId?: string;
+  componentRequirementId?: string;
+  productionOrderId?: string;
+  instanceCode?: string;
+};
+
+export type FinishedGoodsInstanceRow = {
+  id: string;
+  instanceNo: string;
+  componentId: string;
+  componentRevisionId: string;
+  bomDefinitionId?: string | null;
+  productionOrderId?: string | null;
+  requirementId?: string | null;
+  projectId?: string | null;
+  projectTaskId?: string | null;
+  state: ComponentInstanceState;
+  serialSequence?: number | null;
+  producedAt?: string | null;
+  qcPassedAt?: string | null;
+  scrappedAt?: string | null;
+  installedAt?: string | null;
+  legacyComponentId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  component: {
+    id: string;
+    code: string;
+    name: string;
+    componentType?: string | null;
+    profile?: string | null;
+    lifecycleState?: string | null;
+  };
+  componentRevision?: {
+    id: string;
+    revisionNo: string;
+    state: string;
+  } | null;
+  productionOrder?: {
+    id: string;
+    orderNo: string;
+    status: string;
+  } | null;
+  requirement?: {
+    id: string;
+    requirementNo: string;
+    requiredQuantity: number;
+  } | null;
+  project?: ProjectReference | null;
+  qcInspections?: Array<{
+    id: string;
+    inspectionNo: string;
+    status: string;
+    completedAt?: string | null;
+    approvedAt?: string | null;
+    checklist?: {
+      id: string;
+      code: string;
+      name: string;
+      type: string;
+    } | null;
+  }>;
+  ncrs?: Array<{
+    id: string;
+    ncrNo: string;
+    status: string;
+    disposition?: string | null;
+    updatedAt?: string | null;
+  }>;
+};
+
+export type FinishedGoodsReadModel = {
+  data: FinishedGoodsInstanceRow[];
+  summary: {
+    total: number;
+    qcPassed: number;
+    useAsIs: number;
+    projectCount: number;
+  };
+  meta: PaginationMeta;
+};
+
 export type ComponentsListReadModel = {
   data: ComponentWorkspaceRow[];
   meta: PaginationMeta;
   summary: {
     total: number;
+    draft?: number;
+    released?: number;
+    deprecated?: number;
+    missingBom?: number;
+    totalDemand?: number;
     running: number;
     completed: number;
     waitingMaterial: number;

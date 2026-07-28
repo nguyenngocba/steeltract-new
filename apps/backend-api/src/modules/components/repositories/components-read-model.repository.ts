@@ -41,12 +41,30 @@ type ComponentMetadata = {
 
 const componentReadInclude = {
   project: true,
+  currentRevision: {
+    include: {
+      bomDefinition: true,
+    },
+  },
   requirements: {
     select: {
       id: true,
+      requirementNo: true,
       requiredQuantity: true,
+      producedQuantity: true,
+      acceptedQuantity: true,
+      installedQuantity: true,
+      status: true,
       requiredBy: true,
       project: { select: { id: true, code: true, name: true } },
+      productionOrders: {
+        select: {
+          id: true,
+          orderNo: true,
+          quantity: true,
+          status: true,
+        },
+      },
     },
   },
   productionOrders: {
@@ -253,16 +271,8 @@ export class ComponentsReadModelRepository {
   ): Prisma.ComponentWhereInput {
     const search = query.search || query.q;
     const statuses = this.componentStatuses(query.status);
+    const lifecycleStates = this.lifecycleStates(query.status);
     const and: Prisma.ComponentWhereInput[] = [];
-
-    if (query.status === 'Tồn kho') {
-      and.push({
-        OR: [
-          { lifecycleState: null },
-          { lifecycleState: { not: ComponentLifecycleState.DRAFT } },
-        ],
-      });
-    }
 
     if (query.location) {
       and.push({
@@ -285,6 +295,9 @@ export class ComponentsReadModelRepository {
 
     return {
       status: statuses?.length ? { in: statuses } : undefined,
+      lifecycleState: lifecycleStates?.length
+        ? { in: lifecycleStates }
+        : undefined,
       project: query.project
         ? {
             OR: [
@@ -334,6 +347,22 @@ export class ComponentsReadModelRepository {
     }[value];
   }
 
+  private lifecycleStates(
+    value?: string,
+  ): ComponentLifecycleState[] | undefined {
+    if (!value) return undefined;
+    const direct = Object.values(ComponentLifecycleState).find(
+      (state) => state === value,
+    );
+    if (direct) return [direct];
+    return {
+      Nháp: [ComponentLifecycleState.DRAFT],
+      'Đã phát hành sản xuất': [ComponentLifecycleState.ACTIVE],
+      'Ngừng sử dụng': [ComponentLifecycleState.DEPRECATED],
+      'Đã lưu trữ': [ComponentLifecycleState.ARCHIVED],
+    }[value];
+  }
+
   private async toRows(sources: ComponentSource[]) {
     const fallbackBoms = await this.prisma.bOM.findMany({
       where: {
@@ -348,8 +377,20 @@ export class ComponentsReadModelRepository {
       const bom =
         order?.bom ??
         fallbackBoms.find((item) => item.productCode === source.code);
+      const requirements = source.requirements ?? [];
       const requirementQuantity = this.requirementQuantity(source);
-      const quantity = Number(requirementQuantity ?? metadata.quantity ?? 1);
+      const quantity = Number(requirementQuantity ?? 0);
+      const allocatedProductionQty = requirements.reduce(
+        (sum, requirement) =>
+          sum +
+          (requirement.productionOrders ?? []).reduce(
+            (orderSum, order) => orderSum + Number(order.quantity ?? 0),
+            0,
+          ),
+        0,
+      );
+      const currentRevision = source.currentRevision;
+      const bomDefinition = currentRevision?.bomDefinition;
       const requiredByMaterial = new Map<string, number>();
       for (const item of bom?.items ?? []) {
         const required =
@@ -400,7 +441,7 @@ export class ComponentsReadModelRepository {
         installAxis: source.installAxis,
         installLevel: source.installLevel,
         installPosition: source.installPosition,
-        status: this.listStatus(source.status, source.lifecycleState),
+        status: this.engineeringStatus(source),
         rawStatus: source.status,
         qty: quantity,
         qc:
@@ -412,11 +453,46 @@ export class ComponentsReadModelRepository {
         requiredQty,
         issuedQty,
         remainingQty: Math.max(0, requiredQty - issuedQty),
-        hasBom: Boolean(bom),
+        hasBom: Boolean(bomDefinition ?? bom),
         hasProductionOrder: Boolean(order),
         workOrder: order?.orderNo ?? '-',
         dueDate: order?.plannedEndAt?.toISOString(),
         productionStatus: order?.status,
+        lifecycleState: source.lifecycleState,
+        engineeringStatus: this.engineeringStatus(source),
+        revisionNo: currentRevision?.revisionNo ?? null,
+        revisionState: currentRevision?.state ?? null,
+        bomState: bomDefinition?.state ?? (bom ? 'PRODUCTION_BOM' : null),
+        requirementCount: requirements.length,
+        requiredQuantity: quantity,
+        allocatedProductionQuantity: allocatedProductionQty,
+        remainingRequirementQuantity: Math.max(
+          0,
+          quantity - allocatedProductionQty,
+        ),
+        requirements: requirements.map((requirement) => ({
+          id: requirement.id,
+          requirementNo: requirement.requirementNo,
+          projectId: requirement.project.id,
+          projectCode: requirement.project.code,
+          projectName: requirement.project.name,
+          requiredQuantity: Number(requirement.requiredQuantity ?? 0),
+          producedQuantity: Number(requirement.producedQuantity ?? 0),
+          acceptedQuantity: Number(requirement.acceptedQuantity ?? 0),
+          installedQuantity: Number(requirement.installedQuantity ?? 0),
+          allocatedProductionQuantity: (requirement.productionOrders ?? []).reduce(
+            (sum, order) => sum + Number(order.quantity ?? 0),
+            0,
+          ),
+          status: requirement.status,
+          requiredBy: requirement.requiredBy?.toISOString() ?? null,
+          productionOrders: (requirement.productionOrders ?? []).map((order) => ({
+            id: order.id,
+            orderNo: order.orderNo,
+            quantity: Number(order.quantity ?? 0),
+            status: order.status,
+          })),
+        })),
         rawCreatedAt: source.createdAt.toISOString(),
         createdAt: source.createdAt.toISOString(),
       };
@@ -461,48 +537,38 @@ export class ComponentsReadModelRepository {
   }
 
   private async listSummaryFromDb() {
-    const [total, running, completed, delayed, material] = await Promise.all([
+    const [
+      total,
+      draft,
+      active,
+      deprecated,
+      missingBom,
+      demand,
+      delayed,
+      material,
+    ] = await Promise.all([
       this.prisma.component.count(),
       this.prisma.component.count({
-        where: {
-          OR: [
-            {
-              status: {
-                in: [
-                  ComponentStatus.CUTTING,
-                  ComponentStatus.WELDING,
-                  ComponentStatus.PAINTING,
-                ],
-              },
-            },
-            {
-              productionOrders: {
-                some: { status: ProductionOrderStatus.IN_PROGRESS },
-              },
-            },
-          ],
-        },
+        where: { lifecycleState: ComponentLifecycleState.DRAFT },
+      }),
+      this.prisma.component.count({
+        where: { lifecycleState: ComponentLifecycleState.ACTIVE },
+      }),
+      this.prisma.component.count({
+        where: { lifecycleState: ComponentLifecycleState.DEPRECATED },
       }),
       this.prisma.component.count({
         where: {
+          lifecycleState: ComponentLifecycleState.DRAFT,
           OR: [
-            {
-              status: {
-                in: [
-                  ComponentStatus.READY,
-                  ComponentStatus.SHIPPED,
-                  ComponentStatus.DELIVERED,
-                  ComponentStatus.INSTALLED,
-                ],
-              },
-            },
-            {
-              productionOrders: {
-                some: { status: ProductionOrderStatus.COMPLETED },
-              },
-            },
+            { currentRevisionId: null },
+            { currentRevision: { bomDefinition: null } },
+            { currentRevision: { bomDefinition: { state: { not: 'VALIDATED' } } } },
           ],
         },
+      }),
+      this.prisma.projectComponentRequirement.aggregate({
+        _sum: { requiredQuantity: true },
       }),
       this.prisma.component.count({
         where: {
@@ -556,8 +622,13 @@ export class ComponentsReadModelRepository {
     ]);
     return {
       total,
-      running,
-      completed,
+      draft,
+      released: active,
+      deprecated,
+      missingBom,
+      totalDemand: Number(demand._sum.requiredQuantity ?? 0),
+      running: draft,
+      completed: active,
       waitingMaterial: Number(material[0]?.waiting ?? 0),
       delayed,
       weight: Number(material[0]?.weight ?? 0),
@@ -793,6 +864,29 @@ export class ComponentsReadModelRepository {
       DELIVERED: 'Tồn kho',
       INSTALLED: 'Tồn kho',
     }[status];
+  }
+
+  private engineeringStatus(source: ComponentSource) {
+    if (source.lifecycleState === ComponentLifecycleState.DRAFT) {
+      if (!source.currentRevision) return 'Nháp';
+      if (!source.currentRevision.bomDefinition) {
+        return 'Đang hoàn thiện kỹ thuật';
+      }
+      if (source.currentRevision.bomDefinition.state === 'VALIDATED') {
+        return 'Sẵn sàng phát hành';
+      }
+      return 'Đang hoàn thiện kỹ thuật';
+    }
+    if (source.lifecycleState === ComponentLifecycleState.ACTIVE) {
+      return 'Đã phát hành sản xuất';
+    }
+    if (source.lifecycleState === ComponentLifecycleState.DEPRECATED) {
+      return 'Ngừng sử dụng';
+    }
+    if (source.lifecycleState === ComponentLifecycleState.ARCHIVED) {
+      return 'Đã lưu trữ';
+    }
+    return 'Legacy - chưa chuẩn hóa';
   }
 
   private overviewStatus(

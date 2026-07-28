@@ -17,7 +17,7 @@ export class FinishedGoodsEligibilityRepository {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where = this.where(query);
-    const [data, total] = await Promise.all([
+    const [data, total, statusGroups, projectRows] = await Promise.all([
       this.prisma.componentInstance.findMany({
         where,
         include: finishedGoodsInclude,
@@ -30,9 +30,30 @@ export class FinishedGoodsEligibilityRepository {
         take: limit,
       }),
       this.prisma.componentInstance.count({ where }),
+      this.prisma.componentInstance.groupBy({
+        by: ['state'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.componentInstance.findMany({
+        where: { ...where, projectId: { not: null } },
+        distinct: ['projectId'],
+        select: { projectId: true },
+      }),
     ]);
+    const countByState = new Map(
+      statusGroups.map((row) => [row.state, row._count._all]),
+    );
     return {
       data,
+      summary: {
+        total,
+        qcPassed:
+          countByState.get(ComponentInstanceState.QC_PASSED) ?? 0,
+        useAsIs:
+          countByState.get(ComponentInstanceState.USE_AS_IS) ?? 0,
+        projectCount: projectRows.length,
+      },
       meta: {
         page,
         limit,

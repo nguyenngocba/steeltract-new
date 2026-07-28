@@ -118,7 +118,7 @@ export class QcCommandService {
 
       const created = await this.repository.createNcr(
         {
-          ncrNo: command.ncrNo,
+          ncrNo: command.ncrNo ?? (await this.repository.nextNcrNo(tx)),
           inspection: { connect: { id: inspection.id } },
           issue: command.issueId
             ? { connect: { id: command.issueId } }

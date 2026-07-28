@@ -36,6 +36,8 @@ import {
   PostProductionScrapCommandDto,
   readyProductionOrderCommandSchema,
   ReadyProductionOrderCommandDto,
+  reasonedProductionExecutionCommandSchema,
+  ReasonedProductionExecutionCommandDto,
   reasonedVersionedCommandSchema,
   ReasonedVersionedCommandDto,
   recordProductionCompletionCommandSchema,
@@ -46,8 +48,12 @@ import {
   ReleaseProductionOrderCommandDto,
   reverseProductionCompletionCommandSchema,
   ReverseProductionCompletionCommandDto,
+  startProductionExecutionCommandSchema,
+  StartProductionExecutionCommandDto,
   startProductionOrderCommandSchema,
   StartProductionOrderCommandDto,
+  versionedProductionExecutionCommandSchema,
+  VersionedProductionExecutionCommandDto,
   versionedProductionOrderCommandSchema,
   VersionedProductionOrderCommandDto,
   workOrderCommandSchema,
@@ -282,6 +288,89 @@ export class ProductionCommandController {
     return this.commands.completeWorkOrder({
       ...body,
       workOrderId,
+      ...this.context(request, idempotencyKey, correlationId, causationId),
+    });
+  }
+
+  @Post('executions/start')
+  startExecution(
+    @Body(new ZodValidationPipe(startProductionExecutionCommandSchema))
+    body: StartProductionExecutionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.commands.startExecution({
+      ...body,
+      ...this.context(request, idempotencyKey, correlationId, causationId),
+    });
+  }
+
+  @Post('executions/:executionRunId/pause')
+  pauseExecution(
+    @Param('executionRunId') executionRunId: string,
+    @Body(new ZodValidationPipe(reasonedProductionExecutionCommandSchema))
+    body: ReasonedProductionExecutionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.commands.pauseExecution({
+      ...body,
+      executionRunId,
+      ...this.context(request, idempotencyKey, correlationId, causationId),
+    });
+  }
+
+  @Post('executions/:executionRunId/resume')
+  resumeExecution(
+    @Param('executionRunId') executionRunId: string,
+    @Body(new ZodValidationPipe(versionedProductionExecutionCommandSchema))
+    body: VersionedProductionExecutionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.commands.resumeExecution({
+      ...body,
+      executionRunId,
+      ...this.context(request, idempotencyKey, correlationId, causationId),
+    });
+  }
+
+  @Post('executions/:executionRunId/complete')
+  completeExecution(
+    @Param('executionRunId') executionRunId: string,
+    @Body(new ZodValidationPipe(versionedProductionExecutionCommandSchema))
+    body: VersionedProductionExecutionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.commands.completeExecution({
+      ...body,
+      executionRunId,
+      ...this.context(request, idempotencyKey, correlationId, causationId),
+    });
+  }
+
+  @Post('executions/:executionRunId/abort')
+  abortExecution(
+    @Param('executionRunId') executionRunId: string,
+    @Body(new ZodValidationPipe(reasonedProductionExecutionCommandSchema))
+    body: ReasonedProductionExecutionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.commands.abortExecution({
+      ...body,
+      executionRunId,
       ...this.context(request, idempotencyKey, correlationId, causationId),
     });
   }

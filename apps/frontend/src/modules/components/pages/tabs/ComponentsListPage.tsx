@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
-import { Package, Layers, Wrench, CheckCircle2, Clock, AlertTriangle, Eye } from "lucide-react";
+import { Archive, FileText, Layers, Package, PackagePlus, PencilRuler, Rocket, Sigma, Eye } from "lucide-react";
 
 import { EnterpriseModulePage } from "@/shared/runtime-tabs/EnterpriseModulePage";
 import {
@@ -61,60 +61,23 @@ type ComponentsListRouteState = {
 
 function componentStatusBadgeClass(status: string) {
   const normalized = String(status ?? "").toUpperCase();
-  if (
-    ["READY", "COMPLETED", "DONE", "FINISHED", "INSTALLED"].includes(normalized)
-  ) {
+  if (["ĐÃ PHÁT HÀNH SẢN XUẤT", "ACTIVE"].includes(normalized)) {
     return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
   }
-  if (
-    [
-      "CUTTING",
-      "WELDING",
-      "PAINTING",
-      "FABRICATING",
-      "PRODUCING",
-      "PROCESSING",
-      "ĐANG SX",
-    ].includes(normalized)
-  ) {
+  if (["SẴN SÀNG PHÁT HÀNH", "VALIDATED"].includes(normalized)) {
     return "border-cyan-400/30 bg-cyan-400/10 text-cyan-300";
   }
-  if (["QC_WAITING", "CHỜ QC", "QC_PENDING"].includes(normalized)) {
+  if (["NHÁP", "DRAFT", "ĐANG HOÀN THIỆN KỸ THUẬT"].includes(normalized)) {
     return "border-amber-400/30 bg-amber-400/10 text-amber-300";
   }
-  if (["QC_FAILED", "REJECTED", "KHÔNG ĐẠT"].includes(normalized)) {
-    return "border-red-400/30 bg-red-400/10 text-red-300";
+  if (["NGỪNG SỬ DỤNG", "DEPRECATED", "ĐÃ LƯU TRỮ", "ARCHIVED"].includes(normalized)) {
+    return "border-slate-400/20 bg-slate-400/10 text-slate-300";
   }
   return "border-slate-400/20 bg-slate-400/10 text-slate-300";
 }
 
 function componentStatusLabel(status: string) {
-  const normalized = String(status ?? "").toUpperCase();
-  if (
-    ["READY", "COMPLETED", "DONE", "FINISHED", "INSTALLED"].includes(normalized)
-  ) {
-    return "Ready / Sẵn sàng";
-  }
-  if (
-    [
-      "CUTTING",
-      "WELDING",
-      "PAINTING",
-      "FABRICATING",
-      "PRODUCING",
-      "PROCESSING",
-      "ĐANG SX",
-    ].includes(normalized)
-  ) {
-    return "Đang gia công";
-  }
-  if (["QC_WAITING", "CHỜ QC", "QC_PENDING"].includes(normalized)) {
-    return "Chờ QC";
-  }
-  if (["QC_FAILED", "REJECTED", "KHÔNG ĐẠT"].includes(normalized)) {
-    return "QC Không đạt";
-  }
-  return status || "Tồn kho";
+  return status || "Legacy - chưa chuẩn hóa";
 }
 
 function InventoryMetricCard({
@@ -211,7 +174,6 @@ export function ComponentsListPage() {
   const [project, setProject] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
-  const [location, setLocation] = useState("");
   const [query, setQuery] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
   const [expandedModalOpen, setExpandedModalOpen] = useState(false);
@@ -229,7 +191,6 @@ export function ComponentsListPage() {
     setProject("");
     setStatus("");
     setType("");
-    setLocation("");
     setPage(1);
   }
 
@@ -240,16 +201,11 @@ export function ComponentsListPage() {
     project: project || undefined,
     status: status || undefined,
     type: type || undefined,
-    location: location || undefined,
   });
 
   useEffect(() => {
     setPage(1);
-  }, [project, status, type, location, query]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [project, status, type, location, query]);
+  }, [project, status, type, query]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -470,33 +426,33 @@ export function ComponentsListPage() {
   const selectedRemainingQty = selected?.remainingQty ?? 0;
   const quickStats = [
     {
-      title: "Tổng cấu kiện",
+      title: "Tổng hồ sơ",
       value: formatQuantity(cockpitKpis.total, 0),
-      note: "Theo lifecycle",
+      note: "Component definitions",
       tone: "text-cyan-300",
     },
     {
-      title: "Đang gia công",
-      value: formatQuantity(cockpitKpis.running, 0),
-      note: "Cut/Weld/Paint",
+      title: "Hồ sơ nháp",
+      value: formatQuantity(cockpitKpis.draft ?? cockpitKpis.running, 0),
+      note: "Engineering Draft",
       tone: "text-blue-300",
     },
     {
-      title: "Ready",
-      value: formatQuantity(cockpitKpis.completed, 0),
-      note: "QC đạt",
+      title: "Đã phát hành",
+      value: formatQuantity(cockpitKpis.released ?? cockpitKpis.completed, 0),
+      note: "Released for Production",
       tone: "text-emerald-300",
     },
     {
-      title: "Chờ vật tư",
-      value: formatQuantity(cockpitKpis.waitingMaterial, 0),
-      note: "Cần cấp phát",
+      title: "Tổng nhu cầu",
+      value: formatQuantity(cockpitKpis.totalDemand ?? 0, 0),
+      note: "Project requirements",
       tone: "text-amber-300",
     },
     {
-      title: "Trễ tiến độ",
-      value: formatQuantity(cockpitKpis.delayed, 0),
-      note: "Cần xử lý",
+      title: "Chưa có BOM",
+      value: formatQuantity(cockpitKpis.missingBom ?? 0, 0),
+      note: "Cần hoàn thiện kỹ thuật",
       tone: "text-red-300",
     },
   ];
@@ -507,45 +463,45 @@ export function ComponentsListPage() {
         {/* Phase 1: KPI Cards matching EnterpriseKpiCard */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
           <EnterpriseKpiCard
-            title="Tổng cấu kiện"
+            title="Tổng hồ sơ cấu kiện"
             value={formatQuantity(cockpitKpis.total, 0)}
             tone="blue"
             icon={<Layers size={15} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
-            title="Đang gia công"
-            value={formatQuantity(cockpitKpis.running, 0)}
+            title="Hồ sơ nháp"
+            value={formatQuantity(cockpitKpis.draft ?? cockpitKpis.running, 0)}
             tone="purple"
-            icon={<Wrench size={15} />}
+            icon={<PencilRuler size={15} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
-            title="Ready to ship"
-            value={formatQuantity(cockpitKpis.completed, 0)}
+            title="Đã phát hành sản xuất"
+            value={formatQuantity(cockpitKpis.released ?? cockpitKpis.completed, 0)}
             tone="emerald"
-            icon={<CheckCircle2 size={15} />}
+            icon={<Rocket size={15} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
-            title="Chờ cấp vật tư"
-            value={formatQuantity(cockpitKpis.waitingMaterial, 0)}
+            title="Tổng nhu cầu cấu kiện"
+            value={formatQuantity(cockpitKpis.totalDemand ?? 0, 0)}
             tone="amber"
-            icon={<Clock size={15} />}
+            icon={<Sigma size={15} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
-            title="Trễ tiến độ"
-            value={formatQuantity(cockpitKpis.delayed, 0)}
+            title="Chưa có BOM"
+            value={formatQuantity(cockpitKpis.missingBom ?? 0, 0)}
             tone="red"
-            icon={<AlertTriangle size={15} />}
+            icon={<FileText size={15} />}
             isLoading={isLoading}
           />
         </div>
 
         {/* Phase 2: Search & Filter Toolbar Immediately Below KPI Strip (Golden Reference Match) */}
         <InventoryPanel className="rounded-xl -mt-1">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_180px_minmax(260px,1fr)_130px_120px]">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_180px_minmax(260px,1fr)_130px_120px]">
             <ComponentsSelect value={project} onChange={(v) => { setProject(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
               <option value="">Tất cả dự án</option>
               {projects.map((item) => (
@@ -554,27 +510,16 @@ export function ComponentsListPage() {
             </ComponentsSelect>
             <ComponentsSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
               <option value="">Tất cả trạng thái</option>
-              <option value="Tồn kho">Tồn kho</option>
-              <option value="Đang SX">Đang SX</option>
-              <option value="Đã QC">Đã QC</option>
-              <option value="READY">READY</option>
-              <option value="SHIPPED">SHIPPED</option>
-              <option value="DELIVERED">DELIVERED</option>
-              <option value="INSTALLED">INSTALLED</option>
-              <option value="Chờ QC">Chờ QC</option>
-              <option value="Không đạt">Không đạt</option>
+              <option value="DRAFT">Nháp</option>
+              <option value="ACTIVE">Đã phát hành sản xuất</option>
+              <option value="DEPRECATED">Ngừng sử dụng</option>
+              <option value="ARCHIVED">Đã lưu trữ</option>
             </ComponentsSelect>
             <ComponentsSelect value={type} onChange={(v) => { setType(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
               <option value="">Tất cả loại</option>
               <option value="Dầm (Beam)">Dầm (Beam)</option>
               <option value="Cột (Column)">Cột (Column)</option>
               <option value="Bản mã (Plate)">Bản mã (Plate)</option>
-            </ComponentsSelect>
-            <ComponentsSelect value={location} onChange={(v) => { setLocation(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
-              <option value="">Tất cả vị trí</option>
-              <option value="Kho cấu kiện">Kho cấu kiện</option>
-              <option value="Workshop A">Workshop A</option>
-              <option value="QC nội bộ">QC nội bộ</option>
             </ComponentsSelect>
             <input
               value={searchDraft}
@@ -607,9 +552,9 @@ export function ComponentsListPage() {
           <InventoryPanel className="xl:col-span-9">
             <div className="mb-1 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách cấu kiện</h3>
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Hồ sơ cấu kiện</h3>
                 <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
-                  {workspace?.meta.total ?? rows.length} cấu kiện
+                  {workspace?.meta.total ?? rows.length} hồ sơ
                 </span>
               </div>
               <button
@@ -623,18 +568,16 @@ export function ComponentsListPage() {
             <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
               <table className="w-full min-w-[1050px] text-sm table-fixed">
                 <colgroup>
-                  <col className="w-[110px]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[130px]" />
-                  <col className="w-[110px]" />
-                  <col className="w-[130px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[170px]" />
+                  <col className="w-[170px]" />
                   <col className="w-[115px]" />
                   <col className="w-[130px]" />
-                  <col className="w-[130px]" />
-                  <col className="w-[140px]" />
-                  <col className="w-[105px]" />
                   <col className="w-[110px]" />
-                  <col className="w-[95px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[160px]" />
+                  <col className="w-[100px]" />
                   <col className="w-[70px]" />
                 </colgroup>
                 <thead
@@ -643,23 +586,21 @@ export function ComponentsListPage() {
                 >
                   <tr>
                     {[
-                      "Mã cấu kiện",
+                      "Mã hồ sơ",
                       "Tên cấu kiện",
-                      "Profile/Kích thước",
+                      "Công trình / Yêu cầu",
                       "Loại",
-                      "Dự án",
+                      "Profile",
+                      "Revision",
+                      "BOM",
                       "SL yêu cầu",
                       "Trạng thái kỹ thuật",
-                      "BOM",
-                      "Vị trí hiện tại",
-                      "Trạng thái legacy",
-                      "Khối lượng",
-                      "Ngày tạo",
+                      "Cập nhật",
                       "Thao tác",
                     ].map((h, i) => (
                       <th
                         key={h}
-                        className={`px-1.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-300 ${i === 10 ? "text-right" : "text-left"}`}
+                        className="px-1.5 py-1 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-300"
                       >
                         {h}
                       </th>
@@ -669,7 +610,7 @@ export function ComponentsListPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={13} className="px-4 py-6">
+                      <td colSpan={11} className="px-4 py-6">
                         <ModuleLoadingState label="Đang tải dữ liệu cấu kiện..." />
                       </td>
                     </tr>
@@ -681,7 +622,7 @@ export function ComponentsListPage() {
                         className={`cursor-pointer ${inventoryTableRow}`}
                       >
                         <td
-                          className="truncate px-1.5 py-0.5 text-cyan-300 font-mono"
+                          className="truncate px-1.5 py-0.5 font-mono text-cyan-300"
                           title={row.code}
                         >
                           {row.code}
@@ -694,9 +635,11 @@ export function ComponentsListPage() {
                         </td>
                         <td
                           className="truncate px-1.5 py-0.5 text-slate-300"
-                          title={row.profile}
+                          title={row.requirements?.map((item) => `${item.projectCode} · ${item.requirementNo}`).join(", ") || row.project}
                         >
-                          {row.profile}
+                          {row.requirementCount && row.requirementCount > 1
+                            ? `${row.requirementCount} yêu cầu`
+                            : row.project}
                         </td>
                         <td
                           className="truncate px-1.5 py-0.5 text-slate-300"
@@ -706,18 +649,12 @@ export function ComponentsListPage() {
                         </td>
                         <td
                           className="truncate px-1.5 py-0.5 text-slate-300"
-                          title={row.project}
+                          title={row.profile}
                         >
-                          {row.project}
-                        </td>
-                        <td
-                          className="truncate px-1.5 py-0.5 text-cyan-300 font-mono tabular-nums"
-                          title={`${formatQuantity(row.qty, 0)} cấu kiện`}
-                        >
-                          {formatQuantity(row.qty, 0)}
+                          {row.profile}
                         </td>
                         <td className="truncate px-1.5 py-0.5 text-slate-300">
-                          {row.status}
+                          {row.revisionNo ?? "-"}
                         </td>
                         <td className="px-1.5 py-0.5">
                           <span
@@ -727,27 +664,21 @@ export function ComponentsListPage() {
                                 : "border-amber-400/30 bg-amber-400/10 text-amber-300"
                             }`}
                           >
-                            {row.hasBom ? "Có BOM" : "Chờ BOM"}
+                            {row.bomState ?? (row.hasBom ? "Có BOM" : "Chờ BOM")}
                           </span>
                         </td>
                         <td
-                          className="truncate px-1.5 py-0.5 text-slate-300"
-                          title={row.location}
+                          className="truncate px-1.5 py-0.5 font-mono tabular-nums text-cyan-300"
+                          title={`${formatQuantity(row.requiredQuantity ?? row.qty, 0)} cấu kiện yêu cầu`}
                         >
-                          {row.location}
+                          {formatQuantity(row.requiredQuantity ?? row.qty, 0)}
                         </td>
                         <td className="px-1.5 py-0.5">
                           <span
-                            className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.rawStatus)}`}
+                            className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.engineeringStatus ?? row.status)}`}
                           >
-                            {row.status}
+                            {componentStatusLabel(row.engineeringStatus ?? row.status)}
                           </span>
-                        </td>
-                        <td
-                          className="truncate px-1.5 py-0.5 font-mono tabular-nums text-right text-cyan-300"
-                          title={`${formatQuantity(row.weight, 3)} kg`}
-                        >
-                          {formatQuantity(row.weight, 3)} kg
                         </td>
                         <td
                           className="truncate px-1.5 py-0.5 text-slate-300"
@@ -771,7 +702,7 @@ export function ComponentsListPage() {
                   )}
                   {!isLoading && componentTableEmptyRows.map((_, index) => (
                     <tr key={`component-list-empty-${index}`} aria-hidden="true" className="border-b border-white/[0.04]">
-                      <td colSpan={13} className="h-9 px-1.5 py-0.5">
+                      <td colSpan={11} className="h-9 px-1.5 py-0.5">
                         <div className="h-px w-full bg-white/[0.035]" />
                       </td>
                     </tr>
@@ -863,8 +794,8 @@ export function ComponentsListPage() {
           <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h2 className="text-base font-bold text-white">Toàn bộ danh sách cấu kiện</h2>
-                <p className="text-xs text-slate-400">Tổng cộng {workspace?.meta.total ?? rows.length} cấu kiện trong hệ thống</p>
+                <h2 className="text-base font-bold text-white">Toàn bộ hồ sơ cấu kiện</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {workspace?.meta.total ?? rows.length} hồ sơ kỹ thuật trong hệ thống</p>
               </div>
               <button
                 type="button"
@@ -882,13 +813,15 @@ export function ComponentsListPage() {
                   style={{ backgroundColor: "rgba(30, 41, 59, 1)" }}
                 >
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold w-[130px]">Mã cấu kiện</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[130px]">Mã hồ sơ</th>
                     <th className="px-3 py-2 text-left font-semibold w-[180px]">Tên cấu kiện</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[160px]">Công trình / Yêu cầu</th>
                     <th className="px-3 py-2 text-left font-semibold w-[140px]">Profile/Kích thước</th>
                     <th className="px-3 py-2 text-left font-semibold w-[120px]">Loại</th>
-                    <th className="px-3 py-2 text-left font-semibold w-[140px]">Dự án</th>
-                    <th className="px-3 py-2 text-left font-semibold w-[130px]">Vị trí</th>
-                    <th className="px-3 py-2 text-center font-semibold w-[120px]">Trạng thái</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[100px]">Revision</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[100px]">BOM</th>
+                    <th className="px-3 py-2 text-left font-semibold w-[120px]">SL yêu cầu</th>
+                    <th className="px-3 py-2 text-center font-semibold w-[150px]">Trạng thái kỹ thuật</th>
                     <th className="px-3 py-2 text-center font-semibold w-[100px]">Thao tác</th>
                   </tr>
                 </thead>
@@ -904,13 +837,17 @@ export function ComponentsListPage() {
                     >
                       <td className="truncate px-3 py-2 text-cyan-300 font-mono font-medium">{row.code}</td>
                       <td className="truncate px-3 py-2 text-white font-medium">{row.name}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">
+                        {row.requirementCount && row.requirementCount > 1 ? `${row.requirementCount} yêu cầu` : row.project || "Chưa gán"}
+                      </td>
                       <td className="truncate px-3 py-2 text-slate-300">{row.profile || "N/A"}</td>
                       <td className="truncate px-3 py-2 text-slate-300">{row.type || "Dầm"}</td>
-                      <td className="truncate px-3 py-2 text-slate-300">{row.project || "Chưa gán"}</td>
-                      <td className="truncate px-3 py-2 text-slate-300">{row.location || "Kho cấu kiện"}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.revisionNo ?? "-"}</td>
+                      <td className="truncate px-3 py-2 text-slate-300">{row.bomState ?? (row.hasBom ? "Có BOM" : "Chờ BOM")}</td>
+                      <td className="truncate px-3 py-2 font-mono text-cyan-300">{formatQuantity(row.requiredQuantity ?? row.qty, 0)}</td>
                       <td className="px-3 py-2 text-center">
-                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.status)}`}>
-                          {componentStatusLabel(row.status)}
+                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${componentStatusBadgeClass(row.engineeringStatus ?? row.status)}`}>
+                          {componentStatusLabel(row.engineeringStatus ?? row.status)}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -1113,7 +1050,7 @@ export function ComponentsListPage() {
                 onClick={() => openBomFor(selected)}
                 className={componentsMutedButton}
               >
-                Tạo BOM
+                BOM
               </button>
               <button
                 onClick={() => openProductionFor(selected)}
@@ -1140,26 +1077,26 @@ export function ComponentsListPage() {
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Trạng thái</div>
                 <div className="mt-1 text-lg font-semibold text-white">
-                  {selected.status}
+                  {selected.engineeringStatus ?? selected.status}
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs text-slate-400">Số lượng yêu cầu</div>
                 <div className="mt-1 text-lg font-semibold text-white">
-                  {formatQuantity(selected.qty, 0)} kiện
+                  {formatQuantity(selected.requiredQuantity ?? selected.qty, 0)} kiện
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs text-slate-400">Vị trí hiện tại</div>
+                <div className="text-xs text-slate-400">Nhu cầu còn lại</div>
                 <div className="mt-1 text-lg font-semibold text-white">
-                  {selected.location}
+                  {formatQuantity(selected.remainingRequirementQuantity ?? 0, 0)} kiện
                 </div>
               </div>
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
               <div className="mb-3 text-sm font-semibold text-white">
-                Thông tin cấu kiện
+                Thông tin hồ sơ
               </div>
               <div
                 className="grid grid-cols-2 xl:grid-cols-6"
@@ -1169,38 +1106,21 @@ export function ComponentsListPage() {
                 <CostMetric title="Name" value={selected.name} />
                 <CostMetric title="Type" value={selected.type} />
                 <CostMetric title="Project" value={selected.project} />
+                <CostMetric title="Revision" value={selected.revisionNo ?? "-"} />
+                <CostMetric title="BOM" value={selected.bomState ?? (selected.hasBom ? "Có BOM" : "Chưa có BOM")} />
                 <CostMetric
-                  title="Weight"
-                  value={`${formatQuantity(selected.weight, 3)} kg`}
+                  title="Nhu cầu"
+                  value={`${formatQuantity(selected.requiredQuantity ?? selected.qty, 0)} kiện`}
                 />
-                <CostMetric title="Status" value={selected.rawStatus} />
+                <CostMetric title="Lifecycle" value={selected.lifecycleState ?? "LEGACY"} />
               </div>
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
-              <div className="mb-3">
-                <div className="text-sm font-semibold text-white">
-                  Vị trí lắp đặt
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  Thông tin được ghi khi xác nhận lắp đặt tại công trình.
-                </div>
+              <div className="mb-3 text-sm font-semibold text-white">
+                Công trình / nhu cầu
               </div>
-              <div
-                className="grid grid-cols-2 xl:grid-cols-4"
-                style={{ gap: "0.75rem" }}
-              >
-                <CostMetric
-                  title="Khu vực"
-                  value={selected.installZone ?? "-"}
-                />
-                <CostMetric title="Trục" value={selected.installAxis ?? "-"} />
-                <CostMetric title="Tầng" value={selected.installLevel ?? "-"} />
-                <CostMetric
-                  title="Vị trí"
-                  value={selected.installPosition ?? "-"}
-                />
-              </div>
+              <RequirementTable rows={selected.requirements ?? []} />
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4">
@@ -1210,17 +1130,17 @@ export function ComponentsListPage() {
               >
                 <div>
                   <div className="text-sm font-semibold text-white">
-                    Production BOM liên kết
+                    BOM / Revision liên kết
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    Định mức vật tư và routing dùng khi phát hành lệnh sản xuất.
+                    Canonical Engineering BOM đi theo Component Revision. Màn hình Production BOM hiện hữu được giữ như compatibility và cần tách tiếp ở P1.
                   </div>
                 </div>
                 <button
                   onClick={() => openBomFor(selected)}
                   className={componentsMutedButton}
                 >
-                  + Tạo BOM
+                  BOM hiện có
                 </button>
               </div>
               <table className="w-full text-sm">
@@ -1627,6 +1547,67 @@ function RankList({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function RequirementTable({
+  rows,
+}: {
+  rows: NonNullable<ComponentWorkspaceRow["requirements"]>;
+}) {
+  if (!rows.length) {
+    return (
+      <ModuleEmptyState
+        icon={<Package size={18} />}
+        title="Chưa có yêu cầu cấu kiện"
+        description="Hồ sơ này chưa có ProjectComponentRequirement được liên kết."
+      />
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-white/10">
+      <table className="w-full text-xs">
+        <thead className={inventoryTableHead}>
+          <tr>
+            <th className="px-3 py-2 text-left">Yêu cầu</th>
+            <th className="px-3 py-2 text-left">Công trình</th>
+            <th className="px-3 py-2 text-right">SL yêu cầu</th>
+            <th className="px-3 py-2 text-right">Đã phân bổ PO</th>
+            <th className="px-3 py-2 text-right">Còn lại</th>
+            <th className="px-3 py-2 text-left">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const remaining = Math.max(
+              0,
+              row.requiredQuantity - row.allocatedProductionQuantity,
+            );
+            return (
+              <tr key={row.id} className={inventoryTableRow}>
+                <td className="px-3 py-2 font-mono text-cyan-300">
+                  {row.requirementNo}
+                </td>
+                <td className="px-3 py-2 text-slate-200">
+                  {row.projectCode} · {row.projectName}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-white">
+                  {formatQuantity(row.requiredQuantity, 0)}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-emerald-300">
+                  {formatQuantity(row.allocatedProductionQuantity, 0)}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-amber-300">
+                  {formatQuantity(remaining, 0)}
+                </td>
+                <td className="px-3 py-2 text-slate-300">{row.status}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

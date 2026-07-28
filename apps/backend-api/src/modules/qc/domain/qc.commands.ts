@@ -16,7 +16,7 @@ export type CompleteQcInspectionCommand = QcCommandContext & {
 
 export type CreateQcNcrCommand = QcCommandContext & {
   inspectionId: string;
-  ncrNo: string;
+  ncrNo?: string;
   issueId?: string;
   severity: QcIssueSeverity;
   title: string;

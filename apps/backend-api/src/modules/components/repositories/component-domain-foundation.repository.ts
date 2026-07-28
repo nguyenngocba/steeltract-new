@@ -215,6 +215,7 @@ export class ComponentDomainFoundationRepository {
       requirementId: query.requirementId,
       projectId: query.projectId,
       projectTaskId: query.projectTaskId,
+      state: query.state,
       instanceNo: query.instanceNo
         ? { contains: query.instanceNo, mode: 'insensitive' }
         : undefined,
@@ -263,14 +264,53 @@ const requirementInclude = {
   component: { select: { id: true, code: true, name: true, lifecycleState: true } },
   componentRevision: { select: { id: true, revisionNo: true, state: true } },
   bomDefinition: { select: { id: true, state: true, contentHash: true } },
+  productionOrders: {
+    select: {
+      id: true,
+      orderNo: true,
+      title: true,
+      quantity: true,
+      status: true,
+      aggregateVersion: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  },
 } satisfies Prisma.ProjectComponentRequirementInclude;
 
 const instanceInclude = {
   component: { select: { id: true, code: true, name: true, lifecycleState: true } },
   componentRevision: { select: { id: true, revisionNo: true, state: true } },
   bomDefinition: { select: { id: true, state: true, contentHash: true } },
-  productionOrder: { select: { id: true, orderNo: true, status: true } },
+  productionOrder: { select: { id: true, orderNo: true, title: true, quantity: true, status: true } },
   requirement: { select: { id: true, requirementNo: true, requiredQuantity: true } },
   project: { select: { id: true, code: true, name: true } },
   projectTask: { select: { id: true, name: true } },
+  executions: {
+    include: {
+      workOrder: {
+        select: {
+          id: true,
+          workOrderNo: true,
+          productCode: true,
+          quantity: true,
+          status: true,
+          lifecycleState: true,
+          sequence: true,
+        },
+      },
+      productionExecution: {
+        select: {
+          id: true,
+          state: true,
+          workCenterId: true,
+          machineId: true,
+          startedAt: true,
+          completedAt: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  },
 } satisfies Prisma.ComponentInstanceInclude;

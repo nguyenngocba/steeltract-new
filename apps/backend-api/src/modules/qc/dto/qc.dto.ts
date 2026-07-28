@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 
 const metadataSchema = z.record(z.string(), z.unknown()).optional();
+const expectedVersionSchema = z.coerce.number().int().nonnegative();
 const dateSchema = z
   .union([z.string(), z.date()])
   .optional()
@@ -210,6 +211,31 @@ export const qcInspectionHistorySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
 
+export const completeQcInspectionCommandSchema = z.object({
+  expectedVersion: expectedVersionSchema,
+  notes: z.string().optional(),
+  metadata: metadataSchema,
+});
+
+export const createQcNcrCommandSchema = z.object({
+  expectedVersion: expectedVersionSchema,
+  ncrNo: z.string().min(1).optional(),
+  issueId: z.string().min(1).optional(),
+  severity: z.nativeEnum(QcIssueSeverity).default(QcIssueSeverity.HIGH),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  defectCode: z.string().optional(),
+  reasonCode: z.string().optional(),
+});
+
+export const completeQcDispositionCommandSchema = z.object({
+  expectedVersion: expectedVersionSchema,
+  dispositionId: z.string().min(1).optional(),
+  reason: z.string().optional(),
+  approvedQuantity: z.coerce.number().finite().nonnegative().optional(),
+  unit: z.string().min(1).optional(),
+});
+
 export type CreateQcChecklistDto = z.infer<typeof createQcChecklistSchema>;
 export type UpdateQcChecklistDto = z.infer<typeof updateQcChecklistSchema>;
 export type ListQcChecklistsDto = z.infer<typeof listQcChecklistsSchema>;
@@ -230,4 +256,11 @@ export type ListNcrDto = z.infer<typeof listNcrSchema>;
 export type QcWorkspaceReadDto = z.infer<typeof qcWorkspaceReadSchema>;
 export type QcInspectionHistoryDto = z.infer<
   typeof qcInspectionHistorySchema
+>;
+export type CompleteQcInspectionCommandDto = z.infer<
+  typeof completeQcInspectionCommandSchema
+>;
+export type CreateQcNcrCommandDto = z.infer<typeof createQcNcrCommandSchema>;
+export type CompleteQcDispositionCommandDto = z.infer<
+  typeof completeQcDispositionCommandSchema
 >;

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { productionApi, type ProductionBomInput, type ProductionCockpitParams, type ProductionConsumptionParams, type ProductionMaterialIssue, type ProductionMaterialLedgerParams } from '../api/production.api'
+import { productionApi, type CreateCanonicalProductionOrderInput, type ProductionBomInput, type ProductionCockpitParams, type ProductionConsumptionParams, type ProductionMaterialIssue, type ProductionMaterialLedgerParams, type ReleaseCanonicalProductionOrderInput } from '../api/production.api'
 
 export const useProductionOrders = (enabled = true) =>
   useQuery({ queryKey: ['production', 'orders'], queryFn: productionApi.orders, refetchInterval: 5000, enabled })
@@ -70,6 +70,20 @@ export const useMaterialRequirements = (id?: string) =>
     enabled: Boolean(id),
   })
 
+export const useProjectComponentRequirements = (params?: Record<string, unknown>, enabled = true) =>
+  useQuery({
+    queryKey: ['components', 'foundation', 'requirements', params],
+    queryFn: () => productionApi.componentRequirements(params),
+    enabled,
+  })
+
+export const useProductionComponentInstances = (params?: Record<string, unknown>, enabled = true) =>
+  useQuery({
+    queryKey: ['components', 'foundation', 'instances', params],
+    queryFn: () => productionApi.componentInstances(params),
+    enabled,
+  })
+
 export const useProductionComponents = (enabled = true) =>
   useQuery({ queryKey: ['production', 'components'], queryFn: productionApi.components, enabled })
 
@@ -92,6 +106,13 @@ function useProductionMutation<TArgs>(mutationFn: (args: TArgs) => Promise<unkno
 
 export const useCreateProductionOrder = () =>
   useProductionMutation((payload: Record<string, unknown>) => productionApi.createOrder(payload))
+
+export const useCreateCanonicalProductionOrder = () =>
+  useProductionMutation((payload: CreateCanonicalProductionOrderInput) => productionApi.createCanonicalOrder(payload))
+
+export const useReleaseCanonicalProductionOrder = () =>
+  useProductionMutation(({ id, payload }: { id: string; payload: ReleaseCanonicalProductionOrderInput }) =>
+    productionApi.releaseCanonicalOrder(id, payload))
 
 export const useCreateProductionBom = () =>
   useProductionMutation((payload: ProductionBomInput) => productionApi.createBom(payload))
@@ -156,3 +177,13 @@ export const useStageProductionToYard = () =>
 
 export const useCreateComponentFromProductionOrder = () =>
   useProductionMutation((id: string) => productionApi.createComponentFromOrder(id))
+
+export const useAssignComponentInstanceExecution = () =>
+  useProductionMutation((payload: { productionExecutionId: string; componentInstanceIds: string[] }) =>
+    productionApi.assignComponentInstanceExecution(payload))
+
+export const useStartComponentInstanceExecution = () =>
+  useProductionMutation((id: string) => productionApi.startComponentInstanceExecution(id))
+
+export const useCompleteComponentInstanceExecution = () =>
+  useProductionMutation((id: string) => productionApi.completeComponentInstanceExecution(id))

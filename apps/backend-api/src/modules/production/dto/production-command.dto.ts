@@ -26,6 +26,8 @@ export const createProductionOrderCommandSchema = z
     unit: z.string().min(1),
     orderKind: z.nativeEnum(ProductionOrderKind).optional(),
     reworkOfProductionOrderId: z.string().optional(),
+    plannedStartAt: z.string().datetime().optional(),
+    plannedEndAt: z.string().datetime().optional(),
     engineeringBasis: engineeringBasisSchema,
   })
   .strict();
@@ -97,6 +99,29 @@ export const workOrderCommandSchema = z
 export const pauseWorkOrderCommandSchema = workOrderCommandSchema.extend({
   reason: z.string().min(1),
 });
+
+export const startProductionExecutionCommandSchema = z
+  .object({
+    productionOrderId: z.string().min(1),
+    workOrderId: z.string().min(1),
+    workCenterId: z.string().optional(),
+    machineId: z.string().optional(),
+  })
+  .strict();
+
+export const versionedProductionExecutionCommandSchema = z
+  .object({
+    productionOrderId: z.string().min(1),
+    workOrderId: z.string().min(1),
+    expectedVersion: expectedVersionSchema,
+    reason: z.string().optional(),
+  })
+  .strict();
+
+export const reasonedProductionExecutionCommandSchema =
+  versionedProductionExecutionCommandSchema.extend({
+    reason: z.string().min(1),
+  });
 
 export const recordProductionCompletionCommandSchema = z
   .object({
@@ -219,6 +244,15 @@ export type CloseProductionOrderCommandDto = z.infer<
 export type WorkOrderCommandDto = z.infer<typeof workOrderCommandSchema>;
 export type PauseWorkOrderCommandDto = z.infer<
   typeof pauseWorkOrderCommandSchema
+>;
+export type StartProductionExecutionCommandDto = z.infer<
+  typeof startProductionExecutionCommandSchema
+>;
+export type VersionedProductionExecutionCommandDto = z.infer<
+  typeof versionedProductionExecutionCommandSchema
+>;
+export type ReasonedProductionExecutionCommandDto = z.infer<
+  typeof reasonedProductionExecutionCommandSchema
 >;
 export type RecordProductionCompletionCommandDto = z.infer<
   typeof recordProductionCompletionCommandSchema

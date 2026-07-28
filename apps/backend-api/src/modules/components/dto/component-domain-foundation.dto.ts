@@ -1,4 +1,4 @@
-import { ProjectComponentRequirementStatus } from '@prisma/client';
+import { ComponentInstanceState, ProjectComponentRequirementStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { baseQuerySchema } from '../../../common/dto/query.dto';
@@ -66,6 +66,7 @@ export const listComponentInstancesSchema = baseQuerySchema.extend({
   projectId: optionalId,
   projectTaskId: optionalId,
   instanceNo: optionalId,
+  state: z.nativeEnum(ComponentInstanceState).optional(),
 });
 
 export const listFinishedGoodsInstancesSchema = baseQuerySchema.extend({

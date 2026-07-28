@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -15,7 +16,10 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuthUser } from '../rbac/types/auth-user';
 import {
   approveQcInspectionSchema,
+  completeQcDispositionCommandSchema,
+  completeQcInspectionCommandSchema,
   completeQcInspectionSchema,
+  createQcNcrCommandSchema,
   createNcrSchema,
   createQcChecklistSchema,
   createQcInspectionSchema,
@@ -33,12 +37,16 @@ import {
   updateQcIssueSchema,
 } from './dto/qc.dto';
 import { QcReadModelService } from './services/qc-read-model.service';
+import { QcCommandService } from './services/qc-command.service';
 import { QcService } from './services/qc.service';
 import { QcSnapshotReadService } from './services/qc-snapshot-read.service';
 
 import type {
   ApproveQcInspectionDto,
+  CompleteQcDispositionCommandDto,
+  CompleteQcInspectionCommandDto,
   CompleteQcInspectionDto,
+  CreateQcNcrCommandDto,
   CreateNcrDto,
   CreateQcChecklistDto,
   CreateQcInspectionDto,
@@ -64,6 +72,7 @@ type AuthenticatedRequest = Request & {
 export class QcController {
   constructor(
     private readonly qcService: QcService,
+    private readonly qcCommandService: QcCommandService,
     private readonly qcReadModelService: QcReadModelService,
     private readonly qcSnapshotReadService: QcSnapshotReadService,
   ) {}
@@ -207,6 +216,148 @@ export class QcController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.qcService.completeInspection(id, body, request.user?.id);
+  }
+
+  @Post('commands/inspections/:id/pass')
+  passInspectionCommand(
+    @Param('id') inspectionId: string,
+    @Body(new ZodValidationPipe(completeQcInspectionCommandSchema))
+    body: CompleteQcInspectionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.qcCommandService.acceptInspection({
+      inspectionId,
+      expectedVersion: body.expectedVersion,
+      notes: body.notes,
+      actorId: request.user?.id,
+      idempotencyKey: idempotencyKey ?? `qc-final-pass:${inspectionId}:${body.expectedVersion}`,
+      correlationId,
+      causationId,
+    });
+  }
+
+  @Post('commands/inspections/:id/fail')
+  failInspectionCommand(
+    @Param('id') inspectionId: string,
+    @Body(new ZodValidationPipe(completeQcInspectionCommandSchema))
+    body: CompleteQcInspectionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.qcCommandService.rejectInspection({
+      inspectionId,
+      expectedVersion: body.expectedVersion,
+      notes: body.notes,
+      actorId: request.user?.id,
+      idempotencyKey: idempotencyKey ?? `qc-final-fail:${inspectionId}:${body.expectedVersion}`,
+      correlationId,
+      causationId,
+    });
+  }
+
+  @Post('commands/inspections/:id/ncr')
+  createNcrCommand(
+    @Param('id') inspectionId: string,
+    @Body(new ZodValidationPipe(createQcNcrCommandSchema))
+    body: CreateQcNcrCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.qcCommandService.createNcr({
+      inspectionId,
+      expectedVersion: body.expectedVersion,
+      ncrNo: body.ncrNo,
+      issueId: body.issueId,
+      severity: body.severity,
+      title: body.title,
+      description: body.description,
+      defectCode: body.defectCode,
+      reasonCode: body.reasonCode,
+      actorId: request.user?.id,
+      idempotencyKey: idempotencyKey ?? `qc-ncr:${inspectionId}:${body.expectedVersion}`,
+      correlationId,
+      causationId,
+    });
+  }
+
+  @Post('commands/ncr/:id/rework')
+  reworkDispositionCommand(
+    @Param('id') ncrId: string,
+    @Body(new ZodValidationPipe(completeQcDispositionCommandSchema))
+    body: CompleteQcDispositionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.qcCommandService.requestRework({
+      ncrId,
+      expectedVersion: body.expectedVersion,
+      dispositionId: body.dispositionId ?? `DISP-${ncrId}`,
+      reason: body.reason,
+      approvedQuantity: body.approvedQuantity,
+      unit: body.unit,
+      actorId: request.user?.id,
+      idempotencyKey: idempotencyKey ?? `qc-ncr-rework:${ncrId}:${body.expectedVersion}`,
+      correlationId,
+      causationId,
+    });
+  }
+
+  @Post('commands/ncr/:id/scrap')
+  scrapDispositionCommand(
+    @Param('id') ncrId: string,
+    @Body(new ZodValidationPipe(completeQcDispositionCommandSchema))
+    body: CompleteQcDispositionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.qcCommandService.recommendScrap({
+      ncrId,
+      expectedVersion: body.expectedVersion,
+      dispositionId: body.dispositionId ?? `DISP-${ncrId}`,
+      reason: body.reason,
+      approvedQuantity: body.approvedQuantity,
+      unit: body.unit,
+      actorId: request.user?.id,
+      idempotencyKey: idempotencyKey ?? `qc-ncr-scrap:${ncrId}:${body.expectedVersion}`,
+      correlationId,
+      causationId,
+    });
+  }
+
+  @Post('commands/ncr/:id/use-as-is')
+  useAsIsDispositionCommand(
+    @Param('id') ncrId: string,
+    @Body(new ZodValidationPipe(completeQcDispositionCommandSchema))
+    body: CompleteQcDispositionCommandDto,
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-causation-id') causationId?: string,
+  ) {
+    return this.qcCommandService.completeDisposition({
+      ncrId,
+      expectedVersion: body.expectedVersion,
+      dispositionId: body.dispositionId ?? `DISP-${ncrId}`,
+      dispositionType: 'ACCEPT',
+      reason: body.reason,
+      approvedQuantity: body.approvedQuantity,
+      unit: body.unit,
+      actorId: request.user?.id,
+      idempotencyKey: idempotencyKey ?? `qc-ncr-use-as-is:${ncrId}:${body.expectedVersion}`,
+      correlationId,
+      causationId,
+    });
   }
 
   @Post('inspections/:id/approve')

@@ -20,7 +20,7 @@ export const componentsTabs = [
   {
     key: 'stock',
     label: 'STOCK',
-    vi: 'Tồn kho cấu kiện',
+    vi: 'Cấu kiện thành phẩm',
     path: '/components/stock',
   },
   {

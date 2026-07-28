@@ -1,5 +1,190 @@
 # SteelTrack AI Changelog
 
+## 2026-07-28 COMPONENT DOMAIN.5G – End-to-End Operational Certification
+
+Completed certification/stability review:
+
+- Reviewed the canonical operational chain from Component Definition and
+  ProjectComponentRequirement through Production Order, ComponentInstances,
+  ComponentInstanceExecution, final QC, NCR disposition and Finished Goods
+  eligibility.
+- Verified Prisma schema and migration status.
+- Verified targeted canonical tests for Production command, Production
+  instance execution, QC command, Components foundation and Components read
+  model.
+- Verified full backend test suite, frontend tests, backend build and frontend
+  build.
+- Confirmed no P0 data corruption, wrong physical identity, wrong Finished
+  Goods eligibility or duplicate instance generation issue was found during
+  service/test certification.
+- Attempted authenticated runtime path by starting the backend and probing
+  health/login, but Nest startup failed with
+  `PrismaClientInitializationError: Can't reach database server at
+  localhost:5432`.
+- Classified certification as **YELLOW** because API/browser smoke and a fresh
+  `DOMAIN5G-*` fixture could not be executed safely.
+- Created
+  `docs/audits/component-domain5g-end-to-end-certification.md`.
+
+Verification:
+
+- Prisma validate passed.
+- Prisma migrate status passed.
+- Targeted tests passed: 6 suites / 38 tests.
+- Full backend tests passed: 79 suites / 247 tests.
+- Frontend tests passed: 1 file / 2 tests.
+- Backend build passed.
+- Frontend build passed with existing Vite warnings.
+
+## 2026-07-28 COMPONENT DOMAIN.5F.4 – Canonical QC Physical Instance UI
+
+Completed:
+
+- Converted `/qc/final` to source its waiting queue from physical
+  `ComponentInstance` rows in `PRODUCED_WAITING_QC`.
+- Added backend read filtering for `ComponentInstance.state`.
+- Exposed canonical QC command routes for final PASS, final FAIL, NCR creation
+  and NCR dispositions through `QcCommandService`.
+- Added frontend QC API/hooks for component-instance waiting QC, inspection
+  detail, final PASS/FAIL, canonical NCR creation and disposition commands.
+- Rebuilt the QC final tab so each row is one manufactured physical instance,
+  with Component definition, Project, requirement, Production Order, production
+  completion and operation evidence visible in the detail modal.
+- Ensured final PASS transitions the exact instance to `QC_PASSED`.
+- Ensured final FAIL transitions the exact instance to `QC_FAILED` and can
+  create an NCR preserving `componentInstanceId`.
+- Preserved legacy inbound, in-process, NCR, CAPA, report and log workflows.
+- Created
+  `docs/audits/component-domain5f4-qc-instance-ui-report.md`.
+
+Verification:
+
+- Prisma validate passed.
+- QC command service targeted test passed.
+- QC dashboard controller targeted test passed.
+- Full backend tests passed.
+- Frontend tests passed.
+- Backend build passed.
+- Frontend build passed with existing Vite chunk-size warning.
+- `git diff --check` passed before documentation finalization.
+
+## 2026-07-28 COMPONENT DOMAIN.5F.3 – Production Requirement-First & Instance Execution UI
+
+Completed:
+
+- Converted Manufacturing Order creation to start from canonical
+  `ProjectComponentRequirement` demand.
+- Added requirement allocation display: required, allocated Production Order
+  quantity and remaining quantity.
+- Wired create to `POST /production/commands/orders`.
+- Added additive planned start/end support to the canonical Production command
+  DTO/service without schema changes.
+- Added canonical release client/action through
+  `POST /production/commands/orders/:id/release`.
+- Exposed generated physical `ComponentInstance` rows in the Production Order
+  drawer.
+- Localized physical instance state labels and showed QC handoff readiness.
+- Extended foundation read API includes for Production allocation and
+  `ComponentInstanceExecution` lineage.
+- Removed the legacy manual `Tạo cấu kiện từ MO` action from the main drawer
+  semantics.
+- Created
+  `docs/audits/component-domain5f3-production-instance-ui-report.md`.
+
+Verification:
+
+- Prisma validate passed.
+- Backend targeted tests passed: production command service and component
+  domain foundation.
+- Frontend tests passed.
+- Backend build passed.
+- Frontend build passed with existing Vite chunk-size warning.
+- `git diff --check` passed.
+
+## 2026-07-28 COMPONENT DOMAIN.5F.2 – Canonical Component Definition UI
+
+Completed:
+
+- Converted Components `/components/list` semantics to **Hồ sơ cấu kiện**.
+- Added canonical read-model fields for engineering lifecycle, current
+  revision, BOM state and ProjectComponentRequirement demand.
+- Replaced physical-status KPIs with engineering/planning KPIs.
+- Removed UI filters for legacy physical statuses from the Component
+  Definition page.
+- Added requirement presentation in the detail drawer, including required,
+  allocated Production Order and remaining quantities.
+- Updated read-model tests so legacy `Component.status = STOCK` no longer
+  becomes `Tồn kho` on the engineering definition page.
+- Created
+  `docs/audits/component-domain5f2-component-definition-ui-report.md`.
+
+Verification:
+
+- Components read-model repository test passed.
+- Backend targeted domain foundation tests passed.
+- Full backend tests passed.
+- Frontend tests passed.
+- Backend build passed.
+- Frontend build passed with existing Vite warnings.
+
+## 2026-07-28 COMPONENT DOMAIN.5F.1 – Canonical Finished Goods UI
+
+Completed:
+
+- Converted Components `/components/stock` from legacy "Tồn kho cấu kiện"
+  semantics to canonical "Cấu kiện thành phẩm".
+- Added frontend contract/API/query hook for
+  `GET /components/instances/finished-goods`.
+- Rebuilt the page table, KPIs, filters and detail drawer around physical
+  `ComponentInstance` rows returned by the canonical backend.
+- Removed page-level dependencies on `Component.status`, `READY`, `STOCK`,
+  `COUNT(Component)`, completed ProductionOrder quantity, Yard slot scans,
+  Production BOM cost reconstruction and Inventory audit rows for physical
+  Finished Goods presentation.
+- Added minimal backend read API summary counts from the same Finished Goods
+  eligibility predicate.
+- Created
+  `docs/audits/component-domain5f1-finished-goods-ui-report.md`.
+
+Verification:
+
+- Backend targeted tests passed: 2 suites / 12 tests.
+- Full backend tests passed: 79 suites / 247 tests.
+- Frontend tests passed: 1 file / 2 tests.
+- Backend build passed.
+- Frontend build passed with existing Vite warnings.
+
+## 2026-07-28 COMPONENT DOMAIN.5F – Canonical Components / Production / QC UI Integration Audit
+
+Completed audit only:
+
+- Audited current Components frontend screens against the canonical
+  `Component` / `ProjectComponentRequirement` / `ComponentInstance` split.
+- Audited Production frontend screens against canonical `ProductionOrder`,
+  `ComponentInstance` and `ComponentInstanceExecution` execution evidence.
+- Audited QC frontend screens against canonical final QC targeting by
+  `componentInstanceId`.
+- Identified legacy UI semantics still relying on `Component.status`, `STOCK`,
+  `READY`, `description` JSON quantity, `COUNT(Component)`, aggregate
+  ProductionOrder quantity, `/production/boms` and frontend-derived production
+  material stock.
+- Created
+  `docs/audits/component-domain5f-canonical-ui-integration-audit.md`.
+
+No implementation:
+
+- No frontend source change.
+- No backend source change.
+- No Prisma schema change.
+- No migration.
+- No staging or commit.
+
+Next:
+
+- Migrate Components Finished Goods UI to
+  `GET /components/instances/finished-goods`, then align Production instance
+  execution UI and QC instance-level final inspection queue.
+
 ## 2026-07-28 COMPONENT DOMAIN.5D – ComponentInstanceExecution Schema Foundation
 
 Completed:
@@ -6436,3 +6621,14 @@ Notes:
   `GET /components/instances/finished-goods` without creating inventory, yard
   placement, schema or dashboard side effects.
 - Added targeted lifecycle/QC tests and runtime DB smoke for DOMAIN5E fixture.
+
+# 2026-07-28 - STABILITY.DOMAIN5G.2 ProductionExecution REST Commands
+
+- Exposed existing `ProductionCommandService` ProductionExecution lifecycle
+  commands through REST under `/production/commands/executions/...`.
+- Added additive DTO validation for execution start/versioned/reasoned
+  commands and controller tests for execution command context forwarding.
+- Certified authenticated HTTP runtime flow from Component Definition through
+  ProductionExecution completion, WorkOrder completion, QC PASS/FAIL, NCR and
+  Finished Goods eligibility without schema, migration, Inventory or Yard
+  changes.

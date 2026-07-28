@@ -1,13 +1,38 @@
 # Next Tasks
 
-- **Component DOMAIN.5E - Physical Lifecycle Transition & QC Handoff**:
-  use `ComponentInstanceExecution` evidence to move selected physical instances
-  through `PLANNED -> IN_PRODUCTION -> PRODUCED_WAITING_QC`, then allow QC
-  handoff only by exact `componentInstanceId`. Do not infer from aggregate
-  completed quantity.
-- **Component DOMAIN.5 - Production Completion + QC + Finished Goods Gate**:
-  after DOMAIN.5E, add instance-level QC state transitions and make QC PASS /
-  approved Use-As-Is the only path to Finished Goods for new component flows.
+- **Component DOMAIN.5G runtime certification rerun - P1**: fix the
+  environment/runtime DB connectivity issue that prevents `pnpm -C
+  apps/backend-api start` from reaching PostgreSQL at `localhost:5432`, then
+  rerun authenticated API and browser smoke with a fresh `DOMAIN5G-*` fixture.
+  Required paths: Components definition/read, ProjectComponentRequirement,
+  Production PO create/release, instance reads, execution assignment/start/
+  complete, QC waiting queue, PASS, FAIL, NCR, rework/scrap/use-as-is where
+  supported, and Finished Goods API.
+- **Component DOMAIN.5G full fixture accounting - P1**: after runtime startup is
+  fixed, produce the actual DOMAIN5G quantity table: required 20, allocated PO
+  15, remaining 5, 15 physical instances, mixed production states, QC result
+  distribution and exact Finished Goods instance IDs.
+- **Component DOMAIN.6C-P1 - Production instance operation controls**:
+  add a dedicated assignment panel with a stable ProductionExecution picker,
+  then wire row-level assign/start/complete actions to canonical
+  `ComponentInstanceExecution` endpoints. DOMAIN.5F.3 already exposes generated
+  `ComponentInstance` rows and execution evidence in the Production Order
+  drawer.
+- **Component DOMAIN.6B-P1 - Canonical Engineering BOM UI split**:
+  separate Engineering BOM authoring (`Component -> Revision -> Engineering
+  BOM -> Validate -> Release`) from the legacy Production BOM compatibility
+  modal still reachable from Components detail.
+- **Component DOMAIN.6D-P1 - QC NCR detail and disposition UI polish**:
+  DOMAIN.5F.4 now sources final QC from physical
+  `ComponentInstance.state = PRODUCED_WAITING_QC` and sends
+  `componentInstanceId` through final inspection/NCR commands. Next, add a
+  dedicated NCR detail panel with visible rework, scrap and use-as-is
+  disposition actions, plus instance-level inspection/NCR history.
+- **Component DOMAIN.5F.4 runtime smoke**: with authenticated DOMAIN5F4 fixture
+  data, create or select three physical instances waiting QC, then verify PASS,
+  FAIL+NCR and legacy readable paths in the browser/API. Confirm no
+  ComponentInstance, InventoryTransaction, Yard placement or Finished Goods row
+  is created by QC UI actions.
 - **Component DOMAIN.6+ - Yard, Logistics, Installation conversion**: point new
   Yard placements, Dispatch items and Project installation records at
   `ComponentInstance` identity while keeping legacy rows readable.
@@ -1079,3 +1104,14 @@ Backlog after the locked order:
    standardized.
 3. Continue with Yard/Delivery handoff for physical ComponentInstances without
    merging Finished Goods eligibility into Inventory ownership.
+
+# STABILITY.DOMAIN5G.2 Follow-up
+
+1. Run authenticated browser smoke for Production PO detail, `/qc/final` and
+   `/components/stock` using the DOMAIN5G.2 fixture pattern.
+2. Wire frontend operator actions to the new ProductionExecution REST commands
+   only where the current Production UI already exposes execution lifecycle
+   controls.
+3. Consider a narrow WorkOrder ready command REST endpoint if future multi-step
+   HTTP-only execution certification must advance individual WorkOrders without
+   order-level ready orchestration.

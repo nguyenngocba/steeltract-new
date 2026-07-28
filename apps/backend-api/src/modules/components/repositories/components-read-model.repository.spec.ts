@@ -76,8 +76,10 @@ describe('ComponentsReadModelRepository', () => {
         id: 'component-1',
         type: 'Dầm (Beam)',
         profile: 'H300',
-        qty: 2,
-        status: 'Tồn kho',
+        qty: 0,
+        requiredQuantity: 0,
+        status: 'Legacy - chưa chuẩn hóa',
+        engineeringStatus: 'Legacy - chưa chuẩn hóa',
       }),
     ]);
     expect(result.summary).toEqual(

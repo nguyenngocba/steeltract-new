@@ -27,7 +27,7 @@ import {
   enterpriseTableRow as inventoryTableRow,
 } from '@/shared/ui/enterprise-components'
 
-import type { ProductionBom, ProductionCockpitReadModel, ProductionComponent, ProductionLog, ProductionMachine, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
+import type { ComponentInstance, ProductionBom, ProductionCockpitReadModel, ProductionComponent, ProductionLog, ProductionMachine, ProductionMaterialConsumption, ProductionMaterialIssue, ProductionMaterialLedger, ProductionMaterialLedgerParams, ProductionOrder, ProductionReservation } from '../api/production.api'
 import { calculateComponentMaterialReadiness } from '@/modules/components/lib/material-readiness'
 import {
   Meter,
@@ -53,7 +53,6 @@ import {
   useArchiveProductionBom,
   useCloneProductionBom,
   useCompleteProductionStage,
-  useCreateComponentFromProductionOrder,
   useCreateProductionReservation,
   useExpireProductionReservation,
   useIssueProductionReservation,
@@ -67,7 +66,9 @@ import {
   useProductionMaterialLedger,
   useProductionOrder,
   useProductionOrders,
+  useProductionComponentInstances,
   useProductionReservations,
+  useReleaseCanonicalProductionOrder,
   useReleaseProductionReservation,
   useReservationPreview,
   useReserveProductionReservation,
@@ -78,6 +79,34 @@ import {
 
 const number = (value = 0) => formatQuantity(value, 3)
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
+
+const componentInstanceStateLabel: Record<string, string> = {
+  PLANNED: 'Chờ sản xuất',
+  IN_PRODUCTION: 'Đang sản xuất',
+  PRODUCED_WAITING_QC: 'Chờ QC',
+  QC_PASSED: 'Đạt QC',
+  QC_FAILED: 'Không đạt QC',
+  REWORK: 'Làm lại',
+  SCRAPPED: 'Loại bỏ',
+  USE_AS_IS: 'Chấp nhận sử dụng',
+  YARD: 'Trong bãi',
+  DELIVERED: 'Đã giao',
+  INSTALLED: 'Đã lắp dựng',
+}
+
+function instanceStateLabel(value?: string) {
+  return componentInstanceStateLabel[value ?? ''] ?? value ?? '-'
+}
+
+function currentInstanceOperation(instance: ComponentInstance) {
+  const active = instance.executions?.find((execution) => ['ASSIGNED', 'RUNNING'].includes(execution.status))
+  const latest = active ?? instance.executions?.[instance.executions.length - 1]
+  if (!latest) return { label: '-', status: 'Chưa gán' }
+  return {
+    label: latest.workOrder?.workOrderNo ?? latest.productionExecution?.id ?? '-',
+    status: latest.status,
+  }
+}
 
 function sameDay(value?: string) {
   if (!value) return false
@@ -3551,10 +3580,12 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const { data: requirements = [] } = useMaterialRequirements(order.id)
   const { data: reservationPreview } = useReservationPreview(order.id)
   const { data: orderReservations = [] } = useProductionReservations(order.id)
+  const { data: instancesReadModel } = useProductionComponentInstances({ productionOrderId: order.id, limit: 200 }, Boolean(order.id))
+  const componentInstances = instancesReadModel?.data ?? []
   const { data: slots = [] } = useYardSlots()
   const start = useStartProductionOrder()
+  const releaseCanonical = useReleaseCanonicalProductionOrder()
   const createReservation = useCreateProductionReservation()
-  const createComponentFromOrder = useCreateComponentFromProductionOrder()
   const complete = useCompleteProductionStage()
   const stage = useStageProductionToYard()
   const [slotId, setSlotId] = useState('')
@@ -3574,16 +3605,23 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const remainingQuantity = Math.max(0, Number(latest.quantity ?? 0) - stagedQuantity)
   const stageQuantity = parseLocaleNumber(quantity) || 0
   const stageInvalid = !slotId || stageQuantity <= 0 || stageQuantity > remainingQuantity
-  const netIssuedMaterialQty = (latest.materialIssues ?? []).reduce(
-    (sum, issue) => sum + Number(issue.issuedQty ?? 0) - Number(issue.returnedQty ?? 0),
-    0,
-  )
   const materialReadiness = workOrderReadiness(latest)
   const orderIssueRows = latest.materialIssues ?? []
   const reservedQty = orderReservations.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.reservedQty ?? 0), 0), 0)
   const reservationIssuedQty = orderReservations.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.issuedQty ?? 0), 0), 0)
   const availableQty = reservationPreview?.totalAvailableQty ?? 0
-  const canCreateComponentFromOrder = netIssuedMaterialQty > 0
+  const instanceSummary = componentInstances.reduce(
+    (summary, instance) => {
+      if (instance.state === 'PLANNED') summary.planned += 1
+      if (instance.state === 'IN_PRODUCTION') summary.running += 1
+      if (instance.state === 'PRODUCED_WAITING_QC') summary.waitingQc += 1
+      if (instance.state === 'QC_PASSED') summary.qcPassed += 1
+      if (instance.state === 'QC_FAILED') summary.qcFailed += 1
+      if (instance.executions?.some((execution) => execution.status === 'COMPLETED')) summary.operationsCompleted += 1
+      return summary
+    },
+    { planned: 0, running: 0, waitingQc: 0, qcPassed: 0, qcFailed: 0, operationsCompleted: 0 },
+  )
   const stageDisabledReason = !slotId
     ? 'Chọn slot còn tầng trống trước khi chuyển bãi.'
     : stageQuantity <= 0
@@ -3591,6 +3629,15 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
       : stageQuantity > remainingQuantity
         ? `Số lượng chuyển bãi vượt quá số lượng còn lại (${number(remainingQuantity)}).`
         : ''
+  const canonicalReleaseWorkOrders = latest.bom?.routingSteps?.map((step) => ({
+    routingOperationId: step.id,
+    productCode: latest.component?.code ?? latest.orderNo,
+    quantity: Number(latest.quantity ?? 0),
+    sequence: step.stepNo,
+    plannedStart: latest.plannedStartAt ? new Date(latest.plannedStartAt).toISOString() : undefined,
+    plannedEnd: latest.plannedEndAt ? new Date(latest.plannedEndAt).toISOString() : undefined,
+  })) ?? []
+  const canReleaseCanonicalOrder = latest.status === 'DRAFT' && Boolean(latest.componentRequirementId) && canonicalReleaseWorkOrders.length > 0
 
   useEffect(() => {
     if (remainingQuantity > 0 && parseLocaleNumber(quantity) > remainingQuantity) {
@@ -3681,6 +3728,43 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
               ))}
             </div>
           </InventoryChartCard>
+          <InventoryChartCard title="Physical Component Instances" note="Canonical instance execution progress">
+            <div className="mb-3 grid gap-3 md:grid-cols-5">
+              <InventoryKpi title="Planned" value={formatQuantity(instanceSummary.planned, 0)} note="Chờ sản xuất" tone="blue" />
+              <InventoryKpi title="Running" value={formatQuantity(instanceSummary.running, 0)} note="Đang sản xuất" tone="cyan" />
+              <InventoryKpi title="Waiting QC" value={formatQuantity(instanceSummary.waitingQc, 0)} note="Chờ kiểm tra" tone="amber" />
+              <InventoryKpi title="QC Passed" value={formatQuantity(instanceSummary.qcPassed, 0)} note="Đủ điều kiện FG" tone="emerald" />
+              <InventoryKpi title="QC Failed" value={formatQuantity(instanceSummary.qcFailed, 0)} note="Không nhập kho TP" tone="red" />
+            </div>
+            <ModuleDataGrid>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[920px] text-left text-xs">
+                  <thead className={inventoryTableHead}>
+                    <tr>{['Instance', 'Physical state', 'Operation', 'Execution', 'Started', 'Completed', 'QC readiness'].map((head) => <th key={head} className="px-3 py-2 text-left font-medium">{head}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {componentInstances.length ? componentInstances.slice(0, 12).map((instance) => {
+                      const operation = currentInstanceOperation(instance)
+                      const waitingQc = instance.state === 'PRODUCED_WAITING_QC'
+                      const firstStartedExecution = instance.executions?.find((item) => item.startedAt)
+                      const lastCompletedExecution = [...(instance.executions ?? [])].reverse().find((item) => item.completedAt)
+                      return (
+                        <tr key={instance.id} className={inventoryTableRow}>
+                          <td className="px-3 py-3 font-mono text-cyan-300">{instance.instanceNo}</td>
+                          <td className="px-3 py-3"><StatusChip status={instanceStateLabel(instance.state)} /></td>
+                          <td className="px-3 py-3 text-slate-300">{operation.label}</td>
+                          <td className="px-3 py-3"><StatusChip status={operation.status} /></td>
+                          <td className="px-3 py-3 text-slate-400">{date(firstStartedExecution?.startedAt)}</td>
+                          <td className="px-3 py-3 text-slate-400">{date(lastCompletedExecution?.completedAt)}</td>
+                          <td className={`px-3 py-3 ${waitingQc ? 'text-amber-300' : instance.state === 'QC_PASSED' ? 'text-emerald-300' : 'text-slate-500'}`}>{waitingQc ? 'Sẵn sàng bàn giao QC' : instanceStateLabel(instance.state)}</td>
+                        </tr>
+                      )
+                    }) : <tr><td colSpan={7} className="px-3 py-5 text-center text-slate-500">Chưa có ComponentInstance. Release Production Order canonical sẽ tạo instance vật lý theo số lượng PO.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </ModuleDataGrid>
+          </InventoryChartCard>
           <InventoryChartCard title="Material Issues" note="Section D">
             <ModuleDataGrid>
               <div className="overflow-x-auto">
@@ -3762,8 +3846,10 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
           <ProductionPanel title="Thông tin MO">
             <div className="space-y-3 text-xs">
               <Info k="Cấu kiện" v={latest.component ? `${latest.component.code} · ${latest.component.name}` : '-'}/>
+              <Info k="Requirement" v={latest.componentRequirementId ?? '-'}/>
               <Info k="BOM" v={latest.bom?.bomNo??'-'}/>
               <Info k="Số lượng MO" v={number(latest.quantity)}/>
+              <Info k="Physical instances" v={formatQuantity(componentInstances.length, 0)}/>
               <Info k="Đã nhập bãi" v={number(stagedQuantity)}/>
               <Info k="Còn được nhập" v={number(remainingQuantity)}/>
               <Info k="Ưu tiên" v={latest.priority}/>
@@ -3773,15 +3859,28 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
           </ProductionPanel>
           <ProductionPanel title="Thao tác thực thi">
             <div className="space-y-2">
+              {canReleaseCanonicalOrder ? (
+                <button
+                  onClick={() => run(
+                    () => releaseCanonical.mutateAsync({
+                      id: latest.id,
+                      payload: {
+                        expectedVersion: latest.aggregateVersion ?? 1,
+                        reason: 'Release from canonical Production UI',
+                        workOrders: canonicalReleaseWorkOrders,
+                      },
+                    }),
+                    'Đã phát hành PO và tạo ComponentInstance',
+                  )}
+                  disabled={releaseCanonical.isPending}
+                  className="w-full rounded bg-blue-600 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Phát hành PO canonical
+                </button>
+              ) : null}
+              {latest.status === 'DRAFT' && latest.componentRequirementId && !canonicalReleaseWorkOrders.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-300">Chưa có routing/work order basis từ BOM materialized để phát hành PO.</p> : null}
               {latest.status !== 'IN_PROGRESS' && !canStageToYard && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}
-              <button
-                onClick={() => run(() => createComponentFromOrder.mutateAsync(latest.id), 'Đã tạo/đánh dấu cấu kiện từ lệnh sản xuất')}
-                disabled={!canCreateComponentFromOrder || createComponentFromOrder.isPending}
-                className="w-full rounded bg-blue-600 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Tạo cấu kiện từ MO
-              </button>
-              {!canCreateComponentFromOrder ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-300">Cần issue vật tư từ reservation trước khi tạo hoặc đánh dấu cấu kiện từ MO.</p> : null}
+              {!componentInstances.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-300">Chưa có instance vật lý. Release Production Order canonical sẽ tạo ComponentInstance theo quantity của PO.</p> : null}
               {latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}
               {canStageToYard && <p className="rounded border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-300">Tất cả công đoạn đã hoàn tất. Có thể chuyển thành phẩm ra bãi.</p>}
               <p className="text-xs text-slate-400">Mỗi lần hoàn tất sẽ chuyển trạng thái cấu kiện sang công đoạn kế tiếp.</p>

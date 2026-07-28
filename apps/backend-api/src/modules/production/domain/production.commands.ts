@@ -25,6 +25,8 @@ export interface CreateProductionOrderCommand extends ProductionCommandContext {
   unit: string;
   orderKind?: ProductionOrderKind;
   reworkOfProductionOrderId?: string;
+  plannedStartAt?: string;
+  plannedEndAt?: string;
   engineeringBasis: ReleasedEngineeringBasis;
 }
 

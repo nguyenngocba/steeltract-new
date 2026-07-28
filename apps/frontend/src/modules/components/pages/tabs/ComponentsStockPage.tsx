@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2, Layers, Package, Truck, Wrench } from 'lucide-react'
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  FileSearch,
+  Layers,
+  PackageCheck,
+  ShieldCheck,
+} from 'lucide-react'
 
+import { useProjectsQuery } from '@/hooks/query/useProjectQueries'
 import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
-import { ModuleDetailDrawer, ModuleEmptyState, ModuleLoadingState } from '../../../../shared/ui/modules'
+import {
+  ModuleDetailDrawer,
+  ModuleEmptyState,
+  ModuleLoadingState,
+} from '../../../../shared/ui/modules'
 import { CockpitKpiCard, EnterpriseKpiCard } from '../../../../shared/ui/cockpit'
 import {
   InventoryChartCard,
@@ -12,198 +23,191 @@ import {
   inventoryTableHead,
   inventoryTableRow,
 } from '../../../inventory/components/InventoryVisuals'
-import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
-import { useProductionBoms, useProductionOrders } from '../../../production/hooks/useProductionCockpit'
-import { useYardSlotsRuntime } from '../../../yard/hooks/queries/useYardRuntime'
-import { useComponents } from '../../hooks/queries/useComponents'
-import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
 import {
-  ComponentsDonut,
-  componentsInput,
-  componentsPrimaryButton,
-} from './ComponentsCockpitShared'
+  useComponentsWorkspace,
+  useFinishedGoodsInstances,
+} from '../../hooks/queries/useComponents'
+import type { FinishedGoodsInstanceRow } from '../../api/contracts/components.contract'
+import { formatQuantity } from '@/shared/utils/number-format'
 
-const statusBadgeTone: Record<string, string> = {
-  READY: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
-  SHIPPED: 'border-purple-400/30 bg-purple-400/10 text-purple-300',
-  DELIVERED: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300',
-  INSTALLED: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
+const PAGE_SIZE = 14
+
+const stateBadgeTone: Record<string, string> = {
+  QC_PASSED: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
+  USE_AS_IS: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300',
+}
+
+const stateLabel: Record<string, string> = {
+  QC_PASSED: 'Đạt QC',
+  USE_AS_IS: 'Chấp nhận sử dụng',
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('vi-VN')
+}
+
+function projectLabel(row: FinishedGoodsInstanceRow) {
+  if (!row.project) return '-'
+  return [row.project.code, row.project.name].filter(Boolean).join(' - ')
+}
+
+function componentLabel(row: FinishedGoodsInstanceRow) {
+  return `${row.component.code} · ${row.component.name}`
+}
+
+function qualityEvidence(row: FinishedGoodsInstanceRow) {
+  const inspection = row.qcInspections?.[0]
+  if (inspection) {
+    return inspection.inspectionNo
+  }
+  const ncr = row.ncrs?.[0]
+  if (ncr) {
+    return `${ncr.ncrNo} · Use-As-Is`
+  }
+  return '-'
+}
+
+function locationLabel(row: FinishedGoodsInstanceRow) {
+  if (row.installedAt) return 'Đã lắp đặt'
+  return 'Chưa gán bãi'
 }
 
 export function ComponentsStockPage() {
-  const navigate = useNavigate()
-  const { data: components = [], isLoading } = useComponents()
-  const { data: slots = [] } = useYardSlotsRuntime()
-  const { data: orders = [] } = useProductionOrders()
-  const { data: boms = [] } = useProductionBoms()
-  const { data: auditRows = [] } = useInventoryAudit()
-  const [query, setQuery] = useState('')
-  const [searchDraft, setSearchDraft] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [instanceCode, setInstanceCode] = useState('')
+  const [instanceCodeDraft, setInstanceCodeDraft] = useState('')
+  const [projectId, setProjectId] = useState('')
+  const [componentId, setComponentId] = useState('')
   const [page, setPage] = useState(1)
-  const [selectedRow, setSelectedRow] = useState<any | null>(null)
+  const [selectedRow, setSelectedRow] =
+    useState<FinishedGoodsInstanceRow | null>(null)
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
 
-  function applySearch() {
-    setQuery(searchDraft)
-    setPage(1)
-  }
+  const { data: projects = [] } = useProjectsQuery()
+  const { data: componentOptions } = useComponentsWorkspace({
+    page: 1,
+    limit: 200,
+    sortBy: 'code',
+    sortOrder: 'asc',
+  })
 
-  function resetFilters() {
-    setSearchDraft('')
-    setQuery('')
-    setStatusFilter('')
-    setPage(1)
+  const queryParams = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      instanceCode: instanceCode || undefined,
+      projectId: projectId || undefined,
+      componentId: componentId || undefined,
+    }),
+    [componentId, instanceCode, page, projectId],
+  )
+
+  const {
+    data: finishedGoods,
+    isLoading,
+    isError,
+  } = useFinishedGoodsInstances(queryParams)
+
+  const rows = finishedGoods?.data ?? []
+  const meta = finishedGoods?.meta ?? {
+    page,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  }
+  const summary = finishedGoods?.summary ?? {
+    total: 0,
+    qcPassed: 0,
+    useAsIs: 0,
+    projectCount: 0,
   }
 
   useEffect(() => {
     setPage(1)
-  }, [query, statusFilter])
+  }, [componentId, instanceCode, projectId])
 
-  const yardByComponentId = useMemo(() => {
-    const map = new Map<string, { zone: string; slot: string; level: number; weight?: number }>()
-    slots.forEach((slot) => {
-      slot.placements.forEach((placement) => {
-        if (!placement.itemId) return
-        map.set(placement.itemId, {
-          zone: `${slot.zone.code} - ${slot.zone.name}`,
-          slot: slot.code,
-          level: placement.stackLevel,
-          weight: placement.weight,
-        })
-      })
-    })
-    return map
-  }, [slots])
+  function applySearch() {
+    setInstanceCode(instanceCodeDraft.trim())
+  }
 
-  const costByComponentCode = useMemo(() => {
-    const costByMaterial = new Map((auditRows as any[]).map((row) => [String(row.materialCode), Number(row.averageCost ?? 0)]))
-    const map = new Map<string, number>()
-    boms.forEach((bom) => {
-      const materialCost = bom.items.reduce((sum, item) => {
-        const unitCost = costByMaterial.get(item.material.code) ?? 0
-        return sum + item.quantity * (1 + item.wastePercent / 100) * unitCost
-      }, 0)
-      map.set(bom.productCode, materialCost + Number(bom.estimatedWeight ?? 0) * 0)
-    })
-    return map
-  }, [auditRows, boms])
+  function resetFilters() {
+    setInstanceCode('')
+    setInstanceCodeDraft('')
+    setProjectId('')
+    setComponentId('')
+    setPage(1)
+  }
 
-  const completedComponentIds = useMemo(() => new Set(
-    orders.filter((order) => order.status === 'COMPLETED').map((order) => {
-      const runtimeOrder = order as typeof order & { componentId?: string }
-      return order.component?.id ?? runtimeOrder.componentId
-    }).filter(Boolean),
-  ), [orders])
-
-  const rows = useMemo(() => {
-    return components.flatMap((component) => {
-      const yard = yardByComponentId.get(component.id)
-      if (!yard || !completedComponentIds.has(component.id)) return []
-      const unitPrice = costByComponentCode.get(component.code) ?? 0
-      return {
-        id: component.id,
-        code: component.code,
-        name: component.name,
-        status: component.status,
-        project: component.project?.code ?? component.project?.name ?? '-',
-        zone: yard?.zone ?? component.zone ?? 'Kho cấu kiện',
-        slot: yard ? `${yard.slot} / L${yard.level}` : component.position ?? '-',
-        weight: yard?.weight ?? 0,
-        unitPrice,
-        totalAmount: unitPrice,
-        createdAt: component.createdAt ? new Date(component.createdAt).toLocaleDateString('vi-VN') : '-',
-      }
-    })
-  }, [components, costByComponentCode, completedComponentIds, yardByComponentId])
-
-  const filtered = rows.filter((row) => {
-    if (statusFilter && row.status !== statusFilter) return false
-    return `${row.code} ${row.name} ${row.zone} ${row.slot}`.toLowerCase().includes(query.toLowerCase())
-  })
-  const inYard = rows.filter((row) => yardByComponentId.has(row.id)).length
-  const ready = components.filter((row) => row.status === 'READY' && !yardByComponentId.has(row.id)).length
-  const totalWeight = rows.reduce((sum, row) => sum + Number(row.weight ?? 0), 0)
-  const pageSize = 14
-  const paginatedRows = filtered.slice((page - 1) * pageSize, page * pageSize)
-  const lifecycleCounts = useMemo(() => ({
-    total: components.length,
-    ready: components.filter((row) => row.status === 'READY').length,
-    shipped: components.filter((row) => row.status === 'SHIPPED').length,
-    delivered: components.filter((row) => row.status === 'DELIVERED').length,
-    installed: components.filter((row) => row.status === 'INSTALLED').length,
-  }), [components])
+  const tableRows = rows
 
   return (
     <EnterpriseModulePage>
       <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
-        <div className="grid grid-cols-1 gap-1 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
           <EnterpriseKpiCard
-            title="Tổng cấu kiện"
-            value={formatQuantity(lifecycleCounts.total, 0)}
+            title="Cấu kiện thành phẩm"
+            value={formatQuantity(summary.total, 0)}
             tone="blue"
-            icon={<Layers size={15} />}
+            icon={<PackageCheck size={15} />}
             isLoading={isLoading}
-            onClick={() => setStatusFilter('')}
           />
           <EnterpriseKpiCard
-            title="READY"
-            value={formatQuantity(lifecycleCounts.ready, 0)}
+            title="Đạt QC"
+            value={formatQuantity(summary.qcPassed, 0)}
             tone="emerald"
             icon={<CheckCircle2 size={15} />}
             isLoading={isLoading}
-            onClick={() => setStatusFilter('READY')}
           />
           <EnterpriseKpiCard
-            title="SHIPPED"
-            value={formatQuantity(lifecycleCounts.shipped, 0)}
-            tone="purple"
-            icon={<Truck size={15} />}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('SHIPPED')}
-          />
-          <EnterpriseKpiCard
-            title="DELIVERED"
-            value={formatQuantity(lifecycleCounts.delivered, 0)}
+            title="Chấp nhận sử dụng"
+            value={formatQuantity(summary.useAsIs, 0)}
             tone="cyan"
-            icon={<Package size={15} />}
+            icon={<ShieldCheck size={15} />}
             isLoading={isLoading}
-            onClick={() => setStatusFilter('DELIVERED')}
           />
           <EnterpriseKpiCard
-            title="INSTALLED"
-            value={formatQuantity(lifecycleCounts.installed, 0)}
-            tone="amber"
-            icon={<Wrench size={15} />}
+            title="Theo công trình"
+            value={formatQuantity(summary.projectCount, 0)}
+            tone="purple"
+            icon={<Layers size={15} />}
             isLoading={isLoading}
-            onClick={() => setStatusFilter('INSTALLED')}
           />
         </div>
 
         <InventoryPanel className="rounded-xl -mt-1">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_220px_130px_120px]">
+          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_220px_240px_130px_120px]">
             <input
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') applySearch()
+              value={instanceCodeDraft}
+              onChange={(event) => setInstanceCodeDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') applySearch()
               }}
-              placeholder="Tìm mã, tên cấu kiện, zone, slot..."
+              placeholder="Tìm mã cấu kiện vật lý..."
               className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
             />
             <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setPage(1)
-              }}
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
               className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
             >
-              <option value="">Trạng thái: Tất cả</option>
-              <option value="READY">READY</option>
-              <option value="SHIPPED">SHIPPED</option>
-              <option value="DELIVERED">DELIVERED</option>
-              <option value="INSTALLED">INSTALLED</option>
+              <option value="">Công trình: Tất cả</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} - {project.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={componentId}
+              onChange={(event) => setComponentId(event.target.value)}
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+            >
+              <option value="">Hồ sơ cấu kiện: Tất cả</option>
+              {(componentOptions?.data ?? []).map((component) => (
+                <option key={component.id} value={component.id}>
+                  {component.code} - {component.name}
+                </option>
+              ))}
             </select>
             <button
               type="button"
@@ -227,83 +231,99 @@ export function ComponentsStockPage() {
             <InventoryPanel className="rounded-xl">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách tồn kho cấu kiện</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">
+                    Danh sách cấu kiện thành phẩm
+                  </h3>
                   <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
-                    {filtered.length} cấu kiện
+                    {meta.total} cấu kiện vật lý
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setExpandedModalOpen(true)}
-                  className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+                  className="text-xs font-semibold text-cyan-300 transition hover:text-cyan-200"
                 >
                   Xem tất cả
                 </button>
               </div>
 
-              <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
-                <table className="w-full min-w-[980px] table-fixed text-sm">
-                  <thead
-                    className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
-                    style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
-                  >
-                    <tr>
-                      {['Mã cấu kiện', 'Tên', 'Dự án', 'Zone/kho', 'Vị trí', 'Trọng lượng', 'Trạng thái', 'Ngày tạo'].map((heading) => (
-                        <th key={heading} className="px-3 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      <tr><td colSpan={8} className="px-4 py-6 text-center"><ModuleLoadingState label="Đang tải tồn kho cấu kiện..." /></td></tr>
-                    ) : paginatedRows.map((row) => (
-                      <tr key={row.id} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
-                        <td className="truncate px-3 py-1.5 text-cyan-300 font-mono font-medium">{row.code}</td>
-                        <td className="truncate px-3 py-1.5 text-white font-medium">{row.name}</td>
-                        <td className="truncate px-3 py-1.5 text-slate-300">{row.project}</td>
-                        <td className="truncate px-3 py-1.5 text-slate-300">{row.zone}</td>
-                        <td className="truncate px-3 py-1.5 text-slate-300">{row.slot}</td>
-                        <td className="px-3 py-1.5 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
-                        <td className="px-3 py-1.5">
-                          <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${statusBadgeTone[row.status] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-1.5 text-slate-300">{row.createdAt}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {!isLoading && !filtered.length ? <div className="p-3"><ModuleEmptyState icon={<Package size={18} />} title="Chưa có dữ liệu cấu kiện" description="Thử đổi từ khóa hoặc trạng thái lọc." /></div> : null}
-              <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))} total={filtered.length} onPageChange={setPage} containerClassName="border-t-0" />
+              <FinishedGoodsTable
+                rows={tableRows}
+                isLoading={isLoading}
+                isError={isError}
+                onSelect={setSelectedRow}
+              />
+
+              {!isLoading && !isError && !tableRows.length ? (
+                <div className="p-3">
+                  <ModuleEmptyState
+                    icon={<PackageCheck size={18} />}
+                    title="Chưa có cấu kiện thành phẩm"
+                    description="Chưa có cấu kiện hoàn tất sản xuất và được QC chấp nhận."
+                  />
+                </div>
+              ) : null}
+
+              <InventoryPagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                pageCount={Math.max(1, meta.totalPages)}
+                total={meta.total}
+                onPageChange={setPage}
+                containerClassName="border-t-0"
+              />
             </InventoryPanel>
           </div>
 
           <div className="col-span-12 space-y-1 xl:col-span-3">
-            <InventoryChartCard title="Thông số tồn kho" className="h-[170px]">
+            <InventoryChartCard title="Nguồn dữ liệu" className="h-[170px]">
               <div className="space-y-1.5 text-xs text-slate-300">
-                <div className="flex items-center justify-between"><span>Cấu kiện có vị trí bãi</span><b className="font-mono text-emerald-300">{inYard}</b></div>
-                <div className="flex items-center justify-between"><span>Trọng lượng đang lưu</span><b className="font-mono text-cyan-300">{formatQuantity(totalWeight, 1)} tấn</b></div>
-                <div className="flex items-center justify-between"><span>Tổng cấu kiện</span><b className="font-mono text-white">{formatQuantity(components.length, 0)}</b></div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>API canonical</span>
+                  <b className="text-right font-mono text-cyan-300">
+                    /components/instances/finished-goods
+                  </b>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Điều kiện</span>
+                  <b className="font-mono text-emerald-300">QC final</b>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Không tính hồ sơ Draft</span>
+                  <b className="font-mono text-white">Đúng</b>
+                </div>
               </div>
             </InventoryChartCard>
-            <InventoryChartCard title="Phân bố vị trí" className="h-[170px]">
-              <ComponentsDonut
-                centerValue={formatQuantity(rows.length, 0)}
-                centerLabel="cấu kiện"
-                segments={[
-                  { label: 'Đang ở bãi', value: inYard, color: '#14c987' },
-                  { label: 'Chờ nhập bãi', value: ready, color: '#f59e0b' },
-                  { label: 'Khác', value: Math.max(0, components.length - inYard - ready), color: '#1d7cff' },
-                ]}
-              />
+            <InventoryChartCard title="Chất lượng thành phẩm" className="h-[170px]">
+              <div className="space-y-2 text-xs">
+                <MetricBar
+                  label="Đạt QC"
+                  value={summary.qcPassed}
+                  total={summary.total}
+                  tone="emerald"
+                />
+                <MetricBar
+                  label="Chấp nhận sử dụng"
+                  value={summary.useAsIs}
+                  total={summary.total}
+                  tone="cyan"
+                />
+              </div>
             </InventoryChartCard>
-            <InventoryChartCard title="Cảnh báo bãi" className="h-[170px]">
+            <InventoryChartCard title="Traceability" className="h-[170px]">
               <div className="space-y-1.5 text-xs text-slate-300">
-                <div className="flex items-center justify-between"><span>READY chưa vào bãi</span><b className="font-mono text-amber-300">{ready}</b></div>
-                <div className="flex items-center justify-between"><span>Chưa có vị trí bãi</span><b className="font-mono text-red-300">{Math.max(0, components.length - inYard)}</b></div>
-                {!components.length ? <ModuleEmptyState icon={<AlertTriangle size={18} />} title="Chưa có cảnh báo" description="Cảnh báo tồn kho cấu kiện sẽ hiển thị tại đây." /> : null}
+                <div className="flex items-center gap-2">
+                  <FileSearch size={14} className="text-cyan-300" />
+                  <span>ComponentInstance → Hồ sơ cấu kiện</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileSearch size={14} className="text-cyan-300" />
+                  <span>Production Order → QC final</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileSearch size={14} className="text-cyan-300" />
+                  <span>NCR Use-As-Is nếu có</span>
+                </div>
               </div>
             </InventoryChartCard>
           </div>
@@ -311,67 +331,43 @@ export function ComponentsStockPage() {
       </div>
 
       {expandedModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-7xl space-y-4 rounded-2xl border border-white/15 bg-[#08111f] p-5 text-xs shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h2 className="text-base font-bold text-white">Toàn bộ tồn kho cấu kiện thành phẩm</h2>
-                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} cấu kiện thành phẩm trong bãi/kho</p>
+                <h2 className="text-base font-bold text-white">
+                  Cấu kiện thành phẩm
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Đang hiển thị trang {page} / {Math.max(1, meta.totalPages)} · tổng {meta.total} cấu kiện vật lý đủ điều kiện.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setExpandedModalOpen(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 Đóng
               </button>
             </div>
 
-            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
-              <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
-                <thead
-                  className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
-                  style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
-                >
-                  <tr>
-                    {['Mã cấu kiện', 'Tên', 'Dự án', 'Zone/kho', 'Vị trí', 'Trọng lượng', 'Trạng thái', 'Ngày tạo'].map((heading) => (
-                      <th key={heading} className="px-3 py-2 text-left font-semibold text-slate-300">{heading}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row) => (
-                    <tr
-                      key={row.id}
-                      onClick={() => {
-                        setSelectedRow(row)
-                        setExpandedModalOpen(false)
-                      }}
-                      className={`${inventoryTableRow} cursor-pointer`}
-                    >
-                      <td className="truncate px-3 py-2 text-cyan-300 font-mono font-medium">{row.code}</td>
-                      <td className="truncate px-3 py-2 text-white font-medium">{row.name}</td>
-                      <td className="truncate px-3 py-2 text-slate-300">{row.project}</td>
-                      <td className="truncate px-3 py-2 text-slate-300">{row.zone}</td>
-                      <td className="truncate px-3 py-2 text-slate-300">{row.slot}</td>
-                      <td className="px-3 py-2 font-mono tabular-nums text-cyan-300">{formatQuantity(row.weight ?? 0, 2)}</td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${statusBadgeTone[row.status] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-slate-300">{row.createdAt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <FinishedGoodsTable
+              rows={tableRows}
+              isLoading={isLoading}
+              isError={isError}
+              onSelect={(row) => {
+                setSelectedRow(row)
+                setExpandedModalOpen(false)
+              }}
+              heightClassName="h-[640px]"
+              dense
+            />
 
             <InventoryPagination
               page={page}
-              pageSize={pageSize}
-              pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))}
-              total={filtered.length}
+              pageSize={PAGE_SIZE}
+              pageCount={Math.max(1, meta.totalPages)}
+              total={meta.total}
               onPageChange={setPage}
               containerClassName="border-t-0"
             />
@@ -381,33 +377,198 @@ export function ComponentsStockPage() {
 
       <ModuleDetailDrawer
         open={Boolean(selectedRow)}
-        title={selectedRow ? `${selectedRow.code} · ${selectedRow.name}` : ''}
-        subtitle={selectedRow ? `${selectedRow.zone} / ${selectedRow.slot}` : undefined}
+        title={selectedRow ? selectedRow.instanceNo : ''}
+        subtitle={selectedRow ? componentLabel(selectedRow) : undefined}
         onClose={() => setSelectedRow(null)}
       >
         {selectedRow ? (
           <>
             <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
-              <CockpitKpiCard title="Ngày tạo" value={selectedRow.createdAt} state="normal" tone="blue" />
-              <CockpitKpiCard title="Vị trí" value={selectedRow.slot} state="normal" tone="cyan" />
-              <CockpitKpiCard title="Đơn giá" value={formatCurrencyVnd(selectedRow.unitPrice)} state="normal" tone="emerald" />
-              <CockpitKpiCard title="Tổng tiền" value={formatCurrencyVnd(selectedRow.totalAmount)} state="normal" tone="amber" />
+              <CockpitKpiCard
+                title="Hoàn thành SX"
+                value={formatDate(selectedRow.producedAt)}
+                state="normal"
+                tone="blue"
+              />
+              <CockpitKpiCard
+                title="QC"
+                value={stateLabel[selectedRow.state] ?? selectedRow.state}
+                state="normal"
+                tone={selectedRow.state === 'USE_AS_IS' ? 'cyan' : 'emerald'}
+              />
+              <CockpitKpiCard
+                title="Production Order"
+                value={selectedRow.productionOrder?.orderNo ?? '-'}
+                state="normal"
+                tone="purple"
+              />
+              <CockpitKpiCard
+                title="Requirement"
+                value={selectedRow.requirement?.requirementNo ?? '-'}
+                state="normal"
+                tone="amber"
+              />
             </div>
-            <div className="mt-2 flex justify-end gap-1 border-t border-white/10 pt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  window.sessionStorage.setItem('yard-focus-component-id', selectedRow.id)
-                  navigate('/yard#map-2d')
-                }}
-                className={componentsPrimaryButton}
-              >
-                Xem vị trí trong bãi
-              </button>
+
+            <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-300">
+              <Line label="Hồ sơ cấu kiện" value={componentLabel(selectedRow)} />
+              <Line label="Loại / profile" value={[selectedRow.component.componentType, selectedRow.component.profile].filter(Boolean).join(' / ') || '-'} />
+              <Line label="Công trình" value={projectLabel(selectedRow)} />
+              <Line label="Revision" value={selectedRow.componentRevision?.revisionNo ?? '-'} />
+              <Line label="Ngày đạt QC" value={formatDate(selectedRow.qcPassedAt)} />
+              <Line label="Bằng chứng QC" value={qualityEvidence(selectedRow)} />
+              <Line label="Vị trí" value={locationLabel(selectedRow)} />
             </div>
           </>
         ) : null}
       </ModuleDetailDrawer>
     </EnterpriseModulePage>
+  )
+}
+
+function FinishedGoodsTable({
+  rows,
+  isLoading,
+  isError,
+  onSelect,
+  heightClassName = 'h-[430px]',
+  dense = false,
+}: {
+  rows: FinishedGoodsInstanceRow[]
+  isLoading: boolean
+  isError: boolean
+  onSelect: (row: FinishedGoodsInstanceRow) => void
+  heightClassName?: string
+  dense?: boolean
+}) {
+  const cellPadding = dense ? 'px-3 py-2' : 'px-3 py-1.5'
+
+  return (
+    <div className={`${heightClassName} overflow-auto scrollbar-none rounded-lg border border-white/10`}>
+      <table className="w-full min-w-[1120px] table-fixed text-sm">
+        <thead
+          className={`${inventoryTableHead} sticky top-0 z-10 border-b border-cyan-400/10 text-slate-300`}
+          style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
+        >
+          <tr>
+            {[
+              'Mã cấu kiện vật lý',
+              'Hồ sơ cấu kiện',
+              'Công trình',
+              'Production Order',
+              'Hoàn thành SX',
+              'QC',
+              'Trạng thái vật lý',
+              'Vị trí',
+            ].map((heading) => (
+              <th
+                key={heading}
+                className="px-3 py-2 text-left text-xs font-semibold text-slate-300"
+              >
+                {heading}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {isLoading ? (
+            <tr>
+              <td colSpan={8} className="px-4 py-6 text-center">
+                <ModuleLoadingState label="Đang tải cấu kiện thành phẩm..." />
+              </td>
+            </tr>
+          ) : isError ? (
+            <tr>
+              <td colSpan={8} className="px-4 py-6 text-center">
+                <ModuleEmptyState
+                  icon={<ClipboardCheck size={18} />}
+                  title="Không tải được dữ liệu thành phẩm"
+                  description="Vui lòng thử lại sau khi kết nối API ổn định."
+                />
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr
+                key={row.id}
+                onClick={() => onSelect(row)}
+                className={`cursor-pointer ${inventoryTableRow}`}
+              >
+                <td className={`${cellPadding} truncate font-mono font-medium text-cyan-300`}>
+                  {row.instanceNo}
+                </td>
+                <td className={`${cellPadding} truncate font-medium text-white`}>
+                  {componentLabel(row)}
+                </td>
+                <td className={`${cellPadding} truncate text-slate-300`}>
+                  {projectLabel(row)}
+                </td>
+                <td className={`${cellPadding} truncate font-mono text-slate-300`}>
+                  {row.productionOrder?.orderNo ?? '-'}
+                </td>
+                <td className={`${cellPadding} text-slate-300`}>
+                  {formatDate(row.producedAt)}
+                </td>
+                <td className={cellPadding}>
+                  <span className="inline-flex rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-xs text-emerald-300">
+                    {qualityEvidence(row)}
+                  </span>
+                </td>
+                <td className={cellPadding}>
+                  <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${stateBadgeTone[row.state] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
+                    {stateLabel[row.state] ?? row.state}
+                  </span>
+                </td>
+                <td className={`${cellPadding} truncate text-slate-300`}>
+                  {locationLabel(row)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MetricBar({
+  label,
+  value,
+  total,
+  tone,
+}: {
+  label: string
+  value: number
+  total: number
+  tone: 'emerald' | 'cyan'
+}) {
+  const percent = total > 0 ? Math.round((value / total) * 100) : 0
+  const color = tone === 'emerald' ? 'bg-emerald-400' : 'bg-cyan-400'
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-slate-300">
+        <span>{label}</span>
+        <b className="font-mono text-white">{formatQuantity(value, 0)}</b>
+      </div>
+      <div className="h-2 rounded-full bg-white/10">
+        <div
+          className={`h-full rounded-full ${color}`}
+          style={{ width: `${Math.min(100, percent)}%` }}
+        />
+      </div>
+      <div className="mt-1 text-right font-mono text-[10px] text-slate-500">
+        {percent}%
+      </div>
+    </div>
+  )
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <b className="text-right font-medium text-slate-100">{value}</b>
+    </div>
   )
 }

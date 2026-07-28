@@ -17,9 +17,20 @@ import {
   modulePanel,
   modulePrimaryButton,
 } from '@/shared/ui/modules'
-import { approveInspection, completeInspection, createInspection, startInspection, type QcCockpit, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
+import { approveInspection, completeInspection, createInspection, startInspection, type QcCockpit, type QcComponentInstance, type QcInspectionRow, type QcProductionQueueRow } from '../api/qc.api'
 import { queryKeys } from '@/lib/query/query-keys'
-import { useQcDashboard, useQcWorkspace } from '../hooks/useQcWorkspace'
+import {
+  useCreateCanonicalNcr,
+  useFailFinalInspection,
+  useMarkNcrRework,
+  useMarkNcrScrap,
+  useMarkNcrUseAsIs,
+  usePassFinalInspection,
+  useQcComponentInstances,
+  useQcDashboard,
+  useQcInspectionDetail,
+  useQcWorkspace,
+} from '../hooks/useQcWorkspace'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import { useQCActions } from '../context/QCActionContext'
 
@@ -198,7 +209,7 @@ export function QcPage() {
       {(tab === 'overview' || tab === 'dashboard') && <Overview runtime={tab === 'dashboard' ? dashboardRuntime : runtime} rows={filteredInspections} queue={runtime.productionQueue} onOpen={setSelectedInspection} onQueue={setSelectedQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'inbound' && <InputInspectionTab runtime={runtime} rows={filteredInspections} onOpen={setSelectedInspection} />}
       {tab === 'production' && <ProductionInspectionTab runtime={runtime} rows={filteredInspections} onOpen={setSelectedInspection} />}
-      {tab === 'final' && <OutgoingInspectionTab runtime={runtime} rows={filteredInspections} onOpen={setSelectedInspection} />}
+      {tab === 'final' && <OutgoingInspectionTab runtime={runtime} />}
       {tab === 'plan' && <Plan queue={runtime.productionQueue} onCreate={(row) => createMutation.mutate(row)} onQuickApprove={(row) => quickApproveMutation.mutate(row)} />}
       {tab === 'standards' && <Standards runtime={runtime} />}
       {tab === 'ncr' && <NcrTab runtime={runtime} />}
@@ -1492,76 +1503,162 @@ function ProductionInspectionTab({
   )
 }
 
-function OutgoingInspectionTab({
-  runtime,
-  rows,
-  onOpen,
-}: {
-  runtime: QcCockpit
-  rows: QcInspectionRow[]
-  onOpen: (row: QcInspectionRow) => void
-}) {
-  const m = runtime.metrics
-  const finalRows = rows
+function OutgoingInspectionTab({ runtime }: { runtime: QcCockpit }) {
+  const { data: waitingReadModel } = useQcComponentInstances({ state: 'PRODUCED_WAITING_QC', limit: 100 }, true)
+  const waitingInstances = waitingReadModel?.data ?? []
+  const passFinal = usePassFinalInspection()
+  const failFinal = useFailFinalInspection()
+  const createNcr = useCreateCanonicalNcr()
+  const markRework = useMarkNcrRework()
+  const markScrap = useMarkNcrScrap()
+  const markUseAsIs = useMarkNcrUseAsIs()
+  const queryClient = useQueryClient()
+  const finalChecklist = runtime.checklists.find((item) => item.type === 'FINAL' && item.isActive) ?? runtime.checklists.find((item) => item.type === 'FINAL')
   const [search, setSearch] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
-  const [customerFilter, setCustomerFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [inspectorFilter, setInspectorFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(15)
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const [selectedInstance, setSelectedInstance] = useState<QcComponentInstance | null>(null)
+  const [localError, setLocalError] = useState('')
+  const [localNotice, setLocalNotice] = useState('')
+  const finalRows = runtime.inspections.filter((row) => row.category === 'FINAL')
+  const passedCount = finalRows.filter((row) => ['PASSED', 'APPROVED'].includes(row.status)).length
+  const failedCount = finalRows.filter((row) => ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(row.status)).length
+  const reworkCount = waitingInstances.filter((instance) => instance.state === 'REWORK').length
+  const scrapCount = finalRows.filter((row) => row.result === 'FAIL').length
+  const projects = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>()
+    waitingInstances.forEach((instance) => {
+      if (instance.projectId && instance.project) map.set(instance.projectId, { id: instance.projectId, label: `${instance.project.code} - ${instance.project.name}` })
+    })
+    return Array.from(map.values())
+  }, [waitingInstances])
 
   const filtered = useMemo(() => {
-    return finalRows.filter((r) => {
+    return waitingInstances.filter((instance) => {
       const query = search.toLowerCase()
       if (
         query &&
-        !r.inspectionNo.toLowerCase().includes(query) &&
-        !r.componentCode.toLowerCase().includes(query) &&
-        !r.projectName?.toLowerCase().includes(query)
+        !instance.instanceNo.toLowerCase().includes(query) &&
+        !(instance.component?.code ?? '').toLowerCase().includes(query) &&
+        !(instance.component?.name ?? '').toLowerCase().includes(query) &&
+        !(instance.project?.name ?? '').toLowerCase().includes(query) &&
+        !(instance.productionOrder?.orderNo ?? '').toLowerCase().includes(query)
       ) {
         return false
       }
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (projectFilter !== 'all' && instance.projectId !== projectFilter) return false
+      if (statusFilter !== 'all' && instance.state !== statusFilter) return false
       return true
     })
-  }, [finalRows, search, statusFilter])
+  }, [projectFilter, search, statusFilter, waitingInstances])
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+  useEffect(() => setPage(1), [search, projectFilter, statusFilter, pageSize])
+
+  const qcErrorMessage = (value: unknown) => {
+    const raw = (value as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
+    return Array.isArray(raw) ? raw.join(', ') : raw || (value instanceof Error ? value.message : 'Không thể cập nhật QC thành phẩm.')
+  }
+
+  async function createFinalInspection(instance: QcComponentInstance) {
+    if (!finalChecklist) {
+      throw new Error('Chưa có checklist FINAL đang hoạt động cho QC thành phẩm.')
+    }
+    return createInspection({
+      checklistId: finalChecklist?.id,
+      componentInstanceId: instance.id,
+      status: 'READY',
+      metadata: {
+        source: 'qc-final-component-instance',
+        instanceNo: instance.instanceNo,
+        productionOrderId: instance.productionOrderId,
+      },
+    }) as Promise<QcInspectionRow>
+  }
+
+  async function passInstance(instance: QcComponentInstance) {
+    setLocalError('')
+    setLocalNotice('')
+    try {
+      const inspection = await createFinalInspection(instance)
+      await passFinal.mutateAsync({ id: inspection.id, expectedVersion: 0 })
+      setLocalNotice(`${instance.instanceNo} đã đạt QC và đủ điều kiện thành phẩm.`)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.qc.all })
+    } catch (error) {
+      setLocalError(qcErrorMessage(error))
+    }
+  }
+
+  async function failInstance(instance: QcComponentInstance) {
+    setLocalError('')
+    setLocalNotice('')
+    try {
+      const inspection = await createFinalInspection(instance)
+      await failFinal.mutateAsync({ id: inspection.id, expectedVersion: 0 })
+      await createNcr.mutateAsync({
+        inspectionId: inspection.id,
+        payload: {
+          expectedVersion: 1,
+          title: `Không đạt QC cuối cho ${instance.instanceNo}`,
+          description: 'Phiếu NCR được tạo từ UI QC physical instance.',
+          severity: 'HIGH',
+          defectCode: 'FINAL_QC_FAIL',
+          reasonCode: 'FINAL_INSPECTION',
+        },
+      })
+      setLocalNotice(`${instance.instanceNo} không đạt QC. NCR đã được tạo và cấu kiện không vào Finished Goods.`)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.qc.all })
+    } catch (error) {
+      setLocalError(qcErrorMessage(error))
+    }
+  }
 
   return (
     <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
+      {localNotice ? <div className="rounded border border-emerald-800 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{localNotice}</div> : null}
+      {localError ? <div className="rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">{localError}</div> : null}
       {/* 6 KPI Cards */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
-        <EnterpriseKpiCard title="Chờ kiểm tra" value={formatQuantity(m.pending, 0)} tone="amber" icon={<Clock size={15} />} />
-        <EnterpriseKpiCard title="Đạt" value={formatQuantity(m.passed, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
-        <EnterpriseKpiCard title="Không đạt" value={formatQuantity(m.failed, 0)} tone="red" icon={<XCircle size={15} />} />
-        <EnterpriseKpiCard title="Chờ NCR" value={formatQuantity(m.openNcrs, 0)} tone="purple" icon={<AlertTriangle size={15} />} />
-        <EnterpriseKpiCard title="Quá hạn" value={formatQuantity(m.overdue || 0, 0)} tone="red" icon={<CalendarClock size={15} />} />
-        <EnterpriseKpiCard title="Pass Rate" value={`${fmt(m.passRate)}%`} tone="emerald" icon={<ShieldCheck size={15} />} />
+        <EnterpriseKpiCard title="Chờ QC" value={formatQuantity(waitingInstances.length, 0)} tone="amber" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Đạt QC" value={formatQuantity(passedCount, 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Không đạt" value={formatQuantity(failedCount, 0)} tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Làm lại" value={formatQuantity(reworkCount, 0)} tone="purple" icon={<RotateCcw size={15} />} />
+        <EnterpriseKpiCard title="Loại bỏ" value={formatQuantity(scrapCount, 0)} tone="red" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Checklist Final" value={finalChecklist ? 'Sẵn sàng' : 'Thiếu'} tone={finalChecklist ? 'emerald' : 'amber'} icon={<ShieldCheck size={15} />} />
       </div>
 
       {/* Analytics Dashboard */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
-        <CockpitChartCard title="Đạt trước giao hàng" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Sẵn sàng xuất', 42], ['Chờ bổ sung QC', 5], ['Không đạt QC xuất', 1]]} />
+        <CockpitChartCard title="Trạng thái physical QC" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={[['Chờ QC', waitingInstances.length], ['Đã đạt', passedCount], ['Không đạt', failedCount]]} />
         </CockpitChartCard>
-        <CockpitChartCard title="Thiếu chứng từ" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+        <CockpitChartCard title="Lineage theo PO" heightClass="h-[220px]" chartHeightClass="h-[138px]">
           <CockpitStatusList items={[
-            { id: '1', label: 'Thiếu CO/CQ Thép nguyên liệu', value: '2 lô', statusTone: 'amber' },
-            { id: '2', label: 'Thiếu biên bản NDT mối hàn', value: '1 lô', statusTone: 'red' },
-            { id: '3', label: 'Thiếu đo chiều dày sơn', value: '0 lô', statusTone: 'emerald' },
+            ...waitingInstances.slice(0, 5).map((instance) => ({
+              id: instance.id,
+              label: instance.productionOrder?.orderNo ?? 'Không có PO',
+              value: instance.instanceNo,
+              statusTone: 'amber' as const,
+            })),
           ]} />
         </CockpitChartCard>
-        <CockpitChartCard title="Thiếu tem" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Chưa dán QR Code', 3], ['Tem bị hỏng', 1], ['Tem sai dự án', 0]]} />
+        <CockpitChartCard title="Công trình chờ QC" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <StatusMiniBars rows={projects.slice(0, 5).map((project) => [project.label, waitingInstances.filter((instance) => instance.projectId === project.id).length])} />
         </CockpitChartCard>
-        <CockpitChartCard title="Defect cuối cùng" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'Trầy xước sơn vòm C1', subtitle: 'Lô B-2026-102', time: 'Hôm nay', statusDot: 'bg-amber-400' },
-            { id: '2', title: 'Cong vênh bản mã chân cột', subtitle: 'Lô B-2026-098', time: 'Hôm qua', statusDot: 'bg-red-400' },
-          ]} />
+        <CockpitChartCard title="NCR final" heightClass="h-[220px]" chartHeightClass="h-[138px]">
+          <CockpitRecentList
+            items={runtime.ncrs.filter((ncr) => ncr.componentInstanceId).slice(0, 5).map((ncr) => ({
+              id: ncr.id,
+              title: ncr.ncrNo,
+              subtitle: ncr.title,
+              time: ncr.status,
+              statusDot: 'bg-red-400',
+            }))}
+            emptyMessage="Chưa có NCR theo cấu kiện vật lý."
+          />
         </CockpitChartCard>
       </div>
 
@@ -1580,24 +1677,15 @@ function OutgoingInspectionTab({
 
           <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả dự án</option>
-            <option value="p1">Nhà máy Hòa Phát Phân Kỳ 2</option>
-          </select>
-          <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
-            <option value="all">Tất cả khách hàng</option>
-            <option value="c1">Tập đoàn Hòa Phát</option>
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.label}</option>)}
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả trạng thái</option>
-            <option value="READY">Chờ xử lý</option>
-            <option value="PASSED">Đạt xuất xưởng</option>
-          </select>
-          <select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
-            <option value="all">Tất cả QC</option>
-            <option value="QC Admin">QC Admin</option>
+            <option value="PRODUCED_WAITING_QC">Chờ QC</option>
           </select>
 
           <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
-          <button type="button" onClick={() => { setSearch(''); setProjectFilter('all'); setCustomerFilter('all'); setStatusFilter('all'); setInspectorFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
+          <button type="button" onClick={() => { setSearch(''); setProjectFilter('all'); setStatusFilter('all') }} className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 hover:bg-white/10 transition">Làm mới</button>
         </div>
       </EnterprisePanel>
 
@@ -1605,8 +1693,8 @@ function OutgoingInspectionTab({
       <EnterprisePanel className="rounded-xl">
         <div className="mb-1 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Kiểm tra xuất xưởng (Outgoing QC)</h3>
-            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} lô</span>
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Chờ kiểm tra final theo cấu kiện vật lý</h3>
+            <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-400/20">{filtered.length} cấu kiện</span>
           </div>
           <button type="button" onClick={() => setExpandedModalOpen(true)} className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition">Xem tất cả</button>
         </div>
@@ -1615,23 +1703,24 @@ function OutgoingInspectionTab({
           <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
             <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
               <tr>
-                {['Mã lô', 'Dự án', 'Khách hàng', 'QC', 'Trạng thái', 'Ngày xuất', 'Thao tác'].map((h) => (
+                {['Mã cấu kiện vật lý', 'Hồ sơ cấu kiện', 'Công trình', 'Production Order', 'Hoàn thành SX', 'Trạng thái', 'Thao tác'].map((h) => (
                   <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {paged.map((row) => (
-                <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
-                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
-                  <td className="px-2 py-2 text-white font-medium truncate">{row.projectName || 'Dự án Phân Kỳ 2'}</td>
-                  <td className="px-2 py-2 text-slate-300 text-xs truncate">Tập đoàn Hòa Phát</td>
-                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Admin'}</td>
-                  <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
-                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.date)}</td>
-                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+              {paged.map((instance) => (
+                <tr key={instance.id} onClick={() => setSelectedInstance(instance)} className={`${tableRow} cursor-pointer`}>
+                  <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{instance.instanceNo}</td>
+                  <td className="px-2 py-2 text-white font-medium truncate">{instance.component?.code} · {instance.component?.name}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{instance.project ? `${instance.project.code} - ${instance.project.name}` : '-'}</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{instance.productionOrder?.orderNo ?? '-'}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(instance.producedAt)}</td>
+                  <td className="px-2 py-2"><QcStatusBadge status="READY" /></td>
+                  <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedInstance(instance) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Kiểm tra</button></td>
                 </tr>
               ))}
+              {!paged.length ? <tr><td colSpan={7} className="px-2 py-10"><CockpitEmptyState title="Không có cấu kiện vật lý chờ QC" description="Chỉ ComponentInstance ở trạng thái PRODUCED_WAITING_QC mới xuất hiện tại đây." icon={<ShieldCheck size={18} />} /></td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1653,21 +1742,21 @@ function OutgoingInspectionTab({
               <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
                 <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
                   <tr>
-                    {['Mã lô', 'Dự án', 'Khách hàng', 'QC', 'Trạng thái', 'Ngày xuất', 'Thao tác'].map((h) => (
+                    {['Mã cấu kiện vật lý', 'Hồ sơ cấu kiện', 'Công trình', 'Production Order', 'Hoàn thành SX', 'Trạng thái', 'Thao tác'].map((h) => (
                       <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((row) => (
-                    <tr key={row.id} onClick={() => { onOpen(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
-                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
-                      <td className="px-2 py-2 text-white font-medium truncate">{row.projectName || 'Dự án Phân Kỳ 2'}</td>
-                      <td className="px-2 py-2 text-slate-300 truncate">Tập đoàn Hòa Phát</td>
-                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Admin'}</td>
-                      <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
-                      <td className="px-2 py-2 text-slate-300 truncate">{date(row.date)}</td>
-                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(row); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
+                  {filtered.map((instance) => (
+                    <tr key={instance.id} onClick={() => { setSelectedInstance(instance); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
+                      <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{instance.instanceNo}</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">{instance.component?.code} · {instance.component?.name}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{instance.project ? `${instance.project.code} - ${instance.project.name}` : '-'}</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{instance.productionOrder?.orderNo ?? '-'}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{date(instance.producedAt)}</td>
+                      <td className="px-2 py-2"><QcStatusBadge status="READY" /></td>
+                      <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedInstance(instance); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Kiểm tra</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1677,6 +1766,99 @@ function OutgoingInspectionTab({
         </div>,
         document.body,
       ) : null}
+      <FinalInstanceDetail
+        instance={selectedInstance}
+        onClose={() => setSelectedInstance(null)}
+        onPass={passInstance}
+        onFail={failInstance}
+        busy={passFinal.isPending || failFinal.isPending || createNcr.isPending || markRework.isPending || markScrap.isPending || markUseAsIs.isPending}
+      />
+    </div>
+  )
+}
+
+function FinalInstanceDetail({
+  instance,
+  onClose,
+  onPass,
+  onFail,
+  busy,
+}: {
+  instance: QcComponentInstance | null
+  onClose: () => void
+  onPass: (instance: QcComponentInstance) => void
+  onFail: (instance: QcComponentInstance) => void
+  busy: boolean
+}) {
+  if (!instance) return null
+  const completedExecutions = instance.executions?.filter((execution) => execution.status === 'COMPLETED') ?? []
+  const latestExecution = instance.executions?.[instance.executions.length - 1]
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <section className="w-full max-w-5xl rounded-xl border border-cyan-900 bg-[#061321] p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Final QC theo cấu kiện vật lý</p>
+            <h2 className="mt-1 text-xl font-semibold text-white">{instance.instanceNo}</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Đây là một ComponentInstance vật lý. Không phải hồ sơ kỹ thuật CPL và không phải số lượng aggregate của PO.
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><XCircle size={16} /></button>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <Info k="Mã cấu kiện vật lý" v={instance.instanceNo} />
+          <Info k="Hồ sơ cấu kiện" v={instance.component ? `${instance.component.code} · ${instance.component.name}` : '-'} />
+          <Info k="Công trình" v={instance.project ? `${instance.project.code} - ${instance.project.name}` : '-'} />
+          <Info k="Yêu cầu cấu kiện" v={instance.requirement ? `${instance.requirement.requirementNo} · SL ${fmt(instance.requirement.requiredQuantity)}` : '-'} />
+          <Info k="Production Order" v={instance.productionOrder ? `${instance.productionOrder.orderNo} · ${instance.productionOrder.title}` : '-'} />
+          <Info k="Hoàn thành sản xuất" v={date(instance.producedAt)} />
+          <Info k="Trạng thái vật lý" v={instance.state} />
+          <Info k="Revision" v={instance.componentRevision?.revisionNo ?? '-'} />
+          <Info k="Operation cuối" v={latestExecution?.workOrder?.workOrderNo ?? '-'} />
+        </div>
+
+        <div className="mt-5 grid gap-3 xl:grid-cols-[1fr_320px]">
+          <div className={`${panel} overflow-hidden`}>
+            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold">Lịch sử operation</div>
+            <table className="w-full min-w-[720px] text-left text-xs">
+              <thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500">
+                <tr>{['WorkOrder', 'Execution', 'Trạng thái', 'Bắt đầu', 'Hoàn thành'].map((head) => <th key={head} className="px-3 py-2">{head}</th>)}</tr>
+              </thead>
+              <tbody>
+                {(instance.executions ?? []).map((execution) => (
+                  <tr key={execution.id} className="border-t border-slate-800">
+                    <td className="px-3 py-3 text-cyan-300">{execution.workOrder?.workOrderNo ?? '-'}</td>
+                    <td className="px-3 py-3 text-slate-300">{execution.productionExecution?.state ?? '-'}</td>
+                    <td className="px-3 py-3"><StatusBadge value={execution.status} /></td>
+                    <td className="px-3 py-3 text-slate-400">{date(execution.startedAt)}</td>
+                    <td className="px-3 py-3 text-slate-400">{date(execution.completedAt)}</td>
+                  </tr>
+                ))}
+                {!instance.executions?.length ? <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Chưa có execution evidence cho instance này.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={`${panel} p-4`}>
+            <h3 className="text-sm font-semibold">Quyết định QC</h3>
+            <div className="mt-3 space-y-2 text-xs text-slate-400">
+              <Info k="Operation hoàn tất" v={fmt(completedExecutions.length)} />
+              <Info k="Điều kiện queue" v="PRODUCED_WAITING_QC" />
+              <Info k="Finished Goods" v="Chỉ backend eligibility quyết định" />
+            </div>
+            <div className="mt-4 space-y-2">
+              <button disabled={busy} onClick={() => onPass(instance)} className="w-full rounded bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">Đạt QC</button>
+              <button disabled={busy} onClick={() => onFail(instance)} className="w-full rounded bg-red-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">Không đạt + tạo NCR</button>
+            </div>
+            <p className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-500">
+              PASS chuyển đúng instance sang QC_PASSED. FAIL chuyển đúng instance sang QC_FAILED và tạo NCR có `componentInstanceId`.
+              Không tạo InventoryTransaction, Yard placement hoặc Finished Goods row.
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

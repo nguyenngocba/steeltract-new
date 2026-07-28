@@ -7,6 +7,7 @@ describe('QC dashboard controller boundary', () => {
     const controller = new QcController(
       {} as never,
       {} as never,
+      {} as never,
       snapshotRead as never,
     );
 
