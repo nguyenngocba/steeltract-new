@@ -1,5 +1,132 @@
 # Production Module
 
+## COMPONENT DOMAIN.5D - ComponentInstanceExecution Schema Foundation
+
+Implemented on 2026-07-28.
+
+Status: **IMPLEMENTED - PHYSICAL EXECUTION FOUNDATION READY**
+
+- Production keeps `ProductionExecution` as the batch/run header.
+- Added `ComponentInstanceExecution` as per-instance operation evidence for a
+  selected physical ComponentInstance in one WorkOrder/run.
+- Added authenticated command/read foundation under `/production/commands` for
+  assign/start/complete/cancel/history.
+- Aggregate Production completed quantities remain compatible; physical truth
+  for new canonical instance-aware execution now comes from
+  `ComponentInstanceExecution`.
+- DOMAIN.5E remains responsible for actual `ComponentInstance.state`
+  transitions and QC handoff.
+
+## COMPONENT DOMAIN.5C - Production Instance Execution Granularity Audit & Design
+
+Completed on 2026-07-28.
+
+Status: **DESIGN COMPLETE - AWAITING DOMAIN.5D SCHEMA FOUNDATION**
+
+- Audited ProductionOrder, WorkOrder, ProductionExecution,
+  ProductionCompletion, routing/stage models and material boundaries.
+- Current start/completion commands do not carry `ComponentInstance` IDs,
+  serial sequences or serial ranges.
+- Current aggregate completed quantity cannot prove which physical steel
+  components are ready for QC.
+- Recommended future `ComponentInstanceExecution` to bridge
+  `ProductionExecution` batch/run headers to per-instance operation evidence.
+- Deliverable:
+  `docs/audits/component-domain5c-production-instance-execution-design.md`.
+
+## COMPONENT DOMAIN.5A - QC Physical Instance Lineage Foundation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - PRODUCTION READY TO RESUME DOMAIN.5**
+
+- QC now has nullable physical `ComponentInstance` lineage for inspections,
+  NCRs and QC inspection snapshots.
+- This closes the schema blocker that prevented Production completion from
+  handing physical instances to QC safely.
+- Production code was not changed in DOMAIN.5A; DOMAIN.4 remains the current
+  implemented Production boundary where release creates `PLANNED`
+  ComponentInstances.
+
+## COMPONENT DOMAIN.5B - ComponentInstance IN_PRODUCTION State Gate
+
+Implemented on 2026-07-28.
+
+Status: **IMPLEMENTED - PRODUCTION GRANULARITY GATE OPEN**
+
+- Added additive `ComponentInstanceState.IN_PRODUCTION` enum value.
+- Deployed migration
+  `20260728090000_component_domain5b_instance_in_production_state` after backup
+  `/tmp/steeltrack-domain5b-before-20260728.dump`.
+- Existing `ComponentInstance` rows were not backfilled and remained
+  `PLANNED`.
+- Production start/completion physical instance transitions were not
+  implemented because current command evidence does not identify instance IDs,
+  serial sequences or serial ranges.
+
+## COMPONENT DOMAIN.5 - Production Completion, QC & Finished Goods Gate
+
+Audited on 2026-07-27 and resumed on 2026-07-28.
+
+Status: **BLOCKED BY PRODUCTION INSTANCE GRANULARITY GATE**
+
+- Production completion and QC handoff were audited for the canonical
+  `ComponentInstance` workflow.
+- Implementation is blocked because QC cannot yet reference physical
+  `ComponentInstance` rows with a relational FK.
+- Production should not move instances to Finished Goods until QC PASS /
+  approved Use-As-Is can be tied to physical instance identity.
+- Proposed additive schema is documented in
+  `docs/audits/component-domain5-qc-finished-goods-report.md`.
+- DOMAIN.4 remains the current implemented boundary: release creates
+  `PLANNED` instances only.
+- DOMAIN.5A deployed the required QC instance-lineage foundation. Remaining
+  work is Production completion state transition and Finished Goods gating.
+- DOMAIN.5B has closed the `IN_PRODUCTION` enum blocker.
+- DOMAIN.5 remains blocked because current Production start/completion paths
+  identify orders, work orders, execution runs and aggregate completed
+  quantities, but not the affected physical `ComponentInstance` rows.
+
+## COMPONENT DOMAIN.4 - Production Integration & Physical Instance Creation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - TEST/BUILD/RUNTIME SMOKE PASS**
+
+- Canonical `/production/commands/orders` accepts optional
+  `componentRequirementId`.
+- Requirement-bound Production Orders validate ProjectComponentRequirement
+  ownership, released Engineering basis, Project match, integer production
+  quantity and active allocation against `requiredQuantity`.
+- Requirement-bound DRAFT Production Orders preserve Component, Revision, BOM
+  definition, materialized Production BOM and Requirement lineage.
+- Production Order release is now the canonical manufacturing authorization
+  point for physical identity creation.
+- Releasing a requirement-bound order creates one `ComponentInstance` per
+  production quantity in `PLANNED` state.
+- Instance numbers are generated server-side using Component code, Production
+  Order number and serial sequence.
+- Release replay and optimistic concurrency prevent duplicate ComponentInstance
+  creation.
+- ComponentInstance creation does not create InventoryTransactions, QC PASS,
+  produced evidence, Finished Goods, Yard placement or Component inventory.
+- Runtime fixture `DOMAIN4-1785146027125` verified split production 8 + 7
+  against requirement quantity 20, over-allocation rejection, lineage and
+  no Inventory/QC/Yard side effects.
+
+## COMPONENT DOMAIN.2 Lineage Foundation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - DOMAIN.4 CONVERSION COMPLETE**
+
+- `ProductionOrder` now has optional `componentRequirementId` for binding to
+  `ProjectComponentRequirement`.
+- Existing Production Order creation, lifecycle, Engineering BOM B1
+  materialization and Production Warehouse semantics remain unchanged.
+- DOMAIN.4 writes this lineage through the canonical command API and creates
+  planned ComponentInstances at release for requirement-bound orders.
+
 ## Component Manufacturing Workflow Sprint B1
 
 Implemented on 2026-07-27.

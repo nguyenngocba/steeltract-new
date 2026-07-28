@@ -2,13 +2,17 @@ import { BadRequestException } from '@nestjs/common';
 
 import { ProductionCommandController } from './production-command.controller';
 import { ProductionCommandService } from './services/production-command.service';
+import { ProductionInstanceExecutionService } from './services/production-instance-execution.service';
 
 describe('ProductionCommandController', () => {
   it('forwards version, idempotency and correlation context to the command boundary', async () => {
     const commands = {
       releaseOrder: jest.fn().mockResolvedValue({ id: 'po-1' }),
     } as unknown as ProductionCommandService;
-    const controller = new ProductionCommandController(commands);
+    const controller = new ProductionCommandController(
+      commands,
+      {} as ProductionInstanceExecutionService,
+    );
 
     await controller.releaseOrder(
       'po-1',
@@ -45,7 +49,10 @@ describe('ProductionCommandController', () => {
     const commands = {
       cancelOrder: jest.fn(),
     } as unknown as ProductionCommandService;
-    const controller = new ProductionCommandController(commands);
+    const controller = new ProductionCommandController(
+      commands,
+      {} as ProductionInstanceExecutionService,
+    );
 
     expect(() =>
       controller.cancelOrder('po-1', { expectedVersion: 2 }, {

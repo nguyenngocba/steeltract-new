@@ -1,5 +1,255 @@
 # Current State
 
+## COMPONENT DOMAIN.5D – ComponentInstanceExecution Schema Foundation
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD/RUNTIME PASS**
+
+On 2026-07-28, implemented the approved DOMAIN.5C physical production
+traceability foundation. `ProductionExecution` remains the batch/run header;
+new `ComponentInstanceExecution` rows now represent one physical
+`ComponentInstance` participating in one WorkOrder operation/run.
+
+Implemented:
+
+- `ComponentInstanceExecutionStatus` enum:
+  `ASSIGNED`, `RUNNING`, `COMPLETED`, `CANCELLED`
+- `ComponentInstanceExecution` model/table
+- relations to `ComponentInstance`, `WorkOrder`, `ProductionExecution`
+- uniqueness on `componentInstanceId + productionExecutionId`
+- minimum repository/service/API command foundation for assign/start/complete/
+  cancel/history
+- runtime smoke using DOMAIN4 PO-A with temporary execution run and cleanup
+
+DOMAIN.5D intentionally does not mutate `ComponentInstance.state`, does not
+create QC/Inventory/Yard/Fini­shed Goods side effects, and does not backfill
+legacy ProductionExecution history.
+
+Deliverable:
+
+- `docs/audits/component-domain5d-instance-execution-foundation-report.md`
+
+Verification: Prisma validate/generate/migrate status (Pass), targeted tests
+(5 suites / 31 tests Pass), full backend tests (79 suites / 244 tests Pass),
+backend build (Pass), frontend build (Pass with existing Vite chunk-size
+warning), runtime smoke (Pass).
+
+## COMPONENT DOMAIN.5C – Production Instance Execution Granularity Audit & Design
+
+Status: **AUDIT / ARCHITECTURE DESIGN COMPLETE - NO IMPLEMENTATION**
+
+On 2026-07-28, completed the DOMAIN.5C audit and design for the permanent
+bridge from Production execution to physical `ComponentInstance` identity.
+
+Finding:
+
+- Current Production start persists order/work-order/execution-run evidence.
+- Current completion persists aggregate completed quantity and optional
+  WorkOrder/executionRun IDs.
+- Current schema does not persist which physical ComponentInstances started or
+  completed each operation.
+- Partial production such as `001-005=CUTTING`, `006-010=WELDING`,
+  `015-017=PRODUCED_WAITING_QC` cannot be represented truthfully.
+
+Recommended canonical model:
+
+- add a future `ComponentInstanceExecution` entity
+- keep `ProductionExecution` as the batch/run header
+- store one physical execution line per ComponentInstance per WorkOrder /
+  operation / execution run
+- transition `ComponentInstance` state only from explicit physical execution
+  evidence
+
+Deliverable:
+
+- `docs/audits/component-domain5c-production-instance-execution-design.md`
+
+No Prisma schema, migration, backend code, frontend code, stage or commit was
+performed.
+
+## COMPONENT DOMAIN.5B – ComponentInstance IN_PRODUCTION State Gate
+
+Status: **IMPLEMENTED - DOMAIN.5 BLOCKED BY PRODUCTION INSTANCE GRANULARITY**
+
+On 2026-07-28, deployed the additive DOMAIN.5B enum migration after the backup
+gate. `ComponentInstanceState.IN_PRODUCTION` now exists in Prisma and
+PostgreSQL, and existing `ComponentInstance` row counts remained unchanged.
+
+Migration:
+
+- `20260728090000_component_domain5b_instance_in_production_state`
+- SQL: `ALTER TYPE "ComponentInstanceState" ADD VALUE IF NOT EXISTS 'IN_PRODUCTION'`
+- Backup: `/tmp/steeltrack-domain5b-before-20260728.dump`
+- Pre/post `ComponentInstance` count: `16`
+- Pre/post grouped states: all rows remained `PLANNED`
+
+DOMAIN.5 physical transitions were intentionally not implemented. Current
+Production start/completion commands operate at Production Order, WorkOrder,
+Execution Run and aggregate completed-quantity granularity. They do not
+identify which physical `ComponentInstance` IDs, serial sequences or serial
+ranges started/completed. Updating all instances would fabricate history for
+partial production.
+
+Next gate: define the approved Production instance execution granularity before
+implementing `PLANNED -> IN_PRODUCTION -> PRODUCED_WAITING_QC` transitions.
+
+## COMPONENT DOMAIN.5A – QC Physical Instance Lineage Foundation
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD/RUNTIME PASS**
+
+On 2026-07-27, implemented the additive QC physical lineage foundation required
+before Finished Goods gating. `QcInspection`, `NonConformanceReport` and
+`QcInspectionSnapshot` now have nullable `componentInstanceId` fields,
+relations and indexes. `ComponentInstance` now exposes inspection/NCR
+relations.
+
+The migration
+`20260727224000_component_domain5a_qc_instance_lineage` was deployed after a
+verified PostgreSQL backup
+`/tmp/steeltrack-domain5a-before-20260727.dump`. Pre/post row counts for
+`QcInspection`, `NonConformanceReport`, `QcInspectionSnapshot` and
+`ComponentInstance` were unchanged.
+
+QC service foundation now accepts `componentInstanceId`, validates instance /
+component / production order / project lineage, derives context fields from
+the physical instance when omitted, preserves NCR instance lineage, and carries
+`componentInstanceId` through canonical QC/NCR/disposition events and
+inspection snapshots.
+
+Runtime smoke created one instance-level QC inspection and one NCR against
+controlled DOMAIN4 instance `cms31uquo001epvk716nvtrja`. It created no
+ComponentInstances, InventoryTransactions, Yard placements or Finished Goods
+classification.
+
+Verification: Prisma validate/generate/migrate status (Pass), targeted
+QC/snapshot tests (Pass, 4 suites / 13 tests), backend tests (Pass, 78 suites /
+234 tests), backend build (Pass), frontend build (Pass with existing Vite
+chunk-size warning).
+
+## COMPONENT DOMAIN.5 – Production Completion, QC & Finished Goods Gate
+
+Status: **BLOCKED BY COMPONENTINSTANCE STATE MODEL GATE**
+
+On 2026-07-27, audited the Production completion, QC and Finished Goods gate
+for the canonical ComponentInstance workflow. Implementation was intentionally
+blocked before code changes at audit time because the QC schema could not
+structurally reference physical `ComponentInstance` rows.
+
+Current QC models only support `productionOrderId`, `productionStageId`,
+legacy `componentId` and `projectId`. `QcInspection` and
+`NonConformanceReport` do not have `componentInstanceId`, so QC PASS/FAILED/
+REWORK/SCRAP cannot be proven for one physical manufactured component inside a
+Production Order batch. Using metadata would not satisfy canonical lineage or
+future Finished Goods/Yard/Logistics queries.
+
+Created `docs/audits/component-domain5-qc-finished-goods-report.md` with the
+minimal additive schema proposal:
+
+- `QcInspection.componentInstanceId String?`
+- `NonConformanceReport.componentInstanceId String?`
+- `QcInspectionSnapshot.componentInstanceId String?`
+- relations from `ComponentInstance` to inspections/NCRs
+- nullable indexes on those new fields
+
+No code, schema, migration, tests or runtime writes were performed in DOMAIN.5.
+
+DOMAIN.5A has now closed this schema gate. DOMAIN.5 may resume with production
+completion, QC PASS/rework/scrap and Finished Goods eligibility.
+
+## COMPONENT DOMAIN.4 – Production Integration & Physical Instance Creation
+
+Status: **IMPLEMENTED - TEST/BUILD/RUNTIME SMOKE PASS**
+
+On 2026-07-27, connected canonical ProjectComponentRequirement demand to the
+Production command boundary. `POST /production/commands/orders` now accepts
+optional `componentRequirementId` and validates requirement/component/project,
+released Engineering basis, materialized Production BOM lineage and active
+quantity allocation before creating a DRAFT Production Order. Requirement-bound
+orders preserve `componentRequirementId`, `componentId`,
+`componentRevisionId`, `bomDefinitionId` and `bomId`.
+
+Production Order release is now the canonical manufacturing authorization
+point for physical identity creation. Releasing a requirement-bound order
+creates one `ComponentInstance` per integer Production quantity in
+`PLANNED` state, with stable server-side instance numbers and lineage to
+Component, Revision, BOM definition, Production Order, Requirement and Project.
+Release replay with the same idempotency key does not create duplicates.
+
+Runtime smoke namespace `DOMAIN4-1785146027125` created a requirement quantity
+20, PO-A quantity 8 and PO-B quantity 7. Draft PO-A had 0 instances; releasing
+PO-A created 8 planned instances; replay did not increase the count; releasing
+PO-B brought the requirement total to 15; PO-C quantity 6 was rejected as
+over-allocation. DB verification confirmed 15 planned instances, 15 instance
+timeline rows, 0 QC PASS, 0 producedAt, 0 InventoryTransactions and 0 Yard
+placements.
+
+Verification: Prisma migrate status/validate/generate (Pass), targeted
+Production command tests (Pass, 9 tests), backend tests (Pass, 78 suites / 230
+tests), backend build (Pass), frontend build (Pass with existing Vite
+chunk-size warning), runtime authenticated API/DB smoke (Pass).
+
+## COMPONENT DOMAIN.3 – Component Create & Project Requirement Conversion
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD PASS**
+
+On 2026-07-27, converted the new Components UI create path to canonical
+planning semantics. New canonical create now uses an additive
+`POST /components/foundation/definition-requirements` operation that creates one
+engineering `Component` in `DRAFT` lifecycle state and one
+`ProjectComponentRequirement.requiredQuantity` in a single transaction. It does
+not create ComponentInstances, ProductionOrders, inventory quantity, Finished
+Goods or Yard stock. Component code and requirement number are backend-owned
+and unique-constrained with retry.
+
+The Prisma schema now has additive typed engineering attributes
+`Component.componentType` and `Component.profile`, with an index on
+`componentType`. Existing records remain nullable and are not backfilled.
+Components read models prefer typed fields and requirement quantity, then fall
+back to legacy `description` JSON for old records. Legacy `/components` remains
+readable.
+
+The backup gate was cleared through the approved native-client execution path:
+`/tmp/steeltrack-domain3-before-20260727.dump` was created and verified with
+`pg_restore --list`. Migration
+`20260727223000_component_domain3_typed_definition_fields` was deployed with
+`prisma migrate deploy`; Prisma migrate status reports the database schema is
+up to date. Existing Component, Requirement, ComponentInstance, ProductionOrder,
+BOM and BOMItem row counts were unchanged after migration, existing records
+kept `componentType/profile = NULL`, and STABILITY7/B1 lineage remains readable.
+
+Runtime smoke created controlled namespace `DOMAIN3-1785144581343` through the
+real authenticated API. It produced exactly 1 Component definition in
+`DRAFT`, 1 ProjectComponentRequirement with `requiredQuantity=20`, 0
+ComponentInstances, 0 ProductionOrders and 0 InventoryTransactions.
+
+Verification: Prisma migrate status/validate/generate (Pass), backend tests
+(Pass, 78 suites / 227 tests), backend build (Pass), frontend build (Pass with
+existing Vite chunk-size warning), `git diff --check` (Pass).
+
+## COMPONENT DOMAIN.2 – Canonical Schema Foundation
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD PASS**
+
+On 2026-07-27, implemented the first permanent canonical Component domain
+schema foundation. `Component` remains the engineering definition, while new
+additive tables now represent project demand/planning and physical component
+identity: `ProjectComponentRequirement`, `ComponentInstance` and
+`ComponentInstanceTimeline`. `ProductionOrder` now has an optional
+`componentRequirementId` lineage field for future Production conversion.
+
+Legacy Component fields, legacy APIs, Engineering BOM B1, Production Warehouse,
+Inventory, QC, Yard, Logistics, Historical Dashboard, Snapshot Engine and
+frontend flows were not converted or redesigned. No ambiguous legacy Component
+record was fabricated into a ComponentInstance.
+
+Runtime smoke created controlled DOMAIN2 requirements and one PLANNED physical
+instance, confirmed requirements do not create inventory or instances, confirmed
+one Component can have requirements from multiple Projects, and confirmed B1
+released BOM lineage remains usable.
+
+Verification: Prisma migrate deploy/status/validate/generate (Pass), backend
+tests (Pass, 78 suites / 223 tests), backend build (Pass), frontend build
+(Pass with existing Vite chunk-size warnings), `git diff --check` (Pass).
+
 ## SPRINT STABILITY.7 – B1 Runtime Integration Certification
 
 Status: **CERTIFIED - RUNTIME FIXTURE PASS**
@@ -2960,3 +3210,21 @@ views, recent transactions, realtime alerts and movement timeline. It does not
 modify backend contracts, Historical Dashboard, Snapshot Engine, Historical API
 or Prisma schema. True WebSocket push and authoritative warehouse capacity
 alerts remain future backend-contract work.
+
+# COMPONENT DOMAIN.5E Physical Lifecycle and QC Handoff (2026-07-28)
+
+Status: **IMPLEMENTED**
+
+ComponentInstance physical state is now derived from
+ComponentInstanceExecution evidence and final QC facts. Assignment remains
+planning evidence only; `RUNNING` moves `PLANNED/REWORK` instances into
+`IN_PRODUCTION`; `COMPLETED` moves an instance into `PRODUCED_WAITING_QC` only
+when every WorkOrder on that ProductionOrder has completed execution evidence
+for the same instance. Final QC acceptance moves produced instances to
+`QC_PASSED`; final QC rejection moves them to `QC_FAILED`; NCR disposition can
+move failed/waiting/rework instances to `REWORK`, `SCRAPPED` or `USE_AS_IS`.
+
+`GET /components/instances/finished-goods` is available as an authenticated
+read-only eligibility API. It requires physical state plus final QC/NCR evidence
+and does not create Inventory, Yard or dashboard side effects. No schema change
+or migration was introduced.

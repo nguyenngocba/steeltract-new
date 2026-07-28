@@ -1,5 +1,167 @@
 # Components Module
 
+## COMPONENT DOMAIN.5D - ComponentInstanceExecution Schema Foundation
+
+Implemented on 2026-07-28.
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD/RUNTIME PASS**
+
+- Added physical execution evidence table `ComponentInstanceExecution`.
+- One row represents one physical ComponentInstance participating in one
+  WorkOrder / ProductionExecution run.
+- Added statuses: `ASSIGNED`, `RUNNING`, `COMPLETED`, `CANCELLED`.
+- Added repository/service/API foundation for assign/start/complete/cancel and
+  instance execution history.
+- No `ComponentInstance.state` transition is automatic yet.
+- No QC, Inventory, Yard or Finished Goods side effects were created.
+- Runtime smoke verified partial physical operation evidence and cleanup.
+- Deliverable:
+  `docs/audits/component-domain5d-instance-execution-foundation-report.md`.
+
+## COMPONENT DOMAIN.5C - Production Instance Execution Granularity Audit & Design
+
+Completed on 2026-07-28.
+
+Status: **DESIGN COMPLETE - AWAITING DOMAIN.5D SCHEMA FOUNDATION**
+
+- Confirmed current Production execution evidence is order/work-order/run and
+  aggregate quantity level only.
+- Confirmed the system cannot identify which physical `ComponentInstance`
+  rows started/completed each operation.
+- Confirmed partial production cannot be represented truthfully today.
+- Recommended additive `ComponentInstanceExecution` as the physical
+  per-instance operation ledger.
+- Deliverable:
+  `docs/audits/component-domain5c-production-instance-execution-design.md`.
+
+## COMPONENT DOMAIN.5A - QC Physical Instance Lineage Foundation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD/RUNTIME PASS**
+
+- QC can now structurally reference canonical `ComponentInstance` rows through
+  nullable `componentInstanceId` lineage on inspections, NCRs and QC
+  inspection snapshots.
+- Legacy QC rows remain readable with `componentInstanceId = NULL`.
+- NCRs created from instance-level inspections preserve the same physical
+  instance identity.
+- Runtime smoke verified one DOMAIN4 instance-level QC inspection and NCR with
+  no ComponentInstance, Inventory, Yard or Finished Goods side effects.
+- DOMAIN.5 Finished Goods gating can now resume.
+
+## COMPONENT DOMAIN.5B - ComponentInstance IN_PRODUCTION State Gate
+
+Implemented on 2026-07-28.
+
+Status: **IMPLEMENTED - DOMAIN.5 BLOCKED BY PRODUCTION GRANULARITY**
+
+- Added additive enum value `ComponentInstanceState.IN_PRODUCTION`.
+- Deployed migration
+  `20260728090000_component_domain5b_instance_in_production_state` after backup
+  `/tmp/steeltrack-domain5b-before-20260728.dump`.
+- Existing `ComponentInstance` rows were not backfilled; all 16 existing rows
+  remained `PLANNED`.
+- No Production/QC/Finished Goods transition code was implemented because
+  current Production execution evidence does not identify physical instance
+  IDs or serial ranges.
+
+## COMPONENT DOMAIN.5 - Production Completion, QC & Finished Goods Gate
+
+Audited on 2026-07-27 and resumed on 2026-07-28.
+
+Status: **BLOCKED BY PRODUCTION INSTANCE GRANULARITY GATE**
+
+- Current QC schema cannot structurally reference `ComponentInstance`.
+- `QcInspection` and `NonConformanceReport` only reference Production Order,
+  Production Stage, legacy Component and Project.
+- Finished Goods eligibility cannot be implemented safely from QC metadata or
+  legacy `Component.status`.
+- Minimal additive schema proposal is documented in
+  `docs/audits/component-domain5-qc-finished-goods-report.md`.
+- No code/schema/migration/runtime write was performed for DOMAIN.5.
+- DOMAIN.5A has closed the schema blocker. Remaining DOMAIN.5 work is
+  Production completion, instance QC state transitions and Finished Goods
+  eligibility.
+- DOMAIN.5B has closed the `IN_PRODUCTION` enum blocker.
+- DOMAIN.5 remains blocked because Production start/completion is currently
+  order/work-order/completed-quantity level and does not identify which
+  physical `ComponentInstance` rows started or completed.
+- Next gate: define instance-level Production execution evidence before moving
+  instances through `PLANNED -> IN_PRODUCTION -> PRODUCED_WAITING_QC`.
+
+## COMPONENT DOMAIN.4 - Production Integration & Physical Instance Creation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - TEST/BUILD/RUNTIME SMOKE PASS**
+
+- Production Order release now creates canonical `ComponentInstance` rows for
+  requirement-bound Production Orders.
+- Instances preserve Component, Revision, BOM definition, Production Order,
+  Requirement and Project lineage.
+- Initial instance state is `PLANNED`, not Finished Goods, QC PASS, Yard stock
+  or inventory.
+- Instance timeline rows are created with
+  `eventType=component.instance.planned` from Production release.
+- Existing Component definitions and DOMAIN3 requirements remain readable and
+  still do not create physical instances until Production release.
+- Finished Goods gating remains scheduled for DOMAIN.5.
+
+## COMPONENT DOMAIN.3 - Component Create & Project Requirement Conversion
+
+Implemented in code on 2026-07-27.
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD PASS**
+
+- Added additive typed engineering fields to `Component`:
+  `componentType String?`, `profile String?`, and `@@index([componentType])`.
+- Added canonical create API:
+  `POST /components/foundation/definition-requirements`.
+- New create operation atomically creates one engineering Component definition
+  and one `ProjectComponentRequirement.requiredQuantity`.
+- New create does not create ComponentInstances, ProductionOrders, inventory
+  quantity, Finished Goods, Yard stock or Component Inventory.
+- Component code and requirement number are generated by the backend and guarded
+  by unique constraints with retry.
+- Components create modal now says `Tạo hồ sơ cấu kiện`, explicitly selects
+  `Công trình / Dự án`, and labels quantity as `Số lượng yêu cầu`.
+- Components read models prefer typed `componentType/profile` and requirement
+  quantity, with legacy `description` JSON fallback for older records.
+- Backup `/tmp/steeltrack-domain3-before-20260727.dump` was created and
+  verified, then migration
+  `20260727223000_component_domain3_typed_definition_fields` was deployed.
+- Runtime smoke through the authenticated API created exactly one Component
+  definition and one ProjectComponentRequirement, with zero ComponentInstances,
+  ProductionOrders or InventoryTransactions.
+- STABILITY7 fixture records and B1 released BOM lineage remain readable.
+
+## COMPONENT DOMAIN.2 - Canonical Schema Foundation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD PASS**
+
+- `Component` remains the canonical engineering definition and existing legacy
+  fields remain readable.
+- Added additive schema foundation:
+  `ProjectComponentRequirement`, `ComponentInstance` and
+  `ComponentInstanceTimeline`.
+- Added optional `ProductionOrder.componentRequirementId` for future
+  Production lineage.
+- Added `/components/foundation/requirements` and
+  `/components/foundation/instances` read/create API foundation protected by
+  JWT and Zod validation.
+- Requirement quantity is now represented as planning demand and does not
+  create inventory or physical instances.
+- ComponentInstance create starts as physical identity only; it cannot be
+  created directly as QC-passed or Finished Goods through the foundation DTO.
+- Controlled DOMAIN2 runtime smoke verified multi-project requirements for one
+  Component, PLANNED instance semantics, STABILITY7 readability and B1 released
+  BOM lineage.
+- No frontend, Inventory, QC, Yard, Logistics, Historical Dashboard or Snapshot
+  Engine conversion was performed.
+
 ## Component Manufacturing Workflow Sprint B1
 
 Implemented on 2026-07-27.

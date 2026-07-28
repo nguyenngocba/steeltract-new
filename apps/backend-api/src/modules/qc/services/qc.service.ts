@@ -177,6 +177,7 @@ export class QcService {
       status: query.status,
       productionOrderId: query.productionOrderId,
       productionStageId: query.productionStageId,
+      componentInstanceId: query.componentInstanceId,
       componentId: query.componentId,
       projectId: query.projectId,
       inspectorId: query.inspectorId,
@@ -206,6 +207,19 @@ export class QcService {
       if (dto.checklistId) {
         await this.getChecklistOrThrow(dto.checklistId, tx);
       }
+      const instance = await this.validateComponentInstanceLineage(
+        {
+          componentInstanceId: dto.componentInstanceId,
+          componentId: dto.componentId,
+          productionOrderId: dto.productionOrderId,
+          projectId: dto.projectId,
+        },
+        tx,
+      );
+      const componentId = dto.componentId ?? instance?.componentId;
+      const productionOrderId =
+        dto.productionOrderId ?? instance?.productionOrderId ?? undefined;
+      const projectId = dto.projectId ?? instance?.projectId ?? undefined;
 
       const created = await this.repository.createInspection(
         {
@@ -214,10 +228,13 @@ export class QcService {
           checklist: dto.checklistId
             ? { connect: { id: dto.checklistId } }
             : undefined,
-          productionOrderId: dto.productionOrderId,
+          productionOrderId,
           productionStageId: dto.productionStageId,
-          componentId: dto.componentId,
-          projectId: dto.projectId,
+          componentInstance: instance
+            ? { connect: { id: instance.id } }
+            : undefined,
+          componentId,
+          projectId,
           status: dto.status,
           inspectorId: dto.inspectorId ?? actorId,
           metadata: this.toJson(dto.metadata),
@@ -241,6 +258,7 @@ export class QcService {
           metadata: {
             inspectionNo: created.inspectionNo,
             productionOrderId: created.productionOrderId,
+            componentInstanceId: created.componentInstanceId,
           },
         },
       );
@@ -281,13 +299,27 @@ export class QcService {
     actorId?: string,
   ) {
     return this.repository.transaction(async (tx) => {
-      await this.getInspectionOrThrow(id, tx);
+      const existing = await this.getInspectionOrThrow(id, tx);
+      await this.validateComponentInstanceLineage(
+        {
+          componentInstanceId:
+            dto.componentInstanceId ?? existing.componentInstanceId ?? undefined,
+          componentId: dto.componentId ?? existing.componentId ?? undefined,
+          productionOrderId:
+            dto.productionOrderId ?? existing.productionOrderId ?? undefined,
+          projectId: dto.projectId ?? existing.projectId ?? undefined,
+        },
+        tx,
+      );
 
       const updated = await this.repository.updateInspection(
         id,
         {
           checklist: dto.checklistId
             ? { connect: { id: dto.checklistId } }
+            : undefined,
+          componentInstance: dto.componentInstanceId
+            ? { connect: { id: dto.componentInstanceId } }
             : undefined,
           productionOrderId: dto.productionOrderId,
           productionStageId: dto.productionStageId,
@@ -641,6 +673,30 @@ export class QcService {
   async createNcr(inspectionId: string, dto: CreateNcrDto, actorId?: string) {
     const ncr = await this.repository.transaction(async (tx) => {
       const inspection = await this.getInspectionOrThrow(inspectionId, tx);
+      if (
+        dto.componentInstanceId &&
+        inspection.componentInstanceId &&
+        dto.componentInstanceId !== inspection.componentInstanceId
+      ) {
+        throw new BadRequestException(
+          'NCR component instance must match the inspection component instance',
+        );
+      }
+      const instance = await this.validateComponentInstanceLineage(
+        {
+          componentInstanceId:
+            dto.componentInstanceId ??
+            inspection.componentInstanceId ??
+            undefined,
+          componentId: dto.componentId ?? inspection.componentId ?? undefined,
+          productionOrderId:
+            dto.productionOrderId ??
+            inspection.productionOrderId ??
+            undefined,
+          projectId: inspection.projectId ?? undefined,
+        },
+        tx,
+      );
 
       const created = await this.repository.createNcr(
         {
@@ -649,6 +705,9 @@ export class QcService {
           issue: dto.issueId ? { connect: { id: dto.issueId } } : undefined,
           productionOrderId:
             dto.productionOrderId ?? inspection.productionOrderId,
+          componentInstance: instance
+            ? { connect: { id: instance.id } }
+            : undefined,
           componentId: dto.componentId ?? inspection.componentId,
           status: dto.status,
           severity: dto.severity,
@@ -695,6 +754,7 @@ export class QcService {
           metadata: {
             ncrNo: created.ncrNo,
             inspectionId,
+            componentInstanceId: created.componentInstanceId,
             severity: created.severity,
             defectType: dto.defectType,
             defectCategory: dto.defectCategory,
@@ -736,6 +796,7 @@ export class QcService {
       status: query.status,
       severity: query.severity,
       productionOrderId: query.productionOrderId,
+      componentInstanceId: query.componentInstanceId,
       componentId: query.componentId,
     };
     const [data, total] = await Promise.all([
@@ -916,6 +977,47 @@ export class QcService {
     return inspection;
   }
 
+  private async validateComponentInstanceLineage(
+    input: {
+      componentInstanceId?: string;
+      componentId?: string | null;
+      productionOrderId?: string | null;
+      projectId?: string | null;
+    },
+    tx: QcTx,
+  ) {
+    if (!input.componentInstanceId) return null;
+
+    const instance = await this.repository.findComponentInstanceById(
+      input.componentInstanceId,
+      tx,
+    );
+    if (!instance) {
+      throw new NotFoundException('Component instance not found');
+    }
+
+    if (input.componentId && input.componentId !== instance.componentId) {
+      throw new BadRequestException(
+        'Component instance does not belong to the supplied component',
+      );
+    }
+    if (
+      input.productionOrderId &&
+      input.productionOrderId !== instance.productionOrderId
+    ) {
+      throw new BadRequestException(
+        'Component instance does not belong to the supplied production order',
+      );
+    }
+    if (input.projectId && input.projectId !== instance.projectId) {
+      throw new BadRequestException(
+        'Component instance does not belong to the supplied project',
+      );
+    }
+
+    return instance;
+  }
+
   private canStartInspection(status: QcInspectionStatus) {
     return [QcInspectionStatus.DRAFT, QcInspectionStatus.READY].some(
       (item) => item === status,
@@ -1074,7 +1176,12 @@ export class QcService {
   ) {
     const row = this.asRecord(payload) ?? {};
     if (eventName === 'qc.inspection.completed') {
-      const subject = row.productionOrderId
+      const subject = row.componentInstanceId
+        ? {
+            subjectType: 'COMPONENT_INSTANCE',
+            subjectId: row.componentInstanceId,
+          }
+        : row.productionOrderId
         ? { subjectType: 'PRODUCTION_ORDER', subjectId: row.productionOrderId }
         : row.componentId
           ? { subjectType: 'COMPONENT', subjectId: row.componentId }
@@ -1084,6 +1191,9 @@ export class QcService {
       return {
         inspectionId: row.id,
         ...subject,
+        componentInstanceId: row.componentInstanceId ?? null,
+        componentId: row.componentId ?? null,
+        productionOrderId: row.productionOrderId ?? null,
         result: row.status,
         ncrId: null,
         inspectorId: row.inspectorId ?? actorId ?? null,
@@ -1092,7 +1202,12 @@ export class QcService {
     }
     if (eventName === 'qc.ncr.created') {
       const eventMetadata = this.asRecord(row.metadata) ?? {};
-      const subject = row.productionOrderId
+      const subject = row.componentInstanceId
+        ? {
+            subjectType: 'COMPONENT_INSTANCE',
+            subjectId: row.componentInstanceId,
+          }
+        : row.productionOrderId
         ? { subjectType: 'PRODUCTION_ORDER', subjectId: row.productionOrderId }
         : row.componentId
           ? { subjectType: 'COMPONENT', subjectId: row.componentId }
@@ -1101,6 +1216,9 @@ export class QcService {
         ncrId: row.id,
         ...subject,
         inspectionId: row.inspectionId,
+        componentInstanceId: row.componentInstanceId ?? null,
+        componentId: row.componentId ?? null,
+        productionOrderId: row.productionOrderId ?? null,
         defectCode: eventMetadata.defectCode ?? null,
         reasonCode: eventMetadata.reasonCode ?? null,
         severity: row.severity,

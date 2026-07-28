@@ -1,5 +1,23 @@
 # QC Module
 
+## COMPONENT DOMAIN.5A - QC Physical Instance Lineage Foundation
+
+Implemented on 2026-07-27.
+
+Status: **IMPLEMENTED - MIGRATION/TEST/BUILD/RUNTIME PASS**
+
+- `QcInspection`, `NonConformanceReport` and `QcInspectionSnapshot` now support
+  nullable `componentInstanceId` lineage.
+- QC service validates instance/component/production/project consistency before
+  writing instance-level inspections or NCRs.
+- Instance-level QC events use `COMPONENT_INSTANCE` as the canonical subject
+  and preserve contextual `componentId` and `productionOrderId`.
+- NCR disposition events preserve the same physical instance identity, enabling
+  future rework/scrap/Finished Goods transitions without losing traceability.
+- QC snapshots now preserve physical instance lineage for historical analytics.
+- DOMAIN.5A does not create ComponentInstances, InventoryTransactions, Yard
+  placements or Finished Goods classification.
+
 ## Production Defect Recording Additive Fields
 
 Implemented on 2026-07-23.

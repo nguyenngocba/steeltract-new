@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import {
-  createComponent,
+  createComponentDefinitionRequirement,
   createProductionOrder,
   deleteComponent,
   getComponentCostingBreakdown,
@@ -71,10 +71,16 @@ export function useCreateComponent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: createComponent,
+    mutationFn: createComponentDefinitionRequirement,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["components"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["components", "workspace"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["components", "overview"],
       });
     },
   });

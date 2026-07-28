@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama GPU HCM",
+      "options": {
+        "baseURL": "http://172.16.83.13:11434/v1"
+      },
+      "models": {
+        "qwen3.5:9b": {
+          "name": "Qwen 3.5 9B Original"
+        },
+        "qwen3.5:9b-8k": {
+          "name": "Qwen 3.5 9B 8K"
+        },
+        "qwen2.5-coder:7b-16k": {
+          "name": "Qwen 2.5 Coder 7B 16K"
+        }
+      }
+    }
+  },
+
+  "model": "ollama/qwen3.5:9b-8k",
+
+  "permission": {
+    "*": "deny",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "edit": "deny",
+    "bash": {
+      "*": "deny",
+      "semble search *": "allow"
+    },
+    "external_directory": "deny",
+    "task": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+    "lsp": "deny"
+  }
+}

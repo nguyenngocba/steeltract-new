@@ -14,7 +14,6 @@ import {
   CockpitKpiCard,
   EnterpriseKpiCard,
 } from "../../../../shared/ui/cockpit";
-import { nextLocalCode } from "@/shared/utils/code-format";
 import { useProjects } from "../../../inventory/hooks/useProjects";
 import {
   inventoryInput,
@@ -52,13 +51,6 @@ import {
 } from "./ComponentsCockpitShared";
 
 type ComponentRow = ComponentWorkspaceRow;
-
-type ComponentMetadata = {
-  type?: string;
-  profile?: string;
-  quantity?: number;
-  qcQuantity?: number;
-};
 
 const inventoryFilterControl =
   "h-9 w-full rounded-lg border border-white/10 bg-slate-950/45 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65";
@@ -291,7 +283,8 @@ export function ComponentsListPage() {
     profile: "",
     projectId: "",
     qty: "1",
-    location: "Kho cấu kiện",
+    requiredBy: "",
+    note: "",
   });
   function closeCreateModal() {
     setCreateOpen(false);
@@ -301,7 +294,8 @@ export function ComponentsListPage() {
       profile: "",
       projectId: "",
       qty: "1",
-      location: "Kho cấu kiện",
+      requiredBy: "",
+      note: "",
     });
   }
 
@@ -379,26 +373,41 @@ export function ComponentsListPage() {
   }
 
   async function submitCreate() {
-    const code = nextLocalCode("CPL");
-    const metadata: ComponentMetadata = {
-      type: createForm.type,
-      profile: createForm.profile || "N/A",
-      quantity: Number(createForm.qty || 0),
-      qcQuantity: 0,
-    };
+    const requiredQuantity = Number(createForm.qty || 0);
+    if (!createForm.name.trim()) {
+      toast.error("Nhập tên cấu kiện");
+      return;
+    }
+    if (!createForm.projectId) {
+      toast.error("Chọn công trình / dự án");
+      return;
+    }
+    if (!createForm.type.trim()) {
+      toast.error("Chọn loại cấu kiện");
+      return;
+    }
+    if (!Number.isFinite(requiredQuantity) || requiredQuantity <= 0) {
+      toast.error("Số lượng yêu cầu phải lớn hơn 0");
+      return;
+    }
 
     try {
-      await createComponent.mutateAsync({
-        code,
-        name: createForm.name || "COMPONENT",
-        description: JSON.stringify(metadata),
-        status: "STOCK",
-        projectId: createForm.projectId || undefined,
-        floor: "Kho cấu kiện",
+      const result = await createComponent.mutateAsync({
+        name: createForm.name.trim(),
+        componentType: createForm.type.trim(),
+        profile: createForm.profile.trim() || undefined,
+        projectId: createForm.projectId,
+        requiredQuantity,
+        requiredBy: createForm.requiredBy
+          ? new Date(createForm.requiredBy).toISOString()
+          : undefined,
+        note: createForm.note.trim() || undefined,
       });
-      toast.success(`Đã tạo cấu kiện ${code}`);
+      toast.success(
+        `Đã tạo hồ sơ ${result.component.code} · Draft · yêu cầu ${requiredQuantity} cấu kiện`,
+      );
     } catch {
-      toast.error("Không thể tạo cấu kiện");
+      toast.error("Không thể tạo hồ sơ cấu kiện");
       return;
     }
 
@@ -639,11 +648,11 @@ export function ComponentsListPage() {
                       "Profile/Kích thước",
                       "Loại",
                       "Dự án",
-                      "Work Order",
-                      "Progress",
-                      "Material Ready",
+                      "SL yêu cầu",
+                      "Trạng thái kỹ thuật",
+                      "BOM",
                       "Vị trí hiện tại",
-                      "Trạng thái",
+                      "Trạng thái legacy",
                       "Khối lượng",
                       "Ngày tạo",
                       "Thao tác",
@@ -702,19 +711,24 @@ export function ComponentsListPage() {
                           {row.project}
                         </td>
                         <td
-                          className="truncate px-1.5 py-0.5 text-cyan-300 font-mono"
-                          title={row.workOrder}
+                          className="truncate px-1.5 py-0.5 text-cyan-300 font-mono tabular-nums"
+                          title={`${formatQuantity(row.qty, 0)} cấu kiện`}
                         >
-                          {row.workOrder}
+                          {formatQuantity(row.qty, 0)}
+                        </td>
+                        <td className="truncate px-1.5 py-0.5 text-slate-300">
+                          {row.status}
                         </td>
                         <td className="px-1.5 py-0.5">
-                          <ProgressMeter value={row.progress} />
-                        </td>
-                        <td className="px-1.5 py-0.5">
-                          <ProgressMeter
-                            value={row.materialReady}
-                            tone={row.materialReady < 100 ? "amber" : "emerald"}
-                          />
+                          <span
+                            className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${
+                              row.hasBom
+                                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                                : "border-amber-400/30 bg-amber-400/10 text-amber-300"
+                            }`}
+                          >
+                            {row.hasBom ? "Có BOM" : "Chờ BOM"}
+                          </span>
                         </td>
                         <td
                           className="truncate px-1.5 py-0.5 text-slate-300"
@@ -938,7 +952,7 @@ export function ComponentsListPage() {
           >
             <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
-                Tạo cấu kiện mới
+                Tạo hồ sơ cấu kiện
               </h3>
               <button
                 onClick={closeCreateModal}
@@ -947,65 +961,104 @@ export function ComponentsListPage() {
                 Đóng
               </button>
             </div>
-            <div
-              className="grid grid-cols-1 xl:grid-cols-2"
-              style={{ gap: "0.75rem" }}
-            >
-              <input
-                value={createForm.name}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, name: e.target.value }))
-                }
-                placeholder="Tên cấu kiện"
-                className={`${inventoryInput} xl:col-span-2`}
-              />
-              <select
-                value={createForm.type}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, type: e.target.value }))
-                }
-                className={inventoryInput}
-              >
-                <option>Dầm (Beam)</option>
-                <option>Cột (Column)</option>
-                <option>Bản mã (Plate)</option>
-              </select>
-              <input
-                value={createForm.profile}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, profile: e.target.value }))
-                }
-                placeholder="Profile/Kích thước"
-                className={inventoryInput}
-              />
-              <select
-                value={createForm.projectId}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, projectId: e.target.value }))
-                }
-                className={inventoryInput}
-              >
-                <option value="">Chọn dự án</option>
-                {projects.map(
-                  (item: { id: string; code?: string; name: string }) => (
-                    <option key={item.id} value={item.id}>
-                      {item.code ?? item.name} - {item.name}
-                    </option>
-                  ),
-                )}
-              </select>
-              <input
-                value={createForm.qty}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, qty: e.target.value }))
-                }
-                placeholder="Số lượng"
-                className={inventoryInput}
-              />
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Thông tin kỹ thuật
+                </div>
+                <div
+                  className="grid grid-cols-1 xl:grid-cols-2"
+                  style={{ gap: "0.75rem" }}
+                >
+                  <input
+                    value={createForm.name}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, name: e.target.value }))
+                    }
+                    placeholder="Tên cấu kiện *"
+                    className={`${inventoryInput} xl:col-span-2`}
+                  />
+                  <select
+                    value={createForm.type}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, type: e.target.value }))
+                    }
+                    className={inventoryInput}
+                  >
+                    <option>Dầm (Beam)</option>
+                    <option>Cột (Column)</option>
+                    <option>Bản mã (Plate)</option>
+                  </select>
+                  <input
+                    value={createForm.profile}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, profile: e.target.value }))
+                    }
+                    placeholder="Profile / Kích thước"
+                    className={inventoryInput}
+                  />
+                  <input
+                    value="Mã cấu kiện tự động sinh"
+                    readOnly
+                    className={`${inventoryInput} text-slate-500`}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Yêu cầu công trình
+                </div>
+                <div
+                  className="grid grid-cols-1 xl:grid-cols-2"
+                  style={{ gap: "0.75rem" }}
+                >
+                  <select
+                    value={createForm.projectId}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, projectId: e.target.value }))
+                    }
+                    className={inventoryInput}
+                  >
+                    <option value="">Công trình / Dự án *</option>
+                    {projects.map(
+                      (item: { id: string; code?: string; name: string }) => (
+                        <option key={item.id} value={item.id}>
+                          {item.code ?? item.name} - {item.name}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                  <input
+                    value={createForm.qty}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, qty: e.target.value }))
+                    }
+                    placeholder="Số lượng yêu cầu *"
+                    className={inventoryInput}
+                  />
+                  <input
+                    type="date"
+                    value={createForm.requiredBy}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, requiredBy: e.target.value }))
+                    }
+                    className={inventoryInput}
+                  />
+                  <input
+                    value={createForm.note}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, note: e.target.value }))
+                    }
+                    placeholder="Ghi chú"
+                    className={inventoryInput}
+                  />
+                </div>
+              </div>
             </div>
             <div className="mt-4 rounded-xl border border-cyan-900/40 bg-cyan-950/20 p-3 text-xs text-cyan-100">
-              Vật tư không khai báo tại đây. Sau khi tạo cấu kiện, tạo
-              Production BOM riêng để quản lý định mức và routing sản xuất.
+              Hồ sơ mới ở trạng thái Draft. Số lượng là nhu cầu công trình,
+              không tạo tồn kho, ComponentInstance hay lệnh sản xuất.
             </div>
             <div className="mt-4 flex justify-end gap-2 border-t border-white/10 pt-3">
               <button
@@ -1018,7 +1071,7 @@ export function ComponentsListPage() {
                 onClick={submitCreate}
                 className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition"
               >
-                Lưu cấu kiện
+                Tạo hồ sơ
               </button>
             </div>
           </div>
@@ -1091,7 +1144,7 @@ export function ComponentsListPage() {
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs text-slate-400">Số lượng hiện tại</div>
+                <div className="text-xs text-slate-400">Số lượng yêu cầu</div>
                 <div className="mt-1 text-lg font-semibold text-white">
                   {formatQuantity(selected.qty, 0)} kiện
                 </div>

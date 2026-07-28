@@ -1,5 +1,16 @@
 # Next Tasks
 
+- **Component DOMAIN.5E - Physical Lifecycle Transition & QC Handoff**:
+  use `ComponentInstanceExecution` evidence to move selected physical instances
+  through `PLANNED -> IN_PRODUCTION -> PRODUCED_WAITING_QC`, then allow QC
+  handoff only by exact `componentInstanceId`. Do not infer from aggregate
+  completed quantity.
+- **Component DOMAIN.5 - Production Completion + QC + Finished Goods Gate**:
+  after DOMAIN.5E, add instance-level QC state transitions and make QC PASS /
+  approved Use-As-Is the only path to Finished Goods for new component flows.
+- **Component DOMAIN.6+ - Yard, Logistics, Installation conversion**: point new
+  Yard placements, Dispatch items and Project installation records at
+  `ComponentInstance` identity while keeping legacy rows readable.
 - **Authenticated frontend browser smoke P1**: add a Playwright/browser route
   harness for `/`, `/inventory`, `/components`, `/production`, `/qc`,
   `/projects`, `/suppliers`, `/logistics` and `/history`.
@@ -28,10 +39,10 @@
 - **Components UI polish Sprint 5**: refactor Create/Edit Component,
   Production Order, QC and Component Detail forms with shared Enterprise Form
   primitives. Keep backend/API/schema unchanged.
-- **Component operational lifecycle schema decision**: decide whether the
-  requested full operational states (`WAITING_BOM`, `READY_FOR_PRODUCTION`,
-  `QC_FAILED`, `REWORK`, `FINISHED_GOODS`, `YARD`) should become a new enum or
-  remain mapped through existing status plus lifecycle metadata.
+- **Component dashboard/read-model conversion**: after DOMAIN.3-DOMAIN.6,
+  convert Components and Executive BI metrics away from raw `COUNT(Component)`
+  for physical inventory and use requirements/instances/authoritative module
+  evidence instead.
 - **QC defect analytics follow-up**: after real NCR defect metadata is used in
   operations, design read-model aggregation for top defect types, machines,
   workstations and shifts.
@@ -1057,3 +1068,14 @@ Backlog after the locked order:
    before certifying over-capacity alerts as operationally authoritative.
 4. Continue reducing the remaining frontend lint warnings so legacy-debt rules
    can be promoted from warning back to error over time.
+
+# COMPONENT DOMAIN.5E Follow-up
+
+1. Add an approved routing-operation model for optional/branch WorkOrders if
+   manufacturing needs non-mandatory operations; DOMAIN.5E V1 treats all
+   ProductionOrder WorkOrders as mandatory.
+2. Add authenticated HTTP smoke coverage for
+   `GET /components/instances/finished-goods` once the test token harness is
+   standardized.
+3. Continue with Yard/Delivery handoff for physical ComponentInstances without
+   merging Finished Goods eligibility into Inventory ownership.

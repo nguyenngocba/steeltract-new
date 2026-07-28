@@ -20,6 +20,7 @@ export interface CreateProductionOrderCommand extends ProductionCommandContext {
   title: string;
   description?: string;
   projectId?: string;
+  componentRequirementId?: string;
   quantity: number;
   unit: string;
   orderKind?: ProductionOrderKind;

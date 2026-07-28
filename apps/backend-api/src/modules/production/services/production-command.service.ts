@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ComponentInstanceState,
   ComponentBomDefinitionState,
   ComponentLifecycleState,
   ComponentRevisionState,
@@ -105,6 +106,7 @@ export class ProductionCommandService {
         );
       }
       await this.assertReleasedEngineeringBasis(command, tx);
+      await this.assertRequirementAllocation(command, tx);
       const productionBom =
         await this.bomMaterialization.materializeReleasedEngineeringBom(
           {
@@ -119,6 +121,7 @@ export class ProductionCommandService {
           title: command.title,
           description: command.description,
           projectId: command.projectId,
+          componentRequirementId: command.componentRequirementId,
           componentId: command.engineeringBasis.componentId,
           bomId: productionBom.id,
           componentRevisionId: command.engineeringBasis.componentRevisionId,
@@ -133,6 +136,7 @@ export class ProductionCommandService {
             engineeringContentHash: command.engineeringBasis.contentHash,
             engineeringVerifiedAt: command.engineeringBasis.verifiedAt,
             productionBomId: productionBom.id,
+            componentRequirementId: command.componentRequirementId,
           }),
         },
         tx,
@@ -192,6 +196,73 @@ export class ProductionCommandService {
     }
   }
 
+  private async assertRequirementAllocation(
+    command: Pick<
+      CreateProductionOrderCommand,
+      'componentRequirementId' | 'engineeringBasis' | 'projectId' | 'quantity'
+    >,
+    tx: Tx,
+  ) {
+    if (!command.componentRequirementId) return;
+    if (!Number.isInteger(command.quantity)) {
+      throw new BadRequestException(
+        'Component requirement Production Order quantity must be an integer',
+      );
+    }
+    const requirement = await this.repository.findRequirementForProduction(
+      command.componentRequirementId,
+      tx,
+    );
+    if (!requirement) {
+      throw new NotFoundException('Project component requirement not found');
+    }
+    if (requirement.status === 'CANCELLED') {
+      throw new BadRequestException(
+        'Cancelled Project component requirement cannot be produced',
+      );
+    }
+    if (requirement.componentId !== command.engineeringBasis.componentId) {
+      throw new BadRequestException(
+        'Production Order requirement must reference the same Component definition',
+      );
+    }
+    if (
+      requirement.componentRevisionId &&
+      requirement.componentRevisionId !== command.engineeringBasis.componentRevisionId
+    ) {
+      throw new BadRequestException(
+        'Production Order revision must match the Project requirement revision',
+      );
+    }
+    if (
+      requirement.bomDefinitionId &&
+      requirement.bomDefinitionId !== command.engineeringBasis.bomDefinitionId
+    ) {
+      throw new BadRequestException(
+        'Production Order BOM definition must match the Project requirement BOM',
+      );
+    }
+    if (command.projectId && requirement.projectId !== command.projectId) {
+      throw new BadRequestException(
+        'Production Order Project must match the Project component requirement',
+      );
+    }
+    const allocated =
+      await this.repository.sumProductionQuantityForRequirement(
+        requirement.id,
+        tx,
+      );
+    const activeQuantity = Number(allocated._sum.quantity ?? 0);
+    if (
+      activeQuantity + command.quantity >
+      Number(requirement.requiredQuantity) + 0.000001
+    ) {
+      throw new BadRequestException(
+        'Active Production Order quantity exceeds Project component requirement quantity',
+      );
+    }
+  }
+
   releaseOrder(command: ReleaseProductionOrderCommand) {
     return this.repository.transaction(async (tx) => {
       const replay = await this.replayedOrder(
@@ -225,6 +296,11 @@ export class ProductionCommandService {
         tx,
       );
       this.assertVersion(updated, 'ProductionOrder');
+      const createdInstances = await this.createPlannedComponentInstances(
+        updated!.id,
+        command,
+        tx,
+      );
       for (const input of [...command.workOrders].sort(
         (left, right) => left.sequence - right.sequence,
       )) {
@@ -260,12 +336,151 @@ export class ProductionCommandService {
       }
       await this.recordOrderEvent(
         'production.order.released',
-        updated!,
+        {
+          ...updated!,
+          metadata: {
+            ...this.metadataObject(updated!.metadata),
+            componentInstancesCreated: createdInstances.created,
+            componentInstancesTotal: createdInstances.total,
+          },
+        },
         command,
         tx,
       );
       return updated;
     });
+  }
+
+  private async createPlannedComponentInstances(
+    productionOrderId: string,
+    command: ProductionCommandContext,
+    tx: Tx,
+  ) {
+    const order = await this.repository.findReleaseLineage(productionOrderId, tx);
+    if (!order?.componentRequirementId) {
+      return { created: 0, total: 0 };
+    }
+    if (
+      !order.componentId ||
+      !order.componentRevisionId ||
+      !order.componentRequirement ||
+      !order.component
+    ) {
+      throw new BadRequestException(
+        'Component requirement Production Order is missing Component lineage',
+      );
+    }
+    if (!Number.isInteger(order.quantity) || order.quantity <= 0) {
+      throw new BadRequestException(
+        'Component requirement Production Order quantity must be a positive integer',
+      );
+    }
+    if (order.componentRequirement.componentId !== order.componentId) {
+      throw new BadRequestException(
+        'Production Order requirement does not match Component lineage',
+      );
+    }
+    if (
+      order.componentRequirement.projectId &&
+      order.projectId &&
+      order.componentRequirement.projectId !== order.projectId
+    ) {
+      throw new BadRequestException(
+        'Production Order Project does not match Component requirement Project',
+      );
+    }
+    if (
+      order.componentRequirement.componentRevisionId &&
+      order.componentRequirement.componentRevisionId !== order.componentRevisionId
+    ) {
+      throw new BadRequestException(
+        'Production Order revision does not match Component requirement revision',
+      );
+    }
+    if (
+      order.componentRequirement.bomDefinitionId &&
+      order.componentRequirement.bomDefinitionId !== order.bomDefinitionId
+    ) {
+      throw new BadRequestException(
+        'Production Order BOM definition does not match Component requirement BOM',
+      );
+    }
+    if (
+      !order.bom ||
+      order.bom.componentId !== order.componentId ||
+      order.bom.componentRevisionId !== order.componentRevisionId ||
+      order.bom.bomDefinitionId !== order.bomDefinitionId ||
+      order.bom.source !== 'ENGINEERING'
+    ) {
+      throw new BadRequestException(
+        'Released Production Order requires valid materialized Engineering BOM lineage',
+      );
+    }
+    const existingSequences = new Set(
+      order.componentInstances
+        .map((instance) => instance.serialSequence)
+        .filter((value): value is number => typeof value === 'number'),
+    );
+    const quantity = Math.trunc(order.quantity);
+    if (existingSequences.size > quantity) {
+      throw new ConflictException(
+        'Production Order already has more ComponentInstances than its quantity',
+      );
+    }
+    const missingSequences = Array.from({ length: quantity }, (_, index) => index + 1)
+      .filter((sequence) => !existingSequences.has(sequence));
+    const now = new Date();
+    const metadata = this.json({
+      source: 'production.release',
+      idempotencyKey: command.idempotencyKey,
+      createdBy: command.actorId,
+    });
+    const componentCode = this.sanitizeInstanceCodePart(order.component.code);
+    const orderNo = this.sanitizeInstanceCodePart(order.orderNo);
+    await this.repository.createComponentInstances(
+      missingSequences.map((sequence) => ({
+        instanceNo: `${componentCode}-${orderNo}-${String(sequence).padStart(3, '0')}`,
+        componentId: order.componentId!,
+        componentRevisionId: order.componentRevisionId!,
+        bomDefinitionId: order.bomDefinitionId,
+        productionOrderId: order.id,
+        requirementId: order.componentRequirementId,
+        projectId: order.componentRequirement.projectId,
+        projectTaskId: order.componentRequirement.projectTaskId,
+        state: ComponentInstanceState.PLANNED,
+        serialSequence: sequence,
+        metadata,
+        createdAt: now,
+        updatedAt: now,
+      })),
+      tx,
+    );
+    const refreshed = await this.repository.findReleaseLineage(order.id, tx);
+    const createdInstances =
+      refreshed?.componentInstances.filter((instance) =>
+        missingSequences.includes(instance.serialSequence ?? -1),
+      ) ?? [];
+    await this.repository.createComponentInstanceTimelines(
+      createdInstances.map((instance) => ({
+        componentInstanceId: instance.id,
+        eventType: 'component.instance.planned',
+        sourceModule: 'production',
+        sourceId: order.id,
+        occurredAt: now,
+        metadata: this.json({
+          productionOrderId: order.id,
+          componentRequirementId: order.componentRequirementId,
+          componentRevisionId: order.componentRevisionId,
+          bomDefinitionId: order.bomDefinitionId,
+          state: ComponentInstanceState.PLANNED,
+        }),
+      })),
+      tx,
+    );
+    return {
+      created: createdInstances.length,
+      total: refreshed?.componentInstances.length ?? order.componentInstances.length,
+    };
   }
 
   readyOrder(command: ReadyProductionOrderCommand) {
@@ -1561,6 +1776,7 @@ export class ProductionCommandService {
         quantity: order.quantity,
         unit: this.orderUnit(order),
         componentId: order.componentId,
+        componentRequirementId: order.componentRequirementId,
         componentRevisionId: order.componentRevisionId,
         bomDefinitionId: order.bomDefinitionId,
         lifecycleAt: new Date().toISOString(),
@@ -2046,6 +2262,20 @@ export class ProductionCommandService {
     return metadata?.unit ?? 'unit';
   }
 
+  private metadataObject(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return value as Record<string, unknown>;
+  }
+
+  private sanitizeInstanceCodePart(value: string) {
+    return value
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
   private assertVersion(value: unknown, aggregate: string): asserts value {
     if (!value) throw new ConflictException(`${aggregate} version conflict`);
   }
@@ -2116,6 +2346,7 @@ type OrderLike = Pick<
   | 'status'
   | 'aggregateVersion'
   | 'componentId'
+  | 'componentRequirementId'
   | 'componentRevisionId'
   | 'bomDefinitionId'
   | 'quantity'

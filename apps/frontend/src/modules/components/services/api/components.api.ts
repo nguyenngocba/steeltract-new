@@ -4,7 +4,9 @@ import type {
   ComponentCostingBreakdown,
   ComponentCostingRecord,
   ComponentRecord,
+  ComponentDefinitionRequirementResult,
   CreateComponentPayload,
+  CreateComponentDefinitionRequirementPayload,
   CreateProductionOrderPayload,
   ProductionOrderRecord,
   ComponentsHistoryReadModel,
@@ -62,6 +64,17 @@ export async function getComponentsHistory(params: {
 
 export async function createComponent(payload: CreateComponentPayload) {
   const response = await api.post<ComponentRecord>("/components", payload);
+
+  return response.data;
+}
+
+export async function createComponentDefinitionRequirement(
+  payload: CreateComponentDefinitionRequirementPayload,
+) {
+  const response = await api.post<ComponentDefinitionRequirementResult>(
+    "/components/foundation/definition-requirements",
+    payload,
+  );
 
   return response.data;
 }

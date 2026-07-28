@@ -121,6 +121,35 @@ export interface CreateComponentPayload {
   projectId?: string;
 }
 
+export interface CreateComponentDefinitionRequirementPayload {
+  name: string;
+  componentType: string;
+  profile?: string;
+  description?: string;
+  projectId: string;
+  requiredQuantity: number;
+  requiredBy?: string;
+  note?: string;
+}
+
+export interface ComponentDefinitionRequirementResult {
+  component: ComponentRecord & {
+    componentType?: string | null;
+    profile?: string | null;
+    lifecycleState?: "DRAFT" | "ACTIVE" | "DEPRECATED" | "ARCHIVED" | null;
+  };
+  requirement: {
+    id: string;
+    requirementNo: string;
+    projectId: string;
+    componentId: string;
+    requiredQuantity: number;
+    requiredBy?: string | null;
+    status: string;
+    project?: ProjectReference;
+  };
+}
+
 export interface CreateProductionOrderPayload {
   orderNo: string;
   title: string;

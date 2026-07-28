@@ -1,5 +1,11 @@
 import { ConflictException } from '@nestjs/common';
-import { NcrStatus, QcInspectionStatus, QcIssueSeverity } from '@prisma/client';
+import {
+  ComponentInstanceState,
+  NcrStatus,
+  QcChecklistType,
+  QcInspectionStatus,
+  QcIssueSeverity,
+} from '@prisma/client';
 
 import { QcRepository } from '../repositories/qc.repository';
 import { QcCommandService } from './qc-command.service';
@@ -16,6 +22,7 @@ describe('QcCommandService', () => {
       completedAt: null,
       inspectorId: 'inspector-1',
       productionOrderId: 'order-1',
+      componentInstanceId: null,
       componentId: null,
       projectId: null,
       metadata: { aggregateVersion: 0 },
@@ -38,6 +45,9 @@ describe('QcCommandService', () => {
       updateInspectionVersioned: jest.fn().mockResolvedValue(updated),
       createActivityLog: jest.fn().mockResolvedValue({ id: 'activity-1' }),
       createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+      findComponentInstanceById: jest.fn(),
+      updateComponentInstanceState: jest.fn(),
+      createComponentInstanceTimelineIfMissing: jest.fn(),
     } as unknown as QcRepository;
     const service = new QcCommandService(repository);
 
@@ -143,6 +153,9 @@ describe('QcCommandService', () => {
       updateNcrVersioned: jest.fn().mockResolvedValue(updated),
       createActivityLog: jest.fn().mockResolvedValue({ id: 'activity-1' }),
       createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+      findComponentInstanceById: jest.fn(),
+      updateComponentInstanceState: jest.fn(),
+      createComponentInstanceTimelineIfMissing: jest.fn(),
     } as unknown as QcRepository;
     const service = new QcCommandService(repository);
 
@@ -195,6 +208,133 @@ describe('QcCommandService', () => {
     expect(repository.createNcr).toHaveBeenCalled();
     expect(repository.createOutboxEvent).toHaveBeenCalledWith(
       expect.objectContaining({ eventName: 'qc.ncr.created' }),
+      tx,
+    );
+  });
+
+  it('keeps component instance lineage on NCR disposition events', async () => {
+    const ncr = {
+      id: 'ncr-1',
+      ncrNo: 'NCR-001',
+      status: NcrStatus.OPEN,
+      disposition: null,
+      componentInstanceId: 'instance-1',
+      componentId: 'component-1',
+      productionOrderId: 'order-1',
+      metadata: { aggregateVersion: 0 },
+      updatedAt,
+    };
+    const updated = {
+      ...ncr,
+      status: NcrStatus.REWORK_REQUIRED,
+      disposition: 'REWORK',
+      metadata: { aggregateVersion: 1 },
+    };
+    const repository = {
+      transaction: jest.fn((callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findNcrById: jest.fn().mockResolvedValue(ncr),
+      updateNcrVersioned: jest.fn().mockResolvedValue(updated),
+      createActivityLog: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+      findComponentInstanceById: jest.fn().mockResolvedValue({
+        id: 'instance-1',
+        state: ComponentInstanceState.QC_FAILED,
+        scrappedAt: null,
+        qcPassedAt: null,
+      }),
+      updateComponentInstanceState: jest.fn().mockResolvedValue({}),
+      createComponentInstanceTimelineIfMissing: jest.fn().mockResolvedValue({}),
+    } as unknown as QcRepository;
+    const service = new QcCommandService(repository);
+
+    await service.requestRework({
+      ncrId: ncr.id,
+      dispositionId: 'disposition-1',
+      reason: 'Weld correction required',
+      expectedVersion: 0,
+      idempotencyKey: 'qc-disposition-instance',
+      actorId: 'operator-1',
+    });
+
+    expect(repository.createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'qc.disposition.completed',
+        payload: expect.objectContaining({
+          componentInstanceId: 'instance-1',
+          componentId: 'component-1',
+          productionOrderId: 'order-1',
+        }),
+      }),
+      tx,
+    );
+    expect(repository.updateComponentInstanceState).toHaveBeenCalledWith(
+      'instance-1',
+      { state: ComponentInstanceState.REWORK },
+      tx,
+      [
+        ComponentInstanceState.QC_FAILED,
+        ComponentInstanceState.PRODUCED_WAITING_QC,
+      ],
+    );
+  });
+
+  it('moves final accepted ComponentInstance inspection to QC_PASSED', async () => {
+    const current = {
+      ...inspection(),
+      componentInstanceId: 'instance-1',
+      checklistId: 'checklist-final',
+      checklist: { id: 'checklist-final', type: QcChecklistType.FINAL },
+    };
+    const updated = {
+      ...current,
+      status: QcInspectionStatus.PASSED,
+      completedAt: new Date('2026-07-17T02:00:00.000Z'),
+      metadata: { aggregateVersion: 1 },
+    };
+    const repository = {
+      transaction: jest.fn((callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findInspectionById: jest.fn().mockResolvedValue(current),
+      updateInspectionVersioned: jest.fn().mockResolvedValue(updated),
+      findComponentInstanceById: jest.fn().mockResolvedValue({
+        id: 'instance-1',
+        state: ComponentInstanceState.PRODUCED_WAITING_QC,
+        qcPassedAt: null,
+      }),
+      updateComponentInstanceState: jest.fn().mockResolvedValue({
+        id: 'instance-1',
+        state: ComponentInstanceState.QC_PASSED,
+      }),
+      createComponentInstanceTimelineIfMissing: jest.fn().mockResolvedValue({}),
+      createActivityLog: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+    } as unknown as QcRepository;
+    const service = new QcCommandService(repository);
+
+    await service.acceptInspection({
+      inspectionId: current.id,
+      expectedVersion: 0,
+      idempotencyKey: 'qc-final-pass',
+      actorId: 'operator-1',
+    });
+
+    expect(repository.updateComponentInstanceState).toHaveBeenCalledWith(
+      'instance-1',
+      expect.objectContaining({
+        state: ComponentInstanceState.QC_PASSED,
+        qcPassedAt: expect.any(Date),
+      }),
+      tx,
+      [ComponentInstanceState.PRODUCED_WAITING_QC],
+    );
+    expect(
+      repository.createComponentInstanceTimelineIfMissing,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentInstanceId: 'instance-1',
+        eventType: 'QC_FINAL_PASSED',
+      }),
       tx,
     );
   });

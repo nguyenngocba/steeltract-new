@@ -1,4 +1,5 @@
-import { QcInspectionStatus } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
+import { NcrStatus, QcInspectionStatus, QcIssueSeverity } from '@prisma/client';
 
 import { QcService } from './qc.service';
 
@@ -104,6 +105,158 @@ describe('QcService repository and Outbox boundary', () => {
           aggregateId: 'inspection-1',
           orderingKey: 'qc-inspection:inspection-1',
         }),
+      }),
+      tx,
+    );
+  });
+
+  it('creates canonical instance-level inspection without fabricating stock or instances', async () => {
+    const tx = { marker: 'qc-tx' };
+    const instance = {
+      id: 'instance-1',
+      componentId: 'component-1',
+      productionOrderId: 'order-1',
+      requirementId: 'requirement-1',
+      projectId: 'project-1',
+    };
+    const created = {
+      id: 'inspection-1',
+      inspectionNo: 'QC-001',
+      componentInstanceId: instance.id,
+      componentId: instance.componentId,
+      productionOrderId: instance.productionOrderId,
+      projectId: instance.projectId,
+      status: QcInspectionStatus.READY,
+    };
+    const repository = {
+      transaction: jest.fn((callback) => callback(tx)),
+      findComponentInstanceById: jest.fn().mockResolvedValue(instance),
+      nextInspectionNo: jest.fn().mockResolvedValue(created.inspectionNo),
+      createInspection: jest.fn().mockResolvedValue(created),
+      findInspectionById: jest.fn().mockResolvedValue(created),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+    };
+    const service = new QcService(
+      repository as never,
+      {} as never,
+      { link: jest.fn() } as never,
+      {} as never,
+    );
+
+    const result = await service.createInspection({
+      componentInstanceId: instance.id,
+      componentId: instance.componentId,
+      productionOrderId: instance.productionOrderId,
+      status: QcInspectionStatus.READY,
+      attachmentIds: [],
+    });
+
+    expect(result).toBe(created);
+    expect(repository.createInspection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentInstance: { connect: { id: instance.id } },
+        componentId: instance.componentId,
+        productionOrderId: instance.productionOrderId,
+        projectId: instance.projectId,
+      }),
+      tx,
+    );
+    expect(repository.createInspection).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects component instance and component mismatch before writing inspection', async () => {
+    const tx = { marker: 'qc-tx' };
+    const repository = {
+      transaction: jest.fn((callback) => callback(tx)),
+      findComponentInstanceById: jest.fn().mockResolvedValue({
+        id: 'instance-1',
+        componentId: 'component-1',
+        productionOrderId: 'order-1',
+        requirementId: 'requirement-1',
+        projectId: 'project-1',
+      }),
+      createInspection: jest.fn(),
+    };
+    const service = new QcService(
+      repository as never,
+      {} as never,
+      { link: jest.fn() } as never,
+      {} as never,
+    );
+
+    await expect(
+      service.createInspection({
+        componentInstanceId: 'instance-1',
+        componentId: 'component-2',
+        status: QcInspectionStatus.READY,
+        attachmentIds: [],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.createInspection).not.toHaveBeenCalled();
+  });
+
+  it('preserves component instance lineage when creating NCR from an inspection', async () => {
+    const tx = { marker: 'qc-tx' };
+    const inspection = {
+      id: 'inspection-1',
+      inspectionNo: 'QC-001',
+      componentInstanceId: 'instance-1',
+      componentId: 'component-1',
+      productionOrderId: 'order-1',
+      projectId: 'project-1',
+      status: QcInspectionStatus.FAILED,
+      metadata: null,
+    };
+    const instance = {
+      id: 'instance-1',
+      componentId: 'component-1',
+      productionOrderId: 'order-1',
+      requirementId: 'requirement-1',
+      projectId: 'project-1',
+    };
+    const ncr = {
+      id: 'ncr-1',
+      ncrNo: 'NCR-001',
+      componentInstanceId: instance.id,
+      componentId: instance.componentId,
+      productionOrderId: instance.productionOrderId,
+      status: NcrStatus.OPEN,
+      severity: QcIssueSeverity.HIGH,
+      createdAt: new Date('2026-07-27T08:00:00.000Z'),
+    };
+    const repository = {
+      transaction: jest.fn((callback) => callback(tx)),
+      findInspectionById: jest.fn().mockResolvedValue(inspection),
+      findComponentInstanceById: jest.fn().mockResolvedValue(instance),
+      nextNcrNo: jest.fn().mockResolvedValue(ncr.ncrNo),
+      createNcr: jest.fn().mockResolvedValue(ncr),
+      updateInspection: jest.fn().mockResolvedValue({
+        ...inspection,
+        status: QcInspectionStatus.REWORK_REQUIRED,
+      }),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+    };
+    const service = new QcService(
+      repository as never,
+      {} as never,
+      { link: jest.fn() } as never,
+      {} as never,
+    );
+
+    await service.createNcr(inspection.id, {
+      title: 'Weld defect',
+      severity: QcIssueSeverity.HIGH,
+      status: NcrStatus.OPEN,
+      attachmentIds: [],
+    });
+
+    expect(repository.createNcr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentInstance: { connect: { id: instance.id } },
+        componentId: instance.componentId,
+        productionOrderId: instance.productionOrderId,
       }),
       tx,
     );

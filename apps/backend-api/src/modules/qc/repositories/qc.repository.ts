@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
+import { ComponentInstanceState, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { nextOperationalCode } from '../../../common/utils/code-generator';
@@ -113,6 +113,7 @@ export class QcRepository {
     status?: Prisma.EnumQcInspectionStatusFilter['equals'];
     productionOrderId?: string;
     productionStageId?: string;
+    componentInstanceId?: string;
     componentId?: string;
     projectId?: string;
     inspectorId?: string;
@@ -133,6 +134,7 @@ export class QcRepository {
     status?: Prisma.EnumQcInspectionStatusFilter['equals'];
     productionOrderId?: string;
     productionStageId?: string;
+    componentInstanceId?: string;
     componentId?: string;
     projectId?: string;
     inspectorId?: string;
@@ -203,6 +205,7 @@ export class QcRepository {
     status?: Prisma.EnumNcrStatusFilter['equals'];
     severity?: Prisma.EnumQcIssueSeverityFilter['equals'];
     productionOrderId?: string;
+    componentInstanceId?: string;
     componentId?: string;
     skip?: number;
     take?: number;
@@ -221,11 +224,62 @@ export class QcRepository {
     status?: Prisma.EnumNcrStatusFilter['equals'];
     severity?: Prisma.EnumQcIssueSeverityFilter['equals'];
     productionOrderId?: string;
+    componentInstanceId?: string;
     componentId?: string;
   }) {
     return this.prisma.nonConformanceReport.count({
       where: this.ncrWhere(params),
     });
+  }
+
+  findComponentInstanceById(id: string, tx: QcTx = this.prisma) {
+    return tx.componentInstance.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        state: true,
+        componentId: true,
+        productionOrderId: true,
+        requirementId: true,
+        projectId: true,
+        producedAt: true,
+        qcPassedAt: true,
+        scrappedAt: true,
+      },
+    });
+  }
+
+  async updateComponentInstanceState(
+    id: string,
+    data: Prisma.ComponentInstanceUpdateManyMutationInput,
+    tx: QcTx,
+    allowedStates?: ComponentInstanceState[],
+  ) {
+    const result = await tx.componentInstance.updateMany({
+      where: {
+        id,
+        state: allowedStates?.length ? { in: allowedStates } : undefined,
+      },
+      data,
+    });
+    return result.count === 1 ? this.findComponentInstanceById(id, tx) : null;
+  }
+
+  async createComponentInstanceTimelineIfMissing(
+    data: Prisma.ComponentInstanceTimelineCreateManyInput,
+    tx: QcTx,
+  ) {
+    const existing = await tx.componentInstanceTimeline.findFirst({
+      where: {
+        componentInstanceId: data.componentInstanceId,
+        eventType: data.eventType,
+        sourceModule: data.sourceModule,
+        sourceId: data.sourceId,
+      },
+      select: { id: true },
+    });
+    if (existing) return existing;
+    return tx.componentInstanceTimeline.create({ data });
   }
 
   metrics() {
@@ -309,6 +363,7 @@ export class QcRepository {
       checklist: {
         include: this.checklistInclude(),
       },
+      componentInstance: true,
       results: {
         include: {
           checklistItem: true,
@@ -352,6 +407,7 @@ export class QcRepository {
     return {
       inspection: true,
       issue: true,
+      componentInstance: true,
       attachments: {
         include: {
           attachment: true,
@@ -383,6 +439,7 @@ export class QcRepository {
     status?: Prisma.EnumQcInspectionStatusFilter['equals'];
     productionOrderId?: string;
     productionStageId?: string;
+    componentInstanceId?: string;
     componentId?: string;
     projectId?: string;
     inspectorId?: string;
@@ -391,6 +448,7 @@ export class QcRepository {
       status: params.status,
       productionOrderId: params.productionOrderId,
       productionStageId: params.productionStageId,
+      componentInstanceId: params.componentInstanceId,
       componentId: params.componentId,
       projectId: params.projectId,
       inspectorId: params.inspectorId,
@@ -398,6 +456,12 @@ export class QcRepository {
         ? [
             { inspectionNo: { contains: params.search, mode: 'insensitive' } },
             { componentId: { contains: params.search, mode: 'insensitive' } },
+            {
+              componentInstanceId: {
+                contains: params.search,
+                mode: 'insensitive',
+              },
+            },
             {
               productionOrderId: {
                 contains: params.search,
@@ -414,12 +478,14 @@ export class QcRepository {
     status?: Prisma.EnumNcrStatusFilter['equals'];
     severity?: Prisma.EnumQcIssueSeverityFilter['equals'];
     productionOrderId?: string;
+    componentInstanceId?: string;
     componentId?: string;
   }): Prisma.NonConformanceReportWhereInput {
     return {
       status: params.status,
       severity: params.severity,
       productionOrderId: params.productionOrderId,
+      componentInstanceId: params.componentInstanceId,
       componentId: params.componentId,
       OR: params.search
         ? [

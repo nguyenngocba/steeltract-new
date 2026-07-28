@@ -6,7 +6,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { NcrStatus, Prisma, QcInspectionStatus } from '@prisma/client';
+import {
+  ComponentInstanceState,
+  NcrStatus,
+  Prisma,
+  QcChecklistType,
+  QcInspectionStatus,
+} from '@prisma/client';
 
 import {
   CompleteQcDispositionCommand,
@@ -69,6 +75,12 @@ export class QcCommandService {
         tx,
       );
       if (!updated) this.stale('QcInspection');
+      await this.applyFinalInspectionDecision(
+        inspection,
+        status,
+        completedAt,
+        tx,
+      );
 
       await this.recordEvent(
         'qc.inspection.completed',
@@ -79,6 +91,9 @@ export class QcCommandService {
           inspectionId: inspection.id,
           ...this.inspectionSubject(inspection),
           result: status,
+          componentInstanceId: inspection.componentInstanceId ?? null,
+          componentId: inspection.componentId ?? null,
+          productionOrderId: inspection.productionOrderId ?? null,
           ncrId: null,
           inspectorId: inspection.inspectorId ?? command.actorId ?? null,
           completedAt: completedAt.toISOString(),
@@ -109,6 +124,9 @@ export class QcCommandService {
             ? { connect: { id: command.issueId } }
             : undefined,
           productionOrderId: inspection.productionOrderId,
+          componentInstance: inspection.componentInstanceId
+            ? { connect: { id: inspection.componentInstanceId } }
+            : undefined,
           componentId: inspection.componentId,
           status: NcrStatus.OPEN,
           severity: command.severity,
@@ -149,6 +167,9 @@ export class QcCommandService {
           ncrId: created.id,
           ...this.inspectionSubject(inspection),
           inspectionId: inspection.id,
+          componentInstanceId: inspection.componentInstanceId ?? null,
+          componentId: inspection.componentId ?? null,
+          productionOrderId: inspection.productionOrderId ?? null,
           defectCode: command.defectCode ?? null,
           reasonCode: command.reasonCode ?? null,
           severity: created.severity,
@@ -219,6 +240,7 @@ export class QcCommandService {
         tx,
       );
       if (!updated) this.stale('QcNcr');
+      await this.applyDispositionDecision(ncr, command, completedAt, tx);
 
       await this.recordEvent(
         'qc.disposition.completed',
@@ -229,6 +251,9 @@ export class QcCommandService {
           ncrId: ncr.id,
           dispositionId: command.dispositionId,
           dispositionType: command.dispositionType,
+          componentInstanceId: ncr.componentInstanceId ?? null,
+          componentId: ncr.componentId ?? null,
+          productionOrderId: ncr.productionOrderId ?? null,
           approvedQuantity: command.approvedQuantity ?? null,
           unit: command.unit ?? null,
           decisionActorId: command.actorId ?? null,
@@ -240,6 +265,194 @@ export class QcCommandService {
       );
       return updated!;
     });
+  }
+
+  private async applyFinalInspectionDecision(
+    inspection: Awaited<ReturnType<QcRepository['findInspectionById']>>,
+    status: QcInspectionStatus,
+    completedAt: Date,
+    tx: QcTx,
+  ) {
+    if (!inspection?.componentInstanceId) return;
+    if (inspection.checklist?.type !== QcChecklistType.FINAL) return;
+
+    const instance = await this.repository.findComponentInstanceById(
+      inspection.componentInstanceId,
+      tx,
+    );
+    if (!instance) {
+      throw new NotFoundException('ComponentInstance not found for final QC');
+    }
+    if (instance.state !== ComponentInstanceState.PRODUCED_WAITING_QC) {
+      throw new BadRequestException(
+        `Final QC cannot complete for ComponentInstance in ${instance.state}`,
+      );
+    }
+
+    if (
+      status === QcInspectionStatus.PASSED ||
+      status === QcInspectionStatus.APPROVED
+    ) {
+      await this.repository.updateComponentInstanceState(
+        instance.id,
+        {
+          state: ComponentInstanceState.QC_PASSED,
+          qcPassedAt: instance.qcPassedAt ?? completedAt,
+        },
+        tx,
+        [ComponentInstanceState.PRODUCED_WAITING_QC],
+      );
+      await this.repository.createComponentInstanceTimelineIfMissing(
+        {
+          componentInstanceId: instance.id,
+          eventType: 'QC_FINAL_PASSED',
+          sourceModule: 'QC',
+          sourceId: inspection.id,
+          occurredAt: completedAt,
+          metadata: {
+            inspectionId: inspection.id,
+            checklistId: inspection.checklistId,
+            productionOrderId: inspection.productionOrderId,
+          } as Prisma.InputJsonObject,
+        },
+        tx,
+      );
+      return;
+    }
+
+    if (
+      status === QcInspectionStatus.FAILED ||
+      status === QcInspectionStatus.REJECTED
+    ) {
+      await this.repository.updateComponentInstanceState(
+        instance.id,
+        { state: ComponentInstanceState.QC_FAILED },
+        tx,
+        [ComponentInstanceState.PRODUCED_WAITING_QC],
+      );
+      await this.repository.createComponentInstanceTimelineIfMissing(
+        {
+          componentInstanceId: instance.id,
+          eventType: 'QC_FINAL_FAILED',
+          sourceModule: 'QC',
+          sourceId: inspection.id,
+          occurredAt: completedAt,
+          metadata: {
+            inspectionId: inspection.id,
+            checklistId: inspection.checklistId,
+            productionOrderId: inspection.productionOrderId,
+          } as Prisma.InputJsonObject,
+        },
+        tx,
+      );
+    }
+  }
+
+  private async applyDispositionDecision(
+    ncr: Awaited<ReturnType<QcRepository['findNcrById']>>,
+    command: CompleteQcDispositionCommand,
+    completedAt: Date,
+    tx: QcTx,
+  ) {
+    if (!ncr?.componentInstanceId) return;
+    const instance = await this.repository.findComponentInstanceById(
+      ncr.componentInstanceId,
+      tx,
+    );
+    if (!instance) {
+      throw new NotFoundException('ComponentInstance not found for QC NCR');
+    }
+
+    if (command.dispositionType === 'REWORK') {
+      await this.repository.updateComponentInstanceState(
+        instance.id,
+        { state: ComponentInstanceState.REWORK },
+        tx,
+        [
+          ComponentInstanceState.QC_FAILED,
+          ComponentInstanceState.PRODUCED_WAITING_QC,
+        ],
+      );
+      await this.repository.createComponentInstanceTimelineIfMissing(
+        {
+          componentInstanceId: instance.id,
+          eventType: 'QC_REWORK_REQUIRED',
+          sourceModule: 'QC',
+          sourceId: ncr.id,
+          occurredAt: completedAt,
+          metadata: {
+            ncrId: ncr.id,
+            dispositionType: command.dispositionType,
+            reason: command.reason ?? null,
+          } as Prisma.InputJsonObject,
+        },
+        tx,
+      );
+      return;
+    }
+
+    if (command.dispositionType === 'SCRAP_RECOMMENDATION') {
+      await this.repository.updateComponentInstanceState(
+        instance.id,
+        {
+          state: ComponentInstanceState.SCRAPPED,
+          scrappedAt: instance.scrappedAt ?? completedAt,
+        },
+        tx,
+        [
+          ComponentInstanceState.QC_FAILED,
+          ComponentInstanceState.PRODUCED_WAITING_QC,
+          ComponentInstanceState.REWORK,
+        ],
+      );
+      await this.repository.createComponentInstanceTimelineIfMissing(
+        {
+          componentInstanceId: instance.id,
+          eventType: 'QC_SCRAP_RECOMMENDED',
+          sourceModule: 'QC',
+          sourceId: ncr.id,
+          occurredAt: completedAt,
+          metadata: {
+            ncrId: ncr.id,
+            dispositionType: command.dispositionType,
+            reason: command.reason ?? null,
+          } as Prisma.InputJsonObject,
+        },
+        tx,
+      );
+      return;
+    }
+
+    if (command.dispositionType === 'ACCEPT') {
+      await this.repository.updateComponentInstanceState(
+        instance.id,
+        {
+          state: ComponentInstanceState.USE_AS_IS,
+          qcPassedAt: instance.qcPassedAt ?? completedAt,
+        },
+        tx,
+        [
+          ComponentInstanceState.QC_FAILED,
+          ComponentInstanceState.PRODUCED_WAITING_QC,
+          ComponentInstanceState.REWORK,
+        ],
+      );
+      await this.repository.createComponentInstanceTimelineIfMissing(
+        {
+          componentInstanceId: instance.id,
+          eventType: 'QC_USE_AS_IS_ACCEPTED',
+          sourceModule: 'QC',
+          sourceId: ncr.id,
+          occurredAt: completedAt,
+          metadata: {
+            ncrId: ncr.id,
+            dispositionType: command.dispositionType,
+            reason: command.reason ?? null,
+          } as Prisma.InputJsonObject,
+        },
+        tx,
+      );
+    }
   }
 
   private async recordEvent(
@@ -423,10 +636,17 @@ export class QcCommandService {
 
   private inspectionSubject(inspection: {
     id: string;
+    componentInstanceId?: string | null;
     productionOrderId: string | null;
     componentId: string | null;
     projectId: string | null;
   }) {
+    if (inspection.componentInstanceId) {
+      return {
+        subjectType: 'COMPONENT_INSTANCE',
+        subjectId: inspection.componentInstanceId,
+      };
+    }
     if (inspection.productionOrderId) {
       return {
         subjectType: 'PRODUCTION_ORDER',

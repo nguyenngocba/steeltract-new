@@ -21,6 +21,7 @@ export const createProductionOrderCommandSchema = z
     title: z.string().min(1),
     description: z.string().optional(),
     projectId: z.string().optional(),
+    componentRequirementId: z.string().min(1).optional(),
     quantity: quantitySchema,
     unit: z.string().min(1),
     orderKind: z.nativeEnum(ProductionOrderKind).optional(),
@@ -110,6 +111,13 @@ export const recordProductionCompletionCommandSchema = z
     scrapQty: nonnegativeQuantitySchema,
     remainingQty: nonnegativeQuantitySchema,
     evidence: z.unknown().optional(),
+  })
+  .strict();
+
+export const assignComponentInstanceExecutionSchema = z
+  .object({
+    productionExecutionId: z.string().min(1),
+    componentInstanceIds: z.array(z.string().min(1)).min(1),
   })
   .strict();
 
@@ -214,6 +222,9 @@ export type PauseWorkOrderCommandDto = z.infer<
 >;
 export type RecordProductionCompletionCommandDto = z.infer<
   typeof recordProductionCompletionCommandSchema
+>;
+export type AssignComponentInstanceExecutionDto = z.infer<
+  typeof assignComponentInstanceExecutionSchema
 >;
 export type ReverseProductionCompletionCommandDto = z.infer<
   typeof reverseProductionCompletionCommandSchema

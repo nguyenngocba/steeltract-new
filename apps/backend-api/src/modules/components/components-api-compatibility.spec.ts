@@ -2,6 +2,7 @@ import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 import { ComponentCommandController } from './component-command.controller';
+import { ComponentDomainFoundationController } from './component-domain-foundation.controller';
 import { ComponentsController } from './components.controller';
 
 describe('Components API compatibility', () => {
@@ -28,5 +29,21 @@ describe('Components API compatibility', () => {
         ComponentCommandController.prototype.releaseRevision,
       ),
     ).toBe(':componentId/revisions/:revisionId/release');
+
+    expect(
+      Reflect.getMetadata(PATH_METADATA, ComponentDomainFoundationController),
+    ).toBe('components/foundation');
+    expect(
+      Reflect.getMetadata(
+        PATH_METADATA,
+        ComponentDomainFoundationController.prototype.createRequirement,
+      ),
+    ).toBe('requirements');
+    expect(
+      Reflect.getMetadata(
+        METHOD_METADATA,
+        ComponentDomainFoundationController.prototype.createInstance,
+      ),
+    ).toBe(RequestMethod.POST);
   });
 });

@@ -58,6 +58,8 @@ export function ComponentsActionProvider({ children }: { children: ReactNode }) 
     profile: '',
     projectId: '',
     qty: '1',
+    requiredBy: '',
+    note: '',
   })
 
   function openCreateComponent() {
@@ -83,26 +85,38 @@ export function ComponentsActionProvider({ children }: { children: ReactNode }) 
   }
 
   function submitCreate() {
-    if (!createForm.name.trim()) return
-    const code = `CPL-${Date.now().toString().slice(-4)}`
-    const metadata = {
-      type: createForm.type,
-      profile: createForm.profile || 'N/A',
-      quantity: Number(createForm.qty || 1),
-      qcQuantity: 0,
+    const requiredQuantity = Number(createForm.qty || 0)
+    if (!createForm.name.trim()) {
+      toast.error('Nhập tên cấu kiện')
+      return
+    }
+    if (!createForm.projectId) {
+      toast.error('Chọn công trình / dự án')
+      return
+    }
+    if (!createForm.type.trim()) {
+      toast.error('Chọn loại cấu kiện')
+      return
+    }
+    if (!Number.isFinite(requiredQuantity) || requiredQuantity <= 0) {
+      toast.error('Số lượng yêu cầu phải lớn hơn 0')
+      return
     }
 
     createMutation.mutate(
       {
-        code,
         name: createForm.name.trim(),
-        description: JSON.stringify(metadata),
-        status: 'STOCK',
-        projectId: createForm.projectId || undefined,
-        floor: 'Kho cấu kiện',
+        componentType: createForm.type.trim(),
+        profile: createForm.profile.trim() || undefined,
+        projectId: createForm.projectId,
+        requiredQuantity,
+        requiredBy: createForm.requiredBy
+          ? new Date(createForm.requiredBy).toISOString()
+          : undefined,
+        note: createForm.note.trim() || undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
           setCreateOpen(false)
           setCreateForm({
             name: '',
@@ -110,8 +124,12 @@ export function ComponentsActionProvider({ children }: { children: ReactNode }) 
             profile: '',
             projectId: '',
             qty: '1',
+            requiredBy: '',
+            note: '',
           })
-          toast.success(`Đã tạo cấu kiện ${code}`)
+          toast.success(
+            `Đã tạo hồ sơ ${result.component.code} · Draft · yêu cầu ${requiredQuantity} cấu kiện`,
+          )
         },
         onError: () => {
           toast.error('Không thể tạo cấu kiện')
@@ -140,7 +158,7 @@ export function ComponentsActionProvider({ children }: { children: ReactNode }) 
           >
             <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
-                Tạo cấu kiện mới
+                Tạo hồ sơ cấu kiện
               </h3>
               <button
                 type="button"
@@ -150,49 +168,81 @@ export function ComponentsActionProvider({ children }: { children: ReactNode }) 
                 Đóng
               </button>
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-              <input
-                value={createForm.name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Tên cấu kiện"
-                className={`${inventoryInput} xl:col-span-2`}
-              />
-              <select
-                value={createForm.type}
-                onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))}
-                className={inventoryInput}
-              >
-                <option>Dầm (Beam)</option>
-                <option>Cột (Column)</option>
-                <option>Bản mã (Plate)</option>
-              </select>
-              <input
-                value={createForm.profile}
-                onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))}
-                placeholder="Profile/Kích thước"
-                className={inventoryInput}
-              />
-              <select
-                value={createForm.projectId}
-                onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value }))}
-                className={inventoryInput}
-              >
-                <option value="">Chọn dự án</option>
-                {projects.map((item: { id: string; code?: string; name: string }) => (
-                  <option key={item.id} value={item.id}>
-                    {item.code ?? item.name} - {item.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={createForm.qty}
-                onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))}
-                placeholder="Số lượng"
-                className={inventoryInput}
-              />
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Thông tin kỹ thuật
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  <input
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Tên cấu kiện *"
+                    className={`${inventoryInput} xl:col-span-2`}
+                  />
+                  <select
+                    value={createForm.type}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))}
+                    className={inventoryInput}
+                  >
+                    <option>Dầm (Beam)</option>
+                    <option>Cột (Column)</option>
+                    <option>Bản mã (Plate)</option>
+                  </select>
+                  <input
+                    value={createForm.profile}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))}
+                    placeholder="Profile / Kích thước"
+                    className={inventoryInput}
+                  />
+                  <input
+                    value="Mã cấu kiện tự động sinh"
+                    readOnly
+                    className={`${inventoryInput} text-slate-500`}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Yêu cầu công trình
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  <select
+                    value={createForm.projectId}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, projectId: e.target.value }))}
+                    className={inventoryInput}
+                  >
+                    <option value="">Công trình / Dự án *</option>
+                    {projects.map((item: { id: string; code?: string; name: string }) => (
+                      <option key={item.id} value={item.id}>
+                        {item.code ?? item.name} - {item.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={createForm.qty}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))}
+                    placeholder="Số lượng yêu cầu *"
+                    className={inventoryInput}
+                  />
+                  <input
+                    type="date"
+                    value={createForm.requiredBy}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, requiredBy: e.target.value }))}
+                    className={inventoryInput}
+                  />
+                  <input
+                    value={createForm.note}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, note: e.target.value }))}
+                    placeholder="Ghi chú"
+                    className={inventoryInput}
+                  />
+                </div>
+              </div>
             </div>
             <div className="mt-4 rounded-xl border border-cyan-900/40 bg-cyan-950/20 p-3 text-xs text-cyan-100">
-              Vật tư không khai báo tại đây. Sau khi tạo cấu kiện, tạo Production BOM riêng để quản lý định mức và routing sản xuất.
+              Hồ sơ mới ở trạng thái Draft. Số lượng là nhu cầu công trình, không tạo tồn kho, ComponentInstance hay lệnh sản xuất.
             </div>
             <div className="mt-4 flex justify-end gap-2 border-t border-white/10 pt-3">
               <button
@@ -207,7 +257,7 @@ export function ComponentsActionProvider({ children }: { children: ReactNode }) 
                 onClick={submitCreate}
                 className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition"
               >
-                Lưu cấu kiện
+                Tạo hồ sơ
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Headers,
   Param,
   Post,
@@ -15,6 +16,8 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthUser } from '../rbac/types/auth-user';
 import {
+  assignComponentInstanceExecutionSchema,
+  AssignComponentInstanceExecutionDto,
   acceptProductionReworkCommandSchema,
   AcceptProductionReworkCommandDto,
   closeProductionOrderCommandSchema,
@@ -52,13 +55,17 @@ import {
 } from './dto/production-command.dto';
 import { ProductionCommandContext } from './domain/production.commands';
 import { ProductionCommandService } from './services/production-command.service';
+import { ProductionInstanceExecutionService } from './services/production-instance-execution.service';
 
 type AuthenticatedRequest = Request & { user?: AuthUser };
 
 @UseGuards(JwtAuthGuard)
 @Controller('production/commands')
 export class ProductionCommandController {
-  constructor(private readonly commands: ProductionCommandService) {}
+  constructor(
+    private readonly commands: ProductionCommandService,
+    private readonly instanceExecutions: ProductionInstanceExecutionService,
+  ) {}
 
   @Post('orders')
   createOrder(
@@ -292,6 +299,38 @@ export class ProductionCommandController {
       ...body,
       ...this.context(request, idempotencyKey, correlationId, causationId),
     });
+  }
+
+  @Post('instance-executions/assign')
+  assignComponentInstancesToExecution(
+    @Body(new ZodValidationPipe(assignComponentInstanceExecutionSchema))
+    body: AssignComponentInstanceExecutionDto,
+  ) {
+    return this.instanceExecutions.assignInstancesToExecution(body);
+  }
+
+  @Post('instance-executions/:id/start')
+  startComponentInstanceExecution(@Param('id') id: string) {
+    return this.instanceExecutions.startInstanceExecution(id);
+  }
+
+  @Post('instance-executions/:id/complete')
+  completeComponentInstanceExecution(@Param('id') id: string) {
+    return this.instanceExecutions.completeInstanceExecution(id);
+  }
+
+  @Post('instance-executions/:id/cancel')
+  cancelComponentInstanceExecution(@Param('id') id: string) {
+    return this.instanceExecutions.cancelInstanceExecution(id);
+  }
+
+  @Get('component-instances/:componentInstanceId/executions')
+  getComponentInstanceExecutionHistory(
+    @Param('componentInstanceId') componentInstanceId: string,
+  ) {
+    return this.instanceExecutions.getInstanceExecutionHistory(
+      componentInstanceId,
+    );
   }
 
   @Post('completions/:completionId/reverse')

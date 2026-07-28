@@ -97,6 +97,18 @@ enum ProjectTaskComponentStatus {
   RETURNED
 }
 
+enum ProjectComponentRequirementStatus {
+  DRAFT
+  ENGINEERING_SELECTED
+  RELEASED
+  PRODUCTION_REQUESTED
+  IN_PRODUCTION
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+  LEGACY_UNKNOWN
+}
+
 enum DispatchOrderStatus {
   DRAFT
   PLANNED
@@ -145,6 +157,25 @@ enum ComponentLifecycleState {
   ACTIVE
   DEPRECATED
   ARCHIVED
+}
+
+enum ComponentInstanceState {
+  PLANNED
+  IN_PRODUCTION
+  PRODUCED_WAITING_QC
+  QC_PASSED
+  QC_FAILED
+  REWORK
+  SCRAPPED
+  USE_AS_IS
+  LEGACY_UNKNOWN
+}
+
+enum ComponentInstanceExecutionStatus {
+  ASSIGNED
+  RUNNING
+  COMPLETED
+  CANCELLED
 }
 
 enum ComponentRevisionState {
@@ -1237,6 +1268,8 @@ model Project {
   updatedAt DateTime @updatedAt
 
   components                 Component[]
+  componentRequirements      ProjectComponentRequirement[]
+  componentInstances         ComponentInstance[]
   inventoryTransactions      InventoryTransaction[]
   returnRequests             ReturnRequest[]
   dashboardSnapshot          ProjectDashboardSnapshot?
@@ -1287,6 +1320,10 @@ model Component {
   name String
 
   description String?
+
+  componentType String?
+
+  profile String?
 
   projectId String?
 
@@ -1342,6 +1379,9 @@ model Component {
   revisions       ComponentRevision[]        @relation("ComponentRevisions")
   releaseEvidence ComponentReleaseEvidence[]
   productionBoms  BOM[]                      @relation("ComponentProductionBoms")
+  requirements    ProjectComponentRequirement[] @relation("ComponentRequirements")
+  instances       ComponentInstance[]           @relation("ComponentDefinitionInstances")
+  legacyInstances ComponentInstance[]           @relation("LegacyComponentInstances")
 
   costing         ComponentCosting?
   summarySnapshot ComponentSummarySnapshot?
@@ -1351,6 +1391,7 @@ model Component {
 
   @@index([status])
   @@index([lifecycleState])
+  @@index([componentType])
   @@index([projectId])
   @@map("components")
 }
@@ -1383,6 +1424,8 @@ model ComponentRevision {
   releaseEvidence      ComponentReleaseEvidence?  @relation("ReleasedRevisionEvidence")
   priorReleaseEvidence ComponentReleaseEvidence[] @relation("PreviousRevisionEvidence")
   productionBoms       BOM[]                      @relation("ComponentRevisionProductionBoms")
+  requirements         ProjectComponentRequirement[] @relation("ComponentRevisionRequirements")
+  componentInstances   ComponentInstance[]           @relation("ComponentRevisionInstances")
 
   @@unique([componentId, revisionNo])
   @@index([componentId, state])
@@ -1405,9 +1448,134 @@ model ComponentBomDefinition {
 
   revision      ComponentRevision @relation(fields: [componentRevisionId], references: [id], onDelete: Restrict)
   productionBom BOM?              @relation("ComponentBomDefinitionProductionBom")
+  requirements  ProjectComponentRequirement[] @relation("ComponentBomDefinitionRequirements")
+  componentInstances ComponentInstance[]       @relation("ComponentBomDefinitionInstances")
 
   @@index([state])
   @@map("component_bom_definitions")
+}
+
+model ProjectComponentRequirement {
+  id                  String                            @id @default(cuid())
+  requirementNo       String                            @unique
+  projectId           String
+  projectTaskId       String?
+  componentId         String
+  componentRevisionId String?
+  bomDefinitionId     String?
+  requiredQuantity    Float
+  producedQuantity    Float                             @default(0)
+  acceptedQuantity    Float                             @default(0)
+  installedQuantity   Float                             @default(0)
+  status              ProjectComponentRequirementStatus @default(DRAFT)
+  requiredBy          DateTime?
+  metadata            Json?
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
+
+  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  projectTask       ProjectTask?            @relation(fields: [projectTaskId], references: [id], onDelete: SetNull)
+  component         Component               @relation("ComponentRequirements", fields: [componentId], references: [id], onDelete: Restrict)
+  componentRevision ComponentRevision?      @relation("ComponentRevisionRequirements", fields: [componentRevisionId], references: [id], onDelete: SetNull)
+  bomDefinition     ComponentBomDefinition? @relation("ComponentBomDefinitionRequirements", fields: [bomDefinitionId], references: [id], onDelete: SetNull)
+  productionOrders  ProductionOrder[]
+  componentInstances ComponentInstance[]
+
+  @@index([projectId])
+  @@index([projectTaskId])
+  @@index([componentId])
+  @@index([componentRevisionId])
+  @@index([bomDefinitionId])
+  @@index([status])
+  @@index([projectId, componentId])
+  @@map("project_component_requirements")
+}
+
+model ComponentInstance {
+  id                  String                 @id @default(cuid())
+  instanceNo          String                 @unique
+  componentId         String
+  componentRevisionId String
+  bomDefinitionId     String?
+  productionOrderId   String?
+  requirementId       String?
+  projectId           String?
+  projectTaskId       String?
+  state               ComponentInstanceState @default(PLANNED)
+  serialSequence      Int?
+  producedAt          DateTime?
+  qcPassedAt          DateTime?
+  scrappedAt          DateTime?
+  installedAt         DateTime?
+  legacyComponentId   String?
+  metadata            Json?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  component         Component                    @relation("ComponentDefinitionInstances", fields: [componentId], references: [id], onDelete: Restrict)
+  componentRevision ComponentRevision            @relation("ComponentRevisionInstances", fields: [componentRevisionId], references: [id], onDelete: Restrict)
+  bomDefinition     ComponentBomDefinition?      @relation("ComponentBomDefinitionInstances", fields: [bomDefinitionId], references: [id], onDelete: SetNull)
+  productionOrder   ProductionOrder?             @relation(fields: [productionOrderId], references: [id], onDelete: SetNull)
+  requirement       ProjectComponentRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  project           Project?                     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectTask       ProjectTask?                 @relation(fields: [projectTaskId], references: [id], onDelete: SetNull)
+  legacyComponent   Component?                   @relation("LegacyComponentInstances", fields: [legacyComponentId], references: [id], onDelete: SetNull)
+  timeline          ComponentInstanceTimeline[]
+  executions        ComponentInstanceExecution[]
+  qcInspections     QcInspection[]
+  ncrs              NonConformanceReport[]
+
+  @@unique([productionOrderId, serialSequence])
+  @@index([componentId])
+  @@index([componentRevisionId])
+  @@index([bomDefinitionId])
+  @@index([productionOrderId])
+  @@index([requirementId])
+  @@index([projectId])
+  @@index([projectTaskId])
+  @@index([state])
+  @@index([createdAt])
+  @@map("component_instances")
+}
+
+model ComponentInstanceTimeline {
+  id                  String   @id @default(cuid())
+  componentInstanceId String
+  eventType           String
+  sourceModule        String
+  sourceId            String?
+  occurredAt          DateTime @default(now())
+  metadata            Json?
+
+  componentInstance ComponentInstance @relation(fields: [componentInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([componentInstanceId, occurredAt])
+  @@index([sourceModule, sourceId])
+  @@map("component_instance_timelines")
+}
+
+model ComponentInstanceExecution {
+  id                    String                           @id @default(cuid())
+  componentInstanceId   String
+  workOrderId           String
+  productionExecutionId String
+  status                ComponentInstanceExecutionStatus @default(ASSIGNED)
+  startedAt             DateTime?
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
+
+  componentInstance   ComponentInstance   @relation(fields: [componentInstanceId], references: [id], onDelete: Cascade)
+  workOrder           WorkOrder           @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  productionExecution ProductionExecution @relation(fields: [productionExecutionId], references: [id], onDelete: Cascade)
+
+  @@unique([componentInstanceId, productionExecutionId])
+  @@index([componentInstanceId, status])
+  @@index([workOrderId, status])
+  @@index([productionExecutionId, status])
+  @@index([status])
+  @@map("component_instance_executions")
 }
 
 model ComponentReleaseEvidence {
@@ -1484,6 +1652,8 @@ model ProjectTask {
   materialAllocations ProjectTaskMaterialAllocation[]
 
   componentAllocations ProjectTaskComponentAllocation[]
+  componentRequirements ProjectComponentRequirement[]
+  componentInstances    ComponentInstance[]
 
   resources ProjectTaskResource[]
 
@@ -2199,6 +2369,7 @@ model QcInspectionSnapshot {
   status            String
   checklistId       String?
   productionOrderId String?
+  componentInstanceId String?
   componentId       String?
   projectId         String?
   resultCount       Int      @default(0)
@@ -2213,6 +2384,7 @@ model QcInspectionSnapshot {
 
   @@index([status])
   @@index([productionOrderId])
+  @@index([componentInstanceId])
   @@index([componentId])
   @@index([projectId])
   @@index([updatedAt])
@@ -3112,6 +3284,7 @@ model ProductionOrder {
   description               String?
   projectId                 String?
   componentId               String?
+  componentRequirementId    String?
   bomId                     String?
   quantity                  Float                 @default(1)
   priority                  TaskPriority          @default(MEDIUM)
@@ -3144,6 +3317,7 @@ model ProductionOrder {
   logs                 ProductionLog[]
   bom                  BOM?                            @relation(fields: [bomId], references: [id], onDelete: SetNull)
   component            Component?                      @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  componentRequirement ProjectComponentRequirement?    @relation(fields: [componentRequirementId], references: [id], onDelete: SetNull)
   materialIssues       ProductionMaterialIssue[]
   materialReservations ProductionMaterialReservation[]
   materialLedgers      ProductionMaterialLedger[]
@@ -3158,10 +3332,12 @@ model ProductionOrder {
   reworkOrders         ProductionOrder[]               @relation("ProductionOrderRework")
   reworkRequests       ProductionRework[]              @relation("OriginalProductionRework")
   acceptedRework       ProductionRework?               @relation("AcceptedProductionRework")
+  componentInstances   ComponentInstance[]
 
   @@index([status])
   @@index([projectId])
   @@index([componentId])
+  @@index([componentRequirementId])
   @@index([bomId])
   @@index([orderKind])
   @@index([componentRevisionId])
@@ -3333,6 +3509,7 @@ model QcInspection {
   checklistId        String?
   productionOrderId  String?
   productionStageId  String?
+  componentInstanceId String?
   componentId        String?
   projectId          String?
   status             QcInspectionStatus @default(DRAFT)
@@ -3350,6 +3527,7 @@ model QcInspection {
   updatedAt          DateTime           @updatedAt
 
   checklist   QcChecklist?           @relation(fields: [checklistId], references: [id], onDelete: SetNull)
+  componentInstance ComponentInstance? @relation(fields: [componentInstanceId], references: [id], onDelete: SetNull)
   results     QcResult[]
   issues      QcIssue[]
   attachments QcAttachment[]
@@ -3359,6 +3537,7 @@ model QcInspection {
   @@index([status])
   @@index([productionOrderId])
   @@index([productionStageId])
+  @@index([componentInstanceId])
   @@index([componentId])
   @@index([projectId])
   @@index([checklistId])
@@ -3450,6 +3629,7 @@ model NonConformanceReport {
   inspectionId      String
   issueId           String?
   productionOrderId String?
+  componentInstanceId String?
   componentId       String?
   status            NcrStatus       @default(OPEN)
   severity          QcIssueSeverity @default(HIGH)
@@ -3467,11 +3647,13 @@ model NonConformanceReport {
 
   inspection  QcInspection   @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   issue       QcIssue?       @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  componentInstance ComponentInstance? @relation(fields: [componentInstanceId], references: [id], onDelete: SetNull)
   attachments QcAttachment[]
 
   @@index([inspectionId])
   @@index([issueId])
   @@index([productionOrderId])
+  @@index([componentInstanceId])
   @@index([componentId])
   @@index([status])
   @@index([severity])
@@ -4024,6 +4206,7 @@ model WorkOrder {
 
   productionOrder ProductionOrder?       @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
   executions      ProductionExecution[]
+  instanceExecutions ComponentInstanceExecution[]
   completions     ProductionCompletion[]
   scraps          ProductionScrap[]
 
@@ -4053,6 +4236,7 @@ model ProductionExecution {
 
   productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
   workOrder       WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  instanceExecutions ComponentInstanceExecution[]
 
   @@index([productionOrderId, state])
   @@index([workOrderId, state])

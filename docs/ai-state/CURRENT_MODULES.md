@@ -34,11 +34,38 @@
 - Production now exposes its AD-017/019 aggregate through the additive
   `/production/commands` API with durable idempotency and optimistic
   concurrency. Legacy routes remain compatible while operator certification
-  and controlled client migration are pending.
+  and controlled client migration are pending. DOMAIN.4 now binds
+  requirement-backed Production Orders to ProjectComponentRequirement lineage
+  and creates planned ComponentInstances at Production Order release.
 - Components now exposes its AD-016/019 aggregate through the additive
   `/components/commands` API. Legacy Components routes and operational status
   projections remain compatible pending operator certification and explicit
   row adoption.
+- Components DOMAIN.3 is implemented in code: new create UI targets the
+  canonical Component definition + ProjectComponentRequirement operation, typed
+  `componentType/profile` fields are added in Prisma, and legacy JSON fallback
+  remains readable. The verified backup, additive migration deploy and
+  authenticated runtime smoke are complete.
+- Components DOMAIN.4 is implemented for the Production boundary: physical
+  `ComponentInstance` identities are generated at Production Order release for
+  requirement-bound orders, remain `PLANNED`, and do not count as Finished
+  Goods, QC PASS, Yard stock or inventory.
+- Components DOMAIN.5A has closed the QC instance-lineage schema gate:
+  `QcInspection`, `NonConformanceReport` and `QcInspectionSnapshot` now carry
+  nullable `componentInstanceId` lineage with validation and snapshot support.
+- Components DOMAIN.5B has closed the `ComponentInstanceState.IN_PRODUCTION`
+  enum gate with an additive migration and no backfill. Finished Goods
+  eligibility remains blocked until Production records instance-level
+  start/completion evidence instead of only order/work-order aggregate
+  execution data.
+- Components DOMAIN.5C completed that execution-granularity audit and selected
+  additive `ComponentInstanceExecution` as the recommended future bridge from
+  `ProductionExecution` batch/run headers to physical instance operation
+  evidence. No schema/code was implemented in DOMAIN.5C.
+- Components/Production DOMAIN.5D implemented that bridge as an additive
+  schema and backend foundation. `ComponentInstanceExecution` now records
+  physical instance operation participation for a `ProductionExecution` run.
+  It does not yet drive automatic physical lifecycle or QC handoff transitions.
 
 ## Not Started
 

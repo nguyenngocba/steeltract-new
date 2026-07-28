@@ -1,6 +1,7 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   ComponentBomDefinitionState,
+  ComponentInstanceState,
   ComponentLifecycleState,
   ComponentRevisionState,
   ProductionExecutionState,
@@ -109,6 +110,142 @@ describe('ProductionCommandService', () => {
       }),
       tx,
     );
+  });
+
+  it('binds a Project requirement to a draft Production Order without creating ComponentInstances', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const order = {
+      id: 'po-req-1',
+      orderNo: 'PO-REQ-001',
+      orderKind: ProductionOrderKind.STANDARD,
+      status: ProductionOrderStatus.DRAFT,
+      aggregateVersion: 1,
+      componentId: 'component-1',
+      componentRequirementId: 'requirement-1',
+      componentRevisionId: 'revision-1',
+      bomDefinitionId: 'bom-definition-1',
+      quantity: 10,
+      projectId: 'project-1',
+    };
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReleasedEngineeringBasis: jest
+        .fn()
+        .mockResolvedValue(releasedEngineeringBasis),
+      findRequirementForProduction: jest.fn().mockResolvedValue({
+        id: 'requirement-1',
+        projectId: 'project-1',
+        projectTaskId: null,
+        componentId: 'component-1',
+        componentRevisionId: 'revision-1',
+        bomDefinitionId: 'bom-definition-1',
+        requiredQuantity: 20,
+        status: 'RELEASED',
+      }),
+      sumProductionQuantityForRequirement: jest
+        .fn()
+        .mockResolvedValue({ _sum: { quantity: 0 } }),
+      createAggregateOrder: jest.fn().mockResolvedValue(order),
+      createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      createActivity: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+      createComponentInstances: jest.fn(),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+      {
+        materializeReleasedEngineeringBom: jest.fn().mockResolvedValue({
+          id: 'bom-1',
+        }),
+      } as unknown as ProductionBomMaterializationService,
+    );
+
+    await service.createOrder({
+      orderNo: 'PO-REQ-001',
+      title: 'Requirement order',
+      projectId: 'project-1',
+      componentRequirementId: 'requirement-1',
+      quantity: 10,
+      unit: 'pcs',
+      actorId: 'operator-1',
+      idempotencyKey: 'create-po-req-001',
+      engineeringBasis: {
+        componentId: 'component-1',
+        componentRevisionId: 'revision-1',
+        bomDefinitionId: 'bom-definition-1',
+        contentHash: 'a'.repeat(64),
+        verifiedAt: '2026-07-17T08:00:00.000Z',
+      },
+    });
+
+    expect(repository.createAggregateOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentRequirementId: 'requirement-1',
+        status: ProductionOrderStatus.DRAFT,
+        quantity: 10,
+      }),
+      tx,
+    );
+    expect(repository.createComponentInstances).not.toHaveBeenCalled();
+  });
+
+  it('rejects requirement allocation that exceeds required quantity', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReleasedEngineeringBasis: jest
+        .fn()
+        .mockResolvedValue(releasedEngineeringBasis),
+      findRequirementForProduction: jest.fn().mockResolvedValue({
+        id: 'requirement-1',
+        projectId: 'project-1',
+        componentId: 'component-1',
+        componentRevisionId: 'revision-1',
+        bomDefinitionId: 'bom-definition-1',
+        requiredQuantity: 20,
+        status: 'RELEASED',
+      }),
+      sumProductionQuantityForRequirement: jest
+        .fn()
+        .mockResolvedValue({ _sum: { quantity: 15 } }),
+      createAggregateOrder: jest.fn(),
+      createOutboxEvent: jest.fn(),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+      {
+        materializeReleasedEngineeringBom: jest.fn().mockResolvedValue({
+          id: 'bom-1',
+        }),
+      } as unknown as ProductionBomMaterializationService,
+    );
+
+    await expect(
+      service.createOrder({
+        orderNo: 'PO-REQ-OVER',
+        title: 'Over allocation',
+        projectId: 'project-1',
+        componentRequirementId: 'requirement-1',
+        quantity: 6,
+        unit: 'pcs',
+        actorId: 'operator-1',
+        idempotencyKey: 'create-po-req-over',
+        engineeringBasis: {
+          componentId: 'component-1',
+          componentRevisionId: 'revision-1',
+          bomDefinitionId: 'bom-definition-1',
+          contentHash: 'a'.repeat(64),
+          verifiedAt: '2026-07-17T08:00:00.000Z',
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.createAggregateOrder).not.toHaveBeenCalled();
+    expect(repository.createOutboxEvent).not.toHaveBeenCalled();
   });
 
   it('replays the durable result without duplicating timeline or Outbox', async () => {
@@ -273,6 +410,173 @@ describe('ProductionCommandService', () => {
       tx,
     );
     expect(repository.createOutboxEvent).not.toHaveBeenCalled();
+  });
+
+  it('creates planned ComponentInstances exactly once when releasing a requirement-bound Production Order', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const order = {
+      id: 'po-release-1',
+      orderNo: 'PO-REL-001',
+      title: 'Release requirement order',
+      projectId: 'project-1',
+      orderKind: ProductionOrderKind.STANDARD,
+      status: ProductionOrderStatus.DRAFT,
+      aggregateVersion: 1,
+      componentId: 'component-1',
+      componentRequirementId: 'requirement-1',
+      componentRevisionId: 'revision-1',
+      bomDefinitionId: 'bom-definition-1',
+      bomId: 'bom-1',
+      quantity: 3,
+      metadata: { unit: 'pcs' },
+      workOrders: [],
+      completions: [],
+      scraps: [],
+      materialIssues: [],
+      materialConsumptions: [],
+      materialLedgers: [],
+    };
+    const updated = {
+      ...order,
+      status: ProductionOrderStatus.RELEASED,
+      aggregateVersion: 2,
+      releasedAt: new Date('2026-07-27T08:00:00.000Z'),
+    };
+    const releaseLineageBefore = {
+      ...updated,
+      component: {
+        id: 'component-1',
+        code: 'CPL-20260727-BDC4F6F3',
+        lifecycleState: ComponentLifecycleState.ACTIVE,
+      },
+      componentRequirement: {
+        id: 'requirement-1',
+        projectId: 'project-1',
+        projectTaskId: null,
+        componentId: 'component-1',
+        componentRevisionId: 'revision-1',
+        bomDefinitionId: 'bom-definition-1',
+        requiredQuantity: 20,
+      },
+      bom: {
+        id: 'bom-1',
+        componentId: 'component-1',
+        componentRevisionId: 'revision-1',
+        bomDefinitionId: 'bom-definition-1',
+        engineeringContentHash: 'a'.repeat(64),
+        source: 'ENGINEERING',
+      },
+      componentInstances: [],
+    };
+    const releaseLineageAfter = {
+      ...releaseLineageBefore,
+      componentInstances: [
+        {
+          id: 'instance-1',
+          serialSequence: 1,
+          instanceNo: 'CPL-20260727-BDC4F6F3-PO-REL-001-001',
+        },
+        {
+          id: 'instance-2',
+          serialSequence: 2,
+          instanceNo: 'CPL-20260727-BDC4F6F3-PO-REL-001-002',
+        },
+        {
+          id: 'instance-3',
+          serialSequence: 3,
+          instanceNo: 'CPL-20260727-BDC4F6F3-PO-REL-001-003',
+        },
+      ],
+    };
+    const outbox = new Map<string, unknown>();
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn(async (key: string) => outbox.get(key) ?? null),
+      findAggregate: jest.fn().mockResolvedValue(order),
+      updateAggregateOrder: jest.fn().mockResolvedValue(updated),
+      findReleaseLineage: jest
+        .fn()
+        .mockResolvedValueOnce(releaseLineageBefore)
+        .mockResolvedValueOnce(releaseLineageAfter),
+      createComponentInstances: jest.fn().mockResolvedValue({ count: 3 }),
+      createComponentInstanceTimelines: jest.fn().mockResolvedValue({ count: 3 }),
+      createWorkOrder: jest.fn().mockImplementation((data) =>
+        Promise.resolve({
+          id: `wo-${data.sequence}`,
+          workOrderNo: data.workOrderNo,
+          productionOrderId: data.productionOrderId,
+          lifecycleState: data.lifecycleState,
+          aggregateVersion: 1,
+          productCode: data.productCode,
+          quantity: data.quantity,
+          routingOperationId: data.routingOperationId,
+          sequence: data.sequence,
+        }),
+      ),
+      createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      createActivity: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn(async (data: { idempotencyKey: string }) => {
+        outbox.set(data.idempotencyKey, data);
+        return data;
+      }),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+      {} as ProductionBomMaterializationService,
+    );
+    const command = {
+      productionOrderId: 'po-release-1',
+      expectedVersion: 1,
+      actorId: 'operator-1',
+      idempotencyKey: 'release-po-rel-001',
+      workOrders: [
+        {
+          routingOperationId: 'route-1',
+          productCode: 'BEAM-B01',
+          quantity: 3,
+          sequence: 1,
+        },
+      ],
+    };
+
+    await service.releaseOrder(command);
+
+    expect(repository.createComponentInstances).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          instanceNo: 'CPL-20260727-BDC4F6F3-PO-REL-001-001',
+          componentId: 'component-1',
+          componentRevisionId: 'revision-1',
+          bomDefinitionId: 'bom-definition-1',
+          productionOrderId: 'po-release-1',
+          requirementId: 'requirement-1',
+          state: ComponentInstanceState.PLANNED,
+          serialSequence: 1,
+        }),
+        expect.objectContaining({ serialSequence: 2 }),
+        expect.objectContaining({ serialSequence: 3 }),
+      ],
+      tx,
+    );
+    expect(repository.createComponentInstanceTimelines).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          componentInstanceId: 'instance-1',
+          eventType: 'component.instance.planned',
+          sourceModule: 'production',
+          sourceId: 'po-release-1',
+        }),
+        expect.objectContaining({ componentInstanceId: 'instance-2' }),
+        expect.objectContaining({ componentInstanceId: 'instance-3' }),
+      ],
+      tx,
+    );
+
+    const replay = await service.releaseOrder(command);
+    expect(replay).toBe(order);
+    expect(repository.createComponentInstances).toHaveBeenCalledTimes(1);
+    expect(repository.createWorkOrder).toHaveBeenCalledTimes(1);
   });
 
   it('starts an Execution with timeline, audit and canonical Outbox atomically', async () => {

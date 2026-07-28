@@ -26,6 +26,7 @@ export interface QcInspectionSnapshotPayload {
   status: string;
   checklistId?: string | null;
   productionOrderId?: string | null;
+  componentInstanceId?: string | null;
   componentId?: string | null;
   projectId?: string | null;
   resultCount: number;
@@ -132,6 +133,7 @@ export class QcSnapshotRepository {
       },
       select: {
         productionOrderId: true,
+        componentInstanceId: true,
         componentId: true,
         status: true,
       },
@@ -207,6 +209,7 @@ export class QcSnapshotRepository {
         status: true,
         checklistId: true,
         productionOrderId: true,
+        componentInstanceId: true,
         componentId: true,
         projectId: true,
         inspectorId: true,
@@ -228,6 +231,7 @@ export class QcSnapshotRepository {
         status: row.status,
         checklistId: row.checklistId,
         productionOrderId: row.productionOrderId,
+        componentInstanceId: row.componentInstanceId,
         componentId: row.componentId,
         projectId: row.projectId,
         resultCount: row.results.length,
@@ -284,6 +288,7 @@ export class QcSnapshotRepository {
         status: payload.status,
         checklistId: payload.checklistId,
         productionOrderId: payload.productionOrderId,
+        componentInstanceId: payload.componentInstanceId,
         componentId: payload.componentId,
         projectId: payload.projectId,
         resultCount: payload.resultCount,

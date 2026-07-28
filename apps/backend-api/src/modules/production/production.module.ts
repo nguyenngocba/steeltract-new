@@ -25,6 +25,7 @@ import { ProductionBomMaterializationService } from './services/production-bom-m
 import { ProductionMaterialLedgerService } from './services/production-material-ledger.service';
 import { ProductionReservationService } from './services/production-reservation.service';
 import { ProductionCommandService } from './services/production-command.service';
+import { ProductionInstanceExecutionService } from './services/production-instance-execution.service';
 import { ComponentsModule } from '../components/components.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { YardModule } from '../yard/yard.module';
@@ -59,6 +60,7 @@ import { YardModule } from '../yard/yard.module';
     ProductionMaterialLedgerService,
     ProductionReservationService,
     ProductionCommandService,
+    ProductionInstanceExecutionService,
   ],
   exports: [ProductionService, ProductionCommandService],
 })

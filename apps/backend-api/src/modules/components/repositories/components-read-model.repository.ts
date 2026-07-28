@@ -41,6 +41,14 @@ type ComponentMetadata = {
 
 const componentReadInclude = {
   project: true,
+  requirements: {
+    select: {
+      id: true,
+      requiredQuantity: true,
+      requiredBy: true,
+      project: { select: { id: true, code: true, name: true } },
+    },
+  },
   productionOrders: {
     orderBy: { updatedAt: 'desc' as const },
     take: 1,
@@ -266,6 +274,15 @@ export class ComponentsReadModelRepository {
       });
     }
 
+    if (query.type) {
+      and.push({
+        OR: [
+          { componentType: { contains: query.type, mode: 'insensitive' } },
+          { description: { contains: query.type, mode: 'insensitive' } },
+        ],
+      });
+    }
+
     return {
       status: statuses?.length ? { in: statuses } : undefined,
       project: query.project
@@ -276,15 +293,14 @@ export class ComponentsReadModelRepository {
             ],
           }
         : undefined,
-      description: query.type
-        ? { contains: query.type, mode: 'insensitive' }
-        : undefined,
       AND: and.length ? and : undefined,
       OR: search
         ? [
             { code: { contains: search, mode: 'insensitive' } },
             { name: { contains: search, mode: 'insensitive' } },
             { description: { contains: search, mode: 'insensitive' } },
+            { componentType: { contains: search, mode: 'insensitive' } },
+            { profile: { contains: search, mode: 'insensitive' } },
             { floor: { contains: search, mode: 'insensitive' } },
             { zone: { contains: search, mode: 'insensitive' } },
             { position: { contains: search, mode: 'insensitive' } },
@@ -332,7 +348,8 @@ export class ComponentsReadModelRepository {
       const bom =
         order?.bom ??
         fallbackBoms.find((item) => item.productCode === source.code);
-      const quantity = Number(metadata.quantity ?? 1);
+      const requirementQuantity = this.requirementQuantity(source);
+      const quantity = Number(requirementQuantity ?? metadata.quantity ?? 1);
       const requiredByMaterial = new Map<string, number>();
       for (const item of bom?.items ?? []) {
         const required =
@@ -369,8 +386,8 @@ export class ComponentsReadModelRepository {
         id: source.id,
         code: source.code,
         name: source.name,
-        type: metadata.type ?? 'Cấu kiện thép',
-        profile: metadata.profile ?? 'N/A',
+        type: source.componentType ?? metadata.type ?? 'Cấu kiện thép',
+        profile: source.profile ?? metadata.profile ?? 'N/A',
         project:
           source.project?.code ?? source.project?.name ?? 'Chưa gán dự án',
         projectId: source.projectId,
@@ -415,12 +432,14 @@ export class ComponentsReadModelRepository {
     return sources.map((source) => {
       const metadata = this.metadata(source.description);
       const placement = placementByItem.get(source.id);
+      const requirementQuantity = this.requirementQuantity(source);
+      const quantity = Number(requirementQuantity ?? metadata.quantity ?? 1);
       return {
         id: source.id,
         code: source.code,
         name: source.name,
-        type: metadata.type ?? 'Cấu kiện thép',
-        profile: metadata.profile ?? 'N/A',
+        type: source.componentType ?? metadata.type ?? 'Cấu kiện thép',
+        profile: source.profile ?? metadata.profile ?? 'N/A',
         project: source.project?.code ?? source.project?.name ?? 'Chưa gán',
         location: placement
           ? `${placement.slot.zone.code} / ${placement.slot.code} / L${placement.stackLevel}`
@@ -429,11 +448,11 @@ export class ComponentsReadModelRepository {
               .join(' / ') || 'Kho cấu kiện',
         status: this.overviewStatus(source.status, source.lifecycleState),
         rawStatus: source.status,
-        quantity: Number(metadata.quantity ?? 1),
+        quantity,
         qcQuantity: Number(
           metadata.qcQuantity ??
             (source.status === ComponentStatus.READY
-              ? (metadata.quantity ?? 1)
+              ? quantity
               : 0),
         ),
         createdAt: source.createdAt.toISOString(),
@@ -557,10 +576,10 @@ export class ComponentsReadModelRepository {
       await Promise.all([
         this.prisma.$queryRaw<Array<{ label: string; value: bigint }>>`
         SELECT CASE
-          WHEN LOWER(COALESCE(description, '')) LIKE '%beam%' OR LOWER(COALESCE(description, '')) LIKE '%dầm%' THEN 'Beam'
-          WHEN LOWER(COALESCE(description, '')) LIKE '%column%' OR LOWER(COALESCE(description, '')) LIKE '%cột%' THEN 'Column'
-          WHEN LOWER(COALESCE(description, '')) LIKE '%brace%' OR LOWER(COALESCE(description, '')) LIKE '%giằng%' THEN 'Brace'
-          WHEN LOWER(COALESCE(description, '')) LIKE '%plate%' OR LOWER(COALESCE(description, '')) LIKE '%bản%' THEN 'Plate'
+          WHEN LOWER(COALESCE("componentType", description, '')) LIKE '%beam%' OR LOWER(COALESCE("componentType", description, '')) LIKE '%dầm%' THEN 'Beam'
+          WHEN LOWER(COALESCE("componentType", description, '')) LIKE '%column%' OR LOWER(COALESCE("componentType", description, '')) LIKE '%cột%' THEN 'Column'
+          WHEN LOWER(COALESCE("componentType", description, '')) LIKE '%brace%' OR LOWER(COALESCE("componentType", description, '')) LIKE '%giằng%' THEN 'Brace'
+          WHEN LOWER(COALESCE("componentType", description, '')) LIKE '%plate%' OR LOWER(COALESCE("componentType", description, '')) LIKE '%bản%' THEN 'Plate'
           ELSE 'Assembly'
         END label, COUNT(*)::bigint value
         FROM components
@@ -646,10 +665,18 @@ export class ComponentsReadModelRepository {
         Array<{ type: string; profile: string; quantity: number }>
       >`
           SELECT
-            COALESCE(substring(description from '"type"[[:space:]]*:[[:space:]]*"([^"]+)"'), 'Cấu kiện thép') type,
-            COALESCE(substring(description from '"profile"[[:space:]]*:[[:space:]]*"([^"]+)"'), 'N/A') profile,
-            COALESCE(NULLIF(substring(description from '"quantity"[[:space:]]*:[[:space:]]*([0-9]+(\\.[0-9]+)?)'), '')::float, 1) quantity
-          FROM components
+            COALESCE(c."componentType", substring(c.description from '"type"[[:space:]]*:[[:space:]]*"([^"]+)"'), 'Cấu kiện thép') type,
+            COALESCE(c."profile", substring(c.description from '"profile"[[:space:]]*:[[:space:]]*"([^"]+)"'), 'N/A') profile,
+            CASE
+              WHEN COALESCE(r.required_quantity, 0) > 0 THEN r.required_quantity
+              ELSE COALESCE(NULLIF(substring(c.description from '"quantity"[[:space:]]*:[[:space:]]*([0-9]+(\\.[0-9]+)?)'), '')::float, 1)
+            END quantity
+          FROM components c
+          LEFT JOIN (
+            SELECT "componentId", SUM("requiredQuantity")::float required_quantity
+            FROM project_component_requirements
+            GROUP BY "componentId"
+          ) r ON r."componentId" = c.id
         `,
       this.prisma.project.findMany({
         where: { components: { some: {} } },
@@ -741,6 +768,14 @@ export class ComponentsReadModelRepository {
     } catch {
       return {};
     }
+  }
+
+  private requirementQuantity(source: ComponentSource) {
+    if (!source.requirements?.length) return undefined;
+    return source.requirements.reduce(
+      (sum, row) => sum + Number(row.requiredQuantity ?? 0),
+      0,
+    );
   }
 
   private listStatus(
