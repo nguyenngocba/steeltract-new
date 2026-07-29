@@ -458,9 +458,9 @@ function Overview({
         <CockpitChartCard title="QC theo công đoạn" heightClass="h-[220px]" chartHeightClass="h-[138px]">
           <StatusMiniBars
             rows={[
-              ['Đầu vào', rows.filter((r) => r.category === 'INBOUND').length || 4],
-              ['Sản xuất', rows.filter((r) => !r.category || r.category === 'PRODUCTION').length || 12],
-              ['Xuất xưởng', rows.filter((r) => r.category === 'FINAL').length || 8],
+              ['Đầu vào', rows.filter((r) => r.category === 'INBOUND').length],
+              ['Sản xuất', rows.filter((r) => !r.category || r.category === 'PRODUCTION').length],
+              ['Xuất xưởng', rows.filter((r) => r.category === 'FINAL').length],
             ]}
           />
         </CockpitChartCard>
@@ -1073,12 +1073,49 @@ function Donut({ title, center, rows }: { title: string; center: string; rows: A
 
 function InspectionDetail({ inspection, onClose, onStart, onPass, onFail }: { inspection: QcInspectionRow | null; onClose: () => void; onStart: (id: string) => void; onPass: (id: string) => void; onFail: (id: string) => void }) {
   if (!inspection) return null
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><section className="w-full max-w-4xl rounded border border-cyan-900 bg-[#061321] p-5"><div className="flex justify-between"><div><p className="text-xs text-cyan-300">{inspection.inspectionNo}</p><h2 className="mt-1 text-xl font-semibold">{inspection.componentCode} · {inspection.componentName}</h2></div><button onClick={onClose}><XCircle /></button></div><div className="mt-5 grid gap-3 md:grid-cols-2"><Info k="Dự án" v={inspection.projectName} /><Info k="MO" v={inspection.productionOrderNo} /><Info k="Loại kiểm tra" v={inspection.category} /><Info k="Checklist" v={inspection.checklistName} /><Info k="Kết quả" v={inspection.result} /><Info k="Trạng thái" v={inspection.status} /></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => onStart(inspection.id)} className="rounded border border-slate-700 px-4 py-2 text-xs">Bắt đầu</button><button onClick={() => onFail(inspection.id)} className="rounded bg-red-600 px-4 py-2 text-xs">Không đạt / NCR</button><button onClick={() => onPass(inspection.id)} className="rounded bg-emerald-600 px-4 py-2 text-xs">Chấm đạt & duyệt</button></div></section></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <section className="flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-900 bg-[#061321] shadow-2xl">
+      <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-300">{inspection.inspectionNo}</p><h2 className="mt-1 text-lg font-semibold text-white">{inspection.componentCode} · {inspection.componentName}</h2></div>
+        <button onClick={onClose} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:border-cyan-500 hover:text-white"><XCircle size={16} /></button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Info k="Dự án" v={inspection.projectName} />
+          <Info k="MO" v={inspection.productionOrderNo} />
+          <Info k="Loại kiểm tra" v={inspection.category} />
+          <Info k="Checklist" v={inspection.checklistName} />
+          <Info k="Kết quả" v={inspection.result} />
+          <Info k="Trạng thái" v={inspection.status} />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+        <button onClick={() => onStart(inspection.id)} className="rounded-lg border border-slate-700 px-5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/5">Bắt đầu</button>
+        <button onClick={() => onFail(inspection.id)} className="rounded-lg border border-red-500/40 bg-red-500/10 px-5 py-2.5 text-xs font-semibold text-red-200 hover:bg-red-500/15">Không đạt / NCR</button>
+        <button onClick={() => onPass(inspection.id)} className="rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-500">Chấm đạt & duyệt</button>
+      </div>
+    </section>
+  </div>
 }
 
 function QueueDetail({ row, onClose, onCreate, onQuickApprove }: { row: QcProductionQueueRow | null; onClose: () => void; onCreate: (row: QcProductionQueueRow) => void; onQuickApprove: (row: QcProductionQueueRow) => void }) {
   if (!row) return null
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><section className="w-full max-w-3xl rounded border border-cyan-900 bg-[#061321] p-5"><div className="flex justify-between"><div><p className="text-xs text-cyan-300">{row.orderNo}</p><h2 className="mt-1 text-xl font-semibold">{row.componentCode} · {row.componentName}</h2></div><button onClick={onClose}><XCircle /></button></div><div className="mt-5 space-y-2 text-sm"><Info k="Lệnh sản xuất" v={row.title} /><Info k="Trạng thái sản xuất" v={row.status} /><Info k="Trạng thái QC" v={row.qcStatus} /><Info k="Số phiếu QC" v={fmt(row.inspectionCount)} /></div><div className="mt-5 rounded border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-400">Khi QC đạt/đã duyệt, lệnh sản xuất này sẽ được mở khóa bước chuyển thành phẩm ra bãi tập kết.</div><div className="mt-5 flex justify-end gap-2"><button onClick={() => onCreate(row)} className="rounded border border-blue-700 px-4 py-2 text-xs text-blue-200">Tạo phiếu QC</button><button onClick={() => onQuickApprove(row)} className="rounded bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">Tạo & duyệt đạt</button></div></section></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <section className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-cyan-900 bg-[#061321] shadow-2xl">
+      <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-300">{row.orderNo}</p><h2 className="mt-1 text-lg font-semibold text-white">{row.componentCode} · {row.componentName}</h2></div>
+        <button onClick={onClose} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:border-cyan-500 hover:text-white"><XCircle size={16} /></button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="space-y-2 text-sm"><Info k="Lệnh sản xuất" v={row.title} /><Info k="Trạng thái sản xuất" v={row.status} /><Info k="Trạng thái QC" v={row.qcStatus} /><Info k="Số phiếu QC" v={fmt(row.inspectionCount)} /></div>
+        <div className="mt-5 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-400">Khi QC đạt/đã duyệt, lệnh sản xuất này sẽ được mở khóa bước chuyển thành phẩm ra bãi tập kết.</div>
+      </div>
+      <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+        <button onClick={() => onCreate(row)} className="rounded-lg border border-blue-700 px-5 py-2.5 text-xs font-semibold text-blue-200 hover:bg-blue-500/10">Tạo phiếu QC</button>
+        <button onClick={() => onQuickApprove(row)} className="rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-500">Tạo & duyệt đạt</button>
+      </div>
+    </section>
+  </div>
 }
 
 function StatusBadge({ value }: { value: string }) {
@@ -1117,7 +1154,7 @@ function InputInspectionTab({
   onOpen: (row: QcInspectionRow) => void
 }) {
   const m = runtime.metrics
-  const inboundRows = rows.filter((r) => r.category === 'INBOUND' || true)
+  const inboundRows = rows.filter((r) => r.category === 'INBOUND')
   const [search, setSearch] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [materialFilter, setMaterialFilter] = useState('all')
@@ -1127,6 +1164,7 @@ function InputInspectionTab({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(15)
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const inspectors = useMemo(() => Array.from(new Set(inboundRows.map((row) => row.inspectorId).filter(Boolean))) as string[], [inboundRows])
 
   const filtered = useMemo(() => {
     return inboundRows.filter((r) => {
@@ -1165,15 +1203,19 @@ function InputInspectionTab({
           <StatusMiniBars rows={[['Đạt', m.passed], ['Chờ kiểm', m.pending], ['Không đạt', m.failed]]} />
         </CockpitChartCard>
         <CockpitChartCard title="Defect theo nhà cung cấp" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Thép Hòa Phát', 5], ['Thép Hoa Sen', 2], ['VinaOne', 1]]} />
+          <CockpitEmptyState title="Chưa có dữ liệu nhà cung cấp" description="Backend QC chưa trả nguồn supplier cho phiếu kiểm tra đầu vào." icon={<ShieldCheck size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Defect theo vật tư" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Thép tấm H-Beam', 4], ['Thép cuộn C100', 3], ['Que hàn E7018', 1]]} />
+          <StatusMiniBars rows={Object.entries(inboundRows.reduce((map, row) => {
+            const key = row.componentName || row.componentCode || 'Không xác định'
+            map[key] = (map[key] ?? 0) + 1
+            return map
+          }, {} as Record<string, number>)).slice(0, 5)} />
         </CockpitChartCard>
         <CockpitChartCard title="Trend theo thời gian" heightClass="h-[220px]" chartHeightClass="h-[138px]">
           <CockpitStatusList items={[
-            { id: '1', label: 'Tỷ lệ QC Đạt tuần này', value: '96.5%', statusTone: 'emerald' },
-            { id: '2', label: 'Lô kiểm tra trung bình/ngày', value: '18 lô', statusTone: 'cyan' },
+            { id: '1', label: 'Tỷ lệ QC đạt', value: `${fmt(m.passRate)}%`, statusTone: 'emerald' },
+            { id: '2', label: 'Điểm dữ liệu trend', value: `${runtime.trend.length} kỳ`, statusTone: 'cyan' },
             { id: '3', label: 'Cảnh báo chất lượng mở', value: `${m.openNcrs} ncr`, statusTone: 'purple' },
           ]} />
         </CockpitChartCard>
@@ -1194,13 +1236,11 @@ function InputInspectionTab({
 
           <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả NCC</option>
-            <option value="hoaphat">Thép Hòa Phát</option>
-            <option value="hoasen">Thép Hoa Sen</option>
+            <option value="unavailable" disabled>Chưa có dữ liệu NCC</option>
           </select>
           <select value={materialFilter} onChange={(e) => setMaterialFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả vật tư</option>
-            <option value="steel">Thép tấm</option>
-            <option value="coil">Thép cuộn</option>
+            <option value="unavailable" disabled>Chưa có dữ liệu Material Master</option>
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả trạng thái</option>
@@ -1210,12 +1250,10 @@ function InputInspectionTab({
           </select>
           <select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả người kiểm</option>
-            <option value="QC Admin">QC Admin</option>
+            {inspectors.map((inspector) => <option key={inspector} value={inspector}>{inspector}</option>)}
           </select>
           <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả thời gian</option>
-            <option value="today">Hôm nay</option>
-            <option value="week">Tuần này</option>
           </select>
 
           <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
@@ -1246,10 +1284,10 @@ function InputInspectionTab({
               {paged.map((row) => (
                 <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
                   <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
-                  <td className="px-2 py-2 text-white font-medium truncate">Thép Hòa Phát</td>
+                  <td className="px-2 py-2 text-white font-medium truncate">-</td>
                   <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.componentCode} · {row.componentName}</td>
-                  <td className="px-2 py-2 font-mono text-cyan-400 text-xs">500 kg</td>
-                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Admin'}</td>
+                  <td className="px-2 py-2 font-mono text-cyan-400 text-xs">-</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || '-'}</td>
                   <td className="px-2 py-2 text-slate-300 text-xs truncate">{date(row.date)}</td>
                   <td className="px-2 py-2 text-xs font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
                   <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
@@ -1286,10 +1324,10 @@ function InputInspectionTab({
                   {filtered.map((row) => (
                     <tr key={row.id} onClick={() => { onOpen(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
                       <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
-                      <td className="px-2 py-2 text-white font-medium truncate">Thép Hòa Phát</td>
+                      <td className="px-2 py-2 text-white font-medium truncate">-</td>
                       <td className="px-2 py-2 text-slate-300 truncate">{row.componentCode} · {row.componentName}</td>
-                      <td className="px-2 py-2 font-mono text-cyan-400">500 kg</td>
-                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Admin'}</td>
+                      <td className="px-2 py-2 font-mono text-cyan-400">-</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || '-'}</td>
                       <td className="px-2 py-2 text-slate-300 truncate">{date(row.date)}</td>
                       <td className="px-2 py-2 font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
                       <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
@@ -1326,6 +1364,7 @@ function ProductionInspectionTab({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(15)
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const inspectors = useMemo(() => Array.from(new Set(prodRows.map((row) => row.inspectorId).filter(Boolean))) as string[], [prodRows])
 
   const filtered = useMemo(() => {
     return prodRows.filter((r) => {
@@ -1339,9 +1378,10 @@ function ProductionInspectionTab({
         return false
       }
       if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (inspectorFilter !== 'all' && r.inspectorId !== inspectorFilter) return false
       return true
     })
-  }, [prodRows, search, statusFilter])
+  }, [prodRows, search, statusFilter, inspectorFilter])
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
 
@@ -1360,23 +1400,29 @@ function ProductionInspectionTab({
       {/* Analytics Dashboard */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="Defect theo công đoạn" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Cắt phôi', 4], ['Gá tổ hợp', 6], ['Hàn tự động', 8], ['Sơn phủ', 2]]} />
+          <StatusMiniBars rows={Object.entries(prodRows.reduce((map, row) => {
+            const key = row.category || 'PRODUCTION'
+            map[key] = (map[key] ?? 0) + 1
+            return map
+          }, {} as Record<string, number>)).slice(0, 5)} />
         </CockpitChartCard>
         <CockpitChartCard title="Pass Rate theo Line" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitStatusList items={[
-            { id: '1', label: 'Line 1 (Kết cấu chính)', value: '98.2%', statusTone: 'emerald' },
-            { id: '2', label: 'Line 2 (Xà gồ / Tấm)', value: '95.4%', statusTone: 'cyan' },
-            { id: '3', label: 'Line 3 (Sơn phủ)', value: '91.8%', statusTone: 'amber' },
-          ]} />
+          <CockpitEmptyState title="Chưa có dữ liệu line" description="Backend QC chưa trả line/work center cho inspection sản xuất." icon={<Gauge size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="NCR theo Line" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Line 1', 1], ['Line 2', 3], ['Line 3', 2]]} />
+          <CockpitEmptyState title="Chưa có dữ liệu NCR theo line" description="NCR hiện chưa có trường line/work center authoritative." icon={<AlertTriangle size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Rework Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'Sửa mối hàn Line 2', subtitle: 'NCR-2026-004', time: '2 giờ trước', statusDot: 'bg-amber-400' },
-            { id: '2', title: 'Sơn lại bề mặt dầm B1', subtitle: 'NCR-2026-003', time: '1 ngày trước', statusDot: 'bg-red-400' },
-          ]} />
+          <CockpitRecentList
+            items={runtime.ncrs.slice(0, 5).map((ncr) => ({
+              id: ncr.id,
+              title: ncr.ncrNo,
+              subtitle: ncr.title,
+              time: ncr.status,
+              statusDot: 'bg-amber-400',
+            }))}
+            emptyMessage="Chưa có NCR/rework sản xuất."
+          />
         </CockpitChartCard>
       </div>
 
@@ -1395,13 +1441,11 @@ function ProductionInspectionTab({
 
           <select value={lineFilter} onChange={(e) => setLineFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả Line</option>
-            <option value="line1">Line 1</option>
-            <option value="line2">Line 2</option>
+            <option value="unavailable" disabled>Chưa có dữ liệu line</option>
           </select>
           <select value={processFilter} onChange={(e) => setProcessFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả công đoạn</option>
-            <option value="cut">Cắt phôi</option>
-            <option value="weld">Hàn tự động</option>
+            <option value="unavailable" disabled>Chưa có dữ liệu công đoạn</option>
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả trạng thái</option>
@@ -1411,7 +1455,7 @@ function ProductionInspectionTab({
           </select>
           <select value={inspectorFilter} onChange={(e) => setInspectorFilter(e.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none">
             <option value="all">Tất cả người kiểm</option>
-            <option value="QC Admin">QC Admin</option>
+            {inspectors.map((inspector) => <option key={inspector} value={inspector}>{inspector}</option>)}
           </select>
 
           <button type="button" onClick={() => {}} className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-500 transition">Tìm kiếm</button>
@@ -1442,10 +1486,10 @@ function ProductionInspectionTab({
               {paged.map((row) => (
                 <tr key={row.id} onClick={() => onOpen(row)} className={`${tableRow} cursor-pointer`}>
                   <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{row.inspectionNo}</td>
-                  <td className="px-2 py-2 text-slate-300 text-xs truncate">Hàn tự động</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">{row.category || 'PRODUCTION'}</td>
                   <td className="px-2 py-2 text-white font-medium truncate">{row.componentCode} · {row.componentName}</td>
-                  <td className="px-2 py-2 text-slate-300 text-xs truncate">Ca 1 (Sáng)</td>
-                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || 'QC Admin'}</td>
+                  <td className="px-2 py-2 text-slate-300 text-xs truncate">-</td>
+                  <td className="px-2 py-2 text-cyan-400 text-xs truncate">{row.inspectorId || '-'}</td>
                   <td className="px-2 py-2 text-xs font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
                   <td className="px-2 py-2 text-xs font-mono text-purple-300">{row.ncrCount ? `${row.ncrCount} NCR` : '-'}</td>
                   <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
@@ -1482,10 +1526,10 @@ function ProductionInspectionTab({
                   {filtered.map((row) => (
                     <tr key={row.id} onClick={() => { onOpen(row); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
                       <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{row.inspectionNo}</td>
-                      <td className="px-2 py-2 text-slate-300 truncate">Hàn tự động</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{row.category || 'PRODUCTION'}</td>
                       <td className="px-2 py-2 text-white font-medium truncate">{row.componentCode} · {row.componentName}</td>
-                      <td className="px-2 py-2 text-slate-300 truncate">Ca 1 (Sáng)</td>
-                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || 'QC Admin'}</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">-</td>
+                      <td className="px-2 py-2 text-cyan-400 truncate">{row.inspectorId || '-'}</td>
                       <td className="px-2 py-2 font-semibold"><span className={row.result === 'PASS' ? 'text-emerald-300' : 'text-slate-400'}>{row.result || 'PENDING'}</span></td>
                       <td className="px-2 py-2 font-mono text-purple-300">{row.ncrCount ? `${row.ncrCount} NCR` : '-'}</td>
                       <td className="px-2 py-2"><QcStatusBadge status={row.status} /></td>
@@ -1768,6 +1812,7 @@ function OutgoingInspectionTab({ runtime }: { runtime: QcCockpit }) {
       ) : null}
       <FinalInstanceDetail
         instance={selectedInstance}
+        finalChecklist={finalChecklist}
         onClose={() => setSelectedInstance(null)}
         onPass={passInstance}
         onFail={failInstance}
@@ -1779,12 +1824,14 @@ function OutgoingInspectionTab({ runtime }: { runtime: QcCockpit }) {
 
 function FinalInstanceDetail({
   instance,
+  finalChecklist,
   onClose,
   onPass,
   onFail,
   busy,
 }: {
   instance: QcComponentInstance | null
+  finalChecklist?: QcCockpit['checklists'][number]
   onClose: () => void
   onPass: (instance: QcComponentInstance) => void
   onFail: (instance: QcComponentInstance) => void
@@ -1795,68 +1842,79 @@ function FinalInstanceDetail({
   const latestExecution = instance.executions?.[instance.executions.length - 1]
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <section className="w-full max-w-5xl rounded-xl border border-cyan-900 bg-[#061321] p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
+      <section className="flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-900 bg-[#061321] shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-400">Final QC theo cấu kiện vật lý</p>
-            <h2 className="mt-1 text-xl font-semibold text-white">{instance.instanceNo}</h2>
+            <h2 className="mt-1 text-lg font-semibold text-white">{instance.instanceNo}</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Đây là một ComponentInstance vật lý. Không phải hồ sơ kỹ thuật CPL và không phải số lượng aggregate của PO.
+              ComponentInstance vật lý, kiểm tra theo lineage sản xuất thực tế.
             </p>
           </div>
-          <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><XCircle size={16} /></button>
+          <button onClick={onClose} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:border-cyan-500 hover:text-white"><XCircle size={16} /></button>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <Info k="Mã cấu kiện vật lý" v={instance.instanceNo} />
-          <Info k="Hồ sơ cấu kiện" v={instance.component ? `${instance.component.code} · ${instance.component.name}` : '-'} />
-          <Info k="Công trình" v={instance.project ? `${instance.project.code} - ${instance.project.name}` : '-'} />
-          <Info k="Yêu cầu cấu kiện" v={instance.requirement ? `${instance.requirement.requirementNo} · SL ${fmt(instance.requirement.requiredQuantity)}` : '-'} />
-          <Info k="Production Order" v={instance.productionOrder ? `${instance.productionOrder.orderNo} · ${instance.productionOrder.title}` : '-'} />
-          <Info k="Hoàn thành sản xuất" v={date(instance.producedAt)} />
-          <Info k="Trạng thái vật lý" v={instance.state} />
-          <Info k="Revision" v={instance.componentRevision?.revisionNo ?? '-'} />
-          <Info k="Operation cuối" v={latestExecution?.workOrder?.workOrderNo ?? '-'} />
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <Info k="Mã cấu kiện vật lý" v={instance.instanceNo} />
+            <Info k="Hồ sơ cấu kiện" v={instance.component ? `${instance.component.code} · ${instance.component.name}` : '-'} />
+            <Info k="Công trình" v={instance.project ? `${instance.project.code} - ${instance.project.name}` : '-'} />
+            <Info k="Yêu cầu cấu kiện" v={instance.requirement ? `${instance.requirement.requirementNo} · SL ${fmt(instance.requirement.requiredQuantity)}` : '-'} />
+            <Info k="Production Order" v={instance.productionOrder ? `${instance.productionOrder.orderNo} · ${instance.productionOrder.title}` : '-'} />
+            <Info k="Hoàn thành sản xuất" v={date(instance.producedAt)} />
+            <Info k="Trạng thái vật lý" v={instance.state} />
+            <Info k="Revision" v={instance.componentRevision?.revisionNo ?? '-'} />
+            <Info k="Operation cuối" v={latestExecution?.workOrder?.workOrderNo ?? '-'} />
+            <Info k="Checklist FINAL" v={finalChecklist ? `${finalChecklist.code} · ${finalChecklist.name}` : 'Chưa có checklist FINAL'} />
+          </div>
+
+          <div className="mt-5 grid gap-3 xl:grid-cols-[1fr_260px]">
+            <div className={`${panel} overflow-hidden`}>
+              <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold">Lịch sử công đoạn</div>
+              <div className="max-h-[280px] overflow-auto">
+                <table className="w-full min-w-[640px] text-left text-xs">
+                  <thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500">
+                    <tr>{['WorkOrder', 'Execution', 'Trạng thái', 'Bắt đầu', 'Hoàn thành'].map((head) => <th key={head} className="px-3 py-2">{head}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {(instance.executions ?? []).map((execution) => (
+                      <tr key={execution.id} className="border-t border-slate-800">
+                        <td className="px-3 py-3 text-cyan-300">{execution.workOrder?.workOrderNo ?? '-'}</td>
+                        <td className="px-3 py-3 text-slate-300">{execution.productionExecution?.state ?? '-'}</td>
+                        <td className="px-3 py-3"><StatusBadge value={execution.status} /></td>
+                        <td className="px-3 py-3 text-slate-400">{date(execution.startedAt)}</td>
+                        <td className="px-3 py-3 text-slate-400">{date(execution.completedAt)}</td>
+                      </tr>
+                    ))}
+                    {!instance.executions?.length ? <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Chưa có execution evidence cho instance này.</td></tr> : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className={`${panel} p-4`}>
+              <h3 className="text-sm font-semibold">Tổng hợp kiểm tra</h3>
+              <div className="mt-3 space-y-2 text-xs text-slate-400">
+                <Info k="Operation hoàn tất" v={fmt(completedExecutions.length)} />
+                <Info k="Điều kiện queue" v="PRODUCED_WAITING_QC" />
+                <Info k="Finished Goods" v="Theo backend eligibility" />
+                <Info k="Checklist" v={finalChecklist ? `${finalChecklist.revision} · ${finalChecklist.items?.length ?? 0} tiêu chí` : 'Chưa khả dụng'} />
+              </div>
+              <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-500">
+                PASS/FAIL chỉ áp dụng đúng instance vật lý này và giữ nguyên lineage QC.
+              </p>
+              {!finalChecklist ? (
+                <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  Chưa có checklist FINAL authoritative. Không thể tạo quyết định QC cuối cho tới khi cấu hình checklist.
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
-
-        <div className="mt-5 grid gap-3 xl:grid-cols-[1fr_320px]">
-          <div className={`${panel} overflow-hidden`}>
-            <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold">Lịch sử operation</div>
-            <table className="w-full min-w-[720px] text-left text-xs">
-              <thead className="bg-slate-900/70 text-[10px] uppercase text-slate-500">
-                <tr>{['WorkOrder', 'Execution', 'Trạng thái', 'Bắt đầu', 'Hoàn thành'].map((head) => <th key={head} className="px-3 py-2">{head}</th>)}</tr>
-              </thead>
-              <tbody>
-                {(instance.executions ?? []).map((execution) => (
-                  <tr key={execution.id} className="border-t border-slate-800">
-                    <td className="px-3 py-3 text-cyan-300">{execution.workOrder?.workOrderNo ?? '-'}</td>
-                    <td className="px-3 py-3 text-slate-300">{execution.productionExecution?.state ?? '-'}</td>
-                    <td className="px-3 py-3"><StatusBadge value={execution.status} /></td>
-                    <td className="px-3 py-3 text-slate-400">{date(execution.startedAt)}</td>
-                    <td className="px-3 py-3 text-slate-400">{date(execution.completedAt)}</td>
-                  </tr>
-                ))}
-                {!instance.executions?.length ? <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Chưa có execution evidence cho instance này.</td></tr> : null}
-              </tbody>
-            </table>
-          </div>
-
-          <div className={`${panel} p-4`}>
-            <h3 className="text-sm font-semibold">Quyết định QC</h3>
-            <div className="mt-3 space-y-2 text-xs text-slate-400">
-              <Info k="Operation hoàn tất" v={fmt(completedExecutions.length)} />
-              <Info k="Điều kiện queue" v="PRODUCED_WAITING_QC" />
-              <Info k="Finished Goods" v="Chỉ backend eligibility quyết định" />
-            </div>
-            <div className="mt-4 space-y-2">
-              <button disabled={busy} onClick={() => onPass(instance)} className="w-full rounded bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">Đạt QC</button>
-              <button disabled={busy} onClick={() => onFail(instance)} className="w-full rounded bg-red-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">Không đạt + tạo NCR</button>
-            </div>
-            <p className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-500">
-              PASS chuyển đúng instance sang QC_PASSED. FAIL chuyển đúng instance sang QC_FAILED và tạo NCR có `componentInstanceId`.
-              Không tạo InventoryTransaction, Yard placement hoặc Finished Goods row.
-            </p>
-          </div>
+        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+          <button disabled={busy} onClick={onClose} className="rounded-lg border border-slate-700 px-5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/5 disabled:opacity-50">Hủy</button>
+          <button disabled={busy || !finalChecklist} onClick={() => onFail(instance)} className="rounded-lg border border-red-500/40 bg-red-500/10 px-5 py-2.5 text-xs font-semibold text-red-200 hover:bg-red-500/15 disabled:opacity-50">Không đạt</button>
+          <button disabled={busy || !finalChecklist} onClick={() => onPass(instance)} className="rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">Đạt</button>
         </div>
       </section>
     </div>
@@ -1875,12 +1933,26 @@ function NcrTab({ runtime }: { runtime: QcCockpit }) {
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const [selectedNcr, setSelectedNcr] = useState<any>(null)
 
-  const ncrList = [
-    { id: 'ncr-1', code: 'NCR-2026-001', project: 'Nhà máy Hòa Phát Phân Kỳ 2', process: 'Hàn tự động', severity: 'Critical', owner: 'Nguyễn Văn A', deadline: '2026-07-28', status: 'OPEN', rootCause: 'Dòng điện hàn không ổn định gây khuyết tật mối hàn', timeline: 'Tạo lúc 08:30 hôm nay' },
-    { id: 'ncr-2', code: 'NCR-2026-002', project: 'Sân bay Long Thành', process: 'Sơn phủ', severity: 'Major', owner: 'Trần Văn B', deadline: '2026-07-30', status: 'IN_PROGRESS', rootCause: 'Độ ẩm không khí cao vượt ngưỡng cho phép', timeline: 'Cập nhật 10:15 hôm nay' },
-    { id: 'ncr-3', code: 'NCR-2026-003', project: 'Cầu Mỹ Thuận 2', process: 'Cắt phôi', severity: 'Minor', owner: 'Lê Văn C', deadline: '2026-08-02', status: 'UNDER_CAPA', rootCause: 'Lưỡi cắt cơ khí mòn chưa thay thế kịp thời', timeline: 'Đang thực hiện CAPA' },
-    { id: 'ncr-4', code: 'NCR-2026-004', project: 'Nhà máy Hòa Phát Phân Kỳ 2', process: 'Gá tổ hợp', severity: 'Major', owner: 'Phạm Văn D', deadline: '2026-07-20', status: 'CLOSED', rootCause: 'Gá sai lệch kích thước theo bản vẽ', timeline: 'Đã hoàn thành đóng NCR' },
-  ]
+  const ncrList = runtime.ncrs.map((ncr) => ({
+    id: ncr.id,
+    code: ncr.ncrNo,
+    project: ncr.componentInstanceId ? 'Cấu kiện vật lý' : ncr.productionOrderId ? 'Lệnh sản xuất' : '-',
+    process: ncr.componentInstanceId ? 'Final QC' : 'QC',
+    severity: ncr.severity || '-',
+    owner: '-',
+    deadline: date(ncr.updatedAt),
+    status: ncr.status,
+    rootCause: ncr.title,
+    timeline: `Cập nhật: ${date(ncr.updatedAt)}`,
+  }))
+  const ncrSeverityRows = Object.entries(ncrList.reduce((map, row) => {
+    map[row.severity] = (map[row.severity] ?? 0) + 1
+    return map
+  }, {} as Record<string, number>))
+  const ncrStatusRows = Object.entries(ncrList.reduce((map, row) => {
+    map[row.status] = (map[row.status] ?? 0) + 1
+    return map
+  }, {} as Record<string, number>))
 
   const filtered = useMemo(() => {
     return ncrList.filter((r) => {
@@ -1898,34 +1970,36 @@ function NcrTab({ runtime }: { runtime: QcCockpit }) {
     <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
       {/* 6 KPI Cards */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
-        <EnterpriseKpiCard title="NCR đang mở" value="4" tone="purple" icon={<AlertTriangle size={15} />} />
-        <EnterpriseKpiCard title="Đã đóng" value="18" tone="emerald" icon={<CheckCircle2 size={15} />} />
-        <EnterpriseKpiCard title="Quá hạn" value="2" tone="red" icon={<Clock size={15} />} />
-        <EnterpriseKpiCard title="Đang CAPA" value="5" tone="amber" icon={<SlidersHorizontal size={15} />} />
-        <EnterpriseKpiCard title="Critical NCR" value="1" tone="red" icon={<XCircle size={15} />} />
-        <EnterpriseKpiCard title="Average Close Time" value="3.5 ngày" tone="blue" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="NCR đang mở" value={formatQuantity(runtime.metrics.openNcrs, 0)} tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Tổng NCR" value={formatQuantity(ncrList.length, 0)} tone="blue" icon={<FileText size={15} />} />
+        <EnterpriseKpiCard title="Không đạt/Rework" value={formatQuantity(runtime.metrics.failed + runtime.metrics.rework, 0)} tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Đang CAPA" value="0" tone="amber" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Critical NCR" value={formatQuantity(ncrList.filter((row) => row.severity.toUpperCase() === 'CRITICAL').length, 0)} tone="red" icon={<XCircle size={15} />} />
+        <EnterpriseKpiCard title="Average Close Time" value="-" tone="blue" icon={<CalendarClock size={15} />} />
       </div>
 
       {/* 4 Analytics Dashboards */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="NCR theo nguyên nhân" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Kích thước sai lệch', 8], ['Mối hàn lỗi / Bọt khí', 6], ['Sơn bóng tróc', 4], ['Vật tư không đạt', 2]]} />
+          <CockpitEmptyState title="Chưa có root-cause" description="NCR backend hiện chưa trả root-cause taxonomy authoritative." icon={<AlertTriangle size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="NCR theo dự án" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['NM Hòa Phát Phân Kỳ 2', 10], ['Sân bay Long Thành', 6], ['Cầu Mỹ Thuận 2', 4]]} />
+          <StatusMiniBars rows={ncrStatusRows.slice(0, 5)} />
         </CockpitChartCard>
         <CockpitChartCard title="NCR theo mức độ" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitStatusList items={[
-            { id: '1', label: 'Critical (Nghiêm trọng)', value: '1 NCR', statusTone: 'red' },
-            { id: '2', label: 'Major (Nặng)', value: '4 NCR', statusTone: 'amber' },
-            { id: '3', label: 'Minor (Nhẹ)', value: '8 NCR', statusTone: 'cyan' },
-          ]} />
+          <StatusMiniBars rows={ncrSeverityRows.slice(0, 5)} />
         </CockpitChartCard>
         <CockpitChartCard title="Trend đóng NCR" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'NCR-2026-004 đã xử lý', subtitle: 'Hoàn thành bởi Nguyễn Văn A', time: 'Hôm nay', statusDot: 'bg-emerald-400' },
-            { id: '2', title: 'NCR-2026-003 chuyển CAPA', subtitle: 'Phê duyệt bởi Trưởng phòng QC', time: 'Hôm qua', statusDot: 'bg-blue-400' },
-          ]} />
+          <CockpitRecentList
+            items={ncrList.slice(0, 5).map((row) => ({
+              id: row.id,
+              title: row.code,
+              subtitle: row.rootCause,
+              time: row.status,
+              statusDot: 'bg-amber-400',
+            }))}
+            emptyMessage="Chưa có NCR."
+          />
         </CockpitChartCard>
       </div>
 
@@ -2045,27 +2119,32 @@ function NcrTab({ runtime }: { runtime: QcCockpit }) {
       {/* Drawer */}
       {selectedNcr ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <section className="h-full w-full max-w-2xl overflow-y-auto border-l border-cyan-900 bg-[#05101d] p-6 shadow-2xl space-y-4">
+          <section className="flex h-full w-full max-w-2xl flex-col overflow-hidden border-l border-cyan-900 bg-[#05101d] shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
+              <div className="px-6 pt-6">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-400">Chi tiết NCR</span>
                 <h2 className="text-lg font-bold text-white mt-0.5">{selectedNcr.code}</h2>
               </div>
-              <button type="button" onClick={() => setSelectedNcr(null)} className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={16} /></button>
+              <button type="button" onClick={() => setSelectedNcr(null)} className="mr-6 mt-6 rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={16} /></button>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Dự án</div><div className="text-white font-medium">{selectedNcr.project}</div></div>
-              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Công đoạn</div><div className="text-cyan-300 font-medium">{selectedNcr.process}</div></div>
-              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Mức độ & Hạn chót</div><div className="text-slate-200 font-semibold">{selectedNcr.severity} · {selectedNcr.deadline}</div></div>
-              <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Chủ sở hữu</div><div className="text-cyan-400 font-mono">{selectedNcr.owner}</div></div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Đối tượng</div><div className="text-white font-medium">{selectedNcr.project}</div></div>
+                <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Công đoạn</div><div className="text-cyan-300 font-medium">{selectedNcr.process}</div></div>
+                <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Mức độ & hạn chót</div><div className="text-slate-200 font-semibold">{selectedNcr.severity} · {selectedNcr.deadline}</div></div>
+                <div className={`${panel} p-3 space-y-1`}><div className="text-[10px] text-slate-500 uppercase">Phụ trách</div><div className="text-cyan-400 font-mono">{selectedNcr.owner}</div></div>
+              </div>
+              <div className={`${panel} p-4 space-y-2`}>
+                <h3 className="text-xs font-bold text-cyan-300 uppercase">Mô tả không phù hợp</h3>
+                <p className="text-xs text-slate-300">{selectedNcr.rootCause}</p>
+              </div>
+              <div className={`${panel} p-4 space-y-2`}>
+                <h3 className="text-xs font-bold text-cyan-300 uppercase">Lịch sử / hoạt động</h3>
+                <p className="text-xs text-slate-400">{selectedNcr.timeline}</p>
+              </div>
             </div>
-            <div className={`${panel} p-4 space-y-2`}>
-              <h3 className="text-xs font-bold text-cyan-300 uppercase">Root Cause Analysis</h3>
-              <p className="text-xs text-slate-300">{selectedNcr.rootCause}</p>
-            </div>
-            <div className={`${panel} p-4 space-y-2`}>
-              <h3 className="text-xs font-bold text-cyan-300 uppercase">Timeline & Activity</h3>
-              <p className="text-xs text-slate-400">{selectedNcr.timeline}</p>
+            <div className="flex justify-end border-t border-white/10 px-6 py-4">
+              <button type="button" onClick={() => setSelectedNcr(null)} className="rounded-lg border border-slate-700 px-5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/5">Đóng</button>
             </div>
           </section>
         </div>
@@ -2085,11 +2164,17 @@ function CapaTab({ runtime }: { runtime: QcCockpit }) {
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const [selectedCapa, setSelectedCapa] = useState<any>(null)
 
-  const capaList = [
-    { id: 'capa-1', code: 'CAPA-2026-001', ncrCode: 'NCR-2026-001', owner: 'Nguyễn Văn A', dueDate: '2026-08-05', progress: 75, verification: 'PENDING', status: 'IN_PROGRESS', actionPlan: 'Định kỳ hiệu chuẩn dòng điện hàn hàng ngày' },
-    { id: 'capa-2', code: 'CAPA-2026-002', ncrCode: 'NCR-2026-002', owner: 'Trần Văn B', dueDate: '2026-08-10', progress: 40, verification: 'PENDING', status: 'IN_PROGRESS', actionPlan: 'Lắp đặt máy hút ẩm tự động phòng sơn' },
-    { id: 'capa-3', code: 'CAPA-2026-003', ncrCode: 'NCR-2026-003', owner: 'Lê Văn C', dueDate: '2026-07-25', progress: 100, verification: 'VERIFIED', status: 'COMPLETED', actionPlan: 'Thay bộ dao cắt đĩa hợp kim mới' },
-  ]
+  const capaList: Array<{
+    id: string
+    code: string
+    ncrCode: string
+    owner: string
+    dueDate: string
+    progress: number
+    verification: string
+    status: string
+    actionPlan: string
+  }> = []
 
   const filtered = useMemo(() => {
     return capaList.filter((r) => {
@@ -2106,33 +2191,27 @@ function CapaTab({ runtime }: { runtime: QcCockpit }) {
     <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
       {/* 6 KPI Cards */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
-        <EnterpriseKpiCard title="CAPA mở" value="8" tone="amber" icon={<SlidersHorizontal size={15} />} />
-        <EnterpriseKpiCard title="Đang thực hiện" value="5" tone="blue" icon={<Clock size={15} />} />
-        <EnterpriseKpiCard title="Hoàn thành" value="24" tone="emerald" icon={<CheckCircle2 size={15} />} />
-        <EnterpriseKpiCard title="Quá hạn" value="1" tone="red" icon={<CalendarClock size={15} />} />
-        <EnterpriseKpiCard title="Verification Pending" value="2" tone="purple" icon={<AlertTriangle size={15} />} />
-        <EnterpriseKpiCard title="Effectiveness" value="94.2%" tone="emerald" icon={<ShieldCheck size={15} />} />
+        <EnterpriseKpiCard title="CAPA mở" value="0" tone="amber" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Đang thực hiện" value="0" tone="blue" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Hoàn thành" value="0" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Quá hạn" value="0" tone="red" icon={<CalendarClock size={15} />} />
+        <EnterpriseKpiCard title="Verification Pending" value="0" tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Effectiveness" value="-" tone="emerald" icon={<ShieldCheck size={15} />} />
       </div>
 
       {/* Analytics Dashboard */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="CAPA Progress" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Đúng tiến độ', 80], ['Trễ hạn', 10], ['Chờ nghiệm thu', 10]]} />
+          <CockpitEmptyState title="Chưa có dữ liệu CAPA" description="QC backend chưa có read-model CAPA authoritative." icon={<SlidersHorizontal size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="CAPA theo Owner" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'Nguyễn Văn A', subtitle: 'Phòng Kỹ thuật Sản xuất', time: '3 CAPA', statusDot: 'bg-cyan-400' },
-            { id: '2', title: 'Trần Văn B', subtitle: 'Phòng QLCL (QC)', time: '2 CAPA', statusDot: 'bg-emerald-400' },
-          ]} />
+          <CockpitEmptyState title="Chưa có owner CAPA" description="Không hiển thị owner giả khi backend chưa cung cấp." icon={<ClipboardCheck size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="CAPA theo Loại" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Hành động khắc phục (Corrective)', 18], ['Hành động phòng ngừa (Preventive)', 14]]} />
+          <CockpitEmptyState title="Chưa có phân loại CAPA" description="Chờ read-model phân loại CAPA từ backend QC." icon={<FileBarChart size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Completion Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitStatusList items={[
-            { id: '1', label: 'Tỷ lệ đúng hạn tháng này', value: '94.2%', statusTone: 'emerald' },
-            { id: '2', label: 'Thời gian hoàn thành TB', value: '6.2 ngày', statusTone: 'cyan' },
-          ]} />
+          <CockpitEmptyState title="Chưa có trend CAPA" description="Không dựng tỷ lệ hoàn thành khi chưa có nguồn dữ liệu." icon={<CalendarClock size={18} />} />
         </CockpitChartCard>
       </div>
 
@@ -2274,11 +2353,7 @@ function AuditLogsTab({ runtime }: { runtime: QcCockpit }) {
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState<any>(null)
 
-  const logList = [
-    { id: 'log-1', time: '2026-07-24 15:42:10', user: 'Nguyễn Văn A', module: 'QC Inbound', action: 'CREATE_INSPECTION', object: 'INS-2026-089', ip: '192.168.1.45', detail: 'Tạo phiếu kiểm tra đầu vào thép tấm Hòa Phát' },
-    { id: 'log-2', time: '2026-07-24 14:18:22', user: 'Trần Văn B', module: 'NCR Management', action: 'UPDATE_STATUS', object: 'NCR-2026-002', ip: '192.168.1.62', detail: 'Cập nhật trạng thái NCR thành IN_PROGRESS' },
-    { id: 'log-3', time: '2026-07-24 11:05:01', user: 'Lê Văn C', module: 'Reports', action: 'EXPORT_PDF', object: 'RPT-2026-Q2', ip: '192.168.1.88', detail: 'Xuất báo cáo tổng hợp chất lượng Quý 2 PDF' },
-  ]
+  const logList: Array<{ id: string; time: string; user: string; module: string; action: string; object: string; ip: string; detail: string }> = []
 
   const filtered = useMemo(() => {
     return logList.filter((r) => {
@@ -2294,34 +2369,27 @@ function AuditLogsTab({ runtime }: { runtime: QcCockpit }) {
     <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
       {/* 6 KPI Cards */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
-        <EnterpriseKpiCard title="Tổng hoạt động" value="1,248" tone="blue" icon={<FileBarChart size={15} />} />
-        <EnterpriseKpiCard title="Người dùng" value="34" tone="cyan" icon={<Gauge size={15} />} />
-        <EnterpriseKpiCard title="Thao tác hôm nay" value="86" tone="emerald" icon={<Clock size={15} />} />
-        <EnterpriseKpiCard title="Login" value="42" tone="emerald" icon={<CheckCircle2 size={15} />} />
-        <EnterpriseKpiCard title="Export" value="15" tone="amber" icon={<ListChecks size={15} />} />
-        <EnterpriseKpiCard title="Critical Events" value="2" tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="Tổng hoạt động" value="0" tone="blue" icon={<FileBarChart size={15} />} />
+        <EnterpriseKpiCard title="Người dùng" value="0" tone="cyan" icon={<Gauge size={15} />} />
+        <EnterpriseKpiCard title="Thao tác hôm nay" value="0" tone="emerald" icon={<Clock size={15} />} />
+        <EnterpriseKpiCard title="Login" value="0" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Export" value="0" tone="amber" icon={<ListChecks size={15} />} />
+        <EnterpriseKpiCard title="Critical Events" value="0" tone="purple" icon={<AlertTriangle size={15} />} />
       </div>
 
       {/* Analytics Dashboard */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="User Activity" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Tạo phiếu QC', 450], ['Duyệt NCR/CAPA', 320], ['Xuất báo cáo', 210], ['Thay đổi cấu hình', 80]]} />
+          <CockpitEmptyState title="Chưa có audit logs" description="QC backend chưa trả audit log read-model cho tab này." icon={<FileBarChart size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Action Distribution" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitStatusList items={[
-            { id: '1', label: 'CREATE', value: '45%', statusTone: 'emerald' },
-            { id: '2', label: 'UPDATE / APPROVE', value: '35%', statusTone: 'cyan' },
-            { id: '3', label: 'EXPORT / SYSTEM', value: '20%', statusTone: 'purple' },
-          ]} />
+          <CockpitEmptyState title="Chưa có phân bổ hành động" description="Không dựng tỷ lệ thao tác khi chưa có nguồn dữ liệu." icon={<ListChecks size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Login Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['08:00 - 10:00', 24], ['10:00 - 12:00', 12], ['13:00 - 15:00', 18], ['15:00 - 17:00', 8]]} />
+          <CockpitEmptyState title="Chưa có login trend" description="Login history không thuộc QC read-model hiện tại." icon={<Clock size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Top Users" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'Nguyễn Văn A', subtitle: 'QC Lead', time: '142 thao tác', statusDot: 'bg-emerald-400' },
-            { id: '2', title: 'Trần Văn B', subtitle: 'QC Inspector', time: '98 thao tác', statusDot: 'bg-cyan-400' },
-          ]} />
+          <CockpitEmptyState title="Chưa có top users" description="Không hiển thị người dùng giả khi backend chưa cung cấp." icon={<Gauge size={18} />} />
         </CockpitChartCard>
       </div>
 
@@ -2460,11 +2528,7 @@ function ReportsTab({ runtime }: { runtime: QcCockpit }) {
   const [pageSize, setPageSize] = useState(15)
   const [selectedReport, setSelectedReport] = useState<any>(null)
 
-  const reportList = [
-    { id: 'rpt-1', name: 'Báo cáo Chất lượng Tổng hợp Phân kỳ 2', project: 'Nhà máy Hòa Phát Phân Kỳ 2', customer: 'Tập đoàn Hòa Phát', supplier: 'Thép Hòa Phát', passRate: '98.5%', ncr: '2 NCR', capa: '1 CAPA' },
-    { id: 'rpt-2', name: 'Báo cáo Nghiệm thu Đầu vào Vật tư Thép', project: 'Sân bay Long Thành', customer: 'ACV', supplier: 'Thép Hoa Sen', passRate: '96.2%', ncr: '1 NCR', capa: '0 CAPA' },
-    { id: 'rpt-3', name: 'Báo cáo QC Xuất xưởng Lô B-2026', project: 'Cầu Mỹ Thuận 2', customer: 'Bộ GTVT', supplier: 'VinaOne', passRate: '99.0%', ncr: '0 NCR', capa: '0 CAPA' },
-  ]
+  const reportList: Array<{ id: string; name: string; project: string; customer: string; supplier: string; passRate: string; ncr: string; capa: string }> = []
 
   const filtered = useMemo(() => {
     return reportList.filter((r) => {
@@ -2480,40 +2544,33 @@ function ReportsTab({ runtime }: { runtime: QcCockpit }) {
     <div className="w-full min-w-0 flex-1 space-y-1 mt-1">
       {/* 6 KPI Cards */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
-        <EnterpriseKpiCard title="Tổng báo cáo" value="48" tone="blue" icon={<FileBarChart size={15} />} />
-        <EnterpriseKpiCard title="Pass Rate" value="96.8%" tone="emerald" icon={<CheckCircle2 size={15} />} />
-        <EnterpriseKpiCard title="NCR Rate" value="2.1%" tone="purple" icon={<AlertTriangle size={15} />} />
-        <EnterpriseKpiCard title="CAPA Rate" value="1.4%" tone="amber" icon={<SlidersHorizontal size={15} />} />
-        <EnterpriseKpiCard title="Rework Rate" value="1.8%" tone="red" icon={<RotateCcw size={15} />} />
-        <EnterpriseKpiCard title="Quality Score" value="9.4 / 10" tone="cyan" icon={<ShieldCheck size={15} />} />
+        <EnterpriseKpiCard title="Tổng báo cáo" value="0" tone="blue" icon={<FileBarChart size={15} />} />
+        <EnterpriseKpiCard title="Pass Rate" value={`${fmt(runtime.metrics.passRate)}%`} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="NCR mở" value={formatQuantity(runtime.metrics.openNcrs, 0)} tone="purple" icon={<AlertTriangle size={15} />} />
+        <EnterpriseKpiCard title="CAPA Rate" value="-" tone="amber" icon={<SlidersHorizontal size={15} />} />
+        <EnterpriseKpiCard title="Rework" value={formatQuantity(runtime.metrics.rework, 0)} tone="red" icon={<RotateCcw size={15} />} />
+        <EnterpriseKpiCard title="Quality Score" value="-" tone="cyan" icon={<ShieldCheck size={15} />} />
       </div>
 
       {/* 6 Analytics Dashboards / Pareto / Heatmap */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
         <CockpitChartCard title="Pass Rate Trend" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Tháng 5', 95], ['Tháng 6', 97], ['Tháng 7', 98]]} />
+          <StatusMiniBars rows={runtime.trend.slice(0, 6).map((row) => [row.date, row.passed])} />
         </CockpitChartCard>
         <CockpitChartCard title="Defect Pareto" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Kích thước', 45], ['Mối hàn', 30], ['Sơn phủ', 15], ['Khác', 10]]} />
+          <StatusMiniBars rows={runtime.metrics.defects.slice(0, 6).map((row) => [row.severity, row._count])} />
         </CockpitChartCard>
         <CockpitChartCard title="Supplier Ranking" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitStatusList items={[
-            { id: '1', label: '1. Thép Hòa Phát', value: '99.2%', statusTone: 'emerald' },
-            { id: '2', label: '2. Thép Hoa Sen', value: '97.5%', statusTone: 'cyan' },
-            { id: '3', label: '3. VinaOne', value: '95.0%', statusTone: 'amber' },
-          ]} />
+          <CockpitEmptyState title="Chưa có supplier ranking" description="QC read-model chưa cung cấp ranking nhà cung cấp." icon={<ShieldCheck size={18} />} />
         </CockpitChartCard>
         <CockpitChartCard title="Project Quality" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['NM Hòa Phát PK2', 98], ['Long Thành', 96], ['Mỹ Thuận 2', 99]]} />
+          <StatusMiniBars rows={runtime.byProject.slice(0, 6).map((row) => [row.projectName, row.passRate])} />
         </CockpitChartCard>
         <CockpitChartCard title="Monthly QC" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Tháng 5', 320], ['Tháng 6', 410], ['Tháng 7', 480]]} />
+          <StatusMiniBars rows={runtime.trend.slice(0, 6).map((row) => [row.date, row.total])} />
         </CockpitChartCard>
         <CockpitChartCard title="Defect Heatmap" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'Phân xưởng Hàn', subtitle: '12 vụ lỗi (Vùng Đỏ)', time: 'High Risk', statusDot: 'bg-red-400' },
-            { id: '2', title: 'Phân xưởng Sơn', subtitle: '5 vụ lỗi (Vùng Vàng)', time: 'Medium Risk', statusDot: 'bg-amber-400' },
-          ]} />
+          <CockpitEmptyState title="Chưa có heatmap lỗi" description="Backend chưa trả work center/zone cho defect heatmap." icon={<AlertTriangle size={18} />} />
         </CockpitChartCard>
       </div>
 

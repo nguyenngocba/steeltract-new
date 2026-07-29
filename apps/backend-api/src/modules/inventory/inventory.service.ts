@@ -47,12 +47,51 @@ export class InventoryService {
 
   async getItems() {
     const items = await this.inventoryRepository.findItems({
-      take: 100,
+      take: 1000,
     });
     const stockByItemId = await this.getStockMap(items.map((item) => item.id));
+    const warehouseIds = Array.from(
+      new Set(
+        items.flatMap((item) =>
+          (item.locationStocks ?? [])
+            .map((stock) => stock.warehouseId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    );
+    const warehouses = await this.inventoryRepository.findWarehousesByIds(
+      warehouseIds,
+    );
+    const warehouseById = new Map(
+      warehouses.map((warehouse) => [warehouse.id, warehouse]),
+    );
 
     return items.map((item) => {
       const quantity = stockByItemId[item.id] ?? item.quantity ?? 0;
+      const locationBalances = (item.locationStocks ?? [])
+        .map((stock) => {
+          const directWarehouse = stock.warehouseId
+            ? warehouseById.get(stock.warehouseId)
+            : null;
+          const warehouse = stock.zone?.warehouse ?? directWarehouse ?? null;
+          return {
+            warehouseId: stock.warehouseId ?? stock.zone?.warehouseId ?? null,
+            warehouseCode: warehouse?.code ?? null,
+            warehouseName: warehouse?.name ?? null,
+            zoneId: stock.zoneId,
+            zoneCode: stock.zone?.code ?? null,
+            zoneName: stock.zone
+              ? `${stock.zone.code} - ${stock.zone.name}`
+              : null,
+            row: stock.zone?.row ?? null,
+            column: stock.zone?.column ?? null,
+            slotId: stock.slotId,
+            level: stock.level,
+            quantity: Number(stock.quantity ?? 0),
+          };
+        })
+        .filter((location) => location.quantity > 0)
+        .sort((a, b) => b.quantity - a.quantity);
 
       return {
         id: item.id,
@@ -71,6 +110,7 @@ export class InventoryService {
         zone: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
         zoneCode: item.zone?.code ?? '',
         zoneName: item.zone?.name ?? '',
+        locationBalances,
         status:
           quantity <= 5
             ? 'CRITICAL'
@@ -595,6 +635,8 @@ export class InventoryService {
               id: string;
               code: string;
               unit: string | null;
+              quantity: number | null;
+              updatedAt: Date;
               unitMaster: { code: string; symbol: string } | null;
             }
           >();
@@ -757,6 +799,15 @@ export class InventoryService {
               quantity: Number(updated.quantity),
               aggregateVersion: updated.updatedAt.getTime(),
             });
+          }
+          if (type === TransactionType.TRANSFER) {
+            for (const [materialId, item] of itemsById.entries()) {
+              if (materialBalances.has(materialId)) continue;
+              materialBalances.set(materialId, {
+                quantity: Number(item.quantity ?? 0),
+                aggregateVersion: item.updatedAt.getTime(),
+              });
+            }
           }
 
           const locationBalances = new Map<string, number>();

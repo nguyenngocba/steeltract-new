@@ -1,5 +1,70 @@
 # Project Status
 
+On 2026-07-29 completed **SPRINT EXECUTIVE BI.8 – Redesign Inventory Analytics Charts**. Redesigned the 5 core Inventory Executive BI cards (`WarehouseCapacityCard`, `AbcAnalysisCard`, `InventoryAgingCard`, `TransactionTrendCard`, and `TopInventoryRankingCard`) in `DashboardPage.tsx` & `AnalyticsPrimitives.tsx`. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-29 completed **STABILITY.OPS3A1.1 – Runtime Production Warehouse
+Certification**. Used the healthy already-running backend on
+`http://127.0.0.1:3000`, where `/health/live` and `/health/ready` passed and
+readiness reported database `up`. Created controlled fixture
+`OPS3A1-RT-20260729030324` entirely through authenticated HTTP APIs:
+Material Master, MAIN receipt, MAIN -> PRODUCTION transfer, Production BOM,
+Production Order release and Production Reservation. Runtime evidence proved
+MAIN 60, PRODUCTION 40 and total 100 after transfer; `/inventory/items` exposed
+both location balances; Components Production Warehouse and BOM availability
+both read PRODUCTION 40 / available 40 before reservation; reservation moved
+active reserved 0 -> 20 while onHand(PRODUCTION) stayed 40 and Production
+readiness available moved 40 -> 20. Existing PRODUCTION stock audit found 9
+materials, 11 location balances and total 4216.9, exactly matching the
+`/inventory/items` API exposure. Created
+`docs/audits/stability-ops3a1-runtime-production-warehouse-certification.md`.
+Browser smoke was not tested. No source code, schema, migration, stage or
+commit was performed.
+
+On 2026-07-29 implemented **STEELTRACK UI.OPS.3A.1 – Production Warehouse
+Source-of-Truth Fix**. The root cause was `/inventory/items` omitting
+canonical `InventoryLocationStock` location balances while Components
+`Kho vật tư sản xuất` and the Production BOM picker expected
+`locationBalances` filtered to warehouse `PRODUCTION`. The API now returns
+warehouse/zone/slot/level balances, Production BOM material selection displays
+Production stock/reserved/available and Main Warehouse informational stock
+separately, and Production material readiness now uses
+`onHand(PRODUCTION) - activeReservations` instead of deriving stock from
+historical transaction remarks or subtracting issued material twice. Created
+`docs/audits/ui-ops3a1-production-warehouse-source-of-truth-report.md`.
+Prisma validate, Prisma migrate status, targeted tests, full backend tests,
+frontend tests, backend build, frontend build and `git diff --check` passed.
+Runtime HTTP smoke remains blocked by PostgreSQL connectivity at
+`localhost:5432`; no direct Prisma mutation, stage or commit was performed.
+
+On 2026-07-28 implemented **STEELTRACK UI.OPS.3B – Operational Forms
+Convergence** as a frontend-first forms sprint. Added shared operational form
+primitives for primary form, assistant rail, summary and explicit suggestions.
+Both Components create entry points now use one canonical
+`ComponentDefinitionRequirementForm` with real Component/Project suggestions
+and no hardcoded type/profile options. Production BOM authoring now presents
+readonly Material Master identity, Production stock/reservation/availability
+context, location evidence and explicit stock-backed suggestions without
+changing BOM material-flow semantics. Production Order creation now defaults to
+remaining ProjectComponentRequirement demand and blocks quantities above the
+remaining requirement. Final QC physical-instance detail now exposes FINAL
+checklist readiness and disables PASS/FAIL when no authoritative checklist is
+available. Created
+`docs/audits/ui-ops3b-operational-forms-convergence-report.md`. Frontend tests
+and frontend build passed; backend was not changed.
+
+On 2026-07-28 implemented **STEELTRACK UI.OPS.1 – Components / Production /
+QC Operational UI Convergence** as a frontend-only UI/data-semantics pass.
+Components material-stock is now labeled **Kho vật tư sản xuất** and uses
+Inventory material `locationBalances` filtered to warehouse `PRODUCTION` for
+current production stock instead of frontend transaction remark aggregation.
+Components create modals no longer hardcode Beam/Column/Plate values; type and
+profile suggestions come from existing component data. Production Order create
+copy now aligns to the requirement-first workflow. QC touched surfaces removed
+obvious demo data; NCR reads `runtime.ncrs`, while CAPA/audit/reports show
+controlled empty states where no authoritative backend read-model exists.
+Created `docs/audits/ui-ops1-components-production-qc-convergence-report.md`.
+Frontend tests and frontend build passed. Backend was not changed.
+
 On 2026-07-28 completed **COMPONENT DOMAIN.5G – End-to-End Operational
 Certification** as a certification/stability sprint. The canonical
 Components -> Production -> QC -> Finished Goods chain is conditionally
@@ -1630,3 +1695,29 @@ available; EPIC144 did not invent missing workflows.
 - Backend build: PASS.
 - Frontend build: PASS, existing chunk-size warning only.
 - Overall DOMAIN.5G status: BACKEND GREEN, browser certification pending.
+
+# STEELTRACK UI.OPS.2 Visual & Form Convergence
+
+- Components create form canonical semantics: PASS.
+- Production BOM Material Master lookup: PASS.
+- Production Order requirement-first form layout: PASS.
+- QC inspection/final-instance/NCR bounded detail surfaces: PASS.
+- Backend/API/schema changes: NONE.
+- Frontend build: PASS, existing chunk-size warning only.
+- Screenshot certification: PENDING.
+
+# UI.OPS.3A Production Material Flow Canonicalization
+
+- Production Material Warehouse source of truth: PASS, current balances use
+  `InventoryLocationStock` for `PRODUCTION`.
+- MAIN -> PRODUCTION transfer conservation: PASS by unit coverage.
+- Engineering BOM decoupled from Production stock: PASS.
+- BOM material availability enrichment: PASS by source/build; browser smoke
+  pending.
+- Components Production stock reserved/available display: PASS by source/build.
+- Historical backfill: NOT PERFORMED, no authoritative runtime audit completed.
+- Runtime OPS3 fixture: BLOCKED, direct PrismaClient cannot reach
+  `localhost:5432`.
+- Backend tests: PASS, 81/81 suites and 252/252 tests.
+- Backend build: PASS.
+- Frontend test/build: PASS, existing Vite chunk-size warning only.

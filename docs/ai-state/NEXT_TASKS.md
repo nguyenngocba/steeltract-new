@@ -1,5 +1,34 @@
 # Next Tasks
 
+- **UI.OPS.3A.1 browser visual smoke - P2**: optional follow-up after runtime
+  certification. Open Components `Kho vật tư sản xuất` and Production BOM
+  create/edit in a browser with authenticated data and confirm the certified
+  API values render visually. Backend/runtime certification already passed.
+- **UI.OPS.3B browser form smoke - P1**: open Components create from global
+  action and Components list, Production BOM modal, Production Order modal and
+  `/qc/final` physical-instance detail. Verify assistant rail, summary,
+  validation, keyboard focus and responsive desktop layout against the
+  Inventory receipt form baseline.
+- **Production requirement shortage read-model - P1**: expose authoritative
+  requirement-level BOM material availability/shortage if the Production Order
+  assistant must show exact shortage lines before reservation. Do not infer
+  shortage from demo data or stale frontend state.
+- **Final QC checklist capture - P2**: after checklist templates/results are
+  expanded, replace the current PASS/FAIL-only detail with controlled
+  checklist result entry while preserving ComponentInstance identity.
+
+- **UI.OPS.1 browser visual smoke - P1**: open Components list, Components
+  `Kho vật tư sản xuất`, Production Order create modal and QC overview/inbound/
+  production/final/NCR/CAPA/logs/reports with authenticated data. Verify layout
+  still matches the Inventory cockpit canon and no controlled empty state is
+  visually oversized.
+- **Production stock reservation read-model - P1**: expose authoritative
+  production-stock reserved/held quantity if the Components material-stock page
+  must show real reservation balances. Do not derive reserved stock in the
+  frontend from transaction remarks or partial issue history.
+- **QC CAPA/audit/report read contracts - P1**: define backend read-models
+  before replacing the controlled empty states added by UI.OPS.1. Do not
+  restore local fixture data.
 - **Component DOMAIN.5G runtime certification rerun - P1**: fix the
   environment/runtime DB connectivity issue that prevents `pnpm -C
   apps/backend-api start` from reaching PostgreSQL at `localhost:5432`, then
@@ -1115,3 +1144,26 @@ Backlog after the locked order:
 3. Consider a narrow WorkOrder ready command REST endpoint if future multi-step
    HTTP-only execution certification must advance individual WorkOrders without
    order-level ready orchestration.
+
+# STEELTRACK UI.OPS.2 Follow-up
+
+1. Run browser screenshot review for Components create/detail, Production BOM,
+   Production Order and QC final instance detail against Inventory reference
+   surfaces.
+2. Review large `Xem tat ca` list modals separately; UI.OPS.2 intentionally
+   focused on operational forms and record details.
+3. Add a shared canonical form shell only after the next pass confirms the
+   converged layouts are stable across Components, Production and QC.
+
+# UI.OPS.3A Follow-up
+
+1. Rerun OPS3 runtime fixture once DB/API runtime is reachable:
+   Material Master -> MAIN receipt -> TRANSFER to PRODUCTION -> Production
+   balance -> reservation -> BOM creation.
+2. Audit existing `[COMPONENT_PRODUCTION]` historical transactions with
+   source/destination line evidence before proposing any reconciliation or
+   backfill.
+3. Add browser smoke for `Kho vật tư sản xuất` and Production BOM material
+   availability enrichment.
+4. Decide in UI.OPS.3B whether BOM should expose the existing Inventory
+   material-create flow as `+ Tao vat tu moi`.

@@ -75,6 +75,90 @@ export function EnterpriseFormGrid({
   return <div className={`grid grid-cols-1 gap-3 ${columnsClass} ${className}`}>{children}</div>
 }
 
+export function EnterpriseOperationalFormLayout({
+  primary,
+  assistant,
+  summary,
+  className = '',
+}: {
+  primary: ReactNode
+  assistant: ReactNode
+  summary?: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={`space-y-4 ${className}`}>
+      <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-4">{primary}</div>
+        <aside className="min-w-0 space-y-3">{assistant}</aside>
+      </div>
+      {summary ? <div className="min-w-0">{summary}</div> : null}
+    </div>
+  )
+}
+
+export function EnterpriseAssistantPanel({
+  title,
+  description,
+  children,
+  className = '',
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={`rounded-xl border border-cyan-300/10 bg-slate-950/50 p-4 text-xs ${className}`}>
+      <header className="mb-3">
+        <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+        {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
+      </header>
+      {children}
+    </section>
+  )
+}
+
+export function EnterpriseSummaryPanel({
+  title = 'Tổng hợp',
+  children,
+  className = '',
+}: {
+  title?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={`rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-4 text-xs text-cyan-100 ${className}`}>
+      <div className="mb-3 font-semibold uppercase tracking-[0.14em] text-cyan-200">{title}</div>
+      {children}
+    </section>
+  )
+}
+
+export function EnterpriseSuggestionButton({
+  children,
+  onClick,
+  disabled = false,
+  className = '',
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs text-slate-300 transition hover:border-cyan-300/35 hover:bg-cyan-300/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function EnterpriseField({
   label,
   required = false,

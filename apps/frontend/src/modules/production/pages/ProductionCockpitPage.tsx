@@ -3814,7 +3814,21 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
             <div className="grid gap-2 md:grid-cols-4">{(latest.stages??[]).map(item=><div key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3"><div className="text-xs text-slate-400">Bước {item.sequence}</div><div className="mt-1 text-sm">{item.name}</div><div className="mt-2"><StatusChip status={item.status}/></div></div>)}</div>
           </ProductionPanel>
           <ProductionPanel title="Nhu cầu vật tư theo BOM">
-            <table className="w-full text-left text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr>{['Material','Required','Available SX','Issued','Shortage','Unit'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr></thead><tbody>{requirements.map(row=><tr className="border-t border-slate-800" key={row.materialId}><td className="py-3 text-cyan-300">{row.materialCode} · {row.materialName}</td><td>{number(row.requiredQty)}</td><td>{number(row.availableQty)}</td><td>{number(row.issuedQty)}</td><td className={row.shortageQty?'text-red-300':'text-emerald-300'}>{number(row.shortageQty)}</td><td>{row.unit}</td></tr>)}</tbody></table>
+            <table className="w-full min-w-[900px] text-left text-xs">
+              <thead className="text-[10px] uppercase text-slate-500">
+                <tr>{['Material','Required','On hand SX','Reserved','Available SX','Issued','Shortage','Unit'].map(x=><th className="pb-3" key={x}>{x}</th>)}</tr>
+              </thead>
+              <tbody>{requirements.map(row=><tr className="border-t border-slate-800" key={row.materialId}>
+                <td className="py-3 text-cyan-300">{row.materialCode} · {row.materialName}</td>
+                <td>{number(row.requiredQty)}</td>
+                <td>{number(row.onHandQty ?? row.availableQty)}</td>
+                <td>{number(row.reservedQty ?? 0)}</td>
+                <td>{number(row.availableQty)}</td>
+                <td>{number(row.issuedQty)}</td>
+                <td className={row.shortageQty?'text-red-300':'text-emerald-300'}>{number(row.shortageQty)}</td>
+                <td>{row.unit}</td>
+              </tr>)}</tbody>
+            </table>
           </ProductionPanel>
           <ProductionPanel title="Giữ chỗ vật tư kho sản xuất" action={<StatusChip status={reservationPreview?.status ?? 'PREVIEW'} />}>
             <div className="mb-3 grid gap-2 md:grid-cols-4">

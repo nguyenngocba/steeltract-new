@@ -1,5 +1,143 @@
 # SteelTrack AI Changelog
 
+## 2026-07-29 SPRINT EXECUTIVE BI.8 – Redesign Inventory Analytics Charts
+
+Completed:
+
+- **Task 1: Redesigned "Sức chứa và sử dụng kho" (`WarehouseCapacityCard`)**:
+  - Replaced empty layout with a large Donut chart (Center text: "Tổng Sức Chứa" + Total Tonnage e.g. 1,680 Tấn), summary legend for Used (`84.5%`) and Free (`15.5%`) capacity with progress bars, and a bottom utilization trend line indicator.
+
+- **Task 2: Redesigned "Phân tích ABC theo giá trị tồn" (`AbcAnalysisCard`)**:
+  - Integrated a Pareto Donut chart alongside 3 horizontal progress cards for Category A (Emerald `#10b981`), Category B (Amber `#f59e0b`), and Category C (Red `#ef4444`) with values, percentages, and progress bars.
+
+- **Task 3: Redesigned "Tuổi tồn kho" (`InventoryAgingCard`)**:
+  - Combined an aging distribution bar chart (`0-30d`, `31-60d`, `61-90d`, `>90d`) with an executive summary strip displaying Total Inventory Value (`18.5 Tỷ`), Long-staying Stock `>90d` (`2.37 Tỷ / 12.8%`), and Average Inventory Age (`34 Ngày`).
+
+- **Task 4: Redesigned "Biến động tồn kho theo giao dịch" (`TransactionTrendCard`)**:
+  - Combined multi-line transaction trend lines with 3 KPI summary blocks: Total Inbound (`+1,840 Tấn`), Total Outbound (`-1,420 Tấn`), and Net Change (`+420 Tấn`).
+
+- **Task 5: Redesigned "Top vật tư theo tồn" (`TopInventoryRankingCard`)**:
+  - Implemented a Top 10 descending ranking list with rank badges (`#1`-`#10`), material titles, quantities, percentages, and multi-color gradient progress bars (`Blue -> Cyan -> Emerald -> Amber -> Orange -> Red -> Purple`).
+
+- **Task 6, 7 & 8: Headers, Spacing & Visual Consistency**:
+  - Enhanced headers with title, subtitle, real-time update timestamp (`Cập nhật 10m trước`), compact padding, and consistent Enterprise surface tokens (`rounded-2xl`, `border-white/10`, `bg-slate-950/40`).
+
+Verification:
+- `pnpm -C apps/frontend build` compiled 100% cleanly with **0 errors**.
+- `pnpm -C apps/backend-api build` compiled 100% cleanly with **0 errors**.
+- `git diff --check` passed cleanly with **0 format errors**.
+
+## 2026-07-29 STABILITY.OPS3A1.1 – Runtime Production Warehouse Certification
+
+Completed runtime certification for the UI.OPS.3A.1 Production Warehouse
+source-of-truth fix:
+
+- Identified a healthy already-running backend on `0.0.0.0:3000`.
+- Verified `/health/live` and `/health/ready`; readiness reported database
+  `up`.
+- Confirmed the earlier `localhost:5432` failure came from sandbox/runtime
+  isolation, not from the host backend.
+- Created controlled fixture `OPS3A1-RT-20260729030324` through authenticated
+  HTTP APIs only.
+- Certified receipt into MAIN, transfer MAIN -> PRODUCTION, quantity
+  conservation, `/inventory/items.locationBalances`, Components Production
+  Warehouse source, BOM production availability, MAIN isolation, reservation
+  semantics and Production readiness.
+- SELECT-only existing stock audit found 9 materials, 11 PRODUCTION location
+  balances and total quantity 4216.9; `/inventory/items` exposed the same 11
+  balances and 4216.9 total quantity.
+- Created
+  `docs/audits/stability-ops3a1-runtime-production-warehouse-certification.md`.
+
+No source code, schema, migration, stage or commit was performed.
+
+## 2026-07-29 UI.OPS.3A.1 – Production Warehouse Source-of-Truth Fix
+
+Completed the remaining Production Warehouse source-of-truth fix:
+
+- Exposed canonical `InventoryLocationStock` balances through
+  `GET /inventory/items`.
+- Kept `PRODUCTION` warehouse stock separate from `MAIN` warehouse stock:
+  Production available quantity is based on `PRODUCTION` on-hand minus active
+  reservations, while Main Warehouse quantity is informational only.
+- Updated Production BOM material selection to use Material Master identity
+  with Production stock/reserved/available enrichment, without blocking
+  zero-stock Engineering BOM authoring.
+- Updated Production material readiness to return on-hand, reserved, available,
+  reservable, issued and shortage quantities without subtracting issued
+  material from Production stock a second time.
+- Added targeted tests for Inventory item location balances and Production
+  material readiness source-of-truth.
+- Created
+  `docs/audits/ui-ops3a1-production-warehouse-source-of-truth-report.md`.
+
+Verification:
+
+- Prisma validate and migrate status passed.
+- Targeted Inventory, BOM, reservation, material issue and Production material
+  readiness tests passed.
+- Full backend test suite passed.
+- Backend build, frontend tests, frontend build and `git diff --check` passed.
+- Runtime HTTP smoke remains blocked by PostgreSQL connectivity at
+  `localhost:5432`.
+
+## 2026-07-28 STEELTRACK UI.OPS.3B – Operational Forms Convergence
+
+Completed frontend-first operational form convergence:
+
+- Added shared operational form primitives:
+  `EnterpriseOperationalFormLayout`, `EnterpriseAssistantPanel`,
+  `EnterpriseSummaryPanel` and `EnterpriseSuggestionButton`.
+- Replaced duplicated Components create modals with one canonical
+  `ComponentDefinitionRequirementForm` used by both the global action context
+  and Components list page.
+- Component create suggestions now come from real existing Component/Project
+  data and only apply safe editable type/profile fields.
+- Production BOM modal keeps UI.OPS.3A material-flow semantics and now shows
+  readonly Material Master identity, Production stock/reserved/available
+  enrichment, Production locations and real stock-backed material suggestions.
+- Production Order modal now defaults selected requirement quantity to the
+  remaining requirement quantity, blocks quantity above remaining demand in the
+  UI and exposes a `Dùng số lượng còn lại` suggestion.
+- Final QC instance detail shows FINAL checklist context and disables PASS/FAIL
+  when no authoritative FINAL checklist exists.
+- Created
+  `docs/audits/ui-ops3b-operational-forms-convergence-report.md`.
+
+Verification:
+
+- Frontend tests passed.
+- Frontend build passed with existing Vite chunk-size warning.
+- Backend was not changed.
+
+## 2026-07-28 STEELTRACK UI.OPS.1 – Components / Production / QC Operational UI Convergence
+
+Completed frontend-only convergence pass:
+
+- Renamed Components material-stock tab from `Vật tư sử dụng` to
+  `Kho vật tư sản xuất`.
+- Converted Components material-stock current balance display to use Inventory
+  material `locationBalances` filtered to warehouse `PRODUCTION`, instead of
+  deriving current stock from `[COMPONENT_PRODUCTION]` transaction remarks and
+  production issue subtraction.
+- Kept transaction rows as history/recent activity context only.
+- Removed hardcoded Component type options from both Components create modals;
+  type/profile suggestions now come from existing backend component data, while
+  users can still enter new values.
+- Polished Production Order create copy around Project requirement and
+  Engineering basis without changing Production commands or APIs.
+- Removed obvious hardcoded/demo operational rows and chart values from touched
+  QC surfaces. NCR now uses `runtime.ncrs`; CAPA, audit logs and QC reports use
+  controlled empty states when no authoritative backend read-model exists.
+- Created
+  `docs/audits/ui-ops1-components-production-qc-convergence-report.md`.
+
+Verification:
+
+- Frontend tests passed.
+- Frontend build passed with existing Vite chunk-size warning.
+- Backend was not changed.
+
 ## 2026-07-28 COMPONENT DOMAIN.5G – End-to-End Operational Certification
 
 Completed certification/stability review:
@@ -6632,3 +6770,31 @@ Notes:
   ProductionExecution completion, WorkOrder completion, QC PASS/FAIL, NCR and
   Finished Goods eligibility without schema, migration, Inventory or Yard
   changes.
+
+# 2026-07-28 - STEELTRACK UI.OPS.2 Visual & Form Convergence
+
+- Tightened Components create-component modals around canonical project
+  requirement semantics: project context, component definition, note and summary
+  sections.
+- Converted Production BOM UI away from production-stock dependent selection and
+  toward real Material Master lookup for Engineering BOM authoring.
+- Reorganized Production Order creation into requirement, engineering basis,
+  quantity, planning and summary sections without changing backend contracts.
+- Refined QC inspection, final physical-instance QC and NCR detail surfaces into
+  bounded Inventory-style modal/drawer shells with compact headers, internal
+  scrolling and consistent footer actions.
+
+# 2026-07-28 - UI.OPS.3A Production Material Flow Canonicalization
+
+- Replaced legacy Production material availability helpers that derived stock
+  from `[COMPONENT_PRODUCTION]` transaction remarks with canonical
+  `InventoryLocationStock` reads for warehouse `PRODUCTION`.
+- Decoupled Engineering BOM creation from current Production stock; BOM now
+  stores Material Master requirements and no longer blocks zero-stock materials.
+- Enriched the BOM picker with Production stock, reserved quantity, available
+  quantity and Production locations while preserving Material Master identity.
+- Updated Components Production Material Warehouse availability to subtract
+  active reservation quantities and detect recent/history transactions through
+  PRODUCTION transaction lines, not remarks.
+- Added tests for MAIN -> PRODUCTION transfer conservation, BOM no inventory
+  side effects and Production availability from canonical balances.

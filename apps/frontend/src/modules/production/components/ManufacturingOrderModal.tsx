@@ -3,12 +3,15 @@ import toast from 'react-hot-toast'
 
 import {
   EnterpriseDatePicker,
+  EnterpriseAssistantPanel,
   EnterpriseField,
   EnterpriseFormGrid,
   EnterpriseFormSection,
   EnterpriseModalForm,
   EnterpriseNumberField,
+  EnterpriseOperationalFormLayout,
   EnterpriseSelect,
+  EnterpriseSuggestionButton,
 } from '@/shared/forms'
 import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { nextLocalCode } from '@/shared/utils/code-format'
@@ -107,16 +110,19 @@ export function ManufacturingOrderModal({ initialComponentId = '', onClose }: {
   return (
     <EnterpriseModalForm
       open
-      title="Tạo lệnh sản xuất từ yêu cầu"
-      description="Lệnh sản xuất phải bắt đầu từ ProjectComponentRequirement đã có Engineering Revision/BOM phát hành."
+      title="Tạo lệnh sản xuất"
+      description="Chọn nhu cầu công trình đã có hồ sơ kỹ thuật, revision và BOM phát hành."
       onClose={onClose}
       onSubmit={(event) => { event.preventDefault(); void submit() }}
       submitLabel="Tạo lệnh sản xuất"
       pendingLabel="Đang tạo lệnh..."
       pending={create.isPending}
-      maxWidthClass="max-w-3xl"
+      maxWidthClass="max-w-5xl"
     >
-      <EnterpriseFormSection title="Yêu cầu công trình" description="Chọn nhu cầu dự án trước, sau đó nhập số lượng đưa vào sản xuất.">
+      <EnterpriseOperationalFormLayout
+        primary={(
+          <>
+      <EnterpriseFormSection title="Công trình / Nhu cầu" description="Lệnh sản xuất bắt đầu từ nhu cầu cấu kiện của dự án, không nhập trực tiếp theo tồn kho.">
         <EnterpriseFormGrid>
           <EnterpriseField label="Công trình / Dự án" required htmlFor="production-project">
             <EnterpriseSelect id="production-project" data-autofocus value={projectId} onChange={(event) => { setProjectId(event.target.value); setRequirementId(''); setValidationError('') }}>
@@ -125,7 +131,16 @@ export function ManufacturingOrderModal({ initialComponentId = '', onClose }: {
             </EnterpriseSelect>
           </EnterpriseField>
           <EnterpriseField label="Yêu cầu cấu kiện" required htmlFor="production-requirement">
-            <EnterpriseSelect id="production-requirement" value={requirementId} onChange={(event) => { setRequirementId(event.target.value); setValidationError('') }}>
+            <EnterpriseSelect id="production-requirement" value={requirementId} onChange={(event) => {
+              const next = filteredRequirements.find((item) => item.id === event.target.value)
+              const nextAllocated = next?.productionOrders
+                ?.filter((order) => order.status !== 'CANCELLED')
+                .reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) ?? 0
+              const nextRemaining = Math.max(0, Number(next?.requiredQuantity ?? 0) - nextAllocated)
+              setRequirementId(event.target.value)
+              setQuantity(nextRemaining > 0 ? formatQuantity(nextRemaining, 0) : '1')
+              setValidationError('')
+            }}>
               <option value="">{isLoading ? 'Đang tải yêu cầu...' : 'Chọn yêu cầu'}</option>
               {filteredRequirements.map((item) => (
                 <option value={item.id} key={item.id}>
@@ -134,9 +149,42 @@ export function ManufacturingOrderModal({ initialComponentId = '', onClose }: {
               ))}
             </EnterpriseSelect>
           </EnterpriseField>
+        </EnterpriseFormGrid>
+      </EnterpriseFormSection>
+
+      <EnterpriseFormSection title="Engineering basis">
+        {!selectedRequirement ? <p className="text-xs text-slate-500">Chọn yêu cầu để xem hồ sơ cấu kiện, revision và BOM phát hành.</p> : <div className="grid gap-3 md:grid-cols-2">
+          <InfoRow label="Cấu kiện" value={`${selectedRequirement.component?.code ?? '-'} · ${selectedRequirement.component?.name ?? '-'}`} />
+          <InfoRow label="Công trình" value={`${selectedRequirement.project?.code ?? '-'} - ${selectedRequirement.project?.name ?? '-'}`} />
+          <InfoRow label="Revision" value={selectedRequirement.componentRevision?.revisionNo ?? '-'} />
+          <InfoRow label="BOM" value={selectedRequirement.bomDefinitionId ? 'Đã liên kết' : 'Chưa liên kết'} />
+          <div className={`md:col-span-2 rounded-lg border px-3 py-2 text-xs ${hasReleasedEngineeringBasis ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>
+            {hasReleasedEngineeringBasis ? 'Đủ điều kiện kỹ thuật để tạo lệnh sản xuất.' : 'Cần hồ sơ cấu kiện ACTIVE, revision RELEASED và BOM RELEASED trước khi tạo lệnh sản xuất.'}
+          </div>
+        </div>}
+      </EnterpriseFormSection>
+
+      <EnterpriseFormSection title="Số lượng" description="Số lượng tạo lệnh không được vượt số lượng yêu cầu còn lại.">
+        <EnterpriseFormGrid>
           <EnterpriseField label="Số lượng sản xuất" required htmlFor="production-quantity">
             <EnterpriseNumberField id="production-quantity" value={quantity} onFocus={(event) => setQuantity(formatQuantityInput(event.target.value))} onBlur={(event) => setQuantity(formatQuantity(event.target.value))} onChange={(event) => { setQuantity(formatQuantityInput(event.target.value)); setValidationError('') }} />
           </EnterpriseField>
+          <InfoCard label="Yêu cầu" value={selectedRequirement ? formatQuantity(selectedRequirement.requiredQuantity, 0) : '-'} />
+          <InfoCard label="Đã phân bổ" value={selectedRequirement ? formatQuantity(allocatedQuantity, 0) : '-'} tone="text-cyan-200" />
+          <InfoCard label="Còn lại" value={selectedRequirement ? formatQuantity(remainingQuantity, 0) : '-'} tone="text-emerald-300" />
+        </EnterpriseFormGrid>
+        {selectedRequirement && parsedQuantity > remainingQuantity ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            <span>Vượt nhu cầu còn lại {formatQuantity(parsedQuantity - remainingQuantity, 0)} cấu kiện.</span>
+            <button type="button" onClick={() => { setQuantity(formatQuantity(remainingQuantity, 0)); setValidationError('') }} className="font-semibold text-red-100 underline underline-offset-4">
+              Dùng số lượng còn lại: {formatQuantity(remainingQuantity, 0)}
+            </button>
+          </div>
+        ) : null}
+      </EnterpriseFormSection>
+
+      <EnterpriseFormSection title="Kế hoạch">
+        <EnterpriseFormGrid>
           <EnterpriseField label="Ngày bắt đầu" htmlFor="production-start">
             <EnterpriseDatePicker id="production-start" value={start} onFocus={() => setStart(formatLocalDateTimeInput())} onChange={(event) => setStart(event.target.value)} />
           </EnterpriseField>
@@ -150,22 +198,56 @@ export function ManufacturingOrderModal({ initialComponentId = '', onClose }: {
         {validationError ? <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{validationError}</p> : null}
       </EnterpriseFormSection>
 
-      <EnterpriseFormSection title="Tóm tắt canonical">
-        {!selectedRequirement ? <p className="text-xs text-slate-500">Chọn yêu cầu để xem Engineering basis và số lượng còn lại.</p> : <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2 text-xs text-slate-300">
-            <div className="flex justify-between gap-3"><span className="text-slate-500">Cấu kiện</span><b className="text-cyan-200">{selectedRequirement.component?.code} · {selectedRequirement.component?.name}</b></div>
-            <div className="flex justify-between gap-3"><span className="text-slate-500">Công trình</span><b>{selectedRequirement.project?.code} - {selectedRequirement.project?.name}</b></div>
-            <div className="flex justify-between gap-3"><span className="text-slate-500">Revision</span><b>{selectedRequirement.componentRevision?.revisionNo ?? '-'}</b></div>
-            <div className="flex justify-between gap-3"><span className="text-slate-500">Engineering status</span><b className={hasReleasedEngineeringBasis ? 'text-emerald-300' : 'text-amber-300'}>{hasReleasedEngineeringBasis ? 'Đã phát hành' : 'Chưa đủ điều kiện'}</b></div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="rounded-lg border border-slate-700 bg-slate-950/70 p-3"><p className="text-slate-500">Yêu cầu</p><b className="mt-1 block text-lg text-white">{formatQuantity(selectedRequirement.requiredQuantity, 0)}</b></div>
-            <div className="rounded-lg border border-slate-700 bg-slate-950/70 p-3"><p className="text-slate-500">Đã phân bổ</p><b className="mt-1 block text-lg text-cyan-200">{formatQuantity(allocatedQuantity, 0)}</b></div>
-            <div className="rounded-lg border border-slate-700 bg-slate-950/70 p-3"><p className="text-slate-500">Còn lại</p><b className="mt-1 block text-lg text-emerald-300">{formatQuantity(remainingQuantity, 0)}</b></div>
-          </div>
-          {!hasReleasedEngineeringBasis ? <p className="md:col-span-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Cần Component ACTIVE, revision RELEASED và BOM RELEASED có content hash trước khi tạo Production Order.</p> : null}
-        </div>}
+      <EnterpriseFormSection title="Tổng hợp">
+        <div className="grid gap-3 md:grid-cols-3">
+          <InfoCard label="Công trình" value={selectedRequirement?.project?.code ?? '-'} />
+          <InfoCard label="Hồ sơ cấu kiện" value={selectedRequirement?.component?.code ?? '-'} tone="text-cyan-200" />
+          <InfoCard label="Số lượng tạo lệnh" value={Number.isFinite(parsedQuantity) ? formatQuantity(parsedQuantity, 0) : '-'} tone="text-emerald-300" />
+        </div>
       </EnterpriseFormSection>
+          </>
+        )}
+        assistant={(
+          <>
+            <EnterpriseAssistantPanel title="Readiness nhu cầu" description="Readonly từ ProjectComponentRequirement và Engineering basis.">
+              <div className="space-y-2">
+                <InfoRow label="Nhu cầu" value={selectedRequirement ? formatQuantity(selectedRequirement.requiredQuantity, 0) : '-'} />
+                <InfoRow label="Đã phân bổ" value={selectedRequirement ? formatQuantity(allocatedQuantity, 0) : '-'} />
+                <InfoRow label="Còn lại" value={selectedRequirement ? formatQuantity(remainingQuantity, 0) : '-'} />
+                <InfoRow label="Revision" value={selectedRequirement?.componentRevision?.revisionNo ?? '-'} />
+                <InfoRow label="BOM" value={selectedRequirement?.bomDefinition?.state ?? '-'} />
+                <InfoRow label="Routing" value={hasReleasedEngineeringBasis ? 'Sẵn sàng' : 'Chưa đủ điều kiện'} />
+              </div>
+              {selectedRequirement && remainingQuantity > 0 ? (
+                <div className="mt-3">
+                  <EnterpriseSuggestionButton onClick={() => { setQuantity(formatQuantity(remainingQuantity, 0)); setValidationError('') }}>
+                    <span className="block font-semibold text-cyan-200">Dùng số lượng còn lại</span>
+                    <span className="mt-1 block text-slate-400">{formatQuantity(remainingQuantity, 0)} cấu kiện chưa phân bổ.</span>
+                  </EnterpriseSuggestionButton>
+                </div>
+              ) : null}
+            </EnterpriseAssistantPanel>
+            <EnterpriseAssistantPanel title="Vật tư theo BOM" description="Không suy diễn shortage nếu chưa có read-model authoritative.">
+              <div className="space-y-2">
+                <InfoRow label="Tổng dòng BOM" value={selectedRequirement?.bomDefinitionId ? 'Có BOM phát hành' : '-'} />
+                <InfoRow label="Dòng khả dụng" value="Chưa có dữ liệu gợi ý" />
+                <InfoRow label="Dòng thiếu" value="Chưa có dữ liệu gợi ý" />
+              </div>
+              <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-500">
+                Kiểm tra thiếu vật tư authoritative thuộc reservation/issue. Form không bịa dữ liệu readiness.
+              </p>
+            </EnterpriseAssistantPanel>
+          </>
+        )}
+      />
     </EnterpriseModalForm>
   )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs"><span className="text-slate-500">{label}</span><b className="text-right text-slate-200">{value}</b></div>
+}
+
+function InfoCard({ label, value, tone = 'text-white' }: { label: string; value: string; tone?: string }) {
+  return <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs"><p className="text-slate-500">{label}</p><b className={`mt-1 block text-lg ${tone}`}>{value}</b></div>
 }

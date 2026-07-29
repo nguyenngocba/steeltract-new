@@ -71,6 +71,25 @@ export class InventoryRepository {
             warehouse: true,
           },
         },
+        locationStocks: {
+          where: {
+            quantity: {
+              gt: 0,
+            },
+          },
+          include: {
+            zone: {
+              include: {
+                warehouse: true,
+              },
+            },
+          },
+          orderBy: [
+            { zoneId: 'asc' },
+            { slotId: 'asc' },
+            { level: 'asc' },
+          ],
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -105,6 +124,14 @@ export class InventoryRepository {
   findWarehouseByCode(code: string, db: DbClient = this.prisma) {
     return db.masterWarehouse.findUnique({
       where: { code },
+      select: { id: true, code: true, name: true },
+    });
+  }
+
+  findWarehousesByIds(ids: string[], db: DbClient = this.prisma) {
+    if (!ids.length) return Promise.resolve([]);
+    return db.masterWarehouse.findMany({
+      where: { id: { in: ids } },
       select: { id: true, code: true, name: true },
     });
   }

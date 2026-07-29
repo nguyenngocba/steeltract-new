@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductionMaterialReservationStatus } from '@prisma/client';
 
 import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { PrismaService } from '../../../core/prisma/prisma.service';
@@ -286,6 +286,31 @@ export class ProductionRepository {
       where: {
         inventoryItemId: { in: materialIds },
         status: 'ISSUED',
+      },
+    });
+  }
+
+  findActiveReservationLines(materialIds: string[]) {
+    return this.prisma.productionMaterialReservationLine.findMany({
+      where: {
+        inventoryItemId: { in: materialIds },
+        reservation: {
+          status: {
+            in: [
+              ProductionMaterialReservationStatus.RESERVED,
+              ProductionMaterialReservationStatus.PARTIALLY_ISSUED,
+            ],
+          },
+        },
+      },
+      include: {
+        reservation: {
+          select: {
+            id: true,
+            productionOrderId: true,
+            status: true,
+          },
+        },
       },
     });
   }

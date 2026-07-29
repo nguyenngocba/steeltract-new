@@ -15,7 +15,7 @@ import { useCreateTransaction } from '../../../inventory/hooks/useCreateTransact
 import { useInventoryAudit } from '../../../inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '../../../inventory/hooks/useInventoryItems'
 import { useInventoryTransactions } from '../../../inventory/hooks/useInventoryTransactions'
-import { useProductionIssues } from '../../../production/hooks/useProductionCockpit'
+import { useProductionReservations } from '../../../production/hooks/useProductionCockpit'
 import { componentsInput, componentsMutedButton, componentsPrimaryButton } from './ComponentsCockpitShared'
 import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
@@ -30,6 +30,7 @@ type MaterialStockRow = {
   warehouseId?: string
   zoneId?: string
   slotId?: string
+  level?: string
   returnWarehouseId?: string
   returnZoneId?: string
   warehouse: string
@@ -40,16 +41,35 @@ type MaterialStockRow = {
   averageCost: number
   inventoryValue: number
   status: 'Sẵn sàng' | 'Cảnh báo' | 'Thiếu'
+  updatedAt?: string
 }
 
-type ProductionStockBucket = {
-  inventoryItemId: string
+type LocationBalanceLike = {
   warehouseId?: string
   zoneId?: string
   slotId?: string
-  warehouse?: string
-  location?: string
-  quantity: number
+  level?: string
+  warehouseCode?: string
+  warehouseName?: string
+  zoneCode?: string
+  zoneName?: string
+  quantity?: number
+}
+
+type InventoryItemLike = {
+  id: string
+  code: string
+  name: string
+  materialUsageType?: string
+  specification?: string
+  unit?: string
+  unitMaster?: { symbol?: string }
+  unitPrice?: number
+  minimumStock?: number
+  averageCost?: number
+  updatedAt?: string
+  zone?: { id?: string; warehouse?: { id?: string; code?: string } }
+  locationBalances?: LocationBalanceLike[]
 }
 
 const money = (value: number) => formatCurrencyVnd(value)
@@ -63,30 +83,45 @@ function materialUsageLabel(value: string | undefined) {
   return map[String(value ?? 'PRIMARY')] ?? 'Vật tư chính'
 }
 
-function productionLocationLabel(line: any, transaction: any) {
-  const zone = line.zone ?? transaction.zone
-  const slot = String(line.slotId ?? '').trim()
-  const zoneLabel = zone
-    ? `${zone.code ?? 'ZONE'} - ${zone.name ?? 'Vị trí'}`
-    : 'Vị trí SX chưa gán'
-  return slot ? `${zoneLabel} / ${slot}` : zoneLabel
+function numeric(value: unknown) {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
-function isProductionWarehouseLine(line: any, transaction: any) {
-  const warehouseCode = String(line.warehouse?.code ?? transaction.warehouse?.code ?? '').toUpperCase()
-  const warehouseName = String(line.warehouse?.name ?? transaction.warehouse?.name ?? '').toLowerCase()
-  return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất')
+function isProductionWarehouseBalance(location: LocationBalanceLike) {
+  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
+  const name = String(location.warehouseName ?? '').trim().toLowerCase()
+  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
 }
 
-function productionBucketKey(inventoryItemId: string, zoneId?: string | null, slotId?: string | null) {
-  return `${inventoryItemId}:${zoneId ?? 'NO_ZONE'}:${String(slotId ?? '').trim() || 'NO_SLOT'}`
+function isProductionTransactionLine(line: any, transaction?: any) {
+  const code = String(
+    line?.warehouse?.code ??
+      line?.zone?.warehouse?.code ??
+      transaction?.warehouse?.code ??
+      '',
+  ).trim().toUpperCase()
+  const name = String(
+    line?.warehouse?.name ??
+      line?.zone?.warehouse?.name ??
+      transaction?.warehouse?.name ??
+      '',
+  ).trim().toLowerCase()
+  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+}
+
+function productionBalanceLocationLabel(location: LocationBalanceLike) {
+  const zone = [location.zoneCode, location.zoneName].filter(Boolean).join(' - ') || location.zoneId || 'Vị trí SX chưa gán'
+  const slot = location.slotId ? ` / ${location.slotId}` : ''
+  const level = location.level ? ` / ${String(location.level).startsWith('L') ? location.level : `L${location.level}`}` : ''
+  return `${zone}${slot}${level}`
 }
 
 export function ComponentsMaterialStockPage() {
   const { data: inventoryItems = [], isLoading } = useInventoryItems()
   const { data: auditRows = [] } = useInventoryAudit()
-  const { data: materialIssues = [] } = useProductionIssues()
   const { data: transactionsData = [], isLoading: isTransactionsLoading } = useInventoryTransactions({})
+  const { data: reservations = [] } = useProductionReservations()
   const createTransaction = useCreateTransaction()
   const [query, setQuery] = useState('')
   const [searchDraft, setSearchDraft] = useState('')
@@ -122,98 +157,53 @@ export function ComponentsMaterialStockPage() {
     const auditById = new Map(
       (auditRows as any[]).map((row) => [String(row.materialId ?? row.inventoryItemId), row]),
     )
-    const itemById = new Map((inventoryItems as any[]).map((item) => [String(item.id), item]))
-    const buckets = new Map<string, ProductionStockBucket>()
-    const issueByItem = new Map<string, number>()
-    const transactionRows = Array.isArray(transactionsData)
-      ? transactionsData
-      : (transactionsData as any)?.data ?? []
-
-    ;(materialIssues as any[]).forEach((issue) => {
-      const key = String(issue.inventoryItemId)
-      if (!key || issue.status !== 'ISSUED') return
-      issueByItem.set(key, (issueByItem.get(key) ?? 0) + Number(issue.issuedQty ?? 0))
-    })
-
-    ;(transactionRows as any[]).forEach((transaction) => {
-      const remarks = String(transaction.remarks ?? transaction.note ?? '')
-      const isProductionReceipt = remarks.includes('[COMPONENT_PRODUCTION]')
-      const isReturnToMain = remarks.includes('[COMPONENT_PRODUCTION_RETURN]')
-      if (!isProductionReceipt && !isReturnToMain) return
-
-      ;(transaction.items ?? []).forEach((line: any) => {
-        const key = String(line.inventoryItemId ?? line.inventoryItem?.id ?? '')
-        const rawQty = Number(line.quantity ?? 0)
-        if (!key || !Number.isFinite(rawQty) || rawQty === 0) return
-        if (!isProductionWarehouseLine(line, transaction)) return
-        if (isProductionReceipt && !isReturnToMain && rawQty <= 0) return
-        if (isReturnToMain && rawQty >= 0) return
-
-        const zoneId = line.zoneId ?? transaction.zoneId
-        const slotId = String(line.slotId ?? '').trim()
-        const bucketKey = productionBucketKey(key, zoneId, slotId)
-        const current = buckets.get(bucketKey) ?? {
-          inventoryItemId: key,
-          warehouseId: line.warehouseId ?? transaction.warehouseId,
-          zoneId,
-          slotId,
-          warehouse: line.warehouse?.name ?? transaction.warehouse?.name,
-          location: productionLocationLabel(line, transaction),
-          quantity: 0,
-        }
-        current.quantity += rawQty
-        buckets.set(bucketKey, current)
-      })
-    })
-
-    issueByItem.forEach((issuedQty, inventoryItemId) => {
-      let remaining = Math.max(0, issuedQty)
-      const itemBuckets = Array.from(buckets.values())
-        .filter((bucket) => bucket.inventoryItemId === inventoryItemId && bucket.quantity > 0)
-        .sort((a, b) => `${a.zoneId ?? ''}${a.slotId ?? ''}`.localeCompare(`${b.zoneId ?? ''}${b.slotId ?? ''}`))
-
-      for (const bucket of itemBuckets) {
-        if (remaining <= 0) break
-        const deducted = Math.min(bucket.quantity, remaining)
-        bucket.quantity -= deducted
-        remaining -= deducted
-      }
-
-      if (remaining > 0 && !itemBuckets.length) {
-        buckets.set(productionBucketKey(inventoryItemId), {
-          inventoryItemId,
-          quantity: -remaining,
-          warehouse: 'Kho vật tư SX',
-          location: 'Chưa xác định vị trí SX',
+    const reservedByMaterial = new Map<string, number>()
+    ;(reservations as any[])
+      .filter((reservation) => ['RESERVED', 'PARTIALLY_ISSUED'].includes(String(reservation.status ?? '')))
+      .forEach((reservation) => {
+        ;(reservation.lines ?? []).forEach((line: any) => {
+          const reserved = Math.max(
+            0,
+            numeric(line.reservedQty) -
+              numeric(line.issuedQty) -
+              numeric(line.returnedQty),
+          )
+          reservedByMaterial.set(
+            String(line.inventoryItemId),
+            (reservedByMaterial.get(String(line.inventoryItemId)) ?? 0) + reserved,
+          )
         })
-      }
-    })
-
-    return Array.from(buckets.values()).flatMap((bucket) => {
-      const inventoryItemId = bucket.inventoryItemId
-      const item = itemById.get(inventoryItemId) ?? (materialIssues as any[]).find((issue) => String(issue.inventoryItemId) === inventoryItemId)?.inventoryItem
-      if (!item) return []
+      })
+    return (inventoryItems as InventoryItemLike[]).flatMap((item) => {
+      const productionLocations = (item.locationBalances ?? [])
+        .filter(isProductionWarehouseBalance)
+        .filter((location) => numeric(location.quantity) > 0)
+      if (!productionLocations.length) return []
       const audit = auditById.get(String(item.id))
-      const currentStock = Number(bucket.quantity)
-      const minimumStock = Number(item.minimumStock ?? 0)
-      const averageCost = Number(audit?.averageCost ?? item.unitPrice ?? 0)
-      const reserved = 0
-      const available = Math.max(currentStock - reserved, 0)
-
-      return {
+      const minimumStock = numeric(item.minimumStock)
+      const averageCost = numeric(audit?.averageCost ?? item.averageCost ?? item.unitPrice)
+      const itemReserved = reservedByMaterial.get(String(item.id)) ?? 0
+      const itemProductionStock = productionLocations.reduce((sum, location) => sum + numeric(location.quantity), 0)
+      return productionLocations.map((location) => {
+        const currentStock = numeric(location.quantity)
+        const locationShare = itemProductionStock > 0 ? currentStock / itemProductionStock : 0
+        const reserved = itemReserved * locationShare
+        const available = Math.max(currentStock - reserved, 0)
+        return {
         id: item.id,
         inventoryItemId: item.id,
         code: item.code,
         name: item.name,
         materialUsageType: item.materialUsageType ?? 'PRIMARY',
         unit: item.unitMaster?.symbol ?? item.unit ?? '-',
-        warehouseId: bucket.warehouseId,
-        zoneId: bucket.zoneId,
-        slotId: bucket.slotId,
+        warehouseId: location.warehouseId,
+        zoneId: location.zoneId,
+        slotId: location.slotId,
+        level: location.level,
         returnWarehouseId: item.zone?.warehouse?.code === 'MAIN' ? item.zone.warehouse.id : undefined,
         returnZoneId: item.zone?.warehouse?.code === 'MAIN' ? item.zone.id : undefined,
-        warehouse: bucket.warehouse ?? 'Kho vật tư SX',
-        location: bucket.location ?? 'Chưa xác định vị trí SX',
+        warehouse: location.warehouseName ?? 'Kho vật tư sản xuất',
+        location: productionBalanceLocationLabel(location),
         currentStock,
         reserved,
         available,
@@ -223,11 +213,13 @@ export function ComponentsMaterialStockPage() {
           available <= 0
             ? 'Thiếu'
             : minimumStock > 0 && available <= minimumStock
-              ? 'Cảnh báo'
-              : 'Sẵn sàng',
-      }
+            ? 'Cảnh báo'
+            : 'Sẵn sàng',
+        updatedAt: item.updatedAt,
+        }
+      })
     })
-  }, [auditRows, inventoryItems, materialIssues, transactionsData])
+  }, [auditRows, inventoryItems, reservations])
 
   const filtered = rows.filter((row) => {
     if (status && row.status !== status) return false
@@ -240,12 +232,13 @@ export function ComponentsMaterialStockPage() {
   const topMaterials = [...rows].sort((a, b) => b.available - a.available).slice(0, 5)
   const pageSize = 14
   const paginatedRows = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const recentProductionTransactions = useMemo(() => {
     const transactionRows = Array.isArray(transactionsData)
       ? transactionsData
       : (transactionsData as any)?.data ?? []
     return (transactionRows as any[])
-      .filter((transaction) => String(transaction.remarks ?? transaction.note ?? '').includes('COMPONENT_PRODUCTION'))
+      .filter((transaction) => (transaction.items ?? []).some((line: any) => isProductionTransactionLine(line, transaction)))
       .slice(0, 5)
   }, [transactionsData])
 
@@ -255,18 +248,24 @@ export function ComponentsMaterialStockPage() {
       ? transactionsData
       : (transactionsData as any)?.data ?? []
     return (transactionRows as any[])
-      .filter((transaction) => String(transaction.remarks ?? transaction.note ?? '').includes('COMPONENT_PRODUCTION'))
       .flatMap((transaction) => (transaction.items ?? [])
-        .filter((line: any) => String(line.inventoryItemId ?? line.inventoryItem?.id ?? '') === selectedRow.inventoryItemId)
+        .filter((line: any) =>
+          String(line.inventoryItemId ?? line.inventoryItem?.id ?? '') === selectedRow.inventoryItemId &&
+          isProductionTransactionLine(line, transaction)
+        )
         .map((line: any) => ({ transaction, line })))
   }, [selectedRow, transactionsData])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   async function returnToMainWarehouse(row: MaterialStockRow) {
     const quantity = parseLocaleNumber(returnForm.quantity)
     if (!quantity || quantity <= 0 || quantity > row.available || !row.zoneId) return
 
     await createTransaction.mutateAsync({
-      type: 'RETURN',
+      type: 'TRANSFER',
       transactionDate: returnForm.returnedAt,
       remarks: `[COMPONENT_PRODUCTION_RETURN] ${returnForm.note || `Trả ${row.code} từ kho vật tư SX về kho chính`}`,
       items: [
@@ -298,7 +297,7 @@ export function ComponentsMaterialStockPage() {
       <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
         <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
           <EnterpriseKpiCard
-            title="Tổng mã vật tư SX"
+            title="Mã vật tư trong kho SX"
             value={formatQuantity(rows.length, 0)}
             tone="cyan"
             icon={<Layers size={15} />}
@@ -312,7 +311,7 @@ export function ComponentsMaterialStockPage() {
             isLoading={isLoading || isTransactionsLoading}
           />
           <EnterpriseKpiCard
-            title="Giao dịch SX"
+            title="Giao dịch gần đây"
             value={formatQuantity(recentProductionTransactions.length, 0)}
             tone="purple"
             icon={<Clock size={15} />}
@@ -326,7 +325,7 @@ export function ComponentsMaterialStockPage() {
             isLoading={isLoading || isTransactionsLoading}
           />
           <EnterpriseKpiCard
-            title="Cảnh báo thiếu BOM"
+            title="Cảnh báo tồn SX"
             value={formatQuantity(warningCount, 0)}
             tone="amber"
             icon={<AlertTriangle size={15} />}
@@ -387,7 +386,7 @@ export function ComponentsMaterialStockPage() {
             <InventoryPanel className="rounded-xl">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Danh sách vật tư cấp sản xuất</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">Kho vật tư sản xuất hiện tại</h3>
                   <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
                     {filtered.length} vật tư
                   </span>
@@ -408,7 +407,7 @@ export function ComponentsMaterialStockPage() {
                     style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                   >
                     <tr>
-                      {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho nhận', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
+                      {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho sản xuất', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn SX', 'Đã giữ chỗ', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
                         <th key={heading} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
                       ))}
                     </tr>
@@ -428,7 +427,7 @@ export function ComponentsMaterialStockPage() {
                         <td className="px-2 py-1.5 text-slate-300">{row.unit}</td>
                         <td className="px-2 py-1.5 text-slate-300 truncate">{row.warehouse}</td>
                         <td className="px-2 py-1.5 text-slate-300 truncate">{row.location}</td>
-                        <td className="px-2 py-1.5 text-cyan-200 font-mono">{row.slotId ?? '-'}</td>
+                        <td className="px-2 py-1.5 text-cyan-200 font-mono">{[row.slotId, row.level].filter(Boolean).join(' / ') || '-'}</td>
                         <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{formatQuantity(row.currentStock)}</td>
                         <td className="px-2 py-1.5 font-mono tabular-nums text-slate-300">{formatQuantity(row.reserved)}</td>
                         <td className="px-2 py-1.5 font-mono tabular-nums text-emerald-300">{formatQuantity(row.available)}</td>
@@ -439,14 +438,14 @@ export function ComponentsMaterialStockPage() {
                     )) : (
                       <tr>
                         <td colSpan={13} className="px-2 py-10">
-                          <ModuleEmptyState icon={<Package size={18} />} title="Chưa có tồn kho sản xuất" description="Không tìm thấy vật tư sản xuất phù hợp với bộ lọc hiện tại." />
+                          <ModuleEmptyState icon={<Package size={18} />} title="Chưa có tồn kho sản xuất" description="Không tìm thấy balance hiện tại trong kho PRODUCTION phù hợp với bộ lọc." />
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-              <InventoryPagination page={page} pageSize={pageSize} pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))} total={filtered.length} onPageChange={setPage} containerClassName="border-t-0" />
+              <InventoryPagination page={page} pageSize={pageSize} pageCount={pageCount} total={filtered.length} onPageChange={setPage} containerClassName="border-t-0" />
             </InventoryPanel>
           </div>
 
@@ -492,8 +491,8 @@ export function ComponentsMaterialStockPage() {
           <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h2 className="text-base font-bold text-white">Toàn bộ danh sách vật tư cấp sản xuất</h2>
-                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} mã vật tư sản xuất trong hệ thống</p>
+                <h2 className="text-base font-bold text-white">Toàn bộ kho vật tư sản xuất</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} balance vật tư hiện tại trong kho PRODUCTION</p>
               </div>
               <button
                 type="button"
@@ -511,13 +510,13 @@ export function ComponentsMaterialStockPage() {
                   style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                 >
                   <tr>
-                    {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho nhận', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn hiện tại', 'Đã reserve BOM', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
+                    {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho sản xuất', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn SX', 'Đã giữ chỗ', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
                       <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">{heading}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((row) => (
+                  {paginatedRows.map((row) => (
                     <tr
                       key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`}
                       onClick={() => {
@@ -532,7 +531,7 @@ export function ComponentsMaterialStockPage() {
                       <td className="px-2 py-2 text-slate-300">{row.unit}</td>
                       <td className="px-2 py-2 text-slate-300 truncate">{row.warehouse}</td>
                       <td className="px-2 py-2 text-slate-300 truncate">{row.location}</td>
-                      <td className="px-2 py-2 text-cyan-200 font-mono">{row.slotId ?? '-'}</td>
+                      <td className="px-2 py-2 text-cyan-200 font-mono">{[row.slotId, row.level].filter(Boolean).join(' / ') || '-'}</td>
                       <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{formatQuantity(row.currentStock)}</td>
                       <td className="px-2 py-2 font-mono tabular-nums text-slate-300">{formatQuantity(row.reserved)}</td>
                       <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{formatQuantity(row.available)}</td>
@@ -548,7 +547,7 @@ export function ComponentsMaterialStockPage() {
             <InventoryPagination
               page={page}
               pageSize={pageSize}
-              pageCount={Math.max(1, Math.ceil(filtered.length / pageSize))}
+              pageCount={pageCount}
               total={filtered.length}
               onPageChange={setPage}
               containerClassName="border-t-0"

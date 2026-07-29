@@ -643,10 +643,6 @@ function DualBars({ rows, theme }: { rows: AnalyticsSeriesPoint[]; theme: Domain
 
 export function WarehouseCapacityCard({ rows, total }: { rows: AnalyticsDistributionPoint[]; total: string }) {
   const sumValue = rows.reduce((sum, row) => sum + row.value, 0)
-  const usedRow = rows[0] ?? { label: 'Đã sử dụng', value: 1420, color: '#10b981' }
-  const freeRow = rows[1] ?? { label: 'Còn trống', value: 260, color: '#06b6d4' }
-  const usedPct = sumValue > 0 ? Math.round((usedRow.value / sumValue) * 100) : 84.5
-  const freePct = 100 - usedPct
 
   return (
     <div className="flex flex-col justify-between h-full space-y-2">
@@ -654,38 +650,53 @@ export function WarehouseCapacityCard({ rows, total }: { rows: AnalyticsDistribu
         <div className="relative mx-auto grid h-32 w-32 place-items-center">
           <svg viewBox="0 0 42 42" className="-rotate-90">
             <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#1e293b" strokeWidth="4.5" />
-            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke={usedRow.color} strokeWidth="4.5" strokeDasharray={`${usedPct} ${100 - usedPct}`} strokeDashoffset={25} strokeLinecap="butt" />
-            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke={freeRow.color} strokeWidth="4.5" strokeDasharray={`${freePct} ${100 - freePct}`} strokeDashoffset={25 - usedPct} strokeLinecap="butt" />
+            {rows.map((row, idx) => {
+              const pct = sumValue > 0 ? (row.value / sumValue) * 100 : 0
+              return (
+                <circle
+                  key={row.label}
+                  cx="21"
+                  cy="21"
+                  r="15.915"
+                  fill="transparent"
+                  stroke={row.color}
+                  strokeWidth="4.5"
+                  strokeDasharray={`${pct} ${100 - pct}`}
+                  strokeDashoffset={25 - idx * 25}
+                  strokeLinecap="butt"
+                />
+              )
+            })}
           </svg>
           <div className="absolute text-center">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Tổng Sức Chứa</p>
-            <p className="text-sm font-bold text-white leading-tight">{total || '1,680 Tấn'}</p>
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Tổng Tồn Kho</p>
+            <p className="text-sm font-bold text-white leading-tight">{total || `${sumValue.toLocaleString('vi-VN')} Đơn vị`}</p>
           </div>
         </div>
-        <div className="space-y-2.5">
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2 space-y-1">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-emerald-300">● Đã Sử Dụng</span>
-              <span className="text-white font-mono">{usedRow.value.toLocaleString('vi-VN')} ({usedPct}%)</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${usedPct}%` }} />
-            </div>
-          </div>
-          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-2 space-y-1">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-cyan-300">● Còn Trống</span>
-              <span className="text-white font-mono">{freeRow.value.toLocaleString('vi-VN')} ({freePct}%)</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full bg-cyan-400 rounded-full" style={{ width: `${freePct}%` }} />
-            </div>
-          </div>
+        <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 scrollbar-none">
+          {rows.length > 0 ? (
+            rows.map((row) => {
+              const pct = sumValue > 0 ? Math.round((row.value / sumValue) * 100) : 0
+              return (
+                <div key={row.label} className="rounded-xl border border-white/10 bg-slate-900/40 p-1.5 space-y-0.5">
+                  <div className="flex items-center justify-between text-[11px] font-semibold">
+                    <span className="text-slate-200 truncate">{row.label}</span>
+                    <span className="text-white font-mono shrink-0 ml-1">{row.value.toLocaleString('vi-VN')} ({pct}%)</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: row.color }} />
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <CockpitEmptyState title="Chưa có dữ liệu phân bổ kho" description="Không phát sinh bản ghi tồn kho." />
+          )}
         </div>
       </div>
       <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px]">
-        <span className="text-slate-400">Tỷ lệ lấp đầy bãi: <strong className="text-emerald-300 font-mono">{usedPct}%</strong></span>
-        <span className="text-slate-400">Xu hướng: <strong className="text-cyan-300 font-mono">+2.1% / tuần</strong></span>
+        <span className="text-slate-400">Sức chứa định mức: <strong className="text-amber-300 font-mono">Chưa cấu hình sức chứa</strong></span>
+        <span className="text-slate-400">Số kho: <strong className="text-cyan-300 font-mono">{rows.length} kho</strong></span>
       </div>
     </div>
   )
@@ -693,11 +704,6 @@ export function WarehouseCapacityCard({ rows, total }: { rows: AnalyticsDistribu
 
 export function AbcAnalysisCard({ rows }: { rows: AnalyticsDistributionPoint[] }) {
   const sumValue = rows.reduce((sum, row) => sum + row.value, 0) || 1
-  const abcData = [
-    { label: 'A - Giá trị trọng yếu', color: '#10b981', textColor: 'text-emerald-300', bgBorder: 'border-emerald-500/20 bg-emerald-500/5' },
-    { label: 'B - Giá trị trung bình', color: '#f59e0b', textColor: 'text-amber-300', bgBorder: 'border-amber-500/20 bg-amber-500/5' },
-    { label: 'C - Giá trị thấp', color: '#ef4444', textColor: 'text-red-300', bgBorder: 'border-red-500/20 bg-red-500/5' },
-  ]
 
   return (
     <div className="flex flex-col justify-between h-full space-y-2">
@@ -707,67 +713,91 @@ export function AbcAnalysisCard({ rows }: { rows: AnalyticsDistributionPoint[] }
             <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#1e293b" strokeWidth="4.5" />
             {rows.map((row, idx) => {
               const pct = (row.value / sumValue) * 100
-              const colors = ['#10b981', '#f59e0b', '#ef4444']
-              return <circle key={row.label} cx="21" cy="21" r="15.915" fill="transparent" stroke={colors[idx % 3]} strokeWidth="4.5" strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset={25 - idx * 25} strokeLinecap="butt" />
+              return (
+                <circle
+                  key={row.label}
+                  cx="21"
+                  cy="21"
+                  r="15.915"
+                  fill="transparent"
+                  stroke={row.color}
+                  strokeWidth="4.5"
+                  strokeDasharray={`${pct} ${100 - pct}`}
+                  strokeDashoffset={25 - idx * 25}
+                  strokeLinecap="butt"
+                />
+              )
             })}
           </svg>
           <div className="absolute text-center">
             <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Pareto A-B-C</p>
-            <p className="text-xs font-bold text-white leading-tight">100% Tồn Kho</p>
+            <p className="text-xs font-bold text-white leading-tight">Phân Loại Tồn</p>
           </div>
         </div>
         <div className="space-y-1.5">
-          {abcData.map((item, idx) => {
-            const rowVal = rows[idx]?.value ?? (idx === 0 ? 14500 : idx === 1 ? 2800 : 1200)
-            const pct = Math.round((rowVal / sumValue) * 100)
-            return (
-              <div key={item.label} className={`rounded-xl border p-1.5 ${item.bgBorder} space-y-0.5`}>
-                <div className="flex items-center justify-between text-[11px] font-semibold">
-                  <span className={item.textColor}>{item.label}</span>
-                  <span className="text-white font-mono">{rowVal.toLocaleString('vi-VN')} ({pct}%)</span>
+          {rows.length > 0 ? (
+            rows.map((item) => {
+              const pct = Math.round((item.value / sumValue) * 100)
+              return (
+                <div key={item.label} className="rounded-xl border border-white/10 bg-slate-900/40 p-1.5 space-y-0.5">
+                  <div className="flex items-center justify-between text-[11px] font-semibold">
+                    <span className="text-slate-200 truncate">{item.label}</span>
+                    <span className="text-white font-mono shrink-0 ml-1">{item.value.toLocaleString('vi-VN')} ({pct}%)</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: item.color }} />
+                  </div>
                 </div>
-                <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: item.color }} />
-                </div>
-              </div>
-            )
-          })}
+              )
+            })
+          ) : (
+            <CockpitEmptyState title="Chưa phân loại ABC" description="Cần ghi nhận dữ liệu tồn kho để phân loại." />
+          )}
         </div>
       </div>
-      <p className="text-center text-[10px] text-slate-400 border-t border-white/10 pt-1.5">Phân loại giá trị tồn kho theo quy tắc Pareto A-B-C</p>
+      <p className="text-center text-[10px] text-slate-400 border-t border-white/10 pt-1.5">Phân loại giá trị tồn kho hiện tại theo nguyên lý Pareto</p>
     </div>
   )
 }
 
 export function InventoryAgingCard({ rows }: { rows: AnalyticsDistributionPoint[] }) {
+  const sumValue = rows.reduce((sum, row) => sum + row.value, 0)
   const max = Math.max(1, ...rows.map((row) => row.value))
+  const over90Row = rows.find((r) => r.label.includes('>90'))
+  const over90Val = over90Row?.value ?? 0
+  const over90Pct = sumValue > 0 ? ((over90Val / sumValue) * 100).toFixed(1) : '0'
+
   return (
     <div className="flex flex-col justify-between h-full space-y-2.5">
       <div className="space-y-1.5">
-        {rows.map((row) => (
-          <div key={row.label} className="rounded-xl border border-white/10 bg-slate-900/40 p-2 space-y-1">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-slate-200">{row.label}</span>
-              <span className="font-mono text-white">{row.value.toLocaleString('vi-VN')} Tấn</span>
+        {rows.length > 0 ? (
+          rows.map((row) => (
+            <div key={row.label} className="rounded-xl border border-white/10 bg-slate-900/40 p-2 space-y-1">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-slate-200">{row.label}</span>
+                <span className="font-mono text-white">{row.value.toLocaleString('vi-VN')}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${Math.max(6, (row.value / max) * 100)}%`, backgroundColor: row.color }} />
+              </div>
             </div>
-            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${Math.max(6, (row.value / max) * 100)}%`, backgroundColor: row.color }} />
-            </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <CockpitEmptyState title="Chưa có dữ liệu tuổi tồn" description="Không phát sinh dữ liệu thời gian lưu kho." />
+        )}
       </div>
       <div className="grid grid-cols-3 gap-1.5 text-center border-t border-white/10 pt-2">
         <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-1.5">
-          <p className="text-[9px] text-slate-400 uppercase font-semibold">Tổng Giá Trị</p>
-          <p className="text-xs font-bold text-blue-300 font-mono mt-0.5">18.5 Tỷ</p>
+          <p className="text-[9px] text-slate-400 uppercase font-semibold">Tổng Tồn Kho</p>
+          <p className="text-xs font-bold text-blue-300 font-mono mt-0.5">{sumValue.toLocaleString('vi-VN')}</p>
         </div>
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-1.5">
           <p className="text-[9px] text-slate-400 uppercase font-semibold">Tồn &gt; 90 Ngày</p>
-          <p className="text-xs font-bold text-red-300 font-mono mt-0.5">2.37 Tỷ (12.8%)</p>
+          <p className="text-xs font-bold text-red-300 font-mono mt-0.5">{over90Val.toLocaleString('vi-VN')} ({over90Pct}%)</p>
         </div>
         <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-1.5">
-          <p className="text-[9px] text-slate-400 uppercase font-semibold">Tuổi Tồn TB</p>
-          <p className="text-xs font-bold text-cyan-300 font-mono mt-0.5">34 Ngày</p>
+          <p className="text-[9px] text-slate-400 uppercase font-semibold">Nhóm Tuổi Kho</p>
+          <p className="text-xs font-bold text-cyan-300 font-mono mt-0.5">{rows.length} Nhóm</p>
         </div>
       </div>
     </div>
@@ -775,6 +805,10 @@ export function InventoryAgingCard({ rows }: { rows: AnalyticsDistributionPoint[
 }
 
 export function TransactionTrendCard({ rows, theme }: { rows: AnalyticsSeriesPoint[]; theme: DomainTheme }) {
+  const totalInbound = rows.reduce((sum, r) => sum + r.value, 0)
+  const totalOutbound = rows.reduce((sum, r) => sum + (r.secondary ?? 0), 0)
+  const netChange = totalInbound - totalOutbound
+
   return (
     <div className="flex flex-col justify-between h-full space-y-2.5">
       <div className="h-[185px]">
@@ -782,16 +816,16 @@ export function TransactionTrendCard({ rows, theme }: { rows: AnalyticsSeriesPoi
       </div>
       <div className="grid grid-cols-3 gap-1.5 text-center border-t border-white/10 pt-2">
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-1.5">
-          <p className="text-[9px] text-slate-400 uppercase font-semibold">Tổng Nhập Kho</p>
-          <p className="text-xs font-bold text-emerald-300 font-mono mt-0.5">+1,840 Tấn</p>
+          <p className="text-[9px] text-slate-400 uppercase font-semibold">Tổng Giá Trị / Lượng</p>
+          <p className="text-xs font-bold text-emerald-300 font-mono mt-0.5">+{totalInbound.toLocaleString('vi-VN')}</p>
         </div>
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-1.5">
-          <p className="text-[9px] text-slate-400 uppercase font-semibold">Tổng Xuất Kho</p>
-          <p className="text-xs font-bold text-amber-300 font-mono mt-0.5">-1,420 Tấn</p>
+          <p className="text-[9px] text-slate-400 uppercase font-semibold">Thứ Cấp (Secondary)</p>
+          <p className="text-xs font-bold text-amber-300 font-mono mt-0.5">-{totalOutbound.toLocaleString('vi-VN')}</p>
         </div>
         <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-1.5">
           <p className="text-[9px] text-slate-400 uppercase font-semibold">Biến Động Ròng</p>
-          <p className="text-xs font-bold text-cyan-300 font-mono mt-0.5">+420 Tấn</p>
+          <p className="text-xs font-bold text-cyan-300 font-mono mt-0.5">{netChange >= 0 ? `+${netChange.toLocaleString('vi-VN')}` : netChange.toLocaleString('vi-VN')}</p>
         </div>
       </div>
     </div>
@@ -816,20 +850,24 @@ export function TopInventoryRankingCard({ rows, theme }: { rows: AnalyticsSeries
 
   return (
     <div className="space-y-1.5 max-h-[245px] overflow-y-auto pr-1 scrollbar-none">
-      {valid.map((row, index) => (
-        <div key={`${row.label}-${index}`} className="grid grid-cols-[24px_1fr_80px] items-center gap-2 text-xs">
-          <span className="font-mono text-[10px] font-bold text-slate-400">#{index + 1}</span>
-          <div>
-            <div className="mb-0.5 flex justify-between text-[11px] font-medium text-slate-200">
-              <span className="truncate">{row.label}</span>
+      {valid.length > 0 ? (
+        valid.map((row, index) => (
+          <div key={`${row.label}-${index}`} className="grid grid-cols-[24px_1fr_80px] items-center gap-2 text-xs">
+            <span className="font-mono text-[10px] font-bold text-slate-400">#{index + 1}</span>
+            <div>
+              <div className="mb-0.5 flex justify-between text-[11px] font-medium text-slate-200">
+                <span className="truncate">{row.label}</span>
+              </div>
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                <span className={`block h-full rounded-full bg-gradient-to-r ${gradients[index % gradients.length]}`} style={{ width: `${Math.max(5, (row.value / max) * 100)}%` }} />
+              </div>
             </div>
-            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-              <span className={`block h-full rounded-full bg-gradient-to-r ${gradients[index % gradients.length]}`} style={{ width: `${Math.max(5, (row.value / max) * 100)}%` }} />
-            </div>
+            <span className="text-right font-mono font-bold text-white text-[11px]">{row.value.toLocaleString('vi-VN')}</span>
           </div>
-          <span className="text-right font-mono font-bold text-white text-[11px]">{row.value.toLocaleString('vi-VN')}</span>
-        </div>
-      ))}
+        ))
+      ) : (
+        <CockpitEmptyState title="Chưa có dữ liệu xếp hạng" description="Cần danh mục vật tư có số lượng tồn." />
+      )}
     </div>
   )
 }

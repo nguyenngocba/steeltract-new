@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
 import { Archive, FileText, Layers, Package, PackagePlus, PencilRuler, Rocket, Sigma, Eye } from "lucide-react";
@@ -16,7 +16,6 @@ import {
 } from "../../../../shared/ui/cockpit";
 import { useProjects } from "../../../inventory/hooks/useProjects";
 import {
-  inventoryInput,
   InventoryChartCard,
   InventoryPanel,
   InventoryPagination,
@@ -42,6 +41,11 @@ import {
   formatCurrencyVnd,
   formatQuantity,
 } from "@/shared/utils/number-format";
+import { EnterpriseModalForm } from "@/shared/forms";
+import {
+  ComponentDefinitionRequirementForm,
+  type ComponentDefinitionFormState,
+} from "../../components/ComponentDefinitionRequirementForm";
 import {
   ComponentsDonut,
   ComponentsMiniBars,
@@ -233,9 +237,9 @@ export function ComponentsListPage() {
   const { data: selectedCostingBreakdown, error: costingBreakdownError } =
     useComponentCostingBreakdown(selected?.id);
 
-  const [createForm, setCreateForm] = useState({
+  const [createForm, setCreateForm] = useState<ComponentDefinitionFormState>({
     name: "",
-    type: "Dầm (Beam)",
+    type: "",
     profile: "",
     projectId: "",
     qty: "1",
@@ -246,7 +250,7 @@ export function ComponentsListPage() {
     setCreateOpen(false);
     setCreateForm({
       name: "",
-      type: "Dầm (Beam)",
+      type: "",
       profile: "",
       projectId: "",
       qty: "1",
@@ -262,6 +266,10 @@ export function ComponentsListPage() {
 
   const rows = workspace?.data ?? [];
   const paginatedRows = rows;
+  const componentTypeOptions = useMemo(
+    () => Array.from(new Set(rows.map((row) => row.type).filter(Boolean))).sort((left, right) => left.localeCompare(right)),
+    [rows],
+  );
   const componentTableEmptyRows = Array.from({
     length: Math.max(0, PAGE_SIZE - paginatedRows.length),
   });
@@ -517,9 +525,9 @@ export function ComponentsListPage() {
             </ComponentsSelect>
             <ComponentsSelect value={type} onChange={(v) => { setType(v); setPage(1); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]">
               <option value="">Tất cả loại</option>
-              <option value="Dầm (Beam)">Dầm (Beam)</option>
-              <option value="Cột (Column)">Cột (Column)</option>
-              <option value="Bản mã (Plate)">Bản mã (Plate)</option>
+              {componentTypeOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
             </ComponentsSelect>
             <input
               value={searchDraft}
@@ -882,137 +890,24 @@ export function ComponentsListPage() {
       ) : null}
 
       {createOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md">
-          <div
-            className="w-full rounded-2xl border border-white/10 bg-[#08111f]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] flex flex-col justify-between"
-            style={{ maxWidth: "48rem" }}
-          >
-            <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300">
-                Tạo hồ sơ cấu kiện
-              </h3>
-              <button
-                onClick={closeCreateModal}
-                className="rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 hover:text-white transition"
-              >
-                Đóng
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                  Thông tin kỹ thuật
-                </div>
-                <div
-                  className="grid grid-cols-1 xl:grid-cols-2"
-                  style={{ gap: "0.75rem" }}
-                >
-                  <input
-                    value={createForm.name}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    placeholder="Tên cấu kiện *"
-                    className={`${inventoryInput} xl:col-span-2`}
-                  />
-                  <select
-                    value={createForm.type}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, type: e.target.value }))
-                    }
-                    className={inventoryInput}
-                  >
-                    <option>Dầm (Beam)</option>
-                    <option>Cột (Column)</option>
-                    <option>Bản mã (Plate)</option>
-                  </select>
-                  <input
-                    value={createForm.profile}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, profile: e.target.value }))
-                    }
-                    placeholder="Profile / Kích thước"
-                    className={inventoryInput}
-                  />
-                  <input
-                    value="Mã cấu kiện tự động sinh"
-                    readOnly
-                    className={`${inventoryInput} text-slate-500`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                  Yêu cầu công trình
-                </div>
-                <div
-                  className="grid grid-cols-1 xl:grid-cols-2"
-                  style={{ gap: "0.75rem" }}
-                >
-                  <select
-                    value={createForm.projectId}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, projectId: e.target.value }))
-                    }
-                    className={inventoryInput}
-                  >
-                    <option value="">Công trình / Dự án *</option>
-                    {projects.map(
-                      (item: { id: string; code?: string; name: string }) => (
-                        <option key={item.id} value={item.id}>
-                          {item.code ?? item.name} - {item.name}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                  <input
-                    value={createForm.qty}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, qty: e.target.value }))
-                    }
-                    placeholder="Số lượng yêu cầu *"
-                    className={inventoryInput}
-                  />
-                  <input
-                    type="date"
-                    value={createForm.requiredBy}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, requiredBy: e.target.value }))
-                    }
-                    className={inventoryInput}
-                  />
-                  <input
-                    value={createForm.note}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, note: e.target.value }))
-                    }
-                    placeholder="Ghi chú"
-                    className={inventoryInput}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 rounded-xl border border-cyan-900/40 bg-cyan-950/20 p-3 text-xs text-cyan-100">
-              Hồ sơ mới ở trạng thái Draft. Số lượng là nhu cầu công trình,
-              không tạo tồn kho, ComponentInstance hay lệnh sản xuất.
-            </div>
-            <div className="mt-4 flex justify-end gap-2 border-t border-white/10 pt-3">
-              <button
-                onClick={closeCreateModal}
-                className="rounded border border-slate-700 px-4 py-2 text-xs text-slate-300 hover:bg-white/5 transition"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={submitCreate}
-                className="rounded bg-blue-600 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition"
-              >
-                Tạo hồ sơ
-              </button>
-            </div>
-          </div>
-        </div>
+        <EnterpriseModalForm
+          open
+          title="Tạo hồ sơ cấu kiện"
+          description="Tạo Component Definition ở trạng thái Draft và nhu cầu cấu kiện cho công trình."
+          onClose={closeCreateModal}
+          onSubmit={(event) => { event.preventDefault(); void submitCreate(); }}
+          submitLabel="Tạo hồ sơ"
+          pendingLabel="Đang tạo hồ sơ..."
+          pending={createComponent.isPending}
+          maxWidthClass="max-w-5xl"
+        >
+          <ComponentDefinitionRequirementForm
+            form={createForm}
+            projects={projects as Array<{ id: string; code?: string; name: string }>}
+            components={rows}
+            onChange={(patch) => setCreateForm((current) => ({ ...current, ...patch }))}
+          />
+        </EnterpriseModalForm>
       ) : null}
 
       {productionOpen ? (

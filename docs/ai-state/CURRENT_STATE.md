@@ -1,5 +1,146 @@
 # Current State
 
+## SPRINT EXECUTIVE BI.8 – Redesign Inventory Analytics Charts
+
+Status: **IMPLEMENTED - TEST/BUILD PASS**
+
+On 2026-07-29, redesigned the five Inventory Executive BI analytics cards (`AnalyticsPrimitives` & `DashboardPage`). Implemented `WarehouseCapacityCard` (Donut + Used/Free progress legend + Utilization trend), `AbcAnalysisCard` (Pareto Donut + Class A/B/C progress rows), `InventoryAgingCard` (Distribution bars + Executive summary strip with Total Value, >90D Stock, Avg Age), `TransactionTrendCard` (Multi-line trend + Inbound/Outbound/Net Change KPI summary), and `TopInventoryRankingCard` (Top 10 descending ranking with gradient progress bars).
+
+Verification: `pnpm -C apps/frontend build` (Pass), `pnpm -C apps/backend-api build` (Pass), `git diff --check` (Pass).
+
+## STABILITY.OPS3A1.1 – Runtime Production Warehouse Certification
+
+Status: **PASS - RUNTIME CERTIFIED**
+
+On 2026-07-29, closed the runtime acceptance gate for UI.OPS.3A.1.
+
+Certified using the already-running host backend on `http://127.0.0.1:3000`:
+
+- `/health/live` PASS
+- `/health/ready` PASS, database `up`
+- controlled fixture `OPS3A1-RT-20260729030324` created through authenticated
+  HTTP APIs only
+- Material Master creation PASS
+- receipt into MAIN PASS
+- MAIN -> PRODUCTION transfer PASS
+- quantity conservation PASS: MAIN 60 + PRODUCTION 40 = TOTAL 100
+- `/inventory/items.locationBalances` PASS
+- Components `Kho vật tư sản xuất` source PASS
+- BOM production availability PASS
+- MAIN isolation PASS
+- reservation semantics PASS: onHand(PRODUCTION) remained 40, reserved moved
+  0 -> 20, available moved 40 -> 20
+- Production readiness PASS
+- existing PRODUCTION stock audit PASS: 9 materials, 11 location balances,
+  total 4216.9; API exposed the same 11 balances and total 4216.9
+
+Browser smoke was not tested; authenticated HTTP certification succeeded and
+the sprint allows browser smoke to be reported as NOT TESTED.
+
+Deliverable:
+
+- `docs/audits/stability-ops3a1-runtime-production-warehouse-certification.md`
+
+No source code, schema, migration, stage or commit was performed.
+
+## STEELTRACK UI.OPS.3A.1 – Production Warehouse Source-of-Truth Fix
+
+Status: **IMPLEMENTED - TEST/BUILD PASS, RUNTIME HTTP SMOKE BLOCKED**
+
+On 2026-07-29, fixed the remaining source-of-truth gap for Production
+Warehouse material stock.
+
+Implemented:
+
+- `GET /inventory/items` now returns canonical `locationBalances` from
+  `InventoryLocationStock`
+- Components `Kho vật tư sản xuất` and the Production BOM picker can now read
+  actual `PRODUCTION` warehouse balances instead of depending on transaction
+  remark reconstruction
+- Production BOM selection keeps Material Master identity and shows Production
+  stock, reserved, available and Main Warehouse informational stock separately
+- Production material readiness now uses
+  `onHand(PRODUCTION) - activeReservations` for available quantity and exposes
+  `onHandQty`, `reservedQty`, `availableQty`, `reservableQty`, `issuedQty` and
+  `shortageQty`
+- active reservation calculations subtract returned quantity as well as issued
+  quantity
+
+No historical reconciliation/backfill was performed. If legacy transfers exist
+without matching `InventoryLocationStock` buckets, they need a separate audited
+data repair sprint.
+
+Deliverable:
+
+- `docs/audits/ui-ops3a1-production-warehouse-source-of-truth-report.md`
+
+Verification passed: Prisma validate, Prisma migrate status, targeted
+Inventory/Production/BOM/reservation/material issue tests, full backend tests,
+frontend tests, backend build, frontend build and `git diff --check`.
+
+Runtime HTTP smoke is blocked by environment DB connectivity:
+`PrismaClientInitializationError: Can't reach database server at localhost:5432`.
+
+## STEELTRACK UI.OPS.3B – Operational Forms Convergence
+
+Status: **IMPLEMENTED - FRONTEND TEST/BUILD PASS**
+
+On 2026-07-28, completed a frontend-first convergence pass for the four primary
+operational forms: Component Definition creation, Engineering BOM creation,
+Production Order creation and Final QC physical-instance decision.
+
+Implemented:
+
+- shared operational form primitives for primary form + assistant rail +
+  summary surfaces
+- one canonical Components create form used by both global actions and the
+  Components list page
+- real-data suggestions from existing Component definitions, Project context,
+  Material Master and Production stock availability
+- Production Order UI guard that prevents quantity above remaining
+  ProjectComponentRequirement demand and offers an explicit remaining-quantity
+  apply action
+- Final QC detail context for FINAL checklist readiness with PASS/FAIL disabled
+  when the checklist is unavailable
+
+No backend, schema, migration, Inventory business logic, Snapshot Engine or
+Historical Dashboard code changed.
+
+Deliverable:
+
+- `docs/audits/ui-ops3b-operational-forms-convergence-report.md`
+
+Verification passed: frontend tests and frontend build. Backend build is still
+part of final gate for this turn.
+
+## STEELTRACK UI.OPS.1 – Components / Production / QC Operational UI Convergence
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+On 2026-07-28, completed a frontend-only convergence pass for Components,
+Production and QC operational UI.
+
+Implemented:
+
+- Components material-stock tab is now labeled `Kho vật tư sản xuất`.
+- Components material-stock current balance now reads Inventory material
+  `locationBalances` for the `PRODUCTION` warehouse. It no longer derives
+  current stock from `[COMPONENT_PRODUCTION]` transaction remarks or local
+  subtraction from production issue rows.
+- Component create modals no longer hardcode Beam/Column/Plate options; type
+  and profile suggestions are sourced from existing component data.
+- Production Order create modal terminology now matches the canonical
+  requirement-first workflow.
+- QC touched screens no longer show obvious demo values for supplier, line,
+  shift, CAPA, reports or audit logs where no authoritative backend read-model
+  exists. NCR uses `runtime.ncrs`.
+
+Deliverable:
+
+- `docs/audits/ui-ops1-components-production-qc-convergence-report.md`
+
+Verification passed: frontend tests and frontend build. Backend was not changed.
+
 ## COMPONENT DOMAIN.5G – End-to-End Operational Certification
 
 Status: **CONDITIONALLY CERTIFIED - YELLOW**
@@ -3439,3 +3580,39 @@ guard, ProductionExecution complete, WorkOrder complete, Waiting QC, QC PASS,
 QC FAIL, NCR and Finished Goods reconciliation. QC PASS did not create
 InventoryTransaction or YardItemPlacement side effects. Browser smoke remains
 pending.
+
+# STEELTRACK UI.OPS.2 Visual & Form Convergence (2026-07-28)
+
+Status: **IMPLEMENTED - FRONTEND BUILD PASS**
+
+Components, Production and QC now share tighter Inventory-inspired form/detail
+rhythm for the canonical manufacturing workflow. Component creation presents
+Project Requirement semantics explicitly. Production BOM authoring now selects
+real Material Master rows instead of requiring current Production Warehouse
+stock. Production Order creation exposes requirement-first sections and
+engineering basis validation. QC inspection/final instance/NCR details use
+bounded modal/drawer shells with single scroll ownership and footer actions.
+
+No backend, Prisma, migration, Inventory business logic, Historical Dashboard,
+Snapshot Engine, Yard or Delivery code changed.
+
+# UI.OPS.3A Production Material Flow Canonicalization (2026-07-28)
+
+Status: **IMPLEMENTED - TEST/BUILD PASS, RUNTIME FIXTURE BLOCKED**
+
+Production material availability now uses canonical current balances from
+`InventoryLocationStock` in warehouse `PRODUCTION` instead of reconstructing
+stock from `[COMPONENT_PRODUCTION]` transaction remarks. Engineering BOM
+creation no longer requires current Production stock and no longer treats BOM
+definition as reservation/issue. The BOM UI keeps Material Master as the
+identity source while enriching suggestions with Production stock, active
+reservation, available quantity and Production locations.
+
+Components `Kho vật tư sản xuất` now subtracts active reservation quantities
+from Production balances and detects recent/history movement by actual
+PRODUCTION transaction lines. Production material return from the page now uses
+`TRANSFER` semantics for warehouse-to-warehouse movement.
+
+Runtime OPS3 fixture remains blocked because direct PrismaClient read smoke
+cannot reach PostgreSQL at `localhost:5432` from the current shell. No direct DB
+writes or historical backfill were performed.

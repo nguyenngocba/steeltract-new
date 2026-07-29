@@ -953,14 +953,30 @@ export class ProductionService {
   async materialRequirements(id: string) {
     const order = await this.getOrderOrThrow(id);
     const materialIds = (order.bom?.items ?? []).map((item) => item.materialId);
-    const productionStockByMaterialId = new Map<string, number>();
+    const productionOnHandByMaterialId = new Map<string, number>();
+    const reservedByMaterialId = new Map<string, number>();
 
     if (materialIds.length > 0) {
-      const buckets = await this.productionStockBuckets(materialIds);
+      const [buckets, reservationLines] = await Promise.all([
+        this.productionStockBuckets(materialIds, { subtractIssued: false }),
+        this.repository.findActiveReservationLines(materialIds),
+      ]);
       for (const [materialId, rows] of buckets.entries()) {
-        productionStockByMaterialId.set(
+        productionOnHandByMaterialId.set(
           materialId,
           rows.reduce((total, row) => total + row.quantity, 0),
+        );
+      }
+      for (const line of reservationLines) {
+        const reserved = Math.max(
+          0,
+          Number(line.reservedQty ?? 0) -
+            Number(line.issuedQty ?? 0) -
+            Number(line.returnedQty ?? 0),
+        );
+        reservedByMaterialId.set(
+          line.inventoryItemId,
+          (reservedByMaterialId.get(line.inventoryItemId) ?? 0) + reserved,
         );
       }
     }
@@ -968,11 +984,13 @@ export class ProductionService {
     return (order.bom?.items ?? []).map((item) => {
       const requiredQty =
         item.quantity * (1 + item.wastePercent / 100) * order.quantity;
-      const availableQty =
-        productionStockByMaterialId.get(item.materialId) ?? 0;
+      const onHandQty = productionOnHandByMaterialId.get(item.materialId) ?? 0;
+      const reservedQty = reservedByMaterialId.get(item.materialId) ?? 0;
+      const availableQty = Math.max(onHandQty - reservedQty, 0);
       const issuedQty = order.materialIssues
         .filter((issue) => issue.inventoryItemId === item.materialId)
         .reduce((total, issue) => total + issue.issuedQty, 0);
+      const remainingRequiredQty = Math.max(requiredQty - issuedQty, 0);
 
       return {
         materialId: item.materialId,
@@ -980,9 +998,12 @@ export class ProductionService {
         materialName: item.material.name,
         unit: item.material.unitMaster?.symbol ?? item.material.unit,
         requiredQty,
+        onHandQty,
+        reservedQty,
         availableQty,
+        reservableQty: Math.min(availableQty, remainingRequiredQty),
         issuedQty,
-        shortageQty: Math.max(requiredQty - issuedQty - availableQty, 0),
+        shortageQty: Math.max(remainingRequiredQty - availableQty, 0),
       };
     });
   }
@@ -1099,7 +1120,10 @@ export class ProductionService {
     }
   }
 
-  private async productionStockBuckets(materialIds: string[]) {
+  private async productionStockBuckets(
+    materialIds: string[],
+    options: { subtractIssued?: boolean } = { subtractIssued: true },
+  ) {
     const buckets = new Map<
       string,
       Array<{
@@ -1111,44 +1135,33 @@ export class ProductionService {
       }>
     >();
 
-    const transactions =
-      await this.inventoryRepository.findProductionInventoryTransactions(
+    if (!materialIds.length) return buckets;
+
+    const productionWarehouse =
+      await this.inventoryRepository.findWarehouseByCode('PRODUCTION');
+
+    if (!productionWarehouse) return buckets;
+
+    const locationStocks =
+      await this.inventoryRepository.findPositiveLocationStocks(
         materialIds,
+        productionWarehouse.id,
+        'PRODUCTION',
       );
 
-    for (const transaction of transactions) {
-      const text = `${transaction.remarks ?? ''} ${transaction.note ?? ''}`;
-      const isReturn = text.includes('[COMPONENT_PRODUCTION_RETURN]');
-
-      for (const line of transaction.items) {
-        if (!materialIds.includes(line.inventoryItemId)) continue;
-        const rawQty = Number(line.quantity ?? 0);
-        if (!Number.isFinite(rawQty) || rawQty === 0) continue;
-        if (!this.isProductionWarehouseLine(line, transaction)) continue;
-        if (!isReturn && rawQty <= 0) continue;
-        if (isReturn && rawQty >= 0) continue;
-
-        const rows = buckets.get(line.inventoryItemId) ?? [];
-        const zoneId = line.zoneId ?? transaction.zoneId ?? undefined;
-        const warehouseId =
-          line.warehouseId ?? transaction.warehouseId ?? undefined;
-        const slotId = line.slotId ?? undefined;
-        const level = line.level ?? undefined;
-        const existing = rows.find(
-          (row) =>
-            (row.zoneId ?? null) === (zoneId ?? null) &&
-            (row.warehouseId ?? null) === (warehouseId ?? null) &&
-            (row.slotId ?? null) === (slotId ?? null) &&
-            (row.level ?? null) === (level ?? null),
-        );
-        if (existing) {
-          existing.quantity += rawQty;
-        } else {
-          rows.push({ warehouseId, zoneId, slotId, level, quantity: rawQty });
-        }
-        buckets.set(line.inventoryItemId, rows);
-      }
+    for (const stock of locationStocks) {
+      const rows = buckets.get(stock.inventoryItemId) ?? [];
+      rows.push({
+        warehouseId: stock.warehouseId ?? stock.zone?.warehouseId ?? undefined,
+        zoneId: stock.zoneId ?? undefined,
+        slotId: stock.slotId ?? undefined,
+        level: stock.level ?? undefined,
+        quantity: Number(stock.quantity ?? 0),
+      });
+      buckets.set(stock.inventoryItemId, rows);
     }
+
+    if (options.subtractIssued === false) return buckets;
 
     const issues = await this.repository.findIssuedMaterialIssues(materialIds);
 
@@ -1177,21 +1190,6 @@ export class ProductionService {
     }
 
     return buckets;
-  }
-
-  private isProductionWarehouseLine(
-    line: { warehouse?: { code?: string | null; name?: string | null } | null },
-    transaction: {
-      warehouse?: { code?: string | null; name?: string | null } | null;
-    },
-  ) {
-    const warehouseCode = String(
-      line.warehouse?.code ?? transaction.warehouse?.code ?? '',
-    ).toUpperCase();
-    const warehouseName = String(
-      line.warehouse?.name ?? transaction.warehouse?.name ?? '',
-    ).toLowerCase();
-    return warehouseCode === 'PRODUCTION' || warehouseName.includes('sản xuất');
   }
 
   async metrics() {

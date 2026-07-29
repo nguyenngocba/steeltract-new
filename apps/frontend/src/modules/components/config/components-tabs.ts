@@ -25,8 +25,8 @@ export const componentsTabs = [
   },
   {
     key: 'material-stock',
-    label: 'MATERIAL WIP',
-    vi: 'Vật tư sử dụng',
+    label: 'PRODUCTION STOCK',
+    vi: 'Kho vật tư sản xuất',
     path: '/components/material-stock',
   },
   {

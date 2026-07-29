@@ -461,7 +461,10 @@ export type MaterialRequirement = {
   materialName: string
   unit?: string
   requiredQty: number
+  onHandQty?: number
+  reservedQty?: number
   availableQty: number
+  reservableQty?: number
   issuedQty: number
   shortageQty: number
 }
