@@ -12,6 +12,8 @@ import {
 
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { RequirePermissions } from '../../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import type {
   CreateUomDto,
   ListUomDto,
@@ -24,7 +26,8 @@ import {
 } from './dto/uom.dto';
 import { UomService } from './uom.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('master-data.read')
 @Controller('master-data/uom')
 export class UomController {
   constructor(private readonly uomService: UomService) {}
@@ -43,6 +46,7 @@ export class UomController {
   }
 
   @Post()
+  @RequirePermissions('master-data.write')
   create(
     @Body(new ZodValidationPipe(createUomSchema))
     body: CreateUomDto,
@@ -51,6 +55,7 @@ export class UomController {
   }
 
   @Patch(':id')
+  @RequirePermissions('master-data.write')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateUomSchema))
@@ -60,6 +65,7 @@ export class UomController {
   }
 
   @Delete(':id')
+  @RequirePermissions('master-data.write')
   deactivate(@Param('id') id: string) {
     return this.uomService.deactivate(id);
   }

@@ -174,6 +174,17 @@ export class YardRepository {
     });
   }
 
+  findActivePlacementForComponentInstance(
+    componentInstanceId: string,
+    tx: YardTx = this.prisma,
+  ) {
+    return tx.yardItemPlacement.findFirst({
+      where: { componentInstanceId, removedAt: null },
+      include: this.placementInclude(),
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async updatePlacementVersioned(
     id: string,
     expectedUpdatedAt: Date,
@@ -526,6 +537,41 @@ export class YardRepository {
         },
         take: 20,
       },
+      componentInstance: {
+        include: {
+          component: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              componentType: true,
+              profile: true,
+              lifecycleState: true,
+            },
+          },
+          requirement: {
+            select: {
+              id: true,
+              requirementNo: true,
+              requiredQuantity: true,
+            },
+          },
+          productionOrder: {
+            select: {
+              id: true,
+              orderNo: true,
+              status: true,
+            },
+          },
+          project: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+        },
+      },
     };
   }
 
@@ -545,6 +591,17 @@ export class YardRepository {
         },
       },
       crane: true,
+      componentInstance: {
+        select: {
+          id: true,
+          instanceNo: true,
+          state: true,
+          componentId: true,
+          productionOrderId: true,
+          requirementId: true,
+          projectId: true,
+        },
+      },
     };
   }
 
@@ -599,6 +656,11 @@ export class YardRepository {
             { itemCode: { contains: params.search, mode: 'insensitive' } },
             { itemName: { contains: params.search, mode: 'insensitive' } },
             { itemId: { contains: params.search, mode: 'insensitive' } },
+            {
+              componentInstance: {
+                instanceNo: { contains: params.search, mode: 'insensitive' },
+              },
+            },
           ]
         : undefined,
     };

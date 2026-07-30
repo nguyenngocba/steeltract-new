@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   createComponentDefinitionRequirementSchema,
@@ -16,7 +18,8 @@ import {
 } from './dto/component-domain-foundation.dto';
 import { ComponentDomainFoundationService } from './services/component-domain-foundation.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('components.read')
 @Controller('components/foundation')
 export class ComponentDomainFoundationController {
   constructor(
@@ -24,6 +27,7 @@ export class ComponentDomainFoundationController {
   ) {}
 
   @Post('definition-requirements')
+  @RequirePermissions('components.write')
   createDefinitionRequirement(
     @Body(new ZodValidationPipe(createComponentDefinitionRequirementSchema))
     body: CreateComponentDefinitionRequirementDto,
@@ -32,6 +36,7 @@ export class ComponentDomainFoundationController {
   }
 
   @Post('requirements')
+  @RequirePermissions('components.write')
   createRequirement(
     @Body(new ZodValidationPipe(createProjectComponentRequirementSchema))
     body: CreateProjectComponentRequirementDto,
@@ -48,6 +53,7 @@ export class ComponentDomainFoundationController {
   }
 
   @Post('instances')
+  @RequirePermissions('components.write')
   createInstance(
     @Body(new ZodValidationPipe(createComponentInstanceSchema))
     body: CreateComponentInstanceDto,

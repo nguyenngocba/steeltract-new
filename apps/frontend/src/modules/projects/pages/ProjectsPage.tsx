@@ -47,6 +47,7 @@ import {
   generateProjectWbs,
   createProject,
   deliverProjectComponent,
+  getProjectExecution,
   getProjectDetailTab,
   getProjectTemplates,
   getProjectsRuntime,
@@ -65,6 +66,7 @@ import {
   type InstallProjectComponentPayload,
   type ProjectTemplate,
   type ProjectDetailTab,
+  type ProjectExecutionReadModel,
   type ProjectTemplateTaskRule,
   type ProjectComponentRuntime,
   type ProjectComponentStatus,
@@ -1805,7 +1807,14 @@ function ProjectDetailWorkspace({
     enabled: Boolean(project?.id),
     staleTime: 30_000,
   })
+  const executionQuery = useQuery({
+    queryKey: ['project-execution', project?.id],
+    queryFn: () => getProjectExecution(project!.id),
+    enabled: Boolean(project?.id),
+    staleTime: 30_000,
+  })
   const tabData = detailTabQuery.data as any
+  const execution = executionQuery.data
   const tabProject = tabData?.project ?? project
   const tabMaterials = tabData?.materials ?? materials
   const tabComponents = tabData?.components ?? components
@@ -1850,9 +1859,10 @@ function ProjectDetailWorkspace({
               <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
                 <CockpitKpiCard title="Tiến độ" value={`${fmt(tabProject.progress)}%`} note="Hoàn thành" tone="cyan" />
                 <CockpitKpiCard title="Giá trị" value={formatCurrencyVnd(tabProject.actualValue)} note="Đã thực hiện" tone="blue" />
-                <CockpitKpiCard title="Cấu kiện" value={fmt(componentCount, 0)} note="Theo projectId" tone="purple" />
+                <CockpitKpiCard title="Cấu kiện" value={fmt(execution?.summary.instanceCount ?? componentCount, 0)} note={execution ? 'Physical instances' : 'Theo projectId'} tone="purple" />
                 <CockpitKpiCard title="Vật tư đã cấp" value={fmt(materialCount, 0)} note="Mã vật tư" tone="amber" />
               </div>
+              <ProjectExecutionSummary execution={execution} loading={executionQuery.isLoading} />
               <ProjectFinancialSummary project={tabProject} financial={tabFinancial} />
               <ProjectHealthPanel health={tabHealth} returnRequests={tabReturnRequests} />
               <ProjectOverviewExecution rows={tabWbsRows} project={tabProject} />
@@ -1882,7 +1892,12 @@ function ProjectDetailWorkspace({
           {tab === 'command' && <ProjectCommandCenter project={tabProject} rows={tabWbsRows} financial={tabFinancial ?? fallbackFinancial(tabProject)} health={tabHealth} />}
           {tab === 'site' && <ProjectSiteMode project={tabProject} rows={tabWbsRows} documents={tabDocuments} logs={tabLogs} saving={savingSite} onSubmit={onSiteUpdate} />}
           {tab === 'materials' && <ProjectDetailMaterials rows={tabMaterials} onReturn={onReturnMaterial} onOpenPendingReturn={onOpenPendingReturn} />}
-          {tab === 'components' && <ProjectDetailComponents rows={tabComponents} onReturn={onReturnComponent} />}
+          {tab === 'components' && (
+            <div className="space-y-1">
+              <ProjectExecutionSummary execution={execution} loading={executionQuery.isLoading} expanded />
+              <ProjectDetailComponents rows={tabComponents} onReturn={onReturnComponent} />
+            </div>
+          )}
           {tab === 'progress' && <ProjectDetailProgress project={tabProject} rows={tabWbsRows} health={tabHealth} templates={templates} saving={savingWbs} onCreate={onCreateWbs} onUpdate={onUpdateWbs} onMove={onMoveWbs} onDelete={onDeleteWbs} onGenerate={onGenerateWbs} onBulk={onBulkWbs} />}
           {tab === 'costs' && <ProjectCostControl financial={tabFinancial ?? fallbackFinancial(tabProject)} rows={tabWbsRows} />}
           {tab === 'documents' && <ProjectDocumentsGallery documents={tabDocuments} compact />}
@@ -1903,6 +1918,86 @@ function ProjectFinancialSummary({ project, financial }: { project: ProjectRunti
       <CockpitKpiCard title="Lợi nhuận" value={formatCurrencyVnd(data.profit)} note={data.profit >= 0 ? 'Dương' : 'Âm'} tone={data.profit >= 0 ? 'emerald' : 'red'} />
       <CockpitKpiCard title="Biên lợi nhuận" value={`${fmt(data.marginPercent)}%`} note="Profit / contract" tone={data.marginPercent >= 0 ? 'emerald' : 'red'} />
     </div>
+  )
+}
+
+function ProjectExecutionSummary({
+  execution,
+  loading,
+  expanded = false,
+}: {
+  execution?: ProjectExecutionReadModel
+  loading: boolean
+  expanded?: boolean
+}) {
+  if (loading) {
+    return (
+      <CockpitChartCard title="Canonical Execution" heightClass={expanded ? 'h-[320px]' : 'h-[180px]'}>
+        <CockpitEmptyState title="Đang tải execution read model" description="Nguồn: Requirement → Production Order → Component Instance." />
+      </CockpitChartCard>
+    )
+  }
+
+  if (!execution) {
+    return (
+      <CockpitChartCard title="Canonical Execution" heightClass={expanded ? 'h-[320px]' : 'h-[180px]'}>
+        <CockpitEmptyState title="Chưa có execution read model" description="Dữ liệu canonical sẽ xuất hiện khi API /projects/:id/execution trả kết quả." />
+      </CockpitChartCard>
+    )
+  }
+
+  const rows = execution.requirements.slice(0, expanded ? 12 : 5)
+
+  return (
+    <CockpitChartCard title="Canonical Execution" heightClass={expanded ? 'h-[420px]' : 'h-[240px]'}>
+      <div className="grid grid-cols-2 gap-1 md:grid-cols-6">
+        <CockpitKpiCard title="Yêu cầu" value={fmt(execution.summary.requiredQty, 0)} note={`${fmt(execution.summary.requirementCount, 0)} requirements`} tone="cyan" />
+        <CockpitKpiCard title="Đã lập PO" value={fmt(execution.summary.orderedQty, 0)} note="Không tính cancelled" tone="blue" />
+        <CockpitKpiCard title="Instances" value={fmt(execution.summary.instanceCount, 0)} note="Physical" tone="purple" />
+        <CockpitKpiCard title="Hoàn tất SX" value={fmt(execution.summary.completedQty, 0)} note={`${fmt(execution.summary.productionCompletionPercent)}%`} tone="amber" />
+        <CockpitKpiCard title="Finished Goods" value={fmt(execution.summary.finishedGoodsQty, 0)} note={`${fmt(execution.summary.finishedGoodsPercent)}%`} tone="emerald" />
+        <CockpitKpiCard title="Đã vào Yard" value={fmt(execution.summary.yardStagedQty, 0)} note="ComponentInstance" tone="cyan" />
+      </div>
+      <CockpitTableShell className={expanded ? 'mt-1 h-[270px]' : 'mt-1 h-[110px]'}>
+        <table className="w-full min-w-[900px] table-fixed text-xs">
+          <thead className={tableHead}>
+            <tr>
+              {['Requirement', 'Cấu kiện', 'Required', 'PO', 'Instances', 'In Prod', 'Completed', 'QC Pass', 'QC Fail', 'FG', 'Yard', 'Status'].map((heading) => (
+                <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">{heading}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className={tableRow}>
+                <td className="px-2 py-2 font-mono text-cyan-300">{row.requirementNo}</td>
+                <td className="truncate px-2 py-2 text-white">{row.component.code} · {row.component.name}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{fmt(row.quantities.requiredQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{fmt(row.quantities.orderedQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{fmt(row.quantities.instanceCount, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{fmt(row.quantities.inProductionQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{fmt(row.quantities.completedQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-emerald-300">{fmt(row.quantities.qcPassedQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-red-300">{fmt(row.quantities.qcFailedQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-cyan-300">{fmt(row.quantities.finishedGoodsQty, 0)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-blue-300">{fmt(row.quantities.yardStagedQty, 0)}</td>
+                <td className="px-2 py-2 text-slate-300">{executionStatusLabel(row.executionStatus)}</td>
+              </tr>
+            ))}
+            {!rows.length ? (
+              <tr>
+                <td colSpan={12} className="px-2 py-8">
+                  <CockpitEmptyState title="Chưa có requirement" description="Tạo ProjectComponentRequirement để bắt đầu execution tracking." />
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </CockpitTableShell>
+      <p className="mt-1 text-[10px] text-slate-500">
+        Yard canonical: {execution.summary.downstream.yardCanonical ? 'ComponentInstance-level enabled' : 'chưa canonical'}. Dispatch canonical: chưa triển khai.
+      </p>
+    </CockpitChartCard>
   )
 }
 
@@ -3771,6 +3866,19 @@ function statusLabel(status: ProjectStatus | string) {
   if (status === 'COMPLETED') return 'Hoàn thành'
   if (status === 'PLANNING') return 'Kế hoạch'
   if (status === 'ON_HOLD') return 'Tạm dừng'
+  return status
+}
+
+function executionStatusLabel(status: string) {
+  if (status === 'NO_REQUIREMENTS') return 'Chưa có yêu cầu'
+  if (status === 'NO_PRODUCTION') return 'Chưa lập sản xuất'
+  if (status === 'PLANNED') return 'Đã lập kế hoạch'
+  if (status === 'IN_PRODUCTION') return 'Đang sản xuất'
+  if (status === 'WAITING_QC') return 'Chờ QC'
+  if (status === 'QC_BLOCKED') return 'QC chặn'
+  if (status === 'FINISHED_PARTIAL') return 'FG một phần'
+  if (status === 'FINISHED') return 'Finished Goods'
+  if (status === 'OVER_PRODUCED') return 'Vượt yêu cầu'
   return status
 }
 

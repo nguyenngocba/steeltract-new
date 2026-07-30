@@ -125,17 +125,31 @@ export class ComponentSnapshotRepository {
     });
     const placements = await this.prisma.yardItemPlacement.findMany({
       where: {
-        itemType: YardItemType.COMPONENT,
-        itemId: { in: components.map((row) => row.id) },
         removedAt: null,
+        OR: [
+          {
+            itemType: YardItemType.COMPONENT,
+            itemId: { in: components.map((row) => row.id) },
+            componentInstanceId: null,
+          },
+          {
+            componentInstance: {
+              componentId: { in: components.map((row) => row.id) },
+            },
+          },
+        ],
       },
-      include: { slot: { include: { zone: true } } },
+      include: {
+        slot: { include: { zone: true } },
+        componentInstance: { select: { id: true, instanceNo: true, componentId: true } },
+      },
       orderBy: { placedAt: 'desc' },
     });
     const placementByComponent = new Map<string, (typeof placements)[number]>();
     for (const placement of placements) {
-      if (!placementByComponent.has(placement.itemId)) {
-        placementByComponent.set(placement.itemId, placement);
+      const componentKey = placement.componentInstance?.componentId ?? placement.itemId;
+      if (!placementByComponent.has(componentKey)) {
+        placementByComponent.set(componentKey, placement);
       }
     }
 

@@ -144,6 +144,7 @@ export class DictionariesService {
         'masterQcStatus',
         'masterPriority',
         'masterMaterialStatus',
+        'masterMaterialUsageType',
         'masterWorkflowStatus',
       ].includes(model)
     ) {

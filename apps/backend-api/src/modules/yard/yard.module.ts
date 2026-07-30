@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../core/prisma/prisma.module';
 import { SnapshotsModule } from '../../core/snapshots/snapshots.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
+import { ComponentsModule } from '../components/components.module';
 import { YardRepository } from './repositories/yard.repository';
 import { YardReadModelRepository } from './repositories/yard-read-model.repository';
 import { YardReadModelService } from './services/yard-read-model.service';
@@ -12,7 +13,7 @@ import { YardSnapshotReadService } from './services/yard-snapshot-read.service';
 import { YardController } from './yard.controller';
 
 @Module({
-  imports: [PrismaModule, SnapshotsModule, AttachmentsModule],
+  imports: [PrismaModule, SnapshotsModule, AttachmentsModule, ComponentsModule],
   controllers: [YardController],
   providers: [
     YardService,

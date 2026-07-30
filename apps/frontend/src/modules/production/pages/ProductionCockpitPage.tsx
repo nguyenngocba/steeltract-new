@@ -72,10 +72,10 @@ import {
   useReleaseProductionReservation,
   useReservationPreview,
   useReserveProductionReservation,
-  useStageProductionToYard,
   useStartProductionOrder,
   useYardSlots,
 } from '../hooks/useProductionCockpit'
+import { useStageComponentInstanceToYard } from '@/modules/yard/hooks/queries/useYardRuntime'
 
 const number = (value = 0) => formatQuantity(value, 3)
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
@@ -3587,9 +3587,9 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const releaseCanonical = useReleaseCanonicalProductionOrder()
   const createReservation = useCreateProductionReservation()
   const complete = useCompleteProductionStage()
-  const stage = useStageProductionToYard()
+  const stage = useStageComponentInstanceToYard()
   const [slotId, setSlotId] = useState('')
-  const [quantity, setQuantity] = useState('1')
+  const [selectedYardInstanceId, setSelectedYardInstanceId] = useState('')
   const [weight, setWeight] = useState('1')
   const [actionError, setActionError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
@@ -3598,13 +3598,22 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   const canStageToYard = latest.status === 'COMPLETED' || allStagesCompleted
   const availableSlots = slots.filter((slot) => slot.status !== 'BLOCKED' && slot.currentStackLevel < slot.maxStackLevel)
   const targetSlot = availableSlots.find((slot) => slot.id === slotId)
-  const stagedQuantity = slots
-    .flatMap((slot) => slot.placements ?? [])
-    .filter((placement) => placement.itemId === latest.component?.id && placement.metadata?.productionOrderId === latest.id)
-    .reduce((sum, placement) => sum + Number(placement.quantity ?? 0), 0)
-  const remainingQuantity = Math.max(0, Number(latest.quantity ?? 0) - stagedQuantity)
-  const stageQuantity = parseLocaleNumber(quantity) || 0
-  const stageInvalid = !slotId || stageQuantity <= 0 || stageQuantity > remainingQuantity
+  const instanceIds = new Set(componentInstances.map((instance) => instance.id))
+  const stagedInstanceIds = new Set(
+    slots
+      .flatMap((slot) => slot.placements ?? [])
+      .filter((placement) => placement.componentInstanceId && instanceIds.has(placement.componentInstanceId))
+      .map((placement) => placement.componentInstanceId as string),
+  )
+  const yardEligibleInstances = componentInstances.filter(
+    (instance) =>
+      (instance.state === 'QC_PASSED' || instance.state === 'USE_AS_IS') &&
+      !stagedInstanceIds.has(instance.id),
+  )
+  const selectedYardInstance = yardEligibleInstances.find((instance) => instance.id === selectedYardInstanceId)
+  const stagedQuantity = stagedInstanceIds.size
+  const remainingQuantity = yardEligibleInstances.length
+  const stageInvalid = !slotId || !selectedYardInstance
   const materialReadiness = workOrderReadiness(latest)
   const orderIssueRows = latest.materialIssues ?? []
   const reservedQty = orderReservations.reduce((sum, row) => sum + row.lines.reduce((lineSum, line) => lineSum + Number(line.reservedQty ?? 0), 0), 0)
@@ -3624,11 +3633,9 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
   )
   const stageDisabledReason = !slotId
     ? 'Chọn slot còn tầng trống trước khi chuyển bãi.'
-    : stageQuantity <= 0
-      ? 'Nhập số lượng chuyển bãi lớn hơn 0.'
-      : stageQuantity > remainingQuantity
-        ? `Số lượng chuyển bãi vượt quá số lượng còn lại (${number(remainingQuantity)}).`
-        : ''
+    : !selectedYardInstance
+      ? 'Chọn ComponentInstance finished goods để chuyển bãi.'
+      : ''
   const canonicalReleaseWorkOrders = latest.bom?.routingSteps?.map((step) => ({
     routingOperationId: step.id,
     productCode: latest.component?.code ?? latest.orderNo,
@@ -3638,12 +3645,6 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
     plannedEnd: latest.plannedEndAt ? new Date(latest.plannedEndAt).toISOString() : undefined,
   })) ?? []
   const canReleaseCanonicalOrder = latest.status === 'DRAFT' && Boolean(latest.componentRequirementId) && canonicalReleaseWorkOrders.length > 0
-
-  useEffect(() => {
-    if (remainingQuantity > 0 && parseLocaleNumber(quantity) > remainingQuantity) {
-      setQuantity(number(remainingQuantity))
-    }
-  }, [quantity, remainingQuantity])
 
   function productionErrorMessage(error: unknown) {
     const data = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data
@@ -3865,7 +3866,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
               <Info k="Số lượng MO" v={number(latest.quantity)}/>
               <Info k="Physical instances" v={formatQuantity(componentInstances.length, 0)}/>
               <Info k="Đã nhập bãi" v={number(stagedQuantity)}/>
-              <Info k="Còn được nhập" v={number(remainingQuantity)}/>
+              <Info k="FG chờ Yard" v={number(remainingQuantity)}/>
               <Info k="Ưu tiên" v={latest.priority}/>
               <Info k="Bắt đầu" v={date(latest.plannedStartAt)}/>
               <Info k="Đến hạn" v={date(latest.plannedEndAt)}/>
@@ -3909,8 +3910,11 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
                     {availableSlots.map(slot=><option key={slot.id} value={slot.id}>{slot.zone.code} / {slot.code} · tầng kế tiếp L{slot.currentStackLevel + 1}/{slot.maxStackLevel}</option>)}
                   </EnterpriseSelect>
                 </EnterpriseField>
-                <EnterpriseField label="Số lượng nhập bãi" required htmlFor="production-yard-quantity">
-                  <EnterpriseNumberField id="production-yard-quantity" value={quantity} onFocus={(e)=>setQuantity(formatQuantityInput(e.target.value))} onBlur={(e)=>setQuantity(formatQuantity(e.target.value))} onChange={(e)=>{ setQuantity(formatQuantityInput(e.target.value)); setActionError(''); setActionMessage('') }} />
+                <EnterpriseField label="ComponentInstance" required htmlFor="production-yard-instance">
+                  <EnterpriseSelect id="production-yard-instance" value={selectedYardInstanceId} onChange={(e)=>{ setSelectedYardInstanceId(e.target.value); setActionError(''); setActionMessage('') }}>
+                    <option value="">Chọn instance QC PASS</option>
+                    {yardEligibleInstances.map((instance) => <option key={instance.id} value={instance.id}>{instance.instanceNo} · {instanceStateLabel(instance.state)}</option>)}
+                  </EnterpriseSelect>
                 </EnterpriseField>
                 <EnterpriseField label="Khối lượng" htmlFor="production-yard-weight">
                   <EnterpriseNumberField id="production-yard-weight" value={weight} onFocus={(e)=>setWeight(formatQuantityInput(e.target.value))} onBlur={(e)=>setWeight(formatQuantity(e.target.value))} onChange={(e)=>setWeight(formatQuantityInput(e.target.value))} />
@@ -3920,12 +3924,12 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
               <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
                 <div>Slot đích: <b className="text-cyan-300">{targetSlot ? `${targetSlot.zone.code}/${targetSlot.code}` : '--'}</b></div>
                 <div className="mt-1">Tầng xếp tự động: <b className="text-cyan-300">L{targetSlot ? targetSlot.currentStackLevel + 1 : '--'}</b></div>
-                <div className="mt-1">Còn được nhập bãi: <b className={stageInvalid ? 'text-red-300' : 'text-emerald-300'}>{number(remainingQuantity)}</b></div>
+                <div className="mt-1">Instance: <b className={stageInvalid ? 'text-red-300' : 'text-emerald-300'}>{selectedYardInstance?.instanceNo ?? '--'}</b></div>
               </div>
               {stageDisabledReason ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-amber-300">{stageDisabledReason}</p> : null}
               {actionError ? <p className="rounded border border-red-900 bg-red-950/40 p-2 text-red-200">{actionError}</p> : null}
               {actionMessage ? <p className="rounded border border-emerald-900 bg-emerald-950/40 p-2 text-emerald-200">{actionMessage}</p> : null}
-              <button type="button" onClick={() => run(() => stage.mutateAsync({ id: latest.id, payload: { slotId, quantity: stageQuantity, weight: parseLocaleNumber(weight) || 0 } }), 'Đã chuyển thành phẩm ra bãi')} disabled={stageInvalid || stage.isPending} className={`${enterprisePrimaryButton} w-full bg-amber-600 hover:bg-amber-500`}>Xác nhận QC và chuyển bãi</button>
+              <button type="button" onClick={() => selectedYardInstance ? run(() => stage.mutateAsync({ componentInstanceId: selectedYardInstance.id, slotId, weight: parseLocaleNumber(weight) || 0 }), 'Đã chuyển ComponentInstance ra bãi') : undefined} disabled={stageInvalid || stage.isPending} className={`${enterprisePrimaryButton} w-full bg-amber-600 hover:bg-amber-500`}>Chuyển instance ra bãi</button>
             </div>
           </ProductionPanel>}
         </aside>

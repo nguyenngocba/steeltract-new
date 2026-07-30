@@ -82,11 +82,26 @@ export const createYardSlotSchema = z.object({
 
 export const placeYardItemSchema = z.object({
   slotId: z.string().min(1),
+  componentInstanceId: z.string().min(1).optional(),
   itemType: z.nativeEnum(YardItemType),
   itemId: z.string().min(1),
   itemCode: z.string().min(1),
   itemName: z.string().optional(),
   quantity: z.coerce.number().positive().default(1),
+  stackLevel: z.coerce.number().int().positive().optional(),
+  weight: z.coerce.number().nonnegative().optional(),
+  length: z.coerce.number().nonnegative().optional(),
+  width: z.coerce.number().nonnegative().optional(),
+  height: z.coerce.number().nonnegative().optional(),
+  craneId: z.string().optional(),
+  reason: z.string().optional(),
+  attachmentIds: z.array(z.string()).optional().default([]),
+  metadata: metadataSchema,
+});
+
+export const stageComponentInstanceToYardSchema = z.object({
+  componentInstanceId: z.string().min(1),
+  slotId: z.string().min(1),
   stackLevel: z.coerce.number().int().positive().optional(),
   weight: z.coerce.number().nonnegative().optional(),
   length: z.coerce.number().nonnegative().optional(),
@@ -166,6 +181,9 @@ export type CreateYardRowDto = z.infer<typeof createYardRowSchema>;
 export type ListYardSlotsDto = z.infer<typeof listYardSlotsSchema>;
 export type CreateYardSlotDto = z.infer<typeof createYardSlotSchema>;
 export type PlaceYardItemDto = z.infer<typeof placeYardItemSchema>;
+export type StageComponentInstanceToYardDto = z.infer<
+  typeof stageComponentInstanceToYardSchema
+>;
 export type MoveYardItemDto = z.infer<typeof moveYardItemSchema>;
 export type RemoveYardItemDto = z.infer<typeof removeYardItemSchema>;
 export type YardSearchDto = z.infer<typeof yardSearchSchema>;

@@ -2,13 +2,16 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import {
   listFinishedGoodsInstancesSchema,
   type ListFinishedGoodsInstancesDto,
 } from './dto/component-domain-foundation.dto';
 import { FinishedGoodsEligibilityService } from './services/finished-goods-eligibility.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('components.read')
 @Controller('components/instances')
 export class ComponentInstancesController {
   constructor(private readonly service: FinishedGoodsEligibilityService) {}

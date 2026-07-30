@@ -83,6 +83,8 @@ async function seedAdminAccess(userId: string) {
     'qc.write',
     'yard.read',
     'yard.write',
+    'logistics.read',
+    'logistics.write',
   ];
 
   const role = await prisma.role.upsert({

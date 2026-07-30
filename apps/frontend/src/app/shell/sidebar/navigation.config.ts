@@ -439,14 +439,6 @@ export const navigation = [
         path:
           '/settings',
       },
-      {
-        id: 'settings-backup',
-        title:
-          'Sao lưu dữ liệu',
-
-        path:
-          '/settings',
-      },
     ],
   },
 ]

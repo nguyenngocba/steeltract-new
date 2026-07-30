@@ -228,7 +228,14 @@ export type YardSlot = {
   currentStackLevel: number
   maxStackLevel: number
   zone: { id: string; code: string; name: string }
-  placements?: Array<{ id: string; itemId?: string; quantity?: number; stackLevel?: number; metadata?: { productionOrderId?: string } | null }>
+  placements?: Array<{
+    id: string
+    componentInstanceId?: string | null
+    itemId?: string
+    quantity?: number
+    stackLevel?: number
+    metadata?: { productionOrderId?: string } | null
+  }>
 }
 
 export type ProductionBom = {
@@ -542,8 +549,6 @@ export const productionApi = {
     api.post<ProductionOrder>(`/production/${id}/start`, {}).then((res) => res.data),
   completeStage: (id: string) =>
     api.post<ProductionOrder>(`/production/stages/${id}/complete`, {}).then((res) => res.data),
-  stageToYard: (id: string, payload: Record<string, unknown>) =>
-    api.post(`/production/${id}/stage-to-yard`, payload).then((res) => res.data),
   createComponentFromOrder: (id: string) =>
     api.post<ProductionComponent>(`/production/${id}/component`, {}).then((res) => res.data),
 }

@@ -168,6 +168,9 @@ enum ComponentInstanceState {
   REWORK
   SCRAPPED
   USE_AS_IS
+  IN_YARD
+  IN_TRANSIT
+  DELIVERED
   LEGACY_UNKNOWN
 }
 
@@ -906,6 +909,26 @@ model MasterMaterialStatus {
   @@map("master_material_statuses")
 }
 
+model MasterMaterialUsageType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  color       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  inventoryItems InventoryItem[]
+
+  @@index([active])
+  @@index([sortOrder])
+  @@map("master_material_usage_types")
+}
+
 model MasterSupplierCategory {
   id          String   @id @default(cuid())
   code        String   @unique
@@ -1019,6 +1042,8 @@ model InventoryItem {
 
   materialUsageType MaterialUsageType @default(PRIMARY)
 
+  materialUsageTypeId String?
+
   zoneId String?
 
   slotId String?
@@ -1036,6 +1061,8 @@ model InventoryItem {
   category InventoryCategory @relation(fields: [categoryId], references: [id])
 
   materialType MaterialType? @relation(fields: [materialTypeId], references: [id])
+
+  materialUsageTypeMaster MasterMaterialUsageType? @relation(fields: [materialUsageTypeId], references: [id], onDelete: SetNull)
 
   unitMaster MasterUnit? @relation(fields: [unitId], references: [id])
 
@@ -1057,6 +1084,7 @@ model InventoryItem {
   @@index([unitId])
   @@index([materialTypeId])
   @@index([materialUsageType])
+  @@index([materialUsageTypeId])
   @@index([slotId])
   @@index([level])
   @@index([deletedAt])
@@ -1375,10 +1403,10 @@ model Component {
 
   productionOrders ProductionOrder[]
 
-  currentRevision ComponentRevision?         @relation("ComponentCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
-  revisions       ComponentRevision[]        @relation("ComponentRevisions")
+  currentRevision ComponentRevision?            @relation("ComponentCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  revisions       ComponentRevision[]           @relation("ComponentRevisions")
   releaseEvidence ComponentReleaseEvidence[]
-  productionBoms  BOM[]                      @relation("ComponentProductionBoms")
+  productionBoms  BOM[]                         @relation("ComponentProductionBoms")
   requirements    ProjectComponentRequirement[] @relation("ComponentRequirements")
   instances       ComponentInstance[]           @relation("ComponentDefinitionInstances")
   legacyInstances ComponentInstance[]           @relation("LegacyComponentInstances")
@@ -1416,14 +1444,14 @@ model ComponentRevision {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
-  component            Component                  @relation("ComponentRevisions", fields: [componentId], references: [id], onDelete: Restrict)
-  currentForComponent  Component?                 @relation("ComponentCurrentRevision")
-  baseRevision         ComponentRevision?         @relation("ComponentRevisionLineage", fields: [baseRevisionId], references: [id], onDelete: SetNull)
-  derivedRevisions     ComponentRevision[]        @relation("ComponentRevisionLineage")
+  component            Component                     @relation("ComponentRevisions", fields: [componentId], references: [id], onDelete: Restrict)
+  currentForComponent  Component?                    @relation("ComponentCurrentRevision")
+  baseRevision         ComponentRevision?            @relation("ComponentRevisionLineage", fields: [baseRevisionId], references: [id], onDelete: SetNull)
+  derivedRevisions     ComponentRevision[]           @relation("ComponentRevisionLineage")
   bomDefinition        ComponentBomDefinition?
-  releaseEvidence      ComponentReleaseEvidence?  @relation("ReleasedRevisionEvidence")
-  priorReleaseEvidence ComponentReleaseEvidence[] @relation("PreviousRevisionEvidence")
-  productionBoms       BOM[]                      @relation("ComponentRevisionProductionBoms")
+  releaseEvidence      ComponentReleaseEvidence?     @relation("ReleasedRevisionEvidence")
+  priorReleaseEvidence ComponentReleaseEvidence[]    @relation("PreviousRevisionEvidence")
+  productionBoms       BOM[]                         @relation("ComponentRevisionProductionBoms")
   requirements         ProjectComponentRequirement[] @relation("ComponentRevisionRequirements")
   componentInstances   ComponentInstance[]           @relation("ComponentRevisionInstances")
 
@@ -1446,10 +1474,10 @@ model ComponentBomDefinition {
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
-  revision      ComponentRevision @relation(fields: [componentRevisionId], references: [id], onDelete: Restrict)
-  productionBom BOM?              @relation("ComponentBomDefinitionProductionBom")
-  requirements  ProjectComponentRequirement[] @relation("ComponentBomDefinitionRequirements")
-  componentInstances ComponentInstance[]       @relation("ComponentBomDefinitionInstances")
+  revision           ComponentRevision             @relation(fields: [componentRevisionId], references: [id], onDelete: Restrict)
+  productionBom      BOM?                          @relation("ComponentBomDefinitionProductionBom")
+  requirements       ProjectComponentRequirement[] @relation("ComponentBomDefinitionRequirements")
+  componentInstances ComponentInstance[]           @relation("ComponentBomDefinitionInstances")
 
   @@index([state])
   @@map("component_bom_definitions")
@@ -1473,12 +1501,12 @@ model ProjectComponentRequirement {
   createdAt           DateTime                          @default(now())
   updatedAt           DateTime                          @updatedAt
 
-  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  projectTask       ProjectTask?            @relation(fields: [projectTaskId], references: [id], onDelete: SetNull)
-  component         Component               @relation("ComponentRequirements", fields: [componentId], references: [id], onDelete: Restrict)
-  componentRevision ComponentRevision?      @relation("ComponentRevisionRequirements", fields: [componentRevisionId], references: [id], onDelete: SetNull)
-  bomDefinition     ComponentBomDefinition? @relation("ComponentBomDefinitionRequirements", fields: [bomDefinitionId], references: [id], onDelete: SetNull)
-  productionOrders  ProductionOrder[]
+  project            Project                 @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  projectTask        ProjectTask?            @relation(fields: [projectTaskId], references: [id], onDelete: SetNull)
+  component          Component               @relation("ComponentRequirements", fields: [componentId], references: [id], onDelete: Restrict)
+  componentRevision  ComponentRevision?      @relation("ComponentRevisionRequirements", fields: [componentRevisionId], references: [id], onDelete: SetNull)
+  bomDefinition      ComponentBomDefinition? @relation("ComponentBomDefinitionRequirements", fields: [bomDefinitionId], references: [id], onDelete: SetNull)
+  productionOrders   ProductionOrder[]
   componentInstances ComponentInstance[]
 
   @@index([projectId])
@@ -1524,6 +1552,9 @@ model ComponentInstance {
   executions        ComponentInstanceExecution[]
   qcInspections     QcInspection[]
   ncrs              NonConformanceReport[]
+  yardPlacements    YardItemPlacement[]          @relation("ComponentInstanceYardPlacements")
+  yardMovements     YardMovement[]               @relation("ComponentInstanceYardMovements")
+  dispatchItems     DispatchItem[]               @relation("ComponentInstanceDispatchItems")
 
   @@unique([productionOrderId, serialSequence])
   @@index([componentId])
@@ -1651,7 +1682,7 @@ model ProjectTask {
 
   materialAllocations ProjectTaskMaterialAllocation[]
 
-  componentAllocations ProjectTaskComponentAllocation[]
+  componentAllocations  ProjectTaskComponentAllocation[]
   componentRequirements ProjectComponentRequirement[]
   componentInstances    ComponentInstance[]
 
@@ -2014,6 +2045,8 @@ model DispatchItem {
 
   componentId String?
 
+  componentInstanceId String?
+
   quantity Float @default(0)
 
   createdAt DateTime @default(now())
@@ -2024,9 +2057,12 @@ model DispatchItem {
 
   component Component? @relation(fields: [componentId], references: [id])
 
+  componentInstance ComponentInstance? @relation("ComponentInstanceDispatchItems", fields: [componentInstanceId], references: [id], onDelete: SetNull)
+
   @@index([dispatchOrderId])
   @@index([inventoryItemId])
   @@index([componentId])
+  @@index([componentInstanceId])
   @@map("dispatch_items")
 }
 
@@ -2363,22 +2399,22 @@ model QcDashboardSnapshot {
 }
 
 model QcInspectionSnapshot {
-  id                String   @id @default(cuid())
-  inspectionId      String   @unique
-  inspectionNo      String
-  status            String
-  checklistId       String?
-  productionOrderId String?
+  id                  String   @id @default(cuid())
+  inspectionId        String   @unique
+  inspectionNo        String
+  status              String
+  checklistId         String?
+  productionOrderId   String?
   componentInstanceId String?
-  componentId       String?
-  projectId         String?
-  resultCount       Int      @default(0)
-  issueCount        Int      @default(0)
-  ncrCount          Int      @default(0)
-  passRate          Float    @default(0)
-  payload           Json?
-  updatedAt         DateTime @updatedAt
-  createdAt         DateTime @default(now())
+  componentId         String?
+  projectId           String?
+  resultCount         Int      @default(0)
+  issueCount          Int      @default(0)
+  ncrCount            Int      @default(0)
+  passRate            Float    @default(0)
+  payload             Json?
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
 
   inspection QcInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
@@ -3504,35 +3540,35 @@ model QcChecklistItem {
 }
 
 model QcInspection {
-  id                 String             @id @default(cuid())
-  inspectionNo       String             @unique
-  checklistId        String?
-  productionOrderId  String?
-  productionStageId  String?
+  id                  String             @id @default(cuid())
+  inspectionNo        String             @unique
+  checklistId         String?
+  productionOrderId   String?
+  productionStageId   String?
   componentInstanceId String?
-  componentId        String?
-  projectId          String?
-  status             QcInspectionStatus @default(DRAFT)
-  inspectorId        String?
-  startedAt          DateTime?
-  completedAt        DateTime?
-  approvedById       String?
-  approvedAt         DateTime?
-  rejectedById       String?
-  rejectedAt         DateTime?
-  rejectionReason    String?
-  workflowInstanceId String?
-  metadata           Json?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  componentId         String?
+  projectId           String?
+  status              QcInspectionStatus @default(DRAFT)
+  inspectorId         String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  approvedById        String?
+  approvedAt          DateTime?
+  rejectedById        String?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+  workflowInstanceId  String?
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
-  checklist   QcChecklist?           @relation(fields: [checklistId], references: [id], onDelete: SetNull)
-  componentInstance ComponentInstance? @relation(fields: [componentInstanceId], references: [id], onDelete: SetNull)
-  results     QcResult[]
-  issues      QcIssue[]
-  attachments QcAttachment[]
-  ncrs        NonConformanceReport[]
-  snapshot    QcInspectionSnapshot?
+  checklist         QcChecklist?           @relation(fields: [checklistId], references: [id], onDelete: SetNull)
+  componentInstance ComponentInstance?     @relation(fields: [componentInstanceId], references: [id], onDelete: SetNull)
+  results           QcResult[]
+  issues            QcIssue[]
+  attachments       QcAttachment[]
+  ncrs              NonConformanceReport[]
+  snapshot          QcInspectionSnapshot?
 
   @@index([status])
   @@index([productionOrderId])
@@ -3624,31 +3660,31 @@ model QcAttachment {
 }
 
 model NonConformanceReport {
-  id                String          @id @default(cuid())
-  ncrNo             String          @unique
-  inspectionId      String
-  issueId           String?
-  productionOrderId String?
+  id                  String          @id @default(cuid())
+  ncrNo               String          @unique
+  inspectionId        String
+  issueId             String?
+  productionOrderId   String?
   componentInstanceId String?
-  componentId       String?
-  status            NcrStatus       @default(OPEN)
-  severity          QcIssueSeverity @default(HIGH)
-  title             String
-  description       String?
-  rootCause         String?
-  correctiveAction  String?
-  disposition       String?
-  raisedById        String?
-  approvedById      String?
-  closedAt          DateTime?
-  metadata          Json?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  componentId         String?
+  status              NcrStatus       @default(OPEN)
+  severity            QcIssueSeverity @default(HIGH)
+  title               String
+  description         String?
+  rootCause           String?
+  correctiveAction    String?
+  disposition         String?
+  raisedById          String?
+  approvedById        String?
+  closedAt            DateTime?
+  metadata            Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  inspection  QcInspection   @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  issue       QcIssue?       @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  inspection        QcInspection       @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  issue             QcIssue?           @relation(fields: [issueId], references: [id], onDelete: SetNull)
   componentInstance ComponentInstance? @relation(fields: [componentInstanceId], references: [id], onDelete: SetNull)
-  attachments QcAttachment[]
+  attachments       QcAttachment[]
 
   @@index([inspectionId])
   @@index([issueId])
@@ -3738,31 +3774,34 @@ model YardSlot {
 }
 
 model YardItemPlacement {
-  id             String       @id @default(cuid())
-  slotId         String
-  itemType       YardItemType
-  itemId         String
-  itemCode       String
-  itemName       String?
-  quantity       Float        @default(1)
-  stackLevel     Int          @default(1)
-  weight         Float?
-  length         Float?
-  width          Float?
-  height         Float?
-  placedById     String?
-  placedAt       DateTime     @default(now())
-  removedAt      DateTime?
-  metadata       Json?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  stagedQuantity Float        @default(0)
+  id                  String       @id @default(cuid())
+  slotId              String
+  componentInstanceId String?
+  itemType            YardItemType
+  itemId              String
+  itemCode            String
+  itemName            String?
+  quantity            Float        @default(1)
+  stackLevel          Int          @default(1)
+  weight              Float?
+  length              Float?
+  width               Float?
+  height              Float?
+  placedById          String?
+  placedAt            DateTime     @default(now())
+  removedAt           DateTime?
+  metadata            Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  stagedQuantity      Float        @default(0)
 
-  remainingQuantity Float          @default(0)
-  slot              YardSlot       @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  remainingQuantity Float              @default(0)
+  slot              YardSlot           @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  componentInstance ComponentInstance? @relation("ComponentInstanceYardPlacements", fields: [componentInstanceId], references: [id], onDelete: SetNull)
   movements         YardMovement[]
 
   @@index([slotId])
+  @@index([componentInstanceId])
   @@index([itemType, itemId])
   @@index([itemCode])
   @@index([removedAt])
@@ -3770,26 +3809,29 @@ model YardItemPlacement {
 }
 
 model YardMovement {
-  id          String           @id @default(cuid())
-  placementId String?
-  type        YardMovementType
-  itemType    YardItemType
-  itemId      String
-  itemCode    String
-  fromSlotId  String?
-  toSlotId    String?
-  craneId     String?
-  movedById   String?
-  reason      String?
-  metadata    Json?
-  createdAt   DateTime         @default(now())
+  id                  String           @id @default(cuid())
+  placementId         String?
+  componentInstanceId String?
+  type                YardMovementType
+  itemType            YardItemType
+  itemId              String
+  itemCode            String
+  fromSlotId          String?
+  toSlotId            String?
+  craneId             String?
+  movedById           String?
+  reason              String?
+  metadata            Json?
+  createdAt           DateTime         @default(now())
 
-  placement YardItemPlacement? @relation(fields: [placementId], references: [id], onDelete: SetNull)
-  fromSlot  YardSlot?          @relation("YardMovementFromSlot", fields: [fromSlotId], references: [id], onDelete: SetNull)
-  toSlot    YardSlot?          @relation("YardMovementToSlot", fields: [toSlotId], references: [id], onDelete: SetNull)
-  crane     Crane?             @relation(fields: [craneId], references: [id], onDelete: SetNull)
+  placement         YardItemPlacement? @relation(fields: [placementId], references: [id], onDelete: SetNull)
+  componentInstance ComponentInstance? @relation("ComponentInstanceYardMovements", fields: [componentInstanceId], references: [id], onDelete: SetNull)
+  fromSlot          YardSlot?          @relation("YardMovementFromSlot", fields: [fromSlotId], references: [id], onDelete: SetNull)
+  toSlot            YardSlot?          @relation("YardMovementToSlot", fields: [toSlotId], references: [id], onDelete: SetNull)
+  crane             Crane?             @relation(fields: [craneId], references: [id], onDelete: SetNull)
 
   @@index([itemType, itemId])
+  @@index([componentInstanceId])
   @@index([fromSlotId])
   @@index([toSlotId])
   @@index([craneId])
@@ -4204,11 +4246,11 @@ model WorkOrder {
 
   updatedAt DateTime @updatedAt
 
-  productionOrder ProductionOrder?       @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  executions      ProductionExecution[]
+  productionOrder    ProductionOrder?             @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  executions         ProductionExecution[]
   instanceExecutions ComponentInstanceExecution[]
-  completions     ProductionCompletion[]
-  scraps          ProductionScrap[]
+  completions        ProductionCompletion[]
+  scraps             ProductionScrap[]
 
   @@unique([productionOrderId, sequence])
   @@index([productionOrderId, lifecycleState])
@@ -4234,8 +4276,8 @@ model ProductionExecution {
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
-  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  workOrder       WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  productionOrder    ProductionOrder              @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workOrder          WorkOrder                    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   instanceExecutions ComponentInstanceExecution[]
 
   @@index([productionOrderId, state])

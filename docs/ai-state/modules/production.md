@@ -1,5 +1,21 @@
 # Production Module
 
+## STABILITY.PROJECTS.3A - Legacy Yard Handoff Closure
+
+Implemented on 2026-07-29.
+
+Status: **IMPLEMENTED - LEGACY PATH RETURNS 410**
+
+- `POST /production/:id/stage-to-yard` is retained only for compatibility and
+  now returns `410 Gone` before any Yard write.
+- `ProductionService.stageToYard()` also throws `GoneException` to prevent
+  internal callers from staging by ProductionOrder/Component definition
+  identity.
+- Production cockpit Yard staging now selects a physical `ComponentInstance`
+  in `QC_PASSED` or `USE_AS_IS` state and calls canonical `/yard/stage`.
+- Aggregate Production completion and Finished Goods eligibility semantics are
+  unchanged.
+
 ## COMPONENT DOMAIN.5D - ComponentInstanceExecution Schema Foundation
 
 Implemented on 2026-07-28.

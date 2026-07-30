@@ -11,6 +11,8 @@ import {
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import {
   approveReturnRequestSchema,
   createReturnRequestSchema,
@@ -31,7 +33,8 @@ import type {
 } from './dto/return-workflow.dto';
 import { ReturnWorkflowService } from './return-workflow.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('inventory.read')
 @Controller('inventory/returns')
 export class ReturnWorkflowController {
   constructor(private readonly service: ReturnWorkflowService) {}
@@ -45,6 +48,7 @@ export class ReturnWorkflowController {
   }
 
   @Post()
+  @RequirePermissions('inventory.write')
   create(
     @Body(new ZodValidationPipe(createReturnRequestSchema))
     body: CreateReturnRequestDto,
@@ -53,6 +57,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/approve')
+  @RequirePermissions('inventory.write')
   approve(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(approveReturnRequestSchema))
@@ -62,6 +67,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/receive')
+  @RequirePermissions('inventory.write')
   receive(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(receiveReturnRequestSchema))
@@ -71,6 +77,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/inspect')
+  @RequirePermissions('inventory.write')
   inspect(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(inspectReturnRequestSchema))
@@ -80,6 +87,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/dispose')
+  @RequirePermissions('inventory.write')
   dispose(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(disposeReturnRequestSchema))
@@ -89,6 +97,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/reject')
+  @RequirePermissions('inventory.write')
   reject(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(rejectReturnRequestSchema))

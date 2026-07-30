@@ -4,6 +4,7 @@ import {
   AnalyticsAlertSeverity,
   AnalyticsDomain,
   BackgroundJobStatus,
+  ComponentInstanceState,
   ComponentStatus,
   MachineStatus,
   ProductionOrderStatus,
@@ -121,10 +122,20 @@ export class OperationalSampleDataSeeder {
           where: { name: { startsWith: prefix } },
         });
         await tx.yardMovement.deleteMany({
-          where: { itemCode: { startsWith: prefix } },
+          where: {
+            OR: [
+              { itemCode: { startsWith: prefix } },
+              { placementId: { startsWith: 'steeltrack-placement-' } },
+            ],
+          },
         });
         await tx.yardItemPlacement.deleteMany({
-          where: { itemCode: { startsWith: prefix } },
+          where: {
+            OR: [
+              { itemCode: { startsWith: prefix } },
+              { id: { startsWith: 'steeltrack-placement-' } },
+            ],
+          },
         });
         await tx.yardSlot.deleteMany({
           where: { code: { startsWith: prefix } },
@@ -809,17 +820,65 @@ export class OperationalSampleDataSeeder {
         update: { currentStackLevel: 0, status: 'AVAILABLE' },
       }))))).flat();
 
-    await this.prisma.yardMovement.deleteMany({ where: { itemCode: { startsWith: operationalPrefix } } });
-    await this.prisma.yardItemPlacement.deleteMany({ where: { itemCode: { startsWith: operationalPrefix } } });
+    await this.prisma.yardMovement.deleteMany({
+      where: {
+        OR: [
+          { itemCode: { startsWith: operationalPrefix } },
+          { placementId: { startsWith: 'steeltrack-placement-' } },
+        ],
+      },
+    });
+    await this.prisma.yardItemPlacement.deleteMany({
+      where: {
+        OR: [
+          { itemCode: { startsWith: operationalPrefix } },
+          { id: { startsWith: 'steeltrack-placement-' } },
+        ],
+      },
+    });
     await this.prisma.yardSlot.deleteMany({ where: { code: { startsWith: 'ST-SLOT-' } } });
+    const componentInstances = await this.prisma.componentInstance.findMany({
+      where: {
+        componentId: { in: components.map((component) => component.id) },
+        state: {
+          in: [
+            ComponentInstanceState.QC_PASSED,
+            ComponentInstanceState.USE_AS_IS,
+          ],
+        },
+        scrappedAt: null,
+        yardPlacements: { none: { removedAt: null } },
+      },
+      include: { component: true },
+      orderBy: [{ qcPassedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 12,
+    });
     const placementSlots = [0, 0, 1, 12, 13, 24, 25, 36, 48, 49, 49, 60];
     const placementCounts = new Map<string, number>();
-    const placements = await Promise.all(components.slice(0, 12).map((component, index) => {
+    const placements = await Promise.all(componentInstances.map((instance, index) => {
       const slot = slots[placementSlots[index]];
       const stackLevel = (placementCounts.get(slot.id) ?? 0) + 1;
       placementCounts.set(slot.id, stackLevel);
       return this.prisma.yardItemPlacement.create({
-        data: { id: `steeltrack-placement-${index + 1}`, slotId: slot.id, itemType: 'COMPONENT', itemId: component.id, itemCode: component.code, itemName: component.name, quantity: 1, stackLevel, weight: 1.85 + index * 0.42 },
+        data: {
+          id: `steeltrack-placement-${index + 1}`,
+          slotId: slot.id,
+          componentInstanceId: instance.id,
+          itemType: 'COMPONENT',
+          itemId: instance.id,
+          itemCode: instance.instanceNo,
+          itemName: instance.component.name,
+          quantity: 1,
+          stackLevel,
+          weight: 1.85 + index * 0.42,
+          metadata: {
+            canonicalSource: 'ComponentInstance',
+            componentId: instance.componentId,
+            productionOrderId: instance.productionOrderId,
+            requirementId: instance.requirementId,
+            projectId: instance.projectId,
+          },
+        },
       });
     }));
     await Promise.all(slots.map((slot) => this.prisma.yardSlot.update({
@@ -827,7 +886,7 @@ export class OperationalSampleDataSeeder {
       data: { currentStackLevel: placementCounts.get(slot.id) ?? 0, status: placementCounts.has(slot.id) ? 'OCCUPIED' : 'AVAILABLE' },
     })));
     await Promise.all(placements.map((placement, index) => this.prisma.yardMovement.create({
-      data: { placementId: placement.id, type: 'PLACE', itemType: 'COMPONENT', itemId: placement.itemId, itemCode: placement.itemCode, toSlotId: placement.slotId, craneId: cranes[index % cranes.length].id, reason: index % 3 === 0 ? 'QC passed · staged for delivery' : 'Finished structure received from workshop' },
+      data: { placementId: placement.id, componentInstanceId: placement.componentInstanceId, type: 'PLACE', itemType: 'COMPONENT', itemId: placement.itemId, itemCode: placement.itemCode, toSlotId: placement.slotId, craneId: cranes[index % cranes.length].id, reason: index % 3 === 0 ? 'QC passed · staged for delivery' : 'Finished structure received from workshop' },
     })));
 
     return slots.length;

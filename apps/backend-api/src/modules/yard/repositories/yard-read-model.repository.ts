@@ -74,6 +74,23 @@ export class YardReadModelRepository {
           placements: {
             where: { removedAt: null },
             orderBy: { stackLevel: 'asc' },
+            include: {
+              componentInstance: {
+                select: {
+                  id: true,
+                  instanceNo: true,
+                  state: true,
+                  componentId: true,
+                  productionOrderId: true,
+                  requirementId: true,
+                  projectId: true,
+                  component: { select: { id: true, code: true, name: true } },
+                  project: { select: { id: true, code: true, name: true } },
+                  requirement: { select: { id: true, requirementNo: true } },
+                  productionOrder: { select: { id: true, orderNo: true } },
+                },
+              },
+            },
           },
         },
       }),
@@ -238,6 +255,11 @@ export class YardReadModelRepository {
         itemCode: string;
         itemName: string | null;
         stackLevel: number;
+        componentInstanceId?: string | null;
+        componentInstance?: {
+          componentId: string;
+          instanceNo: string;
+        } | null;
       }>;
     }>,
   ) {
@@ -247,7 +269,11 @@ export class YardReadModelRepository {
         .map((placement) => ({ placement, slot })),
     );
     const componentIds = Array.from(
-      new Set(placements.map((row) => row.placement.itemId)),
+      new Set(
+        placements
+          .map((row) => row.placement.componentInstance?.componentId ?? row.placement.itemId)
+          .filter(Boolean),
+      ),
     );
     if (!componentIds.length) return [];
 
@@ -270,11 +296,14 @@ export class YardReadModelRepository {
     });
 
     return placements.flatMap(({ placement, slot }) => {
-      const inspection = latest.get(placement.itemId);
+      const componentId = placement.componentInstance?.componentId ?? placement.itemId;
+      const inspection = latest.get(componentId);
       return inspection
         ? [{
             id: placement.id,
             itemCode: placement.itemCode,
+            instanceCode: placement.componentInstance?.instanceNo ?? null,
+            componentInstanceId: placement.componentInstanceId ?? null,
             itemName: placement.itemName,
             slotCode: slot.code,
             zoneName: slot.zone.name,
@@ -339,6 +368,17 @@ export class YardReadModelRepository {
       fromSlot: { include: { zone: true } },
       toSlot: { include: { zone: true } },
       crane: true,
+      componentInstance: {
+        select: {
+          id: true,
+          instanceNo: true,
+          state: true,
+          componentId: true,
+          productionOrderId: true,
+          requirementId: true,
+          projectId: true,
+        },
+      },
     };
   }
 

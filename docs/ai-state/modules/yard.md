@@ -1,5 +1,41 @@
 # Yard Module
 
+## STABILITY.PROJECTS.3A Canonical Runtime Certification
+
+Status: **CONDITIONALLY CERTIFIED - READ RUNTIME PASS**
+
+Legacy ProductionOrder-based Yard handoff has been closed. New Component Yard
+placements must carry physical `componentInstanceId`; generic `COMPONENT`
+placement without physical identity is rejected. Production UI now selects a
+concrete QC-passed/use-as-is `ComponentInstance` and calls `/yard/stage`.
+
+Runtime read-only smoke on `PORT=3100` passed health, admin login, no-token
+`/yard/stage` `401`, Finished Goods read, Yard slots, Yard workspace, and
+Projects execution. The current DB has no active Yard placements, so committed
+`POST /yard/stage` write certification remains a controlled follow-up.
+
+## PROJECTS.3 Canonical ComponentInstance Handoff
+
+Status: **IMPLEMENTED - MIGRATION DEPLOYED LOCALLY, TEST/BUILD PASS**
+
+Yard now supports canonical physical `ComponentInstance` placement identity.
+`YardItemPlacement` and `YardMovement` have nullable `componentInstanceId`
+relations, and migration `20260729193000_component_instance_yard_handoff`
+adds FK indexes plus a PostgreSQL partial unique active-placement guard.
+
+Canonical entry point:
+
+* `POST /yard/stage` - stages one eligible Finished Goods
+  `ComponentInstance` into a Yard slot.
+
+The operation reuses Components Finished Goods eligibility, writes
+`itemId = ComponentInstance.id`, preserves movement identity, emits Yard
+ActivityLog/outbox events, and does not mutate legacy `Component.status`.
+Legacy aggregate placement APIs remain readable for compatibility.
+
+Yard endpoints now enforce `JwtAuthGuard + PermissionsGuard` with existing
+`yard.read/write` permissions.
+
 ## Core Platform v1.0 Certification
 
 Status: **PASS** (EPIC174, 2026-07-13)

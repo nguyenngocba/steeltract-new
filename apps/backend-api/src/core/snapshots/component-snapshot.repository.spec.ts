@@ -47,4 +47,63 @@ describe('ComponentSnapshotRepository', () => {
       }),
     ]);
   });
+
+  it('resolves canonical Yard placement by ComponentInstance componentId before legacy itemId fallback', async () => {
+    prisma.component.findMany.mockResolvedValue([
+      {
+        id: 'component-1',
+        code: 'C-1',
+        name: 'Beam 1',
+        status: ComponentStatus.STOCK,
+        projectId: 'project-1',
+        estimatedCost: 0,
+        actualCost: 0,
+        floor: null,
+        zone: null,
+        position: null,
+        installedDate: null,
+        installZone: null,
+        installAxis: null,
+        installLevel: null,
+        installPosition: null,
+        project: null,
+        _count: { productionOrders: 0, timelines: 0 },
+      },
+    ]);
+    prisma.yardItemPlacement.findMany.mockResolvedValue([
+      {
+        itemId: 'component-instance-1',
+        stackLevel: 2,
+        componentInstance: {
+          id: 'component-instance-1',
+          instanceNo: 'CI-001',
+          componentId: 'component-1',
+        },
+        slot: { code: 'A01', zone: { code: 'YA' } },
+      },
+    ]);
+    const repository = new ComponentSnapshotRepository(prisma as never);
+
+    const rows = await repository.calculateSummarySnapshots('component-1');
+
+    expect(prisma.yardItemPlacement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              componentInstance: {
+                componentId: { in: ['component-1'] },
+              },
+            }),
+          ]),
+        }),
+      }),
+    );
+    expect(rows[0]).toEqual(
+      expect.objectContaining({
+        componentId: 'component-1',
+        currentLocation: 'YA / A01 / L2',
+      }),
+    );
+  });
 });

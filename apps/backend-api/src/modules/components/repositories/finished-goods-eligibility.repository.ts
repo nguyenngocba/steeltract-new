@@ -63,6 +63,33 @@ export class FinishedGoodsEligibilityRepository {
     };
   }
 
+  async countByProjectRequirement(projectId: string) {
+    const rows = await this.prisma.componentInstance.groupBy({
+      by: ['requirementId'],
+      where: {
+        ...this.where({ projectId }),
+        requirementId: { not: null },
+      },
+      _count: { _all: true },
+    });
+
+    return new Map(
+      rows
+        .filter((row) => row.requirementId)
+        .map((row) => [row.requirementId!, row._count._all]),
+    );
+  }
+
+  async findEligibleInstance(id: string) {
+    return this.prisma.componentInstance.findFirst({
+      where: {
+        ...this.where({}),
+        id,
+      },
+      include: finishedGoodsInclude,
+    });
+  }
+
   private where(
     query: ListFinishedGoodsInstancesDto,
   ): Prisma.ComponentInstanceWhereInput {

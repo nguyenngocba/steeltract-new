@@ -31,6 +31,12 @@ type NormalizedInventoryLine = InventoryTransactionLine & {
   totalAmount: number | null;
 };
 
+const legacyMaterialUsageTypes = new Set([
+  'PRIMARY',
+  'SECONDARY',
+  'CONSUMABLE',
+]);
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -98,6 +104,8 @@ export class InventoryService {
         code: item.code,
         name: item.name,
         description: item.description,
+        createdAt: item.createdAt?.toISOString?.(),
+        updatedAt: item.updatedAt?.toISOString?.(),
         quantity,
         minimumStock: item.minimumStock ?? 0,
         unit: item.unit ?? item.unitMaster?.code ?? 'PCS',
@@ -106,6 +114,11 @@ export class InventoryService {
         materialTypeId: item.materialTypeId,
         materialType: item.materialType?.name ?? '',
         materialUsageType: item.materialUsageType,
+        materialUsageTypeId: item.materialUsageTypeId,
+        materialUsageTypeCode:
+          item.materialUsageTypeMaster?.code ?? item.materialUsageType,
+        materialUsageTypeName: item.materialUsageTypeMaster?.name ?? null,
+        bomUsageCount: item._count?.bomItems ?? 0,
         zoneId: item.zoneId,
         zone: item.zone ? `${item.zone.code} - ${item.zone.name}` : '',
         zoneCode: item.zone?.code ?? '',
@@ -286,6 +299,10 @@ export class InventoryService {
         materialTypeId: item.materialTypeId,
         materialType: item.materialType?.name ?? '',
         materialUsageType: item.materialUsageType,
+        materialUsageTypeId: item.materialUsageTypeId,
+        materialUsageTypeCode:
+          item.materialUsageTypeMaster?.code ?? item.materialUsageType,
+        materialUsageTypeName: item.materialUsageTypeMaster?.name ?? null,
         minimumStock: item.minimumStock ?? 0,
         unit: item.unit ?? item.unitMaster?.code ?? 'PCS',
         createdAt: item.createdAt.toISOString(),
@@ -301,6 +318,7 @@ export class InventoryService {
         currentStock,
         averageCost,
         inventoryValue,
+        bomUsageCount: item._count?.bomItems ?? 0,
         lastMovementDate: metrics?.lastMovementDate?.toISOString() ?? null,
       };
     });
@@ -323,6 +341,13 @@ export class InventoryService {
     }
 
     return this.inventoryRepository.transaction(async (tx) => {
+      const usageType = await this.resolveMaterialUsageType(
+        {
+          materialUsageTypeId: payload.materialUsageTypeId,
+          materialUsageType: payload.materialUsageType,
+        },
+        tx,
+      );
       const item = await this.inventoryRepository.createItem(
         {
           code: payload.code,
@@ -330,8 +355,24 @@ export class InventoryService {
           description: payload.description,
           createdAt: payload.createdAt ?? new Date(),
           minimumStock: payload.minimumStock ?? 0,
-          materialUsageType: payload.materialUsageType ?? 'PRIMARY',
+          materialUsageType: this.legacyUsageTypeFor(
+            usageType?.code ?? payload.materialUsageType ?? 'PRIMARY',
+          ),
+          ...(usageType && {
+            materialUsageTypeMaster: {
+              connect: {
+                id: usageType.id,
+              },
+            },
+          }),
           unit: payload.unit ?? 'PCS',
+          ...(payload.unitId && {
+            unitMaster: {
+              connect: {
+                id: payload.unitId,
+              },
+            },
+          }),
           category: {
             connect: {
               id: payload.categoryId ?? defaultCategory.id,
@@ -356,6 +397,22 @@ export class InventoryService {
         },
         tx,
       );
+      await tx.activityLog.create({
+        data: {
+          action: 'MATERIAL_CREATED',
+          entity: 'InventoryItem',
+          entityId: item.id,
+          module: 'inventory',
+          metadata: {
+            code: item.code,
+            name: item.name,
+            categoryId: item.categoryId,
+            materialTypeId: item.materialTypeId,
+            materialUsageTypeId: item.materialUsageTypeId,
+            unitId: payload.unitId ?? null,
+          },
+        },
+      });
       await this.inventoryEvents.materialUpdated(
         {
           id: item.id,
@@ -368,6 +425,10 @@ export class InventoryService {
     });
   }
   async updateItem(id: string, payload: UpdateInventoryItemDto) {
+    const usageType = await this.resolveMaterialUsageType({
+      materialUsageTypeId: payload.materialUsageTypeId,
+      materialUsageType: payload.materialUsageType,
+    });
     const data: Prisma.InventoryItemUpdateInput = {
       code: payload.code,
 
@@ -377,9 +438,22 @@ export class InventoryService {
 
       minimumStock: payload.minimumStock,
 
-      materialUsageType: payload.materialUsageType,
+      materialUsageType:
+        usageType || payload.materialUsageType
+          ? this.legacyUsageTypeFor(
+              usageType?.code ?? payload.materialUsageType ?? 'PRIMARY',
+            )
+          : undefined,
 
       unit: payload.unit,
+
+      ...(usageType && {
+        materialUsageTypeMaster: {
+          connect: {
+            id: usageType.id,
+          },
+        },
+      }),
 
       ...(payload.categoryId && {
         category: {
@@ -397,6 +471,18 @@ export class InventoryService {
         },
       }),
     };
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'unitId')) {
+      data.unitMaster = payload.unitId
+        ? {
+            connect: {
+              id: payload.unitId,
+            },
+          }
+        : {
+            disconnect: true,
+          };
+    }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'zoneId')) {
       data.zone = payload.zoneId
@@ -420,6 +506,21 @@ export class InventoryService {
 
     return this.inventoryRepository.transaction(async (tx) => {
       const item = await this.inventoryRepository.updateItemInfo(id, data, tx);
+      await tx.activityLog.create({
+        data: {
+          action: 'MATERIAL_UPDATED',
+          entity: 'InventoryItem',
+          entityId: item.id,
+          module: 'inventory',
+          metadata: {
+            code: item.code,
+            name: item.name,
+            categoryId: item.categoryId,
+            materialTypeId: item.materialTypeId,
+            unitId: item.unitId ?? null,
+          },
+        },
+      });
       await this.inventoryEvents.materialUpdated(
         {
           id,
@@ -435,6 +536,19 @@ export class InventoryService {
   async deleteItem(id: string) {
     return this.inventoryRepository.transaction(async (tx) => {
       const item = await this.inventoryRepository.deleteItem(id, tx);
+      await tx.activityLog.create({
+        data: {
+          action: 'MATERIAL_DELETED',
+          entity: 'InventoryItem',
+          entityId: item.id,
+          module: 'inventory',
+          metadata: {
+            code: item.code,
+            name: item.name,
+            softDelete: true,
+          },
+        },
+      });
       await this.inventoryEvents.materialUpdated(
         {
           id,
@@ -1494,5 +1608,49 @@ export class InventoryService {
     return [] as Array<
       'IMPORT' | 'EXPORT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'
     >;
+  }
+
+  private legacyUsageTypeFor(value: string) {
+    const normalized = String(value || 'PRIMARY')
+      .trim()
+      .toUpperCase();
+
+    return (
+      legacyMaterialUsageTypes.has(normalized) ? normalized : 'PRIMARY'
+    ) as 'PRIMARY' | 'SECONDARY' | 'CONSUMABLE';
+  }
+
+  private async resolveMaterialUsageType(
+    input: {
+      materialUsageTypeId?: string;
+      materialUsageType?: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (input.materialUsageTypeId) {
+      const usageType =
+        await this.inventoryRepository.findMaterialUsageTypeById(
+          input.materialUsageTypeId,
+          tx,
+        );
+
+      if (!usageType || !usageType.active) {
+        throw new BadRequestException('Material usage type is invalid.');
+      }
+
+      return usageType;
+    }
+
+    if (input.materialUsageType) {
+      return this.inventoryRepository.findMaterialUsageTypeByCode(
+        input.materialUsageType,
+        tx,
+      );
+    }
+
+    return this.inventoryRepository.findMaterialUsageTypeByCode(
+      'PRIMARY',
+      tx,
+    );
   }
 }

@@ -1,12 +1,50 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 import { Prisma } from '@prisma/client';
 
 import { RbacRepository } from '../repositories/rbac.repository';
 
+export const CANONICAL_PERMISSIONS = [
+  'master-data.read',
+  'master-data.write',
+  'inventory.read',
+  'inventory.write',
+  'projects.read',
+  'projects.write',
+  'project.approve',
+  'components.read',
+  'components.write',
+  'tasks.read',
+  'tasks.write',
+  'rbac.read',
+  'rbac.write',
+  'workflow.read',
+  'workflow.write',
+  'attachments.read',
+  'attachments.write',
+  'jobs.read',
+  'jobs.write',
+  'analytics.read',
+  'analytics.write',
+  'production.read',
+  'production.write',
+  'qc.read',
+  'qc.write',
+  'yard.read',
+  'yard.write',
+  'logistics.read',
+  'logistics.write',
+] as const;
+
 @Injectable()
-export class RbacService {
+export class RbacService implements OnModuleInit {
+  private readonly logger = new Logger(RbacService.name);
+
   constructor(private readonly repository: RbacRepository) {}
+
+  async onModuleInit() {
+    await this.ensureCanonicalCatalog();
+  }
 
   async getUserAccess(userId: string) {
     const userRoles = await this.repository.findUserRolesAndPermissions(userId);
@@ -39,6 +77,22 @@ export class RbacService {
 
     return requiredPermissions.every((permission) =>
       permissionSet.has(permission),
+    );
+  }
+
+  async ensureCanonicalCatalog() {
+    const adminRole = await this.repository.upsertRole({
+      name: 'admin',
+      description: 'System administrator',
+    });
+
+    for (const name of CANONICAL_PERMISSIONS) {
+      const permission = await this.repository.upsertPermission({ name });
+      await this.repository.assignPermissionToRole(adminRole.id, permission.id);
+    }
+
+    this.logger.log(
+      `RBAC catalog ready: ${CANONICAL_PERMISSIONS.length} canonical permissions assigned to admin role`,
     );
   }
 

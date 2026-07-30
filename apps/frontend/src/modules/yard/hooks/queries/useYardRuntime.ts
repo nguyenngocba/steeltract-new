@@ -35,6 +35,7 @@ const useYardRuntimeMutation = <T,>(mutationFn: (payload: T) => Promise<unknown>
 }
 
 export const usePlaceYardItem = () => useYardRuntimeMutation(yardApi.place)
+export const useStageComponentInstanceToYard = () => useYardRuntimeMutation(yardApi.stageComponentInstance)
 export const useMoveYardItem = () => useYardRuntimeMutation(yardApi.move)
 export const useRemoveYardItem = () => useYardRuntimeMutation(yardApi.remove)
 export const useCreateYardZone = () => useYardRuntimeMutation(yardApi.createZone)

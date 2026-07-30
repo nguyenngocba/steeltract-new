@@ -9,9 +9,12 @@ import {
 } from '@nestjs/common'
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../rbac/guards/permissions.guard'
 import { LogisticsService } from './logistics.service'
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('logistics.read')
 @Controller('logistics')
 export class LogisticsController {
   constructor(
@@ -34,16 +37,19 @@ export class LogisticsController {
   }
 
   @Post('dispatch-orders/suggest')
+  @RequirePermissions('logistics.write')
   suggestDispatchItems(@Body() body: any) {
     return this.logisticsService.suggestDispatchItems(body)
   }
 
   @Post('dispatch-orders')
+  @RequirePermissions('logistics.write')
   createDispatchOrder(@Body() body: any) {
     return this.logisticsService.createDispatchOrder(body)
   }
 
   @Patch('dispatch-orders/:id/loading')
+  @RequirePermissions('logistics.write')
   markLoading(
     @Param('id') id: string,
     @Body() body: any,
@@ -52,6 +58,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/depart')
+  @RequirePermissions('logistics.write')
   depart(
     @Param('id') id: string,
     @Body() body: any,
@@ -60,6 +67,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/arrive')
+  @RequirePermissions('logistics.write')
   arrive(
     @Param('id') id: string,
     @Body() body: any,
@@ -68,6 +76,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/receive')
+  @RequirePermissions('logistics.write')
   receive(
     @Param('id') id: string,
     @Body() body: any,
@@ -76,6 +85,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/complete')
+  @RequirePermissions('logistics.write')
   complete(
     @Param('id') id: string,
     @Body() body: any,
@@ -84,6 +94,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/cancel')
+  @RequirePermissions('logistics.write')
   cancel(
     @Param('id') id: string,
     @Body() body: any,

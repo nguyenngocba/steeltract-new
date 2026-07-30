@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,7 +15,6 @@ import {
   ProductionStageCode,
   ProductionStageStatus,
   ProductionTaskStatus,
-  YardItemType,
 } from '@prisma/client';
 
 import { SnapshotUpdateDispatcher } from '../../../core/jobs/snapshot-update-dispatcher.service';
@@ -611,97 +611,12 @@ export class ProductionService {
     dto: StageProductionToYardDto,
     actorId?: string,
   ) {
-    const order = await this.getOrderOrThrow(id);
-
-    if (order.status !== ProductionOrderStatus.COMPLETED) {
-      throw new BadRequestException(
-        'Production order must be completed before yard staging',
-      );
-    }
-
-    if (!order.component) {
-      throw new BadRequestException(
-        'Production order must reference a component before yard staging',
-      );
-    }
-
-    const approvedQc = await this.repository.findApprovedQcInspection(order.id);
-
-    if (!approvedQc) {
-      throw new BadRequestException(
-        'QC inspection must be passed or approved before staging finished component to yard',
-      );
-    }
-
-    const slot = await this.repository.findYardSlot(dto.slotId);
-
-    if (!slot) {
-      throw new NotFoundException('Yard slot not found');
-    }
-
-    const placements =
-      await this.repository.findActiveYardPlacementsForProduction({
-        componentId: order.component.id,
-        productionOrderId: order.id,
-      });
-
-    const stagedQuantity = placements.reduce(
-      (sum, row) => sum + Number(row.quantity ?? 0),
-      0,
+    void id;
+    void dto;
+    void actorId;
+    throw new GoneException(
+      'Legacy ProductionOrder stage-to-yard is deprecated. Use YardService.stageComponentInstance with componentInstanceId.',
     );
-    const remainingQuantity = Number(order.quantity) - stagedQuantity;
-    const quantity = Number(dto.quantity ?? remainingQuantity);
-
-    if (quantity <= 0) {
-      throw new BadRequestException('Invalid quantity');
-    }
-
-    if (quantity > remainingQuantity) {
-      throw new BadRequestException(`Only ${remainingQuantity} remaining`);
-    }
-
-    const placement = await this.yardService.placeItem(
-      {
-        slotId: dto.slotId,
-        itemType: YardItemType.COMPONENT,
-        itemId: order.component.id,
-        itemCode: order.component.code,
-        itemName: order.component.name,
-        quantity,
-        stackLevel: dto.stackLevel,
-        weight: dto.weight,
-        length: dto.length,
-        width: dto.width,
-        height: dto.height,
-        craneId: dto.craneId,
-        reason: dto.reason ?? `Staged from production order ${order.orderNo}`,
-        attachmentIds: [],
-        metadata: {
-          ...(dto.metadata ?? {}),
-          productionOrderId: order.id,
-          productionOrderNo: order.orderNo,
-        },
-      },
-      actorId,
-    );
-
-    await this.repository.markComponentStagedFromProduction({
-      componentId: order.component.id,
-      componentCode: order.component.code,
-      orderId: order.id,
-      orderNo: order.orderNo,
-      status: ComponentStatus.STOCK,
-      floor: `L${placement.stackLevel}`,
-      zoneCode: slot.zone.code,
-      slotCode: slot.code,
-      x: slot.x,
-      y: slot.y,
-      stackLevel: placement.stackLevel,
-      placementId: placement.id,
-      slotId: slot.id,
-      actorId,
-    });
-    return placement;
   }
 
   async createComponentFromProductionOrder(id: string, actorId?: string) {

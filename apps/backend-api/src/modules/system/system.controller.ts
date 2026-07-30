@@ -1,14 +1,56 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 
 import { UserStatus } from '@prisma/client';
 
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import type { AuthUser } from '../rbac/types/auth-user';
+import {
+  createSystemRoleSchema,
+  replaceSystemRolePermissionsSchema,
+  updateSystemRoleSchema,
+  type CreateSystemRoleDto,
+  type ReplaceSystemRolePermissionsDto,
+  type UpdateSystemRoleDto,
+} from './dto/role-administration.dto';
+import { SystemRoleAdminService } from './system-role-admin.service';
+import {
+  createSystemUserSchema,
+  replaceSystemUserRolesSchema,
+  resetSystemUserPasswordSchema,
+  updateSystemUserSchema,
+  updateSystemUserStatusSchema,
+  type CreateSystemUserDto,
+  type ReplaceSystemUserRolesDto,
+  type ResetSystemUserPasswordDto,
+  type UpdateSystemUserDto,
+  type UpdateSystemUserStatusDto,
+} from './dto/user-administration.dto';
+import { SystemUserAdminService } from './system-user-admin.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('rbac.read')
 @Controller('system')
 export class SystemController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly roleAdminService: SystemRoleAdminService,
+    private readonly userAdminService: SystemUserAdminService,
+  ) {}
 
   @Get('overview')
   async overview() {
@@ -111,104 +153,263 @@ export class SystemController {
 
   @Get('users')
   async users() {
-    const users = await this.prisma.user.findMany({
-      orderBy: { createdAt: 'asc' },
-      include: {
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
-      },
-    });
+    return this.userAdminService.listUsers();
+  }
 
-    const userIds = users.map((user) => user.id);
-    const latestLogs = userIds.length
-      ? await this.prisma.activityLog.findMany({
-          where: { userId: { in: userIds } },
-          orderBy: { createdAt: 'desc' },
-          select: {
-            userId: true,
-            action: true,
-            module: true,
-            createdAt: true,
-          },
-        })
-      : [];
-    const latestByUser = new Map<string, (typeof latestLogs)[number]>();
-    for (const log of latestLogs) {
-      if (log.userId && !latestByUser.has(log.userId)) {
-        latestByUser.set(log.userId, log);
-      }
-    }
+  @Get('users/:id')
+  async userDetail(@Param('id') id: string) {
+    return this.userAdminService.getUser(id);
+  }
 
-    return users.map((user) => ({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      fullName: user.fullName,
-      status: user.status,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      lastActivityAt: latestByUser.get(user.id)?.createdAt ?? null,
-      lastActivityAction: latestByUser.get(user.id)?.action ?? null,
-      lastActivityModule: latestByUser.get(user.id)?.module ?? null,
-      roles: user.userRoles.map((item) => item.role),
-    }));
+  @RequirePermissions('rbac.write')
+  @Post('users')
+  async createUser(
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(createSystemUserSchema))
+    dto: CreateSystemUserDto,
+  ) {
+    return this.userAdminService.createUser(dto, req.user.id);
+  }
+
+  @RequirePermissions('rbac.write')
+  @Patch('users/:id')
+  async updateUser(
+    @Param('id') id: string,
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(updateSystemUserSchema))
+    dto: UpdateSystemUserDto,
+  ) {
+    return this.userAdminService.updateUser(id, dto, req.user.id);
+  }
+
+  @RequirePermissions('rbac.write')
+  @Put('users/:id/roles')
+  async replaceUserRoles(
+    @Param('id') id: string,
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(replaceSystemUserRolesSchema))
+    dto: ReplaceSystemUserRolesDto,
+  ) {
+    return this.userAdminService.replaceRoles(id, dto, req.user.id);
+  }
+
+  @RequirePermissions('rbac.write')
+  @Post('users/:id/status')
+  async updateUserStatus(
+    @Param('id') id: string,
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(updateSystemUserStatusSchema))
+    dto: UpdateSystemUserStatusDto,
+  ) {
+    return this.userAdminService.updateStatus(id, dto, req.user.id);
+  }
+
+  @RequirePermissions('rbac.write')
+  @Post('users/:id/reset-password')
+  async resetUserPassword(
+    @Param('id') id: string,
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(resetSystemUserPasswordSchema))
+    dto: ResetSystemUserPasswordDto,
+  ) {
+    return this.userAdminService.resetPassword(id, dto, req.user.id);
   }
 
   @Get('roles')
   async roles() {
-    const roles = await this.prisma.role.findMany({
-      orderBy: { createdAt: 'asc' },
-      include: {
-        userRoles: true,
-        rolePermissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
-    });
+    return this.roleAdminService.listRoles();
+  }
 
-    return roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      description: role.description,
-      createdAt: role.createdAt,
-      updatedAt: role.updatedAt,
-      userCount: role.userRoles.length,
-      permissions: role.rolePermissions.map((item) => item.permission),
-    }));
+  @Get('permissions')
+  async permissions() {
+    return this.roleAdminService.listPermissions();
+  }
+
+  @RequirePermissions('rbac.write')
+  @Post('roles')
+  async createRole(
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(createSystemRoleSchema))
+    dto: CreateSystemRoleDto,
+  ) {
+    return this.roleAdminService.createRole(dto, req.user.id);
+  }
+
+  @RequirePermissions('rbac.write')
+  @Patch('roles/:id')
+  async updateRole(
+    @Param('id') id: string,
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(updateSystemRoleSchema))
+    dto: UpdateSystemRoleDto,
+  ) {
+    return this.roleAdminService.updateRole(id, dto, req.user.id);
+  }
+
+  @RequirePermissions('rbac.write')
+  @Put('roles/:id/permissions')
+  async replaceRolePermissions(
+    @Param('id') id: string,
+    @Req() req: { user: AuthUser },
+    @Body(new ZodValidationPipe(replaceSystemRolePermissionsSchema))
+    dto: ReplaceSystemRolePermissionsDto,
+  ) {
+    return this.roleAdminService.replacePermissions(id, dto, req.user.id);
   }
 
   @Get('role-matrix')
   async roleMatrix() {
-    const permissions = await this.prisma.permission.findMany({
-      orderBy: { name: 'asc' },
-    });
+    return this.roleAdminService.roleMatrix();
+  }
 
-    const moduleAliases = [
-      ['dashboard', 'Tổng quan'],
-      ['projects', 'Dự án'],
-      ['components', 'Quản lý cấu kiện'],
-      ['production', 'Sản xuất'],
-      ['inventory', 'Kho vật tư'],
-      ['yard', 'Bãi tập kết'],
-      ['logistics', 'Vận chuyển'],
-      ['qc', 'Chất lượng (QC)'],
-      ['reports', 'Báo cáo'],
-      ['settings', 'Cài đặt hệ thống'],
-      ['users', 'Người dùng'],
-      ['roles', 'Vai trò'],
-      ['system-logs', 'Nhật ký hệ thống'],
-    ] as const;
-    const actions = ['view', 'create', 'update', 'delete', 'export'];
+  @Get('settings-catalog')
+  async settingsCatalog() {
+    const [
+      totalUsers,
+      roles,
+      permissions,
+      activityTotal,
+      uomTotal,
+      uomActive,
+      categories,
+      materialUsageTypes,
+      materialTypes,
+      materials,
+      notifications,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.role.count(),
+      this.prisma.permission.count(),
+      this.prisma.activityLog.count(),
+      this.prisma.masterUnit.count(),
+      this.prisma.masterUnit.count({ where: { active: true } }),
+      this.prisma.inventoryCategory.count(),
+      this.prisma.masterMaterialUsageType.count(),
+      this.prisma.materialType.count(),
+      this.prisma.inventoryItem.count({ where: { deletedAt: null } }),
+      this.prisma.notification.count(),
+    ]);
 
     return {
-      modules: moduleAliases.map(([key, label]) => ({ key, label })),
-      actions,
-      permissionCount: permissions.length,
+      generatedAt: new Date(),
+      categories: [
+        {
+          key: 'system-information',
+          label: 'Thông tin hệ thống',
+          status: 'ENV_READ_ONLY',
+          source: '/system/overview',
+          editable: false,
+          count: 1,
+        },
+        {
+          key: 'users',
+          label: 'Người dùng',
+          status: 'REAL_EDITABLE',
+          source: '/system/users',
+          editable: true,
+          count: totalUsers,
+        },
+        {
+          key: 'roles',
+          label: 'Vai trò / Profile phân quyền',
+          status: 'REAL_EDITABLE',
+          source: '/system/roles',
+          editable: true,
+          count: roles,
+        },
+        {
+          key: 'permissions',
+          label: 'Permission catalog',
+          status: 'REAL_READ_ONLY',
+          source: '/system/permissions',
+          editable: false,
+          count: permissions,
+        },
+        {
+          key: 'uom',
+          label: 'Đơn vị & quy đổi',
+          status: 'REAL_EDITABLE',
+          source: '/master-data/uom',
+          editable: true,
+          count: uomTotal,
+          metadata: {
+            active: uomActive,
+          },
+        },
+        {
+          key: 'material-categories',
+          label: 'Danh mục vật tư',
+          status: 'REAL_EDITABLE',
+          source: '/master-data/material-categories',
+          editable: true,
+          count: categories,
+        },
+        {
+          key: 'material-usage-types',
+          label: 'Loại vật tư',
+          status: 'REAL_EDITABLE',
+          source: '/master-data/material-usage-types',
+          editable: true,
+          count: materialUsageTypes,
+          metadata: {
+            canonicalModel: 'MasterMaterialUsageType',
+          },
+        },
+        {
+          key: 'materials',
+          label: 'Material Master',
+          status: 'REAL_EDITABLE',
+          source: '/inventory/items',
+          editable: true,
+          count: materials,
+          metadata: {
+            createsStock: false,
+          },
+        },
+        {
+          key: 'material-types',
+          label: 'Quy cách / Nhóm kỹ thuật',
+          status: 'REAL_EDITABLE',
+          source: '/master-data/material-types',
+          editable: true,
+          count: materialTypes,
+          metadata: {
+            canonicalModel: 'MaterialType',
+            schemaGate:
+              'Profile/specification/grade/dimension chi tiết chưa có model riêng.',
+          },
+        },
+        {
+          key: 'activity-log',
+          label: 'Nhật ký hoạt động',
+          status: 'REAL_READ_ONLY',
+          source: '/system/activity-logs',
+          editable: false,
+          count: activityTotal,
+        },
+        {
+          key: 'notifications',
+          label: 'Thông báo hệ thống',
+          status: 'REAL_READ_ONLY',
+          source: '/system/notifications',
+          editable: false,
+          count: notifications,
+        },
+        {
+          key: 'backup',
+          label: 'Sao lưu & phục hồi',
+          status: 'NOT_IMPLEMENTED',
+          source: 'SYSTEM.7',
+          editable: false,
+          count: 0,
+        },
+      ],
+      safeRuntime: {
+        application: process.env.APP_NAME ?? 'SteelTrack ERP',
+        environment: process.env.NODE_ENV ?? 'development',
+        timezone: process.env.TZ ?? 'Asia/Ho_Chi_Minh',
+        serverTime: new Date().toISOString(),
+      },
     };
   }
 

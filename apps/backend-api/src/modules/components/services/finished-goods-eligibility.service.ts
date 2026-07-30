@@ -12,4 +12,12 @@ export class FinishedGoodsEligibilityService {
   list(query: ListFinishedGoodsInstancesDto) {
     return this.repository.list(query);
   }
+
+  countByProjectRequirement(projectId: string) {
+    return this.repository.countByProjectRequirement(projectId);
+  }
+
+  findEligibleInstance(id: string) {
+    return this.repository.findEligibleInstance(id);
+  }
 }

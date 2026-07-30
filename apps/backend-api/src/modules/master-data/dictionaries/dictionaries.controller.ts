@@ -12,6 +12,8 @@ import {
 
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { RequirePermissions } from '../../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import {
   dictionaryPayloadSchema,
   listDictionarySchema,
@@ -24,7 +26,8 @@ import type {
 } from './dto/dictionary.dto';
 import { DictionariesService } from './dictionaries.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('master-data.read')
 @Controller('master-data')
 export class DictionariesController {
   constructor(
@@ -46,6 +49,7 @@ export class DictionariesController {
   }
 
   @Post(':domain')
+  @RequirePermissions('master-data.write')
   create(
     @Param('domain') domain: string,
     @Body(new ZodValidationPipe(dictionaryPayloadSchema))
@@ -55,6 +59,7 @@ export class DictionariesController {
   }
 
   @Patch(':domain/:id')
+  @RequirePermissions('master-data.write')
   update(
     @Param('domain') domain: string,
     @Param('id') id: string,
@@ -65,6 +70,7 @@ export class DictionariesController {
   }
 
   @Delete(':domain/:id')
+  @RequirePermissions('master-data.write')
   deactivate(
     @Param('domain') domain: string,
     @Param('id') id: string,

@@ -2,6 +2,95 @@ import { api } from '@/lib/api'
 
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED' | 'ON_HOLD'
 export type ProjectComponentStatus = 'STOCK' | 'CUTTING' | 'WELDING' | 'PAINTING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'INSTALLED'
+export type ProjectExecutionStatus =
+  | 'NO_REQUIREMENTS'
+  | 'NO_PRODUCTION'
+  | 'PLANNED'
+  | 'IN_PRODUCTION'
+  | 'WAITING_QC'
+  | 'QC_BLOCKED'
+  | 'FINISHED_PARTIAL'
+  | 'FINISHED'
+  | 'OVER_PRODUCED'
+
+export type ProjectExecutionRequirement = {
+  id: string
+  requirementNo: string
+  status: string
+  requiredBy?: string | null
+  component: {
+    id: string
+    code: string
+    name: string
+    componentType?: string | null
+    profile?: string | null
+  }
+  quantities: {
+    requiredQty: number
+    orderedQty: number
+    plannedQty: number
+    instanceCount: number
+    inProductionQty: number
+    completedQty: number
+    qcPassedQty: number
+    qcFailedQty: number
+    finishedGoodsQty: number
+    yardStagedQty: number
+  }
+  productionOrders: Array<{
+    id: string
+    orderNo: string
+    status: string
+    quantity: number
+  }>
+  physicalInstances: Array<{
+    id: string
+    instanceNo: string
+    state: string
+    productionOrderId?: string | null
+    producedAt?: string | null
+    qcPassedAt?: string | null
+    yardPlacementId?: string | null
+    yardSlotId?: string | null
+    yardPlacedAt?: string | null
+  }>
+  executionStatus: ProjectExecutionStatus
+  progress: {
+    denominator: number
+    productionCompletionPercent: number
+    finishedGoodsPercent: number
+  }
+}
+
+export type ProjectExecutionReadModel = {
+  project: {
+    id: string
+    code: string
+    name: string
+    status: ProjectStatus
+  }
+  summary: {
+    requirementCount: number
+    requiredQty: number
+    orderedQty: number
+    plannedQty: number
+    instanceCount: number
+    inProductionQty: number
+    completedQty: number
+    qcPassedQty: number
+    qcFailedQty: number
+    finishedGoodsQty: number
+    yardStagedQty: number
+    productionCompletionPercent: number
+    finishedGoodsPercent: number
+    sourceOfTruth: string
+    downstream: {
+      yardCanonical: boolean
+      dispatchCanonical: false
+    }
+  }
+  requirements: ProjectExecutionRequirement[]
+}
 
 export type ProjectRuntimeRow = {
   id: string
@@ -396,6 +485,11 @@ export async function getProjectDetailTab(
 ) {
   const response = await api.get(`/projects/${projectId}/detail/${tab}`)
   return response.data
+}
+
+export async function getProjectExecution(projectId: string) {
+  const response = await api.get(`/projects/${projectId}/execution`)
+  return response.data as ProjectExecutionReadModel
 }
 
 export type CreateProjectPayload = {

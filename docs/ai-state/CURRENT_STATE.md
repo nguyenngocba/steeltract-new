@@ -1,5 +1,282 @@
 # Current State
 
+## LOGISTICS.2 - Canonical ComponentInstance Dispatch & Delivery
+
+Status: **SCHEMA/STATE GATED - AUDIT COMPLETE, NO SOURCE IMPLEMENTATION**
+
+On 2026-07-30, audited Logistics dispatch and delivery against the canonical
+ComponentInstance flow. Current Logistics still dispatches component definition
+identity through `DispatchItem.componentId`, project-task component
+allocations, `ShipmentLineInput.componentId`, and frontend create payloads.
+`PATCH /logistics/dispatch-orders/:id/receive` still mutates legacy
+`Component.status = DELIVERED`.
+
+The sprint cannot safely continue because `ComponentInstanceState` currently
+does not include physical logistics states such as `IN_YARD`, `IN_TRANSIT`, or
+`DELIVERED`. LOGISTICS.2 explicitly forbids substituting `Component.status` or
+fabricating physical state. Required next gate is approval for additive
+`DispatchItem.componentInstanceId` plus canonical physical instance state
+extensions before write-path implementation.
+
+Report:
+`docs/audits/logistics2-component-instance-dispatch-delivery-report.md`.
+
+## STABILITY.PROJECTS.3A - Canonical Yard Runtime Certification
+
+Status: **CONDITIONALLY CERTIFIED - READ RUNTIME PASS, MUTATING YARD FIXTURE NOT EXECUTED**
+
+On 2026-07-29, hardened the PROJECTS.3 canonical Yard handoff closure. The
+legacy ProductionOrder staging route `POST /production/:id/stage-to-yard` is
+now retained only as a compatibility endpoint and returns `410 Gone` before any
+Yard write. `ProductionService.stageToYard()` also throws `GoneException` so
+internal callers cannot stage by aggregate order/component definition identity.
+
+Production UI no longer stages aggregate quantity from a ProductionOrder. It
+selects a concrete `ComponentInstance` in `QC_PASSED` or `USE_AS_IS` state and
+uses the canonical `/yard/stage` mutation. Generic Yard placement now rejects
+new `itemType=COMPONENT` placement without `componentInstanceId`.
+
+Yard read models now expose `componentInstance` lineage with component,
+requirement, project and production-order context. Component snapshots now
+resolve Yard location through `YardItemPlacement.componentInstance.componentId`
+first and keep legacy `itemId=Component.id` fallback only for old rows.
+Simulation seeding now uses eligible, unstaged `ComponentInstance` rows instead
+of Component definition rows.
+
+Runtime read-only smoke on `PORT=3100` passed: health `200`, admin login `201`,
+no-token `/yard/stage` `401`, finished-goods read `200` with 2 `QC_PASSED`
+instances, Yard slots `200` with 93 slots, Yard workspace `200`, and Projects
+execution `200`. Current DB has 0 active Yard placements, so committed
+`POST /yard/stage` was not executed; a mutating write smoke was blocked by the
+safety reviewer and remains a controlled follow-up.
+
+Report:
+`docs/audits/stability-projects3a-yard-runtime-certification.md`.
+
+## PROJECTS.3 – Canonical ComponentInstance -> Yard Handoff
+
+Status: **IMPLEMENTED - MIGRATION DEPLOYED LOCALLY, TEST/BUILD PASS, RUNTIME HTTP NOT AVAILABLE**
+
+On 2026-07-29, closed the canonical Finished Goods -> Yard identity gap for
+Projects/Yard V1. Yard placements and movements now have nullable
+`componentInstanceId` relations to physical `ComponentInstance` rows. The
+additive migration `20260729193000_component_instance_yard_handoff` was
+deployed locally and adds FK indexes plus a PostgreSQL partial unique index
+that permits multiple historical placement rows but only one active placement
+per ComponentInstance.
+
+Added `POST /yard/stage` as the canonical stage-to-yard command. It uses
+`FinishedGoodsEligibilityService.findEligibleInstance()` so Yard shares the same
+Finished Goods predicate as `GET /components/instances/finished-goods`, writes
+`itemId = ComponentInstance.id`, preserves movement identity, emits existing
+Yard ActivityLog/outbox events, and does not mutate `Component.status`.
+
+Projects `GET /projects/:id/execution` now exposes `yardStagedQty` and active
+Yard placement identity from ComponentInstance placements. Production and
+Finished Goods progress remain unchanged by Yard movement. Yard RBAC is now
+guarded by `JwtAuthGuard + PermissionsGuard` with existing `yard.read/write`.
+
+Local DB contained 0 Yard placements after migration, so no legacy backfill was
+performed. Runtime HTTP fixture certification was not executed because no
+backend server was listening on `127.0.0.1:3000` or `127.0.0.1:3105`.
+
+Report:
+`docs/audits/projects3-component-instance-yard-handoff-report.md`.
+
+## PROJECTS.2 – Canonical Project Execution Read Model
+
+Status: **IMPLEMENTED - TARGETED TEST/BUILD PASS, RUNTIME HTTP NOT AVAILABLE**
+
+On 2026-07-29, added the canonical Projects execution read model. Projects now
+has `GET /projects/:id/execution`, sourced from
+`ProjectComponentRequirement -> ProductionOrder -> ComponentInstance`.
+The read model exposes requirement-level required quantity, non-cancelled
+ordered quantity, physical instance counts, in-production/completed/QC
+quantities and Finished Goods quantities.
+
+Finished Goods counts are delegated to the Components domain eligibility
+service so Projects does not duplicate QC/NCR eligibility rules from
+`GET /components/instances/finished-goods`. The minimal frontend adoption adds
+a `Canonical Execution` panel inside the Project detail drawer. Yard and
+Dispatch remain explicitly non-canonical at ComponentInstance level.
+
+Report:
+`docs/audits/projects2-canonical-execution-read-model-report.md`.
+
+## UI.SYSTEM.MASTERDATA.2A – Master Data Taxonomy + KPI Strip + Density
+
+Status: **IMPLEMENTED - MIGRATION DEPLOYED LOCALLY, TEST/BUILD PASS**
+
+On 2026-07-29, corrected the Settings Master Data taxonomy model. Audit found
+`InventoryItem.materialUsageType` was a fixed enum and `MaterialType` is the
+canonical technical group, not the usage taxonomy. Added additive
+`MasterMaterialUsageType` and nullable `InventoryItem.materialUsageTypeId` so
+`Loại vật tư` can be managed as real master data. The legacy enum remains for
+backward compatibility.
+
+Settings Master Data now exposes five workspaces: `Danh mục vật tư`, `Loại vật
+tư`, `Material Master`, `Quy cách / Nhóm kỹ thuật`, and `Đơn vị & Quy đổi`.
+Material Master filters/forms now select `Loại vật tư` from
+`/master-data/material-usage-types`, not a hardcoded frontend list. The modal
+header is compact, workspace KPI strips use real loaded records, and the right
+rail no longer repeats the same KPI values.
+
+Local DB migration evidence: `PRIMARY` 53 items, `SECONDARY` 14 items,
+`CONSUMABLE` 7 items; 72/72 non-deleted inventory items are linked to the new
+taxonomy.
+
+Report:
+`docs/audits/ui-system-masterdata2a-taxonomy-kpi-density-report.md`.
+
+## UI.SYSTEM.MASTERDATA.2 – Enterprise Master Data Workspace Redesign
+
+Status: **IMPLEMENTED - UI TEST/TYPECHECK PASS**
+
+On 2026-07-29, refined the Settings master-data workspaces into a stronger
+enterprise administration surface without backend/schema/API changes. The four
+canonical sources remain unchanged: `InventoryCategory`,
+`InventoryItem`, `MaterialType`, and `MasterUnit`.
+
+The modal now uses a 95vw/90vh workspace, a dominant table area, a stable
+right-side editor rail, compact row actions, real summary metrics, and
+viewport-bounded scroll ownership. Material Master presentation now clearly
+communicates full Material Master administration rather than only "Vật tư
+chính"; `InventoryItem.materialUsageType` still provides `Chính`, `Phụ`, and
+`Tiêu hao`. The Material Master table column mismatch was fixed by adding the
+missing status cell. The UOM editor now explains base-unit versus derived-unit
+conversion and disables conversion factor input for true base units.
+
+Report:
+`docs/audits/ui-system-masterdata2-enterprise-workspace-redesign.md`.
+
+## STABILITY.SYSTEM.1A – Master Data Interactive CRUD Workspaces
+
+Status: **IMPLEMENTED - API + UI INTERACTION CERTIFIED**
+
+On 2026-07-29, fixed the Settings master-data interaction defect. The Overview
+capability table no longer opens only metadata for the four master-data
+capabilities. Clicking `Danh mục vật tư`, `Vật tư chính`, `Quy cách / Nhóm kỹ
+thuật`, or `Đơn vị & Quy đổi` now opens the large interactive CRUD workspace
+backed by canonical APIs.
+
+The implementation reuses `InventoryCategory`, `InventoryItem`,
+`MaterialType`, and `MasterUnit`; no new master-data schema/model was created.
+`Vật tư chính/phụ/tiêu hao` remains the existing `InventoryItem.materialUsageType`
+field (`PRIMARY`, `SECONDARY`, `CONSUMABLE`), not a new dictionary. Runtime HTTP
+fixture `STABILITY-SYSTEM1A` certified create/edit/deactivate for all four
+workspaces and proved the Material Master picker sees edited category/type/unit
+lookups after refetch. A jsdom UI interaction test now proves the Overview
+capability click opens the CRUD modal and calls the canonical create API.
+
+Full browser automation was not available because Chromium/Playwright CLI is
+not installed in this environment. Report:
+`docs/audits/stability-system1a-masterdata-interactive-crud-report.md`.
+
+## STABILITY.SYSTEM.1 – User Creation Fix & Master Data CRUD Workspace
+
+Status: **IMPLEMENTED - HTTP SMOKE CERTIFIED**
+
+On 2026-07-29, fixed the System Users create-user runtime 400 by aligning the
+frontend modal validation with the backend `/system/users` DTO contract. The
+root cause was password length: backend requires at least 8 characters while
+the frontend only blocked empty passwords and displayed the generic Axios
+`Request failed with status code 400` message. The frontend now validates
+username, password, email and role selection before submit, and normalizes API
+errors into Vietnamese operator-facing messages.
+
+Settings Master Data CRUD was also hardened for Material Categories, Material
+Master, Material Types and UOM. Material Master remains identity only and does
+not create inventory stock. Backup was hidden from current navigation/UI while
+source/backend placeholders remain intact. Runtime HTTP fixture
+`STABILITY-SYSTEM1-*` certified user create/list/login/role-change/disable/
+enable plus master-data 401/403/admin access and CRUD.
+
+Report:
+`docs/audits/stability-system1-user-masterdata-crud-report.md`.
+
+## SYSTEM.MASTERDATA.1 – Canonical Material Master Data Administration
+
+Status: **IMPLEMENTED - HTTP SMOKE CERTIFIED**
+
+On 2026-07-29, Settings `Danh mục / Đơn vị` was upgraded from inspection-level
+catalogs into canonical material master-data administration. The V1 source of
+truth is `InventoryCategory` for material categories, `InventoryItem` for
+Material Master identity, `MaterialType` for technical grouping, and
+`MasterUnit` for UOM/conversion. No parallel master-data system was introduced.
+
+Settings now opens four modal workspaces for `Danh mục vật tư`, `Vật tư chính`,
+`Quy cách / Nhóm kỹ thuật`, and `Đơn vị & Quy đổi`, all backed by real
+authenticated APIs. Dictionary endpoints now enforce `master-data.read/write`.
+Material Master create/update binds `unitId` to `MasterUnit`, does not create
+stock, and exposes real BOM usage counts. Runtime fixture
+`SYSTEM-MD1-1785309482405` proved category/type/UOM/material creation through
+HTTP, material visibility via `/inventory/items`, stock delta 0,
+ComponentInstance delta 0 and ProductionOrder delta 0.
+
+Technical-spec detail remains a controlled schema gate: V1 reuses
+`MaterialType`; profile/specification/grade/dimension require a later approved
+additive schema before they can become canonical structured master data.
+Report:
+`docs/audits/system-masterdata1-canonical-material-administration-report.md`.
+
+## SYSTEM.ADMIN.V1 – Operational Administration & Settings
+
+Status: **IMPLEMENTED - HTTP SMOKE CERTIFIED**
+
+On 2026-07-29, System Administration moved from mostly read-only workspaces to
+an operational V1 admin surface. Users now has real create/detail/role
+assignment/enable-disable/password-reset UI. Roles now has real profile
+creation, permission assignment and effective access preview derived from the
+29-permission SYSTEM.2 catalog. Settings now exposes a real classified
+configuration catalog, safe runtime information, and existing UOM data from
+`MasterUnit`/`/master-data/uom`.
+
+No Prisma schema change or migration was introduced. Backup remains a controlled
+empty state because no backup engine exists yet. Runtime HTTP smoke on
+`127.0.0.1:3105` certified 401 no-token, admin role/user creation, role matrix,
+settings catalog, UOM read, 403 for insufficient permissions, and ActivityLog
+evidence. Created `docs/audits/system-admin-v1-operational-ui-report.md`.
+
+## SYSTEM.3 – Canonical User Administration
+
+Status: **IMPLEMENTED - RUNTIME CERTIFIED**
+
+On 2026-07-29, System Users moved from read-only backend data to real administrative capability. `/system/users` now supports canonical create, detail, update, role replacement, enable/disable and password reset using existing `User`, `Role`, `UserRole`, `RolePermission`, `Permission`, `RefreshToken` and `ActivityLog` models. No schema change or migration was introduced.
+
+Auth is hardened beyond login: disabled users cannot refresh tokens, resolve `/auth/me`, or continue using old access tokens because JWT validation checks current DB user state. Runtime fixture `SYSTEM3-1785305716894` proved create/list/login/role removal 403/role restore/disable 401/old-token 401/enable/reset/new-login success with no password hash leakage.
+
+## SYSTEM.2 – Canonical RBAC Enforcement
+
+Status: **IMPLEMENTED - RUNTIME CERTIFIED**
+
+On 2026-07-29, turned existing RBAC into backend authorization. Core operational controllers now use `PermissionsGuard` and stable permission metadata. Read paths use module read permissions; mutations/commands use module write permissions. `RbacModule` is global so `PermissionsGuard` resolves correctly from feature modules. The catalog now includes 29 canonical permissions, including `logistics.read` and `logistics.write`, and admin retains all permissions.
+
+Runtime certification on working-tree backend port `3102`: no token returned 401, valid signed token without DB role permissions returned 403, and admin reached Inventory, System and Logistics read endpoints. No schema change, Prisma model change, migration, frontend redesign, stage or commit was performed.
+
+## STABILITY.OPS3A2 – BOM Production Stock Picker & Component Production Warehouse Fix
+
+Status: **IMPLEMENTED - RUNTIME API CERTIFIED**
+
+On 2026-07-29, fixed the remaining operational BOM picker inconsistency. `ComponentsMaterialStockPage` was already sourced from `/inventory/items.locationBalances` filtered to `PRODUCTION`; the bug was that `ProductionBomModal` still made MAIN-only Material Master rows selectable. The modal now limits active selectable BOM materials to rows with positive PRODUCTION warehouse balance, while MAIN/Kho vật tư remains clearly labeled as secondary reference.
+
+Runtime API evidence reused existing certified data. `OPS3A1-RT-20260729030324` reconciles MAIN 60, PRODUCTION 40, reserved 20, available 20. MAIN-only materials were present in `/inventory/items` and are no longer picker-eligible by the frontend source calculation. No backend, Prisma schema, or migration change was required.
+
+## SPRINT SYSTEM.1 – System Administration Operational Audit
+
+Status: **AUDIT COMPLETED**
+
+On 2026-07-29, completed operational audit of System Administration module ("Hệ thống"). Created `docs/audits/system-administration-operational-audit.md`. Identified P0 security finding (lack of `PermissionsGuard` on core operational controllers) and missing User/Role/Permission mutation APIs and Backup engine.
+
+Verification: `prisma validate` (Pass), `prisma migrate status` (Pass), `pnpm -C apps/backend-api build` (Pass), `pnpm -C apps/frontend build` (Pass), `git diff --check` (Pass).
+
+## UI.OPS.3C – Real Operational Dataset & Dashboard Certification
+
+Status: **PASS WITH YARD HANDOFF GATE**
+
+On 2026-07-29, certified the canonical Components -> Production -> QC -> Finished Goods operational dataset using retained runtime fixture `OPS3C-20260729032211`. The fixture was created through authenticated APIs and covered Material Master, MAIN receipt, PRODUCTION transfer, Component Definition + Project Requirement, Engineering BOM/release, Production Orders, reservation/issue from PRODUCTION stock, ComponentInstanceExecution states, QC PASS, QC FAIL + NCR, and Finished Goods eligibility.
+
+Canonical finished goods source `GET /components/instances/finished-goods` returned only the QC-passed physical instance for the fixture. No source code, Prisma schema, migration, stage, or commit was performed. Remaining gate: Yard placement still needs canonical ComponentInstance-level handoff before UI can represent finished goods as Yard stock.
+
 ## SPRINT EXECUTIVE BI.8 – Redesign Inventory Analytics Charts
 
 Status: **IMPLEMENTED - TEST/BUILD PASS**

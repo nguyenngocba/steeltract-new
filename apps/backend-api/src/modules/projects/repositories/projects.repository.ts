@@ -629,6 +629,70 @@ export class ProjectsRepository {
     };
   }
 
+  findProjectExecutionSources(projectId: string) {
+    return this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        status: true,
+        componentRequirements: {
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            requirementNo: true,
+            status: true,
+            requiredQuantity: true,
+            producedQuantity: true,
+            acceptedQuantity: true,
+            installedQuantity: true,
+            requiredBy: true,
+            component: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                componentType: true,
+                profile: true,
+              },
+            },
+            productionOrders: {
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+              select: {
+                id: true,
+                orderNo: true,
+                status: true,
+                quantity: true,
+              },
+            },
+            componentInstances: {
+              orderBy: [{ serialSequence: 'asc' }, { createdAt: 'asc' }],
+              select: {
+                id: true,
+                instanceNo: true,
+                state: true,
+                productionOrderId: true,
+                producedAt: true,
+                qcPassedAt: true,
+                yardPlacements: {
+                  where: { removedAt: null },
+                  select: {
+                    id: true,
+                    slotId: true,
+                    placedAt: true,
+                    removedAt: true,
+                  },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   private findProjectReturnRequests(projectId?: string) {
     return this.prisma.returnRequest.findMany({
       where: {

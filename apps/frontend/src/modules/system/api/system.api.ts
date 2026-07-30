@@ -11,7 +11,12 @@ export type SystemUser = {
   lastActivityAt?: string | null
   lastActivityAction?: string | null
   lastActivityModule?: string | null
-  roles: Array<{ id: string; name: string; description?: string | null }>
+  roles: Array<{
+    id: string
+    name: string
+    description?: string | null
+    permissions?: Array<{ id: string; name: string; description?: string | null }>
+  }>
 }
 
 export type SystemRole = {
@@ -44,9 +49,39 @@ export type ActivitySummary = {
 }
 
 export type RoleMatrix = {
-  modules: Array<{ key: string; label: string }>
+  modules: Array<{
+    key: string
+    label: string
+    permissions: Array<{
+      id: string
+      name: string
+      action: string
+      capability: string
+      description?: string | null
+    }>
+  }>
   actions: string[]
   permissionCount: number
+  permissions: Array<{ id: string; name: string; description?: string | null }>
+}
+
+export type SystemSettingsCatalog = {
+  generatedAt: string
+  categories: Array<{
+    key: string
+    label: string
+    status: 'REAL_EDITABLE' | 'REAL_READ_ONLY' | 'ENV_READ_ONLY' | 'NOT_IMPLEMENTED'
+    source: string
+    editable: boolean
+    count: number
+    metadata?: Record<string, unknown>
+  }>
+  safeRuntime: {
+    application: string
+    environment: string
+    timezone: string
+    serverTime: string
+  }
 }
 
 export type SystemNotification = {
@@ -97,8 +132,32 @@ export type WorkflowCheck = {
 export const systemApi = {
   overview: () => api.get<SystemOverview>('/system/overview').then((res) => res.data),
   users: () => api.get<SystemUser[]>('/system/users').then((res) => res.data),
+  userDetail: (id: string) => api.get<SystemUser>(`/system/users/${id}`).then((res) => res.data),
+  createUser: (payload: {
+    username: string
+    email?: string
+    fullName?: string
+    password: string
+    roleIds: string[]
+  }) => api.post<SystemUser>('/system/users', payload).then((res) => res.data),
+  updateUser: ({ id, payload }: { id: string; payload: { username?: string; email?: string; fullName?: string | null } }) =>
+    api.patch<SystemUser>(`/system/users/${id}`, payload).then((res) => res.data),
+  replaceUserRoles: ({ id, roleIds }: { id: string; roleIds: string[] }) =>
+    api.put<SystemUser>(`/system/users/${id}/roles`, { roleIds }).then((res) => res.data),
+  updateUserStatus: ({ id, status }: { id: string; status: 'ACTIVE' | 'BLOCKED' }) =>
+    api.post<SystemUser>(`/system/users/${id}/status`, { status }).then((res) => res.data),
+  resetUserPassword: ({ id, password }: { id: string; password: string }) =>
+    api.post<SystemUser>(`/system/users/${id}/reset-password`, { password }).then((res) => res.data),
   roles: () => api.get<SystemRole[]>('/system/roles').then((res) => res.data),
+  permissions: () => api.get<Array<{ id: string; name: string; description?: string | null }>>('/system/permissions').then((res) => res.data),
+  createRole: (payload: { name: string; description?: string; permissionIds: string[] }) =>
+    api.post<SystemRole>('/system/roles', payload).then((res) => res.data),
+  updateRole: ({ id, payload }: { id: string; payload: { name?: string; description?: string | null } }) =>
+    api.patch<SystemRole>(`/system/roles/${id}`, payload).then((res) => res.data),
+  replaceRolePermissions: ({ id, permissionIds }: { id: string; permissionIds: string[] }) =>
+    api.put<SystemRole>(`/system/roles/${id}/permissions`, { permissionIds }).then((res) => res.data),
   roleMatrix: () => api.get<RoleMatrix>('/system/role-matrix').then((res) => res.data),
+  settingsCatalog: () => api.get<SystemSettingsCatalog>('/system/settings-catalog').then((res) => res.data),
   activityLogs: () => api.get<ActivityLog[]>('/system/activity-logs').then((res) => res.data),
   activitySummary: () => api.get<ActivitySummary>('/system/activity-summary').then((res) => res.data),
   notifications: () => api.get<SystemNotificationsResponse>('/system/notifications').then((res) => res.data),

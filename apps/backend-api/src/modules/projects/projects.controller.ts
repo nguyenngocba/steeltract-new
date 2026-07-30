@@ -46,6 +46,8 @@ import {
 }
   from './dto/projects.dto'
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('projects.read')
 @Controller('projects')
 export class ProjectsController {
   constructor(
@@ -68,7 +70,6 @@ export class ProjectsController {
       .runtimeDashboard()
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.read')
   @Get('templates')
   templates() {
@@ -76,7 +77,6 @@ export class ProjectsController {
       .listTemplates()
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Post('templates')
   createTemplate(
@@ -87,7 +87,6 @@ export class ProjectsController {
       .createTemplate(body)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Patch('templates/:templateId')
   updateTemplate(
@@ -99,7 +98,6 @@ export class ProjectsController {
       .updateTemplate(templateId, body)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Post('templates/:templateId/duplicate')
   duplicateTemplate(@Param('templateId') templateId: string) {
@@ -107,7 +105,6 @@ export class ProjectsController {
       .duplicateTemplate(templateId)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Post('templates/:templateId/publish')
   publishTemplate(@Param('templateId') templateId: string) {
@@ -115,7 +112,6 @@ export class ProjectsController {
       .publishTemplate(templateId)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Post('templates/:templateId/deactivate')
   deactivateTemplate(@Param('templateId') templateId: string) {
@@ -123,7 +119,6 @@ export class ProjectsController {
       .deactivateTemplate(templateId)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Post('templates/:templateId/default')
   setDefaultTemplate(@Param('templateId') templateId: string) {
@@ -131,7 +126,6 @@ export class ProjectsController {
       .setDefaultTemplate(templateId)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.read')
   @Get('templates/:templateId/export')
   exportTemplate(@Param('templateId') templateId: string) {
@@ -139,7 +133,6 @@ export class ProjectsController {
       .exportTemplate(templateId)
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('projects.write')
   @Post('templates/import')
   importTemplates(
@@ -151,6 +144,7 @@ export class ProjectsController {
   }
 
   @Post()
+  @RequirePermissions('projects.write')
   create(
     @Body(new ZodValidationPipe(createProjectSchema))
     body: CreateProjectDto,
@@ -160,6 +154,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
+  @RequirePermissions('projects.write')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProjectSchema))
@@ -170,6 +165,7 @@ export class ProjectsController {
   }
 
   @Post(':id/components/:componentId/return')
+  @RequirePermissions('projects.write')
   returnComponent(
     @Param('id') id: string,
     @Param('componentId') componentId: string,
@@ -178,6 +174,13 @@ export class ProjectsController {
   ) {
     return this.projectsService
       .returnProjectComponent(id, componentId, body)
+  }
+
+  @Get(':id/execution')
+  @RequirePermissions('projects.read')
+  execution(@Param('id') id: string) {
+    return this.projectsService
+      .executionReadModel(id)
   }
 
   @Get(':id/detail/:tab')
@@ -196,6 +199,7 @@ export class ProjectsController {
   }
 
   @Post(':id/wbs')
+  @RequirePermissions('projects.write')
   createWbsTask(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createProjectWbsTaskSchema))
@@ -206,6 +210,7 @@ export class ProjectsController {
   }
 
   @Post(':id/wbs/generate')
+  @RequirePermissions('projects.write')
   generateWbs(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(generateProjectWbsSchema))
@@ -216,6 +221,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/wbs/bulk')
+  @RequirePermissions('projects.write')
   bulkUpdateWbs(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(bulkProjectWbsSchema))
@@ -226,6 +232,7 @@ export class ProjectsController {
   }
 
   @Post(':id/site-update')
+  @RequirePermissions('projects.write')
   siteUpdate(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(siteProjectUpdateSchema))
@@ -236,6 +243,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/wbs/:taskId')
+  @RequirePermissions('projects.write')
   updateWbsTask(
     @Param('id') id: string,
     @Param('taskId') taskId: string,
@@ -247,6 +255,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/wbs/:taskId/move')
+  @RequirePermissions('projects.write')
   moveWbsTask(
     @Param('id') id: string,
     @Param('taskId') taskId: string,
@@ -258,6 +267,7 @@ export class ProjectsController {
   }
 
   @Delete(':id/wbs/:taskId')
+  @RequirePermissions('projects.write')
   deleteWbsTask(
     @Param('id') id: string,
     @Param('taskId') taskId: string,

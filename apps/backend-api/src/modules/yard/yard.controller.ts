@@ -15,6 +15,8 @@ import { Request } from 'express';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { AuthUser } from '../rbac/types/auth-user';
 import {
   createCraneSchema,
@@ -29,6 +31,7 @@ import {
   moveYardItemSchema,
   placeYardItemSchema,
   removeYardItemSchema,
+  stageComponentInstanceToYardSchema,
   updateCraneSchema,
   updateYardZoneSchema,
   yardSearchSchema,
@@ -49,6 +52,7 @@ import type {
   MoveYardItemDto,
   PlaceYardItemDto,
   RemoveYardItemDto,
+  StageComponentInstanceToYardDto,
   UpdateCraneDto,
   UpdateYardZoneDto,
   YardSearchDto,
@@ -61,7 +65,8 @@ type AuthenticatedRequest = Request & {
   user?: AuthUser;
 };
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('yard.read')
 @Controller('yard')
 export class YardController {
   constructor(
@@ -92,6 +97,7 @@ export class YardController {
   }
 
   @Post('zones')
+  @RequirePermissions('yard.write')
   createZone(
     @Body(new ZodValidationPipe(createYardZoneSchema))
     body: CreateYardZoneDto,
@@ -106,6 +112,7 @@ export class YardController {
   }
 
   @Patch('zones/:id')
+  @RequirePermissions('yard.write')
   updateZone(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateYardZoneSchema))
@@ -116,6 +123,7 @@ export class YardController {
   }
 
   @Delete('zones/:id')
+  @RequirePermissions('yard.write')
   deleteZone(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
@@ -124,6 +132,7 @@ export class YardController {
   }
 
   @Post('zones/:zoneId/rows')
+  @RequirePermissions('yard.write')
   createRow(
     @Param('zoneId') zoneId: string,
     @Body(new ZodValidationPipe(createYardRowSchema))
@@ -142,6 +151,7 @@ export class YardController {
   }
 
   @Post('zones/:zoneId/slots')
+  @RequirePermissions('yard.write')
   createSlot(
     @Param('zoneId') zoneId: string,
     @Body(new ZodValidationPipe(createYardSlotSchema))
@@ -152,6 +162,7 @@ export class YardController {
   }
 
   @Post('placements')
+  @RequirePermissions('yard.write')
   placeItem(
     @Body(new ZodValidationPipe(placeYardItemSchema))
     body: PlaceYardItemDto,
@@ -160,7 +171,18 @@ export class YardController {
     return this.yardService.placeItem(body, request.user?.id);
   }
 
+  @Post('stage')
+  @RequirePermissions('yard.write')
+  stageComponentInstance(
+    @Body(new ZodValidationPipe(stageComponentInstanceToYardSchema))
+    body: StageComponentInstanceToYardDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.yardService.stageComponentInstance(body, request.user?.id);
+  }
+
   @Post('placements/:id/move')
+  @RequirePermissions('yard.write')
   moveItem(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(moveYardItemSchema))
@@ -171,6 +193,7 @@ export class YardController {
   }
 
   @Post('placements/:id/remove')
+  @RequirePermissions('yard.write')
   removeItem(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(removeYardItemSchema))
@@ -207,6 +230,7 @@ export class YardController {
   }
 
   @Post('cranes')
+  @RequirePermissions('yard.write')
   createCrane(
     @Body(new ZodValidationPipe(createCraneSchema)) body: CreateCraneDto,
   ) {
@@ -214,6 +238,7 @@ export class YardController {
   }
 
   @Patch('cranes/:id')
+  @RequirePermissions('yard.write')
   updateCrane(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateCraneSchema)) body: UpdateCraneDto,
@@ -230,6 +255,7 @@ export class YardController {
   }
 
   @Post('snapshots')
+  @RequirePermissions('yard.write')
   generateSnapshot(
     @Body(new ZodValidationPipe(generateYardSnapshotSchema))
     body: GenerateYardSnapshotDto,

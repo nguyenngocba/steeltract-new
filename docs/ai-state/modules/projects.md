@@ -10,6 +10,12 @@ Architecture Freeze v1.0 approved.
 
 ## Implemented Features
 
+* STABILITY.PROJECTS.3A conditionally certifies canonical Yard integration.
+  `POST /production/:id/stage-to-yard` now returns `410 Gone`, and Production
+  callers must use `/yard/stage` with `componentInstanceId`. Runtime read-only
+  smoke proved Projects execution still returns requirement and physical
+  instance lineage; committed Yard write fixture remains a controlled follow-up.
+* PROJECTS.3 extends canonical execution into Yard state. `GET /projects/:id/execution` now reports `yardStagedQty` and active Yard placement identity from `ComponentInstance.yardPlacements`, while production completion and Finished Goods percentages remain unchanged.
 * Project data is used by Inventory outbound workflows.
 * Dashboard cockpit aggregates project totals and active project status.
 * QC analytics can group by project when production/component/project links are available.

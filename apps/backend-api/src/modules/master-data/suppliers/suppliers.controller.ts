@@ -6,10 +6,16 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common'
 
 import { SuppliersService } from './suppliers.service'
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard'
+import { RequirePermissions } from '../../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../../rbac/guards/permissions.guard'
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('master-data.read')
 @Controller('suppliers')
 export class SuppliersController {
   constructor(
@@ -48,6 +54,7 @@ export class SuppliersController {
   }
 
   @Post()
+  @RequirePermissions('master-data.write')
   async create(
     @Body() body: any,
   ) {
@@ -55,6 +62,7 @@ export class SuppliersController {
   }
 
   @Put(':id')
+  @RequirePermissions('master-data.write')
   async update(
     @Param('id') id: string,
     @Body() body: any,

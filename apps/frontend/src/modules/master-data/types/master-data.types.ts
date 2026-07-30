@@ -5,6 +5,7 @@ import type {
 export type MasterDataDomainId =
   | 'material-categories'
   | 'material-types'
+  | 'material-usage-types'
   | 'transaction-types'
   | 'warehouses'
   | 'yard-zones'

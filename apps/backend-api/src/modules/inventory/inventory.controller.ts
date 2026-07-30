@@ -7,10 +7,14 @@ import {
   Post,
   Query,
   Put,
+  UseGuards,
 } from '@nestjs/common'
 
 import { InventoryService } from './inventory.service'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../rbac/guards/permissions.guard'
 import {
   createInventoryItemSchema,
   createTransactionSchema,
@@ -29,6 +33,8 @@ import type {
   UpdateInventoryItemDto,
 } from './dto/inventory.dto'
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('inventory.read')
 @Controller('inventory')
 export class InventoryController {
   constructor(
@@ -83,6 +89,7 @@ export class InventoryController {
   }
 
   @Post('items')
+  @RequirePermissions('inventory.write')
   async createItem(
     @Body(new ZodValidationPipe(createInventoryItemSchema))
     body: CreateInventoryItemDto,
@@ -93,6 +100,7 @@ export class InventoryController {
   }
 
   @Put('items/:id')
+  @RequirePermissions('inventory.write')
   async updateItem(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateInventoryItemSchema))
@@ -105,6 +113,7 @@ export class InventoryController {
   }
 
   @Delete('items/:id')
+  @RequirePermissions('inventory.write')
   async deleteItem(
     @Param('id') id: string,
   ) {
@@ -122,6 +131,7 @@ export class InventoryController {
   }
 
   @Post('transactions')
+  @RequirePermissions('inventory.write')
   async createTransaction(
     @Body(new ZodValidationPipe(createTransactionSchema))
     body: CreateTransactionDto,

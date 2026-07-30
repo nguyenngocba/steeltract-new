@@ -190,8 +190,13 @@ export function ProductionBomModal({
       .sort((a, b) => String(a.code).localeCompare(String(b.code)))
   }, [inventoryItems, reservations]) as ProductionMaterialOption[]
 
+  const productionMaterialOptions = useMemo(
+    () => materialOptions.filter((item) => numeric(item.productionStock) > 0),
+    [materialOptions],
+  )
+
   const materialOptionsByCategory = useMemo(() => {
-    return materialOptions.reduce<Record<MaterialDraft['category'], ProductionMaterialOption[]>>((groups, item) => {
+    return productionMaterialOptions.reduce<Record<MaterialDraft['category'], ProductionMaterialOption[]>>((groups, item) => {
       groups[usageToBomCategory(item.materialUsageType)].push(item)
       return groups
     }, {
@@ -199,13 +204,13 @@ export function ProductionBomModal({
       SECONDARY_MATERIAL: [],
       CONSUMABLE: [],
     })
-  }, [materialOptions])
+  }, [productionMaterialOptions])
   const selectedMaterialDraft = materials.find((item) => item.materialId)
   const selectedMaterial = selectedMaterialDraft
     ? materialOptions.find((row) => row.id === selectedMaterialDraft.materialId)
     : undefined
   const stockSuggestions = materialOptions
-    .filter((row) => row.availableQty && row.availableQty > 0)
+    .filter((row) => numeric(row.productionStock) > 0 && numeric(row.availableQty) > 0)
     .slice(0, 5)
 
   function updateMaterial(index: number, patch: Partial<MaterialDraft>) {
@@ -231,6 +236,12 @@ export function ProductionBomModal({
     if (!component) return toast.error('Chọn cấu kiện áp dụng BOM')
     if (validMaterials.length === 0) return toast.error('BOM cần ít nhất một vật tư')
     if (validRouting.length === 0) return toast.error('BOM cần ít nhất một công đoạn')
+    const invalidProductionMaterials = validMaterials
+      .map((item) => materialOptions.find((row) => row.id === item.materialId))
+      .filter((item) => !item || numeric(item.productionStock) <= 0)
+    if (invalidProductionMaterials.length > 0) {
+      return toast.error('Vật tư BOM cần có tồn kho tại Kho vật tư sản xuất')
+    }
     try {
       await create.mutateAsync({
         bomNo: nextLocalCode('BOM'),
@@ -266,7 +277,7 @@ export function ProductionBomModal({
   return <EnterpriseModalForm
     open
     title="Tạo BOM kỹ thuật cấu kiện"
-    description="BOM xác định định mức vật tư theo Material Master; không phụ thuộc tồn kho sản xuất hiện tại."
+    description="Chọn vật tư đang có trong Kho vật tư sản xuất; BOM chỉ lưu định mức, không lưu số tồn."
     onClose={onClose}
     onSubmit={(event) => { event.preventDefault(); void submit() }}
     submitLabel="Tạo BOM"
@@ -297,7 +308,7 @@ export function ProductionBomModal({
 
           <section className="rounded-xl border border-slate-800 bg-[#04101d] p-4">
             <div className="mb-3 flex items-center justify-between">
-              <div><h3 className="text-sm font-semibold">Vật tư BOM</h3><p className="mt-1 text-xs text-slate-500">Chọn Material Master theo mã, tên, quy cách và đơn vị tính.</p></div>
+            <div><h3 className="text-sm font-semibold">Vật tư BOM</h3><p className="mt-1 text-xs text-slate-500">Danh sách lấy từ InventoryLocationStock của Kho vật tư sản xuất.</p></div>
               <button type="button" onClick={() => setMaterials((rows) => [...rows, { materialId: '', quantity: '1', wastePercent: '0', category: 'MAIN_MATERIAL' }])} className={enterpriseSecondaryButton}><Plus size={14} /> Thêm vật tư</button>
             </div>
             <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-xs">
@@ -309,8 +320,8 @@ export function ProductionBomModal({
                   <td className="py-2 pr-2">
                     <EnterpriseSelect aria-label={`Vật tư dòng ${index + 1}`} value={item.materialId} onChange={(event) => selectMaterial(index, event.target.value)}>
                       <option value="">Chọn {bomCategoryLabel(item.category).toLowerCase()}</option>
-                      {groupOptions.length === 0 ? <option value="" disabled>Chưa có Material Master phù hợp</option> : null}
-                      {groupOptions.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · {row.specification ?? '-'} · {row.unitMaster?.symbol ?? row.unit ?? '-'} · Kho SX tồn {formatQuantity(row.productionStock ?? 0)} · khả dụng {formatQuantity(row.availableQty ?? 0)} · Kho chính {formatQuantity(row.mainStock ?? 0)}</option>)}
+                      {groupOptions.length === 0 ? <option value="" disabled>Chưa có vật tư có tồn tại Kho vật tư sản xuất</option> : null}
+                      {groupOptions.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name} · {row.specification ?? '-'} · {row.unitMaster?.symbol ?? row.unit ?? '-'} · Tồn kho SX {formatQuantity(row.productionStock ?? 0)} · Đã giữ chỗ {formatQuantity(row.reservedQty ?? 0)} · Khả dụng {formatQuantity(row.availableQty ?? 0)} · Kho vật tư {formatQuantity(row.mainStock ?? 0)}</option>)}
                     </EnterpriseSelect>
                   </td>
                   <td className="pr-2">
@@ -328,7 +339,7 @@ export function ProductionBomModal({
                   <td className="pr-2"><EnterpriseNumberField aria-label={`Hao hụt dòng ${index + 1}`} value={item.wastePercent} onFocus={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} onBlur={(event) => updateMaterial(index, { wastePercent: formatQuantity(event.target.value) })} onChange={(event) => updateMaterial(index, { wastePercent: formatQuantityInput(event.target.value) })} /></td>
                   <td className="pt-2 text-slate-300">
                     <div>{material?.unitMaster?.symbol ?? material?.unit ?? '-'}</div>
-                    {material ? <div className="mt-1 text-[10px] text-slate-500">Kho SX {formatQuantity(material.productionStock ?? 0)} · Giữ {formatQuantity(material.reservedQty ?? 0)} · Khả dụng {formatQuantity(material.availableQty ?? 0)} · Kho chính {formatQuantity(material.mainStock ?? 0)}</div> : null}
+                    {material ? <div className="mt-1 text-[10px] text-slate-500">Tồn kho SX {formatQuantity(material.productionStock ?? 0)} · Đã giữ chỗ {formatQuantity(material.reservedQty ?? 0)} · Khả dụng {formatQuantity(material.availableQty ?? 0)} · Kho vật tư {formatQuantity(material.mainStock ?? 0)}</div> : null}
                   </td>
                   <td className="pt-2"><button type="button" onClick={() => setMaterials((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} aria-label="Xóa vật tư" className="grid h-9 w-9 place-items-center rounded-lg text-red-300 hover:bg-red-500/10"><Trash2 size={15} /></button></td>
                 </tr>
@@ -358,8 +369,8 @@ export function ProductionBomModal({
             <div className="mt-4 text-slate-500">Vật tư BOM</div><div className="mt-2 text-xl font-semibold text-white">{materials.filter((item) => item.materialId).length}</div>
             <div className="mt-4 text-slate-500">Công đoạn routing</div><div className="mt-2 text-xl font-semibold text-white">{routing.filter((item) => item.stepName).length}</div>
           </EnterpriseAssistantPanel>
-          <div className="rounded-xl border border-amber-900/70 bg-amber-950/20 p-4 text-xs text-amber-100">BOM kỹ thuật dùng Material Master để định nghĩa nhu cầu. Kiểm tra tồn kho sản xuất diễn ra ở bước reservation/issue, không khóa việc soạn BOM.</div>
-          <EnterpriseAssistantPanel title="Vật tư đang chọn" description="Tồn SX chỉ là enrichment để quyết định, không thay thế Material Master trong BOM.">
+          <div className="rounded-xl border border-amber-900/70 bg-amber-950/20 p-4 text-xs text-amber-100">BOM kỹ thuật chỉ lưu định mức vật tư. Số tồn hiển thị ở đây đến từ Kho vật tư sản xuất để tránh chọn nhầm tồn Kho vật tư chính.</div>
+          <EnterpriseAssistantPanel title="Vật tư đang chọn" description="Tồn kho SX là nguồn khả dụng vận hành; Kho vật tư chỉ là tham khảo.">
             {selectedMaterial ? <div className="space-y-2">
               <InfoLine label="Mã vật tư" value={selectedMaterial.code} />
               <InfoLine label="Tên" value={selectedMaterial.name} />
@@ -368,7 +379,12 @@ export function ProductionBomModal({
               <InfoLine label="Tồn kho SX" value={formatQuantity(selectedMaterial.productionStock ?? 0)} />
               <InfoLine label="Đã giữ chỗ" value={formatQuantity(selectedMaterial.reservedQty ?? 0)} />
               <InfoLine label="Khả dụng" value={formatQuantity(selectedMaterial.availableQty ?? 0)} />
-              <InfoLine label="Tồn kho chính" value={formatQuantity(selectedMaterial.mainStock ?? 0)} />
+              <InfoLine label="Kho vật tư" value={formatQuantity(selectedMaterial.mainStock ?? 0)} />
+              {numeric(selectedMaterial.productionStock) <= 0 ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200">
+                  Kho SX = 0. Vật tư này không khả dụng cho sản xuất.
+                </div>
+              ) : null}
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-slate-500">
                 Kho SX: {selectedMaterial.productionLocations?.join('; ') || 'Chưa có vị trí SX'}
               </div>
@@ -427,13 +443,16 @@ export function ProductionBomModal({
               )) : <p className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-slate-500">Chưa có vật tư có tồn khả dụng tại Kho vật tư sản xuất.</p>}
             </div>
           </EnterpriseAssistantPanel>
-          <EnterpriseAssistantPanel title="Material Master theo nhóm">
+          <EnterpriseAssistantPanel title="Vật tư có tồn kho SX theo nhóm">
             {(['MAIN_MATERIAL', 'SECONDARY_MATERIAL', 'CONSUMABLE'] as MaterialDraft['category'][]).map((category) => (
               <div key={category} className="mb-2 flex items-center justify-between text-slate-300">
                 <span>{bomCategoryLabel(category)}</span>
                 <span className="font-semibold text-cyan-300">{materialOptionsByCategory[category].length}</span>
               </div>
             ))}
+            <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-slate-500">
+              {materialOptions.length - productionMaterialOptions.length} Material Master chưa có tồn tại Kho vật tư sản xuất.
+            </div>
           </EnterpriseAssistantPanel>
         </aside>
       </div>

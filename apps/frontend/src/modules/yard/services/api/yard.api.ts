@@ -2,6 +2,7 @@ import { api } from '@/lib/api'
 
 export type YardPlacement = {
   id: string
+  componentInstanceId?: string | null
   itemType: string
   itemId: string
   itemCode: string
@@ -9,6 +10,15 @@ export type YardPlacement = {
   quantity: number
   stackLevel: number
   weight?: number
+  componentInstance?: {
+    id: string
+    instanceNo: string
+    state: string
+    component?: { id: string; code: string; name: string; componentType?: string | null; profile?: string | null }
+    requirement?: { id: string; requirementNo: string; requiredQuantity: number }
+    productionOrder?: { id: string; orderNo: string; status: string }
+    project?: { id: string; code: string; name: string }
+  } | null
 }
 
 export type YardZoneRuntime = {
@@ -134,11 +144,21 @@ export type YardDashboardRead = {
 
 export type YardPlacePayload = {
   slotId: string
+  componentInstanceId?: string
   itemType: 'COMPONENT'
   itemId: string
   itemCode: string
   itemName?: string
   quantity: number
+  stackLevel?: number
+  weight?: number
+  craneId?: string
+  reason?: string
+}
+
+export type YardStageComponentInstancePayload = {
+  componentInstanceId: string
+  slotId: string
   stackLevel?: number
   weight?: number
   craneId?: string
@@ -198,6 +218,7 @@ export const yardApi = {
   movements: () => api.get<YardMovement[] | { data: YardMovement[] }>('/yard/movements', { params: { limit: 12 } }).then((res) => unwrap(res.data)),
   cranes: () => api.get<YardCrane[]>('/yard/cranes').then((res) => res.data),
   place: (payload: YardPlacePayload) => api.post<YardPlacement>('/yard/placements', payload).then((res) => res.data),
+  stageComponentInstance: (payload: YardStageComponentInstancePayload) => api.post<YardPlacement>('/yard/stage', payload).then((res) => res.data),
   move: ({ id, ...payload }: YardMovePayload) => api.post<YardPlacement>(`/yard/placements/${id}/move`, payload).then((res) => res.data),
   remove: ({ id, ...payload }: YardRemovePayload) => api.post<YardPlacement>(`/yard/placements/${id}/remove`, payload).then((res) => res.data),
   createZone: (payload: YardCreateZonePayload) => api.post<YardZoneRuntime>('/yard/zones', payload).then((res) => res.data),

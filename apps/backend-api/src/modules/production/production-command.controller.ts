@@ -14,6 +14,8 @@ import { Request } from 'express';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { AuthUser } from '../rbac/types/auth-user';
 import {
   assignComponentInstanceExecutionSchema,
@@ -65,7 +67,8 @@ import { ProductionInstanceExecutionService } from './services/production-instan
 
 type AuthenticatedRequest = Request & { user?: AuthUser };
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('production.write')
 @Controller('production/commands')
 export class ProductionCommandController {
   constructor(
@@ -414,6 +417,7 @@ export class ProductionCommandController {
   }
 
   @Get('component-instances/:componentInstanceId/executions')
+  @RequirePermissions('production.read')
   getComponentInstanceExecutionHistory(
     @Param('componentInstanceId') componentInstanceId: string,
   ) {

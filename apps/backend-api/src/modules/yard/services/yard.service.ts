@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
 } from '@prisma/client';
 
 import { AttachmentsService } from '../../attachments/services/attachments.service';
+import { FinishedGoodsEligibilityService } from '../../components/services/finished-goods-eligibility.service';
 import {
   CreateCraneDto,
   CreateYardRowDto,
@@ -28,6 +30,7 @@ import {
   MoveYardItemDto,
   PlaceYardItemDto,
   RemoveYardItemDto,
+  StageComponentInstanceToYardDto,
   UpdateCraneDto,
   UpdateYardZoneDto,
   YardSearchDto,
@@ -46,6 +49,7 @@ export class YardService {
   constructor(
     private readonly repository: YardRepository,
     private readonly attachmentsService: AttachmentsService,
+    private readonly finishedGoodsEligibility: FinishedGoodsEligibilityService,
   ) {}
 
   async listZones(query: ListYardZonesDto) {
@@ -262,6 +266,15 @@ export class YardService {
         throw new BadRequestException('Yard slot is blocked');
       }
 
+      if (
+        dto.itemType === YardItemType.COMPONENT &&
+        !dto.componentInstanceId
+      ) {
+        throw new BadRequestException(
+          'Component Yard placement requires componentInstanceId. Use POST /yard/stage for finished goods.',
+        );
+      }
+
       const activePlacements =
         await this.repository.findActivePlacementsForSlot(dto.slotId, tx);
       const stackLevel = dto.stackLevel ?? activePlacements.length + 1;
@@ -272,9 +285,32 @@ export class YardService {
         stackLevel,
       );
 
+      if (dto.componentInstanceId) {
+        if (dto.itemId !== dto.componentInstanceId) {
+          throw new BadRequestException(
+            'Canonical Yard placement itemId must equal componentInstanceId',
+          );
+        }
+
+        const existingInstancePlacement =
+          await this.repository.findActivePlacementForComponentInstance(
+            dto.componentInstanceId,
+            tx,
+          );
+
+        if (existingInstancePlacement) {
+          throw new ConflictException(
+            'Component instance is already actively placed in yard',
+          );
+        }
+      }
+
       const created = await this.repository.createPlacement(
         {
           slot: { connect: { id: dto.slotId } },
+          componentInstance: dto.componentInstanceId
+            ? { connect: { id: dto.componentInstanceId } }
+            : undefined,
           itemType: dto.itemType,
           itemId: dto.itemId,
           itemCode: dto.itemCode,
@@ -294,6 +330,9 @@ export class YardService {
       await this.repository.createMovement(
         {
           placement: { connect: { id: created.id } },
+          componentInstance: dto.componentInstanceId
+            ? { connect: { id: dto.componentInstanceId } }
+            : undefined,
           type: YardMovementType.PLACE,
           itemType: dto.itemType,
           itemId: dto.itemId,
@@ -319,6 +358,7 @@ export class YardService {
             itemType: created.itemType,
             itemId: created.itemId,
             itemCode: created.itemCode,
+            componentInstanceId: created.componentInstanceId,
             slotId: dto.slotId,
           },
         },
@@ -344,6 +384,71 @@ export class YardService {
 
     await this.linkAttachments(placement.id, dto.attachmentIds, actorId);
     return placement;
+  }
+
+  async stageComponentInstance(
+    dto: StageComponentInstanceToYardDto,
+    actorId?: string,
+  ) {
+    const instance = await this.finishedGoodsEligibility.findEligibleInstance(
+      dto.componentInstanceId,
+    );
+
+    if (!instance) {
+      throw new BadRequestException(
+        'Component instance is not eligible finished goods for yard staging',
+      );
+    }
+
+    try {
+      const placement = await this.placeItem(
+        {
+          slotId: dto.slotId,
+          componentInstanceId: instance.id,
+          itemType: YardItemType.COMPONENT,
+          itemId: instance.id,
+          itemCode: instance.instanceNo,
+          itemName: `${instance.component.code} - ${instance.component.name}`,
+          quantity: 1,
+          stackLevel: dto.stackLevel,
+          weight: dto.weight,
+          length: dto.length,
+          width: dto.width,
+          height: dto.height,
+          craneId: dto.craneId,
+          reason:
+            dto.reason ??
+            `Stage finished goods instance ${instance.instanceNo} to yard`,
+          attachmentIds: dto.attachmentIds,
+          metadata: {
+            ...(dto.metadata ?? {}),
+            canonicalSource: 'ComponentInstance',
+            componentInstanceId: instance.id,
+            componentInstanceNo: instance.instanceNo,
+            componentId: instance.componentId,
+            componentCode: instance.component.code,
+            projectId: instance.projectId,
+            requirementId: instance.requirementId,
+            productionOrderId: instance.productionOrderId,
+            productionOrderNo: instance.productionOrder?.orderNo,
+          },
+        },
+        actorId,
+      );
+
+      return placement;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Component instance is already actively placed in yard',
+        );
+      }
+
+      throw error;
+    }
   }
 
   async moveItem(id: string, dto: MoveYardItemDto, actorId?: string) {
@@ -384,6 +489,9 @@ export class YardService {
       await this.repository.createMovement(
         {
           placement: { connect: { id } },
+          componentInstance: existing.componentInstanceId
+            ? { connect: { id: existing.componentInstanceId } }
+            : undefined,
           type: YardMovementType.MOVE,
           itemType: existing.itemType,
           itemId: existing.itemId,
@@ -404,6 +512,7 @@ export class YardService {
         actorId,
         metadata: {
           itemCode: updated.itemCode,
+          componentInstanceId: updated.componentInstanceId,
           fromSlotId: previousSlotId,
           toSlotId: dto.toSlotId,
         },
@@ -455,7 +564,10 @@ export class YardService {
         tx,
       );
 
-      if (existing.itemType === YardItemType.COMPONENT) {
+      if (
+        existing.itemType === YardItemType.COMPONENT &&
+        !existing.componentInstanceId
+      ) {
         const component = await this.repository.findComponentForOutbound(
           existing.itemId,
           tx,
@@ -488,6 +600,9 @@ export class YardService {
       await this.repository.createMovement(
         {
           placement: { connect: { id } },
+          componentInstance: existing.componentInstanceId
+            ? { connect: { id: existing.componentInstanceId } }
+            : undefined,
           type: YardMovementType.REMOVE,
           itemType: existing.itemType,
           itemId: existing.itemId,
@@ -506,9 +621,11 @@ export class YardService {
         actorId,
         metadata: {
           itemCode: updated.itemCode,
+          componentInstanceId: updated.componentInstanceId,
           slotId: existing.slotId,
           componentStatus:
-            existing.itemType === YardItemType.COMPONENT
+            existing.itemType === YardItemType.COMPONENT &&
+            !existing.componentInstanceId
               ? ComponentStatus.SHIPPED
               : undefined,
         },
@@ -905,8 +1022,21 @@ export class YardService {
     return {
       yardItemId: row.itemId,
       itemType: row.itemType,
+      componentInstanceId: row.componentInstanceId ?? null,
+      physicalIdentity:
+        row.componentInstanceId != null
+          ? {
+              module: 'components',
+              type: 'ComponentInstance',
+              id: row.componentInstanceId,
+              code: row.itemCode,
+            }
+          : null,
       sourceOwnerReference: {
-        module: String(row.itemType ?? '').toLowerCase(),
+        module:
+          row.componentInstanceId != null
+            ? 'component-instance'
+            : String(row.itemType ?? '').toLowerCase(),
         id: row.itemId,
       },
       placementId: row.id,

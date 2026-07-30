@@ -171,10 +171,6 @@ export const useConsumeProductionMaterial = () =>
 export const useCompleteProductionStage = () =>
   useProductionMutation((id: string) => productionApi.completeStage(id))
 
-export const useStageProductionToYard = () =>
-  useProductionMutation(({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
-    productionApi.stageToYard(id, payload))
-
 export const useCreateComponentFromProductionOrder = () =>
   useProductionMutation((id: string) => productionApi.createComponentFromOrder(id))
 

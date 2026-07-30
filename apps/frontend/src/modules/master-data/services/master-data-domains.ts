@@ -22,6 +22,13 @@ export const masterDataDomains: MasterDataDomainConfig[] =
       },
     },
     {
+      id: 'material-usage-types',
+      label: 'Material Usage Types',
+      description:
+        'Material Master usage taxonomy such as primary, secondary and consumable materials.',
+      sortable: true,
+    },
+    {
       id: 'transaction-types',
       label: 'Transaction Types',
       description:

@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 
 import { ComponentsService } from '../../components/services/components.service';
+import { FinishedGoodsEligibilityService } from '../../components/services/finished-goods-eligibility.service';
 import { EventPublisherService } from '../../../core/events/event-publisher.service';
 import { SnapshotUpdateDispatcher } from '../../../core/jobs/snapshot-update-dispatcher.service';
 import { PerformanceMetricsService } from '../../../core/performance/performance-metrics.service';
@@ -34,6 +35,10 @@ import {
 } from '../dto/projects.dto';
 
 import { ProjectsRepository } from '../repositories/projects.repository';
+import {
+  buildProjectExecutionReadModel,
+  type ProjectExecutionRequirementSource,
+} from './project-execution-read-model';
 
 const projectTaskInclude = {
   dependencies: true,
@@ -73,6 +78,8 @@ export class ProjectsService {
     private readonly repository: ProjectsRepository,
     @Inject(ComponentsService)
     private readonly componentsService: ComponentsService,
+    @Inject(FinishedGoodsEligibilityService)
+    private readonly finishedGoodsEligibility: FinishedGoodsEligibilityService,
     @Inject(DashboardReaderService)
     private readonly dashboardReader: DashboardReaderService,
     @Inject(SnapshotReaderService)
@@ -126,6 +133,25 @@ export class ProjectsService {
 
   findOne(id: string) {
     return this.repository.findOne(id);
+  }
+
+  async executionReadModel(projectId: string) {
+    const source = await this.repository.findProjectExecutionSources(projectId);
+    if (!source) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const finishedGoodsByRequirement =
+      await this.finishedGoodsEligibility.countByProjectRequirement(projectId);
+
+    return buildProjectExecutionReadModel(
+      {
+        project: source,
+        requirements:
+          source.componentRequirements as ProjectExecutionRequirementSource[],
+      },
+      finishedGoodsByRequirement,
+    );
   }
 
   create(dto: CreateProjectDto) {

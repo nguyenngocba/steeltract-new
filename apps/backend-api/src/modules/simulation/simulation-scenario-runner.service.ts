@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import {
   AnalyticsDomain,
+  ComponentInstanceState,
   MachineStatus,
   ProductionOrderStatus,
   QcInspectionStatus,
@@ -9,7 +10,6 @@ import {
   QcIssueStatus,
   QcResultStatus,
   NcrStatus,
-  YardItemType,
 } from '@prisma/client';
 
 import { EventBusService } from '../../core/events/event-bus.service';
@@ -321,9 +321,19 @@ export class SimulationScenarioRunner {
   }
 
   private async placeAdditionalYardItem(tick: number, random: number) {
-    const component = await this.prisma.component.findFirst({
-      where: { code: { startsWith: `${operationalPrefix}-` } },
-      orderBy: { updatedAt: 'asc' },
+    const instance = await this.prisma.componentInstance.findFirst({
+      where: {
+        component: { code: { startsWith: `${operationalPrefix}-` } },
+        state: {
+          in: [
+            ComponentInstanceState.QC_PASSED,
+            ComponentInstanceState.USE_AS_IS,
+          ],
+        },
+        scrappedAt: null,
+        yardPlacements: { none: { removedAt: null } },
+      },
+      orderBy: [{ qcPassedAt: 'desc' }, { updatedAt: 'asc' }],
     });
     const slot = await this.prisma.yardSlot.findFirst({
       where: {
@@ -333,18 +343,14 @@ export class SimulationScenarioRunner {
       orderBy: { currentStackLevel: 'asc' },
     });
 
-    if (!component || !slot) return;
+    if (!instance || !slot) return;
 
-    await this.yardService.placeItem({
+    await this.yardService.stageComponentInstance({
       slotId: slot.id,
-      itemType: YardItemType.COMPONENT,
-      itemId: component.id,
-      itemCode: `${component.code}-C${tick}`,
-      itemName: component.name,
-      quantity: 1,
+      componentInstanceId: instance.id,
       stackLevel: Math.min(slot.currentStackLevel + 1, 4),
       weight: 2.4 + random,
-      reason: 'Operational congestion placement',
+      reason: `Operational congestion placement tick ${tick}`,
       attachmentIds: [],
     });
   }

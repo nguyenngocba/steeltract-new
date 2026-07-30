@@ -1,12 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import { UserStatus } from '@prisma/client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
+import { AuthRepository } from '../repositories/auth.repository';
 import { AccessTokenPayload } from '../services/token.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly repository: AuthRepository) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -14,18 +16,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: AccessTokenPayload) {
-  if (payload.tokenType !== 'access') {
-    throw new UnauthorizedException(
-      'Invalid access token',
-    )
-  }
+  async validate(payload: AccessTokenPayload) {
+    if (payload.tokenType !== 'access') {
+      throw new UnauthorizedException('Invalid access token');
+    }
 
-   return {
-    id: payload.sub,
-    username: payload.username,
-    roles: payload.roles ?? [],
-    permissions: payload.permissions ?? [],
-  };
+    const user = await this.repository.findUserById(payload.sub);
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      roles: payload.roles ?? [],
+      permissions: payload.permissions ?? [],
+    };
   }
 }

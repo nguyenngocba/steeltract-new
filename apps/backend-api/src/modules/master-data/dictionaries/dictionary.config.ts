@@ -24,9 +24,25 @@ export const masterDataDomains: Record<string, MasterDataDomainConfig> = {
     entity: 'MaterialType',
     include: {
       category: true,
+      _count: {
+        select: {
+          inventoryItems: true,
+        },
+      },
     },
     relationKey: 'categoryId',
     relationName: 'category',
+  },
+  'material-usage-types': {
+    model: 'masterMaterialUsageType',
+    entity: 'MasterMaterialUsageType',
+    include: {
+      _count: {
+        select: {
+          inventoryItems: true,
+        },
+      },
+    },
   },
   'transaction-types': {
     model: 'masterTransactionType',

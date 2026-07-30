@@ -1,5 +1,356 @@
 # SteelTrack AI Changelog
 
+## 2026-07-30 LOGISTICS.2 – Canonical ComponentInstance Dispatch & Delivery Audit
+
+Completed:
+
+- Audited Logistics dispatch and delivery identity across Prisma, backend
+  service/domain command paths and frontend Logistics create flow.
+- Confirmed current component dispatch is still definition-level through
+  `DispatchItem.componentId`, `ProjectTaskComponentAllocation.componentId`,
+  `ShipmentLineInput.componentId`, and frontend create payloads.
+- Confirmed delivery receive still mutates legacy `Component.status =
+  DELIVERED`.
+- Stopped implementation at the required schema/state gate because
+  `ComponentInstanceState` lacks `IN_YARD`, `IN_TRANSIT`, and `DELIVERED`.
+- Created
+  `docs/audits/logistics2-component-instance-dispatch-delivery-report.md`.
+
+Verification:
+
+- `git diff --check` PASS
+
+Warning:
+
+- No backend/frontend source code was changed. LOGISTICS.2 requires approval
+  for additive dispatch-instance relation and physical instance lifecycle
+  states before safe implementation can continue.
+
+## 2026-07-29 STABILITY.PROJECTS.3A – Canonical Yard Runtime Certification
+
+Completed:
+
+- Closed the active legacy ProductionOrder Yard handoff path by making
+  `POST /production/:id/stage-to-yard` return `410 Gone`.
+- Made `ProductionService.stageToYard()` reject internal legacy callers.
+- Updated Production cockpit staging to select physical `ComponentInstance`
+  rows and call `/yard/stage`.
+- Rejected new generic `COMPONENT` Yard placements without
+  `componentInstanceId`.
+- Extended Yard read model output with ComponentInstance lineage.
+- Updated component snapshot Yard-location derivation to prefer canonical
+  ComponentInstance placement and keep legacy fallback.
+- Updated operational simulation seeding/scenario placement to use eligible,
+  unstaged ComponentInstances.
+- Created
+  `docs/audits/stability-projects3a-yard-runtime-certification.md`.
+
+Verification:
+
+- Prisma validate/generate/status PASS
+- targeted backend tests PASS
+- full backend tests PASS
+- backend build PASS
+- frontend build PASS
+- runtime read-only smoke PASS on `PORT=3100`
+
+Warning:
+
+- Committed `/yard/stage` runtime write fixture was not executed because it
+  would mutate real runtime data and was blocked by the safety reviewer.
+
+## 2026-07-29 PROJECTS.3 – Canonical ComponentInstance -> Yard Handoff
+
+Completed:
+
+- Added canonical Yard relation from `YardItemPlacement` and `YardMovement` to
+  physical `ComponentInstance`.
+- Added additive migration
+  `20260729193000_component_instance_yard_handoff` with nullable columns, FK
+  indexes and PostgreSQL partial unique active-placement guard.
+- Added `POST /yard/stage` as the canonical Finished Goods -> Yard operation
+  using `componentInstanceId`.
+- Reused `FinishedGoodsEligibilityService.findEligibleInstance()` so Yard uses
+  the same eligibility predicate as `/components/instances/finished-goods`.
+- Preserved legacy Yard placement readability and avoided guessed backfill.
+- Prevented canonical Yard remove from mutating legacy `Component.status`.
+- Extended `GET /projects/:id/execution` with Yard staged counts and active
+  placement identity while keeping production/Finished Goods progress unchanged.
+- Added Yard `PermissionsGuard` enforcement with `yard.read/write`.
+- Updated Yard inbound UI to stage physical Finished Goods instances instead
+  of completed ProductionOrder/Component definition quantity.
+- Created
+  `docs/audits/projects3-component-instance-yard-handoff-report.md`.
+
+Verification:
+
+- Prisma validate/generate PASS
+- migration deploy/status PASS
+- targeted backend tests PASS
+- full backend tests PASS
+- backend build PASS
+- frontend build PASS
+
+## 2026-07-29 PROJECTS.2 – Canonical Project Execution Read Model
+
+Completed:
+
+- Added `GET /projects/:id/execution` as a Projects read endpoint sourced from
+  `ProjectComponentRequirement`, `ProductionOrder`, and `ComponentInstance`.
+- Added a pure canonical execution read-model builder that does not use legacy
+  `Component.status`, remarks/free text, frontend reconstruction, or capped
+  inventory transaction reads.
+- Reused Components Finished Goods eligibility through
+  `FinishedGoodsEligibilityService.countByProjectRequirement()` so Projects
+  does not duplicate Finished Goods QC/NCR business rules.
+- Added minimal Projects UI adoption in the Project detail drawer through a
+  `Canonical Execution` panel.
+- Added unit coverage for empty, partial, multi-order, multi-requirement,
+  Finished Goods and legacy-status isolation scenarios.
+- Created
+  `docs/audits/projects2-canonical-execution-read-model-report.md`.
+
+Verification:
+
+- targeted backend test PASS
+- backend build PASS
+- frontend typecheck PASS
+
+## 2026-07-29 UI.SYSTEM.MASTERDATA.2A – Master Data Taxonomy + KPI Density
+
+Completed:
+
+- Audited material taxonomy and confirmed `MaterialType` is technical grouping,
+  not material usage taxonomy.
+- Added canonical `MasterMaterialUsageType` dictionary and nullable
+  `InventoryItem.materialUsageTypeId` relation while preserving the legacy
+  `MaterialUsageType` enum for compatibility.
+- Added generic master-data CRUD support for
+  `/master-data/material-usage-types`.
+- Added migration/backfill for `PRIMARY`, `SECONDARY`, and `CONSUMABLE` with
+  no destructive SQL.
+- Updated Settings Master Data to expose five workspaces: Material Categories,
+  Material Usage Types, Material Master, Material Types and UOM.
+- Changed Material Master form/filter/table to use canonical usage taxonomy
+  from the backend instead of hardcoded frontend select options.
+- Replaced weak repeated summary rows with compact cockpit KPI strips sourced
+  from real loaded API records.
+- Reduced master-data modal header height and removed redundant right-rail KPI
+  repetition.
+- Created
+  `docs/audits/ui-system-masterdata2a-taxonomy-kpi-density-report.md`.
+
+Verification:
+
+- Prisma validate/generate PASS
+- migration deploy/status PASS
+- backend tests/build PASS
+- frontend tests/typecheck/build PASS
+- git diff --check PASS
+
+## 2026-07-29 UI.SYSTEM.MASTERDATA.2 – Enterprise Master Data Workspace Redesign
+
+Completed:
+
+- Refined the Settings master-data CRUD modal into a wider enterprise
+  workspace with a dominant table area and stable editor rail.
+- Kept all four workspaces on canonical APIs only:
+  `/master-data/material-categories`, `/inventory/items`,
+  `/master-data/material-types`, and `/master-data/uom`.
+- Renamed the Material Master presentation away from the narrower
+  `Vật tư chính` wording while preserving `InventoryItem.materialUsageType`
+  for `Chính`, `Phụ`, and `Tiêu hao`.
+- Fixed the Material Master table status-column mismatch and added usage-type
+  display.
+- Clarified UOM base-unit/conversion semantics in the editor without changing
+  backend contracts.
+- Added compact row action icons, real workspace summary counts and a
+  viewport-bounded single-scroll layout.
+- Expanded Settings UI tests to open all four workspaces and verify canonical
+  backend-shaped rows render.
+- Created
+  `docs/audits/ui-system-masterdata2-enterprise-workspace-redesign.md`.
+
+Verification:
+
+- frontend targeted Settings tests PASS
+- frontend TypeScript PASS
+
+## 2026-07-29 STABILITY.SYSTEM.1A – Master Data Interactive CRUD Workspaces
+
+Completed:
+
+- Fixed Settings Overview master-data capability clicks so the four editable
+  master-data rows open the large interactive CRUD workspace instead of the
+  metadata-only detail modal.
+- Reused the existing canonical workspaces and APIs for Material Categories,
+  Material Master, Material Types and UOM.
+- Added modal pagination, destructive-action confirmation, loading state and
+  form validation for required fields/UOM code length.
+- Confirmed `Vật tư chính/phụ/tiêu hao` maps to existing
+  `InventoryItem.materialUsageType` (`PRIMARY`, `SECONDARY`, `CONSUMABLE`) and
+  did not introduce a new dictionary.
+- Added a Settings UI interaction test covering Overview capability click,
+  CRUD modal rendering and canonical create API invocation.
+- Created
+  `docs/audits/stability-system1a-masterdata-interactive-crud-report.md`.
+
+Verification:
+
+- runtime HTTP CRUD smoke PASS
+- frontend tests PASS
+
+## 2026-07-29 STABILITY.SYSTEM.1 – User Creation Fix & Master Data CRUD Workspace
+
+Completed:
+
+- Reproduced the create-user 400 through `POST /system/users`; backend rejected
+  short passwords because the DTO requires at least 8 characters.
+- Added frontend create-user validation for username, password, email and role
+  selection to match the backend contract.
+- Added shared API error normalization for Vietnamese operator-facing messages.
+- Hardened Settings Master Data CRUD workspaces with real filters, safer
+  material hide behavior and backend error display.
+- Added `/inventory/items/:id` soft-delete client support and ActivityLog write
+  on Material Master deletion.
+- Hid Backup from current Settings/sidebar navigation without deleting source
+  or backend placeholders.
+- Created
+  `docs/audits/stability-system1-user-masterdata-crud-report.md`.
+
+Verification:
+
+- `prisma validate` PASS
+- `prisma migrate status` PASS
+- targeted User Admin, RBAC and Inventory tests PASS
+- full backend tests PASS
+- frontend tests PASS
+- backend build PASS
+- runtime HTTP smoke PASS
+- frontend build PASS
+- `git diff --check` PASS
+
+## 2026-07-29 SYSTEM.MASTERDATA.1 – Canonical Material Master Data Administration
+
+Completed:
+
+- Audited Material Master Data source-of-truth and reused existing canonical
+  models: `InventoryCategory`, `InventoryItem`, `MaterialType`, and
+  `MasterUnit`.
+- Turned Settings `Danh mục / Đơn vị` into four operational workspaces:
+  `Danh mục vật tư`, `Vật tư chính`, `Quy cách / Nhóm kỹ thuật`, and
+  `Đơn vị & Quy đổi`.
+- Standardized Settings master-data edits on authenticated APIs:
+  `/master-data/material-categories`, `/inventory/items`,
+  `/master-data/material-types`, and `/master-data/uom`.
+- Added `master-data.read/write` enforcement to dictionary endpoints.
+- Bound Material Master `unitId` to canonical `MasterUnit` while preserving the
+  legacy `unit` display field.
+- Exposed real BOM usage counts from `/inventory/items` and added material
+  create/update ActivityLog writes.
+- Created audit report
+  `docs/audits/system-masterdata1-canonical-material-administration-report.md`.
+
+Verification:
+
+- `prisma validate` PASS
+- `prisma migrate status` PASS
+- targeted RBAC and Inventory tests PASS
+- full backend tests PASS
+- frontend tests PASS
+- backend build PASS
+- frontend build PASS
+- authenticated runtime HTTP smoke PASS
+
+## 2026-07-29 SYSTEM.ADMIN.V1 – Operational Administration & Settings
+
+Completed:
+
+- Turned Users into an operational admin workspace with real create, detail,
+  role assignment, enable/disable and password-reset UI backed by `/system/users`.
+- Turned Roles into profile-based authorization management with real role
+  creation, permission replacement and effective access preview backed by the
+  SYSTEM.2 permission catalog.
+- Added Role Administration backend service/repository/DTOs and activity logs
+  for role create/update/permission changes.
+- Added `/system/permissions`, service-backed `/system/role-matrix`, and
+  `/system/settings-catalog`.
+- Reused existing `MasterUnit` and `/master-data/uom`; UOM routes now enforce
+  `master-data.read/write`.
+- Settings catalog entries now open real classified configuration details;
+  unsupported Backup remains a controlled empty state instead of fake records.
+- Added report `docs/audits/system-admin-v1-operational-ui-report.md`.
+
+Verification:
+
+- `prisma validate` PASS
+- `prisma migrate status` PASS
+- targeted User/Role/RBAC/Auth tests PASS
+- full backend tests PASS
+- frontend tests PASS
+- backend build PASS
+- frontend build PASS
+- authenticated runtime HTTP smoke PASS
+- Vite preview route smoke PASS
+- `git diff --check` PASS
+
+## 2026-07-29 SYSTEM.3 – Canonical User Administration
+
+Completed:
+
+- Implemented real backend User Administration under `/system/users` using the existing `User`, `Role`, `UserRole`, `RolePermission`, `Permission`, `RefreshToken` and `ActivityLog` models.
+- Added create, detail, update, role replacement, enable/disable and admin password reset endpoints protected by SYSTEM.2 RBAC.
+- Hardened authentication so disabled users cannot login, refresh tokens, resolve current user, or continue operating with old access tokens.
+- Added administrative lockout protection for self-disable, self-removal of final admin role, and last active `rbac.write` administrator loss.
+- Added targeted User Administration, Auth and JWT strategy tests plus runtime HTTP certification with fixture `SYSTEM3-1785305716894`.
+- Added `docs/audits/system3-user-administration-report.md`.
+
+## 2026-07-29 SYSTEM.2 – Canonical RBAC Enforcement
+
+Completed:
+
+- Enforced backend permissions with `JwtAuthGuard + PermissionsGuard + @RequirePermissions(...)` across Inventory, Components, Production, QC, Projects, Suppliers, Logistics and System Administration controllers.
+- Added idempotent canonical permission bootstrap in RBAC service and extended the catalog with `logistics.read` / `logistics.write`.
+- Marked `RbacModule` global so feature-module guards resolve `RbacService` at runtime.
+- Runtime-certified 401 no-token, 403 valid-token-without-permission, and admin authorized access.
+- Added targeted RBAC enforcement tests and report `docs/audits/system2-rbac-enforcement-report.md`.
+
+## 2026-07-29 STABILITY.OPS3A2 – BOM Production Stock Picker & Component Production Warehouse Fix
+
+Completed:
+
+- Fixed the operational Production BOM material picker so selectable materials come from `InventoryLocationStock(PRODUCTION)` exposure through `/inventory/items.locationBalances`.
+- Prevented MAIN-only Material Master rows from being selectable as production-available BOM materials.
+- Kept MAIN/Kho vật tư quantity as secondary reference only and labeled picker numbers as `Tồn kho SX`, `Đã giữ chỗ`, `Khả dụng`, and `Kho vật tư`.
+- Certified runtime API evidence with existing fixtures including `OPS3A1-RT-20260729030324`: MAIN 60, PRODUCTION 40, reserved 20, available 20.
+- Added `docs/audits/stability-ops3a2-bom-production-stock-picker-fix.md`.
+
+## 2026-07-29 SPRINT SYSTEM.1 – System Administration Operational Audit
+
+Completed audit of the SteelTrack System Administration ("Hệ thống") module:
+
+- Audited 5 tabs: Users (Read-only), Roles & Permissions (Read-only), System Audit Log (Read-only), Settings (Read-only / ENV-based), Backup (Placeholder / FE-only).
+- Identified P0 Security Gap: Core controllers (`Inventory`, `Production`, `QC`, `Logistics`, `Components`) enforce `JwtAuthGuard` only and do not attach `PermissionsGuard` or `@Permissions(...)`.
+- Identified missing User/Role/Permission mutation endpoints and missing Backup service.
+- Created audit deliverable: `docs/audits/system-administration-operational-audit.md`.
+
+Verification:
+- `prisma validate` (Pass)
+- `prisma migrate status` (Pass - 84 migrations up to date)
+- `pnpm -C apps/backend-api build` (Pass)
+- `pnpm -C apps/frontend build` (Pass)
+- `git diff --check` (Pass)
+
+## 2026-07-29 UI.OPS.3C – Real Operational Dataset & Dashboard Certification
+
+Completed:
+
+- Created runtime certification report for controlled fixture `OPS3C-20260729032211`.
+- Certified canonical flow through real APIs: Material Master -> MAIN receipt -> PRODUCTION transfer -> Component Definition + Project Requirement -> Engineering BOM/release -> Production Orders -> Reservation/Issue -> ComponentInstanceExecution -> QC PASS/FAIL + NCR -> Finished Goods.
+- Verified `GET /components/instances/finished-goods` returns only QC-passed physical instances for the fixture project.
+- Identified one remaining P1 gate: Yard handoff is still exposed through an order-level path and is not yet a clean ComponentInstance finished-goods placement flow.
+- Added `docs/audits/ui-ops3c-real-operational-dataset-dashboard-certification.md`.
+
 ## 2026-07-29 SPRINT EXECUTIVE BI.8 – Redesign Inventory Analytics Charts
 
 Completed:

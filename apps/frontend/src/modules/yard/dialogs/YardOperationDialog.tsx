@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Boxes, Construction, MapPinned, X } from 'lucide-react'
 
 import type { ComponentRecord } from '@/modules/components/api/contracts/components.contract'
-import { useProductionOrders, useStageProductionToYard } from '@/modules/production/hooks/useProductionCockpit'
+import { useFinishedGoodsInstances } from '@/modules/components/hooks/queries/useComponents'
 import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
-import { useMoveYardItem, useRemoveYardItem } from '../hooks/queries/useYardRuntime'
+import { useMoveYardItem, useRemoveYardItem, useStageComponentInstanceToYard } from '../hooks/queries/useYardRuntime'
 import type { YardCrane, YardPlacement, YardSlotRuntime } from '../services/api/yard.api'
 
 export type YardOperationMode = 'inbound' | 'transfer' | 'outbound'
@@ -37,9 +37,9 @@ export function YardOperationDialog({
 }) {
   const move = useMoveYardItem()
   const remove = useRemoveYardItem()
-  const stageToYard = useStageProductionToYard()
-  const { data: productionOrders = [] } = useProductionOrders()
-  const [productionOrderId, setProductionOrderId] = useState('')
+  const stageToYard = useStageComponentInstanceToYard()
+  const { data: finishedGoods } = useFinishedGoodsInstances({ limit: 200 })
+  const [componentInstanceId, setComponentInstanceId] = useState('')
   const [componentId, setComponentId] = useState('')
   const [placementId, setPlacementId] = useState('')
   const [zoneId, setZoneId] = useState('')
@@ -53,26 +53,17 @@ export function YardOperationDialog({
     () => slots.flatMap((slot) => slot.placements.map((placement) => ({ ...placement, slot }))),
     [slots],
   )
-  const stagedQuantityByComponentId = useMemo(() => {
-    const map = new Map<string, number>()
+  const activePlacedInstanceIds = useMemo(() => {
+    const set = new Set<string>()
     placements.forEach((placement) => {
-      if (!placement.itemId) return
-      map.set(placement.itemId, (map.get(placement.itemId) ?? 0) + Number(placement.quantity ?? 0))
+      if (placement.componentInstanceId) set.add(placement.componentInstanceId)
     })
-    return map
+    return set
   }, [placements])
-  const completedOrders = useMemo(() => productionOrders
-    .filter((order) => order.status === 'COMPLETED' && order.component?.id)
-    .map((order) => {
-      const componentId = order.component!.id
-      const stagedQuantity = stagedQuantityByComponentId.get(componentId) ?? 0
-      return {
-        ...order,
-        stagedQuantity,
-        remainingQuantity: Math.max(0, Number(order.quantity ?? 0) - stagedQuantity),
-      }
-    })
-    .filter((order) => order.remainingQuantity > 0), [productionOrders, stagedQuantityByComponentId])
+  const finishedGoodsInstances = useMemo(
+    () => (finishedGoods?.data ?? []).filter((instance) => !activePlacedInstanceIds.has(instance.id)),
+    [activePlacedInstanceIds, finishedGoods?.data],
+  )
   const zones = useMemo(() => Array.from(new Map(slots.map((slot) => [slot.zone.id, slot.zone])).values()), [slots])
   const placement = placements.find((item) => item.id === placementId)
   const availableSlots = slots.filter((slot) =>
@@ -81,17 +72,16 @@ export function YardOperationDialog({
     slot.currentStackLevel < slot.maxStackLevel &&
     slot.id !== placement?.slot.id)
   const target = slots.find((slot) => slot.id === slotId)
-  const selectedOrder = completedOrders.find((item) => item.id === productionOrderId)
-  const component = selectedOrder?.component ?? components.find((item) => item.id === componentId)
+  const selectedInstance = finishedGoodsInstances.find((item) => item.id === componentInstanceId)
+  const component = selectedInstance?.component ?? placement?.componentInstance?.component ?? components.find((item) => item.id === componentId)
   const inboundQuantity = parseLocaleNumber(quantity) || 0
-  const inboundRemaining = selectedOrder?.remainingQuantity ?? 0
-  const inboundQuantityInvalid = mode === 'inbound' && (!selectedOrder || inboundQuantity <= 0 || inboundQuantity > inboundRemaining)
+  const inboundQuantityInvalid = mode === 'inbound' && !selectedInstance
   const pending = move.isPending || remove.isPending || stageToYard.isPending
   const error = move.error || remove.error || stageToYard.error
 
   useEffect(() => {
     if (!open) return
-    setProductionOrderId('')
+    setComponentInstanceId('')
     setComponentId('')
     setPlacementId('')
     setZoneId('')
@@ -103,24 +93,21 @@ export function YardOperationDialog({
   }, [mode, open])
 
   useEffect(() => {
-    if (!selectedOrder) return
-    setComponentId(selectedOrder.component?.id ?? '')
-    setQuantity(fmt(Math.min(1, selectedOrder.remainingQuantity)))
-  }, [selectedOrder])
+    if (!selectedInstance) return
+    setComponentId(selectedInstance.component?.id ?? '')
+    setQuantity('1')
+  }, [selectedInstance])
 
   if (!open) return null
 
   const submit = async () => {
-    if (mode === 'inbound' && selectedOrder && slotId && !inboundQuantityInvalid) {
+    if (mode === 'inbound' && selectedInstance && slotId && !inboundQuantityInvalid) {
       await stageToYard.mutateAsync({
-        id: selectedOrder.id,
-        payload: {
+        componentInstanceId: selectedInstance.id,
         slotId,
-          quantity: inboundQuantity,
         weight: parseLocaleNumber(weight) || 0,
         craneId: craneId || undefined,
         reason: reason || 'Nhập bãi sau hoàn thành sản xuất',
-        },
       })
       onClose()
     }
@@ -144,11 +131,11 @@ export function YardOperationDialog({
         <div className="p-3">
           <div className="mb-2 grid grid-cols-3 gap-1">{labels[mode].slice(1).map((label, index) => <div key={label} className="flex items-center gap-1.5 border-b border-slate-800 pb-2 text-xs text-slate-350"><span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${index === 0 ? 'bg-blue-600 text-white' : 'border border-slate-700 text-slate-400'}`}>{index + 1}</span>{label}</div>)}</div>
           <div className="grid gap-1 md:grid-cols-2">
-            {mode === 'inbound' ? <label className="text-xs text-slate-455">Lệnh sản xuất hoàn thành còn số lượng
-              <select value={productionOrderId} onChange={(event) => setProductionOrderId(event.target.value)} className={`${input} mt-1`}><option value="">Chọn MO đã hoàn thành</option>{completedOrders.map((item) => <option value={item.id} key={item.id}>{item.orderNo} · {item.component?.code} · còn {fmt(item.remainingQuantity)}/{fmt(item.quantity)}</option>)}</select>
-              {!completedOrders.length ? <span className="mt-1 block text-[11px] text-amber-305">Chưa có MO COMPLETED còn số lượng để nhập bãi.</span> : null}
+            {mode === 'inbound' ? <label className="text-xs text-slate-455">Finished Goods instance
+              <select value={componentInstanceId} onChange={(event) => setComponentInstanceId(event.target.value)} className={`${input} mt-1`}><option value="">Chọn instance QC PASS</option>{finishedGoodsInstances.map((item) => <option value={item.id} key={item.id}>{item.instanceNo} · {item.component?.code} · {item.project?.code ?? 'Không có dự án'}</option>)}</select>
+              {!finishedGoodsInstances.length ? <span className="mt-1 block text-[11px] text-amber-305">Chưa có ComponentInstance finished goods đủ điều kiện hoặc tất cả đã nhập bãi.</span> : null}
             </label> : <label className="text-xs text-slate-455">Cấu kiện đang lưu bãi
-              <select value={placementId} onChange={(event) => { setPlacementId(event.target.value); setZoneId(''); setSlotId('') }} className={`${input} mt-1`}><option value="">Chọn cấu kiện và vị trí</option>{placements.map((item) => <option value={item.id} key={item.id}>{item.itemCode} · {item.slot.code} · L{item.stackLevel}</option>)}</select>
+              <select value={placementId} onChange={(event) => { setPlacementId(event.target.value); setZoneId(''); setSlotId('') }} className={`${input} mt-1`}><option value="">Chọn cấu kiện và vị trí</option>{placements.map((item) => <option value={item.id} key={item.id}>{item.componentInstance?.instanceNo ?? item.itemCode} · {item.slot.code} · L{item.stackLevel}</option>)}</select>
             </label>}
             <label className="text-xs text-slate-455">Cầu trục / thiết bị nâng
               <select value={craneId} onChange={(event) => setCraneId(event.target.value)} className={`${input} mt-1`}><option value="">Điều phối tự động</option>{cranes.map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select>
@@ -163,7 +150,7 @@ export function YardOperationDialog({
               </label>
             </>}
             {mode === 'inbound' && <>
-              <label className="text-xs text-slate-455">Số lượng cấu kiện<input value={quantity} onChange={(event) => setQuantity(formatQuantityInput(event.target.value))} className={`${input} mt-1`} inputMode="decimal"/>{selectedOrder ? <span className={`mt-1 block text-[11px] ${inboundQuantityInvalid ? 'text-red-305' : 'text-emerald-305'}`}>Còn được nhập bãi: {fmt(inboundRemaining)} cấu kiện. Đã nhập: {fmt(selectedOrder.stagedQuantity)} / MO: {fmt(selectedOrder.quantity)}</span> : null}</label>
+              <label className="text-xs text-slate-455">Số lượng cấu kiện<input value={quantity} readOnly className={`${input} mt-1 opacity-80`} inputMode="decimal"/>{selectedInstance ? <span className="mt-1 block text-[11px] text-emerald-305">Canonical Yard nhận từng ComponentInstance vật lý: {selectedInstance.instanceNo}</span> : null}</label>
               <label className="text-xs text-slate-455">Khối lượng (tấn)<input value={weight} onChange={(event) => setWeight(formatQuantityInput(event.target.value))} className={`${input} mt-1`} inputMode="decimal"/></label>
             </>}
             <label className="text-xs text-slate-455 md:col-span-2">Lý do / ghi chú vận hành<textarea value={reason} onChange={(event) => setReason(event.target.value)} className={`${input} mt-1 min-h-[82px] resize-none`} placeholder={mode === 'outbound' ? 'Công trình, xe nhận, mã shipment...' : 'Ghi chú điều phối...'}/></label>
@@ -173,7 +160,7 @@ export function YardOperationDialog({
         <aside className="border-l border-slate-800 bg-[#040d18]/45 p-3 flex flex-col gap-y-1">
           <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-cyan-400">Tóm tắt điều phối</h3>
           <div className="mt-2 space-y-1">
-            <div className="rounded border border-white/5 bg-white/[0.02] p-2.5 flex flex-col gap-y-0.5"><Boxes size={15} className="text-cyan-400"/><p className="mt-1 text-[10px] uppercase text-slate-500">Cấu kiện</p><p className="text-sm font-semibold text-slate-200 font-mono">{component?.code ?? placement?.itemCode ?? '--'}</p></div>
+            <div className="rounded border border-white/5 bg-white/[0.02] p-2.5 flex flex-col gap-y-0.5"><Boxes size={15} className="text-cyan-400"/><p className="mt-1 text-[10px] uppercase text-slate-500">Instance vật lý</p><p className="text-sm font-semibold text-slate-200 font-mono">{selectedInstance?.instanceNo ?? placement?.componentInstance?.instanceNo ?? placement?.itemCode ?? component?.code ?? '--'}</p></div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 rounded border border-white/5 bg-white/[0.02] p-2.5 text-xs"><div><MapPinned size={14} className="text-emerald-400"/><p className="mt-1 font-mono text-slate-300">{placement?.slot.code ?? 'Xưởng'}</p></div><ArrowRight size={14} className="text-amber-400"/><div><MapPinned size={14} className="text-cyan-400"/><p className="mt-1 font-mono text-slate-300">{mode === 'outbound' ? 'Cổng xuất' : target?.code ?? '--'}</p></div></div>
             <div className="rounded border border-white/5 bg-white/[0.02] p-2.5 text-xs text-slate-400"><Construction size={14} className="text-amber-400"/><p className="mt-1">Tầng đích: <b className="text-slate-200 font-mono">L{target ? target.currentStackLevel + 1 : '--'}</b></p><p className="mt-1">Occupancy: <b className="text-slate-200 font-mono">{target ? `${target.currentStackLevel}/${target.maxStackLevel}` : '--'}</b></p><p className="mt-1">Số lượng nhập: <b className="text-slate-200 font-mono">{mode === 'inbound' ? fmt(inboundQuantity) : fmt(parseLocaleNumber(quantity))}</b></p><p className="mt-1">Khối lượng: <b className="text-slate-200 font-mono">{fmt(parseLocaleNumber(weight))} tấn</b></p></div>
           </div>

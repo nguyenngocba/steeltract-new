@@ -1,5 +1,21 @@
 # Logistics Module
 
+## Current Canonicalization Gate
+
+LOGISTICS.2 audit on 2026-07-30 found Dispatch/Delivery is still
+definition-level for component lines. Current component dispatch uses
+`DispatchItem.componentId`, `ProjectTaskComponentAllocation.componentId`,
+`ShipmentLineInput.componentId`, and frontend payload `componentId`. Delivery
+receive still updates legacy `Component.status = DELIVERED`.
+
+Do not implement new component dispatch writes on this legacy identity. The
+next approved gate must add `DispatchItem.componentInstanceId` and physical
+`ComponentInstanceState` values for Yard/transit/delivery before Logistics can
+operate on canonical physical component identity.
+
+Audit:
+`docs/audits/logistics2-component-instance-dispatch-delivery-report.md`.
+
 ## Architecture Design
 
 Thiết kế chi tiết cho phân hệ Logistics được đặc tả tại [logistics-blueprint.md](file:///opt/projects/steeltrack/docs/architecture/logistics-blueprint.md).

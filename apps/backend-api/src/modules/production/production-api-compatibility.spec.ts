@@ -1,5 +1,5 @@
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
-import { RequestMethod } from '@nestjs/common';
+import { GoneException, RequestMethod } from '@nestjs/common';
 
 import { ProductionCommandController } from './production-command.controller';
 import { ProductionController } from './production.controller';
@@ -31,5 +31,24 @@ describe('Production API compatibility', () => {
         ProductionCommandController.prototype.releaseOrder,
       ),
     ).toBe('orders/:id/release');
+  });
+
+  it('keeps the legacy stage-to-yard route non-authoritative', () => {
+    const controller = new ProductionController(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    expect(() =>
+      controller.stageToYard(
+        'po-1',
+        { slotId: 'slot-1' } as never,
+        { user: { id: 'operator-1' } } as never,
+      ),
+    ).toThrow(GoneException);
   });
 });

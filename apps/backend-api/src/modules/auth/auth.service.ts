@@ -62,6 +62,7 @@ export class AuthService {
 
       if (
         !storedToken ||
+        storedToken.user.status !== UserStatus.ACTIVE ||
         storedToken.revokedAt ||
         storedToken.expiresAt < new Date()
       ) {
@@ -127,7 +128,7 @@ export class AuthService {
   async currentUser(userId: string) {
     const user = await this.repository.findUserById(userId);
 
-    if (!user) {
+    if (!user || user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid user');
     }
 

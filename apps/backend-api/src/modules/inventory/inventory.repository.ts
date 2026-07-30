@@ -65,6 +65,7 @@ export class InventoryRepository {
       include: {
         category: true,
         materialType: true,
+        materialUsageTypeMaster: true,
         unitMaster: true,
         zone: {
           include: {
@@ -89,6 +90,11 @@ export class InventoryRepository {
             { slotId: 'asc' },
             { level: 'asc' },
           ],
+        },
+        _count: {
+          select: {
+            bomItems: true,
+          },
         },
       },
       orderBy: {
@@ -918,6 +924,18 @@ export class InventoryRepository {
     });
   }
 
+  findMaterialUsageTypeById(id: string, db: DbClient = this.prisma) {
+    return db.masterMaterialUsageType.findUnique({
+      where: { id },
+    });
+  }
+
+  findMaterialUsageTypeByCode(code: string, db: DbClient = this.prisma) {
+    return db.masterMaterialUsageType.findUnique({
+      where: { code: code.trim().toUpperCase() },
+    });
+  }
+
   createItem(
     data: Prisma.InventoryItemCreateInput,
     db: DbClient = this.prisma,
@@ -927,6 +945,7 @@ export class InventoryRepository {
       include: {
         category: true,
         materialType: true,
+        materialUsageTypeMaster: true,
         unitMaster: true,
         zone: true,
       },
@@ -946,6 +965,7 @@ export class InventoryRepository {
       include: {
         category: true,
         materialType: true,
+        materialUsageTypeMaster: true,
         unitMaster: true,
         zone: true,
       },

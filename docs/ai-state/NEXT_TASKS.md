@@ -1,5 +1,117 @@
 # Next Tasks
 
+- **LOGISTICS.2 schema/state gate - P0**: approve the minimal canonical
+  logistics schema/state extension before implementation: nullable
+  `DispatchItem.componentInstanceId` relation/index plus physical
+  `ComponentInstanceState` values for `IN_YARD`, `IN_TRANSIT` and
+  `DELIVERED`. Without this gate, Logistics cannot safely dispatch/deliver
+  physical ComponentInstances and must not fall back to `Component.status`.
+- **STABILITY.PROJECTS.3A mutating Yard fixture - P1**: with explicit approval
+  to mutate a disposable/runtime database, certify the write flow `GET
+  /components/instances/finished-goods -> POST /yard/stage -> duplicate stage
+  rejection -> GET /yard/search -> GET /projects/:id/execution`. 3A already
+  passed read-only runtime smoke, tests and builds; committed Yard write was
+  intentionally not executed in this session.
+- **STABILITY.PROJECTS.3A 403 runtime credential - P1**: create or provide a
+  normal active user with known credentials and no `yard.read/write`, then
+  certify authenticated `403`. No-token `401` and unit-level RBAC passed.
+- **Yard browser handoff smoke - P1**: run Production and Yard UI against the
+  canonical `/yard/stage` flow and verify operators stage concrete
+  `ComponentInstance` rows only.
+- **LOGISTICS project instance dispatch - P0**: add canonical dispatch support
+  for physical `ComponentInstance` rows before claiming Project delivery
+  traceability. Current `DispatchItem.componentId` is component-level.
+- **Projects material read-model cleanup - P1**: replace project material
+  runtime derivation from capped project-linked `InventoryTransaction` rows
+  with a correctness-safe project material read model that keeps requirements,
+  reservation, issue, consumption and shipment separate.
+- **Material usage taxonomy legacy consumer cleanup - P1**: convert remaining
+  Inventory read-model/dashboard calculations that group by the legacy
+  `InventoryItem.materialUsageType` enum to prefer
+  `materialUsageTypeId`/`MasterMaterialUsageType` where dynamic taxonomy
+  matters. Keep enum fallback for older records and existing API compatibility.
+
+- **UI.SYSTEM.MASTERDATA.2 browser visual certification - P1**: run a real
+  Chromium/Playwright smoke for Settings master-data workspaces once a browser
+  harness is available. Cover 1920x1080 layout, table/editor proportions,
+  sticky header, editor footer, create/edit/deactivate confirmation, and UOM
+  base/derived conversion display. Current sprint passed jsdom UI tests and
+  TypeScript but did not claim browser GREEN.
+
+- **STABILITY.SYSTEM.1A true browser certification - P1**: run a Chromium/
+  Playwright browser smoke for Settings Overview and `/settings?tab=master`
+  once a browser harness is available. Cover opening all four master-data CRUD
+  workspaces, create/edit/deactivate confirmation and Material Master picker
+  refetch visibility. SYSTEM.1A passed runtime HTTP CRUD and jsdom UI
+  interaction tests, but this environment has no Chromium/Playwright CLI.
+
+- **STABILITY.SYSTEM.1 browser smoke - P1**: add or enable a Playwright browser
+  smoke covering `/users` create modal validation/API error rendering and
+  `/settings?tab=master` CRUD modal workspaces. SYSTEM.1 runtime HTTP smoke
+  passed, but browser smoke was not executed in this session.
+- **UOM frontend max-length hint - P2**: backend limits `MasterUnit.code` to 32
+  characters. The Settings form should show this as inline help if operators
+  commonly use generated UOM codes.
+- **System ActivityLog endpoint clarity - P2**: `/system/overview` exposes
+  recent activities and `/system-logs` exists in the UI, but `/system/activity`
+  is not a backend route. Add a direct filtered endpoint only if operators need
+  external ActivityLog audit retrieval.
+
+- **Master Data technical specification schema - P1**: if operators need
+  profile/specification/grade/dimension as structured material master data,
+  run a scoped schema sprint. Current SYSTEM.MASTERDATA.1 intentionally uses
+  existing `MaterialType` as V1 technical grouping and does not store new
+  canonical technical fields in JSON/free text.
+- **Settings Master Data browser smoke - P1**: add a Playwright/browser smoke
+  for `/settings?tab=master` covering the four modal workspaces, create/edit,
+  status filter, search, sticky footer and viewport-bounded single scroll owner.
+- **Master Data legacy endpoint consolidation - P2**: decide whether legacy
+  `/inventory/categories` and `/inventory/material-types` write endpoints should
+  delegate to `/master-data/*` or remain compatibility-only.
+
+- **SYSTEM.ADMIN.V1 browser smoke harness - P1**: add or enable a real browser
+  smoke runner for `/users`, `/roles`, `/settings`, `/system-logs`, create-user
+  modal, create-role modal, permission matrix, UOM catalog and ActivityLog
+  drawer. Current V1 passed build, HTTP smoke and Vite preview route smoke, but
+  no Playwright/browser runner is installed.
+- **SYSTEM.5 persisted settings - P1**: if operators need editable System
+  Configuration, introduce a scoped persisted settings contract. Do not use
+  React state or localStorage as fake persistence.
+- **SYSTEM.7 Backup Center - P1**: implement real backup/restore job contracts
+  before replacing the controlled Backup empty state.
+- **SYSTEM.3 session visibility - P1**: if administrators need operational
+  session control, add read-only session listing and explicit session revoke
+  flows on top of `RefreshToken`; do not expose token hashes.
+- **System notification mutations - P1**: add mark-read/archive operations for
+  persisted notifications if the Notification Center needs operator actions.
+- **RBAC granular command permissions - P1**: split high-impact module
+  `*.write` permissions into stable command permissions such as
+  `inventory.issue`, `production.execute`, `production.material-issue`,
+  `qc.decide`, and `qc.ncr-disposition` after the Role Matrix API exists.
+
+- **STABILITY.OPS3A2 browser BOM picker smoke - P1**: open the operational
+  Production BOM modal from Production and Components entry points with real
+  data. Confirm MAIN-only materials do not appear as selectable production
+  materials, PRODUCTION materials show `Tồn kho SX`, `Đã giữ chỗ`, `Khả dụng`,
+  and MAIN/Kho vật tư is visually secondary.
+- **Engineering BOM vs operational BOM split - P1**: if full Material Master
+  search is needed for Engineering BOM authoring, build it as a separate
+  engineering surface and explicitly mark `Kho SX = 0 / Không khả dụng cho sản
+  xuất` instead of weakening the operational picker.
+
+- **Canonical Finished Goods -> Yard handoff - P1**: expose or adapt a
+  ComponentInstance-level Yard placement flow. UI must not treat finished goods
+  as Yard stock until the canonical Yard handoff confirms physical placement.
+- **Components dashboard source cleanup - P1**: ensure every inventory/finished
+  goods metric uses `GET /components/instances/finished-goods`, never
+  `COUNT(Component)`, legacy `Component.status`, or `STOCK`/`READY` assumptions.
+- **Production Warehouse dashboard certification - P1**: keep widgets sourced
+  from PRODUCTION location balances and reservations, not transaction remarks
+  or historical issue-list reconstruction.
+- **QC physical-instance browser smoke - P1**: open the QC final and NCR screens
+  with fixture `OPS3C-20260729032211` and confirm physical instance code,
+  project, PO, component definition, result, and NCR context render clearly.
+
 - **UI.OPS.3A.1 browser visual smoke - P2**: optional follow-up after runtime
   certification. Open Components `Kho vật tư sản xuất` and Production BOM
   create/edit in a browser with authenticated data and confirm the certified

@@ -13,6 +13,8 @@ import { Request } from 'express';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { AuthUser } from '../rbac/types/auth-user';
 import {
   archiveComponentCommandSchema,
@@ -37,7 +39,8 @@ import { ComponentCommandService } from './services/component-command.service';
 
 type AuthenticatedRequest = Request & { user?: AuthUser };
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('components.write')
 @Controller('components/commands')
 export class ComponentCommandController {
   constructor(private readonly commands: ComponentCommandService) {}

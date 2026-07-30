@@ -17,6 +17,8 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
 import type {
   CreateComponentDto,
@@ -46,6 +48,8 @@ import { ComponentsService } from './services/components.service';
 import { ComponentsReadModelService } from './services/components-read-model.service';
 import { ComponentsSnapshotReadService } from './services/components-snapshot-read.service';
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('components.read')
 @Controller('components')
 export class ComponentsController {
   constructor(
@@ -111,18 +115,21 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/costing/recalculate')
+  @RequirePermissions('components.write')
   recalculateCosting(@Param('id') id: string) {
     return this.componentCostingService.recalculate(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/deliver')
+  @RequirePermissions('components.write')
   deliver(@Param('id') id: string) {
     return this.componentsService.deliver(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/install')
+  @RequirePermissions('components.write')
   install(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(installComponentSchema))
@@ -133,6 +140,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
+  @RequirePermissions('components.write')
   create(
     @Body(new ZodValidationPipe(createComponentSchema))
     body: CreateComponentDto,
@@ -158,6 +166,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('upload')
+  @RequirePermissions('components.write')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -177,6 +186,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('timeline-upload')
+  @RequirePermissions('components.write')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -196,6 +206,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
+  @RequirePermissions('components.write')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateComponentSchema))
@@ -206,6 +217,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
+  @RequirePermissions('components.write')
   remove(@Param('id') id: string) {
     return this.componentsService.remove(id);
   }
