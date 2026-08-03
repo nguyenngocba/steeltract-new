@@ -1,5 +1,82 @@
 # Project Status
 
+On 2026-08-03 completed **SYSTEM.INTEGRITY.2 – SteelTrack V1 Runtime
+Certification & Canonical Freeze Audit** as an audit-only sprint. No production
+source, schema, migration, staging or commit action was performed. Runtime DB
+evidence confirms canonical project/requirement/instance/finished-goods
+foundation data exists, but current runtime data has 0 active Yard placements,
+0 DispatchItems and 0 installed ComponentInstances, so the full physical chain
+cannot be certified without a disposable `SYSTEM-INTEGRITY2-*` fixture.
+Freeze readiness is estimated at 72%. Remaining P0s are legacy RBAC endpoint
+closure, dashboard/read-model cleanup away from `Component.status` / `STOCK`,
+Projects downstream dispatch read-model correction, and full end-to-end runtime
+fixture certification. Created
+`docs/audits/system-integrity2-v1-runtime-certification.md`.
+
+On 2026-08-03 completed **LOGISTICS.3 – Canonical Physical Dispatch &
+Delivery**. Logistics component dispatch now operates on physical
+`ComponentInstance` rows staged in Yard, not engineering `Component`
+definitions. `POST /logistics/dispatch-orders/suggest` reads active Yard
+placements for `IN_YARD` instances; `POST /logistics/dispatch-orders` requires
+`componentInstanceId`; duplicate active dispatch detection is by
+`componentInstanceId`; departure, receive and completion update
+`ComponentInstance` state/timestamps. The legacy `Component.status =
+DELIVERED` mutation was removed from Logistics receive. Logistics UI now shows
+physical instance/Yard placement data and removes fake logistics dashboard
+charts. Created
+`docs/audits/logistics3-canonical-componentinstance-dispatch.md`.
+
+On 2026-08-03 completed **QC.3 – Canonical QC Module Convergence**.
+Standalone QC now renders the same `CanonicalPhysicalQcWorkspace` as
+Components/QC and no longer actively calculates KPI/chart/table data from
+`runtime.inspections` or `runtime.metrics`. The source of truth across QC UI is
+now `GET /components/foundation/instances?qcScope=true`, backed by physical
+`ComponentInstance` rows with FINAL inspection, checklist, NCR and timeline
+lineage. Created `docs/audits/qc3-canonical-module-convergence.md`.
+
+On 2026-08-03 completed **COMPONENTS.QC.2 – Canonical Physical QC Workspace**.
+The Components internal QC tab now operates on physical `ComponentInstance`
+rows instead of legacy `Component.status` inference. Extended
+`GET /components/foundation/instances` with `qcScope=true`, server-side QC
+summary counts and lineage includes for FINAL inspections, checklist
+items/results, NCRs and timeline. The UI now exposes a compact physical QC
+table plus `ModuleDetailDrawer` tabs for Overview, Inspection, Checklist, NCR,
+Disposition and History. No schema, migration, Logistics, Yard or legacy
+Component status restoration was introduced. Created
+`docs/audits/components-qc2-canonical-physical-workspace.md`.
+
+On 2026-08-02 completed **LOGISTICS.2A – Physical Logistics Schema
+Foundation**. Added permanent physical logistics state vocabulary to
+`ComponentInstanceState`: `IN_YARD`, `IN_TRANSIT`, and `DELIVERED`. Added
+nullable `DispatchItem.componentInstanceId` with an optional relation to
+`ComponentInstance` and a non-unique index, while preserving
+`DispatchItem.componentId` for legacy history. Migration
+`20260730100000_physical_logistics_schema_foundation` was reviewed as additive,
+backed up, deployed locally, and did not backfill or fabricate data. Runtime
+evidence after deploy: 0 DispatchItems and 0 Yard placements, with existing
+ComponentInstances left in their original states. Created
+`docs/audits/logistics2a-physical-logistics-schema-foundation-report.md`.
+
+On 2026-07-30 completed **PATCH UI.PRODUCTION.COCKPIT.1A – Restore Production Orders as Primary Workspace & Pagination**. Restored "Lệnh sản xuất" table and Search/Filter toolbar to the top of `ProductionCockpitPage.tsx` directly below Page Header & KPI strip. Restored `<InventoryPagination>` below the main table (server pagination), audited project name rendering, and moved analytical charts to support section below table. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **SPRINT UI.PRODUCTION.COCKPIT.1 – Production Overview Layout Density & Work Order Table Redesign**. Reorganized `ProductionCockpitPage.tsx` overview layout into a 4-level information hierarchy (Top 6 KPI Cards, Row 1 8-col Stage Workload & 4-col Status Distribution, Row 2 6-col Material Readiness & 6-col Attention POs, Row 3 12-col Production Activity Logs, Row 4 12-col High-Density "Lệnh sản xuất" Operational Table + 96vw Level 2 Workspace Modal). Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **Production Cockpit Overview – Production Orders Table Title Update**. Renamed table header title in `ProductionCockpitPage.tsx` from `Top {N} lệnh sản xuất` to **`Lệnh sản xuất`** in the "Tổng quan sản xuất" overview tab. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **SPRINT UI.COMPONENTS.FG.1 – Finished Goods Warehouse Enterprise UI Redesign**. Redesigned Finished Goods Warehouse (`ComponentsStockPage.tsx`) with a 3-level information architecture (Level 1 8-column compact operational table, Level 2 `w-[96vw] max-w-[1720px] h-[88vh]` workspace modal, Level 3 `64vw` right-sliding Instance Detail Workspace with 5 tabs), 4 KPI cards, and strict physical `ComponentInstance` finished-goods semantics. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **SPRINT UI.COMPONENTS.DEFINITIONS.2 – Component Detail Sliding Workspace**. Redesigned Component Detail into a right-sliding detail workspace (`w-[64vw] max-w-[1280px] min-w-[820px] 100vh`) with backdrop dim/blur, compact identity header, 6-card KPI strip, 6 horizontal tabs (`Tổng quan`, `BOM`, `Nhu cầu`, `Sản xuất`, `Instances`, `Lịch sử`), and full canonical data integration. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **PATCH UI.COMPONENTS.DEFINITIONS.1C – Fix Actual "Chi tiết" Component Inspector Size**. Resolved root cause of large detail modal in `ModuleDetailDrawer` (removed prepended `w-screen`, added `maxHeightClass` support) and centered Level 3 Component Detail inspector in `ComponentsListPage.tsx` to `600px` max width (`w-[min(600px,calc(100vw-32px))]`) and `72vh` max height with compact inner layout. Frontend build compiles with 0 errors.
+
+On 2026-07-30 completed **PATCH UI.COMPONENTS.DEFINITIONS.1B – Expanded Workspace & Compact Component Detail**. Expanded Level 2 "Xem tất cả" modal to a near-full workspace (`w-[96vw] max-w-[1720px] h-[88vh]`) with 12-column width redistribution. Compacted Level 3 Component detail drawer to `w-[min(660px,calc(100vw-40px))]` and `max-h-[76vh]`, replacing 4 KPI cards with a 3-column metric strip and dense 6-item info grid. Frontend build compiles with 0 errors.
+
+On 2026-07-30 completed **PATCH UI.COMPONENTS.DEFINITIONS.1A – Expanded Actions & Compact Detail Popup**. Updated `ComponentsListPage.tsx` with real API delete action (`useDeleteComponent`), Delete Confirmation Dialog, compact Trash icon in Level 2 "Xem tất cả" workspace table, and compact Component Detail Drawer width (`780px`) with a single body scroll owner. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **SPRINT UI.COMPONENTS.DEFINITIONS.1 – Component Definition List Density & Detail Redesign**. Redesigned `ComponentsListPage.tsx` with a 3-level information architecture (Level 1 8-column operational table, Level 2 12-column modal view via "Xem tất cả", Level 3 Engineering detail drawer), single-line cell truncation, compact font-medium typography, right-aligned tabular nums, and strict engineering domain semantics. Both frontend and backend builds compile with 0 errors.
+
+On 2026-07-30 completed **SPRINT UI.COMPONENTS.MATERIALS.1 – Production Material Warehouse Table Redesign**. Redesigned `ComponentsMaterialStockPage.tsx` table with a 2-level information architecture (Level 1 9-column operational table, Level 2 13-column modal view via "Xem tất cả"), single-line cell truncation, compact font-medium typography, right-aligned tabular nums, and responsive layout. Both frontend and backend builds compile with 0 errors.
+
 On 2026-07-30 completed the audit/gate phase of **LOGISTICS.2 – Canonical
 ComponentInstance Dispatch & Delivery**. Static audit found Logistics still
 uses legacy component-definition dispatch identity: `DispatchItem.componentId`,
@@ -1916,3 +1993,58 @@ available; EPIC144 did not invent missing workflows.
 - Backend tests: PASS, 81/81 suites and 252/252 tests.
 - Backend build: PASS.
 - Frontend test/build: PASS, existing Vite chunk-size warning only.
+
+# COMPONENTS.PRODUCTION.2 Canonical Production Workspace
+
+- Components Production source of truth: PASS,
+  `GET /production/read-model/cockpit`.
+- Legacy frontend aggregation over `/production`: REMOVED for this workspace.
+- Canonical row enrichment: PASS for requirement, project, component
+  definition, revision, BOM definition, physical instances, execution, QC and
+  material readiness.
+- Shared drawer/modal workspace: PASS, `ModuleDetailDrawer` is used for both
+  `Xem tất cả` and record details.
+- Schema/migration changes: NONE.
+- Prisma validate/generate/migrate status: PASS.
+- Backend tests: PASS, 89/89 suites and 291/291 tests.
+- Frontend tests: PASS, 2/2 files and 4/4 tests.
+- Backend build: PASS.
+- Frontend build: PASS, existing Vite chunk-size warning only.
+- Browser runtime certification: PENDING.
+
+# SYSTEM.INTEGRITY.1 V1 Operational Readiness Audit
+
+- Audit mode: PASS, no source implementation, schema change, migration, stage
+  or commit performed.
+- Overall V1 operational readiness: 72%.
+- Internal staging readiness: CONDITIONALLY READY.
+- V1 freeze readiness: NOT READY.
+- P0 blockers:
+  - Logistics dispatch/delivery write path still uses component definition
+    identity instead of `ComponentInstance`.
+  - Registered legacy write endpoints lack canonical RBAC permission guards.
+  - Some dashboard/read-model paths still derive physical component inventory
+    or completion from `Component.status`.
+- Runtime count evidence captured through read-only Prisma audit:
+  14 projects, 25 requirements, 29 components, 35 component instances, 29
+  production orders, 117 inventory location stocks, 153 inventory transactions,
+  0 active Yard placements and 0 DispatchItems.
+- Report:
+  `docs/audits/system-integrity1-steeltrack-v1-operational-readiness-audit.md`.
+# SYSTEM.E2E.1 Full Business Workflow Certification
+
+- Canonical REST happy path: PASS, 80 recorded calls with no harness failure.
+- Material integrity: PASS; 180 received, 16 consumed, 164 remains.
+- Physical identity: PASS; PO quantity 2 created exactly 2 ComponentInstances.
+- QC/Finished Goods gate: PASS; PASS instance included, FAIL instance excluded.
+- Yard/Logistics/Installation: PASS with P0 custody warning; active Yard
+  placement remains after delivered/installed state.
+- RBAC: PASS for Admin, Planner, Warehouse, QC, Project and Logistics role
+  matrix; no-token 401 and cross-role 403 verified.
+- Reverse flow: PARTIAL; warehouse return, rework disposition and scrap pass;
+  dismantle, project surplus and supplier outbound return are missing.
+- Enterprise projections: FAILED/DEGRADED due aggregate version INT4 overflow.
+- Backend tests: PASS, 91 suites / 296 tests.
+- Frontend tests: PASS, 2 files / 4 tests.
+- Backend/frontend builds: PASS.
+- Internal pilot: CONDITIONALLY READY. V1 freeze/production: NOT READY.

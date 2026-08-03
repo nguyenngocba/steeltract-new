@@ -1,5 +1,26 @@
 # Components Module
 
+## COMPONENTS.QC.2 - Canonical Physical QC Workspace
+
+Implemented on 2026-08-03.
+
+Status: **IMPLEMENTED - SHARED WITH QC MODULE, TEST/BUILD PASS, BROWSER RUNTIME PENDING**
+
+- Components internal QC now uses physical `ComponentInstance` rows from
+  `GET /components/foundation/instances?qcScope=true`.
+- Removed legacy UI inference from `Component.status`, `STOCK`, `READY`,
+  remarks or description JSON.
+- Backend read model returns physical QC summary counts for Waiting QC, Passed,
+  Failed, Rework, Use-As-Is and Scrap.
+- Instance rows include FINAL inspection, checklist item/result, NCR and
+  timeline lineage for the right-side QC detail drawer.
+- Detail tabs: Overview, Inspection, Checklist, NCR, Disposition and History.
+- No Logistics/Yard semantics changed and no schema/migration was introduced.
+- QC.3 now reuses this same physical workspace inside the standalone QC module,
+  so Components/QC and `/qc` no longer maintain duplicate QC UI logic.
+- Deliverable:
+  `docs/audits/components-qc2-canonical-physical-workspace.md`.
+
 ## COMPONENT DOMAIN.5D - ComponentInstanceExecution Schema Foundation
 
 Implemented on 2026-07-28.
@@ -624,3 +645,12 @@ now use `EnterpriseModulePage` directly, keep a single content stack, place the
 table as the hero inside the 9/3 grid, and close the hero grid before rendering
 the bottom analytics/summary section. Backend contracts and business behavior
 were unchanged.
+
+## COMPONENTS.PRODUCTION.2 Canonical Production Workspace
+
+Components Production now treats `GET /production/read-model/cockpit` as the
+source of truth for production workspace data. The tab no longer derives order
+KPIs, physical progress or pagination from the legacy `/production` list. It
+renders ProductionOrder, ProjectComponentRequirement, Component Definition,
+ComponentInstance, ComponentInstanceExecution, QC and material readiness through
+shared cockpit/Inventory UI primitives.

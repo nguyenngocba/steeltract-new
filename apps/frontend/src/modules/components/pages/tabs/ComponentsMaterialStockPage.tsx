@@ -400,44 +400,86 @@ export function ComponentsMaterialStockPage() {
                 </button>
               </div>
 
-              <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
-                <table className="w-full min-w-[1180px] table-fixed text-sm">
+              <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10 bg-[#08111f]/60">
+                <table className="w-full min-w-[920px] table-fixed text-xs border-collapse">
                   <thead
                     className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
                     style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                   >
                     <tr>
-                      {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho sản xuất', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn SX', 'Đã giữ chỗ', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
-                        <th key={heading} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{heading}</th>
-                      ))}
+                      <th className="w-[240px] px-3 py-2.5 text-left font-semibold text-slate-300">Vật tư (Mã & Tên)</th>
+                      <th className="w-[120px] px-2.5 py-2.5 text-left font-semibold text-slate-300">Loại vật tư</th>
+                      <th className="w-[60px] px-2 py-2.5 text-center font-semibold text-slate-300">ĐVT</th>
+                      <th className="w-[90px] px-2 py-2.5 text-right font-semibold text-slate-300">Tồn SX</th>
+                      <th className="w-[90px] px-2 py-2.5 text-right font-semibold text-slate-300">Đã giữ</th>
+                      <th className="w-[95px] px-2 py-2.5 text-right font-semibold text-slate-300">Khả dụng</th>
+                      <th className="w-[140px] px-2.5 py-2.5 text-left font-semibold text-slate-300">Vị trí kho SX</th>
+                      <th className="w-[90px] px-2 py-2.5 text-center font-semibold text-slate-300">Trạng thái</th>
+                      <th className="w-[70px] px-2 py-2.5 text-center font-semibold text-slate-300">Thao tác</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-white/5">
                     {isLoading || isTransactionsLoading ? (
                       <tr>
-                        <td colSpan={13} className="px-2 py-8 text-center">
+                        <td colSpan={9} className="px-2 py-8 text-center">
                           <ModuleLoadingState label="Đang tải tồn kho vật tư..." />
                         </td>
                       </tr>
-                    ) : paginatedRows.length ? paginatedRows.map((row) => (
-                      <tr key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`} onClick={() => setSelectedRow(row)} className={`cursor-pointer ${inventoryTableRow}`}>
-                        <td className="px-2 py-1.5 text-cyan-300 font-mono font-medium">{row.code}</td>
-                        <td className="px-2 py-1.5 text-white font-medium truncate">{row.name}</td>
-                        <td className="px-2 py-1.5"><span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-200">{materialUsageLabel(row.materialUsageType)}</span></td>
-                        <td className="px-2 py-1.5 text-slate-300">{row.unit}</td>
-                        <td className="px-2 py-1.5 text-slate-300 truncate">{row.warehouse}</td>
-                        <td className="px-2 py-1.5 text-slate-300 truncate">{row.location}</td>
-                        <td className="px-2 py-1.5 text-cyan-200 font-mono">{[row.slotId, row.level].filter(Boolean).join(' / ') || '-'}</td>
-                        <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{formatQuantity(row.currentStock)}</td>
-                        <td className="px-2 py-1.5 font-mono tabular-nums text-slate-300">{formatQuantity(row.reserved)}</td>
-                        <td className="px-2 py-1.5 font-mono tabular-nums text-emerald-300">{formatQuantity(row.available)}</td>
-                        <td className="px-2 py-1.5 font-mono tabular-nums text-slate-300">{money(row.averageCost)}</td>
-                        <td className="px-2 py-1.5 font-mono tabular-nums text-cyan-300">{money(row.inventoryValue)}</td>
-                        <td className="px-2 py-1.5 text-slate-300">{row.status}</td>
-                      </tr>
-                    )) : (
+                    ) : paginatedRows.length ? (
+                      paginatedRows.map((row) => (
+                        <tr
+                          key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`}
+                          onClick={() => setSelectedRow(row)}
+                          className={`cursor-pointer transition hover:bg-white/[0.04] ${inventoryTableRow}`}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap min-w-0 overflow-hidden">
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[11px] font-mono font-semibold text-cyan-300 truncate">{row.code}</span>
+                              <span className="text-xs font-medium text-slate-100 truncate" title={row.name}>{row.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-2.5 py-2 whitespace-nowrap overflow-hidden">
+                            <span className="inline-block rounded-md border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[11px] text-cyan-200 truncate max-w-full">
+                              {materialUsageLabel(row.materialUsageType)}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-center text-slate-300 font-medium whitespace-nowrap">{row.unit}</td>
+                          <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-slate-200 whitespace-nowrap">{formatQuantity(row.currentStock)}</td>
+                          <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-slate-400 whitespace-nowrap">{formatQuantity(row.reserved)}</td>
+                          <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-emerald-300 whitespace-nowrap">{formatQuantity(row.available)}</td>
+                          <td className="px-2.5 py-2 text-slate-300 text-[11px] font-mono whitespace-nowrap overflow-hidden truncate" title={row.location}>
+                            {row.location}
+                          </td>
+                          <td className="px-2 py-2 text-center whitespace-nowrap">
+                            <span
+                              className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                                row.status === 'Thiếu'
+                                  ? 'border border-red-500/30 bg-red-500/10 text-red-300'
+                                  : row.status === 'Cảnh báo'
+                                  ? 'border border-amber-500/30 bg-amber-500/10 text-amber-300'
+                                  : 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                              }`}
+                            >
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedRow(row)
+                              }}
+                              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-cyan-300 transition hover:bg-white/10 hover:text-white"
+                            >
+                              Chi tiết
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
                       <tr>
-                        <td colSpan={13} className="px-2 py-10">
+                        <td colSpan={9} className="px-2 py-10">
                           <ModuleEmptyState icon={<Package size={18} />} title="Chưa có tồn kho sản xuất" description="Không tìm thấy balance hiện tại trong kho PRODUCTION phù hợp với bộ lọc." />
                         </td>
                       </tr>
@@ -491,31 +533,41 @@ export function ComponentsMaterialStockPage() {
           <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h2 className="text-base font-bold text-white">Toàn bộ kho vật tư sản xuất</h2>
-                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} balance vật tư hiện tại trong kho PRODUCTION</p>
+                <h2 className="text-base font-bold text-white">Toàn bộ kho vật tư sản xuất (Chi tiết Level 2)</h2>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} balance vật tư hiện tại trong kho PRODUCTION với đầy đủ thông số kho, giá trị và đơn giá</p>
               </div>
               <button
                 type="button"
                 onClick={() => setExpandedModalOpen(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
               >
                 Đóng
               </button>
             </div>
 
-            <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
-              <table className="w-full min-w-[1200px] text-xs table-fixed border-collapse">
+            <div className="h-[620px] overflow-y-auto rounded-xl border border-white/10 bg-[#08111f]/60">
+              <table className="w-full min-w-[1280px] text-xs table-fixed border-collapse">
                 <thead
                   className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
                   style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                 >
                   <tr>
-                    {['Mã vật tư', 'Tên vật tư', 'Loại vật tư', 'ĐVT', 'Kho sản xuất', 'Vị trí kho SX', 'Slot/Tầng', 'Tồn SX', 'Đã giữ chỗ', 'Khả dụng', 'Giá TB', 'Tổng giá trị', 'Trạng thái'].map((heading) => (
-                      <th key={heading} className="px-2 py-2 text-left font-semibold text-slate-300">{heading}</th>
-                    ))}
+                    <th className="w-[100px] px-2 py-2 text-left font-semibold text-slate-300">Mã vật tư</th>
+                    <th className="w-[200px] px-2.5 py-2 text-left font-semibold text-slate-300">Tên vật tư</th>
+                    <th className="w-[110px] px-2 py-2 text-left font-semibold text-slate-300">Loại vật tư</th>
+                    <th className="w-[50px] px-1 py-2 text-center font-semibold text-slate-300">ĐVT</th>
+                    <th className="w-[140px] px-2 py-2 text-left font-semibold text-slate-300">Kho SX</th>
+                    <th className="w-[140px] px-2 py-2 text-left font-semibold text-slate-300">Vị trí kho SX</th>
+                    <th className="w-[90px] px-2 py-2 text-center font-semibold text-slate-300">Slot/Tầng</th>
+                    <th className="w-[85px] px-2 py-2 text-right font-semibold text-slate-300">Tồn SX</th>
+                    <th className="w-[85px] px-2 py-2 text-right font-semibold text-slate-300">Đã giữ</th>
+                    <th className="w-[90px] px-2 py-2 text-right font-semibold text-slate-300">Khả dụng</th>
+                    <th className="w-[95px] px-2 py-2 text-right font-semibold text-slate-300">Giá TB</th>
+                    <th className="w-[110px] px-2 py-2 text-right font-semibold text-slate-300">Tổng giá trị</th>
+                    <th className="w-[85px] px-2 py-2 text-center font-semibold text-slate-300">Trạng thái</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-white/5">
                   {paginatedRows.map((row) => (
                     <tr
                       key={`${row.id}-${row.zoneId ?? 'none'}-${row.slotId ?? 'none'}`}
@@ -523,21 +575,33 @@ export function ComponentsMaterialStockPage() {
                         setSelectedRow(row)
                         setExpandedModalOpen(false)
                       }}
-                      className={`${inventoryTableRow} cursor-pointer`}
+                      className={`${inventoryTableRow} cursor-pointer transition hover:bg-white/[0.04]`}
                     >
-                      <td className="px-2 py-2 text-cyan-300 font-mono font-medium">{row.code}</td>
-                      <td className="px-2 py-2 text-white font-medium truncate">{row.name}</td>
-                      <td className="px-2 py-2"><span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-200">{materialUsageLabel(row.materialUsageType)}</span></td>
-                      <td className="px-2 py-2 text-slate-300">{row.unit}</td>
-                      <td className="px-2 py-2 text-slate-300 truncate">{row.warehouse}</td>
-                      <td className="px-2 py-2 text-slate-300 truncate">{row.location}</td>
-                      <td className="px-2 py-2 text-cyan-200 font-mono">{[row.slotId, row.level].filter(Boolean).join(' / ') || '-'}</td>
-                      <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{formatQuantity(row.currentStock)}</td>
-                      <td className="px-2 py-2 font-mono tabular-nums text-slate-300">{formatQuantity(row.reserved)}</td>
-                      <td className="px-2 py-2 font-mono tabular-nums text-emerald-300">{formatQuantity(row.available)}</td>
-                      <td className="px-2 py-2 font-mono tabular-nums text-slate-300">{money(row.averageCost)}</td>
-                      <td className="px-2 py-2 font-mono tabular-nums text-cyan-300">{money(row.inventoryValue)}</td>
-                      <td className="px-2 py-2 text-slate-300">{row.status}</td>
+                      <td className="px-2 py-2 text-cyan-300 font-mono font-semibold whitespace-nowrap truncate">{row.code}</td>
+                      <td className="px-2.5 py-2 text-slate-100 font-medium whitespace-nowrap truncate" title={row.name}>{row.name}</td>
+                      <td className="px-2 py-2 whitespace-nowrap truncate"><span className="rounded-md border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[11px] text-cyan-200">{materialUsageLabel(row.materialUsageType)}</span></td>
+                      <td className="px-1 py-2 text-center text-slate-300 font-medium whitespace-nowrap">{row.unit}</td>
+                      <td className="px-2 py-2 text-slate-300 whitespace-nowrap truncate" title={row.warehouse}>{row.warehouse}</td>
+                      <td className="px-2 py-2 text-slate-300 font-mono text-[11px] whitespace-nowrap truncate" title={row.location}>{row.location}</td>
+                      <td className="px-2 py-2 text-center text-cyan-200 font-mono whitespace-nowrap">{[row.slotId, row.level].filter(Boolean).join(' / ') || '-'}</td>
+                      <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-slate-200 whitespace-nowrap">{formatQuantity(row.currentStock)}</td>
+                      <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-slate-400 whitespace-nowrap">{formatQuantity(row.reserved)}</td>
+                      <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-emerald-300 whitespace-nowrap">{formatQuantity(row.available)}</td>
+                      <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-slate-300 whitespace-nowrap">{money(row.averageCost)}</td>
+                      <td className="px-2 py-2 text-right font-mono font-medium tabular-nums text-cyan-300 whitespace-nowrap">{money(row.inventoryValue)}</td>
+                      <td className="px-2 py-2 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                            row.status === 'Thiếu'
+                              ? 'border border-red-500/30 bg-red-500/10 text-red-300'
+                              : row.status === 'Cảnh báo'
+                              ? 'border border-amber-500/30 bg-amber-500/10 text-amber-300'
+                              : 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

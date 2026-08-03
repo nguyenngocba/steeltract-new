@@ -46,7 +46,7 @@ import {
 } from '../components/ProductionMaterialCommandModals'
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
-import { InventoryPanel } from '@/modules/inventory/components/InventoryVisuals'
+import { InventoryPanel, InventoryPagination } from '@/modules/inventory/components/InventoryVisuals'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import {
   useMaterialRequirements,
@@ -1036,8 +1036,12 @@ function Overview({
   const { issued, waiting, shortage } = readModel.overview.material
   const stageRows = readModel.overview.stages.map(({ label, value }) => [label, value] as [string, number])
   const hasStageData = stageRows.some(([, value]) => value > 0)
-  const activeComponents = readModel.overview.activeComponents
   const summary = readModel.summary
+
+  const issuedQty = issued
+  const consumedQty = running
+  const reservedQty = waiting
+
   const attentionRows = orders
     .map((order) => {
       const material = order.cockpit?.materialReadiness
@@ -1058,9 +1062,10 @@ function Overview({
     .sort((a, b) => b.severity - a.severity || a.progress - b.progress)
     .slice(0, 5)
 
-  return <div className="w-full min-w-0 flex-1 space-y-1">
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-12">
-      <div className="xl:col-span-9">
+  return (
+    <div className="w-full min-w-0 flex-1 space-y-3 text-xs">
+      {/* 1. PRIMARY OPERATIONAL WORKSPACE: LỆNH SẢN XUẤT TABLE + PAGINATION */}
+      <div className="w-full min-w-0">
         <Orders
           readModel={readModel}
           onOpen={onOpen}
@@ -1070,11 +1075,47 @@ function Overview({
           onViewAll={() => navigate('/production/orders')}
         />
       </div>
-      <aside className="space-y-1 xl:col-span-3">
-        <CockpitChartCard title="Tiến độ sản xuất" subtitle="Running / Pending / Completed" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+
+      {/* 2. ANALYTICS SECTION HEADER */}
+      <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+          Phân tích & Tải xưởng sản xuất (Production Analytics)
+        </h3>
+      </div>
+
+      {/* ROW A: 8 cols Stage Workload, 4 cols Status Distribution */}
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-12">
+        <CockpitChartCard
+          title="Tải xưởng theo Công đoạn"
+          subtitle="Số lượng phân bổ theo từng bước công nghệ"
+          className="h-[270px] xl:col-span-8"
+        >
+          {hasStageData ? (
+            <div className="flex h-full flex-col justify-center space-y-3">
+              <ProductionMiniBars values={stageRows.map(([, value]) => value)} />
+              <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-5 pt-2 border-t border-white/10">
+                {stageRows.map(([label, value]) => (
+                  <Info key={label} k={label} v={formatQuantity(value, 0)} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <ModuleEmptyState
+              icon={<Factory size={20} />}
+              title="Chưa có công đoạn sản xuất"
+              description="Chưa có thông tin công đoạn được phân bổ cho các Lệnh sản xuất hiện tại."
+            />
+          )}
+        </CockpitChartCard>
+
+        <CockpitChartCard
+          title="Trạng thái Lệnh sản xuất"
+          subtitle="Phân bổ Running / Pending / Completed"
+          className="h-[270px] xl:col-span-4"
+        >
           <ProductionDonut
             centerValue={formatQuantity(orders.length, 0)}
-            centerLabel="MO"
+            centerLabel="Lệnh MO"
             segments={[
               { label: 'Running', value: running, color: '#06b6d4' },
               { label: 'Pending', value: pending, color: '#f59e0b' },
@@ -1082,10 +1123,18 @@ function Overview({
             ]}
           />
         </CockpitChartCard>
-        <CockpitChartCard title="Vật tư cấp phát" subtitle="Issue / reservation hiện có" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+      </div>
+
+      {/* ROW B: 6 cols Material Readiness, 6 cols Attention POs */}
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-12">
+        <CockpitChartCard
+          title="Tình trạng sẵn sàng Vật tư"
+          subtitle="Phân bổ Lệnh SX theo vật tư cấp phát"
+          className="h-[260px] xl:col-span-6"
+        >
           <ProductionDonut
             centerValue={formatQuantity(orders.length, 0)}
-            centerLabel="MO"
+            centerLabel="Lệnh MO"
             segments={[
               { label: 'Đã cấp phát', value: issued, color: '#14c987' },
               { label: 'Chờ cấp phát', value: waiting, color: '#f59e0b' },
@@ -1093,9 +1142,14 @@ function Overview({
             ]}
           />
         </CockpitChartCard>
-        <CockpitChartCard title="Cần chú ý hôm nay" subtitle="Trễ, thiếu vật tư, tiến độ thấp" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
+
+        <CockpitChartCard
+          title="Lệnh sản xuất cần chú ý"
+          subtitle="Điểm nghẽn: Trễ tiến độ, thiếu vật tư, tiến độ thấp"
+          className="h-[260px] xl:col-span-6"
+        >
           {attentionRows.length ? (
-            <div className="space-y-1">
+            <div className="space-y-1.5 overflow-auto max-h-[190px] scrollbar-none">
               {attentionRows.map(({ order, reason }) => (
                 <button
                   key={order.id}
@@ -1104,83 +1158,43 @@ function Overview({
                   className="grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs transition hover:border-cyan-400/35 hover:bg-white/[0.06]"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-semibold text-cyan-300">{order.orderNo}</span>
+                    <span className="block truncate font-mono font-semibold text-cyan-300">{order.orderNo}</span>
                     <span className="block truncate text-slate-400">{order.title}</span>
                   </span>
-                  <span className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-amber-300">{reason}</span>
+                  <span className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-300">{reason}</span>
                 </button>
               ))}
             </div>
           ) : (
-            <ModuleEmptyState icon={<Wrench size={18} />} title="Không có điểm nghẽn nổi bật" description="Các lệnh trễ, thiếu vật tư hoặc tiến độ thấp sẽ xuất hiện tại đây." />
+            <ModuleEmptyState
+              icon={<Wrench size={18} />}
+              title="Không có điểm nghẽn nổi bật"
+              description="Các lệnh trễ, thiếu vật tư hoặc tiến độ thấp sẽ xuất hiện tại đây."
+            />
           )}
         </CockpitChartCard>
-      </aside>
-    </div>
-    <div className="grid grid-cols-1 gap-1 md:grid-cols-[2fr_1fr_1fr_1fr]">
-      <CockpitChartCard title="Thao tác nhanh" className="p-1.5">
-        <ActionCards compact />
-      </CockpitChartCard>
-      <CockpitChartCard title="Hoàn thành hôm nay" className="border-emerald-500/20 bg-emerald-500/5">
-        <ProductionSummaryTile
-          label="lệnh"
-          value={summary.completedToday}
-          note={`${formatQuantity(summary.completed, 0)} hoàn thành tổng`}
-          tone="text-emerald-300"
-        />
-      </CockpitChartCard>
-      <CockpitChartCard title="Chờ vật tư" className="border-amber-500/20 bg-amber-500/5">
-        <ProductionSummaryTile
-          label="MO"
-          value={summary.waitingMaterial}
-          note={`${formatQuantity(waiting, 0)} chờ · ${formatQuantity(shortage, 0)} thiếu`}
-          tone="text-amber-300"
-        />
-      </CockpitChartCard>
-      <CockpitChartCard title="Trễ tiến độ" className="border-red-500/20 bg-red-500/5">
-        <ProductionSummaryTile
-          label="lệnh"
-          value={summary.delayed}
-          note="Theo due date/status"
-          tone="text-red-300"
-        />
-      </CockpitChartCard>
-    </div>
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <CockpitChartCard title="Công đoạn sản xuất" subtitle="Phân bổ theo công đoạn hiện tại" heightClass={COCKPIT_HEIGHTS.CHART_LG}>
-        {hasStageData ? (
-          <>
-            <ProductionMiniBars values={stageRows.map(([, value]) => value)} />
-            <div className="mt-2 grid grid-cols-2 gap-1 text-xs md:grid-cols-5">
-              {stageRows.map(([label, value]) => <Info key={label} k={label} v={formatQuantity(value, 0)} />)}
-            </div>
-          </>
-        ) : (
-          <ModuleEmptyState icon={<Factory size={18} />} title="Chưa có công đoạn sản xuất" description="Không dựng chart khi read model chưa có stage thật." />
-        )}
-      </CockpitChartCard>
-      <aside className="space-y-1">
-        <CockpitChartCard title="Cấu kiện đang sản xuất" subtitle="Top 5 lệnh đang mở" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
-          <div className="space-y-1">
-            {activeComponents.length ? activeComponents.map((component) => (
-              <div key={component.id} className="grid grid-cols-[1fr_auto] items-center gap-1 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
-                <div className="min-w-0">
-                  <div className="truncate font-semibold text-cyan-300">{component.code}</div>
-                  <div className="truncate text-slate-400">{component.name}</div>
-                </div>
-                <StatusChip status="RUNNING" />
-              </div>
-            )) : <ModuleEmptyState icon={<span>🏭</span>} title="Chưa có cấu kiện đang sản xuất" description="Các cấu kiện có lệnh sản xuất mở sẽ xuất hiện tại đây." />}
-          </div>
-        </CockpitChartCard>
-        <CockpitChartCard title="Nhật ký vận hành" subtitle="6 hoạt động mới nhất" heightClass={COCKPIT_HEIGHTS.CHART_MD}>
-          {(logs ?? []).length ? <ActivityList logs={(logs ?? []).slice(0, 6)} /> : (
-            <ModuleEmptyState icon={<span>🕒</span>} title="Chưa có nhật ký" description="Hoạt động sản xuất sẽ xuất hiện sau khi operator thao tác." />
+      </div>
+
+      {/* ROW C: 12 cols Production Logs */}
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-12">
+        <CockpitChartCard
+          title="Nhật ký vận hành sản xuất"
+          subtitle="Nhật ký hoạt động mới nhất"
+          className="h-[240px] xl:col-span-12"
+        >
+          {(logs ?? []).length ? (
+            <ActivityList logs={(logs ?? []).slice(0, 5)} />
+          ) : (
+            <ModuleEmptyState
+              icon={<Clock size={18} />}
+              title="Chưa có nhật ký"
+              description="Hoạt động sản xuất sẽ xuất hiện sau khi operator thao tác."
+            />
           )}
         </CockpitChartCard>
-      </aside>
+      </div>
     </div>
-  </div>
+  )
 }
 
 function ProductionSummaryTile({
@@ -1237,6 +1251,7 @@ function Orders({
       progress,
     }
   })
+
   const colors = ['#64748b', '#06b6d4', '#f59e0b', '#7c3aed', '#14c987']
   const progressSegments = readModel.orderAnalytics.progressSegments.map((segment, index) => ({ ...segment, color: colors[index] }))
   const readinessColors = ['#ef4444', '#f59e0b', '#06b6d4', '#14c987']
@@ -1244,66 +1259,93 @@ function Orders({
   const readyToReleaseRows = enriched
     .filter(({ row, readiness }) => !['COMPLETED', 'CANCELLED'].includes(row.status) && readiness.readiness.readinessPercent >= 100)
     .slice(0, 5)
+
   const pagedRows = embedded && maxRows ? enriched.slice(0, maxRows) : enriched
-  const { page, limit: pageSize, total } = readModel.meta
-  const pageStart = total ? (page - 1) * pageSize + 1 : 0
-  const pageEnd = embedded ? Math.min(pagedRows.length, total) : Math.min(page * pageSize, total)
+  const { page, limit: pageSize, total, totalPages } = readModel.meta
+
+  function projectLabel(row: ProductionOrder) {
+    const proj = (row.component as Record<string, unknown> | undefined)?.project as { code?: string; name?: string } | undefined
+    if (proj) {
+      return [proj.code, proj.name].filter(Boolean).join(' - ')
+    }
+    if (row.projectId) {
+      return row.projectId
+    }
+    return '-'
+  }
 
   const grid = (
-    <InventoryPanel className="rounded-xl">
-      <div className="mb-1 flex items-center justify-between gap-3">
+    <InventoryPanel className="rounded-xl p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">
-            {embedded ? `Top ${Math.min(maxRows ?? pagedRows.length, pagedRows.length)} lệnh sản xuất` : 'Danh sách lệnh sản xuất'}
+            Lệnh sản xuất
           </h3>
-          <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
+          <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-mono font-medium text-cyan-300 border border-cyan-400/20">
             {total} lệnh
           </span>
         </div>
         <button
           type="button"
           onClick={() => setExpandedModalOpen(true)}
-          className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition"
+          className="rounded-lg border border-cyan-400/30 bg-cyan-600/20 px-3 py-1 text-xs font-semibold text-cyan-300 hover:bg-cyan-600/30 transition"
         >
           Xem tất cả
         </button>
       </div>
 
-      <div className="h-[430px] overflow-auto scrollbar-none rounded-lg border border-white/10">
-        <table className="w-full min-w-[1180px] table-fixed text-sm">
+      <div className="h-[360px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+        <table className="w-full min-w-[1100px] table-fixed text-xs border-collapse">
           <thead
             className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
             style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
           >
             <tr>
-              {['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((x) => (
-                <th key={x} className="px-2 py-2 text-left text-xs font-semibold text-slate-300">{x}</th>
-              ))}
+              <th className="w-[180px] px-3 py-2 text-left font-semibold text-slate-300">Lệnh SX (WO No)</th>
+              <th className="w-[200px] px-3 py-2 text-left font-semibold text-slate-300">Cấu kiện</th>
+              <th className="w-[170px] px-3 py-2 text-left font-semibold text-slate-300">Công trình</th>
+              <th className="w-[90px] px-3 py-2 text-right font-semibold text-slate-300">Số lượng</th>
+              <th className="w-[170px] px-3 py-2 text-left font-semibold text-slate-300">Vật tư sẵn sàng</th>
+              <th className="w-[150px] px-3 py-2 text-left font-semibold text-slate-300">Tiến độ SX</th>
+              <th className="w-[120px] px-3 py-2 text-left font-semibold text-slate-300">Kế hoạch</th>
+              <th className="w-[110px] px-3 py-2 text-center font-semibold text-slate-300">Trạng thái</th>
             </tr>
           </thead>
-          <tbody>
-            {pagedRows.length ? pagedRows.map(({ row, readiness, progress }) => (
-              <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}>
-                <td className="px-2 py-1.5 font-semibold text-cyan-300 font-mono">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500 font-normal">{row.title}</div></td>
-                <td className="px-2 py-1.5 text-slate-200 truncate">{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
-                <td className="px-2 py-1.5 text-slate-300 font-mono">{row.projectId ?? row.component?.project?.code ?? '-'}</td>
-                <td className="px-2 py-1.5 font-mono tabular-nums text-slate-200">{number(row.quantity)}</td>
-                <td className="w-44 px-2 py-1.5">
-                  <Meter value={readiness.readiness.readinessPercent} tone={readinessBarClass(readiness.readiness.readinessPercent)} />
-                  <div className={`mt-1 text-[10px] font-mono ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
-                    {formatQuantity(readiness.readiness.readinessPercent, 0)}% · {readiness.label}
-                  </div>
-                </td>
-                <td className="w-40 px-2 py-1.5">
-                  <Meter value={progress} tone={orderStatusTone(row)} />
-                  <div className="mt-1 text-[10px] font-mono text-slate-400">{progress}%</div>
-                </td>
-                <td className="px-2 py-1.5 text-slate-300 font-mono text-xs">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-0.5 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
-                <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
-              </tr>
-            )) : (
+          <tbody className="divide-y divide-white/5">
+            {pagedRows.length ? (
+              pagedRows.map(({ row, readiness, progress }) => (
+                <tr key={row.id} onClick={() => onOpen(row)} className={`cursor-pointer ${inventoryTableRow}`}>
+                  <td className="px-3 py-1.5 min-w-0">
+                    <div className="font-mono font-semibold text-cyan-300 truncate" title={row.orderNo}>{row.orderNo}</div>
+                    <div className="text-[11px] font-medium text-slate-400 truncate" title={row.title}>{row.title}</div>
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-200 font-medium truncate" title={row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}>
+                    {row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-300 font-medium truncate" title={projectLabel(row)}>
+                    {projectLabel(row)}
+                  </td>
+                  <td className="px-3 py-1.5 text-right font-mono tabular-nums text-white font-bold">{number(row.quantity)}</td>
+                  <td className="px-3 py-1.5">
+                    <Meter value={readiness.readiness.readinessPercent} tone={readinessBarClass(readiness.readiness.readinessPercent)} />
+                    <div className={`mt-0.5 text-[10px] font-mono ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                      {formatQuantity(readiness.readiness.readinessPercent, 0)}% · {readiness.label}
+                    </div>
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <Meter value={progress} tone={orderStatusTone(row)} />
+                    <div className="mt-0.5 text-[10px] font-mono text-slate-400">{progress}%</div>
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-300 font-mono text-xs">
+                    {date(row.plannedEndAt)}
+                    {row.cockpit?.delayed ? <div className="mt-0.5 text-[10px] text-red-300 font-medium">Trễ tiến độ</div> : null}
+                  </td>
+                  <td className="px-3 py-1.5 text-center"><StatusChip status={row.status} /></td>
+                </tr>
+              ))
+            ) : (
               <tr>
-                <td colSpan={8} className="px-2 py-10">
+                <td colSpan={8} className="px-3 py-10">
                   <ModuleEmptyState icon={<Factory size={18} />} title="Chưa có lệnh sản xuất" description="Tạo lệnh sản xuất để theo dõi tiến độ, vật tư và hoàn thành." />
                 </td>
               </tr>
@@ -1312,42 +1354,49 @@ function Orders({
         </table>
       </div>
 
-      {!embedded ? (
-        <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
-      ) : null}
+      <InventoryPagination
+        page={page}
+        pageSize={pageSize}
+        pageCount={Math.max(1, totalPages ?? Math.ceil(total / pageSize))}
+        total={total}
+        onPageChange={onPageChange}
+        containerClassName="border-t-0 pt-2"
+      />
 
-      {/* EXPANDED TABLE MODAL */}
+      {/* EXPANDED TABLE MODAL (LEVEL 2 WORKSPACE) */}
       {expandedModalOpen
         ? createPortal(
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-              <div className="w-full max-w-7xl rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-4 text-xs">
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex w-[96vw] max-w-[1720px] h-[88vh] flex-col rounded-2xl border border-white/15 bg-[#08111f] p-5 shadow-2xl space-y-3 text-xs overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
                   <div>
-                    <h2 className="text-base font-bold text-white">Toàn bộ danh sách lệnh sản xuất</h2>
+                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                      Toàn bộ danh sách lệnh sản xuất (Production Orders Workspace)
+                    </h2>
                     <p className="text-xs text-slate-400">Tổng cộng {total} lệnh sản xuất trong hệ thống</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setExpandedModalOpen(false)}
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
                   >
-                    Đóng
+                    Đóng Workspace
                   </button>
                 </div>
 
-                <div className="h-[640px] overflow-y-auto rounded-xl border border-white/10">
-                  <table className="w-full min-w-[1180px] text-xs table-fixed border-collapse">
+                <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/10">
+                  <table className="w-full min-w-[1280px] text-xs table-fixed border-collapse">
                     <thead
                       className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
                       style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                     >
                       <tr>
-                        {['WO No', 'Component', 'Project', 'Qty', 'Material Ready', 'Progress', 'Due Date', 'Status'].map((x) => (
-                          <th key={x} className="px-2 py-2 text-left font-semibold text-slate-300">{x}</th>
+                        {['Lệnh SX (WO No)', 'Tiêu đề Lệnh', 'Cấu kiện', 'Công trình', 'Số lượng', 'Vật tư sẵn sàng', 'Tiến độ SX', 'Kế hoạch', 'Trạng thái'].map((x) => (
+                          <th key={x} className="px-3 py-2.5 text-left font-semibold text-slate-300">{x}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-white/5">
                       {enriched.map(({ row, readiness, progress }) => (
                         <tr
                           key={row.id}
@@ -1357,29 +1406,39 @@ function Orders({
                           }}
                           className={`${inventoryTableRow} cursor-pointer`}
                         >
-                          <td className="px-2 py-2 font-semibold text-cyan-300 font-mono">{row.orderNo}<div className="mt-0.5 truncate text-[10px] text-slate-500 font-normal">{row.title}</div></td>
-                          <td className="px-2 py-2 text-slate-200 truncate">{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
-                          <td className="px-2 py-2 text-slate-300 font-mono">{row.projectId ?? row.component?.project?.code ?? '-'}</td>
-                          <td className="px-2 py-2 font-mono tabular-nums text-slate-200">{number(row.quantity)}</td>
-                          <td className="w-44 px-2 py-2">
+                          <td className="px-3 py-2 font-semibold text-cyan-300 font-mono truncate" title={row.orderNo}>{row.orderNo}</td>
+                          <td className="px-3 py-2 font-medium text-slate-200 truncate" title={row.title}>{row.title || 'Lệnh sản xuất'}</td>
+                          <td className="px-3 py-2 text-slate-200 truncate" title={row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}>{row.component ? `${row.component.code} · ${row.component.name}` : row.bom?.productCode ?? '-'}</td>
+                          <td className="px-3 py-2 text-slate-300 font-medium truncate" title={projectLabel(row)}>{projectLabel(row)}</td>
+                          <td className="px-3 py-2 font-mono tabular-nums text-white text-right font-bold">{number(row.quantity)}</td>
+                          <td className="w-44 px-3 py-2">
                             <Meter value={readiness.readiness.readinessPercent} tone={readinessBarClass(readiness.readiness.readinessPercent)} />
-                            <div className={`mt-1 text-[10px] font-mono ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                            <div className={`mt-0.5 text-[10px] font-mono ${readiness.readiness.readinessPercent >= 100 ? 'text-emerald-300' : readiness.readiness.readinessPercent >= 80 ? 'text-cyan-300' : readiness.readiness.readinessPercent >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
                               {formatQuantity(readiness.readiness.readinessPercent, 0)}% · {readiness.label}
                             </div>
                           </td>
-                          <td className="w-40 px-2 py-2">
+                          <td className="w-40 px-3 py-2">
                             <Meter value={progress} tone={orderStatusTone(row)} />
-                            <div className="mt-1 text-[10px] font-mono text-slate-400">{progress}%</div>
+                            <div className="mt-0.5 text-[10px] font-mono text-slate-400">{progress}%</div>
                           </td>
-                          <td className="px-2 py-2 text-slate-300 font-mono text-xs">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-0.5 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
-                          <td className="px-2 py-2"><StatusChip status={row.status} /></td>
+                          <td className="px-3 py-2 text-slate-300 font-mono text-xs">{date(row.plannedEndAt)}{row.cockpit?.delayed ? <div className="mt-0.5 text-[10px] text-red-300">Trễ tiến độ</div> : null}</td>
+                          <td className="px-3 py-2 text-center"><StatusChip status={row.status} /></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                <DataTablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
+                <div className="shrink-0 pt-2 border-t border-white/10">
+                  <InventoryPagination
+                    page={page}
+                    pageSize={pageSize}
+                    pageCount={Math.max(1, totalPages ?? Math.ceil(total / pageSize))}
+                    total={total}
+                    onPageChange={onPageChange}
+                    containerClassName="border-t-0"
+                  />
+                </div>
               </div>
             </div>,
             document.body,

@@ -251,3 +251,15 @@ Yard placement/movement events now emit bounded placement/location facts with a
 complete AD-019 envelope. Placement is authoritative for new events. Prior move
 zone/stack facts and `yard.loading.completed` remain unavailable, so full Yard
 movement/loading projections are non-authoritative.
+
+# SYSTEM.E2E.1 Physical Custody Gate
+
+Canonical component placement now transitions an eligible physical
+`ComponentInstance` from `QC_PASSED` or `USE_AS_IS` to `IN_YARD` inside the
+same Serializable transaction as placement, movement, ActivityLog and Outbox
+persistence. This allows Logistics to enforce both physical state and active
+placement without bypassing Yard ownership.
+
+Known P0: Dispatch/Delivery currently leaves the Yard placement active. Until
+that handoff closes placement, Yard occupancy and Project `yardStagedQty` can
+remain overstated after the instance is delivered/installed.

@@ -67,6 +67,7 @@ export const listComponentInstancesSchema = baseQuerySchema.extend({
   projectTaskId: optionalId,
   instanceNo: optionalId,
   state: z.nativeEnum(ComponentInstanceState).optional(),
+  qcScope: z.coerce.boolean().optional(),
 });
 
 export const listFinishedGoodsInstancesSchema = baseQuerySchema.extend({

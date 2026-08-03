@@ -7,12 +7,9 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock,
-  Filter,
   PackageCheck,
-  Plus,
   RefreshCw,
   Search,
-  ShieldCheck,
   Truck,
   X,
 } from 'lucide-react'
@@ -99,6 +96,14 @@ const statusTone: Record<DispatchOrderStatus, string> = {
   CANCELLED: 'border-red-500/30 bg-red-500/10 text-red-300',
 }
 
+const instanceStateLabel: Record<string, string> = {
+  IN_YARD: 'Đang ở Yard',
+  IN_TRANSIT: 'Đang vận chuyển',
+  DELIVERED: 'Đã giao',
+  QC_PASSED: 'QC đạt',
+  USE_AS_IS: 'Dùng nguyên trạng',
+}
+
 const tableHead = 'border-b border-white/10 bg-[#08111f]/90 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400'
 const tableRow = 'border-b border-white/[0.06] text-slate-200 transition hover:bg-white/[0.04]'
 
@@ -156,7 +161,7 @@ export function LogisticsPage() {
 
   const tab = getTabFromPath(location.pathname)
 
-  const { data: dashboard, isLoading: dashboardLoading } = useQuery({
+  const { data: dashboard } = useQuery({
     queryKey: ['logistics-dispatch-dashboard'],
     queryFn: getDispatchDashboard,
   })
@@ -253,30 +258,44 @@ export function LogisticsPage() {
         <EnterpriseKpiCard title="Đã lên xe" value={fmt(dashboard?.statusCounts?.LOADING ?? 0)} tone="cyan" icon={<ClipboardCheck size={15} />} />
         <EnterpriseKpiCard title="Đang vận chuyển" value={fmt(dashboard?.kpis.inTransit ?? 0)} tone="blue" icon={<Truck size={15} />} />
         <EnterpriseKpiCard title="Đã giao" value={fmt(dashboard?.kpis.delivered ?? 0)} tone="emerald" icon={<PackageCheck size={15} />} />
-        <EnterpriseKpiCard title="Chậm giao" value="0" tone="red" icon={<Clock size={15} />} />
-        <EnterpriseKpiCard title="On-time Delivery" value="98.4%" tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Hoàn thành" value={fmt(dashboard?.kpis.completed ?? 0)} tone="emerald" icon={<CheckCircle2 size={15} />} />
+        <EnterpriseKpiCard title="Hôm nay" value={fmt(dashboard?.kpis.movementsToday ?? 0)} tone="cyan" icon={<Clock size={15} />} />
       </section>
 
       {/* Phase 3: Analytics Dashboard */}
       <section className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-4">
         <CockpitChartCard title="Điều xe theo ngày" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <StatusMiniBars rows={[['Thứ 2', 12], ['Thứ 3', 18], ['Thứ 4', 24], ['Thứ 5', 15], ['Thứ 6', 20]]} />
+          {dashboard?.trend?.length ? (
+            <StatusMiniBars rows={dashboard.trend.slice(-7).map((row) => [row.date.slice(5), row.total])} />
+          ) : (
+            <CockpitEmptyState title="Chưa có xu hướng" description="Dữ liệu sẽ xuất hiện khi phát sinh điều xe." />
+          )}
         </CockpitChartCard>
         <CockpitChartCard title="Tiến độ giao hàng" heightClass="h-[220px]" chartHeightClass="h-[138px]">
           <StatusMiniBars rows={[['Chờ điều xe', dashboard?.kpis.waiting ?? 0], ['Đang vận chuyển', dashboard?.kpis.inTransit ?? 0], ['Đã giao công trình', dashboard?.kpis.delivered ?? 0], ['Hoàn thành', dashboard?.kpis.completed ?? 0]]} />
         </CockpitChartCard>
         <CockpitChartCard title="Cấu kiện theo trạng thái" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitStatusList items={[
-            { id: '1', label: 'Đã xếp xe vận chuyển', value: '120 cấu kiện', statusTone: 'cyan' },
-            { id: '2', label: 'Đang trên đường di chuyển', value: '85 cấu kiện', statusTone: 'blue' },
-            { id: '3', label: 'Đã giao & nghiệm thu', value: '450 cấu kiện', statusTone: 'emerald' },
-          ]} />
+          <CockpitStatusList
+            items={Object.entries(dashboard?.componentStateCounts ?? {}).map(([state, value]) => ({
+              id: state,
+              label: instanceStateLabel[state] ?? state,
+              value: `${fmt(value)} cấu kiện`,
+              statusTone: state === 'IN_TRANSIT' ? 'blue' : state === 'DELIVERED' ? 'emerald' : 'cyan',
+            }))}
+            emptyMessage="Chưa có cấu kiện vật lý trong luồng vận chuyển."
+          />
         </CockpitChartCard>
         <CockpitChartCard title="Top dự án đang giao" heightClass="h-[220px]" chartHeightClass="h-[138px]">
-          <CockpitRecentList items={[
-            { id: '1', title: 'NM Hòa Phát Phân Kỳ 2', subtitle: '5 chuyến xe đang giao', time: 'Đang di chuyển', statusDot: 'bg-emerald-400' },
-            { id: '2', title: 'Sân bay Long Thành', subtitle: '3 chuyến xe đang giao', time: 'Đang bốc xếp', statusDot: 'bg-cyan-400' },
-          ]} />
+          <CockpitRecentList
+            items={(dashboard?.topProjects ?? []).slice(0, 6).map((row) => ({
+              id: row.id,
+              title: row.name,
+              subtitle: `${fmt(row.active)} cấu kiện đang xử lý`,
+              time: `${fmt(row.total)} tổng`,
+              statusDot: row.active > 0 ? 'bg-cyan-400' : 'bg-slate-500',
+            }))}
+            emptyMessage="Chưa có dự án đang giao."
+          />
         </CockpitChartCard>
       </section>
 
@@ -342,7 +361,7 @@ export function LogisticsPage() {
             <table className="w-full min-w-[1000px] table-fixed text-sm border-collapse">
               <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
                 <tr>
-                  {['Mã điều xe', 'Dự án', 'Khách hàng', 'Xe', 'Tài xế', 'Số cấu kiện', 'ETA', 'Trạng thái', 'Thao tác'].map((h) => (
+                  {['Mã điều xe', 'Dự án', 'Instance đầu', 'Xe', 'Tài xế', 'Cấu kiện', 'Yard', 'Trạng thái', 'Thao tác'].map((h) => (
                     <th key={h} className="px-2 py-2 text-xs font-semibold text-slate-300 text-left">{h}</th>
                   ))}
                 </tr>
@@ -352,11 +371,11 @@ export function LogisticsPage() {
                   <tr key={order.id} onClick={() => setSelectedOrder(order)} className={`${tableRow} cursor-pointer`}>
                     <td className="px-2 py-2 font-mono font-semibold text-cyan-300 text-xs">{order.code}</td>
                     <td className="px-2 py-2 text-white font-medium truncate">{order.project?.name ?? '—'}</td>
-                    <td className="px-2 py-2 text-slate-300 text-xs truncate">Tập đoàn Hòa Phát</td>
+                    <td className="px-2 py-2 text-slate-300 text-xs truncate">{firstInstance(order)?.instanceNo ?? '—'}</td>
                     <td className="px-2 py-2 font-medium text-slate-200 text-xs truncate">{order.vehicle || '—'}</td>
                     <td className="px-2 py-2 text-cyan-400 text-xs truncate">{order.driver || '—'}</td>
-                    <td className="px-2 py-2 font-mono text-cyan-300 text-xs">{fmt(order.items.length)} dòng</td>
-                    <td className="px-2 py-2 text-slate-400 text-xs truncate">{formatDate(order.plannedAt)}</td>
+                    <td className="px-2 py-2 font-mono text-cyan-300 text-xs">{fmt(componentInstanceCount(order))}</td>
+                    <td className="px-2 py-2 text-slate-400 text-xs truncate">{yardLocation(firstInstance(order))}</td>
                     <td className="px-2 py-2"><StatusBadge status={order.status} /></td>
                     <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedOrder(order) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
                   </tr>
@@ -383,7 +402,7 @@ export function LogisticsPage() {
               <table className="w-full min-w-[1000px] text-xs table-fixed border-collapse">
                 <thead className={`${tableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`} style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}>
                   <tr>
-                    {['Mã điều xe', 'Dự án', 'Khách hàng', 'Xe', 'Tài xế', 'Số cấu kiện', 'ETA', 'Trạng thái', 'Thao tác'].map((h) => (
+                    {['Mã điều xe', 'Dự án', 'Instance đầu', 'Xe', 'Tài xế', 'Cấu kiện', 'Yard', 'Trạng thái', 'Thao tác'].map((h) => (
                       <th key={h} className="px-2 py-2 text-left font-semibold text-slate-300">{h}</th>
                     ))}
                   </tr>
@@ -393,11 +412,11 @@ export function LogisticsPage() {
                     <tr key={order.id} onClick={() => { setSelectedOrder(order); setExpandedModalOpen(false) }} className={`${tableRow} cursor-pointer`}>
                       <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{order.code}</td>
                       <td className="px-2 py-2 text-white font-medium truncate">{order.project?.name ?? '—'}</td>
-                      <td className="px-2 py-2 text-slate-300 truncate">Tập đoàn Hòa Phát</td>
+                      <td className="px-2 py-2 text-slate-300 truncate">{firstInstance(order)?.instanceNo ?? '—'}</td>
                       <td className="px-2 py-2 font-medium text-slate-200 truncate">{order.vehicle || '—'}</td>
                       <td className="px-2 py-2 text-cyan-400 truncate">{order.driver || '—'}</td>
-                      <td className="px-2 py-2 font-mono text-cyan-300">{fmt(order.items.length)} dòng</td>
-                      <td className="px-2 py-2 text-slate-400 truncate">{formatDate(order.plannedAt)}</td>
+                      <td className="px-2 py-2 font-mono text-cyan-300">{fmt(componentInstanceCount(order))}</td>
+                      <td className="px-2 py-2 text-slate-400 truncate">{yardLocation(firstInstance(order))}</td>
                       <td className="px-2 py-2"><StatusBadge status={order.status} /></td>
                       <td className="px-2 py-2"><button type="button" onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); setExpandedModalOpen(false) }} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:border-cyan-500 transition">Chi tiết</button></td>
                     </tr>
@@ -690,7 +709,7 @@ function DispatchTable({
             <table className="w-full min-w-[1150px] table-fixed text-[13px]">
               <thead className="border-b border-cyan-400/10 bg-transparent text-slate-300">
                 <tr>
-                  {['Mã lệnh', 'Công trình', 'Task', 'Hàng hóa', 'Xe', 'Tài xế', 'Kế hoạch', 'Trạng thái', 'Thao tác'].map(
+                  {['Mã lệnh', 'Công trình', 'Task', 'Instance đầu', 'Xe', 'Tài xế', 'Cấu kiện', 'Trạng thái', 'Thao tác'].map(
                     (header, idx) => (
                       <th
                         key={header}
@@ -712,10 +731,10 @@ function DispatchTable({
                     <td className="px-2 py-2 font-mono font-semibold text-cyan-300">{order.code}</td>
                     <td className="px-2 py-2 text-white truncate">{order.project?.name ?? '—'}</td>
                     <td className="px-2 py-2 truncate">{order.projectTask?.name ?? '—'}</td>
-                    <td className="px-2 py-2 font-mono">{fmt(order.items.length)} dòng</td>
+                    <td className="px-2 py-2 font-mono text-cyan-300">{firstInstance(order)?.instanceNo ?? '—'}</td>
                     <td className="px-2 py-2 font-medium">{order.vehicle || '—'}</td>
                     <td className="px-2 py-2">{order.driver || '—'}</td>
-                    <td className="px-2 py-2 font-mono text-slate-400">{formatDate(order.plannedAt)}</td>
+                    <td className="px-2 py-2 font-mono text-slate-400">{fmt(componentInstanceCount(order))}</td>
                     <td className="px-2 py-2">
                       <StatusBadge status={order.status} />
                     </td>
@@ -784,7 +803,7 @@ function DispatchDetailDrawer({
       open={Boolean(order)}
       onClose={onClose}
       title={`Điều xe ${detailOrder.code}`}
-      subtitle={`${detailOrder.project?.name ?? 'Chưa rõ công trình'} · ${statusLabel[detailOrder.status]}`}
+      subtitle={`${detailOrder.project?.name ?? 'Chưa rõ công trình'} · ${statusLabel[detailOrder.status]} · ${fmt(componentInstanceCount(detailOrder))} cấu kiện`}
       size="md"
     >
       <div className="space-y-3 text-sm text-slate-300">
@@ -897,7 +916,7 @@ function CreateDispatchDrawer({
       items: selectedItems.map((item) => ({
         type: item.type,
         inventoryItemId: item.inventoryItemId,
-        componentId: item.componentId,
+        componentInstanceId: item.componentInstanceId,
         quantity: item.quantity,
       })),
     }
@@ -976,11 +995,12 @@ function CreateDispatchDrawer({
             <div className="space-y-2">
               {selectedItems.map((item, index) => (
                 <div
-                  key={`${item.type}-${item.inventoryItemId ?? item.componentId}-${index}`}
+                  key={`${item.type}-${item.inventoryItemId ?? item.componentInstanceId}-${index}`}
                   className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2 text-xs"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-white">
+                      {item.instanceNo ? `${item.instanceNo} · ` : ''}
                       {item.materialCode ?? item.componentCode} · {item.materialName ?? item.componentName}
                     </span>
                     <span className="font-mono text-cyan-300">
@@ -988,7 +1008,7 @@ function CreateDispatchDrawer({
                     </span>
                   </div>
                   <p className="mt-1 text-slate-500">
-                    {item.projectTaskName ?? 'Task'} · {item.reason}
+                    {[item.projectTaskName ?? 'Task', item.productionOrderCode, item.yardLocation, item.reason].filter(Boolean).join(' · ')}
                   </p>
                 </div>
               ))}
@@ -996,7 +1016,7 @@ function CreateDispatchDrawer({
           ) : (
             <CockpitEmptyState
               title="Chưa có hàng hóa đề xuất"
-              description="Chọn công trình rồi bấm Tự đề xuất để đọc task, vật tư thiếu và cấu kiện cần vận chuyển."
+              description="Chọn công trình rồi bấm Tự đề xuất để đọc cấu kiện thành phẩm đang staged tại Yard."
             />
           )}
         </Section>
@@ -1014,8 +1034,9 @@ function CreateDispatchDrawer({
 }
 
 function DispatchItemRow({ item }: { item: DispatchItem }) {
-  const code = item.inventoryItem?.code ?? item.component?.code ?? '—'
-  const name = item.inventoryItem?.name ?? item.component?.name ?? '—'
+  const instance = item.componentInstance
+  const code = item.inventoryItem?.code ?? instance?.instanceNo ?? item.component?.code ?? '—'
+  const name = item.inventoryItem?.name ?? instance?.component?.name ?? item.component?.name ?? '—'
   return (
     <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
@@ -1026,9 +1047,32 @@ function DispatchItemRow({ item }: { item: DispatchItem }) {
           {fmt(item.quantity)} {item.inventoryItem?.unit ?? ''}
         </span>
       </div>
-      <p className="mt-1 text-slate-500">{item.type === 'MATERIAL' ? 'Vật tư' : 'Cấu kiện'}</p>
+      <p className="mt-1 text-slate-500">
+        {item.type === 'MATERIAL'
+          ? 'Vật tư'
+          : [
+              instanceStateLabel[instance?.state ?? ''] ?? instance?.state ?? 'Cấu kiện vật lý',
+              instance?.productionOrder?.orderNo,
+              yardLocation(instance),
+            ].filter(Boolean).join(' · ')}
+      </p>
     </div>
   )
+}
+
+function firstInstance(order: DispatchOrder) {
+  return order.items.find((item) => item.componentInstance)?.componentInstance ?? null
+}
+
+function componentInstanceCount(order: DispatchOrder) {
+  return order.items.filter((item) => item.componentInstanceId || item.componentInstance).length
+}
+
+function yardLocation(instance?: DispatchItem['componentInstance'] | null) {
+  const placement = instance?.yardPlacements?.[0]
+  const slot = placement?.slot
+  if (!slot) return '—'
+  return [slot.zone?.code, slot.row?.code, slot.code].filter(Boolean).join(' / ')
 }
 
 function StatusBars({ counts }: { counts: Record<string, number> }) {

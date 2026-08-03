@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ComponentLifecycleState, Prisma } from '@prisma/client';
+import {
+  ComponentInstanceState,
+  ComponentLifecycleState,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import type {
@@ -208,20 +212,8 @@ export class ComponentDomainFoundationRepository {
   async listInstances(query: ListComponentInstancesDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const where: Prisma.ComponentInstanceWhereInput = {
-      componentId: query.componentId,
-      componentRevisionId: query.componentRevisionId,
-      productionOrderId: query.productionOrderId,
-      requirementId: query.requirementId,
-      projectId: query.projectId,
-      projectTaskId: query.projectTaskId,
-      state: query.state,
-      instanceNo: query.instanceNo
-        ? { contains: query.instanceNo, mode: 'insensitive' }
-        : undefined,
-      OR: this.search(query.search ?? query.q, ['instanceNo']),
-    };
-    const [data, total] = await Promise.all([
+    const where = this.instanceWhere(query);
+    const [data, total, summary] = await Promise.all([
       this.prisma.componentInstance.findMany({
         where,
         include: instanceInclude,
@@ -230,8 +222,84 @@ export class ComponentDomainFoundationRepository {
         take: limit,
       }),
       this.prisma.componentInstance.count({ where }),
+      this.componentInstanceSummary(where),
     ]);
-    return { data, meta: this.meta(page, limit, total) };
+    return { data, meta: this.meta(page, limit, total), summary };
+  }
+
+  private instanceWhere(
+    query: ListComponentInstancesDto,
+  ): Prisma.ComponentInstanceWhereInput {
+    const search = query.search ?? query.q;
+    return {
+      componentId: query.componentId,
+      componentRevisionId: query.componentRevisionId,
+      productionOrderId: query.productionOrderId,
+      requirementId: query.requirementId,
+      projectId: query.projectId,
+      projectTaskId: query.projectTaskId,
+      state: query.state ?? (query.qcScope ? { in: qcInstanceStates } : undefined),
+      instanceNo: query.instanceNo
+        ? { contains: query.instanceNo, mode: 'insensitive' }
+        : undefined,
+      OR: search
+        ? [
+            { instanceNo: { contains: search, mode: 'insensitive' } },
+            {
+              component: {
+                is: {
+                  OR: [
+                    { code: { contains: search, mode: 'insensitive' } },
+                    { name: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            },
+            {
+              project: {
+                is: {
+                  OR: [
+                    { code: { contains: search, mode: 'insensitive' } },
+                    { name: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            },
+            {
+              productionOrder: {
+                is: {
+                  OR: [
+                    { orderNo: { contains: search, mode: 'insensitive' } },
+                    { title: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            },
+          ]
+        : undefined,
+    };
+  }
+
+  private async componentInstanceSummary(
+    where: Prisma.ComponentInstanceWhereInput,
+  ) {
+    const rows = await this.prisma.componentInstance.groupBy({
+      by: ['state'],
+      where,
+      _count: { _all: true },
+    });
+    const byState = new Map(
+      rows.map((row) => [row.state, row._count._all]),
+    );
+    const count = (state: ComponentInstanceState) => byState.get(state) ?? 0;
+    return {
+      waitingQc: count(ComponentInstanceState.PRODUCED_WAITING_QC),
+      passed: count(ComponentInstanceState.QC_PASSED),
+      failed: count(ComponentInstanceState.QC_FAILED),
+      rework: count(ComponentInstanceState.REWORK),
+      useAsIs: count(ComponentInstanceState.USE_AS_IS),
+      scrap: count(ComponentInstanceState.SCRAPPED),
+    };
   }
 
   private search(
@@ -313,4 +381,45 @@ const instanceInclude = {
     },
     orderBy: { createdAt: 'asc' },
   },
+  qcInspections: {
+    include: {
+      checklist: {
+        include: {
+          items: {
+            orderBy: { sequence: 'asc' },
+          },
+        },
+      },
+      results: {
+        include: {
+          checklistItem: true,
+          issues: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+      ncrs: {
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+  },
+  ncrs: {
+    include: {
+      issue: true,
+    },
+    orderBy: { updatedAt: 'desc' },
+  },
+  timeline: {
+    orderBy: { occurredAt: 'desc' },
+    take: 20,
+  },
 } satisfies Prisma.ComponentInstanceInclude;
+
+const qcInstanceStates = [
+  ComponentInstanceState.PRODUCED_WAITING_QC,
+  ComponentInstanceState.QC_PASSED,
+  ComponentInstanceState.QC_FAILED,
+  ComponentInstanceState.REWORK,
+  ComponentInstanceState.USE_AS_IS,
+  ComponentInstanceState.SCRAPPED,
+] satisfies ComponentInstanceState[];

@@ -303,6 +303,18 @@ export class YardService {
             'Component instance is already actively placed in yard',
           );
         }
+
+        const transitioned =
+          await this.repository.transitionComponentInstanceToYard(
+            dto.componentInstanceId,
+            tx,
+          );
+
+        if (transitioned.count !== 1) {
+          throw new ConflictException(
+            'Component instance is no longer eligible for yard staging',
+          );
+        }
       }
 
       const created = await this.repository.createPlacement(

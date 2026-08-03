@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
-import { Prisma, ProductionMaterialReservationStatus } from '@prisma/client';
+import {
+  ComponentInstanceExecutionStatus,
+  ComponentInstanceState,
+  Prisma,
+  ProductionMaterialReservationStatus,
+} from '@prisma/client';
 
 import { nextOperationalCode } from '../../../common/utils/code-generator';
 import { PrismaService } from '../../../core/prisma/prisma.service';
@@ -544,6 +549,12 @@ export class ProductionRepository {
           materialReservations: {
             select: { status: true },
           },
+          componentInstances: {
+            select: {
+              id: true,
+              state: true,
+            },
+          },
         },
       }),
       this.prisma.productionOrder.count({ where }),
@@ -576,6 +587,7 @@ export class ProductionRepository {
         delayed: productionOrderDelayed(row),
         materialReadiness: productionOrderReadiness(row),
       },
+      canonical: productionOrderCanonical(row),
     }));
     const countStatus = (status: string) =>
       aggregates.filter(({ row }) => row.status === status).length;
@@ -624,6 +636,23 @@ export class ProductionRepository {
           (sum, { row }) =>
             sum +
             Number(row.quantity ?? 0) * Number(row.bom?.estimatedWeight ?? 0),
+          0,
+        ),
+        componentInstances: aggregates.reduce(
+          (sum, { row }) => sum + componentInstanceCount(row),
+          0,
+        ),
+        waitingQc: aggregates.reduce(
+          (sum, { row }) => sum + componentInstancesByState(row, [
+            ComponentInstanceState.PRODUCED_WAITING_QC,
+          ]),
+          0,
+        ),
+        qcPassed: aggregates.reduce(
+          (sum, { row }) => sum + componentInstancesByState(row, [
+            ComponentInstanceState.QC_PASSED,
+            ComponentInstanceState.USE_AS_IS,
+          ]),
           0,
         ),
       },
@@ -825,6 +854,89 @@ export class ProductionRepository {
           project: true,
         },
       },
+      componentRequirement: {
+        include: {
+          project: { select: { id: true, code: true, name: true } },
+          projectTask: { select: { id: true, name: true } },
+          component: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              componentType: true,
+              profile: true,
+              lifecycleState: true,
+            },
+          },
+          componentRevision: {
+            select: { id: true, revisionNo: true, state: true },
+          },
+          bomDefinition: {
+            select: { id: true, state: true, contentHash: true },
+          },
+        },
+      },
+      componentInstances: {
+        include: {
+          componentRevision: {
+            select: { id: true, revisionNo: true, state: true },
+          },
+          bomDefinition: {
+            select: { id: true, state: true, contentHash: true },
+          },
+          executions: {
+            include: {
+              workOrder: {
+                select: {
+                  id: true,
+                  workOrderNo: true,
+                  productCode: true,
+                  quantity: true,
+                  status: true,
+                  lifecycleState: true,
+                  sequence: true,
+                },
+              },
+              productionExecution: {
+                select: {
+                  id: true,
+                  state: true,
+                  workCenterId: true,
+                  machineId: true,
+                  startedAt: true,
+                  completedAt: true,
+                },
+              },
+            },
+            orderBy: { updatedAt: 'desc' as const },
+          },
+          qcInspections: {
+            select: {
+              id: true,
+              inspectionNo: true,
+              status: true,
+              completedAt: true,
+              approvedAt: true,
+              rejectedAt: true,
+              updatedAt: true,
+            },
+            orderBy: { updatedAt: 'desc' as const },
+            take: 5,
+          },
+          ncrs: {
+            select: {
+              id: true,
+              ncrNo: true,
+              status: true,
+              disposition: true,
+              updatedAt: true,
+            },
+            orderBy: { updatedAt: 'desc' as const },
+            take: 5,
+          },
+        },
+        orderBy: { serialSequence: 'asc' as const },
+      },
       materialIssues: {
         include: {
           inventoryItem: true,
@@ -839,6 +951,22 @@ export class ProductionRepository {
         },
         orderBy: {
           createdAt: 'desc' as const,
+        },
+      },
+      materialReservations: {
+        include: {
+          lines: {
+            include: {
+              inventoryItem: {
+                select: { id: true, code: true, name: true, unit: true },
+              },
+              warehouse: { select: { id: true, code: true, name: true } },
+              zone: { select: { id: true, code: true, name: true } },
+            },
+          },
+        },
+        orderBy: {
+          updatedAt: 'desc' as const,
         },
       },
     };
@@ -877,11 +1005,95 @@ export class ProductionRepository {
 }
 
 type CockpitOrder = {
+  id?: string;
+  updatedAt?: Date;
+  projectId?: string | null;
+  componentRequirementId?: string | null;
   status: string;
   quantity: number;
   plannedEndAt: Date | null;
+  component?: { id: string; code: string; name: string } | null;
+  componentRequirement?: {
+    id: string;
+    requirementNo: string;
+    requiredQuantity: number | string;
+    project?: { id: string; code: string; name: string } | null;
+    component?: {
+      id: string;
+      code: string;
+      name: string;
+      componentType?: string | null;
+      profile?: string | null;
+      lifecycleState: string;
+    } | null;
+    componentRevision?: {
+      id: string;
+      revisionNo: string;
+      state: string;
+    } | null;
+    bomDefinition?: {
+      id: string;
+      state: string;
+      contentHash?: string | null;
+    } | null;
+  } | null;
   stages: Array<{ status: string; name: string }>;
+  componentInstances?: Array<{
+    id: string;
+    instanceNo?: string;
+    state: ComponentInstanceState;
+    producedAt?: Date | null;
+    qcPassedAt?: Date | null;
+    scrappedAt?: Date | null;
+    updatedAt?: Date;
+    executions?: Array<{
+      id: string;
+      status: ComponentInstanceExecutionStatus;
+      startedAt: Date | null;
+      completedAt: Date | null;
+      cancelledAt: Date | null;
+      updatedAt: Date;
+      workOrder?: {
+        id: string;
+        workOrderNo: string;
+        productCode: string;
+        quantity: number;
+        status: string;
+        lifecycleState?: string;
+        sequence?: number | null;
+      } | null;
+      productionExecution?: {
+        id: string;
+        state: string;
+        workCenterId?: string | null;
+        machineId?: string | null;
+        startedAt?: Date | null;
+        completedAt?: Date | null;
+      } | null;
+    }>;
+    qcInspections?: Array<{
+      id: string;
+      inspectionNo: string;
+      status: string;
+      completedAt: Date | null;
+      approvedAt: Date | null;
+      rejectedAt: Date | null;
+      updatedAt: Date;
+    }>;
+    ncrs?: Array<{
+      id: string;
+      ncrNo: string;
+      status: string;
+      disposition: string | null;
+      updatedAt: Date;
+    }>;
+  }>;
   bom: {
+    id?: string;
+    bomNo?: string;
+    productCode?: string;
+    version?: string;
+    status?: string;
     items: Array<{
       materialId: string;
       quantity: number;
@@ -893,6 +1105,25 @@ type CockpitOrder = {
     issuedQty: number;
     returnedQty: number;
     status: string;
+  }>;
+  materialReservations?: Array<{
+    id?: string;
+    reservationNo?: string;
+    status: string;
+    reservedAt?: Date | null;
+    lines?: Array<{
+      id: string;
+      requiredQty: number;
+      reservedQty: number;
+      issuedQty: number;
+      returnedQty: number;
+      status: string;
+      inventoryItem: { id: string; code: string; name: string; unit?: string | null };
+      warehouse?: { id: string; code: string; name: string } | null;
+      zone?: { id: string; code: string; name: string } | null;
+      slotId?: string | null;
+      level?: string | null;
+    }>;
   }>;
 };
 
@@ -976,6 +1207,133 @@ function productionOrderReadiness(order: CockpitOrder) {
             ? 'Thiếu một phần'
             : 'Thiếu vật tư',
   };
+}
+
+function componentInstanceCount(order: CockpitOrder) {
+  return order.componentInstances?.length ?? 0;
+}
+
+function componentInstancesByState(
+  order: CockpitOrder,
+  states: ComponentInstanceState[],
+) {
+  const set = new Set(states);
+  return (order.componentInstances ?? []).filter((instance) =>
+    set.has(instance.state),
+  ).length;
+}
+
+function productionOrderCanonical(order: CockpitOrder) {
+  const instances = order.componentInstances ?? [];
+  const executionCounts = countBy(
+    instances.flatMap((instance) =>
+      (instance.executions ?? []).map((run) => run.status),
+    ),
+  );
+  const stateCounts = countBy(instances.map((instance) => instance.state));
+  const latestQc = instances
+    .flatMap((instance) =>
+      (instance.qcInspections ?? []).map((inspection) => ({
+        ...inspection,
+        componentInstanceId: instance.id,
+        instanceNo: instance.instanceNo ?? instance.id,
+      })),
+    )
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  const qcCounts = countBy(latestQc.map((inspection) => inspection.status));
+  const readiness = productionOrderReadiness(order);
+
+  return {
+    productionOrder: {
+      id: order.id,
+      componentRequirementId: order.componentRequirementId ?? null,
+      projectId: order.projectId ?? order.componentRequirement?.project?.id ?? null,
+      updatedAt: order.updatedAt ?? null,
+    },
+    project: order.componentRequirement?.project ?? null,
+    requirement: order.componentRequirement
+      ? {
+          id: order.componentRequirement.id,
+          requirementNo: order.componentRequirement.requirementNo,
+          requiredQuantity: Number(order.componentRequirement.requiredQuantity ?? 0),
+        }
+      : null,
+    componentDefinition:
+      order.componentRequirement?.component ??
+      (order.component
+        ? {
+            id: order.component.id,
+            code: order.component.code,
+            name: order.component.name,
+            componentType: null,
+            profile: null,
+            lifecycleState: null,
+          }
+        : null),
+    revision: order.componentRequirement?.componentRevision ?? null,
+    bomDefinition: order.componentRequirement?.bomDefinition ?? null,
+    bom: order.bom
+      ? {
+          id: order.bom.id ?? null,
+          bomNo: order.bom.bomNo ?? null,
+          productCode: order.bom.productCode ?? null,
+          version: order.bom.version ?? null,
+          status: order.bom.status ?? null,
+        }
+      : null,
+    plannedQuantity: Number(order.quantity ?? 0),
+    allocatedQuantity: Number(order.quantity ?? 0),
+    componentInstances: {
+      total: instances.length,
+      stateCounts,
+      rows: instances.map((instance) => ({
+        id: instance.id,
+        instanceNo: instance.instanceNo,
+        state: instance.state,
+        producedAt: instance.producedAt,
+        qcPassedAt: instance.qcPassedAt,
+        scrappedAt: instance.scrappedAt,
+        updatedAt: instance.updatedAt,
+        executions: instance.executions ?? [],
+        qcInspections: instance.qcInspections ?? [],
+        ncrs: instance.ncrs ?? [],
+      })),
+    },
+    execution: {
+      assigned: executionCounts.ASSIGNED ?? 0,
+      running: executionCounts.RUNNING ?? 0,
+      completed: executionCounts.COMPLETED ?? 0,
+      cancelled: executionCounts.CANCELLED ?? 0,
+      rows: instances.flatMap((instance) =>
+        (instance.executions ?? []).map((run) => ({
+          ...run,
+          componentInstanceId: instance.id,
+          instanceNo: instance.instanceNo ?? instance.id,
+        })),
+      ),
+    },
+    qc: {
+      passed: qcCounts.PASSED ?? 0,
+      failed: qcCounts.FAILED ?? 0,
+      approved: qcCounts.APPROVED ?? 0,
+      rejected: qcCounts.REJECTED ?? 0,
+      rows: latestQc,
+    },
+    materialReadiness: readiness,
+    material: {
+      reservations: order.materialReservations ?? [],
+      issues: order.materialIssues,
+    },
+    updatedAt: order.updatedAt ?? null,
+  };
+}
+
+function countBy(values: Array<string | null | undefined>) {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    if (!value) return acc;
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
 }
 
 function productionStageFamily(value?: string | null) {

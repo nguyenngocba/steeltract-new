@@ -282,6 +282,7 @@ export function ModuleDetailDrawer({
   children,
   onClose,
   widthClass,
+  maxHeightClass,
   size = 'md',
   placement = 'right',
 }: {
@@ -293,6 +294,7 @@ export function ModuleDetailDrawer({
   children: ReactNode
   onClose: () => void
   widthClass?: string
+  maxHeightClass?: string
   size?: 'sm' | 'md' | 'lg'
   placement?: 'right' | 'center'
 }) {
@@ -362,7 +364,8 @@ export function ModuleDetailDrawer({
     md: 'w-screen md:w-[58vw] md:min-w-[900px] md:max-w-[1180px]',
     lg: 'w-screen md:w-[62vw] md:min-w-[980px] md:max-w-[1280px]',
   }[size]
-  const resolvedWidthClass = widthClass ? `w-screen ${widthClass}` : sizeClass
+  const resolvedWidthClass = widthClass ? widthClass : sizeClass
+  const resolvedMaxHeight = maxHeightClass ?? (placement === 'center' ? 'max-h-[88vh]' : 'h-full')
 
   const shellClass =
     placement === 'center'
@@ -370,8 +373,8 @@ export function ModuleDetailDrawer({
       : 'fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-sm'
   const asideClass =
     placement === 'center'
-      ? `flex max-h-[90vh] w-full ${resolvedWidthClass} flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
-      : `flex h-full ${resolvedWidthClass} flex-col border-l border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
+      ? `flex ${resolvedMaxHeight} w-full ${resolvedWidthClass} flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
+      : `flex ${resolvedMaxHeight} ${resolvedWidthClass} flex-col border-l border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
 
   return (
     <div className={shellClass}>

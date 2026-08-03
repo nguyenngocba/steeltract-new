@@ -1,20 +1,25 @@
 # Logistics Module
 
-## Current Canonicalization Gate
+## Current Canonicalization Status
 
-LOGISTICS.2 audit on 2026-07-30 found Dispatch/Delivery is still
-definition-level for component lines. Current component dispatch uses
-`DispatchItem.componentId`, `ProjectTaskComponentAllocation.componentId`,
-`ShipmentLineInput.componentId`, and frontend payload `componentId`. Delivery
-receive still updates legacy `Component.status = DELIVERED`.
+LOGISTICS.2 audit on 2026-07-30 found Dispatch/Delivery was still
+definition-level for component lines. LOGISTICS.2A on 2026-08-02 implemented
+the required schema foundation: `ComponentInstanceState` now includes
+`IN_YARD`, `IN_TRANSIT`, and `DELIVERED`, and `DispatchItem` now has nullable
+`componentInstanceId` relation/index while keeping legacy `componentId`
+readable.
 
-Do not implement new component dispatch writes on this legacy identity. The
-next approved gate must add `DispatchItem.componentInstanceId` and physical
-`ComponentInstanceState` values for Yard/transit/delivery before Logistics can
-operate on canonical physical component identity.
+Do not treat this as write-path completion. New canonical Logistics behavior
+still belongs to LOGISTICS.2B: dispatch candidates must come from active Yard
+`ComponentInstance` placements, dispatch lines must write
+`componentInstanceId`, departure must release Yard exactly once, and delivery
+must transition physical instances to `DELIVERED` without relying on
+`Component.status`.
 
-Audit:
-`docs/audits/logistics2-component-instance-dispatch-delivery-report.md`.
+Reports:
+
+- `docs/audits/logistics2-component-instance-dispatch-delivery-report.md`
+- `docs/audits/logistics2a-physical-logistics-schema-foundation-report.md`
 
 ## Architecture Design
 

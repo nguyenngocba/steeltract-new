@@ -8,7 +8,7 @@ export class ShipmentLine {
   private constructor(
     readonly type: DispatchItemType,
     readonly inventoryItemId: string | null,
-    readonly componentId: string | null,
+    readonly componentInstanceId: string | null,
     readonly quantity: number,
     readonly yardReleaseReference: string,
   ) {}
@@ -23,20 +23,24 @@ export class ShipmentLine {
       );
     }
     if (input.type === DispatchItemType.MATERIAL) {
-      if (!input.inventoryItemId || input.componentId) {
+      if (!input.inventoryItemId || input.componentInstanceId) {
         throw new LogisticsDomainError(
           'Material shipment line requires only inventoryItemId',
         );
       }
-    } else if (!input.componentId || input.inventoryItemId) {
+    } else if (!input.componentInstanceId || input.inventoryItemId) {
       throw new LogisticsDomainError(
-        'Component shipment line requires only componentId',
+        'Component shipment line requires only componentInstanceId',
+      );
+    } else if (input.quantity !== 1) {
+      throw new LogisticsDomainError(
+        'Component shipment line quantity must be exactly one physical instance',
       );
     }
     return new ShipmentLine(
       input.type,
       input.inventoryItemId ?? null,
-      input.componentId ?? null,
+      input.componentInstanceId ?? null,
       input.quantity,
       input.yardReleaseReference,
     );

@@ -1,5 +1,411 @@
 # SteelTrack AI Changelog
 
+## 2026-08-03 SYSTEM.E2E.1 - End-to-End Business Workflow Certification
+
+Completed:
+
+- Executed a real authenticated REST workflow from Material Master/receipt
+  through Production, QC, Finished Goods, Yard, Logistics and Installation.
+- Fixed the sole continuation blocker by atomically transitioning eligible
+  ComponentInstances to `IN_YARD` in the Yard placement transaction.
+- Certified stock conservation, physical instance cardinality, QC/Finished
+  Goods eligibility, duplicate placement/dispatch prevention and role-specific
+  RBAC behavior.
+- Executed reverse Production-to-MAIN transfer, QC rework disposition and QC
+  scrap disposition.
+- Identified P0 custody, projection version overflow, idempotency payload
+  mismatch and Projects pagination defects without expanding feature scope.
+- Created
+  `docs/audits/system-e2e1-full-business-workflow-certification.md`.
+
+Verification:
+
+- Backend tests PASS: 91 suites / 296 tests.
+- Frontend tests PASS: 2 files / 4 tests.
+- Backend and frontend builds PASS.
+- Schema/migration unchanged; no stage or commit.
+
+
+## 2026-08-03 SYSTEM.INTEGRITY.2 – V1 Runtime Certification & Canonical Freeze Audit
+
+Completed:
+
+- Performed audit-only V1 runtime certification.
+- Verified runtime DB counts for Projects, requirements, ProductionOrders,
+  ComponentInstances, QC inspections, Finished Goods eligibility, Yard
+  placements, DispatchItems and installed instances.
+- Confirmed no complete Yard -> Dispatch -> Delivery -> Installation runtime
+  chain exists in current DB data.
+- Reconfirmed P0 freeze blockers around legacy RBAC endpoint coverage,
+  dashboard/read-model dependency on `Component.status` / `STOCK`, and Projects
+  downstream dispatch canonicality.
+- Created
+  `docs/audits/system-integrity2-v1-runtime-certification.md`.
+
+Verification:
+
+- Source audit PASS
+- Runtime DB read-only audit PASS
+- Source changes NONE
+- Schema/migration changes NONE
+
+Warning:
+
+- Runtime HTTP RBAC/browser smoke was not certified because the backend port was
+  already in use during startup.
+- Full V1 freeze requires a disposable `SYSTEM-INTEGRITY2-*` fixture and P0
+  cleanup sprints.
+
+## 2026-08-03 LOGISTICS.3 – Canonical Physical Dispatch & Delivery
+
+Completed:
+
+- Converted Logistics dispatch suggestions to read physical
+  `ComponentInstance` rows that are `IN_YARD`, actively placed in Yard and not
+  already in an active dispatch.
+- Converted component dispatch creation to require `componentInstanceId`; legacy
+  component-definition `componentId` creation is rejected.
+- Changed duplicate active dispatch prevention from `componentId` to
+  `componentInstanceId`.
+- Removed Logistics receive mutation of legacy `Component.status = DELIVERED`.
+- Added physical lifecycle updates:
+  `depart -> IN_TRANSIT`, `receive -> DELIVERED`, `complete -> installedAt`.
+- Updated shipment command line identity from `componentId` to
+  `componentInstanceId`.
+- Rewired Logistics UI/API types, create drawer, tables and detail drawer to
+  show physical instance/Yard placement lineage.
+- Replaced fake Logistics analytics with backend-derived values or controlled
+  empty states.
+- Created `docs/audits/logistics3-canonical-componentinstance-dispatch.md`.
+
+Verification:
+
+- Prisma validate PASS
+- Prisma generate PASS
+- Prisma migrate status PASS
+- Targeted Logistics tests PASS
+- Backend build PASS
+- Frontend build PASS
+
+Warning:
+
+- Browser/runtime write certification with a disposable Yard-staged fixture is
+  still P1.
+- Material project issue compatibility remains in the Logistics service pending
+  a business-boundary decision.
+
+## 2026-08-03 QC.3 – Canonical QC Module Convergence
+
+Completed:
+
+- Converged standalone QC module onto the same canonical physical QC workspace
+  used by Components/QC.
+- Exported `CanonicalPhysicalQcWorkspace` from the Components/QC surface and
+  reused it inside `QcPage.tsx`.
+- Removed active rendering of the standalone QC cockpit implementation that
+  calculated KPI/chart/table data from `runtime.inspections` and
+  `runtime.metrics`.
+- Standalone QC routes now consume the same physical `ComponentInstance`
+  read-model:
+  `GET /components/foundation/instances?qcScope=true`.
+- Created `docs/audits/qc3-canonical-module-convergence.md`.
+
+Verification:
+
+- Prisma validate PASS
+- Prisma migrate status PASS
+- Targeted backend tests PASS
+- Frontend tests PASS
+- Backend build PASS
+- Frontend build PASS
+
+Warning:
+
+- Browser runtime smoke with authenticated physical QC fixture remains P1.
+- Checklist result entry and enabled disposition commands remain P1; controls
+  stay disabled until FINAL checklist completion is authoritative.
+
+## 2026-08-03 COMPONENTS.QC.2 – Canonical Physical QC Workspace
+
+Completed:
+
+- Converted `ComponentsInternalQcPage.tsx` from legacy `useComponents()` /
+  `Component.status` inference to canonical `ComponentInstance` read-model
+  sourcing.
+- Extended `GET /components/foundation/instances` with `qcScope=true`,
+  physical QC `summary`, and instance lineage includes for FINAL inspection,
+  checklist items/results, NCR and timeline.
+- Updated frontend QC instance API types to expose inspection/checklist/NCR
+  lineage.
+- Rebuilt the Components/QC table around physical columns:
+  Instance, Component, Project, Production Order, Inspection, Result,
+  Disposition, Status and Action.
+- Added right-side `ModuleDetailDrawer` tabs: Overview, Inspection, Checklist,
+  NCR, Disposition and History.
+- Created
+  `docs/audits/components-qc2-canonical-physical-workspace.md`.
+
+Verification:
+
+- Prisma validate PASS
+- Prisma migrate status PASS
+- Targeted backend tests PASS
+- Frontend tests PASS
+- Backend build PASS
+- Frontend build PASS
+
+Warning:
+
+- The main QC page still has mixed cockpit calculations from
+  `runtime.inspections`; a follow-up should move those final-QC KPI values to
+  the same physical summary contract before certifying all QC UI as
+  physical-only.
+
+## 2026-08-02 LOGISTICS.2A – Physical Logistics Schema Foundation
+
+Completed:
+
+- Added canonical physical logistics states to `ComponentInstanceState`:
+  `IN_YARD`, `IN_TRANSIT`, and `DELIVERED`.
+- Added nullable `DispatchItem.componentInstanceId` with optional relation to
+  `ComponentInstance`.
+- Added reverse `ComponentInstance.dispatchItems` relation and non-unique
+  `DispatchItem.componentInstanceId` index.
+- Added additive migration
+  `20260730100000_physical_logistics_schema_foundation`.
+- Preserved legacy `DispatchItem.componentId`; no historical rows were
+  backfilled or reinterpreted.
+- Added schema-foundation tests and Finished Goods eligibility regression
+  coverage.
+- Created
+  `docs/audits/logistics2a-physical-logistics-schema-foundation-report.md`.
+
+Verification:
+
+- Prisma validate PASS
+- Prisma generate PASS
+- backup PASS after escalated `pg_dump`
+- migration deploy/status PASS
+- targeted tests PASS
+- full backend tests PASS
+- backend build PASS
+- frontend build PASS
+- `git diff --check` PASS
+
+Warning:
+
+- Canonical dispatch creation, Yard departure release, delivery state
+  transition, frontend picker and Projects dispatched/delivered counts remain
+  LOGISTICS.2B scope.
+
+## 2026-07-30 PATCH UI.PRODUCTION.COCKPIT.1A – Restore Production Orders as Primary Workspace & Pagination
+
+Completed:
+
+- **Restored Primary Information Hierarchy**:
+  - Moved "Lệnh sản xuất" table and Search/Filter toolbar to the top of the Overview tab in `ProductionCockpitPage.tsx`, directly below Page Header & KPI strip.
+  - Positioned analytical support charts (Stage Workload, Status Donut, Material Readiness, Attention POs, Activity Logs) below the main table & pagination under a section divider.
+- **Restored Table Pagination & Project Labeling**:
+  - Restored `<InventoryPagination>` directly below the main dashboard table using server pagination from `readModel.meta`.
+  - Audited project column: Renders `${project.code} - ${project.name}` when available, fallback to `projectId`.
+- Created deliverable report: `docs/audits/ui-production-cockpit1a-layout-order-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 SPRINT UI.PRODUCTION.COCKPIT.1 – Production Overview Layout Density & Work Order Table Redesign
+
+Completed:
+
+- **Layout Grid Reorganization**:
+  - Reorganized `ProductionCockpitPage.tsx` overview tab into a structured 4-level information hierarchy (Level A Tình hình hiện tại, Level B Tiến độ & Tải xưởng, Level C Điểm nghẽn & Nhật ký, Level D Primary Operational Table).
+  - Compacted 6 top KPI cards (`Tổng Lệnh SX`, `Đang sản xuất`, `Đã hoàn thành`, `Đã cấp phát`, `Chờ cấp phát`, `Thiếu vật tư`).
+  - Standardized chart card heights (`h-[270px]`, `h-[260px]`, `h-[240px]`) and grid spans across Rows 1, 2, and 3 to eliminate empty space on 1366px and 1920px viewports.
+- **Production Orders Table Redesign**:
+  - Titled table **`Lệnh sản xuất`** (removed "Top 8" terminology).
+  - Built high-density 8-column preview table (`Lệnh SX`, `Cấu kiện`, `Công trình`, `Số lượng`, `Vật tư sẵn sàng`, `Tiến độ SX`, `Kế hoạch`, `Trạng thái`).
+  - Updated Level 2 "Xem tất cả" button to open expansive workspace modal (`w-[96vw] max-w-[1720px] h-[88vh]`).
+- Created deliverable report: `docs/audits/ui-production-cockpit1-layout-density-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 Production Cockpit Overview – Production Orders Table Title Update
+
+Completed:
+
+- **Table Title Update**:
+  - Updated table title in `ProductionCockpitPage.tsx` from `Top {N} lệnh sản xuất` / `Danh sách lệnh sản xuất` to **`Lệnh sản xuất`** in the Production Overview tab.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 SPRINT UI.COMPONENTS.FG.1 – Finished Goods Warehouse Enterprise UI Redesign
+
+Completed:
+
+- **Source of Truth Audit & Binding**:
+  - Bound `ComponentsStockPage.tsx` exclusively to canonical `GET /components/instances/finished-goods` via `useFinishedGoodsInstances` hook.
+  - Enforced strict physical vs. engineering semantics: Finished Goods are physical `ComponentInstance` records (`state: QC_PASSED | USE_AS_IS`).
+- **Level 1 Default Table Redesign**:
+  - Compact 8-column high-density operational table: `Cấu kiện (Instance)` (stacked identity), `Công trình`, `Loại / Quy cách`, `Trạng thái`, `QC Inspection`, `Vị trí`, `Cập nhật`, `Thao tác`.
+  - Fixed row height, single-line text truncation (`truncate`), font-medium typography, and font-mono code/numbers.
+- **KPI Strip & Filter Toolbar**:
+  - 4 compact operational KPI cards: `Tổng thành phẩm`, `Đạt QC`, `Chấp nhận sử dụng`, `Công trình liên kết`.
+  - Filter bar with search by instance code/serial, project filter, and component filter.
+- **Level 2 Expansive Workspace Modal**:
+  - Standardized "Xem tất cả" modal to `w-[96vw] max-w-[1720px] h-[88vh]`.
+  - 12-column comprehensive table layout taking full workspace height with sticky headers and pagination.
+- **Level 3 Instance Detail Sliding Workspace**:
+  - Transformed detail view into a right-sliding drawer (`w-screen md:w-[64vw] md:max-w-[1280px] md:min-w-[820px] 100vh`) with backdrop blur.
+  - Header identity, 4-card instance KPI strip, and 5 horizontal tabs (`Tổng quan`, `Sản xuất`, `QC`, `Bãi / Yard`, `Truy vết`).
+- Created deliverable report: `docs/audits/ui-components-fg1-finished-goods-workspace-redesign.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 SPRINT UI.COMPONENTS.DEFINITIONS.2 – Component Detail Sliding Workspace
+
+Completed:
+
+- **Component Detail Sliding Workspace Shell**:
+  - Transformed Component Detail from a centered dialog modal into a right-sliding workspace using `<ModuleDetailDrawer placement="right">`.
+  - Applied desktop sizing: `w-screen md:w-[64vw] md:max-w-[1280px] md:min-w-[820px]` (~1200–1230px usable width at 1920px widescreen, ~850–900px at 1366px desktop) and `100vh` application height.
+  - Preserved background visibility with `bg-black/65 backdrop-blur-sm` backdrop dimming and blur.
+  - Linked both Level 1 default table `Chi tiết` and Level 2 "Xem tất cả" workspace `Chi tiết` to open the exact same sliding workspace shell.
+- **Header & 6-Card Operational KPI Strip**:
+  - Header identity: `CẤU KIỆN · {type} · {profile} · Rev {revisionNo} · {statusLabel}` with actions `[BOM]`, `[Tạo Lệnh SX]`, `[Xóa]` (destructive confirmation), `[X]`.
+  - KPI Strip: 6 cards displaying real metrics (`Nhu cầu`, `Đã phân bổ PO`, `Còn lại`, `Production Orders`, `Instances`, `Thành phẩm`).
+- **Tab Navigation & Real Data Integration**:
+  - Integrated 6 horizontal tabs using `ModuleTabs`: `[Tổng quan]`, `[BOM]`, `[Nhu cầu]`, `[Sản xuất]`, `[Instances]`, `[Lịch sử]`.
+  - `Tổng quan`: 2-column dashboard grid (Engineering Definition + Demand & Production Summary) + Project Requirements preview.
+  - `BOM`: Real Production BOM list (`selectedBoms`) + `[Mở BOM Editor]` action.
+  - `Nhu cầu`: Full ProjectComponentRequirement breakdown.
+  - `Sản xuất`: Linked Production Orders list (`selectedOrders`) + `[Tạo Lệnh Sản xuất]` action.
+  - `Instances` & `Lịch sử`: Controlled empty states (`"Chưa có Component Instances vật lý"`, `"Chưa có nguồn lịch sử cấu kiện đầy đủ"`).
+- Created deliverable report: `docs/audits/ui-components-definitions2-sliding-workspace-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 PATCH UI.COMPONENTS.DEFINITIONS.1C – Fix Actual "Chi tiết" Component Inspector Size
+
+Completed:
+
+- **Root Cause Resolution in `ModuleDetailDrawer` & `ComponentsListPage`**:
+  - Removed prepended `w-screen` (`width: 100vw`) from `resolvedWidthClass` in `ModuleDetailDrawer` (`shared/ui/modules/index.tsx`).
+  - Added `maxHeightClass` prop support to `ModuleDetailDrawer` to override full-screen height.
+  - Centered Level 3 Component Detail inspector with `placement="center"`, `widthClass="w-full max-w-[600px] w-[min(600px,calc(100vw-32px))]"`, and `maxHeightClass="max-h-[72vh]"`.
+- **Compact Inner Layout Optimization**:
+  - Compacted header: `ENGINEERING DEFINITION · {Project}`, identity `${selected.code} · ${selected.name}`, inline status badge, and compact actions (`[BOM]`, `[Tạo Lệnh SX]`, `[Xóa]`).
+  - Compacted demand metric strip: `Yêu cầu` | `Đã phân bổ` | `Còn lại` (~54px height).
+  - Compacted technical info: 2-column grid (`Mã hồ sơ`, `Loại`, `Profile`, `Revision`, `BOM State`, `Trạng thái KT`).
+  - Compacted `RequirementTable`: 4 columns (`Công trình` with `truncate`, `YC`, `PO`, `Còn`).
+  - Compacted Production Lineage: 3 columns (`Mã BOM / Lệnh`, `SL Vật tư`, `Trạng thái`).
+- Created deliverable report: `docs/audits/ui-components-definitions1c-patch-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 PATCH UI.COMPONENTS.DEFINITIONS.1B – Expanded Workspace & Compact Component Detail
+
+Completed:
+
+- **Expanded Level 2 "Xem tất cả" Modal**:
+  - Resized container to `w-[96vw] max-w-[1720px] h-[88vh]`.
+  - Redistributed 12-column table widths prioritizing wide text fields (`Tên cấu kiện` 260px, `Công trình / Yêu cầu` 220px, `Profile / Quy cách` 180px) while keeping numeric and status columns compact.
+- **Compacted Level 3 Component Detail Drawer**:
+  - Resized container to `w-[min(660px,calc(100vw-40px))]` and `max-h-[76vh]` max height.
+  - Replaced oversized KPI cards with a dense 3-column demand metric strip (`Yêu cầu`, `Đã phân bổ`, `Còn lại`).
+  - Streamlined header to `ENGINEERING DEFINITION · {Project}` with inline status badge and compact actions.
+  - Organized dense 6-item technical info grid and single-line requirement/lineage tables.
+- Created deliverable report: `docs/audits/ui-components-definitions1b-patch-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 PATCH UI.COMPONENTS.DEFINITIONS.1A – Expanded Actions & Compact Detail Popup
+
+Completed:
+
+- **Added Delete Action & Safety Confirmation Dialog**:
+  - Bound real API mutation `useDeleteComponent` (`DELETE /components/:id`).
+  - Added compact Trash icon button in Level 2 "Xem tất cả" workspace table actions.
+  - Implemented Delete Confirmation Dialog showing `Mã cấu kiện`, `Tên cấu kiện`, and handling real backend dependency rejection errors cleanly.
+- **Compacted Component Detail Popup/Drawer**:
+  - Bounded width to `780px` (`w-[min(780px,calc(100vw-48px))]`) and height to `82vh`.
+  - Enforced single scroll owner for body content.
+  - Organized dense metric strips for `Tổng quan`, `Nhu cầu`, `Requirements Table`, and `Production Lineage`.
+- Created deliverable report: `docs/audits/ui-components-definitions1a-patch-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 SPRINT UI.COMPONENTS.DEFINITIONS.1 – Component Definition List Density & Detail Redesign
+
+Completed:
+
+- **Redesigned Component Definition Workspace (`ComponentsListPage.tsx`)**:
+  - Implemented Three-Level Information Architecture:
+    - **Level 1 (Default Table)**: High-density 8-column operational table (`Cấu kiện`, `Công trình`, `Loại / Quy cách`, `Nhu cầu`, `Còn lại`, `Rev / BOM`, `Trạng thái kỹ thuật`, `Thao tác`). Enforced single-line cell constraints (`whitespace-nowrap overflow-hidden text-ellipsis truncate`), compact `font-medium` typography, right-aligned tabular nums.
+    - **Level 2 (Expanded Detailed Workspace)**: Triggered via `"Xem tất cả"`, displaying full 12-column detailed table (`Mã hồ sơ`, `Tên cấu kiện`, `Công trình / Yêu cầu`, `Loại`, `Profile`, `Revision`, `BOM State`, `SL yêu cầu`, `Đã phân bổ`, `Còn lại`, `Trạng thái kỹ thuật`, `Thao tác`).
+    - **Level 3 (Detail Drawer)**: Polished engineering detail drawer emphasizing **Engineering Definition** identity, technical specs grid, project requirement breakdown table, and BOM / Production Order lineage.
+- Created deliverable report: `docs/audits/ui-components-definitions1-list-density-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
+## 2026-07-30 SPRINT UI.COMPONENTS.MATERIALS.1 – Production Material Warehouse Table Redesign
+
+Completed:
+
+- **Redesigned Production Material Warehouse Table (`ComponentsMaterialStockPage.tsx`)**:
+  - Implemented 2-Level Information Architecture:
+    - **Level 1 (Default Table)**: High-density 9-column operational table (`Vật tư`, `Loại vật tư`, `ĐVT`, `Tồn SX`, `Đã giữ`, `Khả dụng`, `Vị trí kho SX`, `Trạng thái`, `Thao tác`). Single-line cell constraints (`whitespace-nowrap`, `truncate`), compact font-medium typography, right-aligned tabular nums.
+    - **Level 2 (Expanded Detailed View)**: Triggered via `"Xem tất cả"`, displaying complete 13-column view (`Kho SX`, `Slot/Tầng`, `Giá TB`, `Tổng giá trị`).
+- Created deliverable report: `docs/audits/ui-components-materials1-production-stock-table-report.md`.
+
+Verification:
+- `pnpm -C apps/frontend test` (Pass - 2/2 suites, 4/4 tests)
+- `pnpm -C apps/frontend exec tsc --noEmit` (Pass - 0 errors)
+- `pnpm -C apps/frontend build` (Pass - 0 errors)
+- `pnpm -C apps/backend-api build` (Pass - 0 errors)
+- `git diff --check` (Pass - 0 format errors)
+
 ## 2026-07-30 LOGISTICS.2 – Canonical ComponentInstance Dispatch & Delivery Audit
 
 Completed:
@@ -7149,3 +7555,32 @@ Notes:
   PRODUCTION transaction lines, not remarks.
 - Added tests for MAIN -> PRODUCTION transfer conservation, BOM no inventory
   side effects and Production availability from canonical balances.
+
+# 2026-08-03 - COMPONENTS.PRODUCTION.2 Canonical Production Workspace
+
+- Converted the Components Production tab from the legacy `/production` order
+  list to `GET /production/read-model/cockpit` as its operational source of
+  truth.
+- Enriched the Production cockpit read model with canonical requirement,
+  project, component definition, revision, BOM definition, physical
+  `ComponentInstance`, `ComponentInstanceExecution`, QC and production material
+  readiness payloads.
+- Replaced frontend-derived production KPIs/table semantics with backend
+  read-model values for order counts, physical instances, waiting QC and
+  material readiness.
+- Reworked `Xem tất cả` and order details to use shared `ModuleDetailDrawer`
+  surfaces with canonical Materials, Instances, Execution, QC and History tabs.
+
+# 2026-08-03 - SYSTEM.INTEGRITY.1 V1 Operational Readiness Audit
+
+- Completed audit-only V1 operational readiness review across Authentication,
+  RBAC, Master Data, Inventory, Components, Production, QC, Projects, Yard,
+  Logistics, Executive BI and System Administration.
+- Rated SteelTrack V1 operational readiness at 72%: conditionally ready for
+  internal staging, not ready for V1 freeze.
+- Identified P0 blockers: Logistics write path still uses component definition
+  identity, registered legacy write endpoints lack canonical RBAC permissions,
+  and some dashboards/read models still derive physical component metrics from
+  `Component.status`.
+- Created
+  `docs/audits/system-integrity1-steeltrack-v1-operational-readiness-audit.md`.

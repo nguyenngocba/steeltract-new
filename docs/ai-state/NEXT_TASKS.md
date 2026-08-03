@@ -1,11 +1,49 @@
 # Next Tasks
 
-- **LOGISTICS.2 schema/state gate - P0**: approve the minimal canonical
-  logistics schema/state extension before implementation: nullable
-  `DispatchItem.componentInstanceId` relation/index plus physical
-  `ComponentInstanceState` values for `IN_YARD`, `IN_TRANSIT` and
-  `DELIVERED`. Without this gate, Logistics cannot safely dispatch/deliver
-  physical ComponentInstances and must not fall back to `Component.status`.
+- **SYSTEM.INTEGRITY.2 P0 - Full disposable runtime fixture certification**:
+  create and execute a controlled `SYSTEM-INTEGRITY2-*` fixture through
+  Finished Goods -> Yard stage -> Logistics suggest/create -> depart ->
+  receive -> complete/install -> Project execution read model. Current runtime
+  DB has 2 Finished Goods eligible instances but 0 active Yard placements,
+  0 DispatchItems and 0 installed ComponentInstances, so V1 freeze cannot be
+  certified from existing data alone.
+- **SYSTEM.INTEGRITY.2 P0 - Projects dispatch canonical read-model closure**:
+  update Projects execution/downstream read model so canonical Logistics
+  `DispatchItem.componentInstanceId` and `ComponentInstance` delivery/
+  installation states are reflected; current source still reports
+  `dispatchCanonical: false`.
+- **SYSTEM.INTEGRITY.2 P0 - Dashboard/read-model canonical freeze cleanup**:
+  remove remaining dashboard, snapshot and Components report/overview
+  calculations that treat `Component.status` / `ComponentStatus.STOCK` as
+  physical component inventory. Use `ComponentInstance` and Finished Goods
+  eligibility sources.
+- **SYSTEM.INTEGRITY.1 P0 - RBAC legacy endpoint closure**: guard or remove
+  registered legacy write endpoints that currently rely on global JWT but not
+  canonical `PermissionsGuard`: `/inventory/categories`,
+  `/inventory/material-types`, `/inventory/units`, `/inventory/zones`, and
+  `/material-movements`. Add route-level 401/403/authorized tests before V1
+  freeze.
+- **SYSTEM.INTEGRITY.1 P0 - Dashboard source-of-truth cleanup**: remove
+  physical component inventory/completion metrics derived from
+  `Component.status`, `ComponentStatus.STOCK`, `READY`, `SHIPPED`,
+  `DELIVERED` or `INSTALLED`. Use `ComponentInstance` and
+  `GET /components/instances/finished-goods` semantics instead.
+- **COMPONENTS.QC.2 P1 - FINAL checklist decision UI**: add authoritative
+  checklist result entry and enable PASS/FAIL/USE-AS-IS/REWORK/SCRAP commands
+  only after all required FINAL checklist items have non-`PENDING` results.
+- **QC.3 P1 - Physical QC browser runtime smoke**: certify authenticated
+  `/qc`, `/qc/final`, `/qc/ncr` and Components/QC routes against the same
+  physical fixture. Verify KPI summary, table rows, drawer tabs, FINAL
+  checklist completion state, NCR, timeline and controlled empty states.
+- **QC.3 P2 - Canonical physical analytics**: reintroduce richer QC charts only
+  from `ComponentInstance` summary/projection data. Do not restore
+  `runtime.inspections` frontend aggregation.
+- **LOGISTICS.3 browser/runtime certification - P1**: with a disposable
+  physical fixture, certify Finished Goods -> Yard stage -> Logistics suggest
+  -> create dispatch -> loading -> depart -> arrive -> receive -> complete.
+  Verify `DispatchItem.componentInstanceId`, `ComponentInstance.state`
+  transitions (`IN_YARD` -> `IN_TRANSIT` -> `DELIVERED`), `installedAt`, UI
+  tables, detail drawer and no legacy `Component.status` mutation.
 - **STABILITY.PROJECTS.3A mutating Yard fixture - P1**: with explicit approval
   to mutate a disposable/runtime database, certify the write flow `GET
   /components/instances/finished-goods -> POST /yard/stage -> duplicate stage
@@ -18,9 +56,10 @@
 - **Yard browser handoff smoke - P1**: run Production and Yard UI against the
   canonical `/yard/stage` flow and verify operators stage concrete
   `ComponentInstance` rows only.
-- **LOGISTICS project instance dispatch - P0**: add canonical dispatch support
-  for physical `ComponentInstance` rows before claiming Project delivery
-  traceability. Current `DispatchItem.componentId` is component-level.
+- **LOGISTICS material/project issue boundary - P1**: decide whether material
+  project issue remains in Logistics V1 or moves to a separate outbound/project
+  material flow. LOGISTICS.3 canonicalized component dispatch only and retained
+  material compatibility for existing project issue behavior.
 - **Projects material read-model cleanup - P1**: replace project material
   runtime derivation from capped project-linked `InventoryTransaction` rows
   with a correctness-safe project material read model that keeps requirements,
@@ -1279,3 +1318,30 @@ Backlog after the locked order:
    availability enrichment.
 4. Decide in UI.OPS.3B whether BOM should expose the existing Inventory
    material-create flow as `+ Tao vat tu moi`.
+
+# COMPONENTS.PRODUCTION.2 Follow-up
+
+1. Run browser smoke for Components Production:
+   table load -> search -> status filter -> pagination -> `Xem tất cả` ->
+   detail drawer tabs.
+2. Seed or reuse one canonical ProductionOrder with ProjectComponentRequirement,
+   ComponentInstances, ComponentInstanceExecution, QC and material reservation
+   evidence to visually certify every tab.
+3. Consider adding server-side column sorting to the Production cockpit read
+   model if operators need more than the current `updatedAt desc` default.
+4. Expand the material tab only after a specific operator need is approved for
+   production warehouse slot-level drill-down inside the order drawer.
+# SYSTEM.E2E.1 Follow-up
+
+1. P0: close/remove canonical Yard placement atomically when Dispatch takes
+   physical custody; reconcile Project `yardStagedQty` after delivery.
+2. P0: correct projection aggregate-version storage/emission mismatch and
+   rebuild degraded Production, Inventory, QC and Yard projections.
+3. P0: bind Inventory idempotency to a normalized payload hash and reject key
+   reuse with a different payload.
+4. P0: coerce Projects `limit/page` query values before Prisma repository calls.
+5. P1: define canonical physical reverse APIs for installed dismantle, project
+   surplus return and supplier outbound return.
+6. P1: certify full `QC FAIL -> REWORK -> Production -> FINAL QC -> PASS`.
+7. P1: run authenticated browser/chart certification against the retained
+   `SYSTEM-E2E1-1785732305546` fixture.

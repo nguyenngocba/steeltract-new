@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DispatchOrderStatus, Prisma } from '@prisma/client';
+import {
+  ComponentInstanceState,
+  DispatchOrderStatus,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { nextOperationalCode } from '../../common/utils/code-generator';
@@ -11,6 +15,28 @@ export const dispatchInclude = {
     include: {
       inventoryItem: true,
       component: true,
+      componentInstance: {
+        include: {
+          component: true,
+          requirement: true,
+          productionOrder: true,
+          project: true,
+          projectTask: true,
+          yardPlacements: {
+            where: { removedAt: null },
+            include: {
+              slot: {
+                include: {
+                  zone: true,
+                  row: true,
+                },
+              },
+            },
+            orderBy: { placedAt: 'desc' },
+            take: 1,
+          },
+        },
+      },
     },
   },
   events: {
@@ -103,59 +129,110 @@ export class LogisticsRepository {
     });
   }
 
-  findProjectTasksForDispatchSuggestion(params: {
+  findYardStagedComponentInstances(params: {
     projectId: string;
     projectTaskId?: string;
+    activeStatuses: DispatchOrderStatus[];
   }) {
-    const where: Prisma.ProjectTaskWhereInput = {
-      projectId: params.projectId,
-      progress: {
-        lt: 100,
+    return this.prisma.componentInstance.findMany({
+      where: {
+        projectId: params.projectId,
+        ...(params.projectTaskId && { projectTaskId: params.projectTaskId }),
+        state: ComponentInstanceState.IN_YARD,
+        yardPlacements: {
+          some: { removedAt: null },
+        },
+        dispatchItems: {
+          none: {
+            dispatchOrder: {
+              status: { in: params.activeStatuses },
+            },
+          },
+        },
       },
-    };
-
-    if (params.projectTaskId) {
-      where.id = params.projectTaskId;
-    }
-
-    return this.prisma.projectTask.findMany({
-      where,
       include: {
-        materialAllocations: {
+        component: true,
+        requirement: true,
+        productionOrder: true,
+        project: true,
+        projectTask: true,
+        yardPlacements: {
+          where: { removedAt: null },
           include: {
-            inventoryItem: true,
+            slot: {
+              include: {
+                zone: true,
+                row: true,
+              },
+            },
           },
-        },
-        componentAllocations: {
-          include: {
-            component: true,
-          },
+          orderBy: { placedAt: 'desc' },
+          take: 1,
         },
       },
-      orderBy: [
-        { scheduledStartAt: 'asc' },
-        { plannedStartAt: 'asc' },
-        { sortOrder: 'asc' },
-      ],
-      take: params.projectTaskId ? 1 : 5,
+      orderBy: [{ updatedAt: 'desc' }, { instanceNo: 'asc' }],
+      take: 200,
     });
   }
 
-  findActiveComponentDispatch(
-    componentIds: string[],
+  findComponentInstancesForDispatch(componentInstanceIds: string[]) {
+    return this.prisma.componentInstance.findMany({
+      where: {
+        id: { in: componentInstanceIds },
+      },
+      include: {
+        component: true,
+        project: true,
+        projectTask: true,
+        yardPlacements: {
+          where: { removedAt: null },
+          include: {
+            slot: {
+              include: {
+                zone: true,
+                row: true,
+              },
+            },
+          },
+          orderBy: { placedAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+  }
+
+  findActiveComponentInstanceDispatch(
+    componentInstanceIds: string[],
     activeStatuses: DispatchOrderStatus[],
   ) {
     return this.prisma.dispatchItem.findFirst({
       where: {
-        componentId: { in: componentIds },
+        componentInstanceId: { in: componentInstanceIds },
         dispatchOrder: {
           status: { in: activeStatuses },
         },
       },
       include: {
         dispatchOrder: true,
-        component: true,
+        componentInstance: {
+          include: {
+            component: true,
+          },
+        },
       },
+    });
+  }
+
+  updateComponentInstances(
+    ids: string[],
+    data: Prisma.ComponentInstanceUpdateManyMutationInput,
+  ) {
+    if (!ids.length) {
+      return Promise.resolve({ count: 0 });
+    }
+    return this.prisma.componentInstance.updateMany({
+      where: { id: { in: ids } },
+      data,
     });
   }
 
@@ -185,41 +262,6 @@ export class LogisticsRepository {
     data: Prisma.ProjectTaskMaterialAllocationCreateInput,
   ) {
     return this.prisma.projectTaskMaterialAllocation.create({ data });
-  }
-
-  findProjectTaskComponentAllocation(
-    projectTaskId: string,
-    componentId: string,
-  ) {
-    return this.prisma.projectTaskComponentAllocation.findFirst({
-      where: {
-        projectTaskId,
-        componentId,
-      },
-    });
-  }
-
-  updateProjectTaskComponentAllocation(
-    id: string,
-    data: Prisma.ProjectTaskComponentAllocationUpdateInput,
-  ) {
-    return this.prisma.projectTaskComponentAllocation.update({
-      where: { id },
-      data,
-    });
-  }
-
-  createProjectTaskComponentAllocation(
-    data: Prisma.ProjectTaskComponentAllocationCreateInput,
-  ) {
-    return this.prisma.projectTaskComponentAllocation.create({ data });
-  }
-
-  updateComponent(id: string, data: Prisma.ComponentUpdateInput) {
-    return this.prisma.component.update({
-      where: { id },
-      data,
-    });
   }
 
   createActivityLog(

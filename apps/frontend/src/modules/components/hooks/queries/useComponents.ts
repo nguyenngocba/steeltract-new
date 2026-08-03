@@ -17,7 +17,6 @@ import {
   getComponentsDashboard,
   getComponentsWorkspace,
   getFinishedGoodsInstances,
-  getProductionOrders,
   recalculateComponentCosting,
 } from "../../services/api/components.api";
 import type {
@@ -155,9 +154,29 @@ export function useRecalculateComponentCosting() {
 export function useProductionOrders(enabled = true) {
   return useQuery({
     queryKey: ["component-production-orders"],
-    queryFn: getProductionOrders,
+    queryFn: () => productionApi.orders(),
     refetchInterval: 5000,
     enabled,
+  });
+}
+
+export function useComponentsProductionWorkspace(params: {
+  search?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  return useQuery({
+    queryKey: ["components", "production-workspace", params],
+    queryFn: () =>
+      productionApi.cockpit({
+        scope: "all",
+        sortBy: "updatedAt",
+        sortOrder: "desc",
+        ...params,
+      }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 5000,
   });
 }
 

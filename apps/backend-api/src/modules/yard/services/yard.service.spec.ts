@@ -262,6 +262,74 @@ describe('YardService repository and Outbox boundary', () => {
     ).rejects.toThrow('requires componentInstanceId');
   });
 
+  it('atomically transitions an eligible physical instance into Yard custody', async () => {
+    const tx = {};
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findSlotById: jest.fn().mockResolvedValue({
+        id: 'slot-a',
+        status: 'AVAILABLE',
+        maxStackLevel: 4,
+      }),
+      findActivePlacementsForSlot: jest.fn().mockResolvedValue([]),
+      findActivePlacementForComponentInstance: jest
+        .fn()
+        .mockResolvedValue(null),
+      transitionComponentInstanceToYard: jest
+        .fn()
+        .mockResolvedValue({ count: 1 }),
+      createPlacement: jest.fn().mockResolvedValue({
+        id: 'placement-1',
+        slotId: 'slot-a',
+        itemType: 'COMPONENT',
+        itemId: 'instance-1',
+        itemCode: 'BEAM-A-001',
+        componentInstanceId: 'instance-1',
+      }),
+      createMovement: jest.fn().mockResolvedValue({ id: 'movement-1' }),
+      updateSlot: jest.fn().mockResolvedValue({}),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+      findPlacementById: jest.fn().mockResolvedValue({
+        id: 'placement-1',
+        slotId: 'slot-a',
+        itemType: 'COMPONENT',
+        itemId: 'instance-1',
+        itemCode: 'BEAM-A-001',
+        componentInstanceId: 'instance-1',
+        placedAt: new Date('2026-08-03T00:00:00.000Z'),
+        slot: { zoneId: 'zone-1' },
+        movements: [],
+      }),
+    };
+    const service = new YardService(
+      repository as never,
+      { link: jest.fn() } as never,
+      { findEligibleInstance: jest.fn() } as never,
+    );
+
+    await service.placeItem({
+      slotId: 'slot-a',
+      componentInstanceId: 'instance-1',
+      itemType: 'COMPONENT' as never,
+      itemId: 'instance-1',
+      itemCode: 'BEAM-A-001',
+      quantity: 1,
+      attachmentIds: [],
+    });
+
+    expect(repository.transitionComponentInstanceToYard).toHaveBeenCalledWith(
+      'instance-1',
+      tx,
+    );
+    expect(repository.createPlacement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentInstance: { connect: { id: 'instance-1' } },
+      }),
+      tx,
+    );
+  });
+
   it('preserves ComponentInstance identity during move', async () => {
     const tx = {};
     const existing = {

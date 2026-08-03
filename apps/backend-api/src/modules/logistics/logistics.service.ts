@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import {
+  ComponentInstanceState,
   DispatchEventType,
   DispatchItemType,
   DispatchOrderStatus,
@@ -26,6 +27,11 @@ const activeDispatchStatuses: DispatchOrderStatus[] = [
   'ARRIVED',
   'RECEIVED',
 ]
+
+type NormalizedDispatchItems = {
+  create: Prisma.DispatchItemCreateWithoutDispatchOrderInput[]
+  componentInstanceIds: string[]
+}
 
 @Injectable()
 export class LogisticsService {
@@ -130,6 +136,34 @@ export class LogisticsService {
       }, {}),
     )
 
+    const componentStateCounts = orders.reduce<Record<string, number>>((acc, order) => {
+      for (const item of order.items) {
+        const state = item.componentInstance?.state
+        if (!state) continue
+        acc[state] = (acc[state] ?? 0) + 1
+      }
+      return acc
+    }, {})
+
+    const topProjects = Object.values(
+      orders.reduce<Record<string, { id: string; name: string; active: number; total: number }>>((acc, order) => {
+        const id = order.project?.id ?? order.projectId
+        acc[id] ??= {
+          id,
+          name: order.project?.name ?? order.project?.code ?? 'Chưa rõ công trình',
+          active: 0,
+          total: 0,
+        }
+        acc[id].total += order.items.filter((item) => item.componentInstanceId).length
+        if (['PLANNED', 'LOADING', 'IN_TRANSIT', 'ARRIVED'].includes(order.status)) {
+          acc[id].active += order.items.filter((item) => item.componentInstanceId).length
+        }
+        return acc
+      }, {}),
+    )
+      .filter((row) => row.total > 0)
+      .sort((a, b) => b.active - a.active || b.total - a.total)
+
     return {
       kpis: {
         waiting: orders.filter((order) =>
@@ -147,6 +181,8 @@ export class LogisticsService {
       statusCounts,
       trend,
       vehicleUtilization,
+      componentStateCounts,
+      topProjects,
       recent: orders.slice(0, 12),
     }
   }
@@ -211,76 +247,63 @@ export class LogisticsService {
       throw new BadRequestException('projectId is required')
     }
 
-    const taskWhere: {
+    const where: {
       projectId: string
       projectTaskId?: string
     } = {
       projectId,
     }
     if (body?.projectTaskId) {
-      taskWhere.projectTaskId = String(body.projectTaskId)
+      where.projectTaskId = String(body.projectTaskId)
     }
 
-    const tasks =
-      await this.logisticsRepository.findProjectTasksForDispatchSuggestion(
-        taskWhere,
-      )
-
-    const items = tasks.flatMap((task) => {
-      const materialItems = task.materialAllocations
-        .map((allocation) => {
-          const missingQty = Math.max(
-            0,
-            Number(allocation.plannedQty ?? 0) -
-              Number(allocation.issuedQty ?? 0),
-          )
-          if (missingQty <= 0) {
-            return null
-          }
-          return {
-            type: 'MATERIAL' as DispatchItemType,
-            projectTaskId: task.id,
-            projectTaskName: task.name,
-            inventoryItemId: allocation.inventoryItemId,
-            materialCode: allocation.inventoryItem.code,
-            materialName: allocation.inventoryItem.name,
-            quantity: missingQty,
-            unit: allocation.inventoryItem.unit,
-            reason: 'Thiếu vật tư theo kế hoạch task',
-          }
-        })
-        .filter(Boolean)
-
-      const componentItems = task.componentAllocations
-        .filter((allocation) =>
-          !['HANDED_OVER', 'RETURNED'].includes(allocation.status),
-        )
-        .map((allocation) => ({
-          type: 'COMPONENT' as DispatchItemType,
-          projectTaskId: task.id,
-          projectTaskName: task.name,
-          componentId: allocation.componentId,
-          componentCode: allocation.component.code,
-          componentName: allocation.component.name,
-          quantity: 1,
-          reason: 'Cấu kiện đã gán cho task',
-        }))
-
-      return [
-        ...materialItems,
-        ...componentItems,
-      ]
-    })
+    const instances =
+      await this.logisticsRepository.findYardStagedComponentInstances({
+        ...where,
+        activeStatuses: activeDispatchStatuses,
+      })
 
     return {
       projectId,
-      tasks: tasks.map((task) => ({
-        id: task.id,
-        name: task.name,
-        plannedStartAt: task.plannedStartAt,
-        scheduledStartAt: task.scheduledStartAt,
-      })),
-      items,
+      tasks: Array.from(
+        new Map(
+          instances
+            .filter((instance) => instance.projectTask)
+            .map((instance) => [
+              instance.projectTask!.id,
+              {
+                id: instance.projectTask!.id,
+                name: instance.projectTask!.name,
+                plannedStartAt: instance.projectTask!.plannedStartAt,
+                scheduledStartAt: instance.projectTask!.scheduledStartAt,
+              },
+            ]),
+        ).values(),
+      ),
+      items: instances.map((instance) => {
+        const placement = instance.yardPlacements[0]
+        const slot = placement?.slot
+        const location = slot
+          ? [slot.zone?.code, slot.row?.code, slot.code].filter(Boolean).join(' / ')
+          : null
+        return {
+          type: 'COMPONENT' as DispatchItemType,
+          componentInstanceId: instance.id,
+          instanceNo: instance.instanceNo,
+          projectTaskId: instance.projectTaskId ?? undefined,
+          projectTaskName: instance.projectTask?.name,
+          componentCode: instance.component.code,
+          componentName: instance.component.name,
+          productionOrderId: instance.productionOrderId,
+          productionOrderCode: instance.productionOrder?.orderNo,
+          requirementId: instance.requirementId,
+          yardPlacementId: placement?.id,
+          yardLocation: location,
+          quantity: 1,
+          unit: 'cấu kiện',
+          reason: 'Cấu kiện thành phẩm đã staged tại Yard',
+        }
+      }),
     }
   }
 
@@ -291,7 +314,7 @@ export class LogisticsService {
     }
 
     const items = this.normalizeItems(body?.items)
-    await this.assertNoActiveComponentDispatch(items)
+    await this.assertDispatchableComponentInstances(items.componentInstanceIds)
 
     const code = await nextOperationalCode(
       this.prisma,
@@ -320,7 +343,7 @@ export class LogisticsService {
         driver: body?.driver ?? null,
         notes: body?.notes ?? null,
         items: {
-          create: items,
+          create: items.create,
         },
         events: {
           create: {
@@ -355,7 +378,8 @@ export class LogisticsService {
 
   async depart(id: string, body: any) {
     await this.assertStatus(id, ['LOADING'])
-    return this.updateStatus(
+    const order = await this.getDispatchOrder(id)
+    const updated = await this.updateStatus(
       id,
       'IN_TRANSIT',
       'DEPARTED',
@@ -365,6 +389,8 @@ export class LogisticsService {
       },
       body?.createdBy,
     )
+    await this.transitionComponentInstances(order, ComponentInstanceState.IN_TRANSIT)
+    return updated
   }
 
   async arrive(id: string, body: any) {
@@ -412,6 +438,7 @@ export class LogisticsService {
     }
 
     await this.reconcileProjectAllocations(order)
+    await this.transitionComponentInstances(order, ComponentInstanceState.DELIVERED)
 
     const updated = await this.updateStatus(
       id,
@@ -432,7 +459,7 @@ export class LogisticsService {
       items: order.items.map((item) => ({
         type: item.type,
         inventoryItemId: item.inventoryItemId,
-        componentId: item.componentId,
+        componentInstanceId: item.componentInstanceId,
         quantity: item.quantity,
       })),
     })
@@ -442,7 +469,8 @@ export class LogisticsService {
 
   async complete(id: string, body: any) {
     await this.assertStatus(id, ['RECEIVED'])
-    return this.updateStatus(
+    const order = await this.getDispatchOrder(id)
+    const updated = await this.updateStatus(
       id,
       'COMPLETED',
       'COMPLETED',
@@ -450,6 +478,11 @@ export class LogisticsService {
       {},
       body?.createdBy,
     )
+    await this.logisticsRepository.updateComponentInstances(
+      this.componentInstanceIds(order),
+      { installedAt: new Date() },
+    )
+    return updated
   }
 
   async cancel(id: string, body: any) {
@@ -470,12 +503,13 @@ export class LogisticsService {
     )
   }
 
-  private normalizeItems(items: any[]): Prisma.DispatchItemCreateWithoutDispatchOrderInput[] {
+  private normalizeItems(items: any[]): NormalizedDispatchItems {
     if (!Array.isArray(items) || !items.length) {
       throw new BadRequestException('Dispatch order requires at least one item')
     }
 
-    return items.map((item) => {
+    const componentInstanceIds: string[] = []
+    const create = items.map((item) => {
       const type = String(item?.type ?? '').toUpperCase()
       const quantity = Number(item?.quantity ?? 0)
       if (!['MATERIAL', 'COMPONENT'].includes(type)) {
@@ -487,8 +521,14 @@ export class LogisticsService {
       if (type === 'MATERIAL' && !item?.inventoryItemId) {
         throw new BadRequestException('Material dispatch item requires inventoryItemId')
       }
-      if (type === 'COMPONENT' && !item?.componentId) {
-        throw new BadRequestException('Component dispatch item requires componentId')
+      if (type === 'COMPONENT' && !item?.componentInstanceId) {
+        throw new BadRequestException('Component dispatch item requires componentInstanceId')
+      }
+      if (type === 'COMPONENT' && quantity !== 1) {
+        throw new BadRequestException('Component dispatch item quantity must be exactly 1 physical instance')
+      }
+      if (type === 'COMPONENT') {
+        componentInstanceIds.push(String(item.componentInstanceId))
       }
 
       return {
@@ -501,38 +541,76 @@ export class LogisticsService {
             },
           },
         }),
-        ...(item?.componentId && {
-          component: {
+        ...(item?.componentInstanceId && {
+          componentInstance: {
             connect: {
-              id: String(item.componentId),
+              id: String(item.componentInstanceId),
             },
           },
         }),
       }
     })
+
+    if (new Set(componentInstanceIds).size !== componentInstanceIds.length) {
+      throw new BadRequestException('Dispatch order contains duplicate ComponentInstance')
+    }
+
+    return { create, componentInstanceIds }
   }
 
-  private async assertNoActiveComponentDispatch(
-    items: Prisma.DispatchItemCreateWithoutDispatchOrderInput[],
-  ) {
-    const componentIds = items
-      .map((item: any) => item.component?.connect?.id)
-      .filter(Boolean)
-
-    if (!componentIds.length) {
+  private async assertDispatchableComponentInstances(componentInstanceIds: string[]) {
+    if (!componentInstanceIds.length) {
       return
     }
 
-    const activeItem = await this.logisticsRepository.findActiveComponentDispatch(
-      componentIds,
+    const instances =
+      await this.logisticsRepository.findComponentInstancesForDispatch(
+        componentInstanceIds,
+      )
+    const found = new Set(instances.map((instance) => instance.id))
+    const missing = componentInstanceIds.filter((id) => !found.has(id))
+    if (missing.length) {
+      throw new BadRequestException(`ComponentInstance not found: ${missing.join(', ')}`)
+    }
+
+    const notStaged = instances.find((instance) =>
+      instance.state !== ComponentInstanceState.IN_YARD ||
+      instance.yardPlacements.length === 0,
+    )
+    if (notStaged) {
+      throw new BadRequestException(
+        `Cấu kiện ${notStaged.instanceNo} chưa ở trạng thái staged tại Yard`,
+      )
+    }
+
+    const activeItem = await this.logisticsRepository.findActiveComponentInstanceDispatch(
+      componentInstanceIds,
       activeDispatchStatuses,
     )
 
     if (activeItem) {
       throw new BadRequestException(
-        `Cấu kiện ${activeItem.component?.code ?? activeItem.componentId} đang nằm trong lệnh điều xe ${activeItem.dispatchOrder.code}`,
+        `Cấu kiện ${activeItem.componentInstance?.instanceNo ?? activeItem.componentInstanceId} đang nằm trong lệnh điều xe ${activeItem.dispatchOrder.code}`,
       )
     }
+  }
+
+  private componentInstanceIds(
+    order: Prisma.DispatchOrderGetPayload<{ include: typeof dispatchInclude }>,
+  ) {
+    return order.items
+      .map((item) => item.componentInstanceId)
+      .filter((id): id is string => Boolean(id))
+  }
+
+  private transitionComponentInstances(
+    order: Prisma.DispatchOrderGetPayload<{ include: typeof dispatchInclude }>,
+    state: ComponentInstanceState,
+  ) {
+    return this.logisticsRepository.updateComponentInstances(
+      this.componentInstanceIds(order),
+      { state },
+    )
   }
 
   private async reconcileProjectAllocations(
@@ -571,39 +649,8 @@ export class LogisticsService {
         }
       }
 
-      if (item.type === 'COMPONENT' && item.componentId) {
-        const allocation =
-          await this.logisticsRepository.findProjectTaskComponentAllocation(
-            order.projectTaskId,
-            item.componentId,
-          )
-        if (allocation) {
-          await this.logisticsRepository.updateProjectTaskComponentAllocation(
-            allocation.id,
-            {
-              status: 'HANDED_OVER',
-            },
-          )
-        } else {
-          await this.logisticsRepository.createProjectTaskComponentAllocation({
-              projectTask: { connect: { id: order.projectTaskId } },
-              component: { connect: { id: item.componentId } },
-              assignedAt: new Date(),
-              status: 'HANDED_OVER',
-          })
-        }
-        await this.logisticsRepository.updateComponent(
-          item.componentId,
-          {
-            project: {
-              connect: {
-                id: order.projectId,
-              },
-            },
-            status: 'DELIVERED',
-          },
-        )
-      }
+      // Component delivery is canonicalized on ComponentInstance state/timestamps.
+      // Legacy Component.status and component-allocation mutation are intentionally not touched here.
     }
   }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
+import { ComponentInstanceState, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
@@ -182,6 +182,21 @@ export class YardRepository {
       where: { componentInstanceId, removedAt: null },
       include: this.placementInclude(),
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  transitionComponentInstanceToYard(componentInstanceId: string, tx: YardTx) {
+    return tx.componentInstance.updateMany({
+      where: {
+        id: componentInstanceId,
+        state: {
+          in: [
+            ComponentInstanceState.QC_PASSED,
+            ComponentInstanceState.USE_AS_IS,
+          ],
+        },
+      },
+      data: { state: ComponentInstanceState.IN_YARD },
     });
   }
 

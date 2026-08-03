@@ -73,8 +73,8 @@ export class LogisticsCommandService {
               inventoryItem: line.inventoryItemId
                 ? { connect: { id: line.inventoryItemId } }
                 : undefined,
-              component: line.componentId
-                ? { connect: { id: line.componentId } }
+              componentInstance: line.componentInstanceId
+                ? { connect: { id: line.componentInstanceId } }
                 : undefined,
             })),
           },
@@ -421,7 +421,7 @@ export class LogisticsCommandService {
       lines: shipment.items.map((line) => ({
         type: line.type,
         inventoryItemId: line.inventoryItemId ?? undefined,
-        componentId: line.componentId ?? undefined,
+        componentInstanceId: line.componentInstanceId ?? undefined,
         quantity: line.quantity,
         yardReleaseReference:
           releaseReferences[this.persistedLineKey(line)] ?? '',
@@ -435,15 +435,15 @@ export class LogisticsCommandService {
   }
 
   private lineKey(line: ShipmentLine) {
-    return `${line.type}:${line.inventoryItemId ?? line.componentId}`;
+    return `${line.type}:${line.inventoryItemId ?? line.componentInstanceId}`;
   }
 
   private persistedLineKey(line: {
     type: string;
     inventoryItemId: string | null;
-    componentId: string | null;
+    componentInstanceId: string | null;
   }) {
-    return `${line.type}:${line.inventoryItemId ?? line.componentId}`;
+    return `${line.type}:${line.inventoryItemId ?? line.componentInstanceId}`;
   }
 
   private shipmentPayload(shipment: ShipmentRecord, lifecycleAt: Date) {

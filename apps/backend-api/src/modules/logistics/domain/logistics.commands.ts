@@ -11,7 +11,7 @@ export type LogisticsCommandContext = {
 export type ShipmentLineInput = {
   type: DispatchItemType;
   inventoryItemId?: string;
-  componentId?: string;
+  componentInstanceId?: string;
   quantity: number;
   yardReleaseReference: string;
 };

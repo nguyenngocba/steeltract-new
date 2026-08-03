@@ -128,7 +128,7 @@ describe('EnterpriseProcessService', () => {
         lines: [
           {
             type: 'COMPONENT' as never,
-            componentId: 'component-1',
+            componentInstanceId: 'instance-1',
             quantity: 1,
             yardReleaseReference: 'yard-release-1',
           },

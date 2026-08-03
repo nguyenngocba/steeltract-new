@@ -1,5 +1,43 @@
 # QC Module
 
+## QC.3 - Canonical QC Module Convergence
+
+Implemented on 2026-08-03.
+
+Status: **IMPLEMENTED - TEST/BUILD PASS, BROWSER RUNTIME PENDING**
+
+- Standalone QC now renders the same `CanonicalPhysicalQcWorkspace` used by
+  Components/QC.
+- Active QC UI now consumes
+  `/components/foundation/instances?qcScope=true`.
+- Removed active standalone UI logic that calculated KPI/chart/table values
+  from `runtime.inspections` and `runtime.metrics`.
+- Current source of truth is physical `ComponentInstance` plus FINAL
+  inspection, checklist, disposition, NCR and timeline lineage.
+- No schema, migration, Production, Yard, Logistics, Finished Goods eligibility
+  or ComponentInstance state-machine change was introduced.
+- Deliverable:
+  `docs/audits/qc3-canonical-module-convergence.md`.
+
+## COMPONENTS.QC.2 - Canonical Physical QC Workspace
+
+Implemented on 2026-08-03.
+
+Status: **IMPLEMENTED FOR COMPONENTS/QC TAB - TEST/BUILD PASS**
+
+- Components/QC workspace now reads physical `ComponentInstance` rows through
+  `/components/foundation/instances?qcScope=true`.
+- The read model includes FINAL inspection, checklist items/results, NCR and
+  timeline evidence.
+- The workspace no longer derives QC state from `Component`, `ProductionOrder`
+  or legacy `Component.status`.
+- PASS/FAIL/USE-AS-IS/REWORK/SCRAP controls are shown as canonical
+  dispositions but remain disabled until FINAL checklist evidence is complete
+  and routed through the QC command contract.
+- Main `QcPage.tsx` still has some mixed KPI calculations from
+  `runtime.inspections`; this remains a P1 cleanup before full QC UI
+  physical-only certification.
+
 ## COMPONENT DOMAIN.5A - QC Physical Instance Lineage Foundation
 
 Implemented on 2026-07-27.

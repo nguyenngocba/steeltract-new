@@ -5,7 +5,9 @@ export type ProductionOrder = {
   orderNo: string
   title: string
   projectId?: string
+  componentId?: string
   componentRequirementId?: string
+  bomId?: string
   aggregateVersion?: number
   quantity: number
   priority: string
@@ -23,6 +25,7 @@ export type ProductionOrder = {
     delayed: boolean
     materialReadiness: ProductionCockpitMaterialReadiness
   }
+  canonical?: ProductionOrderCanonicalRead
 }
 
 export type ComponentRequirementProductionOrder = {
@@ -189,6 +192,9 @@ export type ProductionCockpitReadModel = {
     delayed: number
     runningComponents: number
     productionWeight: number
+    componentInstances?: number
+    waitingQc?: number
+    qcPassed?: number
   }
   overview: {
     progress: { running: number; pending: number; completed: number }
@@ -211,6 +217,121 @@ export type ProductionCockpitReadModel = {
     status: string
     _count: { stages: number; machines: number; tasks: number }
   }>
+}
+
+export type ProductionOrderCanonicalRead = {
+  productionOrder: {
+    id: string
+    componentRequirementId?: string | null
+    projectId?: string | null
+    updatedAt?: string | null
+  }
+  project?: { id: string; code: string; name: string } | null
+  requirement?: {
+    id: string
+    requirementNo: string
+    requiredQuantity: number
+  } | null
+  componentDefinition?: {
+    id: string
+    code: string
+    name: string
+    componentType?: string | null
+    profile?: string | null
+    lifecycleState?: string | null
+  } | null
+  revision?: { id: string; revisionNo: string; state: string } | null
+  bomDefinition?: { id: string; state: string; contentHash?: string | null } | null
+  bom?: {
+    id?: string | null
+    bomNo?: string | null
+    productCode?: string | null
+    version?: string | null
+    status?: string | null
+  } | null
+  plannedQuantity: number
+  allocatedQuantity: number
+  componentInstances: {
+    total: number
+    stateCounts: Record<string, number>
+    rows: Array<{
+      id: string
+      instanceNo?: string | null
+      state: string
+      producedAt?: string | null
+      qcPassedAt?: string | null
+      scrappedAt?: string | null
+      updatedAt?: string | null
+      executions: ComponentInstanceExecution[]
+      qcInspections: Array<{
+        id: string
+        inspectionNo: string
+        status: string
+        completedAt?: string | null
+        approvedAt?: string | null
+        rejectedAt?: string | null
+        updatedAt: string
+      }>
+      ncrs: Array<{
+        id: string
+        ncrNo: string
+        status: string
+        disposition?: string | null
+        updatedAt: string
+      }>
+    }>
+  }
+  execution: {
+    assigned: number
+    running: number
+    completed: number
+    cancelled: number
+    rows: Array<ComponentInstanceExecution & {
+      componentInstanceId: string
+      instanceNo: string
+    }>
+  }
+  qc: {
+    passed: number
+    failed: number
+    approved: number
+    rejected: number
+    rows: Array<{
+      id: string
+      inspectionNo: string
+      status: string
+      componentInstanceId: string
+      instanceNo: string
+      completedAt?: string | null
+      approvedAt?: string | null
+      rejectedAt?: string | null
+      updatedAt: string
+    }>
+  }
+  materialReadiness: ProductionCockpitMaterialReadiness
+  material: {
+    reservations: Array<{
+      id: string
+      reservationNo: string
+      status: string
+      reservedAt?: string | null
+      lines: Array<{
+        id: string
+        requiredQty: number
+        reservedQty: number
+        issuedQty: number
+        returnedQty: number
+        status: string
+        inventoryItem: { id: string; code: string; name: string; unit?: string | null }
+        warehouse?: { id: string; code: string; name: string } | null
+        zone?: { id: string; code: string; name: string } | null
+        slotId?: string | null
+        level?: string | null
+      }>
+    }>
+    issues: ProductionMaterialIssue[]
+  }
+  updatedAt?: string | null
 }
 
 export type ProductionComponent = {

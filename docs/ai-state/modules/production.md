@@ -849,3 +849,12 @@ resulting facts needed by projections while retaining AD-019 names/version and
 atomic Outbox behavior. Production Execution has no publisher. Some issue paths
 still lack a canonical cumulative material balance, so ProductionMaterialStatus
 is not yet fully authoritative.
+
+## COMPONENTS.PRODUCTION.2 Cockpit Read Model Enrichment
+
+`GET /production/read-model/cockpit` now exposes canonical row enrichment for
+Components Production: ProjectComponentRequirement, Project, Component
+Definition, ComponentRevision, ComponentBomDefinition, physical
+ComponentInstances, ComponentInstanceExecution, QC rows/NCR references and
+material reservation/issue readiness. The existing route is reused; no schema,
+command, lifecycle, Finished Goods, Yard or Logistics behavior changed.

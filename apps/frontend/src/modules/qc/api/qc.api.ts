@@ -11,6 +11,90 @@ export type ComponentInstanceExecutionRow = {
   productionExecution?: { id: string; state: string; startedAt?: string; completedAt?: string }
 }
 
+export type QcChecklistItem = {
+  id: string
+  checklistId: string
+  sequence: number
+  title: string
+  description?: string | null
+  required: boolean
+  expectedValue?: string | null
+  tolerance?: string | null
+  unit?: string | null
+}
+
+export type QcResultRow = {
+  id: string
+  inspectionId: string
+  checklistItemId?: string | null
+  category: string
+  status: 'PENDING' | 'PASS' | 'FAIL' | 'NA'
+  measuredValue?: string | null
+  expectedValue?: string | null
+  tolerance?: string | null
+  unit?: string | null
+  notes?: string | null
+  checklistItem?: QcChecklistItem | null
+}
+
+export type QcInspectionForInstance = {
+  id: string
+  inspectionNo: string
+  checklistId?: string | null
+  componentInstanceId?: string | null
+  componentId?: string | null
+  productionOrderId?: string | null
+  projectId?: string | null
+  status: QcInspectionStatus
+  startedAt?: string | null
+  completedAt?: string | null
+  approvedAt?: string | null
+  rejectedAt?: string | null
+  rejectionReason?: string | null
+  createdAt: string
+  updatedAt: string
+  checklist?: {
+    id: string
+    code: string
+    name: string
+    type: string
+    revision: string
+    isActive: boolean
+    items?: QcChecklistItem[]
+  } | null
+  results?: QcResultRow[]
+  ncrs?: QcNcrForInstance[]
+}
+
+export type QcNcrForInstance = {
+  id: string
+  ncrNo: string
+  inspectionId: string
+  issueId?: string | null
+  productionOrderId?: string | null
+  componentInstanceId?: string | null
+  componentId?: string | null
+  status: string
+  severity: string
+  title: string
+  description?: string | null
+  rootCause?: string | null
+  correctiveAction?: string | null
+  disposition?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ComponentInstanceTimelineRow = {
+  id: string
+  componentInstanceId: string
+  eventType: string
+  sourceModule: string
+  sourceId?: string | null
+  occurredAt: string
+  metadata?: Record<string, unknown> | null
+}
+
 export type QcComponentInstance = {
   id: string
   instanceNo: string
@@ -35,11 +119,22 @@ export type QcComponentInstance = {
   project?: { id: string; code: string; name: string }
   projectTask?: { id: string; name: string }
   executions?: ComponentInstanceExecutionRow[]
+  qcInspections?: QcInspectionForInstance[]
+  ncrs?: QcNcrForInstance[]
+  timeline?: ComponentInstanceTimelineRow[]
 }
 
 export type QcComponentInstanceList = {
   data: QcComponentInstance[]
   meta: { page: number; limit: number; total: number; totalPages: number }
+  summary?: {
+    waitingQc: number
+    passed: number
+    failed: number
+    rework: number
+    useAsIs: number
+    scrap: number
+  }
 }
 
 export type QcInspectionRow = {

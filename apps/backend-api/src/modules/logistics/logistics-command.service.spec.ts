@@ -24,7 +24,7 @@ describe('Logistics canonical domain', () => {
       loadingChecklist: {
         domain: {
           yardReleaseReferences: {
-            'COMPONENT:component-1': 'yard-release-1',
+            'COMPONENT:instance-1': 'yard-release-1',
           },
         },
       },
@@ -38,9 +38,11 @@ describe('Logistics canonical domain', () => {
           type: DispatchItemType.COMPONENT,
           inventoryItemId: null,
           componentId: 'component-1',
+          componentInstanceId: 'instance-1',
           quantity: 1,
           inventoryItem: null,
           component: { id: 'component-1' },
+          componentInstance: { id: 'instance-1' },
         },
       ],
       events: [],
@@ -75,10 +77,10 @@ describe('Logistics canonical domain', () => {
             id: `line-${index + 1}`,
             type: line.type,
             inventoryItemId: line.inventoryItem?.connect.id ?? null,
-            componentId: line.component?.connect.id ?? null,
+            componentInstanceId: line.componentInstance?.connect.id ?? null,
             quantity: line.quantity,
             inventoryItem: null,
-            component: null,
+            componentInstance: null,
           })),
         };
         return current;
@@ -109,7 +111,7 @@ describe('Logistics canonical domain', () => {
       lines: [
         {
           type: DispatchItemType.COMPONENT,
-          componentId: 'component-1',
+          componentInstanceId: 'instance-1',
           quantity: 1,
           yardReleaseReference: 'yard-release-1',
         },
@@ -139,7 +141,7 @@ describe('Logistics canonical domain', () => {
         lines: [
           {
             type: DispatchItemType.COMPONENT,
-            componentId: 'component-1',
+            componentInstanceId: 'instance-1',
             quantity: 1,
             yardReleaseReference: '',
           },
@@ -159,7 +161,7 @@ describe('Logistics canonical domain', () => {
       lines: [
         {
           type: DispatchItemType.COMPONENT,
-          componentId: 'component-1',
+          componentInstanceId: 'instance-1',
           quantity: 1,
           yardReleaseReference: 'yard-release-1',
         },
@@ -177,7 +179,7 @@ describe('Logistics canonical domain', () => {
       lines: [
         {
           type: DispatchItemType.COMPONENT,
-          componentId: 'component-1',
+          componentInstanceId: 'instance-1',
           quantity: 1,
           yardReleaseReference: 'yard-release-1',
         },

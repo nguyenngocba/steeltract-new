@@ -17,6 +17,7 @@ export type DispatchItem = {
   type: DispatchItemType
   inventoryItemId?: string | null
   componentId?: string | null
+  componentInstanceId?: string | null
   quantity: number
   inventoryItem?: {
     id: string
@@ -29,6 +30,53 @@ export type DispatchItem = {
     code: string
     name: string
     status?: string
+  } | null
+  componentInstance?: {
+    id: string
+    instanceNo: string
+    state: string
+    installedAt?: string | null
+    component?: {
+      id: string
+      code: string
+      name: string
+    } | null
+    requirement?: {
+      id: string
+      requirementNo?: string | null
+      requiredQuantity?: number | null
+    } | null
+    productionOrder?: {
+      id: string
+      orderNo: string
+    } | null
+    project?: {
+      id: string
+      code: string
+      name: string
+    } | null
+    projectTask?: {
+      id: string
+      name: string
+    } | null
+    yardPlacements?: Array<{
+      id: string
+      itemCode: string
+      placedAt: string
+      slot?: {
+        id: string
+        code: string
+        zone?: {
+          id: string
+          code: string
+          name: string
+        } | null
+        row?: {
+          id: string
+          code: string
+        } | null
+      } | null
+    }>
   } | null
 }
 
@@ -88,6 +136,13 @@ export type DispatchDashboard = {
     total: number
     active: number
   }>
+  componentStateCounts: Record<string, number>
+  topProjects: Array<{
+    id: string
+    name: string
+    active: number
+    total: number
+  }>
   recent: DispatchOrder[]
 }
 
@@ -104,11 +159,17 @@ export type DispatchSuggestion = {
     projectTaskId?: string
     projectTaskName?: string
     inventoryItemId?: string
-    componentId?: string
+    componentInstanceId?: string
+    instanceNo?: string
     materialCode?: string
     materialName?: string
     componentCode?: string
     componentName?: string
+    productionOrderId?: string | null
+    productionOrderCode?: string | null
+    requirementId?: string | null
+    yardPlacementId?: string | null
+    yardLocation?: string | null
     quantity: number
     unit?: string | null
     reason?: string
@@ -125,7 +186,7 @@ export type CreateDispatchOrderPayload = {
   items: Array<{
     type: DispatchItemType
     inventoryItemId?: string
-    componentId?: string
+    componentInstanceId?: string
     quantity: number
   }>
 }

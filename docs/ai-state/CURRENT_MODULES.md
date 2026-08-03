@@ -26,6 +26,10 @@
   read-only Historical API. It provides historical filters, KPI cards, chart
   panels, inventory/monthly rollup tables and snapshot job visibility. Browser
   QA with seeded snapshots remains pending.
+- Logistics now has the LOGISTICS.2A physical schema foundation: DispatchItem
+  can reference `ComponentInstance` and physical states include `IN_YARD`,
+  `IN_TRANSIT`, and `DELIVERED`. Canonical dispatch/delivery write behavior
+  remains LOGISTICS.2B and Logistics stays In Progress.
 - Warehouse Realtime Dashboard now has a frontend `/warehouse-realtime`
   cockpit under Inventory navigation. It reads existing Inventory overview,
   material and transaction endpoints with TanStack Query polling; no backend,

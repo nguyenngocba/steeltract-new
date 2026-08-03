@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Building2,
   CheckCircle2,
-  ClipboardCheck,
+  Clock,
+  Eye,
   FileSearch,
   Layers,
   PackageCheck,
@@ -11,17 +13,18 @@ import {
 import { useProjectsQuery } from '@/hooks/query/useProjectQueries'
 import { EnterpriseModulePage } from '@/shared/runtime-tabs/EnterpriseModulePage'
 import {
+  ModuleDataGrid,
   ModuleDetailDrawer,
   ModuleEmptyState,
   ModuleLoadingState,
+  ModuleTabs,
+  moduleTableHead,
+  moduleTableRow,
 } from '../../../../shared/ui/modules'
-import { CockpitKpiCard, EnterpriseKpiCard } from '../../../../shared/ui/cockpit'
+import { EnterpriseKpiCard } from '../../../../shared/ui/cockpit'
 import {
-  InventoryChartCard,
-  InventoryPagination,
   InventoryPanel,
-  inventoryTableHead,
-  inventoryTableRow,
+  InventoryPagination,
 } from '../../../inventory/components/InventoryVisuals'
 import {
   useComponentsWorkspace,
@@ -48,7 +51,7 @@ function formatDate(value?: string | null) {
 }
 
 function projectLabel(row: FinishedGoodsInstanceRow) {
-  if (!row.project) return '-'
+  if (!row.project) return 'Chưa gán công trình'
   return [row.project.code, row.project.name].filter(Boolean).join(' - ')
 }
 
@@ -70,8 +73,18 @@ function qualityEvidence(row: FinishedGoodsInstanceRow) {
 
 function locationLabel(row: FinishedGoodsInstanceRow) {
   if (row.installedAt) return 'Đã lắp đặt'
-  return 'Chưa gán bãi'
+  return 'Kho thành phẩm'
 }
+
+type DetailTabKey = 'overview' | 'production' | 'qc' | 'yard' | 'traceability'
+
+const detailTabs: Array<{ key: DetailTabKey; label: string }> = [
+  { key: 'overview', label: 'Tổng quan' },
+  { key: 'production', label: 'Sản xuất' },
+  { key: 'qc', label: 'QC' },
+  { key: 'yard', label: 'Bãi / Yard' },
+  { key: 'traceability', label: 'Truy vết' },
+]
 
 export function ComponentsStockPage() {
   const [instanceCode, setInstanceCode] = useState('')
@@ -82,6 +95,7 @@ export function ComponentsStockPage() {
   const [selectedRow, setSelectedRow] =
     useState<FinishedGoodsInstanceRow | null>(null)
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
+  const [activeDetailTab, setActiveDetailTab] = useState<DetailTabKey>('overview')
 
   const { data: projects = [] } = useProjectsQuery()
   const { data: componentOptions } = useComponentsWorkspace({
@@ -138,57 +152,57 @@ export function ComponentsStockPage() {
     setPage(1)
   }
 
-  const tableRows = rows
-
   return (
     <EnterpriseModulePage>
-      <div className="w-full min-w-0 flex-1 space-y-1 -mt-2">
-        <div className="grid grid-cols-1 gap-1 md:grid-cols-4">
+      <div className="w-full min-w-0 flex-1 space-y-2 -mt-2">
+        {/* KPI Strip */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
           <EnterpriseKpiCard
-            title="Cấu kiện thành phẩm"
+            title="Tổng thành phẩm"
             value={formatQuantity(summary.total, 0)}
             tone="blue"
-            icon={<PackageCheck size={15} />}
+            icon={<PackageCheck size={16} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
             title="Đạt QC"
             value={formatQuantity(summary.qcPassed, 0)}
             tone="emerald"
-            icon={<CheckCircle2 size={15} />}
+            icon={<CheckCircle2 size={16} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
             title="Chấp nhận sử dụng"
             value={formatQuantity(summary.useAsIs, 0)}
             tone="cyan"
-            icon={<ShieldCheck size={15} />}
+            icon={<ShieldCheck size={16} />}
             isLoading={isLoading}
           />
           <EnterpriseKpiCard
-            title="Theo công trình"
+            title="Công trình liên kết"
             value={formatQuantity(summary.projectCount, 0)}
             tone="purple"
-            icon={<Layers size={15} />}
+            icon={<Building2 size={16} />}
             isLoading={isLoading}
           />
         </div>
 
-        <InventoryPanel className="rounded-xl -mt-1">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_220px_240px_130px_120px]">
+        {/* Filter Toolbar */}
+        <InventoryPanel className="rounded-xl p-2.5">
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[1fr_240px_260px_110px_110px]">
             <input
               value={instanceCodeDraft}
               onChange={(event) => setInstanceCodeDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') applySearch()
               }}
-              placeholder="Tìm mã cấu kiện vật lý..."
-              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
+              placeholder="Tìm mã cấu kiện vật lý (Serial / Instance ID)..."
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-xs font-medium text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
             />
             <select
               value={projectId}
               onChange={(event) => setProjectId(event.target.value)}
-              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-xs font-medium text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
             >
               <option value="">Công trình: Tất cả</option>
               {projects.map((project) => (
@@ -200,7 +214,7 @@ export function ComponentsStockPage() {
             <select
               value={componentId}
               onChange={(event) => setComponentId(event.target.value)}
-              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-xs font-medium text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
             >
               <option value="">Hồ sơ cấu kiện: Tất cả</option>
               {(componentOptions?.data ?? []).map((component) => (
@@ -212,58 +226,102 @@ export function ComponentsStockPage() {
             <button
               type="button"
               onClick={applySearch}
-              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+              className="h-9 rounded-lg bg-cyan-600 px-3 text-xs font-semibold text-white shadow-lg shadow-cyan-600/20 transition hover:bg-cyan-500"
             >
               Tìm kiếm
             </button>
             <button
               type="button"
               onClick={resetFilters}
-              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              className="h-9 rounded-lg border border-white/10 bg-white/[0.055] px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
             >
               Làm mới
             </button>
           </div>
         </InventoryPanel>
 
-        <div className="grid grid-cols-12 gap-1 items-start">
-          <div className="col-span-12 xl:col-span-9">
-            <InventoryPanel className="rounded-xl">
-              <div className="mb-1 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-white">
-                    Danh sách cấu kiện thành phẩm
-                  </h3>
-                  <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 border border-cyan-400/20">
-                    {meta.total} cấu kiện vật lý
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpandedModalOpen(true)}
-                  className="text-xs font-semibold text-cyan-300 transition hover:text-cyan-200"
-                >
-                  Xem tất cả
-                </button>
-              </div>
+        {/* Level 1 Table Container */}
+        <InventoryPanel className="rounded-xl p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                Danh sách cấu kiện thành phẩm
+              </h3>
+              <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-mono font-medium text-cyan-300 border border-cyan-400/20">
+                {formatQuantity(meta.total, 0)} items
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpandedModalOpen(true)}
+              className="rounded-lg border border-cyan-400/30 bg-cyan-600/20 px-3 py-1 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-600/30"
+            >
+              Xem tất cả
+            </button>
+          </div>
 
-              <FinishedGoodsTable
-                rows={tableRows}
+          <Level1FinishedGoodsTable
+            rows={rows}
+            isLoading={isLoading}
+            isError={isError}
+            onSelect={setSelectedRow}
+          />
+
+          {!isLoading && !isError && !rows.length ? (
+            <div className="p-4">
+              <ModuleEmptyState
+                icon={<PackageCheck size={20} />}
+                title="Chưa có cấu kiện thành phẩm"
+                description="Danh sách chỉ hiển thị các ComponentInstance đã hoàn tất sản xuất và đạt điều kiện nghiệm thu thành phẩm."
+              />
+            </div>
+          ) : null}
+
+          <InventoryPagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            pageCount={Math.max(1, meta.totalPages)}
+            total={meta.total}
+            onPageChange={setPage}
+            containerClassName="border-t-0"
+          />
+        </InventoryPanel>
+      </div>
+
+      {/* LEVEL 2: "XEM TẤT CẢ" EXPANSIVE WORKSPACE */}
+      {expandedModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex w-[96vw] max-w-[1720px] h-[88vh] flex-col rounded-2xl border border-white/15 bg-[#08111f] p-5 text-xs shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  Cấu kiện thành phẩm (Physical Finished Goods Workspace)
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Hiển thị trang {page} / {Math.max(1, meta.totalPages)} · tổng {formatQuantity(meta.total, 0)} cấu kiện vật lý đủ điều kiện nghiệm thu thành phẩm.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedModalOpen(false)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+              >
+                Đóng Workspace
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 py-3 overflow-hidden">
+              <Level2FinishedGoodsWorkspaceTable
+                rows={rows}
                 isLoading={isLoading}
                 isError={isError}
-                onSelect={setSelectedRow}
+                onSelect={(row) => {
+                  setSelectedRow(row)
+                }}
               />
+            </div>
 
-              {!isLoading && !isError && !tableRows.length ? (
-                <div className="p-3">
-                  <ModuleEmptyState
-                    icon={<PackageCheck size={18} />}
-                    title="Chưa có cấu kiện thành phẩm"
-                    description="Chưa có cấu kiện hoàn tất sản xuất và được QC chấp nhận."
-                  />
-                </div>
-              ) : null}
-
+            <div className="shrink-0 border-t border-white/10 pt-2">
               <InventoryPagination
                 page={page}
                 pageSize={PAGE_SIZE}
@@ -272,218 +330,223 @@ export function ComponentsStockPage() {
                 onPageChange={setPage}
                 containerClassName="border-t-0"
               />
-            </InventoryPanel>
-          </div>
-
-          <div className="col-span-12 space-y-1 xl:col-span-3">
-            <InventoryChartCard title="Nguồn dữ liệu" className="h-[170px]">
-              <div className="space-y-1.5 text-xs text-slate-300">
-                <div className="flex items-center justify-between gap-3">
-                  <span>API canonical</span>
-                  <b className="text-right font-mono text-cyan-300">
-                    /components/instances/finished-goods
-                  </b>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Điều kiện</span>
-                  <b className="font-mono text-emerald-300">QC final</b>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Không tính hồ sơ Draft</span>
-                  <b className="font-mono text-white">Đúng</b>
-                </div>
-              </div>
-            </InventoryChartCard>
-            <InventoryChartCard title="Chất lượng thành phẩm" className="h-[170px]">
-              <div className="space-y-2 text-xs">
-                <MetricBar
-                  label="Đạt QC"
-                  value={summary.qcPassed}
-                  total={summary.total}
-                  tone="emerald"
-                />
-                <MetricBar
-                  label="Chấp nhận sử dụng"
-                  value={summary.useAsIs}
-                  total={summary.total}
-                  tone="cyan"
-                />
-              </div>
-            </InventoryChartCard>
-            <InventoryChartCard title="Traceability" className="h-[170px]">
-              <div className="space-y-1.5 text-xs text-slate-300">
-                <div className="flex items-center gap-2">
-                  <FileSearch size={14} className="text-cyan-300" />
-                  <span>ComponentInstance → Hồ sơ cấu kiện</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileSearch size={14} className="text-cyan-300" />
-                  <span>Production Order → QC final</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileSearch size={14} className="text-cyan-300" />
-                  <span>NCR Use-As-Is nếu có</span>
-                </div>
-              </div>
-            </InventoryChartCard>
-          </div>
-        </div>
-      </div>
-
-      {expandedModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-7xl space-y-4 rounded-2xl border border-white/15 bg-[#08111f] p-5 text-xs shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <h2 className="text-base font-bold text-white">
-                  Cấu kiện thành phẩm
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Đang hiển thị trang {page} / {Math.max(1, meta.totalPages)} · tổng {meta.total} cấu kiện vật lý đủ điều kiện.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExpandedModalOpen(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
-              >
-                Đóng
-              </button>
             </div>
-
-            <FinishedGoodsTable
-              rows={tableRows}
-              isLoading={isLoading}
-              isError={isError}
-              onSelect={(row) => {
-                setSelectedRow(row)
-                setExpandedModalOpen(false)
-              }}
-              heightClassName="h-[640px]"
-              dense
-            />
-
-            <InventoryPagination
-              page={page}
-              pageSize={PAGE_SIZE}
-              pageCount={Math.max(1, meta.totalPages)}
-              total={meta.total}
-              onPageChange={setPage}
-              containerClassName="border-t-0"
-            />
           </div>
         </div>
       ) : null}
 
+      {/* LEVEL 3: INSTANCE DETAIL SLIDING WORKSPACE */}
       <ModuleDetailDrawer
         open={Boolean(selectedRow)}
-        title={selectedRow ? selectedRow.instanceNo : ''}
-        subtitle={selectedRow ? componentLabel(selectedRow) : undefined}
+        placement="right"
+        title={selectedRow ? `${selectedRow.instanceNo}` : ''}
+        subtitle={
+          selectedRow
+            ? `THÀNH PHẨM VẬT LÝ · ${selectedRow.component.code} · ${selectedRow.component.name}`
+            : undefined
+        }
         onClose={() => setSelectedRow(null)}
+        widthClass="w-screen md:w-[64vw] md:max-w-[1280px] md:min-w-[820px]"
       >
         {selectedRow ? (
-          <>
-            <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
-              <CockpitKpiCard
-                title="Hoàn thành SX"
-                value={formatDate(selectedRow.producedAt)}
-                state="normal"
-                tone="blue"
-              />
-              <CockpitKpiCard
-                title="QC"
-                value={stateLabel[selectedRow.state] ?? selectedRow.state}
-                state="normal"
-                tone={selectedRow.state === 'USE_AS_IS' ? 'cyan' : 'emerald'}
-              />
-              <CockpitKpiCard
-                title="Production Order"
-                value={selectedRow.productionOrder?.orderNo ?? '-'}
-                state="normal"
-                tone="purple"
-              />
-              <CockpitKpiCard
-                title="Requirement"
-                value={selectedRow.requirement?.requirementNo ?? '-'}
-                state="normal"
-                tone="amber"
-              />
+          <div className="space-y-4 text-xs">
+            {/* Instance KPI Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Hoàn thành SX</div>
+                <div className="mt-1 font-mono text-sm font-bold text-white">{formatDate(selectedRow.producedAt)}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Trạng thái QC</div>
+                <div className="mt-1 font-mono text-sm font-bold text-emerald-300">
+                  {stateLabel[selectedRow.state] ?? selectedRow.state}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Lệnh Sản xuất</div>
+                <div className="mt-1 font-mono text-sm font-bold text-cyan-300 truncate" title={selectedRow.productionOrder?.orderNo ?? '-'}>
+                  {selectedRow.productionOrder?.orderNo ?? '-'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Mã Yêu cầu</div>
+                <div className="mt-1 font-mono text-sm font-bold text-slate-200 truncate" title={selectedRow.requirement?.requirementNo ?? '-'}>
+                  {selectedRow.requirement?.requirementNo ?? '-'}
+                </div>
+              </div>
             </div>
 
-            <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-300">
-              <Line label="Hồ sơ cấu kiện" value={componentLabel(selectedRow)} />
-              <Line label="Loại / profile" value={[selectedRow.component.componentType, selectedRow.component.profile].filter(Boolean).join(' / ') || '-'} />
-              <Line label="Công trình" value={projectLabel(selectedRow)} />
-              <Line label="Revision" value={selectedRow.componentRevision?.revisionNo ?? '-'} />
-              <Line label="Ngày đạt QC" value={formatDate(selectedRow.qcPassedAt)} />
-              <Line label="Bằng chứng QC" value={qualityEvidence(selectedRow)} />
-              <Line label="Vị trí" value={locationLabel(selectedRow)} />
-            </div>
-          </>
+            {/* Tab Strip */}
+            <ModuleTabs
+              tabs={detailTabs}
+              active={activeDetailTab}
+              onChange={(key) => setActiveDetailTab(key)}
+            />
+
+            {/* TAB CONTENTS */}
+            {activeDetailTab === 'overview' ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* LEFT - Physical Identity */}
+                  <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">Thông tin Vật lý (Physical Identity)</span>
+                      <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium border ${stateBadgeTone[selectedRow.state] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
+                        {stateLabel[selectedRow.state] ?? selectedRow.state}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <DetailLine title="Mã Instance / Serial" value={selectedRow.instanceNo} isMono />
+                      <DetailLine title="Mã cấu kiện" value={selectedRow.component.code} isMono />
+                      <DetailLine title="Tên cấu kiện" value={selectedRow.component.name} />
+                      <DetailLine title="Loại / Quy cách" value={[selectedRow.component.componentType, selectedRow.component.profile].filter(Boolean).join(' / ') || '-'} />
+                      <DetailLine title="Phiên bản (Revision)" value={selectedRow.componentRevision?.revisionNo ? `Rev ${selectedRow.componentRevision.revisionNo}` : '-'} />
+                      <DetailLine title="Vị trí lưu kho" value={locationLabel(selectedRow)} />
+                    </div>
+                  </div>
+
+                  {/* RIGHT - Lineage & Project */}
+                  <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Công trình & Nguồn gốc</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <DetailLine title="Công trình" value={projectLabel(selectedRow)} />
+                      <DetailLine title="Lệnh sản xuất" value={selectedRow.productionOrder?.orderNo ?? '-'} isMono />
+                      <DetailLine title="Nhu cầu đăng ký" value={selectedRow.requirement?.requirementNo ?? '-'} isMono />
+                      <DetailLine title="Ngày sản xuất" value={formatDate(selectedRow.producedAt)} isMono />
+                      <DetailLine title="Ngày nghiệm thu QC" value={formatDate(selectedRow.qcPassedAt)} isMono />
+                      <DetailLine title="Cập nhật lần cuối" value={formatDate(selectedRow.updatedAt)} isMono />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : activeDetailTab === 'production' ? (
+              <div className="space-y-3 text-xs">
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">Lineage Sản xuất (Production Lineage)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailLine title="Mã Lệnh SX" value={selectedRow.productionOrder?.orderNo ?? '-'} isMono />
+                    <DetailLine title="Trạng thái Lệnh" value={selectedRow.productionOrder?.status ?? '-'} />
+                    <DetailLine title="Mã Yêu cầu" value={selectedRow.requirement?.requirementNo ?? '-'} isMono />
+                    <DetailLine title="SL Yêu cầu" value={formatQuantity(selectedRow.requirement?.requiredQuantity ?? 0, 0)} isMono />
+                  </div>
+                </div>
+              </div>
+            ) : activeDetailTab === 'qc' ? (
+              <div className="space-y-3 text-xs">
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">Hồ sơ QC & Nghiệm thu</span>
+                    <span className="text-xs font-mono text-emerald-300">{qualityEvidence(selectedRow)}</span>
+                  </div>
+                  {selectedRow.qcInspections?.length ? (
+                    <div className="space-y-2">
+                      {selectedRow.qcInspections.map((ins) => (
+                        <div key={ins.id} className="rounded-lg border border-white/10 bg-slate-950/45 p-3 flex items-center justify-between">
+                          <div>
+                            <div className="font-mono font-semibold text-cyan-300">{ins.inspectionNo}</div>
+                            <div className="text-[11px] text-slate-400">{ins.checklist?.name ?? 'Quy trình kiểm tra'} · {formatDate(ins.completedAt)}</div>
+                          </div>
+                          <span className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-xs text-emerald-300 font-medium">
+                            {ins.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : selectedRow.ncrs?.length ? (
+                    <div className="space-y-2">
+                      {selectedRow.ncrs.map((ncr) => (
+                        <div key={ncr.id} className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
+                          <div>
+                            <div className="font-mono font-semibold text-amber-300">{ncr.ncrNo} (NCR)</div>
+                            <div className="text-[11px] text-slate-400">Disposition: {ncr.disposition ?? 'Use-As-Is'}</div>
+                          </div>
+                          <span className="rounded-md border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-300 font-medium">
+                            {ncr.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-slate-400 italic">Không có chi tiết biên bản QC mở rộng.</div>
+                  )}
+                </div>
+              </div>
+            ) : activeDetailTab === 'yard' ? (
+              <div className="space-y-3 text-xs">
+                <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">Vị trí Quản lý Bãi (Yard Placement)</span>
+                  </div>
+                  <div className="text-slate-300 text-xs">
+                    {selectedRow.installedAt ? (
+                      <div className="text-emerald-300 font-semibold">Cấu kiện đã được bàn giao và lắp đặt hoàn tất tại công trình.</div>
+                    ) : (
+                      <div className="text-slate-400">Cấu kiện đang được lưu trữ bảo quản tại <b>Kho thành phẩm</b> xưởng chế tạo.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs">
+                <ModuleEmptyState
+                  icon={<Clock size={20} />}
+                  title="Chưa có nguồn truy vết nâng cao"
+                  description="Nhật ký truy vết di chuyển và sự kiện chi tiết của cấu kiện vật lý đang được tích hợp."
+                />
+              </div>
+            )}
+          </div>
         ) : null}
       </ModuleDetailDrawer>
     </EnterpriseModulePage>
   )
 }
 
-function FinishedGoodsTable({
+/* LEVEL 1: DEFAULT COMPACT 8-COLUMN TABLE */
+function Level1FinishedGoodsTable({
   rows,
   isLoading,
   isError,
   onSelect,
-  heightClassName = 'h-[430px]',
-  dense = false,
 }: {
   rows: FinishedGoodsInstanceRow[]
   isLoading: boolean
   isError: boolean
   onSelect: (row: FinishedGoodsInstanceRow) => void
-  heightClassName?: string
-  dense?: boolean
 }) {
-  const cellPadding = dense ? 'px-3 py-2' : 'px-3 py-1.5'
-
   return (
-    <div className={`${heightClassName} overflow-auto scrollbar-none rounded-lg border border-white/10`}>
-      <table className="w-full min-w-[1120px] table-fixed text-sm">
-        <thead
-          className={`${inventoryTableHead} sticky top-0 z-10 border-b border-cyan-400/10 text-slate-300`}
-          style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
-        >
+    <div className="h-[440px] overflow-auto scrollbar-none rounded-lg border border-white/10">
+      <table className="w-full min-w-[1000px] table-fixed text-xs border-collapse">
+        <thead className={`${moduleTableHead} sticky top-0 z-10 bg-slate-900 border-b border-white/10`}>
           <tr>
-            {[
-              'Mã cấu kiện vật lý',
-              'Hồ sơ cấu kiện',
-              'Công trình',
-              'Production Order',
-              'Hoàn thành SX',
-              'QC',
-              'Trạng thái vật lý',
-              'Vị trí',
-            ].map((heading) => (
-              <th
-                key={heading}
-                className="px-3 py-2 text-left text-xs font-semibold text-slate-300"
-              >
-                {heading}
-              </th>
-            ))}
+            <th className="w-[180px] px-3 py-2 text-left font-semibold text-slate-300">Cấu kiện (Instance)</th>
+            <th className="w-[200px] px-3 py-2 text-left font-semibold text-slate-300">Công trình</th>
+            <th className="w-[160px] px-3 py-2 text-left font-semibold text-slate-300">Loại / Quy cách</th>
+            <th className="w-[110px] px-3 py-2 text-center font-semibold text-slate-300">Trạng thái</th>
+            <th className="w-[120px] px-3 py-2 text-center font-semibold text-slate-300">QC Inspection</th>
+            <th className="w-[120px] px-3 py-2 text-left font-semibold text-slate-300">Vị trí</th>
+            <th className="w-[110px] px-3 py-2 text-right font-semibold text-slate-300">Cập nhật</th>
+            <th className="w-[80px] px-3 py-2 text-center font-semibold text-slate-300">Thao tác</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-white/5">
           {isLoading ? (
             <tr>
-              <td colSpan={8} className="px-4 py-6 text-center">
-                <ModuleLoadingState label="Đang tải cấu kiện thành phẩm..." />
+              <td colSpan={8} className="px-4 py-8 text-center">
+                <ModuleLoadingState label="Đang tải danh sách thành phẩm..." />
               </td>
             </tr>
           ) : isError ? (
             <tr>
-              <td colSpan={8} className="px-4 py-6 text-center">
+              <td colSpan={8} className="px-4 py-8 text-center">
                 <ModuleEmptyState
-                  icon={<ClipboardCheck size={18} />}
-                  title="Không tải được dữ liệu thành phẩm"
-                  description="Vui lòng thử lại sau khi kết nối API ổn định."
+                  icon={<PackageCheck size={20} />}
+                  title="Lỗi tải dữ liệu"
+                  description="Không kết nối được với server canonical API."
                 />
               </td>
             </tr>
@@ -492,35 +555,49 @@ function FinishedGoodsTable({
               <tr
                 key={row.id}
                 onClick={() => onSelect(row)}
-                className={`cursor-pointer ${inventoryTableRow}`}
+                className={`cursor-pointer ${moduleTableRow}`}
               >
-                <td className={`${cellPadding} truncate font-mono font-medium text-cyan-300`}>
-                  {row.instanceNo}
+                {/* 1. Stacked Identity */}
+                <td className="px-3 py-1.5 min-w-0">
+                  <div className="font-mono font-semibold text-cyan-300 truncate" title={row.instanceNo}>{row.instanceNo}</div>
+                  <div className="text-[11px] font-medium text-slate-300 truncate" title={componentLabel(row)}>{componentLabel(row)}</div>
                 </td>
-                <td className={`${cellPadding} truncate font-medium text-white`}>
-                  {componentLabel(row)}
-                </td>
-                <td className={`${cellPadding} truncate text-slate-300`}>
+                {/* 2. Project */}
+                <td className="px-3 py-1.5 text-slate-200 font-medium truncate" title={projectLabel(row)}>
                   {projectLabel(row)}
                 </td>
-                <td className={`${cellPadding} truncate font-mono text-slate-300`}>
-                  {row.productionOrder?.orderNo ?? '-'}
+                {/* 3. Type / Spec */}
+                <td className="px-3 py-1.5 text-slate-300 font-medium truncate" title={[row.component.componentType, row.component.profile].filter(Boolean).join(' · ')}>
+                  {[row.component.componentType, row.component.profile].filter(Boolean).join(' · ') || '-'}
                 </td>
-                <td className={`${cellPadding} text-slate-300`}>
-                  {formatDate(row.producedAt)}
-                </td>
-                <td className={cellPadding}>
-                  <span className="inline-flex rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-xs text-emerald-300">
-                    {qualityEvidence(row)}
-                  </span>
-                </td>
-                <td className={cellPadding}>
-                  <span className={`inline-flex rounded-lg border px-2 py-0.5 text-xs ${stateBadgeTone[row.state] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
+                {/* 4. State */}
+                <td className="px-3 py-1.5 text-center">
+                  <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium border ${stateBadgeTone[row.state] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
                     {stateLabel[row.state] ?? row.state}
                   </span>
                 </td>
-                <td className={`${cellPadding} truncate text-slate-300`}>
+                {/* 5. QC */}
+                <td className="px-3 py-1.5 text-center font-mono text-emerald-300 truncate" title={qualityEvidence(row)}>
+                  {qualityEvidence(row)}
+                </td>
+                {/* 6. Location */}
+                <td className="px-3 py-1.5 text-slate-300 font-medium truncate" title={locationLabel(row)}>
                   {locationLabel(row)}
+                </td>
+                {/* 7. Timestamp */}
+                <td className="px-3 py-1.5 text-right font-mono text-slate-400">
+                  {formatDate(row.updatedAt || row.qcPassedAt || row.producedAt)}
+                </td>
+                {/* 8. Action */}
+                <td className="px-3 py-1.5 text-center" onClick={(event) => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(row)}
+                    className="inline-flex items-center gap-1 rounded-md border border-cyan-400/30 bg-cyan-600/20 px-2 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-600/30 transition"
+                  >
+                    <Eye size={12} />
+                    Chi tiết
+                  </button>
                 </td>
               </tr>
             ))
@@ -531,44 +608,100 @@ function FinishedGoodsTable({
   )
 }
 
-function MetricBar({
-  label,
-  value,
-  total,
-  tone,
+/* LEVEL 2: EXPANSIVE 12-COLUMN WORKSPACE TABLE */
+function Level2FinishedGoodsWorkspaceTable({
+  rows,
+  isLoading,
+  isError,
+  onSelect,
 }: {
-  label: string
-  value: number
-  total: number
-  tone: 'emerald' | 'cyan'
+  rows: FinishedGoodsInstanceRow[]
+  isLoading: boolean
+  isError: boolean
+  onSelect: (row: FinishedGoodsInstanceRow) => void
 }) {
-  const percent = total > 0 ? Math.round((value / total) * 100) : 0
-  const color = tone === 'emerald' ? 'bg-emerald-400' : 'bg-cyan-400'
-
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-slate-300">
-        <span>{label}</span>
-        <b className="font-mono text-white">{formatQuantity(value, 0)}</b>
-      </div>
-      <div className="h-2 rounded-full bg-white/10">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${Math.min(100, percent)}%` }}
-        />
-      </div>
-      <div className="mt-1 text-right font-mono text-[10px] text-slate-500">
-        {percent}%
-      </div>
+    <div className="h-full overflow-auto scrollbar-none rounded-xl border border-white/10">
+      <table className="w-full min-w-[1400px] table-fixed text-xs border-collapse">
+        <thead className={`${moduleTableHead} sticky top-0 z-10 bg-slate-900 border-b border-white/10`}>
+          <tr>
+            <th className="w-[140px] px-3 py-2.5 text-left font-semibold text-slate-300">Serial Instance</th>
+            <th className="w-[110px] px-3 py-2.5 text-left font-semibold text-slate-300">Mã cấu kiện</th>
+            <th className="w-[180px] px-3 py-2.5 text-left font-semibold text-slate-300">Tên cấu kiện</th>
+            <th className="w-[180px] px-3 py-2.5 text-left font-semibold text-slate-300">Công trình</th>
+            <th className="w-[120px] px-3 py-2.5 text-left font-semibold text-slate-300">Mã Yêu cầu</th>
+            <th className="w-[120px] px-3 py-2.5 text-left font-semibold text-slate-300">Lệnh SX (PO)</th>
+            <th className="w-[110px] px-3 py-2.5 text-left font-semibold text-slate-300">Loại</th>
+            <th className="w-[120px] px-3 py-2.5 text-left font-semibold text-slate-300">Quy cách</th>
+            <th className="w-[70px] px-3 py-2.5 text-center font-semibold text-slate-300">Rev</th>
+            <th className="w-[110px] px-3 py-2.5 text-center font-semibold text-slate-300">Trạng thái</th>
+            <th className="w-[120px] px-3 py-2.5 text-center font-semibold text-slate-300">QC Evidence</th>
+            <th className="w-[80px] px-3 py-2.5 text-center font-semibold text-slate-300">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {isLoading ? (
+            <tr>
+              <td colSpan={12} className="px-4 py-12 text-center">
+                <ModuleLoadingState label="Đang tải dữ liệu workspace..." />
+              </td>
+            </tr>
+          ) : isError ? (
+            <tr>
+              <td colSpan={12} className="px-4 py-12 text-center">
+                <ModuleEmptyState
+                  icon={<PackageCheck size={20} />}
+                  title="Lỗi kết nối API"
+                  description="Không thể kết nối với server."
+                />
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr
+                key={row.id}
+                onClick={() => onSelect(row)}
+                className={`cursor-pointer ${moduleTableRow}`}
+              >
+                <td className="px-3 py-2 font-mono font-semibold text-cyan-300 truncate" title={row.instanceNo}>{row.instanceNo}</td>
+                <td className="px-3 py-2 font-mono font-semibold text-white truncate" title={row.component.code}>{row.component.code}</td>
+                <td className="px-3 py-2 font-medium text-slate-200 truncate" title={row.component.name}>{row.component.name}</td>
+                <td className="px-3 py-2 font-medium text-slate-300 truncate" title={projectLabel(row)}>{projectLabel(row)}</td>
+                <td className="px-3 py-2 font-mono text-slate-400 truncate" title={row.requirement?.requirementNo ?? '-'}>{row.requirement?.requirementNo ?? '-'}</td>
+                <td className="px-3 py-2 font-mono text-cyan-400 truncate" title={row.productionOrder?.orderNo ?? '-'}>{row.productionOrder?.orderNo ?? '-'}</td>
+                <td className="px-3 py-2 font-medium text-slate-300 truncate" title={row.component.componentType ?? '-'}>{row.component.componentType ?? '-'}</td>
+                <td className="px-3 py-2 font-medium text-slate-300 truncate" title={row.component.profile ?? '-'}>{row.component.profile ?? '-'}</td>
+                <td className="px-3 py-2 text-center font-mono text-slate-400">{row.componentRevision?.revisionNo ?? '0'}</td>
+                <td className="px-3 py-2 text-center">
+                  <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium border ${stateBadgeTone[row.state] ?? 'border-slate-400/20 bg-slate-400/10 text-slate-300'}`}>
+                    {stateLabel[row.state] ?? row.state}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-center font-mono text-emerald-300 truncate" title={qualityEvidence(row)}>{qualityEvidence(row)}</td>
+                <td className="px-3 py-2 text-center" onClick={(event) => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(row)}
+                    className="inline-flex items-center gap-1 rounded-md border border-cyan-400/30 bg-cyan-600/20 px-2 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-600/30 transition"
+                  >
+                    <Eye size={12} />
+                    Chi tiết
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function Line({ label, value }: { label: string; value: string }) {
+function DetailLine({ title, value, isMono = false }: { title: string; value: string; isMono?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <b className="text-right font-medium text-slate-100">{value}</b>
+    <div className="flex flex-col">
+      <span className="text-[10px] uppercase font-semibold text-slate-400">{title}</span>
+      <span className={`mt-0.5 text-xs font-medium text-slate-100 ${isMono ? 'font-mono' : ''}`}>{value}</span>
     </div>
   )
 }
