@@ -6,9 +6,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Start seeding...');
 
-  const hashedPassword = await bcrypt.hash('123', 10);
   await seedUnitsOfMeasure();
   await seedMasterDataDictionaries();
+
+  const bootstrapPassword = process.env.STEELTRACK_BOOTSTRAP_ADMIN_PASSWORD;
+  if (bootstrapPassword) {
+    assertStrongBootstrapPassword(bootstrapPassword);
+  }
 
   const existingUser = await prisma.user.findUnique({
     where: {
@@ -22,17 +26,28 @@ async function main() {
         username: 'admin',
       },
 
-      data: {
-        password: hashedPassword,
-        status: 'ACTIVE',
-      },
+      data: bootstrapPassword
+        ? {
+            password: await bcrypt.hash(bootstrapPassword, 10),
+          }
+        : {},
     });
 
-    console.log('✅ Admin updated');
+    console.log(
+      bootstrapPassword
+        ? '✅ Admin credential rotated from environment'
+        : '✅ Existing admin preserved',
+    );
 
     await seedAdminAccess(admin.id);
 
     return;
+  }
+
+  if (!bootstrapPassword) {
+    throw new Error(
+      'STEELTRACK_BOOTSTRAP_ADMIN_PASSWORD is required when creating the initial administrator',
+    );
   }
 
   const admin = await prisma.user.create({
@@ -41,7 +56,7 @@ async function main() {
 
       email: 'admin@steeltrack.vn',
 
-      password: hashedPassword,
+      password: await bcrypt.hash(bootstrapPassword, 10),
 
       fullName: 'System Admin',
 
@@ -52,6 +67,21 @@ async function main() {
   await seedAdminAccess(admin.id);
 
   console.log('✅ Admin created');
+}
+
+function assertStrongBootstrapPassword(password: string) {
+  const strongEnough =
+    password.length >= 12 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password);
+
+  if (!strongEnough) {
+    throw new Error(
+      'STEELTRACK_BOOTSTRAP_ADMIN_PASSWORD must contain at least 12 characters, upper/lowercase letters, a number and a symbol',
+    );
+  }
 }
 
 async function seedAdminAccess(userId: string) {

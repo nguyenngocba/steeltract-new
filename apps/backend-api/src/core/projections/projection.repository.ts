@@ -19,117 +19,135 @@ type ProjectionDocumentQuery = Omit<ProjectionListQuery, 'cursor'> & {
 export class ProjectionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  apply(definition: ProjectionDefinition, event: ProjectionSourceEvent) {
-    return this.prisma.$transaction(async (tx) => {
-      const receipt = await tx.enterpriseProjectionReceipt.findUnique({
-        where: {
-          projectionName_outboxEventId: {
-            projectionName: definition.name,
-            outboxEventId: event.id,
+  async apply(definition: ProjectionDefinition, event: ProjectionSourceEvent) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const receipt = await tx.enterpriseProjectionReceipt.findUnique({
+          where: {
+            projectionName_outboxEventId: {
+              projectionName: definition.name,
+              outboxEventId: event.id,
+            },
           },
-        },
-      });
-      if (receipt) return { applied: false, replay: true };
+        });
+        if (receipt) return { applied: false, replay: true };
 
-      const metadata = this.record(event.metadata);
-      const aggregateVersion = this.number(
-        metadata.aggregateVersion ??
-          this.record(event.payload).aggregateVersion,
-      );
-      const occurredAt = this.date(metadata.occurredAt, event.createdAt);
-      const eventId = this.string(metadata.eventId) ?? event.id;
-      const provisional = definition.reduce(null, event);
-      const current = provisional
-        ? await tx.enterpriseProjectionDocument.findUnique({
+        const metadata = this.record(event.metadata);
+        const aggregateVersion = this.number(
+          metadata.aggregateVersion ??
+            this.record(event.payload).aggregateVersion,
+        );
+        const persistedAggregateVersion =
+          aggregateVersion === undefined ? null : BigInt(aggregateVersion);
+        const occurredAt = this.date(metadata.occurredAt, event.createdAt);
+        const eventId = this.string(metadata.eventId) ?? event.id;
+        const provisional = definition.reduce(null, event);
+        const current = provisional
+          ? await tx.enterpriseProjectionDocument.findUnique({
+              where: {
+                projectionName_entityKey: {
+                  projectionName: definition.name,
+                  entityKey: provisional.entityKey,
+                },
+              },
+            })
+          : null;
+        const draft = definition.reduce(current?.data ?? null, event);
+
+        if (draft) {
+          await tx.enterpriseProjectionDocument.upsert({
             where: {
               projectionName_entityKey: {
                 projectionName: definition.name,
-                entityKey: provisional.entityKey,
+                entityKey: draft.entityKey,
               },
             },
-          })
-        : null;
-      const draft = definition.reduce(current?.data ?? null, event);
-
-      if (draft) {
-        await tx.enterpriseProjectionDocument.upsert({
-          where: {
-            projectionName_entityKey: {
+            create: {
               projectionName: definition.name,
               entityKey: draft.entityKey,
+              scopeKey: draft.scopeKey,
+              schemaVersion: definition.schemaVersion,
+              data: draft.data,
+              sourceEventId: eventId,
+              sourceEventName: event.eventName,
+              sourceAggregateVersion: persistedAggregateVersion,
+              sourceOccurredAt: occurredAt,
             },
-          },
-          create: {
+            update: {
+              scopeKey: draft.scopeKey,
+              schemaVersion: definition.schemaVersion,
+              data: draft.data,
+              sourceEventId: eventId,
+              sourceEventName: event.eventName,
+              sourceAggregateVersion: persistedAggregateVersion,
+              sourceOccurredAt: occurredAt,
+            },
+          });
+        }
+
+        await tx.enterpriseProjectionReceipt.create({
+          data: {
             projectionName: definition.name,
-            entityKey: draft.entityKey,
-            scopeKey: draft.scopeKey,
-            schemaVersion: definition.schemaVersion,
-            data: draft.data,
-            sourceEventId: eventId,
-            sourceEventName: event.eventName,
-            sourceAggregateVersion: aggregateVersion,
-            sourceOccurredAt: occurredAt,
-          },
-          update: {
-            scopeKey: draft.scopeKey,
-            schemaVersion: definition.schemaVersion,
-            data: draft.data,
-            sourceEventId: eventId,
-            sourceEventName: event.eventName,
-            sourceAggregateVersion: aggregateVersion,
-            sourceOccurredAt: occurredAt,
+            outboxEventId: event.id,
+            eventName: event.eventName,
+            aggregateId: this.string(metadata.aggregateId),
+            aggregateVersion: persistedAggregateVersion,
           },
         });
+
+        const lagMs = Math.min(
+          2_147_483_647,
+          Math.max(0, Date.now() - occurredAt.getTime()),
+        );
+        await tx.enterpriseProjectionCheckpoint.upsert({
+          where: { projectionName: definition.name },
+          create: {
+            projectionName: definition.name,
+            schemaVersion: definition.schemaVersion,
+            lastOutboxEventId: event.id,
+            lastOccurredAt: occurredAt,
+            lastProcessedAt: new Date(),
+            processedCount: 1,
+            lagMs,
+            status: 'HEALTHY',
+          },
+          update: {
+            schemaVersion: definition.schemaVersion,
+            lastOutboxEventId: event.id,
+            lastOccurredAt: occurredAt,
+            lastProcessedAt: new Date(),
+            processedCount: { increment: 1 },
+            lagMs,
+            status: 'HEALTHY',
+            lastError: null,
+          },
+        });
+        await tx.enterpriseProjectionFailure.updateMany({
+          where: {
+            projectionName: definition.name,
+            outboxEventId: event.id,
+            status: { not: 'RESOLVED' },
+          },
+          data: { status: 'RESOLVED', resolvedAt: new Date() },
+        });
+
+        return { applied: true, replay: false };
+      });
+    } catch (error) {
+      if (this.isUniqueConflict(error)) {
+        const receipt =
+          await this.prisma.enterpriseProjectionReceipt.findUnique({
+            where: {
+              projectionName_outboxEventId: {
+                projectionName: definition.name,
+                outboxEventId: event.id,
+              },
+            },
+          });
+        if (receipt) return { applied: false, replay: true };
       }
-
-      await tx.enterpriseProjectionReceipt.create({
-        data: {
-          projectionName: definition.name,
-          outboxEventId: event.id,
-          eventName: event.eventName,
-          aggregateId: this.string(metadata.aggregateId),
-          aggregateVersion,
-        },
-      });
-
-      const lagMs = Math.min(
-        2_147_483_647,
-        Math.max(0, Date.now() - occurredAt.getTime()),
-      );
-      await tx.enterpriseProjectionCheckpoint.upsert({
-        where: { projectionName: definition.name },
-        create: {
-          projectionName: definition.name,
-          schemaVersion: definition.schemaVersion,
-          lastOutboxEventId: event.id,
-          lastOccurredAt: occurredAt,
-          lastProcessedAt: new Date(),
-          processedCount: 1,
-          lagMs,
-          status: 'HEALTHY',
-        },
-        update: {
-          schemaVersion: definition.schemaVersion,
-          lastOutboxEventId: event.id,
-          lastOccurredAt: occurredAt,
-          lastProcessedAt: new Date(),
-          processedCount: { increment: 1 },
-          lagMs,
-          status: 'HEALTHY',
-          lastError: null,
-        },
-      });
-      await tx.enterpriseProjectionFailure.updateMany({
-        where: {
-          projectionName: definition.name,
-          outboxEventId: event.id,
-          status: { not: 'RESOLVED' },
-        },
-        data: { status: 'RESOLVED', resolvedAt: new Date() },
-      });
-
-      return { applied: true, replay: false };
-    });
+      throw error;
+    }
   }
 
   async recordFailure(
@@ -179,6 +197,15 @@ export class ProjectionRepository {
         },
       }),
     ]);
+  }
+
+  private isUniqueConflict(error: unknown) {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'P2002'
+    );
   }
 
   findDocument(projectionName: string, entityKey: string) {

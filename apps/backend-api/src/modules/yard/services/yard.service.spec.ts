@@ -437,4 +437,162 @@ describe('YardService repository and Outbox boundary', () => {
       tx,
     );
   });
+
+  it('closes canonical Yard custody and releases slot for dispatch departure', async () => {
+    const tx = { transaction: 'logistics-tx' };
+    const placement = {
+      id: 'placement-1',
+      slotId: 'slot-a',
+      itemType: 'COMPONENT',
+      itemId: 'instance-1',
+      itemCode: 'BEAM-A-001',
+      componentInstanceId: 'instance-1',
+      removedAt: null,
+      placedAt: new Date('2026-08-10T00:00:00.000Z'),
+      createdAt: new Date('2026-08-10T00:00:00.000Z'),
+      updatedAt: new Date('2026-08-10T00:00:00.000Z'),
+      metadata: {},
+    };
+    const repository = {
+      findActivePlacementsForComponentInstances: jest
+        .fn()
+        .mockResolvedValue([placement]),
+      updatePlacement: jest.fn().mockImplementation(async (_id, data) => ({
+        ...placement,
+        ...data,
+      })),
+      createMovement: jest.fn().mockResolvedValue({ id: 'movement-1' }),
+      findActivePlacementsForSlot: jest.fn().mockResolvedValue([]),
+      updateSlot: jest.fn().mockResolvedValue({}),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+    };
+    const service = new YardService(
+      repository as never,
+      { link: jest.fn() } as never,
+      { findEligibleInstance: jest.fn() } as never,
+    );
+
+    await service.releaseComponentInstancesForDispatch(
+      ['instance-1'],
+      'dispatch-1',
+      'user-1',
+      tx as never,
+    );
+
+    expect(repository.updatePlacement).toHaveBeenCalledWith(
+      'placement-1',
+      expect.objectContaining({ removedAt: expect.any(Date) }),
+      tx,
+    );
+    expect(repository.createMovement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'REMOVE',
+        componentInstance: { connect: { id: 'instance-1' } },
+        fromSlot: { connect: { id: 'slot-a' } },
+      }),
+      tx,
+    );
+    expect(repository.updateSlot).toHaveBeenCalledWith(
+      'slot-a',
+      { currentStackLevel: 0, status: 'AVAILABLE' },
+      tx,
+    );
+    expect(repository.createActivityLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'YARD_ITEM_DISPATCHED' }),
+      tx,
+    );
+    expect(repository.createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ eventName: 'yard.item.removed' }),
+      tx,
+    );
+  });
+
+  it('returns an installed ComponentInstance into Yard QC quarantine atomically', async () => {
+    const tx = { transaction: 'yard-return-tx' };
+    const instance = {
+      id: 'instance-return',
+      instanceNo: 'BEAM-R-001',
+      state: 'INSTALLED',
+      componentId: 'component-1',
+      projectId: 'project-1',
+      productionOrderId: 'po-1',
+      component: { code: 'BEAM-R', name: 'Returned beam' },
+    };
+    const placement = {
+      id: 'placement-return',
+      slotId: 'slot-return',
+      itemType: 'COMPONENT',
+      itemId: instance.id,
+      itemCode: instance.instanceNo,
+      componentInstanceId: instance.id,
+      placedAt: new Date('2026-08-10T00:00:00.000Z'),
+      metadata: { returnQuarantine: true },
+      slot: { zoneId: 'zone-return' },
+      movements: [],
+    };
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findComponentInstanceForReturn: jest.fn().mockResolvedValue(instance),
+      findActivePlacementForComponentInstance: jest.fn().mockResolvedValue(null),
+      findSlotById: jest.fn().mockResolvedValue({
+        id: 'slot-return',
+        status: 'AVAILABLE',
+        maxStackLevel: 3,
+      }),
+      findActivePlacementsForSlot: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([placement]),
+      transitionReturnedComponentInstanceToQc: jest
+        .fn()
+        .mockResolvedValue({ count: 1 }),
+      createPlacement: jest.fn().mockResolvedValue(placement),
+      createMovement: jest.fn().mockResolvedValue({ id: 'movement-return' }),
+      updateSlot: jest.fn().mockResolvedValue({}),
+      createComponentInstanceTimelineIfMissing: jest.fn().mockResolvedValue({}),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+      findPlacementById: jest.fn().mockResolvedValue(placement),
+    };
+    const service = new YardService(
+      repository as never,
+      { link: jest.fn() } as never,
+      { findEligibleInstance: jest.fn() } as never,
+    );
+
+    await service.returnComponentInstanceToYard(
+      {
+        componentInstanceId: instance.id,
+        slotId: 'slot-return',
+        sourceDispatchOrderId: 'dispatch-1',
+        reason: 'Customer return',
+      },
+      'operator-1',
+    );
+
+    expect(
+      repository.transitionReturnedComponentInstanceToQc,
+    ).toHaveBeenCalledWith(instance.id, tx);
+    expect(repository.createPlacement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentInstance: { connect: { id: instance.id } },
+        metadata: expect.objectContaining({
+          returnQuarantine: true,
+          reverseFlow: true,
+          previousState: 'INSTALLED',
+        }),
+      }),
+      tx,
+    );
+    expect(repository.updateSlot).toHaveBeenCalledWith(
+      'slot-return',
+      { currentStackLevel: 1, status: 'OCCUPIED' },
+      tx,
+    );
+    expect(repository.createActivityLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'YARD_COMPONENT_RETURNED' }),
+      tx,
+    );
+  });
 });

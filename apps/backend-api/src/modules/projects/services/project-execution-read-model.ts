@@ -136,7 +136,7 @@ export type ProjectExecutionReadModel = {
     sourceOfTruth: string;
     downstream: {
       yardCanonical: boolean;
-      dispatchCanonical: false;
+      dispatchCanonical: boolean;
     };
   };
   requirements: ProjectExecutionRequirementRow[];
@@ -149,6 +149,10 @@ const completedStates = new Set<ComponentInstanceState>([
   ComponentInstanceState.REWORK,
   ComponentInstanceState.SCRAPPED,
   ComponentInstanceState.USE_AS_IS,
+  ComponentInstanceState.IN_YARD,
+  ComponentInstanceState.IN_TRANSIT,
+  ComponentInstanceState.DELIVERED,
+  ComponentInstanceState.INSTALLED,
 ]);
 
 const activeProductionStates = new Set<ComponentInstanceState>([
@@ -180,7 +184,8 @@ export function buildProjectExecutionReadModel(
     const qcFailedQty = requirement.componentInstances.filter(
       (instance) => instance.state === ComponentInstanceState.QC_FAILED,
     ).length;
-    const finishedGoodsQty = finishedGoodsByRequirement.get(requirement.id) ?? 0;
+    const finishedGoodsQty =
+      finishedGoodsByRequirement.get(requirement.id) ?? 0;
     const yardStagedQty = requirement.componentInstances.filter((instance) =>
       instance.yardPlacements?.some((placement) => !placement.removedAt),
     ).length;
@@ -272,13 +277,19 @@ export function buildProjectExecutionReadModel(
     summary: {
       requirementCount: requirements.length,
       ...totals,
-      productionCompletionPercent: percent(totals.completedQty, totals.requiredQty),
-      finishedGoodsPercent: percent(totals.finishedGoodsQty, totals.requiredQty),
+      productionCompletionPercent: percent(
+        totals.completedQty,
+        totals.requiredQty,
+      ),
+      finishedGoodsPercent: percent(
+        totals.finishedGoodsQty,
+        totals.requiredQty,
+      ),
       sourceOfTruth:
         'Project -> ProjectComponentRequirement -> ProductionOrder -> ComponentInstance',
       downstream: {
         yardCanonical: true,
-        dispatchCanonical: false,
+        dispatchCanonical: true,
       },
     },
     requirements,

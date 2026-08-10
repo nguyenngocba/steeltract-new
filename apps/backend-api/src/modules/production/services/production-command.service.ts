@@ -1314,6 +1314,20 @@ export class ProductionCommandService {
         command.originalProductionOrderId,
         tx,
       );
+      const ncr = await this.repository.findQcNcrForRework(
+        command.qcNcrId,
+        tx,
+      );
+      if (!ncr?.componentInstanceId) {
+        throw new BadRequestException(
+          'Production Rework requires an NCR linked to a physical ComponentInstance',
+        );
+      }
+      if (ncr.productionOrderId !== originalOrder.id) {
+        throw new BadRequestException(
+          'QC NCR does not belong to the original Production Order',
+        );
+      }
       const versionedOriginal = await this.repository.updateAggregateOrder(
         originalOrder.id,
         command.expectedVersion,
@@ -1331,6 +1345,7 @@ export class ProductionCommandService {
           componentRevisionId: command.engineeringBasis.componentRevisionId,
           bomDefinitionId: command.engineeringBasis.bomDefinitionId,
           reworkOfProductionOrderId: command.originalProductionOrderId,
+          projectId: originalOrder.projectId,
           orderKind: ProductionOrderKind.REWORK,
           status: ProductionOrderStatus.DRAFT,
           aggregateVersion: 1,
@@ -1349,6 +1364,7 @@ export class ProductionCommandService {
           qcNcrId: command.qcNcrId,
           originalProductionOrderId: command.originalProductionOrderId,
           reworkProductionOrderId: reworkOrder.id,
+          componentInstanceId: ncr.componentInstanceId,
           state: ProductionReworkState.ACCEPTED,
           routingScope: this.json(command.routingScope ?? {}),
           reason: command.reason,

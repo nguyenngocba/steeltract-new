@@ -299,3 +299,10 @@ QC inspection completion now emits a bounded AD-019 fact rather than a Prisma
 graph. NCR payloads expose real identifiers/severity but explicit null for
 defect/reason codes absent from the domain. `qc.disposition.completed` has no
 publisher, so NCR/disposition certification remains partial.
+
+## SYSTEM.REVERSE.1 Return QC Gate
+
+Returned ComponentInstances enter Yard quarantine in
+`PRODUCED_WAITING_QC`. FINAL PASS/Use-As-Is releases the active placement to
+`IN_YARD`; REWORK or SCRAP closes quarantine and releases slot occupancy. QC
+decisions remain the sole physical quality owner.

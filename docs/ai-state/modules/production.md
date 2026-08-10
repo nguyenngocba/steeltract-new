@@ -858,3 +858,18 @@ Definition, ComponentRevision, ComponentBomDefinition, physical
 ComponentInstances, ComponentInstanceExecution, QC rows/NCR references and
 material reservation/issue readiness. The existing route is reused; no schema,
 command, lifecycle, Finished Goods, Yard or Logistics behavior changed.
+
+## SYSTEM.HARDENING.1 Completion Certification
+
+Production completion validation now inspects only numeric completion fields;
+application command metadata no longer causes runtime numeric validation errors.
+The retained fixture records one completion and one canonical material
+consumption, then advances the Production Order to `COMPLETED` version 6.
+
+## SYSTEM.REVERSE.1 Physical Rework and Material Return
+
+ProductionRework retains the NCR ComponentInstance identity. Accepted rework
+orders can execute that same instance, and mandatory rework operation completion
+sends it back to `PRODUCED_WAITING_QC`. Material issue return remains the
+canonical MAIN <- PRODUCTION path with reservation, ledger, ActivityLog and
+InventoryPosting in one transaction.

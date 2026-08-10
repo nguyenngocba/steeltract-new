@@ -15,6 +15,7 @@ import { ProjectsRepository } from './repositories/projects.repository';
 import { ComponentsModule } from '../components/components.module';
 
 import { RbacModule } from '../rbac/rbac.module';
+import { YardModule } from '../yard/yard.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RbacModule } from '../rbac/rbac.module';
     RbacModule,
     SnapshotsModule,
     EventsModule,
+    YardModule,
   ],
 
   controllers: [ProjectsController],

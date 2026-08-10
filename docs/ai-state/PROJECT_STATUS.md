@@ -1,5 +1,25 @@
 # Project Status
 
+On 2026-08-10 completed **SYSTEM.RUNTIME.2 - Production Runtime Closure**.
+Implemented deployment-grade live/ready/startup probes, stale Yard snapshot
+watermark detection, exact Yard KPI parity certification, complete Playwright
+workflow evidence and idempotent handling of concurrent projection receipt
+races. Runtime certification passed 68 REST steps, 15/15 database invariants,
+11/11 Yard KPI comparisons, 54/54 RBAC/authentication checks and all required
+dashboard deltas. Backend tests pass 94 suites / 313 tests; frontend tests,
+typecheck, builds and Playwright pass. Decision: **GO FOR STEELTRACK V1 RC1**.
+Report: `docs/audits/system-runtime2-final-runtime-closure.md`.
+
+On 2026-08-10 implemented **SYSTEM.REVERSE.1 – Canonical Reverse Workflow
+Certification**. Added canonical Supplier Return outbound posting, physical
+Project/Logistics return into Yard QC quarantine, QC rework/scrap quarantine
+release and Production Rework ComponentInstance lineage. Migration
+`20260810150000_canonical_reverse_workflow_foundation` is deployed. Backend
+tests pass 92/92 suites and 308/308 tests; frontend tests/build and backend build
+pass. Status is conditionally ready because authenticated reverse REST fixture,
+403 authorization proof and dashboard delta evidence remain pending. Report:
+`docs/audits/system-reverse1-canonical-reverse-workflows.md`.
+
 On 2026-08-03 completed **SYSTEM.INTEGRITY.2 – SteelTrack V1 Runtime
 Certification & Canonical Freeze Audit** as an audit-only sprint. No production
 source, schema, migration, staging or commit action was performed. Runtime DB
@@ -2048,3 +2068,28 @@ available; EPIC144 did not invent missing workflows.
 - Frontend tests: PASS, 2 files / 4 tests.
 - Backend/frontend builds: PASS.
 - Internal pilot: CONDITIONALLY READY. V1 freeze/production: NOT READY.
+
+# SYSTEM.HARDENING.1 Production Readiness
+
+- P0 Yard custody lifecycle: PASS.
+- Projection overflow and replay recovery: PASS; active failures 0.
+- Inventory payload-bound idempotency: PASS; conflict returns 409.
+- Projects pagination contract: PASS; `limit=3` returns three rows.
+- Runtime canonical happy path: PASS.
+- Inventory conservation: PASS; movement 95 PCS equals balance 95 PCS.
+- Backend/frontend tests and builds: PASS.
+- Readiness: 94%; controlled pilot GO, production CONDITIONALLY GO.
+- Report: `docs/audits/system-hardening1-production-readiness.md`.
+
+# SYSTEM.RUNTIME.1
+
+- Secure bootstrap and runtime accounts: PASS.
+- RBAC/security: PASS, 54/54 checks.
+- Canonical REST workflow: PASS, 73 calls / 13 assertions.
+- Database/read-model parity: PASS, 15/15 checks.
+- Dashboard deltas: PASS for Inventory, Production, QC, Yard, Logistics and
+  Executive; Yard snapshot/live parity: FAIL with five mismatches.
+- Browser login/render/logout: PASS, 17 workspaces.
+- Full browser mutation workflow: NOT CERTIFIED.
+- V1 RC1: NO-GO pending browser workflow, deployment probes and Yard snapshot
+  parity.

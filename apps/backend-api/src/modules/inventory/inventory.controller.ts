@@ -3,18 +3,19 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   Query,
   Put,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { InventoryService } from './inventory.service'
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
-import { PermissionsGuard } from '../rbac/guards/permissions.guard'
+import { InventoryService } from './inventory.service';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import {
   createInventoryItemSchema,
   createTransactionSchema,
@@ -22,7 +23,7 @@ import {
   inventoryOverviewQuerySchema,
   inventoryTransactionListQuerySchema,
   updateInventoryItemSchema,
-} from './dto/inventory.dto'
+} from './dto/inventory.dto';
 
 import type {
   CreateInventoryItemDto,
@@ -31,45 +32,37 @@ import type {
   InventoryOverviewQueryDto,
   InventoryTransactionListQueryDto,
   UpdateInventoryItemDto,
-} from './dto/inventory.dto'
+} from './dto/inventory.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions('inventory.read')
 @Controller('inventory')
 export class InventoryController {
-  constructor(
-    private readonly inventoryService: InventoryService,
-  ) {}
+  constructor(private readonly inventoryService: InventoryService) {}
 
   @Get('items')
   async getItems() {
-    return this.inventoryService.getItems()
+    return this.inventoryService.getItems();
   }
 
   @Get('items/:id')
-  async getItem(
-    @Param('id') id: string,
-  ) {
-    return this.inventoryService.getItem(id)
+  async getItem(@Param('id') id: string) {
+    return this.inventoryService.getItem(id);
   }
 
   @Get('items/:id/detail')
-  async getItemDetail(
-    @Param('id') id: string,
-  ) {
-    return this.inventoryService.getItemDetail(id)
+  async getItemDetail(@Param('id') id: string) {
+    return this.inventoryService.getItemDetail(id);
   }
 
   @Get('items/:id/inbound-suggestions')
-  async getInboundSuggestions(
-    @Param('id') id: string,
-  ) {
-    return this.inventoryService.getInboundSuggestions(id)
+  async getInboundSuggestions(@Param('id') id: string) {
+    return this.inventoryService.getInboundSuggestions(id);
   }
 
   @Get('audit')
   async getInventoryAudit() {
-    return this.inventoryService.getInventoryAudit()
+    return this.inventoryService.getInventoryAudit();
   }
 
   @Get('overview')
@@ -77,7 +70,7 @@ export class InventoryController {
     @Query(new ZodValidationPipe(inventoryOverviewQuerySchema))
     query: InventoryOverviewQueryDto,
   ) {
-    return this.inventoryService.getOverview(query)
+    return this.inventoryService.getOverview(query);
   }
 
   @Get('materials')
@@ -85,7 +78,7 @@ export class InventoryController {
     @Query(new ZodValidationPipe(inventoryMaterialListQuerySchema))
     query: InventoryMaterialListQueryDto,
   ) {
-    return this.inventoryService.getMaterialList(query)
+    return this.inventoryService.getMaterialList(query);
   }
 
   @Post('items')
@@ -94,9 +87,7 @@ export class InventoryController {
     @Body(new ZodValidationPipe(createInventoryItemSchema))
     body: CreateInventoryItemDto,
   ) {
-    return this.inventoryService.createItem(
-      body,
-    )
+    return this.inventoryService.createItem(body);
   }
 
   @Put('items/:id')
@@ -106,20 +97,13 @@ export class InventoryController {
     @Body(new ZodValidationPipe(updateInventoryItemSchema))
     body: UpdateInventoryItemDto,
   ) {
-    return this.inventoryService.updateItem(
-      id,
-      body,
-    )
+    return this.inventoryService.updateItem(id, body);
   }
 
   @Delete('items/:id')
   @RequirePermissions('inventory.write')
-  async deleteItem(
-    @Param('id') id: string,
-  ) {
-    return this.inventoryService.deleteItem(
-      id,
-    )
+  async deleteItem(@Param('id') id: string) {
+    return this.inventoryService.deleteItem(id);
   }
 
   @Get('transactions')
@@ -127,7 +111,7 @@ export class InventoryController {
     @Query(new ZodValidationPipe(inventoryTransactionListQuerySchema))
     query: InventoryTransactionListQueryDto,
   ) {
-    return this.inventoryService.listTransactions(query)
+    return this.inventoryService.listTransactions(query);
   }
 
   @Post('transactions')
@@ -135,16 +119,13 @@ export class InventoryController {
   async createTransaction(
     @Body(new ZodValidationPipe(createTransactionSchema))
     body: CreateTransactionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.inventoryService.createTransaction(
-      body,
-    )
+    return this.inventoryService.createTransaction(body, idempotencyKey);
   }
 
   @Get('transactions/:id')
-  async getTransactionDetail(
-    @Param('id') id: string,
-  ) {
-    return this.inventoryService.getTransactionDetail(id)
+  async getTransactionDetail(@Param('id') id: string) {
+    return this.inventoryService.getTransactionDetail(id);
   }
 }

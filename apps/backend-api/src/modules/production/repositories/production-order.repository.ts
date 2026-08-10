@@ -64,6 +64,30 @@ export class ProductionOrderRepository {
     });
   }
 
+  findEligibleComponentInstanceIdsForProductionOrder(
+    ids: string[],
+    productionOrderId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.componentInstance.findMany({
+      where: {
+        id: { in: ids },
+        OR: [
+          { productionOrderId },
+          {
+            productionReworks: {
+              some: {
+                reworkProductionOrderId: productionOrderId,
+                state: 'ACCEPTED',
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+  }
+
   findComponentInstanceExecutionsByRun(
     productionExecutionId: string,
     componentInstanceIds: string[],
@@ -465,6 +489,17 @@ export class ProductionOrderRepository {
     tx: Prisma.TransactionClient = this.prisma,
   ) {
     return tx.productionRework.findUnique({ where: { reworkRequestId } });
+  }
+
+  findQcNcrForRework(id: string, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.nonConformanceReport.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        componentInstanceId: true,
+        productionOrderId: true,
+      },
+    });
   }
 
   async updateRework(

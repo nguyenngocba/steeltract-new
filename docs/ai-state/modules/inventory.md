@@ -996,3 +996,19 @@ material, unit, separate location fields and resulting material/location
 balances. Stocktake emits scope and count facts. Existing compatibility events
 remain for backward compatibility. Historical retained events and locationless
 legacy postings prevent full authoritative replay; missing facts are not guessed.
+
+## SYSTEM.HARDENING.1 Idempotency
+
+Inventory transaction commands persist an idempotency receipt keyed by the
+normalized request key and deterministic payload hash. Exact replay returns the
+original transaction. Key reuse with another payload returns 409 and records
+`INVENTORY_IDEMPOTENCY_CONFLICT`. Receipt, transaction, ActivityLog and Outbox
+remain in the same transaction boundary.
+
+## SYSTEM.REVERSE.1 Supplier and Production Returns
+
+Supplier Return requires a valid supplier/source warehouse and posts `EXPORT`
+with `transactionTypeCode = SUPPLIER_RETURN` and negative quantities through
+InventoryService. Posting is idempotent by ReturnRequest reference. Generic
+`PRODUCTION_RETURN` requests are rejected; MAIN <- PRODUCTION remains owned by
+`POST /production/material-issues/:id/return`.

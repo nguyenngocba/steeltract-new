@@ -118,6 +118,9 @@ enum DispatchOrderStatus {
   RECEIVED
   COMPLETED
   CANCELLED
+  RETURN_REQUESTED
+  RETURN_IN_TRANSIT
+  RETURNED
 }
 
 enum DispatchItemType {
@@ -133,6 +136,9 @@ enum DispatchEventType {
   RECEIVED
   COMPLETED
   CANCELLED
+  RETURN_REQUESTED
+  RETURN_DEPARTED
+  RETURNED
 }
 
 enum ProjectTemplateStatus {
@@ -171,6 +177,7 @@ enum ComponentInstanceState {
   IN_YARD
   IN_TRANSIT
   DELIVERED
+  INSTALLED
   LEGACY_UNKNOWN
 }
 
@@ -1555,6 +1562,7 @@ model ComponentInstance {
   yardPlacements    YardItemPlacement[]          @relation("ComponentInstanceYardPlacements")
   yardMovements     YardMovement[]               @relation("ComponentInstanceYardMovements")
   dispatchItems     DispatchItem[]               @relation("ComponentInstanceDispatchItems")
+  productionReworks ProductionRework[]           @relation("ComponentInstanceProductionReworks")
 
   @@unique([productionOrderId, serialSequence])
   @@index([componentId])
@@ -3145,7 +3153,7 @@ model EnterpriseProjectionDocument {
   data                   Json
   sourceEventId          String
   sourceEventName        String
-  sourceAggregateVersion Int?
+  sourceAggregateVersion BigInt?
   sourceOccurredAt       DateTime
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
@@ -3184,7 +3192,7 @@ model EnterpriseProjectionReceipt {
   outboxEventId    String
   eventName        String
   aggregateId      String?
-  aggregateVersion Int?
+  aggregateVersion BigInt?
   processedAt      DateTime @default(now())
 
   @@unique([projectionName, outboxEventId])
@@ -4356,6 +4364,7 @@ model ProductionRework {
   qcNcrId                   String
   originalProductionOrderId String
   reworkProductionOrderId   String?               @unique
+  componentInstanceId       String?
   state                     ProductionReworkState
   routingScope              Json?
   reason                    String?
@@ -4364,11 +4373,13 @@ model ProductionRework {
   decidedAt                 DateTime              @default(now())
   completedAt               DateTime?
 
-  originalProductionOrder ProductionOrder  @relation("OriginalProductionRework", fields: [originalProductionOrderId], references: [id], onDelete: Restrict)
-  reworkProductionOrder   ProductionOrder? @relation("AcceptedProductionRework", fields: [reworkProductionOrderId], references: [id], onDelete: SetNull)
+  originalProductionOrder ProductionOrder    @relation("OriginalProductionRework", fields: [originalProductionOrderId], references: [id], onDelete: Restrict)
+  reworkProductionOrder   ProductionOrder?   @relation("AcceptedProductionRework", fields: [reworkProductionOrderId], references: [id], onDelete: SetNull)
+  componentInstance       ComponentInstance? @relation("ComponentInstanceProductionReworks", fields: [componentInstanceId], references: [id], onDelete: SetNull)
 
   @@index([qcNcrId])
   @@index([originalProductionOrderId, state])
+  @@index([componentInstanceId])
 }
 
 //

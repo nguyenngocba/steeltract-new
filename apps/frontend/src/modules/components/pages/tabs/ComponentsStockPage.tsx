@@ -100,7 +100,7 @@ export function ComponentsStockPage() {
   const { data: projects = [] } = useProjectsQuery()
   const { data: componentOptions } = useComponentsWorkspace({
     page: 1,
-    limit: 200,
+    limit: 100,
     sortBy: 'code',
     sortOrder: 'asc',
   })

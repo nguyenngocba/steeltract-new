@@ -8,10 +8,10 @@ import loginLogo from '../../../../../../images/logo-bg.jpg'
 
 export function LoginPage() {
   const [username, setUsername] =
-    useState('admin')
+    useState('')
 
   const [password, setPassword] =
-    useState('123')
+    useState('')
 
   const setSession =
     useAuthStore((s) => s.setSession)

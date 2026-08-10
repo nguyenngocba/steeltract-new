@@ -28,6 +28,7 @@ import {
   ListProjectsDto,
   MoveProjectWbsTaskDto,
   ReturnProjectComponentDto,
+  ReturnProjectComponentInstanceDto,
   SiteProjectUpdateDto,
   UpdateProjectDto,
   UpdateProjectTemplateDto,
@@ -39,6 +40,7 @@ import {
   buildProjectExecutionReadModel,
   type ProjectExecutionRequirementSource,
 } from './project-execution-read-model';
+import { YardService } from '../../yard/services/yard.service';
 
 const projectTaskInclude = {
   dependencies: true,
@@ -90,6 +92,8 @@ export class ProjectsService {
     private readonly snapshotDispatcher: SnapshotUpdateDispatcher,
     @Inject(PerformanceMetricsService)
     private readonly metrics: PerformanceMetricsService,
+    @Inject(YardService)
+    private readonly yardService: YardService,
   ) {}
 
   async findAll(query: ListProjectsDto) {
@@ -361,49 +365,37 @@ export class ProjectsService {
     componentId: string,
     dto: ReturnProjectComponentDto,
   ) {
-    await this.assertProjectExists(projectId);
-    return this.repository.transaction(async (tx) => {
-      const component = await this.repository.findProjectComponent(projectId, componentId, tx);
-      if (!component) {
-        throw new NotFoundException('Project component not found');
-      }
-      if (!['SHIPPED', 'DELIVERED', 'INSTALLED'].includes(component.status)) {
-        throw new BadRequestException('Only shipped, delivered, or installed project components can be returned.');
-      }
+    void projectId;
+    void componentId;
+    void dto;
+    throw new BadRequestException(
+      'Component definitions cannot be returned. Use the ComponentInstance return-to-yard endpoint.',
+    );
+  }
 
-      const updated = await this.repository.updateProjectComponentReturned(componentId, tx);
-      await this.repository.createComponentTimeline(
-        {
-          componentId,
-          action: 'RETURNED_TO_YARD',
-          note: dto.reason ?? 'Trả cấu kiện từ công trình về bãi',
-        },
-        tx,
-      );
-      await this.repository.createActivityLog(
-        {
-          action: 'PROJECT_COMPONENT_RETURNED',
-          entity: 'Component',
-          entityId: componentId,
-          module: 'projects',
-          metadata: {
-            projectId,
-            componentCode: component.code,
-            previousStatus: component.status,
-            nextStatus: updated.status,
-            returnedBy: dto.returnedBy,
-            reason: dto.reason,
-          },
-        },
-        tx,
-      );
-      await this.emitProjectEvent('project.component.changed', componentId, {
-        projectId,
-        status: updated.status,
-        action: 'RETURNED_TO_YARD',
-      }, tx);
-      return updated;
-    });
+  async returnProjectComponentInstance(
+    projectId: string,
+    componentInstanceId: string,
+    dto: ReturnProjectComponentInstanceDto,
+    actorId?: string,
+  ) {
+    await this.assertProjectExists(projectId);
+    const instance = await this.repository.findProjectComponentInstance(
+      projectId,
+      componentInstanceId,
+    );
+    if (!instance) {
+      throw new NotFoundException('Project ComponentInstance not found');
+    }
+    return this.yardService.returnComponentInstanceToYard(
+      {
+        componentInstanceId,
+        slotId: dto.slotId,
+        reason: dto.reason,
+        metadata: { projectId, initiatedBy: 'projects' },
+      },
+      actorId,
+    );
   }
 
   remove(id: string) {

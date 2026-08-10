@@ -31,6 +31,7 @@ import {
   moveYardItemSchema,
   placeYardItemSchema,
   removeYardItemSchema,
+  returnComponentInstanceToYardBodySchema,
   stageComponentInstanceToYardSchema,
   updateCraneSchema,
   updateYardZoneSchema,
@@ -52,6 +53,7 @@ import type {
   MoveYardItemDto,
   PlaceYardItemDto,
   RemoveYardItemDto,
+  ReturnComponentInstanceToYardBodyDto,
   StageComponentInstanceToYardDto,
   UpdateCraneDto,
   UpdateYardZoneDto,
@@ -179,6 +181,20 @@ export class YardController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.yardService.stageComponentInstance(body, request.user?.id);
+  }
+
+  @Post('component-instances/:id/return')
+  @RequirePermissions('yard.write')
+  returnComponentInstance(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(returnComponentInstanceToYardBodySchema))
+    body: ReturnComponentInstanceToYardBodyDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.yardService.returnComponentInstanceToYard(
+      { ...body, componentInstanceId: id },
+      request.user?.id,
+    );
   }
 
   @Post('placements/:id/move')

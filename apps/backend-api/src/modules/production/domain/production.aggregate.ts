@@ -204,7 +204,14 @@ export class ProductionCompletionAggregate {
     scrapQty: number;
     remainingQty: number;
   }) {
-    for (const [field, value] of Object.entries(input)) {
+    const quantities = {
+      quantity: input.quantity,
+      completedQty: input.completedQty,
+      rejectedQty: input.rejectedQty,
+      scrapQty: input.scrapQty,
+      remainingQty: input.remainingQty,
+    };
+    for (const [field, value] of Object.entries(quantities)) {
       if (!Number.isFinite(value) || value < 0) {
         throw new ProductionDomainError(`${field} must be non-negative`);
       }

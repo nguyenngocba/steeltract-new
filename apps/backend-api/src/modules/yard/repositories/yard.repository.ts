@@ -185,6 +185,20 @@ export class YardRepository {
     });
   }
 
+  findActivePlacementsForComponentInstances(
+    componentInstanceIds: string[],
+    tx: YardTx = this.prisma,
+  ) {
+    return tx.yardItemPlacement.findMany({
+      where: {
+        componentInstanceId: { in: componentInstanceIds },
+        removedAt: null,
+      },
+      include: this.placementInclude(),
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   transitionComponentInstanceToYard(componentInstanceId: string, tx: YardTx) {
     return tx.componentInstance.updateMany({
       where: {
@@ -198,6 +212,83 @@ export class YardRepository {
       },
       data: { state: ComponentInstanceState.IN_YARD },
     });
+  }
+
+  findComponentInstanceForReturn(
+    componentInstanceId: string,
+    tx: YardTx = this.prisma,
+  ) {
+    return tx.componentInstance.findUnique({
+      where: { id: componentInstanceId },
+      include: {
+        component: {
+          select: { id: true, code: true, name: true },
+        },
+        productionOrder: {
+          select: { id: true, orderNo: true },
+        },
+        project: {
+          select: { id: true, code: true, name: true },
+        },
+      },
+    });
+  }
+
+  transitionReturnedComponentInstanceToQc(
+    componentInstanceId: string,
+    tx: YardTx,
+  ) {
+    return tx.componentInstance.updateMany({
+      where: {
+        id: componentInstanceId,
+        state: {
+          in: [
+            ComponentInstanceState.IN_TRANSIT,
+            ComponentInstanceState.DELIVERED,
+            ComponentInstanceState.INSTALLED,
+          ],
+        },
+      },
+      data: {
+        state: ComponentInstanceState.PRODUCED_WAITING_QC,
+        installedAt: null,
+      },
+    });
+  }
+
+  transitionReturnedComponentInstanceToYard(
+    componentInstanceId: string,
+    tx: YardTx,
+  ) {
+    return tx.componentInstance.updateMany({
+      where: {
+        id: componentInstanceId,
+        state: {
+          in: [
+            ComponentInstanceState.QC_PASSED,
+            ComponentInstanceState.USE_AS_IS,
+          ],
+        },
+      },
+      data: { state: ComponentInstanceState.IN_YARD },
+    });
+  }
+
+  async createComponentInstanceTimelineIfMissing(
+    data: Prisma.ComponentInstanceTimelineCreateManyInput,
+    tx: YardTx,
+  ) {
+    const existing = await tx.componentInstanceTimeline.findFirst({
+      where: {
+        componentInstanceId: data.componentInstanceId,
+        eventType: data.eventType,
+        sourceModule: data.sourceModule,
+        sourceId: data.sourceId,
+      },
+      select: { id: true },
+    });
+    if (existing) return existing;
+    return tx.componentInstanceTimeline.create({ data });
   }
 
   async updatePlacementVersioned(

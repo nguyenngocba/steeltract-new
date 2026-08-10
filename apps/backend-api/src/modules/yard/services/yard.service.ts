@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 
 import {
+  ComponentInstanceState,
   ComponentStatus,
   Prisma,
   YardItemType,
@@ -30,6 +31,7 @@ import {
   MoveYardItemDto,
   PlaceYardItemDto,
   RemoveYardItemDto,
+  ReturnComponentInstanceToYardDto,
   StageComponentInstanceToYardDto,
   UpdateCraneDto,
   UpdateYardZoneDto,
@@ -266,10 +268,7 @@ export class YardService {
         throw new BadRequestException('Yard slot is blocked');
       }
 
-      if (
-        dto.itemType === YardItemType.COMPONENT &&
-        !dto.componentInstanceId
-      ) {
+      if (dto.itemType === YardItemType.COMPONENT && !dto.componentInstanceId) {
         throw new BadRequestException(
           'Component Yard placement requires componentInstanceId. Use POST /yard/stage for finished goods.',
         );
@@ -461,6 +460,263 @@ export class YardService {
 
       throw error;
     }
+  }
+
+  async returnComponentInstanceToYard(
+    dto: ReturnComponentInstanceToYardDto,
+    actorId?: string,
+    transaction?: YardTx,
+  ) {
+    const execute = (tx: YardTx) =>
+      this.returnComponentInstanceToYardInTransaction(dto, actorId, tx);
+    return transaction ? execute(transaction) : this.repository.transaction(execute);
+  }
+
+  async acceptReturnedComponentAfterQc(
+    componentInstanceId: string,
+    inspectionId: string,
+    actorId: string | undefined,
+    tx: YardTx,
+  ) {
+    const placement =
+      await this.repository.findActivePlacementForComponentInstance(
+        componentInstanceId,
+        tx,
+      );
+    const metadata = placement
+      ? this.objectMetadata(placement.metadata)
+      : undefined;
+    if (!placement || metadata?.returnQuarantine !== true) return false;
+
+    const transitioned =
+      await this.repository.transitionReturnedComponentInstanceToYard(
+        componentInstanceId,
+        tx,
+      );
+    if (transitioned.count !== 1) {
+      throw new ConflictException(
+        'Returned component instance is no longer eligible for Yard release',
+      );
+    }
+
+    const updated = await this.repository.updatePlacement(
+      placement.id,
+      {
+        metadata: this.toJson({
+          ...metadata,
+          returnQuarantine: false,
+          returnQcInspectionId: inspectionId,
+          returnQcReleasedAt: new Date().toISOString(),
+        }),
+      },
+      tx,
+    );
+    await this.repository.createComponentInstanceTimelineIfMissing(
+      {
+        componentInstanceId,
+        eventType: 'RETURN_QC_REUSE_APPROVED',
+        sourceModule: 'yard',
+        sourceId: inspectionId,
+        metadata: this.toJson({ placementId: placement.id }),
+      },
+      tx,
+    );
+    await this.logActivity(
+      tx,
+      'YARD_RETURN_RELEASED',
+      'ComponentInstance',
+      componentInstanceId,
+      { actorId, metadata: { placementId: placement.id, inspectionId } },
+    );
+    await this.createYardOutboxEvent(tx, 'yard.item.placed', updated, actorId);
+    return true;
+  }
+
+  async releaseReturnedComponentForDisposition(
+    componentInstanceId: string,
+    disposition: 'REWORK' | 'SCRAP',
+    sourceId: string,
+    actorId: string | undefined,
+    tx: YardTx,
+  ) {
+    const placement =
+      await this.repository.findActivePlacementForComponentInstance(
+        componentInstanceId,
+        tx,
+      );
+    const metadata = placement
+      ? this.objectMetadata(placement.metadata)
+      : undefined;
+    if (!placement || metadata?.returnQuarantine !== true) return false;
+
+    const removedAt = new Date();
+    const dispositionMetadata = {
+      ...metadata,
+      returnQuarantine: false,
+      returnDisposition: disposition,
+      returnDispositionSourceId: sourceId,
+      returnQuarantineReleasedAt: removedAt.toISOString(),
+    };
+    const updated = await this.repository.updatePlacement(
+      placement.id,
+      { removedAt, metadata: this.toJson(dispositionMetadata) },
+      tx,
+    );
+    await this.repository.createMovement(
+      {
+        placement: { connect: { id: placement.id } },
+        componentInstance: { connect: { id: componentInstanceId } },
+        type: YardMovementType.REMOVE,
+        itemType: placement.itemType,
+        itemId: placement.itemId,
+        itemCode: placement.itemCode,
+        fromSlot: { connect: { id: placement.slotId } },
+        movedById: actorId,
+        reason: `Returned component disposition: ${disposition}`,
+        metadata: this.toJson(dispositionMetadata),
+      },
+      tx,
+    );
+    await this.updateSlotOccupancy(placement.slotId, tx);
+    await this.logActivity(
+      tx,
+      'YARD_RETURN_QUARANTINE_RELEASED',
+      'ComponentInstance',
+      componentInstanceId,
+      {
+        actorId,
+        metadata: { placementId: placement.id, disposition, sourceId },
+      },
+    );
+    await this.createYardOutboxEvent(tx, 'yard.item.removed', updated, actorId);
+    return true;
+  }
+
+  private async returnComponentInstanceToYardInTransaction(
+    dto: ReturnComponentInstanceToYardDto,
+    actorId: string | undefined,
+    tx: YardTx,
+  ) {
+    const instance = await this.repository.findComponentInstanceForReturn(
+      dto.componentInstanceId,
+      tx,
+    );
+    if (!instance) throw new NotFoundException('Component instance not found');
+    const returnableStates = new Set<ComponentInstanceState>([
+      ComponentInstanceState.IN_TRANSIT,
+      ComponentInstanceState.DELIVERED,
+      ComponentInstanceState.INSTALLED,
+    ]);
+    if (!returnableStates.has(instance.state)) {
+      throw new ConflictException(
+        'Only dispatched, delivered or installed component instances can return to Yard',
+      );
+    }
+
+    const existing =
+      await this.repository.findActivePlacementForComponentInstance(
+        instance.id,
+        tx,
+      );
+    if (existing) {
+      throw new ConflictException(
+        'Component instance already has an active Yard placement',
+      );
+    }
+
+    const slot = await this.getSlotOrThrow(dto.slotId, tx);
+    if (slot.status === YardSlotStatus.BLOCKED) {
+      throw new BadRequestException('Yard slot is blocked');
+    }
+    const activePlacements =
+      await this.repository.findActivePlacementsForSlot(dto.slotId, tx);
+    const stackLevel = dto.stackLevel ?? activePlacements.length + 1;
+    this.assertStackAvailable(slot.maxStackLevel, activePlacements, stackLevel);
+
+    const previousState = instance.state;
+    const transitioned =
+      await this.repository.transitionReturnedComponentInstanceToQc(
+        instance.id,
+        tx,
+      );
+    if (transitioned.count !== 1) {
+      throw new ConflictException(
+        'Component instance state changed before Yard return',
+      );
+    }
+
+    const metadata = {
+      ...(dto.metadata ?? {}),
+      canonicalSource: 'ComponentInstance',
+      reverseFlow: true,
+      returnQuarantine: true,
+      previousState,
+      sourceDispatchOrderId: dto.sourceDispatchOrderId,
+      reason: dto.reason,
+      componentId: instance.componentId,
+      projectId: instance.projectId,
+      productionOrderId: instance.productionOrderId,
+    };
+    const placement = await this.repository.createPlacement(
+      {
+        slot: { connect: { id: dto.slotId } },
+        componentInstance: { connect: { id: instance.id } },
+        itemType: YardItemType.COMPONENT,
+        itemId: instance.id,
+        itemCode: instance.instanceNo,
+        itemName: `${instance.component.code} - ${instance.component.name}`,
+        quantity: 1,
+        stackLevel,
+        placedById: actorId,
+        metadata: this.toJson(metadata),
+      },
+      tx,
+    );
+    await this.repository.createMovement(
+      {
+        placement: { connect: { id: placement.id } },
+        componentInstance: { connect: { id: instance.id } },
+        type: YardMovementType.PLACE,
+        itemType: YardItemType.COMPONENT,
+        itemId: instance.id,
+        itemCode: instance.instanceNo,
+        toSlot: { connect: { id: dto.slotId } },
+        movedById: actorId,
+        reason: dto.reason,
+        metadata: this.toJson(metadata),
+      },
+      tx,
+    );
+    await this.updateSlotOccupancy(dto.slotId, tx);
+    await this.repository.createComponentInstanceTimelineIfMissing(
+      {
+        componentInstanceId: instance.id,
+        eventType: 'COMPONENT_RETURNED_TO_YARD_QUARANTINE',
+        sourceModule: 'yard',
+        sourceId: dto.sourceDispatchOrderId ?? placement.id,
+        metadata: this.toJson({ placementId: placement.id, previousState }),
+      },
+      tx,
+    );
+    await this.logActivity(
+      tx,
+      'YARD_COMPONENT_RETURNED',
+      'ComponentInstance',
+      instance.id,
+      {
+        actorId,
+        metadata: {
+          placementId: placement.id,
+          slotId: dto.slotId,
+          previousState,
+          sourceDispatchOrderId: dto.sourceDispatchOrderId,
+        },
+      },
+    );
+    const result = await this.repository.findPlacementById(placement.id, tx);
+    if (!result) throw new NotFoundException('Yard placement not found');
+    await this.createYardOutboxEvent(tx, 'yard.item.placed', result, actorId);
+    return result;
   }
 
   async moveItem(id: string, dto: MoveYardItemDto, actorId?: string) {
@@ -662,6 +918,95 @@ export class YardService {
     }
 
     return placement;
+  }
+
+  async releaseComponentInstancesForDispatch(
+    componentInstanceIds: string[],
+    dispatchOrderId: string,
+    actorId: string | undefined,
+    tx: YardTx,
+  ) {
+    const uniqueInstanceIds = Array.from(new Set(componentInstanceIds));
+    if (!uniqueInstanceIds.length) return [];
+
+    const placements =
+      await this.repository.findActivePlacementsForComponentInstances(
+        uniqueInstanceIds,
+        tx,
+      );
+    const placementByInstance = new Map(
+      placements.map((placement) => [placement.componentInstanceId, placement]),
+    );
+    const missing = uniqueInstanceIds.filter(
+      (componentInstanceId) => !placementByInstance.has(componentInstanceId),
+    );
+    if (missing.length || placements.length !== uniqueInstanceIds.length) {
+      throw new ConflictException(
+        'Component instance Yard placement changed before dispatch',
+      );
+    }
+
+    const removedAt = new Date();
+    for (const placement of placements) {
+      const metadata = {
+        ...this.objectMetadata(placement.metadata),
+        outboundAt: removedAt.toISOString(),
+        dispatchOrderId,
+      };
+      const updated = await this.repository.updatePlacement(
+        placement.id,
+        {
+          removedAt,
+          metadata: this.toJson(metadata),
+        },
+        tx,
+      );
+      await this.repository.createMovement(
+        {
+          placement: { connect: { id: placement.id } },
+          componentInstance: placement.componentInstanceId
+            ? { connect: { id: placement.componentInstanceId } }
+            : undefined,
+          type: YardMovementType.REMOVE,
+          itemType: placement.itemType,
+          itemId: placement.itemId,
+          itemCode: placement.itemCode,
+          fromSlot: { connect: { id: placement.slotId } },
+          movedById: actorId,
+          reason: `Dispatch order ${dispatchOrderId} departed Yard`,
+          metadata: this.toJson(metadata),
+        },
+        tx,
+      );
+      await this.logActivity(
+        tx,
+        'YARD_ITEM_DISPATCHED',
+        'YardItemPlacement',
+        placement.id,
+        {
+          actorId,
+          metadata: {
+            componentInstanceId: placement.componentInstanceId,
+            dispatchOrderId,
+            slotId: placement.slotId,
+          },
+        },
+      );
+      await this.createYardOutboxEvent(
+        tx,
+        'yard.item.removed',
+        updated,
+        actorId,
+      );
+    }
+
+    for (const slotId of new Set(
+      placements.map((placement) => placement.slotId),
+    )) {
+      await this.updateSlotOccupancy(slotId, tx);
+    }
+
+    return placements;
   }
 
   async search(query: YardSearchDto) {
@@ -1016,10 +1361,7 @@ export class YardService {
   }
 
   private yardEventPayload(eventName: YardEventName, payload: unknown) {
-    if (
-      eventName !== 'yard.item.placed' &&
-      eventName !== 'yard.item.moved'
-    ) {
+    if (eventName !== 'yard.item.placed' && eventName !== 'yard.item.moved') {
       return payload;
     }
     const row = this.objectMetadata(payload);
@@ -1075,8 +1417,10 @@ export class YardService {
     const latestMovement = this.objectMetadata(movements[0]);
     const value =
       eventName === 'yard.item.moved'
-        ? latestMovement.createdAt ?? row.updatedAt
-        : row.placedAt ?? row.createdAt;
+        ? (latestMovement.createdAt ?? row.updatedAt)
+        : eventName === 'yard.item.removed'
+          ? (row.removedAt ?? latestMovement.createdAt ?? row.updatedAt)
+          : (row.placedAt ?? row.createdAt);
     if (value instanceof Date) return value.toISOString();
     if (typeof value === 'string' && !Number.isNaN(Date.parse(value))) {
       return new Date(value).toISOString();
@@ -1112,15 +1456,11 @@ export class YardService {
     };
   }
 
-
   async getYards() {
-
-  return []
-}
-
-  async getTrucks() {
-
-    return []
+    return [];
   }
 
+  async getTrucks() {
+    return [];
+  }
 }

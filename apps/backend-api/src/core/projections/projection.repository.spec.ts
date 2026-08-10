@@ -81,6 +81,99 @@ describe('ProjectionRepository', () => {
     expect(tx.enterpriseProjectionDocument.upsert).toHaveBeenCalledTimes(1);
     expect(tx.enterpriseProjectionReceipt.create).toHaveBeenCalledTimes(1);
     expect(tx.enterpriseProjectionCheckpoint.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.enterpriseProjectionDocument.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ sourceAggregateVersion: 3n }),
+      }),
+    );
+    expect(tx.enterpriseProjectionReceipt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ aggregateVersion: 3n }),
+      }),
+    );
+  });
+
+  it('persists epoch-millisecond aggregate versions without INT4 overflow', async () => {
+    const aggregateVersion = 1_785_732_307_896;
+    const tx = {
+      enterpriseProjectionReceipt: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      enterpriseProjectionDocument: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      enterpriseProjectionCheckpoint: {
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      enterpriseProjectionFailure: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const repository = new ProjectionRepository({
+      $transaction: jest.fn((callback) => callback(tx)),
+    } as never);
+    const definition = new ProjectionRegistryService().get(
+      'ProductionOrderSummary',
+    );
+
+    await repository.apply(
+      definition,
+      event({
+        metadata: {
+          eventId: 'event-large-version',
+          aggregateId: 'order-1',
+          aggregateVersion,
+          occurredAt: '2026-08-10T01:00:00.000Z',
+        },
+      }),
+    );
+
+    expect(tx.enterpriseProjectionDocument.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          sourceAggregateVersion: BigInt(aggregateVersion),
+        }),
+      }),
+    );
+    expect(tx.enterpriseProjectionReceipt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          aggregateVersion: BigInt(aggregateVersion),
+        }),
+      }),
+    );
+  });
+
+  it('treats a concurrent receipt unique conflict as an idempotent replay', async () => {
+    const receipt = {
+      projectionName: 'ProductionOrderSummary',
+      outboxEventId: 'outbox-1',
+    };
+    const prisma = {
+      $transaction: jest.fn().mockRejectedValue({ code: 'P2002' }),
+      enterpriseProjectionReceipt: {
+        findUnique: jest.fn().mockResolvedValue(receipt),
+      },
+    };
+    const repository = new ProjectionRepository(prisma as never);
+    const definition = new ProjectionRegistryService().get(
+      'ProductionOrderSummary',
+    );
+
+    await expect(repository.apply(definition, event())).resolves.toEqual({
+      applied: false,
+      replay: true,
+    });
+    expect(prisma.enterpriseProjectionReceipt.findUnique).toHaveBeenCalledWith({
+      where: {
+        projectionName_outboxEventId: {
+          projectionName: definition.name,
+          outboxEventId: 'outbox-1',
+        },
+      },
+    });
   });
 
   it('records a projection dead letter at the Outbox retry boundary', async () => {

@@ -1,0 +1,1 @@
+ALTER TYPE "ComponentInstanceState" ADD VALUE IF NOT EXISTS 'INSTALLED';

@@ -1,5 +1,17 @@
 # Yard Module
 
+## SYSTEM.RUNTIME.2 Dashboard Parity Closure
+
+Status: **CERTIFIED FOR RC1**
+
+Yard snapshot reads now compare snapshot time with the latest mutation across
+zones, slots, placements, movements and cranes. A stale snapshot falls back to
+the live repository and schedules refresh rather than serving mismatched KPI
+data. Runtime certification compared `GET /yard/dashboard` with
+`GET /yard/read-model/workspace`: all 11 KPIs matched exactly. The certified
+forward workflow also closed the active placement at dispatch and left no
+active Yard placement after installation.
+
 ## STABILITY.PROJECTS.3A Canonical Runtime Certification
 
 Status: **CONDITIONALLY CERTIFIED - READ RUNTIME PASS**
@@ -263,3 +275,17 @@ placement without bypassing Yard ownership.
 Known P0: Dispatch/Delivery currently leaves the Yard placement active. Until
 that handoff closes placement, Yard occupancy and Project `yardStagedQty` can
 remain overstated after the instance is delivered/installed.
+
+## SYSTEM.HARDENING.1 Dispatch Handoff
+
+The prior P0 is resolved. Logistics departure delegates Yard ownership release
+to Yard inside the shared Serializable transaction. The active placement is
+closed, a REMOVE movement, ActivityLog and Outbox fact are persisted, and slot
+occupancy is recalculated before the instance enters `IN_TRANSIT`.
+
+## SYSTEM.REVERSE.1 Return Quarantine
+
+Yard accepts returned IN_TRANSIT/DELIVERED/INSTALLED ComponentInstances into an
+active quarantine placement and changes state to `PRODUCED_WAITING_QC`
+atomically with movement, occupancy, timeline, ActivityLog and Outbox. Only QC
+PASS/Use-As-Is releases normal IN_YARD custody; REWORK/SCRAP closes placement.

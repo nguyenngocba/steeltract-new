@@ -791,16 +791,16 @@ export function InventoryOutboundPage() {
                 <div className="rounded-lg border border-white/10 overflow-hidden h-[430px]">
                 <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
                   <colgroup>
-                    <col className="w-[100px]" /> {/* Ngày */}
-                    <col className="w-[120px]" /> {/* Mã phiếu */}
-                    <col className="w-[90px]" /> {/* Loại */}
-                    <col className="w-[130px]" /> {/* Đơn vị nhận */}
-                    <col className="w-[120px]" /> {/* Kho xuất */}
-                    <col className="w-[120px]" /> {/* Khối lượng */}
-                    <col className="w-[140px]" /> {/* Giá trị */}
-                    <col className="w-[80px]" /> {/* Hồ sơ */}
-                    <col className="w-[60px]" /> {/* Trạng thái */}
-                    <col className="w-[140px]" /> {/* Người tạo */}
+                    <col className="w-[100px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[90px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[140px]" />
+                    <col className="w-[80px]" />
+                    <col className="w-[60px]" />
+                    <col className="w-[140px]" />
                   </colgroup>
                   <thead
                     className={`${inventoryTableHead}
@@ -1013,16 +1013,16 @@ export function InventoryOutboundPage() {
             <div className="flex-1 min-h-[550px] overflow-y-auto rounded-xl border border-white/10">
             <table className="w-full min-w-[1220px] text-xs table-fixed border-collapse">
                   <colgroup>
-                    <col className="w-[100px]" /> {/* Ngày */}
-                    <col className="w-[160px]" /> {/* Mã phiếu */}
-                    <col className="w-[100px]" /> {/* Loại */}
-                    <col className="w-[120px]" /> {/* Đơn vị nhận */}
-                    <col className="w-[100px]" /> {/* Kho xuất */}
-                    <col className="w-[120px]" /> {/* Khối lượng */}
-                    <col className="w-[140px]" /> {/* Giá trị */}
-                    <col className="w-[80px]" /> {/* Hồ sơ */}
-                    <col className="w-[100px]" /> {/* Trạng thái */}
-                    <col className="w-[140px]" /> {/* Người tạo */}
+                    <col className="w-[100px]" />
+                    <col className="w-[160px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[120px]" />
+                    <col className="w-[140px]" />
+                    <col className="w-[80px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[140px]" />
                   </colgroup>
                    <thead
                     className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10`}

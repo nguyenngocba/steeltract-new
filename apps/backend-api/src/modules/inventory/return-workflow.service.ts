@@ -60,6 +60,25 @@ export class ReturnWorkflowService {
   }
 
   async create(dto: CreateReturnRequestDto) {
+    if (dto.flowType === ReturnFlowType.PRODUCTION_RETURN) {
+      throw new BadRequestException(
+        'Production material returns must use the canonical Production Material Issue return endpoint.',
+      );
+    }
+    if (dto.flowType === ReturnFlowType.SUPPLIER_RETURN) {
+      if (!dto.supplierId) {
+        throw new BadRequestException('Supplier return requires supplierId.');
+      }
+      if (!dto.warehouseId) {
+        throw new BadRequestException('Supplier return requires warehouseId.');
+      }
+      const supplier = await this.inventoryRepository.findSupplierById(
+        dto.supplierId,
+      );
+      if (!supplier) {
+        throw new BadRequestException('Supplier return supplierId is invalid.');
+      }
+    }
     if (dto.flowType === ReturnFlowType.SITE_RETURN) {
       await this.validateSiteReturnAvailability(dto);
     }
@@ -95,7 +114,7 @@ export class ReturnWorkflowService {
       );
 
       const activity = {
-        action: 'PROJECT_MATERIAL_RETURN_REQUESTED',
+        action: this.returnActivity(request.flowType, 'REQUESTED'),
         entity: 'ReturnRequest',
         entityId: request.id,
         module: 'inventory',
@@ -360,10 +379,31 @@ export class ReturnWorkflowService {
     const scrapItems = request.items.filter(
       (item) => item.disposition === ReturnDisposition.SCRAP,
     );
+    const supplierReturnDispositions = new Set<ReturnDisposition>([
+      ReturnDisposition.DAMAGED,
+      ReturnDisposition.REPAIR,
+    ]);
+    const supplierReturnItems = request.items.filter((item) =>
+      item.disposition
+        ? supplierReturnDispositions.has(item.disposition)
+        : false,
+    );
+
+    if (
+      request.flowType === ReturnFlowType.SUPPLIER_RETURN &&
+      request.items.some(
+        (item) => item.disposition === ReturnDisposition.QC_HOLD,
+      )
+    ) {
+      throw new BadRequestException(
+        'Supplier return cannot be disposed while an item remains on QC hold.',
+      );
+    }
 
     if (
       stockItems.length > 0 &&
-      request.flowType !== ReturnFlowType.SITE_RETURN
+      request.flowType !== ReturnFlowType.SITE_RETURN &&
+      request.flowType !== ReturnFlowType.SUPPLIER_RETURN
     ) {
       await this.inventoryService.createTransaction({
         type: TransactionType.RETURN,
@@ -384,6 +424,36 @@ export class ReturnWorkflowService {
           zoneId: item.zoneId ?? undefined,
         })),
       });
+    }
+
+    if (
+      request.flowType === ReturnFlowType.SUPPLIER_RETURN &&
+      supplierReturnItems.length > 0
+    ) {
+      await this.inventoryService.createTransaction(
+        {
+          type: TransactionType.EXPORT,
+          transactionTypeCode: 'SUPPLIER_RETURN',
+          referenceModule: 'return-workflow',
+          referenceId: request.id,
+          warehouseId: request.warehouseId ?? undefined,
+          supplierId: request.supplierId ?? undefined,
+          performedBy: dto.performedBy,
+          remarks: dto.remarks ?? `Return ${request.returnNo} to supplier`,
+          items: supplierReturnItems.map((item) => ({
+            inventoryItemId: item.inventoryItemId,
+            quantity: -Math.abs(
+              item.inspectedQuantity ??
+                item.receivedQuantity ??
+                item.requestedQuantity,
+            ),
+            unitId: item.unitId ?? undefined,
+            warehouseId: request.warehouseId ?? undefined,
+            zoneId: item.zoneId ?? undefined,
+          })),
+        },
+        `supplier-return:${request.id}`,
+      );
     }
 
     if (scrapItems.length > 0) {
@@ -446,6 +516,28 @@ export class ReturnWorkflowService {
         await this.inventoryRepository.createActivityLog(activity, tx);
         await this.createAuditOutbox(activity, tx);
       }
+      if (result.flowType === ReturnFlowType.SUPPLIER_RETURN) {
+        const activity = {
+          action: 'SUPPLIER_MATERIAL_RETURN_DISPOSED',
+          entity: 'ReturnRequest',
+          entityId: result.id,
+          module: 'inventory',
+          metadata: {
+            returnNo: result.returnNo,
+            supplierId: result.supplierId,
+            warehouseId: result.warehouseId,
+            returnedItems: supplierReturnItems.map((item) => ({
+              inventoryItemId: item.inventoryItemId,
+              quantity:
+                item.inspectedQuantity ??
+                item.receivedQuantity ??
+                item.requestedQuantity,
+            })),
+          },
+        } satisfies Prisma.ActivityLogCreateInput;
+        await this.inventoryRepository.createActivityLog(activity, tx);
+        await this.createAuditOutbox(activity, tx);
+      }
       await this.createReturnOutbox(
         'inventory.return.disposed',
         { id: result.id, returnNo: result.returnNo },
@@ -490,7 +582,7 @@ export class ReturnWorkflowService {
       );
 
       const activity = {
-        action: 'PROJECT_MATERIAL_RETURN_REJECTED',
+        action: this.returnActivity(updated.flowType, 'REJECTED'),
         entity: 'ReturnRequest',
         entityId: updated.id,
         module: 'inventory',
@@ -662,6 +754,19 @@ export class ReturnWorkflowService {
       : flowType === 'SUPPLIER_RETURN'
         ? 'HT-NCC'
         : 'HT-CT';
+  }
+
+  private returnActivity(
+    flowType: ReturnFlowType,
+    phase: 'REQUESTED' | 'REJECTED',
+  ) {
+    const owner =
+      flowType === ReturnFlowType.SUPPLIER_RETURN
+        ? 'SUPPLIER_MATERIAL_RETURN'
+        : flowType === ReturnFlowType.PRODUCTION_RETURN
+          ? 'PRODUCTION_MATERIAL_RETURN'
+          : 'PROJECT_MATERIAL_RETURN';
+    return `${owner}_${phase}`;
   }
 
   private returnPayload(request: {

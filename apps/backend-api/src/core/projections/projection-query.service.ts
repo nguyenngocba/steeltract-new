@@ -63,7 +63,7 @@ export class ProjectionQueryService {
       cursor: query.cursor ? this.decodeCursor(query.cursor) : undefined,
     });
     return {
-      items: result.items,
+      items: result.items.map((item) => this.serializeDocument(item)),
       meta: {
         ...result.meta,
         nextCursor: result.nextCursor
@@ -73,9 +73,25 @@ export class ProjectionQueryService {
     };
   }
 
-  find(projectionName: string, entityKey: string) {
+  async find(projectionName: string, entityKey: string) {
     this.registry.get(projectionName);
-    return this.repository.findDocument(projectionName, entityKey);
+    const document = await this.repository.findDocument(
+      projectionName,
+      entityKey,
+    );
+    return document ? this.serializeDocument(document) : null;
+  }
+
+  private serializeDocument<
+    T extends { sourceAggregateVersion?: bigint | number | null },
+  >(document: T) {
+    return {
+      ...document,
+      sourceAggregateVersion:
+        typeof document.sourceAggregateVersion === 'bigint'
+          ? Number(document.sourceAggregateVersion)
+          : (document.sourceAggregateVersion ?? null),
+    };
   }
 
   private encodeCursor(cursor: { sourceOccurredAt: Date; id: string }) {

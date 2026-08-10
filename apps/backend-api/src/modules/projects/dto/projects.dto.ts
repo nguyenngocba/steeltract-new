@@ -47,6 +47,11 @@ export const returnProjectComponentSchema = z.object({
   returnedBy: z.string().trim().optional(),
 });
 
+export const returnProjectComponentInstanceSchema = z.object({
+  slotId: z.string().trim().min(1),
+  reason: z.string().trim().min(1),
+});
+
 const projectTaskStatusSchema = z.enum([
   'DRAFT',
   'PLANNED',
@@ -242,6 +247,9 @@ export type CreateProjectDto = z.infer<typeof createProjectSchema>;
 export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
 
 export type ReturnProjectComponentDto = z.infer<typeof returnProjectComponentSchema>;
+export type ReturnProjectComponentInstanceDto = z.infer<
+  typeof returnProjectComponentInstanceSchema
+>;
 
 export type CreateProjectWbsTaskDto = z.infer<typeof createProjectWbsTaskSchema>;
 

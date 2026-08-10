@@ -81,3 +81,18 @@ Excluded in S1:
   Yard Staging cung cấp danh sách cấu kiện sẵn sàng bốc dỡ lên xe.
 * Projects (PMS):
   Logistics đồng bộ tiến độ nhận hàng của cấu kiện về WBS task của dự án (`SHIPPED` -> `DELIVERED`).
+
+## SYSTEM.HARDENING.1 Physical Lifecycle
+
+Canonical dispatch enforces active Yard custody and guarded physical state
+transitions: `IN_YARD -> IN_TRANSIT -> DELIVERED -> INSTALLED`. Departure closes
+Yard placement and releases the slot atomically. Delivery and installation use
+conditional updates so duplicate or competing ownership transitions fail
+instead of silently succeeding.
+
+## SYSTEM.REVERSE.1 Reverse Dispatch
+
+Physical dispatch supports `RETURN_REQUESTED -> RETURN_IN_TRANSIT -> RETURNED`.
+Each dispatched ComponentInstance maps exactly once to a Yard return slot.
+Return departure clears installed state; Yard receipt establishes QC quarantine
+inside the shared transaction.

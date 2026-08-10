@@ -13,6 +13,14 @@ import { QcCommandService } from './qc-command.service';
 describe('QcCommandService', () => {
   const tx = { marker: 'qc-command-tx' } as never;
   const updatedAt = new Date('2026-07-17T01:00:00.000Z');
+  const yardService = {
+    acceptReturnedComponentAfterQc: jest.fn().mockResolvedValue(false),
+    releaseReturnedComponentForDisposition: jest.fn().mockResolvedValue(false),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   function inspection() {
     return {
@@ -49,7 +57,7 @@ describe('QcCommandService', () => {
       updateComponentInstanceState: jest.fn(),
       createComponentInstanceTimelineIfMissing: jest.fn(),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
 
     const result = await service.acceptInspection({
       inspectionId: current.id,
@@ -92,7 +100,7 @@ describe('QcCommandService', () => {
       createActivityLog: jest.fn(),
       createOutboxEvent: jest.fn(),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
     (repository.findOutboxEvent as jest.Mock).mockResolvedValue({
       payload: { inspectionId: current.id },
       metadata: {
@@ -119,7 +127,7 @@ describe('QcCommandService', () => {
       findInspectionById: jest.fn().mockResolvedValue(current),
       updateInspectionVersioned: jest.fn(),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
 
     await expect(
       service.rejectInspection({
@@ -157,7 +165,7 @@ describe('QcCommandService', () => {
       updateComponentInstanceState: jest.fn(),
       createComponentInstanceTimelineIfMissing: jest.fn(),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
 
     const result = await service.requestRework({
       ncrId: ncr.id,
@@ -194,7 +202,7 @@ describe('QcCommandService', () => {
       createActivityLog: jest.fn().mockResolvedValue({}),
       createOutboxEvent: jest.fn().mockResolvedValue({}),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
 
     await service.createNcr({
       inspectionId: current.id,
@@ -246,7 +254,7 @@ describe('QcCommandService', () => {
       updateComponentInstanceState: jest.fn().mockResolvedValue({}),
       createComponentInstanceTimelineIfMissing: jest.fn().mockResolvedValue({}),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
 
     await service.requestRework({
       ncrId: ncr.id,
@@ -276,6 +284,15 @@ describe('QcCommandService', () => {
         ComponentInstanceState.QC_FAILED,
         ComponentInstanceState.PRODUCED_WAITING_QC,
       ],
+    );
+    expect(
+      yardService.releaseReturnedComponentForDisposition,
+    ).toHaveBeenCalledWith(
+      'instance-1',
+      'REWORK',
+      'ncr-1',
+      'operator-1',
+      tx,
     );
   });
 
@@ -310,7 +327,7 @@ describe('QcCommandService', () => {
       createActivityLog: jest.fn().mockResolvedValue({ id: 'activity-1' }),
       createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
     } as unknown as QcRepository;
-    const service = new QcCommandService(repository);
+    const service = new QcCommandService(repository, yardService as never);
 
     await service.acceptInspection({
       inspectionId: current.id,
@@ -335,6 +352,72 @@ describe('QcCommandService', () => {
         componentInstanceId: 'instance-1',
         eventType: 'QC_FINAL_PASSED',
       }),
+      tx,
+    );
+    expect(yardService.acceptReturnedComponentAfterQc).toHaveBeenCalledWith(
+      'instance-1',
+      current.id,
+      'inspector-1',
+      tx,
+    );
+  });
+
+  it('releases returned Yard quarantine when a physical instance is scrapped', async () => {
+    const ncr = {
+      id: 'ncr-scrap',
+      ncrNo: 'NCR-SCRAP',
+      inspectionId: 'inspection-scrap',
+      status: NcrStatus.OPEN,
+      disposition: null,
+      componentInstanceId: 'instance-scrap',
+      componentId: 'component-1',
+      productionOrderId: 'order-1',
+      metadata: { aggregateVersion: 0 },
+      updatedAt,
+    };
+    const repository = {
+      transaction: jest.fn((callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findNcrById: jest.fn().mockResolvedValue(ncr),
+      updateNcrVersioned: jest.fn().mockResolvedValue({
+        ...ncr,
+        status: NcrStatus.REJECTED,
+        disposition: 'SCRAP_RECOMMENDATION',
+      }),
+      findComponentInstanceById: jest.fn().mockResolvedValue({
+        id: 'instance-scrap',
+        state: ComponentInstanceState.QC_FAILED,
+        scrappedAt: null,
+      }),
+      updateComponentInstanceState: jest.fn().mockResolvedValue({}),
+      createComponentInstanceTimelineIfMissing: jest.fn().mockResolvedValue({}),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+    } as unknown as QcRepository;
+    const service = new QcCommandService(repository, yardService as never);
+
+    await service.recommendScrap({
+      ncrId: ncr.id,
+      dispositionId: 'disposition-scrap',
+      reason: 'Beyond repair',
+      expectedVersion: 0,
+      idempotencyKey: 'qc-scrap-instance',
+      actorId: 'operator-1',
+    });
+
+    expect(repository.updateComponentInstanceState).toHaveBeenCalledWith(
+      'instance-scrap',
+      expect.objectContaining({ state: ComponentInstanceState.SCRAPPED }),
+      tx,
+      expect.any(Array),
+    );
+    expect(
+      yardService.releaseReturnedComponentForDisposition,
+    ).toHaveBeenCalledWith(
+      'instance-scrap',
+      'SCRAP',
+      'ncr-scrap',
+      'operator-1',
       tx,
     );
   });

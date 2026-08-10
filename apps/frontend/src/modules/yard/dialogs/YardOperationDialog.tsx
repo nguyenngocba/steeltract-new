@@ -38,7 +38,7 @@ export function YardOperationDialog({
   const move = useMoveYardItem()
   const remove = useRemoveYardItem()
   const stageToYard = useStageComponentInstanceToYard()
-  const { data: finishedGoods } = useFinishedGoodsInstances({ limit: 200 })
+  const { data: finishedGoods } = useFinishedGoodsInstances({ limit: 100 })
   const [componentInstanceId, setComponentInstanceId] = useState('')
   const [componentId, setComponentId] = useState('')
   const [placementId, setPlacementId] = useState('')

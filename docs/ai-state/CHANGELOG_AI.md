@@ -1,5 +1,31 @@
 # SteelTrack AI Changelog
 
+## 2026-08-10 SYSTEM.RUNTIME.2 - Production Runtime Closure
+
+Completed:
+
+- Added production `/health/live`, `/health/ready` and `/health/startup` probes
+  with database, storage, configured queue and optional Redis diagnostics.
+- Extended Playwright certification across the complete forward physical
+  workflow with 13 screenshots and per-stage timings.
+- Added exact Yard dashboard/live read-model parity certification and stale
+  snapshot source-watermark protection.
+- Hardened concurrent projection receipt handling so a unique-receipt race is
+  treated as an idempotent replay with transaction rollback.
+- Certified 68 REST steps, 15 database invariants, 54 RBAC/authentication checks,
+  dashboard changes and ActivityLog lineage.
+- Published `docs/audits/system-runtime2-final-runtime-closure.md` with a
+  **GO FOR STEELTRACK V1 RC1** recommendation.
+
+Verification:
+
+- Backend tests PASS: 94 suites / 313 tests.
+- Frontend tests PASS: 2 files / 4 tests.
+- Backend/frontend builds and frontend typecheck PASS.
+- Playwright, Yard parity, Prisma validate/generate/migrate status and
+  `git diff --check` PASS.
+- No stage or commit.
+
 ## 2026-08-03 SYSTEM.E2E.1 - End-to-End Business Workflow Certification
 
 Completed:
@@ -7584,3 +7610,48 @@ Notes:
   `Component.status`.
 - Created
   `docs/audits/system-integrity1-steeltrack-v1-operational-readiness-audit.md`.
+
+# 2026-08-10 - SYSTEM.HARDENING.1 Production Readiness
+
+- Closed active Yard placement atomically when Logistics takes physical custody,
+  released slot occupancy, and guarded `IN_YARD -> IN_TRANSIT -> DELIVERED ->
+  INSTALLED` transitions.
+- Changed projection aggregate-version persistence to PostgreSQL `BIGINT`,
+  rebuilt failed projections and restored zero active projection failures.
+- Bound Inventory idempotency keys to deterministic command hashes; mismatched
+  payload reuse now returns 409 and emits an audit conflict.
+- Coerced and validated Projects pagination query parameters before repository
+  access.
+- Corrected Production completion validation so command metadata is not treated
+  as numeric completion data.
+- Certified retained fixture `SYSTEM-HARDENING1-1786329000052` with inventory
+  conservation, ActivityLog continuity and dashboard/read-model proof.
+- Report: `docs/audits/system-hardening1-production-readiness.md`.
+
+# 2026-08-10 - SYSTEM.REVERSE.1 Canonical Reverse Workflows
+
+- Added physical reverse Logistics statuses/events and canonical
+  `ComponentInstance -> return transit -> Yard QC quarantine` handling.
+- Linked Production Rework to the NCR physical instance and enabled that same
+  instance to execute against an accepted rework order.
+- Removed legacy Project return mutation of engineering `Component.status`.
+- Corrected Supplier Return to post an idempotent outbound movement; generic
+  Production Return now delegates to the canonical material-issue owner.
+- Deployed additive migration
+  `20260810150000_canonical_reverse_workflow_foundation` after backup.
+- Full tests/builds pass; authenticated REST reverse fixture remains pending.
+- Report: `docs/audits/system-reverse1-canonical-reverse-workflows.md`.
+
+# 2026-08-10 - SYSTEM.RUNTIME.1 Runtime Certification
+
+- Added secure runtime identity/RBAC, REST business, database read-only and
+  Playwright browser certification harnesses.
+- Removed insecure seed/login defaults and required an explicit strong
+  bootstrap password for a missing administrator.
+- Fixed hidden frontend 400s caused by page limits above canonical API maximum
+  and removed invalid React `<colgroup>` text nodes.
+- Certified 73 REST calls, 15 DB parity checks, 54 RBAC/security checks, six
+  dashboard deltas and 17 browser workspace renders.
+- Full browser mutation workflow and deployment probe contracts remain P0;
+  SteelTrack V1 RC1 remains NO-GO.
+- Report: `docs/audits/system-runtime1-production-runtime-certification.md`.

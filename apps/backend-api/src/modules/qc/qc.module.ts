@@ -5,6 +5,7 @@ import { PrismaModule } from '../../core/prisma/prisma.module';
 import { SnapshotsModule } from '../../core/snapshots/snapshots.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
 import { WorkflowModule } from '../workflow/workflow.module';
+import { YardModule } from '../yard/yard.module';
 import { QcRepository } from './repositories/qc.repository';
 import { QcCockpitRepository } from './repositories/qc-cockpit.repository';
 import { QcReadModelRepository } from './repositories/qc-read-model.repository';
@@ -21,6 +22,7 @@ import { QcController } from './qc.controller';
     SnapshotsModule,
     AttachmentsModule,
     WorkflowModule,
+    YardModule,
   ],
   controllers: [QcController],
   providers: [

@@ -53,6 +53,14 @@ describe('LogisticsService physical ComponentInstance dispatch', () => {
   };
 
   function setup(overrides: Record<string, unknown> = {}) {
+    const yardService = {
+      releaseComponentInstancesForDispatch: jest
+        .fn()
+        .mockResolvedValue([{ id: 'placement-1' }]),
+      returnComponentInstanceToYard: jest
+        .fn()
+        .mockResolvedValue({ id: 'return-placement-1' }),
+    };
     const repository = {
       findDispatchOrders: jest.fn().mockResolvedValue([order]),
       findDispatchOrder: jest.fn().mockResolvedValue(order),
@@ -84,7 +92,12 @@ describe('LogisticsService physical ComponentInstance dispatch', () => {
         ...data,
       })),
       updateComponentInstances: jest.fn().mockResolvedValue({ count: 1 }),
+      transitionComponentInstances: jest.fn().mockResolvedValue({ count: 1 }),
+      transitionComponentInstancesFromStates: jest
+        .fn()
+        .mockResolvedValue({ count: 1 }),
       createActivityLog: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      transaction: jest.fn(async (work) => work({ transaction: true })),
       ...overrides,
     };
 
@@ -96,7 +109,9 @@ describe('LogisticsService physical ComponentInstance dispatch', () => {
         { createTransaction: jest.fn() } as never,
         {} as never,
         {} as never,
+        yardService as never,
       ),
+      yardService,
     };
   }
 
@@ -155,9 +170,11 @@ describe('LogisticsService physical ComponentInstance dispatch', () => {
     const { repository, service } = setup();
 
     await service.depart('dispatch-1', {});
-    expect(repository.updateComponentInstances).toHaveBeenCalledWith(
+    expect(repository.transitionComponentInstances).toHaveBeenCalledWith(
       ['instance-1'],
-      { state: ComponentInstanceState.IN_TRANSIT },
+      ComponentInstanceState.IN_YARD,
+      ComponentInstanceState.IN_TRANSIT,
+      { transaction: true },
     );
 
     repository.findDispatchOrderStatus.mockResolvedValueOnce({
@@ -172,10 +189,88 @@ describe('LogisticsService physical ComponentInstance dispatch', () => {
     repository.findDispatchOrderStatus.mockResolvedValueOnce({
       status: DispatchOrderStatus.RECEIVED,
     });
+    repository.findDispatchOrder.mockResolvedValueOnce({
+      ...order,
+      status: DispatchOrderStatus.RECEIVED,
+    });
     await service.complete('dispatch-1', {});
+    expect(repository.transitionComponentInstances).toHaveBeenCalledWith(
+      ['instance-1'],
+      ComponentInstanceState.DELIVERED,
+      ComponentInstanceState.INSTALLED,
+      { transaction: true },
+    );
     expect(repository.updateComponentInstances).toHaveBeenCalledWith(
       ['instance-1'],
       { installedAt: expect.any(Date) },
+      { transaction: true },
+    );
+  });
+
+  it('returns installed ComponentInstances through transit into Yard quarantine', async () => {
+    const installedOrder = {
+      ...order,
+      status: DispatchOrderStatus.COMPLETED,
+      items: order.items.map((item) => ({
+        ...item,
+        componentInstance: {
+          ...item.componentInstance,
+          state: ComponentInstanceState.INSTALLED,
+        },
+      })),
+    };
+    const { repository, service, yardService } = setup({
+      findDispatchOrder: jest
+        .fn()
+        .mockResolvedValueOnce(installedOrder)
+        .mockResolvedValueOnce({
+          ...installedOrder,
+          status: DispatchOrderStatus.RETURN_REQUESTED,
+        })
+        .mockResolvedValueOnce({
+          ...installedOrder,
+          status: DispatchOrderStatus.RETURN_IN_TRANSIT,
+        }),
+      transitionComponentInstancesFromStates: jest
+        .fn()
+        .mockResolvedValue({ count: 1 }),
+    });
+
+    await service.requestReturn('dispatch-1', {
+      reason: 'Customer rejected component',
+    });
+    await service.departReturn('dispatch-1', {
+      reason: 'Return vehicle departed',
+    });
+    await service.receiveReturnToYard('dispatch-1', {
+      reason: 'Received into return quarantine',
+      placements: [
+        { componentInstanceId: 'instance-1', slotId: 'slot-return' },
+      ],
+    });
+
+    expect(
+      repository.transitionComponentInstancesFromStates,
+    ).toHaveBeenCalledWith(
+      ['instance-1'],
+      [ComponentInstanceState.DELIVERED, ComponentInstanceState.INSTALLED],
+      ComponentInstanceState.IN_TRANSIT,
+      { installedAt: null },
+      { transaction: true },
+    );
+    expect(yardService.returnComponentInstanceToYard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentInstanceId: 'instance-1',
+        slotId: 'slot-return',
+        sourceDispatchOrderId: 'dispatch-1',
+      }),
+      undefined,
+      { transaction: true },
+    );
+    expect(repository.updateDispatchOrder).toHaveBeenLastCalledWith(
+      'dispatch-1',
+      expect.objectContaining({ status: DispatchOrderStatus.RETURNED }),
+      { transaction: true },
     );
   });
 });

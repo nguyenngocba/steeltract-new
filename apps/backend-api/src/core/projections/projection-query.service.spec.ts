@@ -60,4 +60,39 @@ describe('ProjectionQueryService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('serializes BIGINT aggregate versions at the REST boundary', async () => {
+    const repository = {
+      listDocuments: jest.fn().mockResolvedValue({
+        items: [{ id: 'doc-1', sourceAggregateVersion: 1_785_732_307_896n }],
+        nextCursor: null,
+        meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      }),
+      findDocument: jest.fn().mockResolvedValue({
+        id: 'doc-1',
+        sourceAggregateVersion: 1_785_732_307_896n,
+      }),
+    };
+    const service = new ProjectionQueryService(
+      registry as never,
+      repository as never,
+    );
+
+    await expect(
+      service.list('ProductionOrderSummary', { page: 1, limit: 10 }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            sourceAggregateVersion: 1_785_732_307_896,
+          }),
+        ],
+      }),
+    );
+    await expect(
+      service.find('ProductionOrderSummary', 'order-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({ sourceAggregateVersion: 1_785_732_307_896 }),
+    );
+  });
 });

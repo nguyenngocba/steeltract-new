@@ -35,9 +35,15 @@ export class ProductionInstanceExecutionService {
       if (instances.length !== componentInstanceIds.length) {
         throw new NotFoundException('One or more ComponentInstances not found');
       }
+      const eligible =
+        await this.repository.findEligibleComponentInstanceIdsForProductionOrder(
+          componentInstanceIds,
+          execution.productionOrderId,
+          tx,
+        );
+      const eligibleIds = new Set(eligible.map((instance) => instance.id));
       const wrongOrder = instances.find(
-        (instance) =>
-          instance.productionOrderId !== execution.productionOrderId,
+        (instance) => !eligibleIds.has(instance.id),
       );
       if (wrongOrder) {
         throw new BadRequestException(
@@ -202,12 +208,7 @@ export class ProductionInstanceExecutionService {
       tx,
     );
 
-    const productionOrderId = record.componentInstance.productionOrderId;
-    if (!productionOrderId) {
-      throw new BadRequestException(
-        'ComponentInstance is missing Production Order lineage',
-      );
-    }
+    const productionOrderId = record.workOrder.productionOrderId;
     const mandatoryWorkOrders =
       await this.repository.findMandatoryWorkOrdersForProductionOrder(
         productionOrderId,

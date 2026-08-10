@@ -85,11 +85,7 @@ export class InventoryRepository {
               },
             },
           },
-          orderBy: [
-            { zoneId: 'asc' },
-            { slotId: 'asc' },
-            { level: 'asc' },
-          ],
+          orderBy: [{ zoneId: 'asc' }, { slotId: 'asc' }, { level: 'asc' }],
         },
         _count: {
           select: {
@@ -1326,8 +1322,12 @@ export class InventoryRepository {
     });
   }
 
-  findTransactionById(id: string) {
-    return this.prisma.inventoryTransaction.findUnique({
+  findOutboxEvent(idempotencyKey: string, db: DbClient = this.prisma) {
+    return db.outboxEvent.findUnique({ where: { idempotencyKey } });
+  }
+
+  findTransactionById(id: string, db: DbClient = this.prisma) {
+    return db.inventoryTransaction.findUnique({
       where: { id },
       include: {
         transactionType: true,

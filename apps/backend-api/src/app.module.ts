@@ -51,6 +51,7 @@ import { EnterpriseProcessModule } from './modules/process-orchestration/enterpr
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { HistoricalSnapshotEngineModule } from './core/historical-snapshots/historical-snapshot-engine.module';
 import { HistoricalDashboardModule } from './core/historical-dashboard/historical-dashboard.module';
+import { HealthModule } from './modules/health/health.module';
 @Module({
   imports: [
     EventsModule,
@@ -102,6 +103,7 @@ import { HistoricalDashboardModule } from './core/historical-dashboard/historica
     EnterpriseProcessModule,
     HistoricalSnapshotEngineModule,
     HistoricalDashboardModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

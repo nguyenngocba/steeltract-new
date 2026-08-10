@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 
 import { RuntimeGateway } from '../../core/ws/runtime.gateway';
@@ -37,6 +43,17 @@ const legacyMaterialUsageTypes = new Set([
   'CONSUMABLE',
 ]);
 
+class InventoryIdempotencyConflict extends Error {
+  constructor(
+    readonly key: string,
+    readonly transactionId: string,
+    readonly expectedHash: string | null,
+    readonly receivedHash: string,
+  ) {
+    super('Inventory idempotency payload conflict');
+  }
+}
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -65,9 +82,8 @@ export class InventoryService {
         ),
       ),
     );
-    const warehouses = await this.inventoryRepository.findWarehousesByIds(
-      warehouseIds,
-    );
+    const warehouses =
+      await this.inventoryRepository.findWarehousesByIds(warehouseIds);
     const warehouseById = new Map(
       warehouses.map((warehouse) => [warehouse.id, warehouse]),
     );
@@ -691,7 +707,10 @@ export class InventoryService {
     };
   }
 
-  async createTransaction(payload: CreateTransactionDto) {
+  async createTransaction(
+    payload: CreateTransactionDto,
+    idempotencyKey?: string,
+  ) {
     const typeMap: Record<string, TransactionType> = {
       INBOUND: 'IMPORT',
       OUTBOUND: 'EXPORT',
@@ -713,6 +732,19 @@ export class InventoryService {
       resolvedItems,
       type,
     );
+    const normalizedIdempotencyKey =
+      this.normalizeIdempotencyKey(idempotencyKey);
+    const receiptKey = this.inventoryReceiptKey(
+      type,
+      payload,
+      normalizedIdempotencyKey,
+    );
+    const commandHash = this.inventoryCommandHash(
+      type,
+      direction,
+      payload,
+      orderedItems,
+    );
     const baseItems = this.applyValuationToLines(
       orderedItems,
       await this.averageCostsByMaterial(
@@ -728,6 +760,15 @@ export class InventoryService {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         return await this.inventoryRepository.transaction(async (tx) => {
+          if (receiptKey) {
+            const replay = await this.replayedInventoryTransaction(
+              receiptKey,
+              commandHash,
+              tx,
+            );
+            if (replay) return replay;
+          }
+
           if (payload.referenceModule && payload.referenceId) {
             const existing =
               await this.inventoryRepository.findTransactionByReference(
@@ -739,6 +780,32 @@ export class InventoryService {
                 tx,
               );
             if (existing) {
+              if (
+                !this.legacyTransactionMatches(
+                  existing,
+                  type,
+                  direction,
+                  payload,
+                  orderedItems,
+                )
+              ) {
+                throw new InventoryIdempotencyConflict(
+                  receiptKey ??
+                    `${type}:${payload.referenceModule}:${payload.referenceId}`,
+                  existing.id,
+                  null,
+                  commandHash,
+                );
+              }
+              if (receiptKey) {
+                await this.recordInventoryCommandReceipt(
+                  receiptKey,
+                  commandHash,
+                  existing,
+                  payload.performedBy,
+                  tx,
+                );
+              }
               return existing;
             }
           }
@@ -905,10 +972,10 @@ export class InventoryService {
           for (const line of aggregateInventoryMaterials(baseItems)) {
             const updated =
               await this.inventoryRepository.updateItemQuantitySnapshot(
-              line.inventoryItemId,
-              line.quantity,
-              tx,
-            );
+                line.inventoryItemId,
+                line.quantity,
+                tx,
+              );
             materialBalances.set(line.inventoryItemId, {
               quantity: Number(updated.quantity),
               aggregateVersion: updated.updatedAt.getTime(),
@@ -926,7 +993,9 @@ export class InventoryService {
 
           const locationBalances = new Map<string, number>();
           for (const line of bucketDeltas) {
-            if (!(line.warehouseId || line.zoneId || line.slotId || line.level)) {
+            if (
+              !(line.warehouseId || line.zoneId || line.slotId || line.level)
+            ) {
               continue;
             }
             const updated = await this.inventoryRepository.upsertLocationStock(
@@ -1041,10 +1110,42 @@ export class InventoryService {
             );
           }
 
+          if (receiptKey) {
+            await this.recordInventoryCommandReceipt(
+              receiptKey,
+              commandHash,
+              transaction,
+              payload.performedBy,
+              tx,
+            );
+          }
+
           return transaction;
         });
       } catch (error) {
-        if (this.isRetryableInventoryTransactionError(error) && attempt < maxAttempts) {
+        if (error instanceof InventoryIdempotencyConflict) {
+          await this.inventoryRepository.createActivityLog({
+            action: 'INVENTORY_IDEMPOTENCY_CONFLICT',
+            entity: 'InventoryTransaction',
+            entityId: error.transactionId,
+            module: 'inventory',
+            userId: payload.performedBy,
+            metadata: {
+              idempotencyKey: error.key,
+              expectedHash: error.expectedHash,
+              receivedHash: error.receivedHash,
+              referenceModule: payload.referenceModule ?? null,
+              referenceId: payload.referenceId ?? null,
+            },
+          });
+          throw new ConflictException(
+            'Idempotency key was already used with a different Inventory payload',
+          );
+        }
+        if (
+          this.isRetryableInventoryTransactionError(error) &&
+          attempt < maxAttempts
+        ) {
           console.warn(
             '[inventory.transaction] retrying serializable transaction',
             {
@@ -1096,6 +1197,258 @@ export class InventoryService {
       (error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2034')
     );
+  }
+
+  private normalizeIdempotencyKey(value?: string) {
+    const key = value?.trim();
+    if (!key) return undefined;
+    if (key.length > 200) {
+      throw new BadRequestException(
+        'Idempotency-Key must not exceed 200 characters',
+      );
+    }
+    return key;
+  }
+
+  private inventoryReceiptKey(
+    type: TransactionType,
+    payload: CreateTransactionDto,
+    idempotencyKey?: string,
+  ) {
+    if (idempotencyKey) return `inventory-command:${idempotencyKey}`;
+    if (payload.referenceModule && payload.referenceId) {
+      return `inventory-command:${type}:${payload.referenceModule}:${payload.referenceId}`;
+    }
+    return undefined;
+  }
+
+  private inventoryCommandHash(
+    type: TransactionType,
+    direction: string,
+    payload: CreateTransactionDto,
+    lines: NormalizedInventoryLine[],
+  ) {
+    return this.stableHash({
+      type,
+      direction,
+      note: payload.note ?? null,
+      performedBy: payload.performedBy ?? null,
+      approvedBy: payload.approvedBy ?? null,
+      referenceModule: payload.referenceModule ?? null,
+      referenceId: payload.referenceId ?? null,
+      projectId: payload.projectId ?? null,
+      supplierId: payload.supplierId ?? null,
+      warehouseId: payload.warehouseId ?? null,
+      zoneId: payload.zoneId ?? null,
+      remarks: payload.remarks ?? payload.invoiceNo ?? '',
+      transactionTypeId: payload.transactionTypeId ?? null,
+      transactionTypeCode: payload.transactionTypeCode ?? null,
+      transactionDate: payload.transactionDate
+        ? new Date(payload.transactionDate).toISOString()
+        : null,
+      lines,
+    });
+  }
+
+  private async replayedInventoryTransaction(
+    receiptKey: string,
+    commandHash: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    const receipt = await this.inventoryRepository.findOutboxEvent(
+      receiptKey,
+      tx,
+    );
+    if (!receipt) return null;
+    const metadata = this.objectRecord(receipt.metadata);
+    const expectedHash = String(metadata.commandHash ?? '');
+    const transactionId = String(
+      this.objectRecord(receipt.payload).entityId ?? '',
+    );
+    if (expectedHash !== commandHash) {
+      throw new InventoryIdempotencyConflict(
+        receiptKey,
+        transactionId,
+        expectedHash || null,
+        commandHash,
+      );
+    }
+    return transactionId
+      ? this.inventoryRepository.findTransactionById(transactionId, tx)
+      : null;
+  }
+
+  private async recordInventoryCommandReceipt(
+    receiptKey: string,
+    commandHash: string,
+    transaction: { id: string; transactionNo?: string | null; code: string },
+    actorId: string | undefined,
+    tx: Prisma.TransactionClient,
+  ) {
+    await this.inventoryRepository.createActivityLog(
+      {
+        action: 'INVENTORY_TRANSACTION_POSTED',
+        entity: 'InventoryTransaction',
+        entityId: transaction.id,
+        module: 'inventory',
+        userId: actorId,
+        metadata: {
+          transactionNo: transaction.transactionNo ?? transaction.code,
+          idempotencyKey: receiptKey,
+          commandHash,
+        },
+      },
+      tx,
+    );
+    return this.inventoryRepository.createOutboxEvent(
+      {
+        eventName: 'audit.activity.created',
+        payload: {
+          action: 'INVENTORY_TRANSACTION_POSTED',
+          entity: 'InventoryTransaction',
+          entityId: transaction.id,
+          module: 'inventory',
+        },
+        metadata: {
+          module: 'inventory',
+          commandHash,
+          idempotencyKey: receiptKey,
+          persistToOutbox: true,
+        },
+        idempotencyKey: receiptKey,
+      },
+      tx,
+    );
+  }
+
+  private legacyTransactionMatches(
+    existing: Awaited<
+      ReturnType<InventoryRepository['findTransactionByReference']>
+    >,
+    type: TransactionType,
+    direction: string,
+    payload: CreateTransactionDto,
+    lines: NormalizedInventoryLine[],
+  ) {
+    if (
+      !existing ||
+      existing.type !== type ||
+      existing.direction !== direction
+    ) {
+      return false;
+    }
+    const headerChecks: Array<[unknown, unknown]> = [
+      [payload.note, existing.note],
+      [payload.performedBy, existing.performedBy],
+      [payload.approvedBy, existing.approvedBy],
+      [payload.projectId, existing.projectId],
+      [payload.supplierId, existing.supplierId],
+      [payload.warehouseId, existing.warehouseId],
+      [payload.zoneId, existing.zoneId],
+      [payload.transactionTypeId, existing.transactionTypeId],
+    ];
+    if (
+      headerChecks.some(
+        ([requested, stored]) =>
+          requested !== undefined && requested !== (stored ?? undefined),
+      )
+    ) {
+      return false;
+    }
+    if (
+      (payload.remarks !== undefined || payload.invoiceNo !== undefined) &&
+      (payload.remarks ?? payload.invoiceNo ?? '') !== (existing.remarks ?? '')
+    ) {
+      return false;
+    }
+    if (
+      payload.transactionDate &&
+      new Date(payload.transactionDate).getTime() !==
+        existing.transactionDate.getTime()
+    ) {
+      return false;
+    }
+
+    const normalizedRequested = lines.map((line) => this.idempotencyLine(line));
+    const normalizedStored = existing.items.map((line) =>
+      this.idempotencyLine({
+        inventoryItemId: line.inventoryItemId,
+        quantity: line.quantity,
+        unitId: line.unitId ?? undefined,
+        warehouseId: line.warehouseId ?? undefined,
+        zoneId: line.zoneId ?? undefined,
+        slotId: line.slotId ?? undefined,
+        level: line.level ?? undefined,
+        unitPrice: line.unitPrice,
+        totalAmount: line.totalAmount,
+      }),
+    );
+    return (
+      this.stableHash(normalizedRequested) ===
+      this.stableHash(
+        normalizedStored.map((stored, index) => ({
+          ...stored,
+          unitPrice:
+            normalizedRequested[index]?.unitPrice == null
+              ? null
+              : stored.unitPrice,
+          totalAmount:
+            normalizedRequested[index]?.totalAmount == null
+              ? null
+              : stored.totalAmount,
+        })),
+      )
+    );
+  }
+
+  private idempotencyLine(line: {
+    inventoryItemId: string;
+    quantity: number;
+    unitId?: string | null;
+    warehouseId?: string | null;
+    zoneId?: string | null;
+    slotId?: string | null;
+    level?: string | null;
+    unitPrice?: number | null;
+    totalAmount?: number | null;
+  }) {
+    return {
+      inventoryItemId: line.inventoryItemId,
+      quantity: Number(line.quantity),
+      unitId: line.unitId ?? null,
+      warehouseId: line.warehouseId ?? null,
+      zoneId: line.zoneId ?? null,
+      slotId: line.slotId ?? null,
+      level: line.level ?? null,
+      unitPrice: line.unitPrice == null ? null : Number(line.unitPrice),
+      totalAmount: line.totalAmount == null ? null : Number(line.totalAmount),
+    };
+  }
+
+  private stableHash(value: unknown) {
+    return createHash('sha256')
+      .update(JSON.stringify(this.stableValue(value)))
+      .digest('hex');
+  }
+
+  private stableValue(value: unknown): unknown {
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value))
+      return value.map((item) => this.stableValue(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, this.stableValue(item)]),
+      );
+    }
+    return value;
+  }
+
+  private objectRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   }
 
   private normalizeItems(
@@ -1279,9 +1632,15 @@ export class InventoryService {
         const destination = params.lines[index + 1];
         if (!source || !destination) continue;
         const item = params.itemsById.get(source.inventoryItemId);
-        const unit = item?.unit ?? item?.unitMaster?.symbol ?? item?.unitMaster?.code;
+        const unit =
+          item?.unit ?? item?.unitMaster?.symbol ?? item?.unitMaster?.code;
         const balance = params.materialBalances.get(source.inventoryItemId);
-        if (!unit || !balance || !source.warehouseId || !destination.warehouseId) {
+        if (
+          !unit ||
+          !balance ||
+          !source.warehouseId ||
+          !destination.warehouseId
+        ) {
           continue;
         }
         await this.inventoryEvents.transferred(
@@ -1305,7 +1664,8 @@ export class InventoryService {
               slotId: destination.slotId ?? null,
               level: destination.level ?? null,
               resultingBalance:
-                params.locationBalances.get(inventoryBucketKey(destination)) ?? 0,
+                params.locationBalances.get(inventoryBucketKey(destination)) ??
+                0,
             },
             referenceModule: params.transaction.referenceModule,
             referenceId: params.transaction.referenceId,
@@ -1332,7 +1692,8 @@ export class InventoryService {
       | 'inventory.adjusted';
     for (const line of params.bucketDeltas) {
       const item = params.itemsById.get(line.inventoryItemId);
-      const unit = item?.unit ?? item?.unitMaster?.symbol ?? item?.unitMaster?.code;
+      const unit =
+        item?.unit ?? item?.unitMaster?.symbol ?? item?.unitMaster?.code;
       const balance = params.materialBalances.get(line.inventoryItemId);
       const warehouseId = line.warehouseId;
       if (!unit || !balance || !warehouseId) continue;
@@ -1648,9 +2009,6 @@ export class InventoryService {
       );
     }
 
-    return this.inventoryRepository.findMaterialUsageTypeByCode(
-      'PRIMARY',
-      tx,
-    );
+    return this.inventoryRepository.findMaterialUsageTypeByCode('PRIMARY', tx);
   }
 }

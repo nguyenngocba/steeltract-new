@@ -61,7 +61,10 @@ describe('Project execution read model', () => {
             }),
           ],
           componentInstances: [
-            instance({ id: 'i-1', state: ComponentInstanceState.IN_PRODUCTION }),
+            instance({
+              id: 'i-1',
+              state: ComponentInstanceState.IN_PRODUCTION,
+            }),
             instance({
               id: 'i-2',
               state: ComponentInstanceState.PRODUCED_WAITING_QC,
@@ -109,7 +112,10 @@ describe('Project execution read model', () => {
             requirementNo: 'REQ-2',
             requiredQuantity: 3,
             componentInstances: [
-              instance({ id: 'b-1', state: ComponentInstanceState.IN_PRODUCTION }),
+              instance({
+                id: 'b-1',
+                state: ComponentInstanceState.IN_PRODUCTION,
+              }),
               instance({ id: 'b-2', state: ComponentInstanceState.PLANNED }),
             ],
           }),
@@ -121,8 +127,14 @@ describe('Project execution read model', () => {
     expect(model.summary.requiredQty).toBe(5);
     expect(model.summary.instanceCount).toBe(3);
     expect(model.summary.finishedGoodsQty).toBe(1);
-    expect(model.requirements.find((row) => row.id === 'req-1')?.quantities.finishedGoodsQty).toBe(1);
-    expect(model.requirements.find((row) => row.id === 'req-2')?.quantities.finishedGoodsQty).toBe(0);
+    expect(
+      model.requirements.find((row) => row.id === 'req-1')?.quantities
+        .finishedGoodsQty,
+    ).toBe(1);
+    expect(
+      model.requirements.find((row) => row.id === 'req-2')?.quantities
+        .finishedGoodsQty,
+    ).toBe(0);
   });
 
   it('counts finished goods using the external eligibility summary', () => {
@@ -192,6 +204,27 @@ describe('Project execution read model', () => {
     );
   });
 
+  it('keeps downstream physical instances counted as production-complete', () => {
+    const model = buildProjectExecutionReadModel({
+      project,
+      requirements: [
+        requirement({
+          requiredQuantity: 1,
+          componentInstances: [
+            instance({
+              id: 'installed-1',
+              state: ComponentInstanceState.INSTALLED,
+            }),
+          ],
+        }),
+      ],
+    });
+
+    expect(model.summary.completedQty).toBe(1);
+    expect(model.summary.productionCompletionPercent).toBe(100);
+    expect(model.summary.downstream.dispatchCanonical).toBe(true);
+  });
+
   it('does not let Project A instances affect Project B when the source is scoped', () => {
     const projectB = { ...project, id: 'project-b', code: 'P-B' };
     const model = buildProjectExecutionReadModel(
@@ -229,8 +262,12 @@ describe('Project execution read model', () => {
 
     expect(noRequirements.summary.productionCompletionPercent).toBe(0);
     expect(noRequirements.summary.finishedGoodsPercent).toBe(0);
-    expect(zeroRequired.requirements[0].executionStatus).toBe('NO_REQUIREMENTS');
-    expect(zeroRequired.requirements[0].progress.productionCompletionPercent).toBe(0);
+    expect(zeroRequired.requirements[0].executionStatus).toBe(
+      'NO_REQUIREMENTS',
+    );
+    expect(
+      zeroRequired.requirements[0].progress.productionCompletionPercent,
+    ).toBe(0);
   });
 
   it('ignores legacy Component.status because it is absent from canonical inputs', () => {
@@ -274,7 +311,11 @@ function requirement(
   };
 }
 
-function order(overrides: Partial<ProjectExecutionRequirementSource['productionOrders'][number]> = {}) {
+function order(
+  overrides: Partial<
+    ProjectExecutionRequirementSource['productionOrders'][number]
+  > = {},
+) {
   return {
     id: 'po-1',
     orderNo: 'PO-1',
@@ -284,7 +325,11 @@ function order(overrides: Partial<ProjectExecutionRequirementSource['productionO
   };
 }
 
-function instance(overrides: Partial<ProjectExecutionRequirementSource['componentInstances'][number]> = {}) {
+function instance(
+  overrides: Partial<
+    ProjectExecutionRequirementSource['componentInstances'][number]
+  > = {},
+) {
   return {
     id: 'instance-1',
     instanceNo: overrides.id ?? 'CI-1',

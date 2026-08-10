@@ -187,3 +187,17 @@ Currently documented through active integrations:
 * Validate EPIC116 Project Detail snapshots with real operator activity. Confirm summary tabs read snapshot on fresh hits, fall back safely on stale/missing snapshots, and queue background refresh without changing frontend response shape.
 * Monitor Operations Center Project Detail snapshot parity warnings after task/material/component/cost/document/log changes.
 * Keep `documents` and `logs` repository-backed unless a shared attachment/activity snapshot model is introduced.
+
+## SYSTEM.HARDENING.1 Read Contract
+
+Projects list query parameters are coerced and validated through the canonical
+Zod query pipe before repository access. Installed physical instances count as
+production-completed lineage while no longer inflating active Finished Goods or
+Yard staging. Runtime `GET /projects?limit=3` returned exactly three rows.
+
+## SYSTEM.REVERSE.1 Physical Project Return
+
+Projects initiates return by ComponentInstance and validates Project ownership
+before delegating to Yard. The legacy Component-definition return route is
+disabled and no longer clears Component.projectId or writes Component.status
+READY. Frontend migration to the physical route remains P1.

@@ -113,6 +113,18 @@ export const stageComponentInstanceToYardSchema = z.object({
   metadata: metadataSchema,
 });
 
+export const returnComponentInstanceToYardSchema = z.object({
+  componentInstanceId: z.string().min(1),
+  slotId: z.string().min(1),
+  stackLevel: z.coerce.number().int().positive().optional(),
+  sourceDispatchOrderId: z.string().min(1).optional(),
+  reason: z.string().trim().min(1),
+  metadata: metadataSchema,
+});
+
+export const returnComponentInstanceToYardBodySchema =
+  returnComponentInstanceToYardSchema.omit({ componentInstanceId: true });
+
 export const moveYardItemSchema = z.object({
   toSlotId: z.string().min(1),
   craneId: z.string().optional(),
@@ -183,6 +195,12 @@ export type CreateYardSlotDto = z.infer<typeof createYardSlotSchema>;
 export type PlaceYardItemDto = z.infer<typeof placeYardItemSchema>;
 export type StageComponentInstanceToYardDto = z.infer<
   typeof stageComponentInstanceToYardSchema
+>;
+export type ReturnComponentInstanceToYardDto = z.infer<
+  typeof returnComponentInstanceToYardSchema
+>;
+export type ReturnComponentInstanceToYardBodyDto = z.infer<
+  typeof returnComponentInstanceToYardBodySchema
 >;
 export type MoveYardItemDto = z.infer<typeof moveYardItemSchema>;
 export type RemoveYardItemDto = z.infer<typeof removeYardItemSchema>;

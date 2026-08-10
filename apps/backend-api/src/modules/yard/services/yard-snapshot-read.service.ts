@@ -40,7 +40,17 @@ export class YardSnapshotReadService {
       module: 'yard',
       snapshotType: 'YardDashboardSnapshot',
       loadSnapshot: async () => {
-        const snapshot = await this.snapshotReader.yardDashboard(day);
+        const [snapshot, latestMutationAt] = await Promise.all([
+          this.snapshotReader.yardDashboard(day),
+          this.liveReadModel.latestDashboardMutationAt(),
+        ]);
+        if (
+          snapshot &&
+          latestMutationAt &&
+          latestMutationAt.getTime() > snapshot.updatedAt.getTime()
+        ) {
+          return null;
+        }
         return snapshot
           ? { data: snapshot, updatedAt: snapshot.updatedAt, rowCount: 1 }
           : null;
@@ -185,12 +195,14 @@ export class YardSnapshotReadService {
       const runtimeValue = Number(runtime[field] ?? 0);
       return Math.abs(snapshotValue - runtimeValue) <= 0.0001
         ? []
-        : [{
-            field: String(field),
-            snapshotValue,
-            runtimeValue,
-            reason: 'VALUE_MISMATCH' as const,
-          }];
+        : [
+            {
+              field: String(field),
+              snapshotValue,
+              runtimeValue,
+              reason: 'VALUE_MISMATCH' as const,
+            },
+          ];
     });
   }
 

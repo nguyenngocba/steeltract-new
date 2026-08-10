@@ -9,6 +9,25 @@ import type { YardWorkspaceReadDto } from '../dto/yard.dto';
 export class YardReadModelRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async latestDashboardMutationAt() {
+    const rows = await this.prisma.$queryRaw<Array<{ latest: Date | null }>>`
+      SELECT MAX(changes."changedAt") AS latest
+      FROM (
+        SELECT MAX("updatedAt") AS "changedAt" FROM "yard_zones"
+        UNION ALL
+        SELECT MAX("updatedAt") AS "changedAt" FROM "yard_slots"
+        UNION ALL
+        SELECT MAX("updatedAt") AS "changedAt" FROM "yard_item_placements"
+        UNION ALL
+        SELECT MAX("createdAt") AS "changedAt" FROM "yard_movements"
+        UNION ALL
+        SELECT MAX("updatedAt") AS "changedAt" FROM "cranes"
+      ) AS changes
+    `;
+
+    return rows[0]?.latest ?? null;
+  }
+
   async workspace(query: YardWorkspaceReadDto) {
     const slotWhere = this.slotWhere(query);
     const movementWhere = this.movementWhere(query);
@@ -95,7 +114,9 @@ export class YardReadModelRepository {
         },
       }),
       this.prisma.yardSlot.count({ where: slotWhere }),
-      this.prisma.yardSlot.count({ where: { ...slotWhere, status: 'OCCUPIED' } }),
+      this.prisma.yardSlot.count({
+        where: { ...slotWhere, status: 'OCCUPIED' },
+      }),
       this.prisma.yardItemPlacement.count({ where: { removedAt: null } }),
       this.prisma.yardItemPlacement.aggregate({
         where: { removedAt: null },
@@ -115,7 +136,9 @@ export class YardReadModelRepository {
         _count: true,
       }),
       this.prisma.yardMovement.count({ where: { createdAt: { gte: today } } }),
-      this.prisma.yardMovement.count({ where: { createdAt: { gte: monthStart } } }),
+      this.prisma.yardMovement.count({
+        where: { createdAt: { gte: monthStart } },
+      }),
       this.prisma.yardMovement.groupBy({
         by: ['type'],
         where: { createdAt: { gte: today } },
@@ -151,7 +174,9 @@ export class YardReadModelRepository {
     ]);
 
     const zoneUtilization = zoneRows.map((zone) => {
-      const occupied = zone.slots.filter((slot) => slot.status === 'OCCUPIED').length;
+      const occupied = zone.slots.filter(
+        (slot) => slot.status === 'OCCUPIED',
+      ).length;
       return {
         id: zone.id,
         code: zone.code,
@@ -271,7 +296,11 @@ export class YardReadModelRepository {
     const componentIds = Array.from(
       new Set(
         placements
-          .map((row) => row.placement.componentInstance?.componentId ?? row.placement.itemId)
+          .map(
+            (row) =>
+              row.placement.componentInstance?.componentId ??
+              row.placement.itemId,
+          )
           .filter(Boolean),
       ),
     );
@@ -296,23 +325,26 @@ export class YardReadModelRepository {
     });
 
     return placements.flatMap(({ placement, slot }) => {
-      const componentId = placement.componentInstance?.componentId ?? placement.itemId;
+      const componentId =
+        placement.componentInstance?.componentId ?? placement.itemId;
       const inspection = latest.get(componentId);
       return inspection
-        ? [{
-            id: placement.id,
-            itemCode: placement.itemCode,
-            instanceCode: placement.componentInstance?.instanceNo ?? null,
-            componentInstanceId: placement.componentInstanceId ?? null,
-            itemName: placement.itemName,
-            slotCode: slot.code,
-            zoneName: slot.zone.name,
-            stackLevel: placement.stackLevel,
-            inspectionId: inspection.id,
-            inspectionNo: inspection.inspectionNo,
-            status: inspection.status,
-            updatedAt: inspection.updatedAt,
-          }]
+        ? [
+            {
+              id: placement.id,
+              itemCode: placement.itemCode,
+              instanceCode: placement.componentInstance?.instanceNo ?? null,
+              componentInstanceId: placement.componentInstanceId ?? null,
+              itemName: placement.itemName,
+              slotCode: slot.code,
+              zoneName: slot.zone.name,
+              stackLevel: placement.stackLevel,
+              inspectionId: inspection.id,
+              inspectionNo: inspection.inspectionNo,
+              status: inspection.status,
+              updatedAt: inspection.updatedAt,
+            },
+          ]
         : [];
     });
   }
@@ -325,13 +357,22 @@ export class YardReadModelRepository {
         ? [
             { code: { contains: query.search, mode: 'insensitive' } },
             { zone: { code: { contains: query.search, mode: 'insensitive' } } },
-            { placements: { some: { itemCode: { contains: query.search, mode: 'insensitive' }, removedAt: null } } },
+            {
+              placements: {
+                some: {
+                  itemCode: { contains: query.search, mode: 'insensitive' },
+                  removedAt: null,
+                },
+              },
+            },
           ]
         : undefined,
     };
   }
 
-  private movementWhere(query: YardWorkspaceReadDto): Prisma.YardMovementWhereInput {
+  private movementWhere(
+    query: YardWorkspaceReadDto,
+  ): Prisma.YardMovementWhereInput {
     const movementDateEnd = query.movementDate
       ? new Date(query.movementDate.getTime() + 24 * 60 * 60 * 1000)
       : undefined;
@@ -344,20 +385,60 @@ export class YardReadModelRepository {
         ? { gte: query.movementDate, lt: movementDateEnd }
         : undefined,
       AND: query.movementLocation
-        ? [{
-            OR: [
-              { fromSlot: { code: { contains: query.movementLocation, mode: 'insensitive' } } },
-              { toSlot: { code: { contains: query.movementLocation, mode: 'insensitive' } } },
-              { fromSlot: { zone: { code: { contains: query.movementLocation, mode: 'insensitive' } } } },
-              { toSlot: { zone: { code: { contains: query.movementLocation, mode: 'insensitive' } } } },
-            ],
-          }]
+        ? [
+            {
+              OR: [
+                {
+                  fromSlot: {
+                    code: {
+                      contains: query.movementLocation,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+                {
+                  toSlot: {
+                    code: {
+                      contains: query.movementLocation,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+                {
+                  fromSlot: {
+                    zone: {
+                      code: {
+                        contains: query.movementLocation,
+                        mode: 'insensitive',
+                      },
+                    },
+                  },
+                },
+                {
+                  toSlot: {
+                    zone: {
+                      code: {
+                        contains: query.movementLocation,
+                        mode: 'insensitive',
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          ]
         : undefined,
       OR: query.search
         ? [
             { itemCode: { contains: query.search, mode: 'insensitive' } },
-            { fromSlot: { code: { contains: query.search, mode: 'insensitive' } } },
-            { toSlot: { code: { contains: query.search, mode: 'insensitive' } } },
+            {
+              fromSlot: {
+                code: { contains: query.search, mode: 'insensitive' },
+              },
+            },
+            {
+              toSlot: { code: { contains: query.search, mode: 'insensitive' } },
+            },
           ]
         : undefined,
     };

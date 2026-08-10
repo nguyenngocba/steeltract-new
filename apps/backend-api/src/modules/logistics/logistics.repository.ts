@@ -226,13 +226,41 @@ export class LogisticsRepository {
   updateComponentInstances(
     ids: string[],
     data: Prisma.ComponentInstanceUpdateManyMutationInput,
+    db: DbClient = this.prisma,
   ) {
     if (!ids.length) {
       return Promise.resolve({ count: 0 });
     }
-    return this.prisma.componentInstance.updateMany({
+    return db.componentInstance.updateMany({
       where: { id: { in: ids } },
       data,
+    });
+  }
+
+  transitionComponentInstances(
+    ids: string[],
+    from: ComponentInstanceState,
+    to: ComponentInstanceState,
+    tx: LogisticsTx,
+  ) {
+    if (!ids.length) return Promise.resolve({ count: 0 });
+    return tx.componentInstance.updateMany({
+      where: { id: { in: ids }, state: from },
+      data: { state: to },
+    });
+  }
+
+  transitionComponentInstancesFromStates(
+    ids: string[],
+    from: ComponentInstanceState[],
+    to: ComponentInstanceState,
+    data: Prisma.ComponentInstanceUpdateManyMutationInput,
+    tx: LogisticsTx,
+  ) {
+    if (!ids.length) return Promise.resolve({ count: 0 });
+    return tx.componentInstance.updateMany({
+      where: { id: { in: ids }, state: { in: from } },
+      data: { ...data, state: to },
     });
   }
 

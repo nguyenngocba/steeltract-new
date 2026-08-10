@@ -26,6 +26,7 @@ import {
   QcNcrAggregate,
 } from '../domain/qc.aggregate';
 import { QcRepository, QcTx } from '../repositories/qc.repository';
+import { YardService } from '../../yard/services/yard.service';
 
 type CanonicalQcEvent =
   | 'qc.inspection.completed'
@@ -34,7 +35,10 @@ type CanonicalQcEvent =
 
 @Injectable()
 export class QcCommandService {
-  constructor(private readonly repository: QcRepository) {}
+  constructor(
+    private readonly repository: QcRepository,
+    private readonly yardService: YardService,
+  ) {}
 
   acceptInspection(command: Omit<CompleteQcInspectionCommand, 'decision'>) {
     return this.completeInspection({ ...command, decision: 'ACCEPT' });
@@ -302,6 +306,12 @@ export class QcCommandService {
         tx,
         [ComponentInstanceState.PRODUCED_WAITING_QC],
       );
+      await this.yardService.acceptReturnedComponentAfterQc(
+        instance.id,
+        inspection.id,
+        inspection.inspectorId ?? undefined,
+        tx,
+      );
       await this.repository.createComponentInstanceTimelineIfMissing(
         {
           componentInstanceId: instance.id,
@@ -388,6 +398,13 @@ export class QcCommandService {
         },
         tx,
       );
+      await this.yardService.releaseReturnedComponentForDisposition(
+        instance.id,
+        'REWORK',
+        ncr.id,
+        command.actorId,
+        tx,
+      );
       return;
     }
 
@@ -420,6 +437,13 @@ export class QcCommandService {
         },
         tx,
       );
+      await this.yardService.releaseReturnedComponentForDisposition(
+        instance.id,
+        'SCRAP',
+        ncr.id,
+        command.actorId,
+        tx,
+      );
       return;
     }
 
@@ -450,6 +474,12 @@ export class QcCommandService {
             reason: command.reason ?? null,
           } as Prisma.InputJsonObject,
         },
+        tx,
+      );
+      await this.yardService.acceptReturnedComponentAfterQc(
+        instance.id,
+        ncr.inspectionId,
+        command.actorId,
         tx,
       );
     }

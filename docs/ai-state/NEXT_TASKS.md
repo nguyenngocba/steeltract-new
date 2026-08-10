@@ -1,5 +1,17 @@
 # Next Tasks
 
+- **RC1 P1 - Browser form-depth expansion**: convert the current authenticated
+  REST-orchestrated Playwright certification into direct field-entry coverage
+  for Receipt, BOM and FINAL QC once those views expose stable test selectors.
+- **RC1 P1 - Worker contention monitoring**: observe snapshot worker lease-loss
+  warnings and slow snapshot inserts under multi-worker load; tune bounded
+  concurrency/lease duration only from measured staging evidence.
+- **RC1 P1 - API latency budget**: profile login and the Inventory, Projects and
+  Production list/read-model paths that exceeded local warning budgets during
+  certification. Preserve contracts and optimize only confirmed hotspots.
+- **RC1 P2 - Certification artifact publishing**: retain Playwright screenshots,
+  timing JSON, REST evidence and database evidence as CI artifacts.
+
 - **SYSTEM.INTEGRITY.2 P0 - Full disposable runtime fixture certification**:
   create and execute a controlled `SYSTEM-INTEGRITY2-*` fixture through
   Finished Goods -> Yard stage -> Logistics suggest/create -> depart ->
@@ -1345,3 +1357,42 @@ Backlog after the locked order:
 6. P1: certify full `QC FAIL -> REWORK -> Production -> FINAL QC -> PASS`.
 7. P1: run authenticated browser/chart certification against the retained
    `SYSTEM-E2E1-1785732305546` fixture.
+
+# SYSTEM.HARDENING.1 Follow-up
+
+1. P1: implement and certify physical reverse commands for installed dismantle,
+   project surplus return and supplier outbound return.
+2. P1: certify `QC FAIL -> REWORK -> Production -> FINAL QC -> PASS` end to end.
+3. P1: align Yard snapshot stale classification with confidence and source age.
+4. P1: run authenticated browser dashboard checks against
+   `SYSTEM-HARDENING1-1786329000052`.
+5. P2: introduce bounded/cursor dispatch reads before Logistics volume exceeds
+   the current 200-row deep-include query.
+# SYSTEM.REVERSE.1 closeout
+
+- **P0**: run authenticated `SYSTEM-REVERSE1-*` REST fixture through Supplier
+  Return, Production material return, reverse Logistics/Yard, QC Rework/re-QC
+  and Scrap; prove DB balances, ActivityLog uniqueness and dashboard deltas.
+- **P0**: prove 403 for an insufficient-permission user and success for the
+  authorized operator on every reverse write boundary.
+- **P1**: migrate frontend callers from legacy Project Component-definition
+  return to the physical ComponentInstance endpoint.
+- **P1 schema gate**: consider an additive FK/relation for
+  `ReturnRequest.supplierId`; current service validation blocks new orphans.
+- **P1**: define physical scrap cost treatment if Finance requires more than
+  retained Production material consumption.
+
+# SYSTEM.RUNTIME.1 closeout
+
+1. **P0**: extend Playwright from route/render smoke to the complete Receipt ->
+   Installation -> Reverse Flow mutation journey using role-specific users.
+2. **P0**: expose and certify deployment liveness/readiness endpoints without
+   coupling them to deep business queries.
+3. **P0**: diagnose the five YardDashboardSnapshot parity mismatches, replay
+   the snapshot and re-certify Yard/Executive outputs.
+4. **P1**: execute Supplier Return, QC FAIL/Rework/re-QC, Scrap and installed
+   removal branches under one retained runtime fixture.
+5. **P1**: add a supported API-level fixture archive/cleanup procedure for
+   failed certification iterations.
+6. **P1**: paginate/bound Production cockpit, ActivityLog, zones and Yard slot
+   reads before production volume grows.

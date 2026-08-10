@@ -414,6 +414,22 @@ export class ProjectsRepository {
       );
   }
 
+  findProjectComponentInstance(
+    projectId: string,
+    componentInstanceId: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.componentInstance.findFirst({
+      where: { id: componentInstanceId, projectId },
+      select: {
+        id: true,
+        instanceNo: true,
+        state: true,
+        projectId: true,
+      },
+    });
+  }
+
   updateProjectComponentReturned(
     componentId: string,
     db: DbClient = this.prisma,

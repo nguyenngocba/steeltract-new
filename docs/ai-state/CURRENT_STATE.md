@@ -1,5 +1,37 @@
 # Current State
 
+## SYSTEM.RUNTIME.2 - Production Runtime Closure
+
+Status: **GO FOR STEELTRACK V1 RC1**
+
+On 2026-08-10, SteelTrack completed authenticated REST, browser, database,
+dashboard, RBAC and ActivityLog runtime certification. The forward physical
+workflow reached `INSTALLED`; database invariants passed 15/15, RBAC/auth checks
+54/54, and Yard dashboard/live parity 11/11. Deployment health now exposes
+separate liveness, readiness and startup probes.
+
+Playwright produced 13 workflow screenshots and stage timings. The remaining P1
+items are direct browser form automation for three views and worker/endpoint
+latency tuning; neither is a canonical correctness blocker for RC1.
+
+Report: `docs/audits/system-runtime2-final-runtime-closure.md`.
+
+## SYSTEM.REVERSE.1 - Canonical Reverse Workflow Certification
+
+Status: **IMPLEMENTED / CONDITIONALLY READY - AUTHENTICATED RUNTIME PENDING**
+
+Reverse Supplier, Production material, Project physical component, QC
+rework/scrap, Yard quarantine and Logistics flows use authoritative owner
+services. Physical reverse flows use ComponentInstance only. ProductionRework
+stores physical instance lineage; reverse Yard placement is quarantined until
+FINAL QC; Supplier Return posts idempotent outbound inventory movement.
+
+Migration is deployed and all tests/builds pass. Production approval remains
+blocked on the authenticated `SYSTEM-REVERSE1-*` REST fixture, 403/success RBAC
+proof and dashboard before/after evidence.
+
+Report: `docs/audits/system-reverse1-canonical-reverse-workflows.md`.
+
 ## SYSTEM.E2E.1 - Full Business Workflow Certification
 
 Status: **CONDITIONALLY READY FOR CONTROLLED INTERNAL PILOT / NOT V1 FREEZE READY**
@@ -4132,3 +4164,37 @@ derive some physical component metrics from `Component.status`.
 
 Report:
 `docs/audits/system-integrity1-steeltrack-v1-operational-readiness-audit.md`.
+
+# SYSTEM.HARDENING.1 Production Readiness (2026-08-10)
+
+Status: **P0 COMPLETE - CONTROLLED PILOT READY**
+
+Dispatch departure closes Yard ownership and frees the slot in the same
+Serializable transaction that advances physical custody. ComponentInstance has
+an additive `INSTALLED` state. Projection aggregate versions use BIGINT and the
+failed set has been rebuilt with no active failures. Inventory idempotency
+rejects same-key/different-payload commands with 409, and Projects pagination is
+coerced at the controller boundary.
+
+Retained fixture `SYSTEM-HARDENING1-1786329000052` finished with a COMPLETED
+Production Order, INSTALLED instance, inactive Yard placement, available slot
+and conserved inventory balance of 95 PCS. Remaining P1 work covers physical
+reverse flows, the QC rework branch, browser certification and Yard snapshot
+freshness observability.
+
+Report: `docs/audits/system-hardening1-production-readiness.md`.
+
+# SYSTEM.RUNTIME.1 Runtime Certification (2026-08-10)
+
+Status: **REST/RBAC/DB GREEN - RC1 NO-GO**
+
+The retained `SYSTEM-RUNTIME1-1786339882640` fixture completed 73 authenticated
+REST calls through Production completion, QC PASS, Finished Goods, Yard,
+installation and reverse Yard quarantine. Inventory conservation and 15/15 DB
+parity checks pass. Playwright logs in and renders 17 operational workspaces
+without runtime/HTTP errors, but it does not yet automate every business
+mutation. A conventional health/readiness/liveness endpoint is also absent.
+The final runtime also logged five Yard dashboard snapshot/live parity
+mismatches, so dashboard/read-model certification is PARTIAL.
+
+Report: `docs/audits/system-runtime1-production-runtime-certification.md`.

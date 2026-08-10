@@ -100,6 +100,21 @@ describe('Production aggregates', () => {
     ).not.toThrow();
   });
 
+  it('validates only completion quantities when the application command has metadata', () => {
+    const command = {
+      productionOrderId: 'po-1',
+      unit: 'PCS',
+      idempotencyKey: 'completion-1',
+      quantity: 1,
+      completedQty: 1,
+      rejectedQty: 0,
+      scrapQty: 0,
+      remainingQty: 0,
+    };
+
+    expect(() => ProductionCompletionAggregate.record(command)).not.toThrow();
+  });
+
   it('keeps Scrap draft, posting, cancellation and reversal explicit', () => {
     expect(ProductionScrapAggregate.post(ProductionScrapState.DRAFT)).toBe(
       ProductionScrapState.POSTED,

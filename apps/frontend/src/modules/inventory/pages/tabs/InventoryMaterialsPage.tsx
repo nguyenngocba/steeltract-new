@@ -958,16 +958,16 @@ export function InventoryMaterialsPage() {
                       <CockpitTableShell className="h-[clamp(400px,60vh,520px)] min-h-[400px]">
                         <table className="w-full min-w-[1050px] text-sm table-fixed">
                           <colgroup>
-                            <col className="w-[140px]" />   {/* Tên vật tư */}
-                            <col className="w-[140px]" />   {/* Quy cách */}
-                            <col className="w-[40px]" />    {/* ĐVT */}
-                            <col className="w-[100px]" />   {/* Kho chính */}
-                            <col className="w-[100px]" />   {/* Kho SX */}
-                            <col className="w-[100px]" />   {/* Tổng tồn */}
-                            <col className="w-[110px]" />   {/* Đơn giá */}
-                            <col className="w-[130px]" />   {/* Giá trị */}
-                            <col className="w-[150px]" />   {/* Vị trí */}
-                            <col className="w-[100px]" />   {/* Trạng thái */}
+                            <col className="w-[140px]" />
+                            <col className="w-[140px]" />
+                            <col className="w-[40px]" />
+                            <col className="w-[100px]" />
+                            <col className="w-[100px]" />
+                            <col className="w-[100px]" />
+                            <col className="w-[110px]" />
+                            <col className="w-[130px]" />
+                            <col className="w-[150px]" />
+                            <col className="w-[100px]" />
                           </colgroup>
                           <thead
                             className={`${inventoryTableHead}

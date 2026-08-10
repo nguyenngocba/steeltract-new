@@ -1,3 +1,5 @@
+import { ConflictException } from '@nestjs/common';
+
 import { InventoryRepository } from './inventory.repository';
 import { InventoryService } from './inventory.service';
 
@@ -55,9 +57,11 @@ describe('InventoryService multi-material foundation', () => {
           ],
         },
       ]),
-      groupTransactionItemStockByItems: jest.fn().mockResolvedValue([
-        { inventoryItemId: 'material-location-1', _sum: { quantity: 100 } },
-      ]),
+      groupTransactionItemStockByItems: jest
+        .fn()
+        .mockResolvedValue([
+          { inventoryItemId: 'material-location-1', _sum: { quantity: 100 } },
+        ]),
       findWarehousesByIds: jest.fn().mockResolvedValue([
         { id: 'warehouse-main', code: 'MAIN', name: 'Kho chính' },
         {
@@ -117,7 +121,31 @@ describe('InventoryService multi-material foundation', () => {
       code: 'HT-00001',
       transactionNo: 'HT-00001',
       type: 'RETURN',
-      items: [{ id: 'line-existing', inventoryItemId: 'material-1' }],
+      direction: 'INBOUND',
+      note: null,
+      performedBy: null,
+      approvedBy: null,
+      projectId: null,
+      supplierId: null,
+      warehouseId: null,
+      zoneId: null,
+      transactionTypeId: null,
+      remarks: null,
+      transactionDate: new Date('2026-07-28T00:00:00.000Z'),
+      items: [
+        {
+          id: 'line-existing',
+          inventoryItemId: 'material-1',
+          quantity: 5,
+          unitId: null,
+          warehouseId: 'warehouse-1',
+          zoneId: 'zone-1',
+          slotId: 'A01',
+          level: 'L1',
+          unitPrice: 0,
+          totalAmount: 0,
+        },
+      ],
     };
     const repository = {
       findInboundCostLines: jest.fn().mockResolvedValue([]),
@@ -125,6 +153,9 @@ describe('InventoryService multi-material foundation', () => {
         work({ transaction: true }),
       ),
       findTransactionByReference: jest.fn().mockResolvedValue(existing),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
       createTransaction: jest.fn(),
       nextOperationalCode: jest.fn(),
     };
@@ -164,6 +195,105 @@ describe('InventoryService multi-material foundation', () => {
     );
     expect(repository.createTransaction).not.toHaveBeenCalled();
     expect(repository.nextOperationalCode).not.toHaveBeenCalled();
+    expect(repository.createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ commandHash: expect.any(String) }),
+      }),
+      { transaction: true },
+    );
+  });
+
+  it('rejects the same durable reference with a different payload and logs it', async () => {
+    const existing = {
+      id: 'transaction-existing',
+      code: 'DC-00001',
+      transactionNo: 'DC-00001',
+      type: 'TRANSFER',
+      direction: 'INTERNAL',
+      note: null,
+      performedBy: null,
+      approvedBy: null,
+      projectId: null,
+      supplierId: null,
+      warehouseId: null,
+      zoneId: null,
+      transactionTypeId: null,
+      remarks: '',
+      transactionDate: new Date('2026-08-03T00:00:00.000Z'),
+      items: [
+        {
+          inventoryItemId: 'material-1',
+          quantity: -5,
+          unitId: null,
+          warehouseId: 'main',
+          zoneId: 'main-zone',
+          slotId: 'A01',
+          level: 'L1',
+          unitPrice: 0,
+          totalAmount: 0,
+        },
+        {
+          inventoryItemId: 'material-1',
+          quantity: 5,
+          unitId: null,
+          warehouseId: 'production',
+          zoneId: 'production-zone',
+          slotId: 'P01',
+          level: 'L1',
+          unitPrice: 0,
+          totalAmount: 0,
+        },
+      ],
+    };
+    const repository = {
+      findInboundCostLines: jest.fn().mockResolvedValue([]),
+      transaction: jest.fn(async (work: (tx: object) => unknown) =>
+        work({ transaction: true }),
+      ),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findTransactionByReference: jest.fn().mockResolvedValue(existing),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createTransaction: jest.fn(),
+    };
+    const service = new InventoryService(
+      repository as unknown as InventoryRepository,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.createTransaction({
+        type: 'TRANSFER',
+        referenceModule: 'SYSTEM-E2E1',
+        referenceId: 'reverse-transfer',
+        items: [
+          {
+            inventoryItemId: 'material-1',
+            quantity: -1,
+            warehouseId: 'main',
+            zoneId: 'main-zone',
+            slotId: 'A01',
+            level: 'L1',
+          },
+          {
+            inventoryItemId: 'material-1',
+            quantity: 1,
+            warehouseId: 'production',
+            zoneId: 'production-zone',
+            slotId: 'P01',
+            level: 'L1',
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(repository.createTransaction).not.toHaveBeenCalled();
+    expect(repository.createActivityLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'INVENTORY_IDEMPOTENCY_CONFLICT' }),
+    );
   });
 
   it('conserves quantity and posts both buckets for MAIN to PRODUCTION transfers', async () => {
@@ -211,10 +341,19 @@ describe('InventoryService multi-material foundation', () => {
       ],
     };
     const repository = {
-      findInboundCostLines: jest.fn().mockResolvedValue([
-        { inventoryItemId: material.id, quantity: 100, unitPrice: 10, totalAmount: 1000 },
-      ]),
-      transaction: jest.fn(async (work: (client: object) => unknown) => work(tx)),
+      findInboundCostLines: jest
+        .fn()
+        .mockResolvedValue([
+          {
+            inventoryItemId: material.id,
+            quantity: 100,
+            unitPrice: 10,
+            totalAmount: 1000,
+          },
+        ]),
+      transaction: jest.fn(async (work: (client: object) => unknown) =>
+        work(tx),
+      ),
       findItemById: jest.fn().mockResolvedValue(material),
       findLocationStockBucket: jest.fn().mockResolvedValue({ quantity: 100 }),
       nextOperationalCode: jest.fn().mockResolvedValue('DC-00001'),

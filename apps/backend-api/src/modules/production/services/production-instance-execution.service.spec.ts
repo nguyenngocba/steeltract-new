@@ -27,6 +27,20 @@ function makeRepository(overrides: Partial<Record<string, jest.Mock>> = {}) {
         ].filter((instance) => ids.includes(instance.id)),
       ),
     ),
+    findEligibleComponentInstanceIdsForProductionOrder: jest
+      .fn()
+      .mockImplementation((ids: string[], productionOrderId: string) =>
+        Promise.resolve(
+          [
+            { id: 'ci-1', productionOrderId: 'po-1' },
+            { id: 'ci-2', productionOrderId: 'po-1' },
+            { id: 'ci-3', productionOrderId: 'po-1' },
+          ]
+            .filter((instance) => instance.productionOrderId === productionOrderId)
+            .filter((instance) => ids.includes(instance.id))
+            .map(({ id }) => ({ id })),
+        ),
+      ),
     findComponentInstanceExecutionsByRun: jest
       .fn()
       .mockResolvedValueOnce([])
@@ -67,6 +81,8 @@ function makeRepository(overrides: Partial<Record<string, jest.Mock>> = {}) {
         productionOrderId: 'po-1',
         state: ComponentInstanceState.PLANNED,
       },
+      workOrder: { id: 'wo-1', productionOrderId: 'po-1' },
+      productionExecution: { id: 'run-1', productionOrderId: 'po-1' },
     }),
     updateComponentInstanceExecution: jest.fn().mockImplementation((id, data) =>
       Promise.resolve({
@@ -79,6 +95,8 @@ function makeRepository(overrides: Partial<Record<string, jest.Mock>> = {}) {
           productionOrderId: 'po-1',
           state: ComponentInstanceState.IN_PRODUCTION,
         },
+        workOrder: { id: 'wo-1', productionOrderId: 'po-1' },
+        productionExecution: { id: 'run-1', productionOrderId: 'po-1' },
         ...data,
       }),
     ),
@@ -173,6 +191,9 @@ describe('ProductionInstanceExecutionService', () => {
         .mockResolvedValue([
           { id: 'ci-foreign', productionOrderId: 'po-2', serialSequence: 1 },
         ]),
+      findEligibleComponentInstanceIdsForProductionOrder: jest
+        .fn()
+        .mockResolvedValue([]),
     });
     const service = new ProductionInstanceExecutionService(repository);
 
@@ -239,6 +260,7 @@ describe('ProductionInstanceExecutionService', () => {
           productionOrderId: 'po-1',
           state: ComponentInstanceState.IN_PRODUCTION,
         },
+        workOrder: { id: 'wo-1', productionOrderId: 'po-1' },
       }),
     });
     const service = new ProductionInstanceExecutionService(repository);
@@ -283,6 +305,7 @@ describe('ProductionInstanceExecutionService', () => {
               productionOrderId: 'po-1',
               state: ComponentInstanceState.IN_PRODUCTION,
             },
+            workOrder: { id: 'wo-1', productionOrderId: 'po-1' },
             ...data,
           }),
         ),
@@ -321,6 +344,7 @@ describe('ProductionInstanceExecutionService', () => {
           productionOrderId: 'po-1',
           state: ComponentInstanceState.IN_PRODUCTION,
         },
+        workOrder: { id: 'wo-2', productionOrderId: 'po-1' },
       }),
       updateComponentInstanceExecution: jest
         .fn()
@@ -335,6 +359,7 @@ describe('ProductionInstanceExecutionService', () => {
               productionOrderId: 'po-1',
               state: ComponentInstanceState.IN_PRODUCTION,
             },
+            workOrder: { id: 'wo-2', productionOrderId: 'po-1' },
             ...data,
           }),
         ),
@@ -380,9 +405,9 @@ describe('ProductionInstanceExecutionService', () => {
     const repository = makeRepository({
       findExecutionLineage: jest.fn().mockResolvedValue({
         id: 'run-rework',
-        productionOrderId: 'po-1',
+        productionOrderId: 'po-rework',
         workOrderId: 'wo-rework',
-        workOrder: { id: 'wo-rework', productionOrderId: 'po-1' },
+        workOrder: { id: 'wo-rework', productionOrderId: 'po-rework' },
       }),
       findComponentInstancesByIds: jest
         .fn()
@@ -401,6 +426,9 @@ describe('ProductionInstanceExecutionService', () => {
             status: ComponentInstanceExecutionStatus.ASSIGNED,
           },
         ]),
+      findEligibleComponentInstanceIdsForProductionOrder: jest
+        .fn()
+        .mockResolvedValue([{ id: 'ci-1' }]),
       createComponentInstanceExecutions: jest
         .fn()
         .mockResolvedValue({ count: 1 }),
