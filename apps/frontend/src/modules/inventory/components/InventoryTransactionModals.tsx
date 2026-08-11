@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { Pencil, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getInboundSuggestions } from '../api/inventory.api'
@@ -20,6 +20,7 @@ import { useInventoryConfirmDialog } from '../hooks/useInventoryConfirmDialog'
 import { nextLocalCode } from '@/shared/utils/code-format'
 import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatCurrencyInput, formatCurrencyVnd, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { warehouseAllows } from '../utils/warehouse-capabilities'
 
 type ModalProps = {
   open: boolean
@@ -73,11 +74,11 @@ function formatPercent(value?: number | null) {
 }
 
 function isMainWarehouseZone(zone: any) {
-  return zone?.active !== false && zone?.warehouse?.code === 'MAIN' && !String(zone?.code ?? '').startsWith('ST-WH-')
+  return zone?.active !== false && warehouseAllows(zone, 'allowReceipt') && !warehouseAllows(zone, 'allowProduction') && !String(zone?.code ?? '').startsWith('ST-WH-')
 }
 
 function isProductionWarehouseZone(zone: any) {
-  return zone?.active !== false && zone?.warehouse?.code === 'PRODUCTION' && !String(zone?.code ?? '').startsWith('ST-WH-')
+  return zone?.active !== false && warehouseAllows(zone, 'allowProduction') && !String(zone?.code ?? '').startsWith('ST-WH-')
 }
 
 function isRealStorageZone(zone: any) {
@@ -729,18 +730,20 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
                         <button
                           type="button"
                           onClick={() => handleEditPending(item)}
-                          className="rounded p-1 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                          aria-label={`Sửa dòng ${item.materialCode}`}
+                          className="grid h-8 w-8 place-items-center rounded-md text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
                           title="Sửa dòng này"
                         >
-                          ✏️
+                          <Pencil size={15} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRemovePending(item.id)}
-                          className="rounded p-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          aria-label={`Xóa dòng ${item.materialCode}`}
+                          className="grid h-8 w-8 place-items-center rounded-md text-red-400 hover:bg-red-500/10 hover:text-red-300"
                           title="Xóa dòng này"
                         >
-                          ❌
+                          <Trash2 size={15} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -751,8 +754,8 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           )}
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
-            <select value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
+            <input aria-label="Ngày giờ nhập kho" type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+            <select aria-label="Nhà cung cấp" value={form.supplierId} onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))} className={fieldClass}>
               <option value="">Nhà cung cấp</option>
               {suppliers.map((s: any) => (
                 <option key={s.id} value={s.id}>
@@ -760,7 +763,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.inventoryItemId} onChange={(e) => {
+            <select aria-label="Vật tư nhập kho" value={form.inventoryItemId} onChange={(e) => {
               setUnitPriceEdited(false)
               setForm((f) => ({ ...f, inventoryItemId: e.target.value }))
             }} className={fieldClass}>
@@ -771,15 +774,15 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
-            <input value={form.unitPrice} onChange={(e) => {
+            <input aria-label="Số lượng nhập" value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+            <input aria-label="Đơn giá nhập" value={form.unitPrice} onChange={(e) => {
               setUnitPriceEdited(true)
               setForm((f) => ({ ...f, unitPrice: formatCurrencyInput(e.target.value) }))
             }} inputMode="numeric" placeholder="Đơn giá nhập" className={fieldClass} />
             <div className="flex items-center rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-slate-300">
               Vị trí mặc định Kho chính: <span className="ml-1 text-cyan-300">{defaultInboundZone?.code ?? 'A01'} ({defaultInboundZone?.name ?? 'Warehouse Zone A01'})</span>
             </div>
-            <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
+            <select aria-label="Vị trí nhận" value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
               <option value="">Vị trí nhận thuộc Kho chính</option>
               {mainZones.map((z: any) => (
                 <option disabled={isZoneFull(z)} key={z.id} value={z.id}>
@@ -787,21 +790,21 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
+            <select aria-label="Ô nhận" value={form.slotId} onChange={(e) => setForm((f) => ({ ...f, slotId: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
               <option value="">Chọn ô trong vị trí</option>
               {INTERNAL_CELLS.map((cell) => {
                 const occupiedOnAnyLevel = selectedInboundZone && INTERNAL_LEVELS.every((item) => isCellOccupied(selectedInboundZone, cell, item))
                 return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
               })}
             </select>
-            <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
+            <select aria-label="Tầng nhận" value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} className={`${fieldClass} ${missingInboundLocation ? 'border-red-400/60 ring-1 ring-red-400/30' : ''}`}>
               <option value="">Chọn tầng nhận</option>
               {INTERNAL_LEVELS.map((level) => {
                 const occupied = selectedInboundZone && form.slotId && isCellOccupied(selectedInboundZone, form.slotId, level)
                 return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
               })}
             </select>
-            <input value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
+            <input aria-label="Thuế VAT phần trăm" value={form.vat} onChange={(e) => setForm((f) => ({ ...f, vat: e.target.value }))} placeholder="VAT (%)" className={fieldClass} />
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
             <MetricBox title="Tồn hiện tại" value={formatQuantity(currentStock)} />
@@ -945,7 +948,7 @@ export function InboundTransactionModal({ open, onClose }: ModalProps) {
           <div className="mt-3">
             <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
           </div>
-          <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú chung phiếu nhập" className={`${textareaClass} mt-3 w-full text-xs`} />
+          <textarea aria-label="Ghi chú phiếu nhập" value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú chung phiếu nhập" className={`${textareaClass} mt-3 w-full text-xs`} />
           <div className="mt-4 flex justify-end gap-2">
             <button onClick={handleClose} className={secondaryButtonClass}>Hủy</button>
             <button disabled={pendingItems.length === 0 || createTransaction.isPending} onClick={submit} className={primaryButtonClass}>
@@ -1017,8 +1020,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           .filter(
             (balance) =>
               num(balance.quantity) > 0 &&
-              balance.warehouseCode !==
-                'PRODUCTION',
+              !warehouseAllows(balance, 'allowProduction'),
           )
       : []
   }, [selectedMaterialDetail])
@@ -1061,10 +1063,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
     locationBalances.forEach((balance: any) => {
       if (!balance.zoneId) return
 
-      if (
-        String(balance.warehouseCode) ===
-        'PRODUCTION'
-      ) {
+      if (warehouseAllows(balance, 'allowProduction')) {
         return
       }
 
@@ -1493,18 +1492,20 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
                         <button
                           type="button"
                           onClick={() => handleEditPending(item)}
-                          className="rounded p-1 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                          aria-label={`Sửa dòng ${item.materialCode}`}
+                          className="grid h-8 w-8 place-items-center rounded-md text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
                           title="Sửa dòng này"
                         >
-                          ✏️
+                          <Pencil size={15} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRemovePending(item.id)}
-                          className="rounded p-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          aria-label={`Xóa dòng ${item.materialCode}`}
+                          className="grid h-8 w-8 place-items-center rounded-md text-red-400 hover:bg-red-500/10 hover:text-red-300"
                           title="Xóa dòng này"
                         >
-                          ❌
+                          <Trash2 size={15} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -1515,12 +1516,12 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           )}
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
-            <select value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className={fieldClass}>
+            <input aria-label="Ngày giờ xuất kho" type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+            <select aria-label="Mục đích xuất kho" value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value, projectId: e.target.value === 'COMPONENT_PRODUCTION' ? '' : f.projectId }))} className={fieldClass}>
               <option value="PROJECT">Xuất cho công trình</option>
               <option value="COMPONENT_PRODUCTION">Xuất cho sản xuất cấu kiện</option>
             </select>
-            <select disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className={`${fieldClass} disabled:cursor-not-allowed disabled:opacity-50`}>
+            <select aria-label="Công trình nhận vật tư" disabled={form.target === 'COMPONENT_PRODUCTION'} value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} className={`${fieldClass} disabled:cursor-not-allowed disabled:opacity-50`}>
               <option value="">Đơn vị nhận</option>
               {projects.map((p: any) => (
                 <option key={p.id} value={p.id}>
@@ -1528,7 +1529,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className={fieldClass}>
+            <select aria-label="Vật tư xuất kho" value={form.inventoryItemId} onChange={(e) => setForm((f) => ({ ...f, inventoryItemId: e.target.value, zoneId: '' }))} className={fieldClass}>
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
                 <option key={m.id} value={m.id}>
@@ -1536,8 +1537,9 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+            <input aria-label="Số lượng xuất" value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
             <select
+              aria-label="Vị trí nguồn xuất kho"
               value={`${form.zoneId}|${form.sourceSlotId}|${form.sourceLevel}`}
               onChange={(e) => {
                 const [zoneId, slotId, level] =
@@ -1600,18 +1602,18 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <select value={form.productionZoneId} onChange={(e) => setForm((f) => ({ ...f, productionZoneId: e.target.value, productionSlotId: '', productionLevel: '' }))} className={fieldClass}>
+                <select aria-label="Kho sản xuất nhận" value={form.productionZoneId} onChange={(e) => setForm((f) => ({ ...f, productionZoneId: e.target.value, productionSlotId: '', productionLevel: '' }))} className={fieldClass}>
                   <option value="">Vị trí kho SX nhận</option>
                   {productionZones.map((zone: any) => <option key={zone.id} value={zone.id}>{zone.code} - {zone.name}</option>)}
                 </select>
-                <select value={form.productionSlotId} onChange={(e) => setForm((f) => ({ ...f, productionSlotId: e.target.value }))} className={fieldClass}>
+                <select aria-label="Ô kho sản xuất" value={form.productionSlotId} onChange={(e) => setForm((f) => ({ ...f, productionSlotId: e.target.value }))} className={fieldClass}>
                   <option value="">Ô nhận</option>
                   {INTERNAL_CELLS.map((cell) => {
                     const occupiedOnAnyLevel = selectedProductionZone && INTERNAL_LEVELS.every((level) => isCellOccupied(selectedProductionZone, cell, level))
                     return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
                   })}
                 </select>
-                <select value={form.productionLevel} onChange={(e) => setForm((f) => ({ ...f, productionLevel: e.target.value }))} className={fieldClass}>
+                <select aria-label="Tầng kho sản xuất" value={form.productionLevel} onChange={(e) => setForm((f) => ({ ...f, productionLevel: e.target.value }))} className={fieldClass}>
                   <option value="">Tầng nhận</option>
                   {INTERNAL_LEVELS.map((level) => {
                     const occupied = selectedProductionZone && form.productionSlotId && isCellOccupied(selectedProductionZone, form.productionSlotId, level)
@@ -1667,7 +1669,7 @@ export function OutboundTransactionModal({ open, onClose }: ModalProps) {
           <div className="mt-3">
             <InventoryAttachmentPicker files={attachmentFiles} onChange={setAttachmentFiles} />
           </div>
-          <textarea value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú chung phiếu xuất" className={`${textareaClass} mt-3 w-full text-xs`} />
+          <textarea aria-label="Ghi chú phiếu xuất" value={form.remark} onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))} placeholder="Ghi chú chung phiếu xuất" className={`${textareaClass} mt-3 w-full text-xs`} />
           <div className="mt-4 flex justify-end gap-2">
             <button onClick={handleClose} className={secondaryButtonClass}>Hủy</button>
             <button disabled={pendingItems.length === 0 || createTransaction.isPending} onClick={submit} className={primaryButtonClass}>
@@ -2171,18 +2173,20 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                         <button
                           type="button"
                           onClick={() => handleEditPending(item)}
-                          className="rounded p-1 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                          aria-label={`Sửa dòng ${item.materialCode}`}
+                          className="grid h-8 w-8 place-items-center rounded-md text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
                           title="Sửa dòng này"
                         >
-                          ✏️
+                          <Pencil size={15} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRemovePending(item.id)}
-                          className="rounded p-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          aria-label={`Xóa dòng ${item.materialCode}`}
+                          className="grid h-8 w-8 place-items-center rounded-md text-red-400 hover:bg-red-500/10 hover:text-red-300"
                           title="Xóa dòng này"
                         >
-                          ❌
+                          <Trash2 size={15} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -2193,8 +2197,8 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
           )}
 
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <input type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
-            <select value={form.materialId} onChange={(e) => setForm((f) => ({ ...f, materialId: e.target.value, fromZoneId: '', fromSlotId: '', fromLevel: '', toZoneId: '', toSlotId: '', toLevel: '' }))} className={fieldClass}>
+            <input aria-label="Ngày giờ điều chuyển" type="datetime-local" value={form.transactionDate} onFocus={() => setForm((f) => ({ ...f, transactionDate: formatLocalDateTimeInput() }))} onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))} className={fieldClass} />
+            <select aria-label="Vật tư điều chuyển" value={form.materialId} onChange={(e) => setForm((f) => ({ ...f, materialId: e.target.value, fromZoneId: '', fromSlotId: '', fromLevel: '', toZoneId: '', toSlotId: '', toLevel: '' }))} className={fieldClass}>
               <option value="">Vật tư</option>
               {materials.map((m: any) => (
                 <option key={m.id} value={m.id}>
@@ -2202,7 +2206,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={sourceLocationKey} onChange={(e) => {
+            <select aria-label="Vị trí nguồn" value={sourceLocationKey} onChange={(e) => {
               const selected = sourceZoneOptions.find((s) => s.id === e.target.value)
 
               setForm((f) => ({
@@ -2219,7 +2223,7 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.toZoneId} onChange={(e) => {
+            <select aria-label="Vị trí đích" value={form.toZoneId} onChange={(e) => {
               const zone = realZones.find((z: any) => String(z.id) === e.target.value)
               const emptyCell = findEmptyCell(zone, form.materialId)
               setForm((f) => ({
@@ -2236,30 +2240,30 @@ export function TransferTransactionModal({ open, onClose }: ModalProps) {
                 </option>
               ))}
             </select>
-            <select value={form.fromSlotId} onChange={(e) => setForm((f) => ({ ...f, fromSlotId: e.target.value }))} className={fieldClass}>
+            <select aria-label="Ô nguồn" value={form.fromSlotId} onChange={(e) => setForm((f) => ({ ...f, fromSlotId: e.target.value }))} className={fieldClass}>
               <option value="">Ô nguồn</option>
               {INTERNAL_CELLS.map((cell) => <option key={cell} value={cell}>Ô {cell}</option>)}
             </select>
-            <select value={form.fromLevel} onChange={(e) => setForm((f) => ({ ...f, fromLevel: e.target.value }))} className={fieldClass}>
+            <select aria-label="Tầng nguồn" value={form.fromLevel} onChange={(e) => setForm((f) => ({ ...f, fromLevel: e.target.value }))} className={fieldClass}>
               <option value="">Tầng nguồn</option>
               {INTERNAL_LEVELS.map((level) => <option key={level} value={level}>Tầng {level}</option>)}
             </select>
-            <select value={form.toSlotId} onChange={(e) => setForm((f) => ({ ...f, toSlotId: e.target.value }))} className={fieldClass}>
+            <select aria-label="Ô đích" value={form.toSlotId} onChange={(e) => setForm((f) => ({ ...f, toSlotId: e.target.value }))} className={fieldClass}>
               <option value="">Ô đích</option>
               {INTERNAL_CELLS.map((cell) => {
                 const occupiedOnAnyLevel = selectedDestinationFullZone && INTERNAL_LEVELS.every((level) => isCellOccupied(selectedDestinationFullZone, cell, level))
                 return <option disabled={occupiedOnAnyLevel} key={cell} value={cell}>Ô {cell}{occupiedOnAnyLevel ? ' · đầy tầng' : ''}</option>
               })}
             </select>
-            <select value={form.toLevel} onChange={(e) => setForm((f) => ({ ...f, toLevel: e.target.value }))} className={fieldClass}>
+            <select aria-label="Tầng đích" value={form.toLevel} onChange={(e) => setForm((f) => ({ ...f, toLevel: e.target.value }))} className={fieldClass}>
               <option value="">Tầng đích</option>
               {INTERNAL_LEVELS.map((level) => {
                 const occupied = selectedDestinationFullZone && form.toSlotId && isCellOccupied(selectedDestinationFullZone, form.toSlotId, level)
                 return <option disabled={occupied} key={level} value={level}>Tầng {level}{occupied ? ' · đã có vật tư' : ''}</option>
               })}
             </select>
-            <input value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
-            <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Lý do điều chuyển" className={fieldClass} />
+            <input aria-label="Số lượng điều chuyển" value={form.quantity} onFocus={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} onBlur={(e) => setForm((f) => ({ ...f, quantity: formatQuantity(e.target.value) }))} onChange={(e) => setForm((f) => ({ ...f, quantity: formatQuantityInput(e.target.value) }))} inputMode="decimal" placeholder="Số lượng" className={fieldClass} />
+            <input aria-label="Lý do điều chuyển" value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Lý do điều chuyển" className={fieldClass} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 text-xs xl:grid-cols-2">
@@ -2707,38 +2711,48 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
         zoneId: x.zoneId || undefined,
         quantity: x.difference,
       }))
-    if (items.length === 0) return
-    const transaction = await createTx.mutateAsync({
-      type: 'ADJUSTMENT',
-      transactionNo: sessionNo,
-      referenceType: methodFilter || 'Định kỳ',
-      items,
-    })
-    await refreshInventoryCache(queryClient)
-    try {
-      await uploadInventoryTransactionAttachments({
-        transaction,
-        files: attachmentFiles,
-      })
-    } catch {
-      toast.error('Phiếu đã lưu nhưng upload tài liệu kiểm kê thất bại')
+    if (items.length === 0) {
+      toast.error('Thêm ít nhất một dòng có chênh lệch trước khi tạo phiếu')
+      return
     }
-    setCountRows([])
-    setAttachmentFiles([])
-    setSessionNo(generateTransactionNo('KK'))
-    onClose()
+    try {
+      const transaction = await createTx.mutateAsync({
+        type: 'ADJUSTMENT',
+        transactionNo: sessionNo,
+        referenceType: methodFilter || 'Định kỳ',
+        items,
+      })
+      await refreshInventoryCache(queryClient)
+      try {
+        await uploadInventoryTransactionAttachments({
+          transaction,
+          files: attachmentFiles,
+        })
+      } catch {
+        toast.error('Phiếu đã lưu nhưng upload tài liệu kiểm kê thất bại')
+      }
+      toast.success(`Đã tạo phiếu kiểm kê ${sessionNo}`)
+      setCountRows([])
+      setAttachmentFiles([])
+      setSessionNo(generateTransactionNo('KK'))
+      onClose()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể tạo phiếu kiểm kê')
+    }
   }
 
   return (
     <ModalShell open={open} onClose={onClose} title="Chi tiết chênh lệch kiểm kê" wide>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="h-10 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
+        <select aria-label="Phương pháp kiểm kê" value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="h-9 rounded-md border border-white/10 bg-white/[0.06] px-3 text-sm text-slate-100">
           <option value="">Phương pháp</option>
           <option value="Định kỳ">Định kỳ</option>
           <option value="Bất thường">Bất thường</option>
           <option value="Kiểm kê theo khu vực">Kiểm kê theo khu vực</option>
         </select>
         <button
+          type="button"
+          aria-label="Thêm dòng kiểm kê"
           onClick={() => setCountRows((prev) => [...prev, { inventoryItemId: '', physicalQty: '', zoneId: '' }])}
           className="rounded border border-white/10 px-3 py-1.5 text-xs text-slate-200"
         >
@@ -2761,7 +2775,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
             {countSheet.map((line, idx) => (
               <tr key={`${idx}-${line.inventoryItemId}`} className="border-t border-white/10/80">
                 <td className="px-3 py-2">
-                  <select value={line.inventoryItemId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, inventoryItemId: e.target.value } : r)))} className="h-9 w-full rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100">
+                  <select aria-label={`Vật tư kiểm kê dòng ${idx + 1}`} value={line.inventoryItemId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, inventoryItemId: e.target.value } : r)))} className="h-9 w-full rounded-md border border-white/10 bg-white/[0.06] px-2 text-slate-100">
                     <option value="">Chọn vật tư</option>
                     {materials.map((m: any) => (
                       <option key={m.id} value={m.id}>
@@ -2771,7 +2785,7 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
                   </select>
                 </td>
                 <td className="px-3 py-2">
-                  <select value={line.zoneId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, zoneId: e.target.value } : r)))} className="h-9 w-full rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100">
+                  <select aria-label={`Kho kiểm kê dòng ${idx + 1}`} value={line.zoneId} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, zoneId: e.target.value } : r)))} className="h-9 w-full rounded-md border border-white/10 bg-white/[0.06] px-2 text-slate-100">
                     <option value="">Chọn kho</option>
                     {zones.map((z: any) => (
                       <option key={z.id} value={z.id}>
@@ -2782,11 +2796,11 @@ export function StockTakeTransactionModal({ open, onClose }: ModalProps) {
                 </td>
                 <td className="px-3 py-2 text-slate-200">{formatQuantity(line.systemQty)}</td>
                 <td className="px-3 py-2">
-                  <input value={line.physicalQty} onFocus={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} onBlur={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantity(e.target.value) } : r)))} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} inputMode="decimal" className="h-9 w-32 rounded border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
+                  <input aria-label={`Tồn thực tế dòng ${idx + 1}`} value={line.physicalQty} onFocus={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} onBlur={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantity(e.target.value) } : r)))} onChange={(e) => setCountRows((prev) => prev.map((r, i) => (i === idx ? { ...r, physicalQty: formatQuantityInput(e.target.value) } : r)))} inputMode="decimal" className="h-9 w-32 rounded-md border border-white/10 bg-white/[0.06] px-2 text-slate-100" />
                 </td>
                 <td className={`px-3 py-2 ${line.difference >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatQuantity(line.difference)}</td>
                 <td className="px-3 py-2">
-                  <button onClick={() => setCountRows((prev) => prev.filter((_r, i) => i !== idx))} className="rounded border border-red-700/60 px-2 py-1 text-xs text-red-300">
+                  <button type="button" aria-label={`Xóa dòng kiểm kê ${idx + 1}`} onClick={() => setCountRows((prev) => prev.filter((_r, i) => i !== idx))} className="rounded-md border border-red-700/60 px-2 py-1 text-xs text-red-300">
                     Xóa
                   </button>
                 </td>

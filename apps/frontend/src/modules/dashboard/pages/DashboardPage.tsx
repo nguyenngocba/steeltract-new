@@ -54,6 +54,7 @@ import {
   domainThemes,
 } from '@/shared/ui/analytics'
 import { formatCurrencyVnd, formatQuantity } from '@/shared/utils/number-format'
+import { PermissionGate, usePermission } from '@/shared/permissions/PermissionGuard'
 import materialCardBg from '../../../../../../images/vattu.png'
 import supplierCardBg from '../../../../../../images/nhacungcap.jpg'
 import projectCardBg from '../../../../../../images/congtrinh.jpg'
@@ -193,19 +194,27 @@ export function DashboardPage() {
   const [activeWidget, setActiveWidget] = useState<DashboardWidgetId | null>(null)
   const [detailPage, setDetailPage] = useState(1)
 
-  const { data: inventoryAudit = [] } = useInventoryAudit()
-  const { data: inventoryOverview } = useInventoryOverview({})
-  const { data: inventoryItemsRaw = [] } = useQuery({ queryKey: ['inventory-items'], queryFn: getInventoryItems })
-  const { data: warehouses = [] } = useWarehouses()
-  const shouldLoadTransactionDetail = dashboardTab === 'activities' || activeWidget === 'import-export' || activeDomain === 'inbound' || activeDomain === 'outbound'
+  const canInventory = usePermission('inventory.view')
+  const canComponents = usePermission('components.view')
+  const canProduction = usePermission('production.view')
+  const canProjects = usePermission('projects.view')
+  const canSuppliers = usePermission('suppliers.view')
+  const canQc = usePermission('qc.view')
+  const canLogistics = usePermission('logistics.view')
+
+  const { data: inventoryAudit = [] } = useInventoryAudit({ enabled: canInventory })
+  const { data: inventoryOverview } = useInventoryOverview({}, { enabled: canInventory })
+  const { data: inventoryItemsRaw = [] } = useQuery({ queryKey: ['inventory-items'], queryFn: getInventoryItems, enabled: canInventory })
+  const { data: warehouses = [] } = useWarehouses({ enabled: canInventory })
+  const shouldLoadTransactionDetail = canInventory && (dashboardTab === 'activities' || activeWidget === 'import-export' || activeDomain === 'inbound' || activeDomain === 'outbound')
   const { data: transactionPayload = [] } = useInventoryTransactions({ page: 1, pageSize: 200 }, { enabled: shouldLoadTransactionDetail })
-  const { data: productionOrdersRaw = [] } = useQuery({ queryKey: ['production-orders'], queryFn: () => productionApi.orders() })
-  const { data: componentsDashboard } = useQuery({ queryKey: ['components-dashboard'], queryFn: getComponentsDashboard })
-  const { data: supplierSummary } = useQuery<SupplierCockpitSummary>({ queryKey: ['suppliers', 'cockpit-summary'], queryFn: getSupplierCockpitSummary })
-  const { data: projectsRuntime } = useQuery<ProjectsRuntime>({ queryKey: ['project-runtime'], queryFn: getProjectsRuntime })
-  const { data: dispatchDashboard } = useQuery({ queryKey: ['logistics-dispatch-dashboard'], queryFn: getDispatchDashboard })
-  const { data: dispatchOrders = [] } = useQuery({ queryKey: ['logistics-dispatch-orders'], queryFn: getDispatchOrders })
-  const { data: qcCockpit } = useQuery<QcCockpit>({ queryKey: ['qc-cockpit'], queryFn: getQcCockpit })
+  const { data: productionOrdersRaw = [] } = useQuery({ queryKey: ['production-orders'], queryFn: () => productionApi.orders(), enabled: canProduction })
+  const { data: componentsDashboard } = useQuery({ queryKey: ['components-dashboard'], queryFn: getComponentsDashboard, enabled: canComponents })
+  const { data: supplierSummary } = useQuery<SupplierCockpitSummary>({ queryKey: ['suppliers', 'cockpit-summary'], queryFn: getSupplierCockpitSummary, enabled: canSuppliers })
+  const { data: projectsRuntime } = useQuery<ProjectsRuntime>({ queryKey: ['project-runtime'], queryFn: getProjectsRuntime, enabled: canProjects })
+  const { data: dispatchDashboard } = useQuery({ queryKey: ['logistics-dispatch-dashboard'], queryFn: getDispatchDashboard, enabled: canLogistics })
+  const { data: dispatchOrders = [] } = useQuery({ queryKey: ['logistics-dispatch-orders'], queryFn: getDispatchOrders, enabled: canLogistics })
+  const { data: qcCockpit } = useQuery<QcCockpit>({ queryKey: ['qc-cockpit'], queryFn: getQcCockpit, enabled: canQc })
 
   const inventoryRows = asRows(inventoryAudit)
   const inventoryItems = asRows(inventoryItemsRaw)
@@ -297,7 +306,15 @@ export function DashboardPage() {
     buildKpi('projects', Building2, 'Dự án đang thực hiện', fmt(activeProjects), 'dự án', 'so với tháng trước', 'amber', projectSeries, deltaPercent(projectSeries)),
     buildKpi('dispatch', Clock, 'Giao hàng hôm nay', fmt(dispatchActive), 'chuyến', 'so với tháng trước', 'emerald', dispatchSeries, deltaPercent(dispatchSeries)),
     buildKpi('qc', ShieldCheck, 'QC / NCR mở', `${fmt(passRate, 1)}%`, 'đạt', 'so với tháng trước', 'red', qcSeries, deltaPercent(qcSeries)),
-  ]
+  ].filter((kpi) => ({
+    inventory: canInventory,
+    inbound: canInventory,
+    outbound: canInventory,
+    production: canProduction,
+    projects: canProjects,
+    dispatch: canLogistics,
+    qc: canQc,
+  })[kpi.domain])
 
   const alerts = buildAlerts({ lowStockItems, dispatchOrders: filteredDispatchOrders, openNcr, projects: filteredProjects })
   const domainContext: DomainContext = {
@@ -384,7 +401,7 @@ export function DashboardPage() {
           </section>
 
           <section className="grid gap-2 xl:grid-cols-4">
-            <ExecutiveBusinessCard
+            <PermissionGate permission="inventory.view"><ExecutiveBusinessCard
               title="Vật tư"
               description="Quản lý toàn bộ vật tư trong kho"
               Icon={Boxes}
@@ -397,8 +414,8 @@ export function DashboardPage() {
               ]}
               trend={inventoryQtySeries.map((row) => row.value)}
               onOpen={() => navigate('/inventory/materials')}
-            />
-            <ExecutiveBusinessCard
+            /></PermissionGate>
+            <PermissionGate permission="suppliers.view"><ExecutiveBusinessCard
               title="Nhà cung cấp"
               description="Theo dõi nhập hàng và đánh giá nhà cung cấp"
               Icon={PackagePlus}
@@ -411,8 +428,8 @@ export function DashboardPage() {
               ]}
               trend={inboundValueSeries.map((row) => row.value)}
               onOpen={() => navigate('/suppliers')}
-            />
-            <ExecutiveBusinessCard
+            /></PermissionGate>
+            <PermissionGate permission="projects.view"><ExecutiveBusinessCard
               title="Công trình"
               description="Quản lý vật tư theo công trình"
               Icon={Building2}
@@ -425,8 +442,8 @@ export function DashboardPage() {
               ]}
               trend={projectSeries.map((row) => row.value)}
               onOpen={() => navigate('/projects')}
-            />
-            <ExecutiveBusinessCard
+            /></PermissionGate>
+            <PermissionGate permission="components.view"><ExecutiveBusinessCard
               title="Cấu kiện"
               description="Quản lý sản xuất và tồn kho cấu kiện"
               Icon={Factory}
@@ -439,31 +456,31 @@ export function DashboardPage() {
               ]}
               trend={componentStatusRows.map((row) => row.value)}
               onOpen={() => navigate('/components/list')}
-            />
+            /></PermissionGate>
           </section>
 
           <section className="grid gap-2 xl:grid-cols-[1.05fr_1.2fr_1.05fr]">
-            <ExecutiveChartCard title="Giá trị tồn kho theo loại vật tư" onAction={() => setActiveWidget('inventory-type')}>
+            <PermissionGate permission="inventory.view"><ExecutiveChartCard title="Giá trị tồn kho theo loại vật tư" onAction={() => setActiveWidget('inventory-type')}>
               <DonutChart centerLabel="Tổng" total={compactCurrencyValue(inventoryValue)} rows={inventoryValueByType} emptyTitle="Dữ liệu giá trị tồn kho theo loại vật tư chưa khả dụng" valueFormatter={compactCurrencyValue} />
-            </ExecutiveChartCard>
-            <ExecutiveChartCard title="Giá trị nhập - xuất" action="Chi tiết" onAction={() => setActiveWidget('import-export')}>
+            </ExecutiveChartCard></PermissionGate>
+            <PermissionGate permission="inventory.view"><ExecutiveChartCard title="Giá trị nhập - xuất" action="Chi tiết" onAction={() => setActiveWidget('import-export')}>
               <ImportExportMiniTrend rows={importExportTrend} />
-            </ExecutiveChartCard>
-            <ExecutiveChartCard title="Cấu kiện" onAction={() => setActiveWidget('components')}>
+            </ExecutiveChartCard></PermissionGate>
+            <PermissionGate permission="components.view"><ExecutiveChartCard title="Cấu kiện" onAction={() => setActiveWidget('components')}>
               <ComponentBarChart rows={componentStatusRows} total={componentTotal} />
-            </ExecutiveChartCard>
+            </ExecutiveChartCard></PermissionGate>
           </section>
 
           <section className="grid gap-2 xl:grid-cols-3">
-            <ExecutiveChartCard title="Dự án theo tiến độ" onAction={() => setActiveWidget('projects-progress')}>
+            <PermissionGate permission="projects.view"><ExecutiveChartCard title="Dự án theo tiến độ" onAction={() => setActiveWidget('projects-progress')}>
               <DonutChart centerLabel="Dự án" total={fmt(filteredProjects.length)} rows={projectProgressDistribution(filteredProjects)} emptyTitle="Dữ liệu dự án chưa khả dụng" />
-            </ExecutiveChartCard>
-            <ExecutiveChartCard title="Trạng thái chất lượng QC" onAction={() => setActiveWidget('qc-status')}>
+            </ExecutiveChartCard></PermissionGate>
+            <PermissionGate permission="qc.view"><ExecutiveChartCard title="Trạng thái chất lượng QC" onAction={() => setActiveWidget('qc-status')}>
               <DonutChart centerLabel="Đạt" total={`${fmt(passRate, 1)}%`} rows={qcDistribution(qcCockpit)} emptyTitle="Dữ liệu QC chưa khả dụng" />
-            </ExecutiveChartCard>
-            <ExecutiveChartCard title="Giao hàng theo trạng thái" onAction={() => setActiveWidget('delivery-status')}>
+            </ExecutiveChartCard></PermissionGate>
+            <PermissionGate permission="logistics.view"><ExecutiveChartCard title="Giao hàng theo trạng thái" onAction={() => setActiveWidget('delivery-status')}>
               <DonutChart centerLabel="Chuyến" total={fmt(filteredDispatchOrders.length)} rows={dispatchDistribution(filteredDispatchOrders)} emptyTitle="Dữ liệu giao nhận chưa khả dụng" />
-            </ExecutiveChartCard>
+            </ExecutiveChartCard></PermissionGate>
           </section>
 
           <section role="button" tabIndex={0} onClick={() => setActiveWidget('alerts')} onKeyDown={(event) => { if (event.key === 'Enter') setActiveWidget('alerts') }} className="cursor-pointer rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3 shadow-[0_20px_60px_rgba(8,47,73,0.18)] transition duration-300 hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-slate-950/45 hover:shadow-cyan-500/10">

@@ -1,5 +1,80 @@
 # Next Tasks
 
+- **SYSTEM.REVERSE.CERT.1 closure - COMPLETE**: installed return, returned
+  PASS, same-instance REWORK, SCRAP, Production material return and Supplier
+  Return now have REST, database, dashboard, ActivityLog and browser evidence.
+- **Reverse certification fixture retention**: keep
+  `SYSTEM-REVERSE-CERT1-1786431968315` as the regression reference. Remove it
+  only through a later controlled service-level cleanup or approved reset.
+- **Reverse dashboard dimensions - P2**: add dedicated dimensions only when
+  executive reporting requires them; do not reconstruct them in the frontend.
+
+- **SYSTEM.QC.CERT.1 closure - COMPLETE**: canonical REWORK aggregate identity
+  is repaired and runtime-certified through second FINAL PASS, Finished Goods
+  and Yard. Do not reintroduce a `ProductionRework.id` fallback for
+  `ProductionLog.productionOrderId`.
+- **Runtime fixture hygiene - P1**: retire superseded diagnostic
+  `SYSTEM-QC-CERT1-*` fixtures through a controlled service-level cleanup or
+  the next approved demo-data reset. Do not delete them with direct Prisma
+  mutation.
+
+- **PROCUREMENT.UI.1 - canonical workspace**: implement the Purchasing UI over
+  `/material-requests`, `/purchase-orders` and `/procurement/workspace`. Reuse
+  shared enterprise forms/tables, gate actions with `procurement.*`, and do not
+  reconstruct lifecycle/KPI values in the frontend.
+- **Procurement runtime cleanup - P1**: close the retained pre-fix diagnostic
+  Supplier Return through REST when the local connection pool is available.
+  Do not mutate or delete the row directly.
+- **Database connection pool - P1**: profile local/staging Nest background
+  worker concurrency against PostgreSQL `max_connections`; repeated runtime
+  startups reached `too many clients already` after certification.
+
+- **SYSTEM.WAREHOUSE.1 browser runtime - P1**: run
+  `warehouse-master.spec.ts` with an accessible PostgreSQL-backed backend and
+  retain proof for create, edit, disable/reactivate and Storage Location parent
+  selection. Static/UI tests already pass; do not label browser certification
+  GREEN until this scenario runs.
+- **SYSTEM.WAREHOUSE.1 deployment backup - P1**: execute and verify a database
+  backup/restore gate before promoting migration
+  `20260810190000_canonical_warehouse_master` outside the clean local runtime.
+
+- **Administrator credential handoff - operational**: store the restored
+  `admin` credential in the approved secret/password manager and rotate it
+  before external production exposure. Do not place it in `.env`, source,
+  documentation or browser build artifacts.
+
+- **Post-reset sample dataset - next controlled sprint**: create new Warehouse
+  and Yard layouts first, then Material Master and operational records through
+  canonical APIs/UI. Do not restore the removed demo dump into this cleaned
+  environment unless explicitly rolling back SYSTEM.RESET.1.
+- **Storage orphan retention - P1**: inventory physical upload files whose
+  attachment metadata was removed by SYSTEM.RESET.1 and delete them only
+  through a reviewed storage-retention policy with backup evidence.
+
+- **SYSTEM.FREEZE.1 P0 - Dependency remediation**: upgrade/replace the deployed
+  critical/high paths (`node-telegram-bot-api`/request/form-data, xlsx, multer,
+  socket.io/ws, axios, React Router and pnpm), regenerate lockfile/SBOM and rerun
+  full security/runtime regression.
+- **SYSTEM.FREEZE.1 P0 - Release packaging**: build a non-root static frontend
+  image, add it to production orchestration behind approved HTTPS reverse proxy,
+  remove hardcoded API/socket fallbacks, and prove immutable digest deployment.
+- **SYSTEM.FREEZE.1 P0 - Secret boundary**: remove server credentials from all
+  frontend env/build contexts, rotate exposed local values and enforce secret
+  manager injection.
+- **SYSTEM.FREEZE.1 P0 - Recovery certification**: automate encrypted off-host
+  backup/WAL retention and execute a clean restore/PITR drill with measured
+  RPO/RTO and domain invariant comparison.
+- **SYSTEM.FREEZE.1 P0 - Quality gate**: fix backend ESLint project-service
+  configuration and source findings until non-mutating lint passes; define an
+  accepted frontend warning budget.
+- **SYSTEM.FREEZE.1 P0 - Production edge/observability**: add TLS, HSTS/CSP and
+  security headers, login/API rate limiting, Prometheus-compatible metrics,
+  Grafana dashboards and owned alert routes; certify them in staging.
+- **SYSTEM.FREEZE.1 P1 - Release hygiene**: remove payload console logging,
+  update health scripts/READMEs/release policy, isolate experimental/archived
+  workspaces, add root CI orchestration and attribute 1-6.5 second background
+  queries before optimization.
+
 - **RC1 P1 - Browser form-depth expansion**: convert the current authenticated
   REST-orchestrated Playwright certification into direct field-entry coverage
   for Receipt, BOM and FINAL QC once those views expose stable test selectors.
@@ -1396,3 +1471,106 @@ Backlog after the locked order:
    failed certification iterations.
 6. **P1**: paginate/bound Production cockpit, ActivityLog, zones and Yard slot
    reads before production volume grows.
+
+# SYSTEM.RBAC.2 closeout
+
+1. Controlled cleanup: remove the two empty `QC-260810-0000*` authorization
+   probe records through an approved domain/API cleanup path; do not use direct
+   Prisma mutation.
+2. Migrate persisted custom roles from the 29 broad compatibility grants to
+   action-level grants before removing aliases.
+3. Map remaining deep Project template/WBS contextual commands to
+   `projects.edit`/`projects.approve` and remove pre-existing toast-only actions.
+4. Remove the unused mock `shared/auth/auth.store.tsx` in a dedicated dead-code
+   maintenance sprint.
+
+# UI.MASTERDATA.1 closeout
+
+1. **P0 runtime gate**: release stale PostgreSQL sessions or raise the approved
+   connection budget, start the real backend and execute
+   `apps/frontend/e2e/warehouse-master.spec.ts`.
+2. Capture the prepared Warehouse workspace, dependency drawer, Inventory
+   Location and Yard screenshots only after real API-backed CRUD succeeds.
+3. Keep Warehouse Zone and Yard Zone within their canonical topology owners;
+   create standalone dictionaries only if a future domain decision requires it.
+4. Add master-data history APIs only under a separately approved backend scope;
+   do not fabricate drawer history in frontend state.
+
+# UI.AUDIT.1 closeout
+
+1. **Visual gate**: restore PostgreSQL runtime access, start the real backend and
+   run authenticated screenshots at 390x844, 768x1024, 1366x768 and 1920x1080.
+2. Add accessible `title`/tooltip values to remaining page-local truncated
+   business cells; CSS cannot infer the original label.
+3. Migrate remaining command overlays to one shared modal shell only after
+   command focus/validation behavior is mapped.
+4. Adopt the canonical toolbar in remaining module pages without inventing
+   filters or export semantics unsupported by their existing APIs.
+5. Add screenshot-diff baselines to CI after the first approved visual set.
+
+# UI.POLISH.1 closeout
+
+1. Add approved screenshot baselines at 1366, 1440, 1600 and 1920 using the now
+   stable authenticated Warehouse scenario.
+2. Review remaining wide default Production and Projects tables with domain
+   owners; keep six to eight operational columns and move full detail to 96vw.
+3. Opt confirmed action tables into `stickyActionColumn`; do not pin ordinary
+   last columns.
+4. Migrate remaining entity detail tabs to the shared drawer tab contract.
+5. Add saved-filter persistence only under an approved canonical contract.
+
+# UAT.WAREHOUSE.1 closeout
+
+1. **P0 product/RBAC gate**: decide whether Warehouse Operator may create
+   Supplier records or whether supplier setup is an explicit precondition owned
+   by Procurement/Admin.
+2. **P0 frontend/business scope**: expose canonical Production Return to the
+   warehouse custody role without granting the complete Production module.
+3. **P0 frontend/business scope**: expose the existing canonical Supplier Return
+   service through an authorized Inventory command.
+4. Seed or create a controlled supplier through an approved UI/service owner,
+   then rerun `warehouse-operator-uat.spec.ts` through actual mutations.
+5. Review MAIN-to-other-Warehouse transfer scope against INV-005 before changing
+   the current main-zone filter.
+
+# PROCUREMENT.SCHEMA.1 closeout
+
+1. Implement canonical Purchase Request and Purchase Order DTO -> service ->
+   repository -> controller flow using the new nullable identities.
+2. Add Procurement action permissions and lifecycle guards for submit, approve
+   and cancel.
+3. Define discount/tax units before implementing PO amount calculations.
+4. Implement approved-PO Goods Receipt through Inventory posting with
+   over-receipt protection; do not activate PurchaseReceiving as a second ledger.
+5. Replace `/procurement` hardcoded datasets only after canonical APIs exist.
+6. Audit and resolve pre-existing datasource/datamodel drift separately.
+
+# SYSTEM.E2E.2 closeout
+
+1. **P0**: certify QC FAIL -> NCR -> REWORK -> second FINAL QC and separate
+   USE-AS-IS/SCRAP physical-instance outcomes on runtime data.
+2. **P0**: complete Project Return -> Yard -> QC -> Repair/Scrap with one
+   retained canonical ComponentInstance.
+3. **P0**: resolve the Project dashboard snapshot/live mismatch and make the
+   canonical Project execution read model the parity baseline.
+4. **P0**: produce an authoritative latest Historical Dashboard snapshot and
+   re-run `/history/dashboard/latest`.
+5. **P0**: replace REST-orchestrated browser verification with actual UI command
+   mutations for Procurement through Installation and reverse flow.
+6. **P1**: expose fixture-searchable PO, receipt and Supplier Return identity in
+   their operational workspaces.
+7. **P1**: add same-warehouse location move, Yard-to-Yard move, restricted-user
+   403 and per-chart reconciliation to the certification matrix.
+
+# SYSTEM.QC.CERT.1 closeout
+
+1. **P0**: fix Production rework event logging so `ProductionLog` receives the
+   original or rework Production Order ID, never `ProductionRework.id`.
+2. Add a targeted regression test that calls `acceptRework` with a real
+   ProductionLog FK and proves transaction commit/idempotent replay.
+3. Rerun `scripts/qc-cert1-runtime.mjs` and require REWORK to complete on the
+   same ComponentInstance through a second FINAL PASS.
+4. **P1**: migrate Components Overview and Reports STOCK/READY metrics away
+   from legacy `Component.status` to canonical definition/instance read models.
+5. Preserve the retained fixture and screenshots until the REWORK rerun is
+   complete; do not treat its `REWORK` state as Finished Goods.

@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { Edit3, Eye, Layers3, MapPinned, Package, Power, PowerOff, Trash2, Warehouse, X } from 'lucide-react'
 import { useInventoryTransactions } from '../../hooks/useInventoryTransactions'
 import { EnterpriseModulePage } from '../../../../shared/runtime-tabs/EnterpriseModulePage'
 import { useInventoryAudit } from '../../hooks/useInventoryAudit'
-import { moduleMutedButton } from '@/shared/ui/modules'
+import { ModuleDetailDrawer, moduleMutedButton } from '@/shared/ui/modules'
+import {
+  MasterDataDependencyTree,
+  UnifiedMasterDataDrawer,
+  UnifiedMasterDataToolbar,
+  exportMasterDataCsv,
+  type MasterDataDensity,
+  type MasterDataDrawerTab,
+  type MasterDataView,
+} from '@/modules/master-data/components/UnifiedMasterDataWorkspace'
 import {
   CompactDonutSummary,
   HorizontalBars,
@@ -315,6 +325,7 @@ function InventoryMetricCard({
 
 export function InventoryLocationsPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { data: zones = [], isLoading } = useZones()
   const { data: warehouses = [] } = useWarehouses()
   const { data: transactionsData = [] } = useInventoryTransactions({})
@@ -322,6 +333,8 @@ export function InventoryLocationsPage() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [warehouseFilter, setWarehouseFilter] = useState('')
+  const [density, setDensity] = useState<MasterDataDensity>('compact')
+  const [view, setView] = useState<MasterDataView>('essential')
   const [page, setPage] = useState(1)
   const [form, setForm] = useState<LocationForm | null>(null)
   const [detailId, setDetailId] = useState('')
@@ -332,26 +345,6 @@ export function InventoryLocationsPage() {
     queryFn: () => getZoneDetail(detailId),
     enabled: Boolean(detailId),
   })
-  // State cho ô tìm kiếm (chỉ áp dụng khi nhấn nút/Enter)
-  const [searchDraft, setSearchDraft] = useState('')
-
-  // Hàm áp dụng tìm kiếm
-  const applySearch = () => {
-    setQuery(searchDraft)  // cập nhật query thật
-    setPage(1)             // về trang 1
-    refresh()              // tải lại dữ liệu
-  }
-
-  // Hàm làm mới (reset tất cả filter)
-  const resetFilters = () => {
-    setSearchDraft('')
-    setQuery('')
-    setStatus('all')
-    setWarehouseFilter('')
-    setPage(1)
-    refresh()
-  }
-
   // ========== 1. RECENT INBOUND / OUTBOUND DATA ==========
   const recentInboundData = useMemo(() => {
     const txRows = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data ?? []
@@ -383,16 +376,6 @@ export function InventoryLocationsPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-zone-detail'] }),
     ])
   }
-  const handleSearch = () => {
-    setPage(1)
-    refresh()
-  }
-
-  const handleRefresh = () => {
-    setPage(1)
-    refresh()
-  }
-
   const saveMutation = useMutation({
     mutationFn: async (payload: LocationForm) => {
       const body = {
@@ -913,40 +896,15 @@ export function InventoryLocationsPage() {
   }, [kpiTrendsAndDeltas])
 
   const warehouseOptions = useMemo(() => {
-    const byId = new Map<string, { id: string; code: string; name: string }>()
-
-    ;(warehouses as Array<{ id: string; code: string; name: string; active?: boolean }>).forEach((warehouse) => {
-      if (!warehouse?.id) return
-      byId.set(warehouse.id, {
-        id: warehouse.id,
-        code: warehouse.code,
-        name: warehouse.code === 'MAIN'
-          ? 'Kho chính'
-          : warehouse.code === 'PRODUCTION'
-            ? 'Kho sản xuất'
-            : warehouse.name,
-      })
-    })
-
-    ;(zones as WarehouseLocation[]).forEach((zone) => {
-      const warehouse = zone.warehouse
-      if (!warehouse?.id || byId.has(warehouse.id)) return
-      byId.set(warehouse.id, {
-        id: warehouse.id,
-        code: warehouse.code,
-        name: warehouse.code === 'MAIN'
-          ? 'Kho chính'
-          : warehouse.code === 'PRODUCTION'
-            ? 'Kho sản xuất'
-            : warehouse.name,
-      })
-    })
-
-    return Array.from(byId.values()).sort((a, b) => {
-      const order = (code: string) => code === 'MAIN' ? 0 : code === 'PRODUCTION' ? 1 : 2
-      return order(a.code) - order(b.code) || a.name.localeCompare(b.name)
-    })
-  }, [warehouses, zones])
+    return [...warehouses]
+      .filter((warehouse) => warehouse.active)
+      .sort(
+        (a, b) =>
+          Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0) ||
+          a.name.localeCompare(b.name),
+      )
+      .map(({ id, code, name }) => ({ id, code, name }))
+  }, [warehouses])
 
   const edit = (zone: WarehouseLocation) => setForm({
     id: zone.id,
@@ -1031,73 +989,37 @@ export function InventoryLocationsPage() {
       </div>
 
       <InventoryPanel className="rounded-xl -mt-1">
-        <div className="grid grid-cols-1 gap-1 xl:grid-cols-[180px_180px_minmax(260px,1fr)_120px_120px_auto]">
-          {/* Dropdown trạng thái */}
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as typeof status)
-              setPage(1)
-            }}
-            className={`${inventoryInput} h-9 self-end`}
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="inactive">Ngưng dùng</option>
-          </select>
-
-          {/* Dropdown chọn kho (thay cho phân loại) */}
-          <select
-            value={warehouseFilter}
-            onChange={(e) => {
-              setWarehouseFilter(e.target.value)
-              setPage(1)
-            }}
-            className={`${inventoryInput} h-9 self-end`}
-          >
-            <option value="">Tất cả kho</option>
-            {warehouseOptions.map((wh) => (
-              <option key={wh.id} value={wh.id}>
-                {wh.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Ô tìm kiếm */}
-          <input
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch()
-            }}
-            placeholder="Mã, tên, hàng, cột, tầng..."
-            className={`${inventoryInput} h-9 self-end`}
-          />
-
-          {/* Nút Tìm kiếm */}
-          <button
-            onClick={applySearch}
-            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
-          >
-            Tìm kiếm
-          </button>
-
-          {/* Nút Làm mới */}
-          <button
-            onClick={resetFilters}
-            className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            Làm mới
-          </button>
-
-          {/* Nút + Thêm vị trí */}
-          <button
-            onClick={() => setForm(emptyForm)}
-            className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
-          >
-            + Thêm vị trí
-          </button>
-        </div>
+        <UnifiedMasterDataToolbar
+          query={query}
+          searchPlaceholder="Mã, tên, hàng, cột, tầng..."
+          density={density}
+          view={view}
+          createLabel="Thêm vị trí"
+          refreshing={isLoading}
+          onQueryChange={(value) => { setQuery(value); setPage(1) }}
+          onDensityChange={setDensity}
+          onViewChange={setView}
+          onRefresh={() => { void refresh() }}
+          onCreate={() => setForm(emptyForm)}
+          onExport={() => exportMasterDataCsv(
+            `inventory-locations-${new Date().toISOString().slice(0, 10)}.csv`,
+            ['Kho', 'Mã vị trí', 'Tên vị trí', 'Hàng', 'Slot', 'Tầng', 'Khối lượng', 'Số vật tư', 'Trạng thái'],
+            rows.map((zone) => [zone.warehouse?.name ?? zone.warehouse?.code, zone.code, zone.name, zone.row, zone.column, zone.level, n(zone.totalStockQuantity), n(zone.materialCount), zone.active ? 'Hoạt động' : 'Ngưng dùng']),
+          )}
+          filters={
+            <>
+              <select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); setPage(1) }} className={`${inventoryInput} h-9 max-w-44`}>
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Đang hoạt động</option>
+                <option value="inactive">Ngưng dùng</option>
+              </select>
+              <select value={warehouseFilter} onChange={(event) => { setWarehouseFilter(event.target.value); setPage(1) }} className={`${inventoryInput} h-9 max-w-48`}>
+                <option value="">Tất cả kho</option>
+                {warehouseOptions.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+              </select>
+            </>
+          }
+        />
       </InventoryPanel>
 
             {/* Row 1 Grid */}
@@ -1116,7 +1038,7 @@ export function InventoryLocationsPage() {
                         <th className="px-1.5 py-1 text-left">Vị trí</th>
                         <th className="px-1.5 py-1 text-center">Slot</th>
                         <th className="px-1.5 py-1 text-center">Tầng</th>
-                        <th className="px-1.5 py-1 text-right">Khối lượng</th>
+                        {view === 'complete' ? <th className="px-1.5 py-1 text-right">Khối lượng</th> : null}
                         <th className="px-1.5 py-1 text-right">Số vật tư</th>
                         <th className="px-1.5 py-1 text-center">Trạng thái</th>
                         <th className="px-1.5 py-1 text-center">Thao tác</th>
@@ -1132,23 +1054,19 @@ export function InventoryLocationsPage() {
 
                       return (
                         <tr key={zone.id} className={`cursor-pointer ${inventoryTableRow}`} onClick={() => setDetailId(zone.id)}>
-                          <td className="py-2.5 px-1 text-slate-300 font-medium">
-                            {zone.warehouse?.code === 'MAIN'
-                              ? 'Kho chính'
-                              : zone.warehouse?.code === 'PRODUCTION'
-                                ? 'Kho sản xuất'
-                                : (zone.warehouse?.code || '-')}
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 text-slate-300 font-medium`}>
+                            {zone.warehouse?.name || zone.warehouse?.code || '-'}
                           </td>
-                          <td className="py-2.5 px-1 font-medium text-cyan-300">{zone.code}</td>
-                          <td className="py-2.5 px-1 text-center text-slate-200">{zone.column || '-'}</td>
-                          <td className="py-2.5 px-1 text-center text-slate-200">{zone.level || '-'}</td>
-                          <td className="py-2.5 px-1 text-right text-slate-200 font-medium">
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 font-medium text-cyan-300`}>{zone.code}</td>
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 text-center text-slate-200`}>{zone.column || '-'}</td>
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 text-center text-slate-200`}>{zone.level || '-'}</td>
+                          {view === 'complete' ? <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 text-right text-slate-200 font-medium`}>
                             {formatQuantity(n(zone.totalStockQuantity), 1)} tấn
-                          </td>
-                          <td className="py-2.5 px-1 text-right text-slate-200 font-medium">
+                          </td> : null}
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 text-right text-slate-200 font-medium`}>
                             {formatQuantity(n(zone.materialCount), 0)}
                           </td>
-                          <td className="py-2.5 px-1 text-center">
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1 text-center`}>
                             {status === 'MAINTENANCE' && (
                               <span className="border border-amber-400/30 bg-amber-500/10 text-amber-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
                                 Bảo trì
@@ -1165,7 +1083,7 @@ export function InventoryLocationsPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-2.5 px-1" onClick={(event) => event.stopPropagation()}>
+                          <td className={`${density === 'compact' ? 'py-1.5' : 'py-2.5'} px-1`} onClick={(event) => event.stopPropagation()}>
                             <div className="flex justify-center gap-1">
                               <button type="button" title="Chi tiết" onClick={() => setDetailId(zone.id)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Eye size={12} /></button>
                               <button type="button" title="Sửa" onClick={() => edit(zone)} className="rounded border border-slate-700 p-0.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><Edit3 size={12} /></button>
@@ -1379,8 +1297,7 @@ export function InventoryLocationsPage() {
           <LocationsChartCard title="Tổng hợp theo kho" heightClass="h-[170px]">
             {(() => {
               const warehouseSummary = rows.reduce((acc, zone) => {
-                const warehouseCode = zone.warehouse?.code || 'KHÁC'
-                const warehouseName = warehouseCode === 'MAIN' ? 'Kho chính' : warehouseCode === 'PRODUCTION' ? 'Kho sản xuất' : warehouseCode
+                const warehouseName = zone.warehouse?.name || zone.warehouse?.code || 'Chưa xác định'
                 if (!acc[warehouseName]) {
                   acc[warehouseName] = { count: 0, stock: 0 }
                 }
@@ -1423,7 +1340,7 @@ export function InventoryLocationsPage() {
           </LocationsChartCard>
         </div>
       </div>
-    {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} saving={saveMutation.isPending} /> : null}
+    {form ? <LocationFormModal form={form} warehouses={warehouseOptions} setForm={setForm} onClose={() => setForm(null)} onSubmit={() => saveMutation.mutate(form)} onCreateWarehouse={() => navigate('/settings?tab=master&workspace=warehouses')} saving={saveMutation.isPending} /> : null}
     {detailId ? <LocationDetailDrawer detail={detail ?? null} onClose={() => setDetailId('')} /> : null}
     {selectedSlot ? <SlotMaterialDrawer slot={selectedSlot} onClose={() => setSelectedSlot(null)} /> : null}
     {modalType && (
@@ -1762,22 +1679,18 @@ function AuditRow({ icon, label, value, note }: { icon: ReactNode; label: string
   </div>
 }
 
-function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, saving }: { form: LocationForm; warehouses: Array<{ id: string; code: string; name: string }>; setForm: (value: LocationForm) => void; onClose: () => void; onSubmit: () => void; saving: boolean }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-    <div role="dialog" aria-modal="true" aria-label={form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'} className="w-full max-w-3xl overflow-hidden rounded-xl border border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
-      <header className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-        <div><h2 className="text-lg font-semibold">{form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'}</h2><p className="mt-1 text-xs text-slate-500">Sức chứa là tải trọng/tồn chứa vận hành; sơ đồ ô/tầng dùng cấu trúc A01-F06 và L1-L4.</p></div>
-        <button onClick={onClose} className="rounded border border-slate-700 p-2 text-slate-300"><X size={16} /></button>
-      </header>
-      <div className="grid gap-3 p-5 md:grid-cols-2">
+function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, onCreateWarehouse, saving }: { form: LocationForm; warehouses: Array<{ id: string; code: string; name: string }>; setForm: (value: LocationForm) => void; onClose: () => void; onSubmit: () => void; onCreateWarehouse: () => void; saving: boolean }) {
+  return <ModuleDetailDrawer open title={form.id ? 'Sửa vị trí kho' : 'Thêm vị trí kho'} subtitle="Quản lý topology và sức chứa vị trí" onClose={onClose} size="sm" footer={<div className="flex justify-end gap-2"><button onClick={onClose} className="border border-slate-700 px-4 py-2 text-sm text-slate-300">Hủy</button><button disabled={saving || !form.code.trim() || !form.name.trim() || !form.warehouseId} onClick={onSubmit} className="bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu vị trí'}</button></div>}>
+      <div className="grid gap-3 md:grid-cols-2">
         <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className={inventoryInput} placeholder="Mã vị trí, ví dụ A01" />
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inventoryInput} placeholder="Tên vị trí" />
         <select value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })} className={inventoryInput}>
-          <option value="">Chọn kho cha: Kho chính / Kho sản xuất</option>
+          <option value="">Chọn Kho cha</option>
           {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} ({warehouse.code})</option>)}
         </select>
         {!warehouses.length ? <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
-          Chưa tải được danh sách kho cha. Cần có dữ liệu MAIN/PRODUCTION trong master warehouses.
+          <p>Chưa có Kho nào. Tạo Kho trước.</p>
+          <button type="button" onClick={onCreateWarehouse} className="mt-2 rounded-lg border border-amber-300/30 px-3 py-1.5 font-semibold text-amber-100 hover:bg-amber-300/10">Tạo Kho</button>
         </div> : null}
         <input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inventoryInput} placeholder="Hàng (Row), ví dụ A" />
         <input value={form.column} onChange={(e) => setForm({ ...form, column: e.target.value })} className={inventoryInput} placeholder="Cột (Slot), ví dụ 01" />
@@ -1786,16 +1699,11 @@ function LocationFormModal({ form, warehouses, setForm, onClose, onSubmit, savin
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inventoryInput} h-24 py-2 md:col-span-2`} placeholder="Ghi chú vị trí" />
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Đang hoạt động</label>
       </div>
-      <footer className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
-        <button onClick={onClose} className="rounded border border-slate-700 px-4 py-2 text-sm text-slate-300">Hủy</button>
-        <button disabled={saving || !form.code.trim() || !form.name.trim() || !form.warehouseId} onClick={onSubmit} className="rounded bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu vị trí'}</button>
-      </footer>
-    </div>
-  </div>
+  </ModuleDetailDrawer>
 }
 
 function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDetail | null; onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'materials' | 'levels' | 'map'>('overview')
+  const [activeTab, setActiveTab] = useState<MasterDataDrawerTab>('overview')
   const materials = detail
   ? buildMaterialsFromOccupancy(detail)
   : []
@@ -1804,31 +1712,8 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
   const occupiedSlots = getOccupiedCellLevels(materials, detail).length
   const occupancy = capacity > 0 ? Math.min(100, Math.round((usedQuantity / capacity) * 100)) : 0
   const levelGroups = groupMaterialsByLevel(detail)
-  const tabClass = (tab: typeof activeTab) => `rounded-lg px-3 py-2 text-sm font-semibold transition ${
-    activeTab === tab
-      ? 'border border-cyan-400/60 bg-cyan-400/12 text-cyan-200'
-      : 'border border-slate-800 bg-slate-950/45 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-  }`
-
-  return <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-    <aside role="dialog" aria-modal="true" aria-label="Chi tiết vị trí kho" className="h-full w-full max-w-6xl overflow-auto border-l border-slate-700 bg-[#071321] text-slate-100 shadow-2xl">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#071321]/95 px-6 py-5 backdrop-blur">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Chi tiết vị trí kho</p>
-          <h2 className="mt-1 text-2xl font-bold">{detail ? `${detail.code} · ${detail.name}` : 'Đang tải...'}</h2>
-          <p className="mt-1 text-sm text-slate-400">Chế độ xem (Phase 1) · chưa hỗ trợ kéo thả hoặc thay đổi tồn kho trực tiếp.</p>
-        </div>
-        <button onClick={onClose} className="rounded-lg border border-slate-700 p-2.5 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"><X size={18} /></button>
-      </div>
-
-      {detail ? <div className="space-y-5 p-6">
-        <div className="flex flex-wrap gap-2">
-          <button className={tabClass('overview')} onClick={() => setActiveTab('overview')}>Tổng quan</button>
-          <button className={tabClass('materials')} onClick={() => setActiveTab('materials')}>Vật tư</button>
-          <button className={tabClass('levels')} onClick={() => setActiveTab('levels')}>Phân tầng ô</button>
-          <button className={tabClass('map')} onClick={() => setActiveTab('map')}>Sơ đồ 2D</button>
-        </div>
-
+  return <UnifiedMasterDataDrawer open title={detail ? `${detail.code} · ${detail.name}` : 'Đang tải vị trí'} subtitle="Vị trí lưu kho" activeTab={activeTab} onTabChange={setActiveTab} onClose={onClose}>
+      {detail ? <div className="space-y-5">
         {activeTab === 'overview' ? <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
           <SectionCard title="Thông tin vị trí">
             <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-3">
@@ -1859,7 +1744,9 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
           </SectionCard>
         </div> : null}
 
-        {activeTab === 'materials' ? <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        {activeTab === 'dependencies' ? <div className="space-y-4">
+          <MasterDataDependencyTree nodes={[{ label: 'Inventory Stock', count: materials.length, detail: `${formatQuantity(usedQuantity, 0)} đơn vị/tấn đang được ghi nhận` }]} />
+          <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
           <SectionCard title="Danh sách vật tư">
             <div className="overflow-hidden rounded-xl border border-slate-800">
               <table className="w-full min-w-[640px] text-left text-sm">
@@ -1927,18 +1814,14 @@ function LocationDetailDrawer({ detail, onClose }: { detail: WarehouseLocationDe
               {!levelGroups.length ? <p className="text-sm text-slate-500">Chưa có dữ liệu phân tầng để nhóm vật tư.</p> : null}
             </div>
           </SectionCard>
+          </div>
         </div> : null}
 
-        {activeTab === 'levels' ? <SectionCard title="Chi tiết phân tầng của ô">
-          <LayeredSlotDetail detail={detail} />
-        </SectionCard> : null}
+        {activeTab === 'history' ? <SectionCard title="Lịch sử"><p className="text-sm text-slate-500">API chi tiết vị trí hiện chưa cung cấp timeline riêng. Không tạo lịch sử giả ở frontend.</p></SectionCard> : null}
 
-        {activeTab === 'map' ? <SectionCard title="Sơ đồ 2D ô chứa">
-          <Location2DPreview detail={detail} />
-        </SectionCard> : null}
+        {activeTab === 'settings' ? <div className="space-y-4"><SectionCard title="Chi tiết phân tầng của ô"><LayeredSlotDetail detail={detail} /></SectionCard><SectionCard title="Sơ đồ 2D ô chứa"><Location2DPreview detail={detail} /></SectionCard></div> : null}
       </div> : <p className="p-6 text-sm text-slate-500">Đang tải chi tiết...</p>}
-    </aside>
-  </div>
+  </UnifiedMasterDataDrawer>
 }
 
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {

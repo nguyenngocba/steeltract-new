@@ -1,0 +1,118 @@
+{
+  "runId": "SYSTEM-E2E2-BROWSER-1786427319173",
+  "generatedAt": "2026-08-11T05:49:39.355Z",
+  "businessSteps": 92,
+  "businessAssertions": 16,
+  "stages": [
+    {
+      "stage": "dashboard",
+      "route": "/",
+      "durationMs": 2443.71,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "procurement",
+      "route": "/procurement",
+      "durationMs": 1214.42,
+      "fixtureVisible": false
+    },
+    {
+      "stage": "receipt",
+      "route": "/inventory/inbound",
+      "durationMs": 1596.27,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "transfer",
+      "route": "/inventory/transfer",
+      "durationMs": 2794.55,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "inventory-count",
+      "route": "/inventory/stock-take",
+      "durationMs": 2326.22,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "supplier-return",
+      "route": "/inventory/returns",
+      "durationMs": 2059.02,
+      "fixtureVisible": false
+    },
+    {
+      "stage": "project",
+      "route": "/projects/list",
+      "durationMs": 2412.19,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "requirement",
+      "route": "/components/list",
+      "durationMs": 2186.81,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "bom",
+      "route": "/production/boms",
+      "durationMs": 2462.57,
+      "fixtureVisible": false
+    },
+    {
+      "stage": "production-order",
+      "route": "/production/orders",
+      "durationMs": 2229.48,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "execution",
+      "route": "/production/execution",
+      "durationMs": 2569.47,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "qc",
+      "route": "/qc/final",
+      "durationMs": 2203.47,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "finished-goods",
+      "route": "/components/stock",
+      "durationMs": 1993,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "yard",
+      "route": "/yard/components",
+      "durationMs": 2266.8,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "dispatch",
+      "route": "/logistics/dispatch",
+      "durationMs": 2272.32,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "delivery",
+      "route": "/logistics/deliveries",
+      "durationMs": 2307.96,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "installation",
+      "route": "/projects/components",
+      "durationMs": 2034.87,
+      "fixtureVisible": true
+    },
+    {
+      "stage": "reverse",
+      "route": "/logistics/history",
+      "durationMs": 2075.3,
+      "fixtureVisible": true
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": []
+}

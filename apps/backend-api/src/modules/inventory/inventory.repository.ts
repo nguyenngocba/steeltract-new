@@ -9,6 +9,17 @@ import { nextOperationalCode } from '../../common/utils/code-generator';
 
 type DbClient = PrismaService | Prisma.TransactionClient;
 
+export type WarehouseCapability =
+  | 'allowReceipt'
+  | 'allowIssue'
+  | 'allowProduction'
+  | 'allowQc'
+  | 'allowDispatch'
+  | 'allowInstallation'
+  | 'allowSupplierReturn'
+  | 'allowScrap'
+  | 'allowReverse';
+
 type PostingInventoryItem = {
   id: string;
   code: string;
@@ -30,6 +41,33 @@ type LocationStockBucketRow = {
   level: string | null;
   quantity: number;
 };
+
+const materialCustodySnapshotJoin = Prisma.sql`
+  LEFT JOIN LATERAL (
+    SELECT
+      COALESCE(SUM(scope_snapshot."currentStock"), 0)::float8 AS "currentStock"
+    FROM inventory_material_snapshots scope_snapshot
+    JOIN master_warehouses scope_warehouse
+      ON scope_warehouse.id = scope_snapshot."warehouseId"
+    WHERE scope_snapshot."materialId" = i.id
+      AND scope_warehouse.active = true
+      AND scope_warehouse."allowReceipt" = true
+      AND scope_warehouse."allowProduction" = false
+  ) main_snapshot ON true
+`;
+
+const productionCustodySnapshotJoin = Prisma.sql`
+  LEFT JOIN LATERAL (
+    SELECT
+      COALESCE(SUM(scope_snapshot."currentStock"), 0)::float8 AS "currentStock"
+    FROM inventory_material_snapshots scope_snapshot
+    JOIN master_warehouses scope_warehouse
+      ON scope_warehouse.id = scope_snapshot."warehouseId"
+    WHERE scope_snapshot."materialId" = i.id
+      AND scope_warehouse.active = true
+      AND scope_warehouse."allowProduction" = true
+  ) production_snapshot ON true
+`;
 
 export type InventoryMaterialQuery = {
   page?: number;
@@ -79,9 +117,12 @@ export class InventoryRepository {
             },
           },
           include: {
+            warehouse: {
+              include: { warehouseType: true },
+            },
             zone: {
               include: {
-                warehouse: true,
+                warehouse: { include: { warehouseType: true } },
               },
             },
           },
@@ -123,10 +164,29 @@ export class InventoryRepository {
     });
   }
 
-  findWarehouseByCode(code: string, db: DbClient = this.prisma) {
-    return db.masterWarehouse.findUnique({
-      where: { code },
-      select: { id: true, code: true, name: true },
+  findWarehouseByCapability(
+    capability: WarehouseCapability,
+    db: DbClient = this.prisma,
+  ) {
+    return db.masterWarehouse.findFirst({
+      where: {
+        active: true,
+        [capability]: true,
+      } as Prisma.MasterWarehouseWhereInput,
+      include: { warehouseType: true },
+      orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }],
+    });
+  }
+
+  findPrimaryMaterialWarehouse(db: DbClient = this.prisma) {
+    return db.masterWarehouse.findFirst({
+      where: {
+        active: true,
+        allowReceipt: true,
+        allowProduction: false,
+      },
+      include: { warehouseType: true },
+      orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }],
     });
   }
 
@@ -134,23 +194,36 @@ export class InventoryRepository {
     if (!ids.length) return Promise.resolve([]);
     return db.masterWarehouse.findMany({
       where: { id: { in: ids } },
-      select: { id: true, code: true, name: true },
+      include: { warehouseType: true },
+    });
+  }
+
+  findWarehouseById(id: string, db: DbClient = this.prisma) {
+    return db.masterWarehouse.findUnique({
+      where: { id },
+      include: { warehouseType: true },
     });
   }
 
   findPositiveLocationStocks(
     materialIds: string[],
     warehouseId: string,
-    warehouseCode: string,
     db: DbClient = this.prisma,
   ) {
     return db.inventoryLocationStock.findMany({
       where: {
         inventoryItemId: { in: materialIds },
         quantity: { gt: 0.000001 },
-        OR: [{ warehouseId }, { zone: { warehouse: { code: warehouseCode } } }],
+        OR: [{ warehouseId }, { zone: { warehouseId } }],
       },
-      include: { zone: { include: { warehouse: true } } },
+      include: {
+        warehouse: { include: { warehouseType: true } },
+        zone: {
+          include: {
+            warehouse: { include: { warehouseType: true } },
+          },
+        },
+      },
       orderBy: [
         { inventoryItemId: 'asc' },
         { zoneId: 'asc' },
@@ -170,11 +243,39 @@ export class InventoryRepository {
     });
   }
 
-  findActiveWarehouseZone(code: string, db: DbClient = this.prisma) {
+  findActiveWarehouseZoneByCapability(
+    capability: WarehouseCapability,
+    db: DbClient = this.prisma,
+  ) {
     return db.warehouseZone.findFirst({
-      where: { active: true, warehouse: { code } },
-      include: { warehouse: true },
+      where: {
+        active: true,
+        warehouse: {
+          active: true,
+          [capability]: true,
+        } as Prisma.MasterWarehouseWhereInput,
+      },
+      include: {
+        warehouse: { include: { warehouseType: true } },
+      },
       orderBy: { code: 'asc' },
+    });
+  }
+
+  findActivePrimaryMaterialWarehouseZone(db: DbClient = this.prisma) {
+    return db.warehouseZone.findFirst({
+      where: {
+        active: true,
+        warehouse: {
+          active: true,
+          allowReceipt: true,
+          allowProduction: false,
+        },
+      },
+      include: {
+        warehouse: { include: { warehouseType: true } },
+      },
+      orderBy: [{ code: 'asc' }],
     });
   }
 
@@ -219,9 +320,7 @@ export class InventoryRepository {
         LEFT JOIN inventory_material_snapshots all_snapshot
           ON all_snapshot."materialId" = i.id
           AND all_snapshot."scopeKey" = 'ALL'
-        LEFT JOIN inventory_material_snapshots main_snapshot
-          ON main_snapshot."materialId" = i.id
-          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        ${materialCustodySnapshotJoin}
         WHERE ${where}
         ORDER BY ${orderBy}
         LIMIT ${pageSize} OFFSET ${offset}
@@ -232,9 +331,7 @@ export class InventoryRepository {
         LEFT JOIN inventory_material_snapshots all_snapshot
           ON all_snapshot."materialId" = i.id
           AND all_snapshot."scopeKey" = 'ALL'
-        LEFT JOIN inventory_material_snapshots main_snapshot
-          ON main_snapshot."materialId" = i.id
-          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        ${materialCustodySnapshotJoin}
         WHERE ${where}
       `),
     ]);
@@ -247,12 +344,19 @@ export class InventoryRepository {
             category: true,
             materialType: true,
             unitMaster: true,
-            zone: { include: { warehouse: true } },
+            zone: {
+              include: { warehouse: { include: { warehouseType: true } } },
+            },
             materialSnapshots: true,
             locationStocks: {
               where: { quantity: { gt: 0 } },
               include: {
-                zone: { include: { warehouse: true } },
+                warehouse: { include: { warehouseType: true } },
+                zone: {
+                  include: {
+                    warehouse: { include: { warehouseType: true } },
+                  },
+                },
               },
             },
           },
@@ -319,10 +423,19 @@ export class InventoryRepository {
             category: true,
             materialType: true,
             unitMaster: true,
-            zone: { include: { warehouse: true } },
+            zone: {
+              include: { warehouse: { include: { warehouseType: true } } },
+            },
             locationStocks: {
               where: { quantity: { gt: 0 } },
-              include: { zone: { include: { warehouse: true } } },
+              include: {
+                warehouse: { include: { warehouseType: true } },
+                zone: {
+                  include: {
+                    warehouse: { include: { warehouseType: true } },
+                  },
+                },
+              },
             },
           },
         })
@@ -428,8 +541,13 @@ export class InventoryRepository {
       WITH stock AS (
         SELECT ls."inventoryItemId" AS "materialId",
           COALESCE(SUM(ls.quantity), 0)::float8 AS "currentStock",
-          COALESCE(SUM(ls.quantity) FILTER (WHERE UPPER(COALESCE(w.code, zw.code, '')) = 'MAIN'), 0)::float8 AS "mainStock",
-          COALESCE(SUM(ls.quantity) FILTER (WHERE UPPER(COALESCE(w.code, zw.code, '')) = 'PRODUCTION'), 0)::float8 AS "productionStock"
+          COALESCE(SUM(ls.quantity) FILTER (
+            WHERE COALESCE(w."allowReceipt", zw."allowReceipt", false)
+              AND NOT COALESCE(w."allowProduction", zw."allowProduction", false)
+          ), 0)::float8 AS "mainStock",
+          COALESCE(SUM(ls.quantity) FILTER (
+            WHERE COALESCE(w."allowProduction", zw."allowProduction", false)
+          ), 0)::float8 AS "productionStock"
         FROM inventory_location_stocks ls
         LEFT JOIN warehouse_zones z ON z.id = ls."zoneId"
         LEFT JOIN master_warehouses w ON w.id = ls."warehouseId"
@@ -545,12 +663,8 @@ export class InventoryRepository {
       FROM inventory_items i
       LEFT JOIN inventory_material_snapshots all_snapshot
         ON all_snapshot."materialId" = i.id AND all_snapshot."scopeKey" = 'ALL'
-      LEFT JOIN inventory_material_snapshots main_snapshot
-        ON main_snapshot."materialId" = i.id
-        AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
-      LEFT JOIN inventory_material_snapshots production_snapshot
-        ON production_snapshot."materialId" = i.id
-        AND UPPER(COALESCE(production_snapshot."warehouseCode", '')) = 'PRODUCTION'
+      ${materialCustodySnapshotJoin}
+      ${productionCustodySnapshotJoin}
       WHERE ${where}
     `);
     return rows[0];
@@ -566,9 +680,7 @@ export class InventoryRepository {
         LEFT JOIN inventory_categories c ON c.id = i."categoryId"
         LEFT JOIN inventory_material_snapshots all_snapshot
           ON all_snapshot."materialId" = i.id AND all_snapshot."scopeKey" = 'ALL'
-        LEFT JOIN inventory_material_snapshots main_snapshot
-          ON main_snapshot."materialId" = i.id
-          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        ${materialCustodySnapshotJoin}
         WHERE ${where}
         GROUP BY c.name
         ORDER BY value DESC
@@ -581,9 +693,7 @@ export class InventoryRepository {
         JOIN inventory_items i ON i.id = s."materialId"
         LEFT JOIN inventory_material_snapshots all_snapshot
           ON all_snapshot."materialId" = i.id AND all_snapshot."scopeKey" = 'ALL'
-        LEFT JOIN inventory_material_snapshots main_snapshot
-          ON main_snapshot."materialId" = i.id
-          AND UPPER(COALESCE(main_snapshot."warehouseCode", '')) = 'MAIN'
+        ${materialCustodySnapshotJoin}
         WHERE s."scopeKey" <> 'ALL' AND ${where}
         GROUP BY s."warehouseCode"
         ORDER BY value DESC
@@ -1030,6 +1140,29 @@ export class InventoryRepository {
     });
   }
 
+  findTransactionByIdempotencyKey(
+    idempotencyKey: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.inventoryTransaction.findUnique({
+      where: { idempotencyKey },
+      include: {
+        transactionType: true,
+        warehouse: true,
+        zone: true,
+        project: true,
+        items: {
+          include: {
+            inventoryItem: true,
+            unit: true,
+            warehouse: true,
+            zone: true,
+          },
+        },
+      },
+    });
+  }
+
   listMaterialMovementLines(take = 50) {
     return this.prisma.inventoryTransactionItem.findMany({
       take,
@@ -1402,6 +1535,13 @@ export class InventoryRepository {
     });
   }
 
+  findPurchaseOrderById(id: string) {
+    return this.prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: { items: true, supplier: true },
+    });
+  }
+
   aggregateLocationOccupancy(params: {
     zoneId: string;
     slotId: string;
@@ -1705,6 +1845,20 @@ export class InventoryRepository {
     });
   }
 
+  findSupplierReturnsByReceipt(
+    receiptTransactionId: string,
+    db: DbClient = this.prisma,
+  ) {
+    return db.returnRequest.findMany({
+      where: {
+        receiptTransactionId,
+        flowType: 'SUPPLIER_RETURN',
+        status: { not: 'CANCELLED' },
+      },
+      include: { items: true },
+    });
+  }
+
   findSiteReturnAvailabilitySources(params: {
     projectId: string;
     inventoryItemId: string;
@@ -1949,6 +2103,11 @@ export class InventoryRepository {
     return {
       project: true,
       warehouse: true,
+      receiptTransaction: {
+        include: {
+          items: { orderBy: { createdAt: 'asc' as const } },
+        },
+      },
       items: {
         include: {
           inventoryItem: true,

@@ -1,5 +1,6 @@
 import { Edit2, MapPinned, Minus, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { usePermission } from '@/shared/permissions/PermissionGuard'
 
 import type { YardSlotRuntime, YardZoneRuntime } from '../services/api/yard.api'
 
@@ -41,6 +42,7 @@ export function YardOperationalMap2D({
   onCreateZone?: () => void
   onCreateSlot?: (zoneId?: string) => void
 }) {
+  const canMove = usePermission('yard.move')
   const [zoom, setZoom] = useState(1)
   const zoneMap = new Map<string, YardZoneRuntime | YardSlotRuntime['zone']>()
   configuredZones.forEach((zone) => zoneMap.set(zone.id, zone))
@@ -56,12 +58,12 @@ export function YardOperationalMap2D({
         <b className="text-cyan-200">{selectedZone ? `${selectedZone.code} · ${selectedZone.name}` : `${zones.length} zone · ${slots.length} slot`}</b>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" onClick={onCreateZone} className="rounded border border-cyan-700/70 bg-cyan-950/30 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-900" title="Tạo zone">
+        {canMove ? <button type="button" onClick={onCreateZone} className="rounded border border-cyan-700/70 bg-cyan-950/30 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-900" title="Tạo zone">
           + Zone
-        </button>
-        <button type="button" onClick={() => onCreateSlot?.(selectedZoneId)} className="rounded border border-emerald-700/70 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-900" title="Tạo slot trong zone">
+        </button> : null}
+        {canMove ? <button type="button" onClick={() => onCreateSlot?.(selectedZoneId)} className="rounded border border-emerald-700/70 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-900" title="Tạo slot trong zone">
           + Slot
-        </button>
+        </button> : null}
         <div className="ml-1 flex items-center gap-1 rounded border border-slate-700 bg-slate-950/70 p-1">
           <button type="button" onClick={() => setZoom((value) => Math.max(0.75, Number((value - 0.1).toFixed(1))))} className="rounded bg-slate-800 p-1.5 text-cyan-200 hover:bg-cyan-900" title="Thu nhỏ">
             <Minus size={13} />
@@ -88,18 +90,18 @@ export function YardOperationalMap2D({
           <div className="flex items-start justify-between">
             <div><p className="text-[10px] uppercase tracking-[0.14em] text-cyan-300">{zone.code}</p><h3 className="mt-1 text-sm font-semibold">{zone.name}</h3></div>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={(event) => { event.stopPropagation(); onEditZone?.(zone) }} className="rounded border border-cyan-700/50 p-1 text-cyan-300 hover:bg-cyan-950" title="Sửa zone">
+              {canMove ? <button type="button" onClick={(event) => { event.stopPropagation(); onEditZone?.(zone) }} className="rounded border border-cyan-700/50 p-1 text-cyan-300 hover:bg-cyan-950" title="Sửa zone">
                 <Edit2 size={13} />
-              </button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); onDeleteZone?.(zone) }} className="rounded border border-red-700/50 p-1 text-red-300 hover:bg-red-950" title="Xóa zone">
+              </button> : null}
+              {canMove ? <button type="button" onClick={(event) => { event.stopPropagation(); onDeleteZone?.(zone) }} className="rounded border border-red-700/50 p-1 text-red-300 hover:bg-red-950" title="Xóa zone">
                 <Trash2 size={13} />
-              </button>
+              </button> : null}
               <button type="button" onClick={(event) => { event.stopPropagation(); onOpenZoneDetail?.(zone.id) }} className="rounded border border-emerald-700/50 px-2 py-1 text-[10px] text-emerald-300 hover:bg-emerald-950" title="Popup chi tiết zone">
                 Popup
               </button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); onCreateSlot?.(zone.id) }} className="rounded border border-blue-700/50 px-2 py-1 text-[10px] text-blue-200 hover:bg-blue-950" title="Thêm slot">
+              {canMove ? <button type="button" onClick={(event) => { event.stopPropagation(); onCreateSlot?.(zone.id) }} className="rounded border border-blue-700/50 px-2 py-1 text-[10px] text-blue-200 hover:bg-blue-950" title="Thêm slot">
                 + Slot
-              </button>
+              </button> : null}
               <MapPinned size={17} className="text-cyan-300"/>
             </div>
           </div>

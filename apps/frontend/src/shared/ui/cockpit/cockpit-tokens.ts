@@ -1,5 +1,5 @@
 export const COCKPIT_HEIGHTS = {
-  KPI: 'h-[108px]',
+  KPI: 'h-[92px]',
   KPI_EXEC: 'h-[128px]',
   CHART_XXS: 'h-[158px]',
   CHART_SM: 'h-[188px]',

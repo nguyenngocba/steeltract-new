@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common'
 
 import { InventoryRepository } from './inventory.repository'
@@ -19,7 +20,12 @@ import type {
   CreateMaterialTypeDto,
   UpdateMaterialTypeDto,
 } from './dto/inventory.dto'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../rbac/guards/permissions.guard'
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('inventory.view')
 @Controller('inventory/material-types')
 export class MaterialTypesController {
 
@@ -35,6 +41,7 @@ export class MaterialTypesController {
   }
 
   @Post()
+  @RequirePermissions('settings.edit')
   async createMaterialType(
     @Body(new ZodValidationPipe(createMaterialTypeSchema))
     body: CreateMaterialTypeDto,
@@ -63,6 +70,7 @@ export class MaterialTypesController {
   }
 
   @Put(':id')
+  @RequirePermissions('settings.edit')
   async updateMaterialType(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateMaterialTypeSchema))
@@ -95,6 +103,7 @@ export class MaterialTypesController {
   }
 
   @Delete(':id')
+  @RequirePermissions('settings.edit')
   async deleteMaterialType(
     @Param('id') id: string,
   ) {

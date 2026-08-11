@@ -63,6 +63,11 @@ export type RoleMatrix = {
   actions: string[]
   permissionCount: number
   permissions: Array<{ id: string; name: string; description?: string | null }>
+  presets: Array<{
+    key: string
+    label: string
+    permissions: string[]
+  }>
 }
 
 export type SystemSettingsCatalog = {

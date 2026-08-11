@@ -368,9 +368,12 @@ export function CanonicalPhysicalQcWorkspace() {
         subtitle={selectedRow ? `${selectedRow.component?.code ?? '-'} · ${selectedRow.project?.code ?? '-'}` : undefined}
         onClose={() => setSelectedRow(null)}
         widthClass="w-screen md:w-[64vw] md:min-w-[980px] md:max-w-[1320px]"
+        tabs={detailTabs.map((tab) => ({ id: tab.key, label: tab.label }))}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as DetailTab)}
       >
         {selectedRow ? (
-          <PhysicalQcDetail row={selectedRow} activeTab={activeTab} onTabChange={setActiveTab} />
+          <PhysicalQcDetail row={selectedRow} activeTab={activeTab} />
         ) : null}
       </ModuleDetailDrawer>
     </>
@@ -380,11 +383,9 @@ export function CanonicalPhysicalQcWorkspace() {
 function PhysicalQcDetail({
   row,
   activeTab,
-  onTabChange,
 }: {
   row: QcComponentInstance
   activeTab: DetailTab
-  onTabChange: (tab: DetailTab) => void
 }) {
   const inspection = latestFinalInspection(row)
   const ncr = latestNcr(row)
@@ -396,20 +397,6 @@ function PhysicalQcDetail({
         <CockpitKpiCard title="Result" value={inspection?.status ?? stateLabel(row.state)} state="normal" tone={row.state === 'QC_PASSED' ? 'emerald' : row.state === 'QC_FAILED' || row.state === 'SCRAPPED' ? 'red' : 'amber'} />
         <CockpitKpiCard title="Disposition" value={canonicalDisposition(row, ncr)} state="normal" tone="purple" />
         <CockpitKpiCard title="Checklist" value={checklistCompleted ? 'Hoàn tất' : 'Chưa đủ'} state={checklistCompleted ? 'normal' : 'alert'} tone={checklistCompleted ? 'emerald' : 'amber'} />
-      </div>
-      <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-white/[0.035] p-1">
-        {detailTabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onTabChange(tab.key)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              activeTab === tab.key ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
       {activeTab === 'overview' ? <OverviewTab row={row} inspection={inspection} ncr={ncr} /> : null}
       {activeTab === 'inspection' ? <InspectionTab inspection={inspection} /> : null}

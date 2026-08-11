@@ -26,6 +26,7 @@ import {
 
 } from '../../config/navigation.config'
 import { useAuthStore } from '../../../store/auth.store'
+import { canAccessPath, hasPermission } from '../../../shared/permissions/authorization'
 
 type NavigationItem = {
   id?: string
@@ -37,6 +38,7 @@ type NavigationItem = {
 
 export function EnterpriseSidebar() {
   const navRef = useRef<HTMLDivElement>(null)
+  const user = useAuthStore((state) => state.user)
 
   const [opened, setOpened] = useState<
     Record<string, boolean>
@@ -104,6 +106,11 @@ export function EnterpriseSidebar() {
           {navigation.map((group) => {
 
             const Icon = group.icon
+            const visibleChildren = group.children.filter((item) =>
+              canAccessNavigationItem(item, user),
+            )
+
+            if (visibleChildren.length === 0) return null
 
             const isOpen =
               opened[group.title]
@@ -163,7 +170,7 @@ export function EnterpriseSidebar() {
 
                   <div className="mt-2 space-y-1 border-l border-zinc-800 pl-5">
 
-                    {group.children.map((item) => (
+                    {visibleChildren.map((item) => (
                       <EnterpriseSidebarItem
                         key={item.id ?? `${item.path ?? item.title}:${item.title}`}
                         item={item}
@@ -299,16 +306,7 @@ function canAccessNavigationItem(
   item: NavigationItem,
   user: ReturnType<typeof useAuthStore.getState>['user'],
 ) {
-  if (!item.adminOnly) return true
   if (!user) return false
-
-  const roles = user.roles?.map((role) => role.toLowerCase()) ?? []
-  const permissions = user.permissions ?? []
-
-  return (
-    roles.some((role) => role.includes('admin') || role.includes('quản trị')) ||
-    permissions.includes('*') ||
-    permissions.includes('admin.read') ||
-    permissions.includes('admin.write')
-  )
+  if (item.path && !canAccessPath(user, item.path)) return false
+  return !item.adminOnly || hasPermission(user.permissions, 'permissions.view')
 }

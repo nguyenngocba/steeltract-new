@@ -58,7 +58,7 @@ describe('ProductionService production material availability', () => {
       ]),
     };
     const inventoryRepository = {
-      findWarehouseByCode: jest.fn().mockResolvedValue({
+      findWarehouseByCapability: jest.fn().mockResolvedValue({
         id: 'warehouse-production',
         code: 'PRODUCTION',
         name: 'Kho sản xuất',
@@ -96,11 +96,12 @@ describe('ProductionService production material availability', () => {
 
     const result = await service.materialRequirements('po-ops3');
 
-    expect(inventoryRepository.findWarehouseByCode).toHaveBeenCalledWith('PRODUCTION');
+    expect(inventoryRepository.findWarehouseByCapability).toHaveBeenCalledWith(
+      'allowProduction',
+    );
     expect(inventoryRepository.findPositiveLocationStocks).toHaveBeenCalledWith(
       ['material-a', 'material-c'],
       'warehouse-production',
-      'PRODUCTION',
     );
     expect(result).toEqual([
       expect.objectContaining({

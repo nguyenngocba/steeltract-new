@@ -321,3 +321,20 @@ Implications:
   do not mutate stock.
 - `CONSUME` events and snapshot consumed quantity exclude Scrap. Scrap remains a
   separate future command/event semantic.
+
+## PROD-017: Production Warehouse Selection Uses Capabilities
+
+Decision:
+
+- Production reservation, availability and issue select an active Warehouse by
+  `allowProduction`, never by code/name.
+- Returning unused production material selects active material custody with
+  `allowReceipt = true` and `allowProduction = false`.
+- Inventory remains the owner of receipt/issue capability enforcement and stock
+  mutation.
+
+Supersedes:
+
+- Warehouse-code selection described in PROD-001, PROD-002 and PROD-004.
+- Existing transaction markers remain compatibility metadata only and are not
+  a Warehouse source of truth.

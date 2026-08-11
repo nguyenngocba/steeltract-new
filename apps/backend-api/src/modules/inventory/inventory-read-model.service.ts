@@ -5,6 +5,7 @@ import { TransactionType } from '@prisma/client';
 import { SnapshotReaderService } from '../../core/snapshots/snapshot-reader.service';
 import { PerformanceMetricsService } from '../../core/performance/performance-metrics.service';
 import { InventoryRepository } from './inventory.repository';
+import { warehouseMetadata } from './warehouse-metadata';
 import type {
   InventoryMaterialListQueryDto,
   InventoryOverviewQueryDto,
@@ -130,18 +131,20 @@ export class InventoryReadModelService {
 
   private toMaterialListRow(item: any) {
     const liveMetrics = item.liveMetrics ?? {};
-    const locations = item.locationStocks.map((row: any) => ({
-      zoneId: row.zoneId,
-      zoneCode: row.zone?.code ?? null,
-      zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
-      slotId: row.slotId,
-      level: row.level,
-      row: row.zone?.row ?? null,
-      column: row.zone?.column ?? null,
-      warehouseName: row.zone?.warehouse?.name ?? null,
-      warehouseCode: row.zone?.warehouse?.code ?? null,
-      quantity: Number(row.quantity ?? 0),
-    }));
+    const locations = item.locationStocks.map((row: any) => {
+      const warehouse = row.warehouse ?? row.zone?.warehouse ?? null;
+      return {
+        ...warehouseMetadata(warehouse),
+        zoneId: row.zoneId,
+        zoneCode: row.zone?.code ?? null,
+        zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
+        slotId: row.slotId,
+        level: row.level,
+        row: row.zone?.row ?? null,
+        column: row.zone?.column ?? null,
+        quantity: Number(row.quantity ?? 0),
+      };
+    });
     const currentStock = locations.reduce(
       (sum: number, row: any) => sum + Number(row.quantity ?? 0),
       0,

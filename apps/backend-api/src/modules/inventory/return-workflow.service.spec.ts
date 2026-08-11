@@ -87,6 +87,21 @@ describe('ReturnWorkflowService atomic Outbox boundary', () => {
       supplierId: 'supplier-1',
       warehouseId: 'warehouse-main',
       status: ReturnRequestStatus.INSPECTED,
+      receiptTransaction: {
+        id: 'receipt-1',
+        items: [
+          {
+            id: 'receipt-line-1',
+            inventoryItemId: 'material-1',
+            quantity: 4,
+            unitId: 'unit-1',
+            warehouseId: 'warehouse-main',
+            zoneId: 'zone-main',
+            slotId: 'A01',
+            level: 'L2',
+          },
+        ],
+      },
       items: [
         {
           id: 'line-1',
@@ -95,8 +110,8 @@ describe('ReturnWorkflowService atomic Outbox boundary', () => {
           receivedQuantity: 4,
           inspectedQuantity: 3,
           disposition: ReturnDisposition.DAMAGED,
-          unitId: null,
-          zoneId: null,
+          unitId: 'unit-1',
+          zoneId: 'zone-main',
         },
       ],
     };
@@ -136,6 +151,8 @@ describe('ReturnWorkflowService atomic Outbox boundary', () => {
           expect.objectContaining({
             inventoryItemId: 'material-1',
             quantity: -3,
+            slotId: 'A01',
+            level: 'L2',
           }),
         ],
       }),
@@ -145,5 +162,51 @@ describe('ReturnWorkflowService atomic Outbox boundary', () => {
       expect.objectContaining({ action: 'SUPPLIER_MATERIAL_RETURN_DISPOSED' }),
       tx,
     );
+  });
+
+  it('rejects cumulative Supplier Returns beyond the referenced receipt', async () => {
+    const { repository, service } = setup();
+    Object.assign(repository, {
+      findPurchaseOrderById: jest.fn().mockResolvedValue({
+        id: 'po-1',
+        supplierId: 'supplier-1',
+      }),
+      findTransactionById: jest.fn().mockResolvedValue({
+        id: 'receipt-1',
+        type: TransactionType.IMPORT,
+        referenceModule: 'PURCHASE_ORDER',
+        referenceId: 'po-1',
+        supplierId: 'supplier-1',
+        items: [
+          {
+            inventoryItemId: 'material-1',
+            warehouseId: 'warehouse-main',
+            quantity: 10,
+          },
+        ],
+      }),
+      findSupplierReturnsByReceipt: jest.fn().mockResolvedValue([
+        {
+          items: [
+            { inventoryItemId: 'material-1', requestedQuantity: 8 },
+          ],
+        },
+      ]),
+    });
+
+    await expect(
+      service.create({
+        flowType: ReturnFlowType.SUPPLIER_RETURN,
+        supplierId: 'supplier-1',
+        purchaseOrderId: 'po-1',
+        receiptTransactionId: 'receipt-1',
+        warehouseId: 'warehouse-main',
+        items: [{ inventoryItemId: 'material-1', requestedQuantity: 3 }],
+      }),
+    ).rejects.toThrow(
+      'Supplier Return quantity exceeds the referenced receipt quantity.',
+    );
+
+    expect(repository.createReturnRequest).not.toHaveBeenCalled();
   });
 });

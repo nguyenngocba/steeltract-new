@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 import { InventoryRepository } from './inventory.repository';
 import { InventoryService } from './inventory.service';
@@ -153,11 +153,21 @@ describe('InventoryService multi-material foundation', () => {
         work({ transaction: true }),
       ),
       findTransactionByReference: jest.fn().mockResolvedValue(existing),
+      findTransactionByIdempotencyKey: jest.fn().mockResolvedValue(null),
       findOutboxEvent: jest.fn().mockResolvedValue(null),
       createActivityLog: jest.fn().mockResolvedValue({}),
       createOutboxEvent: jest.fn().mockResolvedValue({}),
       createTransaction: jest.fn(),
       nextOperationalCode: jest.fn(),
+      findWarehousesByIds: jest.fn().mockResolvedValue([
+        {
+          id: 'warehouse-1',
+          code: 'RETURN',
+          active: true,
+          allowReceipt: true,
+          allowIssue: false,
+        },
+      ]),
     };
     const service = new InventoryService(
       repository as unknown as InventoryRepository,
@@ -200,6 +210,185 @@ describe('InventoryService multi-material foundation', () => {
         metadata: expect.objectContaining({ commandHash: expect.any(String) }),
       }),
       { transaction: true },
+    );
+  });
+
+  it('rejects receipt posting when the selected warehouse lacks receipt capability', async () => {
+    const repository = {
+      findInboundCostLines: jest.fn().mockResolvedValue([]),
+      findWarehousesByIds: jest.fn().mockResolvedValue([
+        {
+          id: 'warehouse-no-receipt',
+          code: 'NO-RECEIPT',
+          active: true,
+          allowReceipt: false,
+          allowIssue: true,
+        },
+      ]),
+      transaction: jest.fn(),
+      createTransaction: jest.fn(),
+    };
+    const service = new InventoryService(
+      repository as unknown as InventoryRepository,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.createTransaction({
+        type: 'IMPORT',
+        items: [
+          {
+            inventoryItemId: 'material-1',
+            quantity: 5,
+            warehouseId: 'warehouse-no-receipt',
+            zoneId: 'zone-1',
+            slotId: 'A01',
+            level: 'L1',
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.transaction).not.toHaveBeenCalled();
+    expect(repository.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('supports multiple idempotent PURCHASE_ORDER receipts without duplicating stock', async () => {
+    const tx = { transaction: true };
+    const receipts = new Map<string, any>();
+    let sequence = 0;
+    const repository = {
+      findInboundCostLines: jest.fn().mockResolvedValue([]),
+      findWarehousesByIds: jest.fn().mockResolvedValue([
+        {
+          id: 'warehouse-main',
+          code: 'MAIN',
+          active: true,
+          allowReceipt: true,
+          allowIssue: true,
+        },
+      ]),
+      transaction: jest.fn(async (work: (client: object) => unknown) =>
+        work(tx),
+      ),
+      findTransactionByIdempotencyKey: jest.fn(
+        async (key: string) => receipts.get(key) ?? null,
+      ),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findTransactionByReference: jest.fn(),
+      findItemById: jest.fn().mockResolvedValue({
+        id: 'material-1',
+        code: 'MAT-1',
+        unit: 'kg',
+        unitMaster: null,
+        quantity: 0,
+        updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+      }),
+      nextOperationalCode: jest.fn(async () => `PN-${++sequence}`),
+      createTransaction: jest.fn(async (data: any) => {
+        const transaction = {
+          id: `receipt-${sequence}`,
+          code: data.code,
+          transactionNo: data.transactionNo,
+          type: data.type,
+          direction: data.direction,
+          createdAt: new Date('2026-08-11T01:00:00.000Z'),
+          transactionDate: data.transactionDate,
+          projectId: null,
+          referenceModule: data.referenceModule,
+          referenceId: data.referenceId,
+          warehouseId: null,
+          zoneId: null,
+          idempotencyKey: data.idempotencyKey,
+          commandHash: data.commandHash,
+          items: [
+            {
+              id: `line-${sequence}`,
+              inventoryItemId: 'material-1',
+              quantity: data.items.create[0].quantity,
+              warehouseId: 'warehouse-main',
+              zoneId: 'zone-main',
+              slotId: 'A01',
+              level: 'L1',
+            },
+          ],
+        };
+        receipts.set(data.idempotencyKey, transaction);
+        return transaction;
+      }),
+      updateItemQuantitySnapshot: jest.fn().mockResolvedValue({
+        quantity: 40,
+        updatedAt: new Date('2026-08-11T01:00:00.000Z'),
+      }),
+      upsertLocationStock: jest.fn().mockResolvedValue({ quantity: 40 }),
+      createActivityLog: jest.fn().mockResolvedValue({}),
+      createOutboxEvent: jest.fn().mockResolvedValue({}),
+    };
+    const inventoryEvents = {
+      transactionCreated: jest.fn(),
+      stockBucketUpdated: jest.fn(),
+      stockPosted: jest.fn(),
+    };
+    const service = new InventoryService(
+      repository as unknown as InventoryRepository,
+      {} as never,
+      inventoryEvents as never,
+      { emit: jest.fn() } as never,
+      { append: jest.fn() } as never,
+      { track: jest.fn() } as never,
+    );
+    const command = {
+      type: 'IMPORT' as const,
+      referenceModule: 'PURCHASE_ORDER',
+      referenceId: 'po-1',
+      items: [
+        {
+          inventoryItemId: 'material-1',
+          quantity: 40,
+          warehouseId: 'warehouse-main',
+          zoneId: 'zone-main',
+          slotId: 'A01',
+          level: 'L1',
+        },
+      ],
+    };
+
+    const first = await service.createTransaction(command, 'po-1-receipt-1');
+    const replay = await service.createTransaction(command, 'po-1-receipt-1');
+    const second = await service.createTransaction(command, 'po-1-receipt-2');
+
+    expect(replay.id).toBe(first.id);
+    expect(second.id).not.toBe(first.id);
+    expect(repository.findTransactionByReference).not.toHaveBeenCalled();
+    expect(repository.createTransaction).toHaveBeenCalledTimes(2);
+    expect(repository.updateItemQuantitySnapshot).toHaveBeenCalledTimes(2);
+    expect(repository.upsertLocationStock).toHaveBeenCalledTimes(2);
+    expect(repository.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        referenceModule: 'PURCHASE_ORDER',
+        referenceId: 'po-1',
+        idempotencyKey: 'inventory-command:po-1-receipt-1',
+        commandHash: expect.any(String),
+      }),
+      tx,
+    );
+
+    await expect(
+      service.createTransaction(
+        {
+          ...command,
+          items: [{ ...command.items[0], quantity: 5 }],
+        },
+        'po-1-receipt-1',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.createTransaction).toHaveBeenCalledTimes(2);
+    expect(repository.createActivityLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'INVENTORY_IDEMPOTENCY_CONFLICT' }),
     );
   });
 
@@ -251,9 +440,26 @@ describe('InventoryService multi-material foundation', () => {
         work({ transaction: true }),
       ),
       findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findTransactionByIdempotencyKey: jest.fn().mockResolvedValue(null),
       findTransactionByReference: jest.fn().mockResolvedValue(existing),
       createActivityLog: jest.fn().mockResolvedValue({}),
       createTransaction: jest.fn(),
+      findWarehousesByIds: jest.fn().mockResolvedValue([
+        {
+          id: 'main',
+          code: 'MAIN',
+          active: true,
+          allowReceipt: true,
+          allowIssue: true,
+        },
+        {
+          id: 'production',
+          code: 'PRODUCTION',
+          active: true,
+          allowReceipt: true,
+          allowIssue: true,
+        },
+      ]),
     };
     const service = new InventoryService(
       repository as unknown as InventoryRepository,
@@ -359,6 +565,22 @@ describe('InventoryService multi-material foundation', () => {
       nextOperationalCode: jest.fn().mockResolvedValue('DC-00001'),
       createTransaction: jest.fn().mockResolvedValue(transaction),
       updateItemQuantitySnapshot: jest.fn(),
+      findWarehousesByIds: jest.fn().mockResolvedValue([
+        {
+          id: 'warehouse-main',
+          code: 'MAIN',
+          active: true,
+          allowReceipt: true,
+          allowIssue: true,
+        },
+        {
+          id: 'warehouse-production',
+          code: 'PRODUCTION',
+          active: true,
+          allowReceipt: true,
+          allowIssue: true,
+        },
+      ]),
       upsertLocationStock: jest
         .fn()
         .mockResolvedValueOnce({ quantity: 60 })

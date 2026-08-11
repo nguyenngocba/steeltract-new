@@ -19,6 +19,7 @@ import { useProductionReservations } from '../../../production/hooks/useProducti
 import { componentsInput, componentsMutedButton, componentsPrimaryButton } from './ComponentsCockpitShared'
 import { formatLocalDateTimeInput } from '@/shared/utils/date-time'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { warehouseAllows, type WarehouseMetadata } from '../../../inventory/utils/warehouse-capabilities'
 
 type MaterialStockRow = {
   id: string
@@ -68,7 +69,7 @@ type InventoryItemLike = {
   minimumStock?: number
   averageCost?: number
   updatedAt?: string
-  zone?: { id?: string; warehouse?: { id?: string; code?: string } }
+  zone?: { id?: string; warehouse?: WarehouseMetadata }
   locationBalances?: LocationBalanceLike[]
 }
 
@@ -89,25 +90,11 @@ function numeric(value: unknown) {
 }
 
 function isProductionWarehouseBalance(location: LocationBalanceLike) {
-  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(location, 'allowProduction')
 }
 
 function isProductionTransactionLine(line: any, transaction?: any) {
-  const code = String(
-    line?.warehouse?.code ??
-      line?.zone?.warehouse?.code ??
-      transaction?.warehouse?.code ??
-      '',
-  ).trim().toUpperCase()
-  const name = String(
-    line?.warehouse?.name ??
-      line?.zone?.warehouse?.name ??
-      transaction?.warehouse?.name ??
-      '',
-  ).trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(line, 'allowProduction') || warehouseAllows(transaction, 'allowProduction')
 }
 
 function productionBalanceLocationLabel(location: LocationBalanceLike) {
@@ -200,8 +187,8 @@ export function ComponentsMaterialStockPage() {
         zoneId: location.zoneId,
         slotId: location.slotId,
         level: location.level,
-        returnWarehouseId: item.zone?.warehouse?.code === 'MAIN' ? item.zone.warehouse.id : undefined,
-        returnZoneId: item.zone?.warehouse?.code === 'MAIN' ? item.zone.id : undefined,
+        returnWarehouseId: warehouseAllows(item.zone, 'allowReceipt') && !warehouseAllows(item.zone, 'allowProduction') ? item.zone?.warehouse?.id ?? undefined : undefined,
+        returnZoneId: warehouseAllows(item.zone, 'allowReceipt') && !warehouseAllows(item.zone, 'allowProduction') ? item.zone?.id : undefined,
         warehouse: location.warehouseName ?? 'Kho vật tư sản xuất',
         location: productionBalanceLocationLabel(location),
         currentStock,
@@ -480,7 +467,7 @@ export function ComponentsMaterialStockPage() {
                     ) : (
                       <tr>
                         <td colSpan={9} className="px-2 py-10">
-                          <ModuleEmptyState icon={<Package size={18} />} title="Chưa có tồn kho sản xuất" description="Không tìm thấy balance hiện tại trong kho PRODUCTION phù hợp với bộ lọc." />
+                          <ModuleEmptyState icon={<Package size={18} />} title="Chưa có tồn kho sản xuất" description="Không tìm thấy số dư hiện tại trong kho có capability sản xuất phù hợp với bộ lọc." />
                         </td>
                       </tr>
                     )}
@@ -534,7 +521,7 @@ export function ComponentsMaterialStockPage() {
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
                 <h2 className="text-base font-bold text-white">Toàn bộ kho vật tư sản xuất (Chi tiết Level 2)</h2>
-                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} balance vật tư hiện tại trong kho PRODUCTION với đầy đủ thông số kho, giá trị và đơn giá</p>
+                <p className="text-xs text-slate-400">Tổng cộng {filtered.length} số dư vật tư hiện tại trong kho sản xuất với đầy đủ thông số kho, giá trị và đơn giá</p>
               </div>
               <button
                 type="button"

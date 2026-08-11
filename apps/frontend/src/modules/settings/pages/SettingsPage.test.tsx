@@ -15,6 +15,7 @@ const apiMocks = vi.hoisted(() => ({
   createMasterDataRecord: vi.fn(),
   updateMasterDataRecord: vi.fn(),
   deactivateMasterDataRecord: vi.fn(),
+  getMasterDataDependencies: vi.fn(),
   getUnitsOfMeasure: vi.fn(),
   createUnitOfMeasure: vi.fn(),
   updateUnitOfMeasure: vi.fn(),
@@ -34,6 +35,11 @@ vi.mock('@/modules/master-data/api/master-data.api', () => ({
   createMasterDataRecord: apiMocks.createMasterDataRecord,
   updateMasterDataRecord: apiMocks.updateMasterDataRecord,
   deactivateMasterDataRecord: apiMocks.deactivateMasterDataRecord,
+  getMasterDataDependencies: apiMocks.getMasterDataDependencies,
+}))
+
+vi.mock('@/lib/auth/usePermission', () => ({
+  usePermission: () => true,
 }))
 
 vi.mock('@/modules/master-data/uom/api/uom.api', () => ({
@@ -121,6 +127,32 @@ const material = {
   updatedAt: '2026-07-29T00:00:00.000Z',
 }
 
+const warehouseType = {
+  id: 'warehouse-type-main',
+  code: 'MAIN',
+  name: 'Kho chính',
+  active: true,
+  displayOrder: 10,
+  createdAt: '2026-08-10T00:00:00.000Z',
+  updatedAt: '2026-08-10T00:00:00.000Z',
+}
+
+const warehouse = {
+  id: 'warehouse-1',
+  code: 'WH-01',
+  name: 'Kho trung tâm',
+  active: true,
+  warehouseTypeId: warehouseType.id,
+  warehouseType,
+  displayOrder: 10,
+  allowReceipt: true,
+  allowIssue: true,
+  allowProduction: false,
+  usageCount: 0,
+  createdAt: '2026-08-10T00:00:00.000Z',
+  updatedAt: '2026-08-10T00:00:00.000Z',
+}
+
 function mockBaseApis() {
   apiMocks.systemApi.overview.mockResolvedValue({
     company: {},
@@ -164,6 +196,14 @@ function mockBaseApis() {
         count: 1,
       },
       {
+        key: 'warehouses',
+        label: 'Kho',
+        status: 'REAL_EDITABLE',
+        source: '/master-data/warehouses',
+        editable: true,
+        count: 1,
+      },
+      {
         key: 'uom',
         label: 'Đơn vị & Quy đổi',
         status: 'REAL_EDITABLE',
@@ -178,7 +218,11 @@ function mockBaseApis() {
       ? [category]
       : domain === 'material-usage-types'
         ? [materialUsageType]
-        : [materialType],
+        : domain === 'warehouse-types'
+          ? [warehouseType]
+          : domain === 'warehouses'
+            ? [warehouse]
+            : [materialType],
   )
   apiMocks.getUnitsOfMeasure.mockResolvedValue([unit])
   apiMocks.useInventoryItems.mockReturnValue({ data: [material], isLoading: false })
@@ -219,8 +263,14 @@ describe('Settings master data CRUD workspaces', () => {
 
     fireEvent.click(await screen.findByText('Danh mục vật tư'))
 
-    expect(await screen.findByText('Master Data · Danh mục vật tư')).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Danh mục vật tư' })).toBeInTheDocument()
     expect(await screen.findByText('CAT-1')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('CAT-1'))
+    expect(await screen.findByRole('dialog', { name: /CAT-1/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Tổng quan' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Phụ thuộc' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Lịch sử' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Thiết lập' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByText('Thêm danh mục'))
     fireEvent.change(screen.getByLabelText('Mã *'), {
@@ -247,24 +297,56 @@ describe('Settings master data CRUD workspaces', () => {
 
     fireEvent.click(await screen.findByText('Danh mục vật tư'))
     expect(await screen.findByText('CAT-1')).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Đóng modal'))
+    fireEvent.click(screen.getByLabelText('Đóng workspace'))
 
     fireEvent.click(await screen.findByText('Loại vật tư'))
     expect(await screen.findByText('PRIMARY')).toBeInTheDocument()
     expect(screen.getByText('Vật tư chính')).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Đóng modal'))
+    fireEvent.click(screen.getByLabelText('Đóng workspace'))
 
     fireEvent.click(await screen.findByText('Material Master'))
     expect(await screen.findByText('MAT-1')).toBeInTheDocument()
     expect(screen.getByText('Vật tư chính')).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Đóng modal'))
+    fireEvent.click(screen.getByLabelText('Đóng workspace'))
 
     fireEvent.click(await screen.findByText('Quy cách / Nhóm kỹ thuật'))
     expect(await screen.findByText('PLATE')).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Đóng modal'))
+    fireEvent.click(screen.getByLabelText('Đóng workspace'))
 
     fireEvent.click(await screen.findByText('Đơn vị & Quy đổi'))
     expect(await screen.findByText('KG')).toBeInTheDocument()
     expect(screen.getByText('Kilogram')).toBeInTheDocument()
+  })
+
+  it('opens Warehouse Master and submits canonical type and capability fields', async () => {
+    apiMocks.createMasterDataRecord.mockResolvedValue({
+      ...warehouse,
+      id: 'warehouse-2',
+      code: 'WH-02',
+      name: 'Kho mới',
+    })
+
+    renderSettings()
+
+    fireEvent.click(await screen.findByText('Kho'))
+    expect(await screen.findByText('WH-01')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Thêm kho'))
+    fireEvent.change(screen.getByLabelText('Mã kho *'), { target: { value: 'WH-02' } })
+    fireEvent.change(screen.getByLabelText('Tên kho *'), { target: { value: 'Kho mới' } })
+    fireEvent.change(screen.getByLabelText('Loại kho *'), { target: { value: warehouseType.id } })
+    fireEvent.click(screen.getByText('Cho phép nhập kho'))
+    fireEvent.click(screen.getByText('Tạo Kho'))
+
+    await waitFor(() => {
+      expect(apiMocks.createMasterDataRecord).toHaveBeenCalledWith({
+        domain: 'warehouses',
+        payload: expect.objectContaining({
+          code: 'WH-02',
+          name: 'Kho mới',
+          warehouseTypeId: warehouseType.id,
+          allowReceipt: true,
+        }),
+      })
+    })
   })
 })

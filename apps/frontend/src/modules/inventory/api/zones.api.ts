@@ -41,6 +41,21 @@ export type WarehouseMaster = {
   description?: string | null
   active: boolean
   color?: string | null
+  warehouseTypeId?: string | null
+  warehouseType?: { id: string; code: string; name: string } | null
+  displayOrder?: number
+  allowReceipt?: boolean
+  allowIssue?: boolean
+  allowProduction?: boolean
+  allowQc?: boolean
+  allowDispatch?: boolean
+  allowInstallation?: boolean
+  allowSupplierReturn?: boolean
+  allowScrap?: boolean
+  allowReverse?: boolean
+  dashboardVisible?: boolean
+  planningVisible?: boolean
+  reportingVisible?: boolean
 }
 
 export type WarehouseLocationDetail = WarehouseLocation & {

@@ -27,7 +27,7 @@ import type {
 import { DictionariesService } from './dictionaries.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('master-data.read')
+@RequirePermissions('settings.view')
 @Controller('master-data')
 export class DictionariesController {
   constructor(
@@ -48,8 +48,16 @@ export class DictionariesController {
     return this.dictionariesService.findAll(domain, query);
   }
 
+  @Get(':domain/:id/dependencies')
+  dependencies(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+  ) {
+    return this.dictionariesService.dependencies(domain, id);
+  }
+
   @Post(':domain')
-  @RequirePermissions('master-data.write')
+  @RequirePermissions('settings.edit')
   create(
     @Param('domain') domain: string,
     @Body(new ZodValidationPipe(dictionaryPayloadSchema))
@@ -59,7 +67,7 @@ export class DictionariesController {
   }
 
   @Patch(':domain/:id')
-  @RequirePermissions('master-data.write')
+  @RequirePermissions('settings.edit')
   update(
     @Param('domain') domain: string,
     @Param('id') id: string,
@@ -70,7 +78,7 @@ export class DictionariesController {
   }
 
   @Delete(':domain/:id')
-  @RequirePermissions('master-data.write')
+  @RequirePermissions('settings.edit')
   deactivate(
     @Param('domain') domain: string,
     @Param('id') id: string,

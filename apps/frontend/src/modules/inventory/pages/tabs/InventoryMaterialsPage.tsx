@@ -20,6 +20,7 @@ import { useMaterialDetail } from '../../hooks/useMaterialDetail'
 import { useZones } from '../../hooks/useZones'
 import { useInventoryMaterials, useInventoryOverview } from '../../hooks/useInventoryReadModels'
 import { formatCurrencyVnd, formatQuantity, parseLocaleNumber } from '@/shared/utils/number-format'
+import { warehouseAllows } from '../../utils/warehouse-capabilities'
 
 const PAGE_SIZE = 16
 const CHART_PAGE_SIZE = 6
@@ -125,15 +126,11 @@ function rowLocations(item: any) {
 }
 
 function isMainWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+  return warehouseAllows(location, 'allowReceipt') && !warehouseAllows(location, 'allowProduction')
 }
 
 function isProductionWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(location, 'allowProduction')
 }
 
 function allLocationBalances(item: any) {
@@ -559,10 +556,7 @@ export function InventoryMaterialsPage() {
 
     const isMainWarehouseLine = (line: any) => {
       const warehouse = line?.warehouse ?? line?.zone?.warehouse
-      if (!warehouse) return true
-      const code = String(warehouse.code ?? '').trim().toUpperCase()
-      const name = String(warehouse.name ?? '').trim().toLowerCase()
-      return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+      return warehouseAllows(warehouse, 'allowReceipt') && !warehouseAllows(warehouse, 'allowProduction')
     }
 
     const stockAt = (row: any, endDate: Date) => {

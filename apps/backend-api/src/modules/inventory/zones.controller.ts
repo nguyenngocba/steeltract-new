@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,11 +8,15 @@ import {
   Patch,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 
 import { InventoryRepository } from './inventory.repository'
 import { InventoryReadModelService } from './inventory-read-model.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../rbac/guards/permissions.guard'
 
 type ZonePayload = {
   code?: string
@@ -106,6 +111,8 @@ const buildCellOccupancy = (items: OccupancyItem[], includeMaterials = false) =>
   return Array.from(occupancy.values()).sort((a, b) => a.key.localeCompare(b.key))
 }
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('inventory.view')
 @Controller('inventory/zones')
 export class ZonesController {
   constructor(
@@ -125,26 +132,37 @@ export class ZonesController {
   }
 
   @Post()
+  @RequirePermissions('inventory.edit')
   async createZone(@Body() body: ZonePayload) {
-    return this.inventoryRepository.createZone(this.toCreateZoneData(body))
+    const warehouseId = await this.requireActiveWarehouse(body.warehouseId)
+    return this.inventoryRepository.createZone(
+      this.toCreateZoneData({ ...body, warehouseId }),
+    )
   }
 
   @Put(':id')
+  @RequirePermissions('inventory.edit')
   async updateZone(@Param('id') id: string, @Body() body: ZonePayload) {
+    if (body.warehouseId !== undefined) {
+      body.warehouseId = await this.requireActiveWarehouse(body.warehouseId)
+    }
     return this.inventoryRepository.updateZone(id, this.toUpdateZoneData(body))
   }
 
   @Patch(':id/activate')
+  @RequirePermissions('inventory.edit')
   async activateZone(@Param('id') id: string) {
     return this.inventoryRepository.updateZone(id, { active: true })
   }
 
   @Patch(':id/deactivate')
+  @RequirePermissions('inventory.edit')
   async deactivateZone(@Param('id') id: string) {
     return this.inventoryRepository.updateZone(id, { active: false })
   }
 
   @Delete(':id')
+  @RequirePermissions('inventory.edit')
   async deleteZone(@Param('id') id: string) {
     return this.inventoryRepository.updateZone(id, { active: false })
   }
@@ -179,5 +197,17 @@ export class ZonesController {
     if (body.warehouseId !== undefined) data.warehouseId = normalizeText(body.warehouseId)
 
     return data
+  }
+
+  private async requireActiveWarehouse(value?: string) {
+    const warehouseId = normalizeText(value)
+    if (!warehouseId) {
+      throw new BadRequestException('Parent warehouse is required.')
+    }
+    const warehouse = await this.inventoryRepository.findWarehouseById(warehouseId)
+    if (!warehouse?.active) {
+      throw new BadRequestException('Parent warehouse is invalid or inactive.')
+    }
+    return warehouse.id
   }
 }

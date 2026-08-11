@@ -16,7 +16,7 @@ import {
   InventoryPostingTransaction,
 } from './inventory-posting.types';
 
-type PostingKind = 'ISSUE' | 'RETURN';
+type PostingKind = 'ISSUE' | 'RETURN' | 'RECEIVE';
 
 @Injectable()
 export class InventoryPostingService {
@@ -39,6 +39,18 @@ export class InventoryPostingService {
     return this.post('RETURN', command, tx);
   }
 
+  receiveMaterial(
+    command: InventoryMaterialPostingCommand,
+    tx: InventoryPostingTransaction,
+  ) {
+    if (!command.idempotencyKey || !command.commandHash) {
+      throw new BadRequestException(
+        'Inventory receipt requires idempotency identity',
+      );
+    }
+    return this.post('RECEIVE', command, tx);
+  }
+
   private async post(
     kind: PostingKind,
     command: InventoryMaterialPostingCommand,
@@ -51,7 +63,11 @@ export class InventoryPostingService {
     }
 
     const type =
-      kind === 'ISSUE' ? TransactionType.EXPORT : TransactionType.RETURN;
+      kind === 'ISSUE'
+        ? TransactionType.EXPORT
+        : kind === 'RECEIVE'
+          ? TransactionType.IMPORT
+          : TransactionType.RETURN;
     const direction = kind === 'ISSUE' ? 'OUT' : 'IN';
     const materialIds = [
       ...new Set(command.lines.map((line) => line.inventoryItemId)),
@@ -106,13 +122,20 @@ export class InventoryPostingService {
     );
     const signedLines = command.lines.map((line) => {
       const quantity = kind === 'ISSUE' ? -line.quantity : line.quantity;
-      const unitPrice = costs.get(line.inventoryItemId) ?? 0;
+      const unitPrice =
+        line.unitPrice != null
+          ? Math.abs(Number(line.unitPrice))
+          : (costs.get(line.inventoryItemId) ?? 0);
+      const totalAmount =
+        line.totalAmount != null
+          ? Math.abs(Number(line.totalAmount))
+          : Math.abs(quantity) * unitPrice;
 
       return {
         ...line,
         quantity,
         unitPrice,
-        totalAmount: Math.abs(quantity) * unitPrice,
+        totalAmount,
       };
     });
     const headerWarehouseId = sharedLineValue(
@@ -130,8 +153,12 @@ export class InventoryPostingService {
         type,
         direction,
         performedBy: command.performedBy,
+        supplierId: command.supplierId,
         referenceModule: command.referenceModule,
         referenceId: command.referenceId,
+        idempotencyKey: command.idempotencyKey,
+        commandHash: command.commandHash,
+        transactionDate: command.transactionDate,
         remarks: command.remarks ?? '',
         ...(headerWarehouseId && {
           warehouse: { connect: { id: headerWarehouseId } },
@@ -145,6 +172,9 @@ export class InventoryPostingService {
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             totalAmount: line.totalAmount,
+            ...(line.unitId && {
+              unit: { connect: { id: line.unitId } },
+            }),
             ...(line.warehouseId && {
               warehouse: { connect: { id: line.warehouseId } },
             }),
@@ -238,7 +268,11 @@ export class InventoryPostingService {
       const balance = materialBalances.get(line.inventoryItemId);
       if (!unit || !balance || !line.warehouseId) continue;
       await this.inventoryEvents.stockPosted(
-        kind === 'ISSUE' ? 'inventory.issued' : 'inventory.returned',
+        kind === 'ISSUE'
+          ? 'inventory.issued'
+          : kind === 'RECEIVE'
+            ? 'inventory.received'
+            : 'inventory.returned',
         {
           inventoryTransactionId: transaction.id,
           transactionCode: transaction.transactionNo ?? transaction.code,

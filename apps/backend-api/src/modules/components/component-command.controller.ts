@@ -40,12 +40,13 @@ import { ComponentCommandService } from './services/component-command.service';
 type AuthenticatedRequest = Request & { user?: AuthUser };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('components.write')
+@RequirePermissions('components.edit')
 @Controller('components/commands')
 export class ComponentCommandController {
   constructor(private readonly commands: ComponentCommandService) {}
 
   @Post()
+  @RequirePermissions('components.create')
   createComponent(
     @Body(new ZodValidationPipe(createComponentCommandSchema))
     body: CreateComponentCommandDto,
@@ -154,6 +155,7 @@ export class ComponentCommandController {
   }
 
   @Post(':componentId/revisions/:revisionId/release')
+  @RequirePermissions('components.release')
   releaseRevision(
     @Param('componentId') componentId: string,
     @Param('revisionId') revisionId: string,
@@ -190,6 +192,7 @@ export class ComponentCommandController {
   }
 
   @Post(':componentId/archive')
+  @RequirePermissions('components.delete')
   archiveComponent(
     @Param('componentId') componentId: string,
     @Body(new ZodValidationPipe(archiveComponentCommandSchema))

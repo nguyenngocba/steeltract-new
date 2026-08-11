@@ -15,6 +15,9 @@ const baseUrl = process.env.RUNTIME_API_URL ?? env.RUNTIME_API_URL ?? 'http://12
 const runPrefix = process.env.RUNTIME_RUN_PREFIX ?? 'SYSTEM-RUNTIME1';
 const runId = `${runPrefix}-${Date.now()}`;
 const includeReverse = process.env.RUNTIME_INCLUDE_REVERSE !== 'false';
+const useProcurement = process.env.RUNTIME_USE_PROCUREMENT === 'true';
+const canonicalMaterialReturnQty = Number(process.env.RUNTIME_CANONICAL_MATERIAL_RETURN_QTY ?? 0);
+const consumedMaterialQty = Number(process.env.RUNTIME_CONSUMED_MATERIAL_QTY ?? 5);
 const evidence = { runId, baseUrl, startedAt: new Date().toISOString(), steps: [], assertions: [] };
 
 function assert(condition, message, details) {
@@ -86,10 +89,17 @@ const baseline = {
   executive: await request('Baseline Executive dashboard', 'GET', '/dashboard/executive-cockpit', { token }),
 };
 
+const warehouses = dataOf(await request('Read canonical warehouses', 'GET', '/master-data/warehouses?active=true', { token }));
+const materialWarehouse = warehouses.find((warehouse) => warehouse.active && warehouse.allowReceipt && !warehouse.allowProduction);
+const productionWarehouse = warehouses.find((warehouse) => warehouse.active && warehouse.allowProduction);
+assert(materialWarehouse && productionWarehouse, 'Required warehouse capabilities are configured', {
+  materialWarehouse: materialWarehouse?.id,
+  productionWarehouse: productionWarehouse?.id,
+});
 const zones = dataOf(await request('Read inventory zones', 'GET', '/inventory/zones?limit=100', { token }));
-const mainZone = zones.find((zone) => zone.warehouseId === 'wh-main-steeltrack');
-const productionZone = zones.find((zone) => zone.warehouseId === 'wh-production-steeltrack');
-assert(mainZone && productionZone, 'MAIN and PRODUCTION warehouse zones exist', {
+const mainZone = zones.find((zone) => zone.warehouseId === materialWarehouse.id);
+const productionZone = zones.find((zone) => zone.warehouseId === productionWarehouse.id);
+assert(mainZone && productionZone, 'Warehouse zones exist for required capabilities', {
   mainZone: mainZone?.id, productionZone: productionZone?.id,
 });
 const categories = dataOf(await request('Read inventory categories', 'GET', '/inventory/categories?limit=100', { token }));
@@ -105,23 +115,94 @@ const material = await request('Create runtime material', 'POST', '/inventory/it
   },
 });
 
-const receiptBody = {
-  type: 'IMPORT', referenceModule: runPrefix, referenceId: `${runId}:receipt`,
-  remarks: `${runId} receipt`,
-  items: [{ inventoryItemId: material.id, quantity: 100, unitId: 'uom_pcs', unitPrice: 25000,
-    warehouseId: 'wh-main-steeltrack', zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' }],
-};
-const receiptKey = `${runId}:receipt`;
-const receipt = await request('Receipt material', 'POST', '/inventory/transactions', {
-  token, body: receiptBody, headers: { 'Idempotency-Key': receiptKey },
-});
-const replay = await request('Replay identical receipt', 'POST', '/inventory/transactions', {
-  token, body: receiptBody, headers: { 'Idempotency-Key': receiptKey },
-});
-assert(receipt.id === replay.id, 'Identical idempotent receipt returns the original transaction', { receipt: receipt.id, replay: replay.id });
-await request('Reject same idempotency key with different payload', 'POST', '/inventory/transactions', {
-  token, body: { ...receiptBody, remarks: `${runId} conflict` }, headers: { 'Idempotency-Key': receiptKey }, expected: [409],
-});
+let supplier;
+let purchaseRequest;
+let purchaseOrder;
+let procurementReceipts = [];
+let receipt;
+if (useProcurement) {
+  supplier = await request('Create Supplier', 'POST', '/suppliers', {
+    token,
+    body: { code: `${runId}-SUP`, name: `${runId} Supplier`, contact: 'E2E Certification' },
+  });
+  purchaseRequest = await request('Create Purchase Request', 'POST', '/material-requests', {
+    token,
+    body: {
+      requestNumber: `${runId}-PR`,
+      reason: `${runId} production material requirement`,
+      items: [{ materialId: material.id, quantity: 100 }],
+    },
+  });
+  await request('Reject Draft Purchase Request approval', 'PATCH', `/material-requests/${purchaseRequest.id}/approve`, {
+    token, expected: [400],
+  });
+  purchaseRequest = await request('Submit Purchase Request', 'PATCH', `/material-requests/${purchaseRequest.id}/submit`, { token });
+  purchaseRequest = await request('Approve Purchase Request', 'PATCH', `/material-requests/${purchaseRequest.id}/approve`, { token });
+  purchaseOrder = await request('Create Purchase Order', 'POST', '/purchase-orders', {
+    token,
+    body: {
+      poNumber: `${runId}-PURCHASE-ORDER`,
+      materialRequestId: purchaseRequest.id,
+      supplierId: supplier.id,
+      items: [{ materialId: material.id, uomId: 'uom_pcs', warehouseId: materialWarehouse.id, orderedQty: 100, unitPrice: 25000 }],
+    },
+  });
+  purchaseOrder = await request('Submit Purchase Order', 'PATCH', `/purchase-orders/${purchaseOrder.id}/submit`, { token });
+  purchaseOrder = await request('Approve Purchase Order', 'PATCH', `/purchase-orders/${purchaseOrder.id}/approve`, { token });
+  const purchaseOrderItemId = purchaseOrder.items[0].id;
+  for (const [index, quantity] of [40, 40, 20].entries()) {
+    procurementReceipts.push(await request(`Receive PO quantity ${quantity}`, 'POST', `/purchase-orders/${purchaseOrder.id}/receipts`, {
+      token,
+      headers: { 'Idempotency-Key': `${runId}:po-receipt:${index + 1}` },
+      body: {
+        remarks: `${runId} PO receipt ${index + 1}`,
+        items: [{ purchaseOrderItemId, quantity, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' }],
+      },
+    }));
+  }
+  receipt = procurementReceipts[0].receipt;
+  const replay = await request('Replay identical PO receipt', 'POST', `/purchase-orders/${purchaseOrder.id}/receipts`, {
+    token,
+    headers: { 'Idempotency-Key': `${runId}:po-receipt:3` },
+    body: {
+      remarks: `${runId} PO receipt 3`,
+      items: [{ purchaseOrderItemId, quantity: 20, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' }],
+    },
+  });
+  assert(replay.receipt.id === procurementReceipts[2].receipt.id, 'Identical PO receipt replay returns the original transaction', {
+    receipt: procurementReceipts[2].receipt.id, replay: replay.receipt.id,
+  });
+  await request('Reject PO receipt idempotency conflict', 'POST', `/purchase-orders/${purchaseOrder.id}/receipts`, {
+    token,
+    headers: { 'Idempotency-Key': `${runId}:po-receipt:3` },
+    body: {
+      remarks: `${runId} PO receipt 3`,
+      items: [{ purchaseOrderItemId, quantity: 10, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' }],
+    },
+    expected: [409],
+  });
+  assert(procurementReceipts.map((entry) => entry.order.status).join(',') === 'PARTIALLY_RECEIVED,PARTIALLY_RECEIVED,COMPLETED',
+    'Partial receipts move Purchase Order to completed',
+    { statuses: procurementReceipts.map((entry) => entry.order.status) });
+} else {
+  const receiptBody = {
+    type: 'IMPORT', referenceModule: runPrefix, referenceId: `${runId}:receipt`,
+    remarks: `${runId} receipt`,
+    items: [{ inventoryItemId: material.id, quantity: 100, unitId: 'uom_pcs', unitPrice: 25000,
+      warehouseId: materialWarehouse.id, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' }],
+  };
+  const receiptKey = `${runId}:receipt`;
+  receipt = await request('Receipt material', 'POST', '/inventory/transactions', {
+    token, body: receiptBody, headers: { 'Idempotency-Key': receiptKey },
+  });
+  const replay = await request('Replay identical receipt', 'POST', '/inventory/transactions', {
+    token, body: receiptBody, headers: { 'Idempotency-Key': receiptKey },
+  });
+  assert(receipt.id === replay.id, 'Identical idempotent receipt returns the original transaction', { receipt: receipt.id, replay: replay.id });
+  await request('Reject same idempotency key with different payload', 'POST', '/inventory/transactions', {
+    token, body: { ...receiptBody, remarks: `${runId} conflict` }, headers: { 'Idempotency-Key': receiptKey }, expected: [409],
+  });
+}
 
 await request('Transfer material to Production', 'POST', '/inventory/transactions', {
   token,
@@ -131,10 +212,22 @@ await request('Transfer material to Production', 'POST', '/inventory/transaction
     remarks: `${runId} transfer to production`,
     items: [
       { inventoryItemId: material.id, quantity: -60, unitId: 'uom_pcs', unitPrice: 25000,
-        warehouseId: 'wh-main-steeltrack', zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' },
+        warehouseId: materialWarehouse.id, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' },
       { inventoryItemId: material.id, quantity: 60, unitId: 'uom_pcs', unitPrice: 25000,
-        warehouseId: 'wh-production-steeltrack', zoneId: productionZone.id, slotId: `${runId}-PROD`, level: productionZone.level ?? 'L1' },
+        warehouseId: productionWarehouse.id, zoneId: productionZone.id, slotId: `${runId}-PROD`, level: productionZone.level ?? 'L1' },
     ],
+  },
+});
+
+const inventoryCount = await request('Post Inventory Count variance', 'POST', '/inventory/transactions', {
+  token,
+  headers: { 'Idempotency-Key': `${runId}:inventory-count` },
+  body: {
+    type: 'ADJUSTMENT', transactionTypeCode: 'ADJUSTMENT', referenceModule: runPrefix,
+    referenceId: `${runId}:inventory-count`, remarks: `${runId} cycle count +1`,
+    note: JSON.stringify({ kind: 'INVENTORY_ADJUSTMENT_AUDIT', systemQty: 40, actualQty: 41, difference: 1 }),
+    items: [{ inventoryItemId: material.id, quantity: 1, unitId: 'uom_pcs', unitPrice: 25000,
+      warehouseId: materialWarehouse.id, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' }],
   },
 });
 
@@ -177,13 +270,14 @@ activeRevision = await request('Release revision', 'POST', `/components/commands
   body: { expectedVersion: activeRevision.aggregateVersion, expectedComponentVersion: componentBeforeRelease.aggregateVersion },
 });
 
+const engineeringBasis = { componentId: component.id, componentRevisionId: activeRevision.id,
+  bomDefinitionId: activeRevision.bomDefinition.id, contentHash, verifiedAt: new Date().toISOString() };
 let order = await request('Create Production Order', 'POST', '/production/commands/orders', {
   token, headers: { 'Idempotency-Key': `${runId}:po-create` },
   body: {
     orderNo: `${runId}-PO`, title: `${runId} Production Order`, projectId: project.id,
     componentRequirementId: requirement.id, quantity: 1, unit: 'PCS',
-    engineeringBasis: { componentId: component.id, componentRevisionId: activeRevision.id,
-      bomDefinitionId: activeRevision.bomDefinition.id, contentHash, verifiedAt: new Date().toISOString() },
+    engineeringBasis,
   },
 });
 order = await request('Release Production Order', 'POST', `/production/commands/orders/${order.id}/release`, {
@@ -200,6 +294,7 @@ order = await request('Mark Production Order ready', 'POST', `/production/comman
 const issues = await request('Issue Production material', 'POST', `/production/reservations/${reservation.id}/issue`, {
   token, body: { remarks: runId },
 });
+let reverseTransfer;
 order = await request('Start Production Order', 'POST', `/production/commands/orders/${order.id}/start`, {
   token, headers: { 'Idempotency-Key': `${runId}:po-start` }, body: { expectedVersion: order.aggregateVersion, volatileGatesPassed: true },
 });
@@ -229,8 +324,14 @@ await request('Complete Work Order', 'POST', `/production/commands/work-orders/$
   body: { productionOrderId: order.id, expectedVersion: workOrder.aggregateVersion },
 });
 await request('Record Production material consumption', 'POST', `/production/${order.id}/consume`, {
-  token, body: { inventoryItemId: material.id, consumedQty: 5, scrapQty: 0, remark: runId },
+  token, body: { inventoryItemId: material.id, consumedQty: consumedMaterialQty, scrapQty: 0, remark: runId },
 });
+if (includeReverse && canonicalMaterialReturnQty > 0) {
+  reverseTransfer = await request('Return unused Production material through canonical Material Issue', 'POST', `/production/material-issues/${issues[0].id}/return`, {
+    token,
+    body: { quantity: canonicalMaterialReturnQty, remarks: `${runId} canonical production material return` },
+  });
+}
 await request('Record Production completion', 'POST', '/production/commands/completions', {
   token, headers: { 'Idempotency-Key': `${runId}:production-completion` },
   body: {
@@ -247,7 +348,19 @@ order = await request('Complete Production Order', 'POST', `/production/commands
 });
 
 const checklists = dataOf(await request('Read FINAL checklist', 'GET', '/qc/checklists?type=FINAL&isActive=true&limit=100', { token }));
-const checklist = checklists.find((item) => item.items?.length) ?? checklists[0];
+const checklist = checklists.find((item) => item.items?.length) ?? await request('Create runtime FINAL checklist', 'POST', '/qc/checklists', {
+  token,
+  body: {
+    code: `${runId}-FINAL`,
+    name: `${runId} Final Inspection`,
+    type: 'FINAL',
+    revision: 'A',
+    description: 'Runtime certification checklist',
+    isActive: true,
+    items: [{ sequence: 1, title: 'Final dimensional and visual acceptance', required: true }],
+    metadata: { fixture: runId },
+  },
+});
 assert(Boolean(checklist?.id && checklist.items?.[0]?.id), 'Active FINAL checklist with item exists');
 let inspection = await request('Create FINAL inspection', 'POST', '/qc/inspections', {
   token, body: { inspectionNo: `${runId}-QC`, checklistId: checklist.id, productionOrderId: order.id,
@@ -266,6 +379,14 @@ const finishedGoods = dataOf(await request('Read canonical Finished Goods', 'GET
 assert(finishedGoods.some((item) => item.id === instance.id), 'QC-passed instance appears in canonical Finished Goods');
 
 let availableSlots = dataOf(await request('Read available Yard slots', 'GET', '/yard/slots?status=AVAILABLE&limit=200', { token }));
+if (availableSlots.length === 0) {
+  const yardZones = dataOf(await request('Read active Yard zones for runtime capacity', 'GET', '/yard/zones?status=ACTIVE&limit=100', { token }));
+  assert(Boolean(yardZones[0]?.id), 'Active Yard zone exists for runtime capacity');
+  availableSlots = [await request('Create runtime Yard slot', 'POST', `/yard/zones/${yardZones[0].id}/slots`, {
+    token,
+    body: { code: `${runId}-YARD-1`, status: 'AVAILABLE', x: 0, y: Date.now() % 100000, width: 1, height: 1, maxStackLevel: 1, metadata: { fixture: runId } },
+  })];
+}
 const slot = availableSlots[0];
 assert(Boolean(slot?.id), 'Available Yard slot exists');
 const placement = await request('Stage ComponentInstance to Yard', 'POST', '/yard/stage', {
@@ -282,7 +403,7 @@ dispatch = await request('Receive dispatch', 'PATCH', `/logistics/dispatch-order
 dispatch = await request('Complete dispatch installation', 'PATCH', `/logistics/dispatch-orders/${dispatch.id}/complete`, { token, body: {} });
 
 let returnSlot;
-let reverseTransfer;
+let supplierReturn;
 if (includeReverse) {
   dispatch = await request('Request reverse logistics', 'PATCH', `/logistics/dispatch-orders/${dispatch.id}/return-request`, {
     token, body: { reason: `${runId} customer return` },
@@ -291,23 +412,52 @@ if (includeReverse) {
     token, body: { reason: `${runId} return transport` },
   });
   availableSlots = dataOf(await request('Read return Yard slot', 'GET', '/yard/slots?status=AVAILABLE&limit=200', { token }));
-  returnSlot = availableSlots.find((item) => item.id !== slot.id) ?? availableSlots[0];
+  returnSlot = availableSlots.find((item) => item.id !== slot.id);
+  if (!returnSlot) {
+    const yardZones = dataOf(await request('Read active Yard zones for return capacity', 'GET', '/yard/zones?status=ACTIVE&limit=100', { token }));
+    assert(Boolean(yardZones[0]?.id), 'Active Yard zone exists for return capacity');
+    returnSlot = await request('Create runtime return Yard slot', 'POST', `/yard/zones/${yardZones[0].id}/slots`, {
+      token,
+      body: { code: `${runId}-YARD-RETURN`, status: 'AVAILABLE', x: 1, y: Date.now() % 100000, width: 1, height: 1, maxStackLevel: 1, metadata: { fixture: runId } },
+    });
+  }
   dispatch = await request('Receive returned instance to Yard quarantine', 'PATCH', `/logistics/dispatch-orders/${dispatch.id}/return-to-yard`, {
     token, body: { reason: `${runId} return to yard`, placements: [{ componentInstanceId: instance.id, slotId: returnSlot.id }] },
   });
 
-  reverseTransfer = await request('Return unused Production material to MAIN', 'POST', '/inventory/transactions', {
-    token, headers: { 'Idempotency-Key': `${runId}:reverse-production-stock` },
-    body: {
-      type: 'TRANSFER', referenceModule: runPrefix, referenceId: `${runId}:reverse-production-stock`, remarks: runId,
-      items: [
-        { inventoryItemId: material.id, quantity: -5, unitId: 'uom_pcs', unitPrice: 25000,
-          warehouseId: 'wh-production-steeltrack', zoneId: productionZone.id, slotId: `${runId}-PROD`, level: productionZone.level ?? 'L1' },
-        { inventoryItemId: material.id, quantity: 5, unitId: 'uom_pcs', unitPrice: 25000,
-          warehouseId: 'wh-main-steeltrack', zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' },
-      ],
-    },
-  });
+  reverseTransfer = reverseTransfer ?? await request('Return unused Production material to MAIN', 'POST', '/inventory/transactions', {
+        token, headers: { 'Idempotency-Key': `${runId}:reverse-production-stock` },
+        body: {
+          type: 'TRANSFER', referenceModule: runPrefix, referenceId: `${runId}:reverse-production-stock`, remarks: runId,
+          items: [
+            { inventoryItemId: material.id, quantity: -5, unitId: 'uom_pcs', unitPrice: 25000,
+              warehouseId: productionWarehouse.id, zoneId: productionZone.id, slotId: `${runId}-PROD`, level: productionZone.level ?? 'L1' },
+            { inventoryItemId: material.id, quantity: 5, unitId: 'uom_pcs', unitPrice: 25000,
+              warehouseId: materialWarehouse.id, zoneId: mainZone.id, slotId: `${runId}-MAIN`, level: mainZone.level ?? 'L1' },
+          ],
+        },
+      });
+
+  if (useProcurement) {
+    supplierReturn = await request('Create Supplier Return from PO receipt', 'POST', `/purchase-orders/${purchaseOrder.id}/supplier-returns`, {
+      token,
+      body: {
+        receiptTransactionId: receipt.id,
+        remarks: `${runId} supplier return`,
+        items: [{ receiptItemId: receipt.items[0].id, quantity: 5 }],
+      },
+    });
+    supplierReturn = await request('Approve Supplier Return', 'PATCH', `/purchase-orders/${purchaseOrder.id}/supplier-returns/${supplierReturn.id}/approve`, { token, body: {} });
+    supplierReturn = await request('Receive Supplier Return', 'PATCH', `/purchase-orders/${purchaseOrder.id}/supplier-returns/${supplierReturn.id}/receive`, {
+      token, body: { warehouseId: materialWarehouse.id, items: [{ id: supplierReturn.items[0].id, receivedQuantity: 5, zoneId: mainZone.id }] },
+    });
+    supplierReturn = await request('Inspect Supplier Return', 'PATCH', `/purchase-orders/${purchaseOrder.id}/supplier-returns/${supplierReturn.id}/inspect`, {
+      token, body: { items: [{ id: supplierReturn.items[0].id, inspectedQuantity: 5, disposition: 'DAMAGED' }] },
+    });
+    supplierReturn = await request('Dispose Supplier Return', 'PATCH', `/purchase-orders/${purchaseOrder.id}/supplier-returns/${supplierReturn.id}/dispose`, {
+      token, body: { remarks: `${runId} returned to supplier` },
+    });
+  }
 }
 
 const finalState = {
@@ -331,7 +481,10 @@ if (includeReverse) assert(reverseTransfer?.id, 'Reverse Production stock transa
 
 const transactions = dataOf(await request('Read fixture inventory transactions', 'GET', `/inventory/transactions?page=1&pageSize=100&materialId=${material.id}`, { token }));
 const signedMovement = transactions.flatMap((tx) => tx.items ?? []).filter((item) => item.inventoryItemId === material.id).reduce((sum, item) => sum + Number(item.quantity), 0);
-assert(signedMovement === 95, 'Inventory movement conservation matches receipt minus production consumption', { signedMovement, expected: 95 });
+const expectedSignedMovement = 100 + 1 - 5 + canonicalMaterialReturnQty - (useProcurement && includeReverse ? 5 : 0);
+assert(signedMovement === expectedSignedMovement, 'Inventory movement conservation matches receipt, count, consumption and return', {
+  signedMovement, expected: expectedSignedMovement,
+});
 
 const activity = dataOf(await request('Read ActivityLog evidence', 'GET', '/system/activity-logs', { token }));
 const fixtureActivity = activity.filter((item) => JSON.stringify(item).includes(runId));
@@ -348,7 +501,11 @@ evidence.summary = {
   slowApis: evidence.steps.filter((step) => step.durationMs >= 500).map(({ label, path, durationMs }) => ({ label, path, durationMs })),
   ids: { materialId: material.id, projectId: project.id, componentId: component.id, requirementId: requirement.id,
     productionOrderId: order.id, componentInstanceId: instance.id, inspectionId: inspection.id, yardPlacementId: placement.id,
-    dispatchOrderId: dispatch.id, receiptId: receipt.id, reverseTransferId: reverseTransfer?.id ?? null },
+    dispatchOrderId: dispatch.id, receiptId: receipt.id, reverseTransferId: reverseTransfer?.id ?? null,
+    supplierId: supplier?.id ?? null, purchaseRequestId: purchaseRequest?.id ?? null,
+    purchaseOrderId: purchaseOrder?.id ?? null, supplierReturnId: supplierReturn?.id ?? null,
+    materialIssueId: issues[0]?.id ?? null,
+    inventoryCountId: inventoryCount.id },
   labels: {
     materialCode: material.code,
     projectCode: project.code,
@@ -357,7 +514,7 @@ evidence.summary = {
     productionOrderNo: order.orderNo,
     componentInstanceNo: instance.instanceNo,
     inspectionNo: inspection.inspectionNo,
-    dispatchOrderNo: dispatch.orderNo,
+    dispatchOrderNo: dispatch.orderNo ?? dispatch.code,
   },
   dashboardChanged: {
     inventory: JSON.stringify(baseline.inventory) !== JSON.stringify(finalState.inventory),
@@ -370,6 +527,11 @@ evidence.summary = {
   activityCount: workflowActivity.length,
   fixtureLinkedActivityCount: fixtureActivity.length,
   activityEventTypes: eventTypes,
+  expectedSignedMovement,
+  engineeringBasis,
+  canonicalMaterialReturnQty,
+  consumedMaterialQty,
+  procurementEnabled: useProcurement,
 };
 const output = process.env.RUNTIME_EVIDENCE_FILE ?? '/tmp/system-runtime1-business-evidence.json';
 await writeFile(output, JSON.stringify(evidence, null, 2));

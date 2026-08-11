@@ -217,6 +217,8 @@ export class InventorySnapshotRepository {
         select: {
           id: true,
           code: true,
+          allowReceipt: true,
+          allowProduction: true,
         },
       }),
       this.prisma.inventoryItem.findMany({
@@ -323,8 +325,13 @@ export class InventorySnapshotRepository {
       };
     });
 
-    const warehouseCodeById = new Map(
-      warehouses.map((warehouse) => [warehouse.id, warehouse.code.toUpperCase()]),
+    const mainWarehouseIds = new Set(
+      warehouses
+        .filter(
+          (warehouse) =>
+            warehouse.allowReceipt && !warehouse.allowProduction,
+        )
+        .map((warehouse) => warehouse.id),
     );
     const stockByMaterial = new Map<string, number>();
     const mainStockByMaterial = new Map<string, number>();
@@ -334,7 +341,7 @@ export class InventorySnapshotRepository {
         stock.inventoryItemId,
         (stockByMaterial.get(stock.inventoryItemId) ?? 0) + quantity,
       );
-      if (warehouseCodeById.get(stock.warehouseId ?? '') === 'MAIN') {
+      if (mainWarehouseIds.has(stock.warehouseId ?? '')) {
         mainStockByMaterial.set(
           stock.inventoryItemId,
           (mainStockByMaterial.get(stock.inventoryItemId) ?? 0) + quantity,
@@ -563,9 +570,12 @@ export class InventorySnapshotRepository {
           },
         },
         include: {
+          warehouse: {
+            include: { warehouseType: true },
+          },
           zone: {
             include: {
-              warehouse: true,
+              warehouse: { include: { warehouseType: true } },
             },
           },
         },
@@ -741,7 +751,9 @@ export class InventorySnapshotRepository {
           ),
       );
       const locationBalances = itemStocks
-        .map((row) => ({
+        .map((row) => {
+          const warehouse = row.warehouse ?? row.zone?.warehouse ?? null;
+          return {
           zoneId: row.zoneId,
           zoneCode: row.zone?.code ?? null,
           zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
@@ -749,10 +761,22 @@ export class InventorySnapshotRepository {
           level: row.level,
           row: row.zone?.row ?? null,
           column: row.zone?.column ?? null,
-          warehouseName: row.zone?.warehouse?.name ?? null,
-          warehouseCode: row.zone?.warehouse?.code ?? null,
+          warehouseId: warehouse?.id ?? null,
+          warehouseName: warehouse?.name ?? null,
+          warehouseCode: warehouse?.code ?? null,
+          warehouseType: warehouse?.warehouseType ?? null,
+          allowReceipt: warehouse?.allowReceipt ?? false,
+          allowIssue: warehouse?.allowIssue ?? false,
+          allowProduction: warehouse?.allowProduction ?? false,
+          allowQc: warehouse?.allowQc ?? false,
+          allowDispatch: warehouse?.allowDispatch ?? false,
+          allowInstallation: warehouse?.allowInstallation ?? false,
+          allowSupplierReturn: warehouse?.allowSupplierReturn ?? false,
+          allowScrap: warehouse?.allowScrap ?? false,
+          allowReverse: warehouse?.allowReverse ?? false,
           quantity: Number(row.quantity),
-        }))
+          };
+        })
         .sort((a, b) => b.quantity - a.quantity);
       const detailPayload = {
         item: {

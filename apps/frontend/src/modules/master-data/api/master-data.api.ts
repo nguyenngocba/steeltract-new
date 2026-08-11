@@ -68,3 +68,30 @@ export async function deactivateMasterDataRecord({
 
   return response.data
 }
+
+export type WarehouseDependencies = {
+  warehouse: { id: string; code: string; name: string }
+  dependencies: Record<
+    | 'inventory'
+    | 'locations'
+    | 'reservations'
+    | 'production'
+    | 'receipts'
+    | 'issues'
+    | 'transfers'
+    | 'dashboardDependencies',
+    number
+  >
+  total: number
+  canDeactivate: boolean
+}
+
+export async function getMasterDataDependencies(
+  domain: MasterDataDomainId,
+  id: string,
+) {
+  const response = await api.get<WarehouseDependencies>(
+    `/master-data/${domain}/${id}/dependencies`,
+  )
+  return response.data
+}

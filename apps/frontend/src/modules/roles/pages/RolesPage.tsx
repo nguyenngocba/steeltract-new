@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
   ChevronRight,
+  Copy,
   Plus,
   RefreshCw,
   Search,
@@ -29,6 +30,7 @@ import {
 import { systemApi, type RoleMatrix, type SystemRole } from '@/modules/system/api/system.api'
 import { getRoles } from '../api/roles.api'
 import { formatQuantity } from '@/shared/utils/number-format'
+import { ActionGuard, usePermission } from '@/shared/permissions/PermissionGuard'
 
 const fmt = (value = 0) => formatQuantity(value, 0)
 
@@ -53,6 +55,7 @@ export function RolesPage() {
   const [form, setForm] = useState<RoleForm>(emptyRoleForm)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const canManageRoles = usePermission('roles.edit')
 
   const { data = [], isLoading, refetch } = useQuery<SystemRole[]>({
     queryKey: ['system-roles'],
@@ -119,9 +122,11 @@ export function RolesPage() {
           <button className={moduleMutedButton} onClick={() => refetch()} type="button">
             <RefreshCw size={14} /> Làm mới
           </button>
-          <button className={modulePrimaryButton} type="button" onClick={() => setCreateOpen(true)}>
-            <Plus size={14} /> Thêm vai trò
-          </button>
+          <ActionGuard permission="roles.edit">
+            <button className={modulePrimaryButton} type="button" onClick={() => { setForm(emptyRoleForm); setCreateOpen(true) }}>
+              <Plus size={14} /> Thêm vai trò
+            </button>
+          </ActionGuard>
         </div>
       }
     >
@@ -186,6 +191,15 @@ export function RolesPage() {
             matrix={matrix}
             saving={replacePermissions.isPending}
             error={replacePermissions.error}
+            canManage={canManageRoles}
+            onClone={(role) => {
+              setForm({
+                name: `${role.name} Copy`,
+                description: role.description ?? '',
+                permissionIds: role.permissions.map((permission) => permission.id),
+              })
+              setCreateOpen(true)
+            }}
             onReplacePermissions={(roleId, permissionIds) => replacePermissions.mutate({ id: roleId, permissionIds })}
           />
         </aside>
@@ -207,6 +221,30 @@ function CreateRoleModal({ open, form, matrix, saving, error, onClose, onChange,
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-3">
             <FormSection title="Thông tin profile"><Field label="Tên profile *"><input className={inputClass} value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></Field><Field label="Mô tả"><input className={inputClass} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></Field></FormSection>
+            <FormSection title="Preset ERP">
+              <Field label="Khởi tạo từ profile chuẩn">
+                <select
+                  className={inputClass}
+                  defaultValue=""
+                  onChange={(event) => {
+                    const preset = matrix?.presets.find((item) => item.key === event.target.value)
+                    if (!preset) return
+                    const permissionNames = new Set(preset.permissions)
+                    onChange({
+                      ...form,
+                      permissionIds: permissions
+                        .filter((permission) => permissionNames.has(permission.name))
+                        .map((permission) => permission.id),
+                    })
+                  }}
+                >
+                  <option value="">Chọn preset...</option>
+                  {(matrix?.presets ?? []).map((preset) => (
+                    <option key={preset.key} value={preset.key}>{preset.label}</option>
+                  ))}
+                </select>
+              </Field>
+            </FormSection>
             <PermissionPicker matrix={matrix} selectedIds={form.permissionIds} onChange={(permissionIds) => onChange({ ...form, permissionIds })} />
           </div>
           <EffectiveRolePreview permissions={selected.map((permission) => permission.name)} roleName={form.name} />
@@ -217,7 +255,7 @@ function CreateRoleModal({ open, form, matrix, saving, error, onClose, onChange,
   )
 }
 
-function RoleDetailPanel({ role, matrix, saving, error, onReplacePermissions }: { role: SystemRole | null; matrix?: RoleMatrix; saving: boolean; error: unknown; onReplacePermissions: (roleId: string, permissionIds: string[]) => void }) {
+function RoleDetailPanel({ role, matrix, saving, error, canManage, onClone, onReplacePermissions }: { role: SystemRole | null; matrix?: RoleMatrix; saving: boolean; error: unknown; canManage: boolean; onClone: (role: SystemRole) => void; onReplacePermissions: (roleId: string, permissionIds: string[]) => void }) {
   const [permissionIds, setPermissionIds] = useState<string[]>([])
   useEffect(() => {
     setPermissionIds(role?.permissions.map((permission) => permission.id) ?? [])
@@ -227,26 +265,50 @@ function RoleDetailPanel({ role, matrix, saving, error, onReplacePermissions }: 
     <div className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-3 space-y-3">
       <div className="flex items-start justify-between gap-2 border-b border-cyan-300/10 pb-2"><div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Chi tiết Profile</h3><div className="mt-1 font-bold text-white text-base">{role.name}</div><p className="mt-1 text-xs text-slate-400">{role.description ?? 'Chưa có mô tả cho profile này.'}</p></div><StatusBadge used={role.userCount > 0} /></div>
       <div className="grid grid-cols-2 gap-2 text-xs"><Info label="Số người dùng" value={fmt(role.userCount)} /><Info label="Số quyền trực tiếp" value={fmt(role.permissions.length)} /></div>
-      <PermissionPicker matrix={matrix} selectedIds={permissionIds} onChange={setPermissionIds} compact />
+      <PermissionPicker matrix={matrix} selectedIds={permissionIds} onChange={setPermissionIds} compact readOnly={!canManage} />
       <EffectiveRolePreview permissions={(matrix?.permissions ?? []).filter((permission) => permissionIds.includes(permission.id)).map((permission) => permission.name)} roleName={role.name} compact />
       <ErrorText error={error} />
-      <button className={modulePrimaryButton} type="button" disabled={saving} onClick={() => onReplacePermissions(role.id, permissionIds)}>{saving ? 'Đang lưu...' : 'Lưu permission matrix'}</button>
+      {canManage && (
+        <div className="flex gap-2">
+          <button className={moduleMutedButton} type="button" onClick={() => onClone(role)}><Copy size={14} /> Clone</button>
+          <button className={modulePrimaryButton} type="button" disabled={saving} onClick={() => onReplacePermissions(role.id, permissionIds)}>{saving ? 'Đang lưu...' : 'Lưu permission matrix'}</button>
+        </div>
+      )}
     </div>
   )
 }
 
-function PermissionPicker({ matrix, selectedIds, onChange, compact = false }: { matrix?: RoleMatrix; selectedIds: string[]; onChange: (ids: string[]) => void; compact?: boolean }) {
+function PermissionPicker({ matrix, selectedIds, onChange, compact = false, readOnly = false }: { matrix?: RoleMatrix; selectedIds: string[]; onChange: (ids: string[]) => void; compact?: boolean; readOnly?: boolean }) {
   const modules = matrix?.modules ?? []
+  const actions = matrix?.actions ?? []
+  const toggleMany = (ids: string[]) => {
+    if (readOnly) return
+    const allSelected = ids.every((id) => selectedIds.includes(id))
+    onChange(allSelected
+      ? selectedIds.filter((id) => !ids.includes(id))
+      : Array.from(new Set([...selectedIds, ...ids])))
+  }
   return (
-    <FormSection title="Phạm vi module">
+    <FormSection title="Permission Matrix">
       <div className={`md:col-span-2 space-y-2 ${compact ? 'max-h-[280px]' : 'max-h-[420px]'} overflow-y-auto pr-1`}>
+        {!compact && !readOnly && (
+          <div className="flex flex-wrap gap-1 border-b border-cyan-300/10 pb-2">
+            <span className="mr-1 py-1 text-[10px] font-semibold uppercase text-slate-500">Chọn cột:</span>
+            {actions.map((action) => {
+              const ids = modules.flatMap((module) => module.permissions.filter((permission) => permission.action === action).map((permission) => permission.id))
+              if (!ids.length) return null
+              const active = ids.every((id) => selectedIds.includes(id))
+              return <button key={action} type="button" onClick={() => toggleMany(ids)} className={`rounded border px-2 py-1 text-[10px] ${active ? 'border-cyan-400/40 bg-cyan-400/15 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>{action}</button>
+            })}
+          </div>
+        )}
         {modules.map((module) => (
           <div key={module.key} className="rounded-xl border border-cyan-300/10 bg-slate-950/35 p-2">
-            <div className="mb-2 flex items-center justify-between"><b className="text-xs text-white">{module.label}</b><span className="text-[10px] text-slate-500">{module.permissions.length} quyền</span></div>
+            <div className="mb-2 flex items-center justify-between"><b className="text-xs text-white">{module.label}</b>{!readOnly && <button type="button" onClick={() => toggleMany(module.permissions.map((permission) => permission.id))} className="text-[10px] font-semibold text-cyan-300 hover:text-cyan-100">Chọn hàng ({module.permissions.length})</button>}</div>
             <div className="grid gap-1 md:grid-cols-2">
               {module.permissions.map((permission) => (
-                <label key={permission.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/5 bg-white/[0.03] px-2 py-1.5 text-xs text-slate-300 hover:border-cyan-300/30">
-                  <input type="checkbox" checked={selectedIds.includes(permission.id)} onChange={(event) => onChange(event.target.checked ? [...selectedIds, permission.id] : selectedIds.filter((id) => id !== permission.id))} />
+                <label key={permission.id} className={`flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.03] px-2 py-1.5 text-xs text-slate-300 ${readOnly ? '' : 'cursor-pointer hover:border-cyan-300/30'}`}>
+                  <input type="checkbox" disabled={readOnly} checked={selectedIds.includes(permission.id)} onChange={(event) => onChange(event.target.checked ? [...selectedIds, permission.id] : selectedIds.filter((id) => id !== permission.id))} />
                   <span><span className="font-mono text-cyan-300">{permission.name}</span><span className="ml-1 text-slate-500">({permission.capability})</span></span>
                 </label>
               ))}

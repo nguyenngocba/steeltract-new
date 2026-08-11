@@ -89,6 +89,9 @@ export function AppTopbar() {
           <button
             type="button"
             onClick={() => setOpenUserMenu((prev) => !prev)}
+            aria-label="Mở menu tài khoản"
+            aria-haspopup="menu"
+            aria-expanded={openUserMenu}
             className="flex items-center gap-2 rounded-2xl bg-zinc-800 px-2.5 py-1.5"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">

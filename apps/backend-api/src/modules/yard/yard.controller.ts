@@ -68,7 +68,7 @@ type AuthenticatedRequest = Request & {
 };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('yard.read')
+@RequirePermissions('yard.view')
 @Controller('yard')
 export class YardController {
   constructor(
@@ -164,7 +164,7 @@ export class YardController {
   }
 
   @Post('placements')
-  @RequirePermissions('yard.write')
+  @RequirePermissions('yard.stage')
   placeItem(
     @Body(new ZodValidationPipe(placeYardItemSchema))
     body: PlaceYardItemDto,
@@ -174,7 +174,7 @@ export class YardController {
   }
 
   @Post('stage')
-  @RequirePermissions('yard.write')
+  @RequirePermissions('yard.stage')
   stageComponentInstance(
     @Body(new ZodValidationPipe(stageComponentInstanceToYardSchema))
     body: StageComponentInstanceToYardDto,
@@ -184,7 +184,7 @@ export class YardController {
   }
 
   @Post('component-instances/:id/return')
-  @RequirePermissions('yard.write')
+  @RequirePermissions('yard.stage')
   returnComponentInstance(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(returnComponentInstanceToYardBodySchema))
@@ -198,7 +198,7 @@ export class YardController {
   }
 
   @Post('placements/:id/move')
-  @RequirePermissions('yard.write')
+  @RequirePermissions('yard.move')
   moveItem(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(moveYardItemSchema))
@@ -209,7 +209,7 @@ export class YardController {
   }
 
   @Post('placements/:id/remove')
-  @RequirePermissions('yard.write')
+  @RequirePermissions('yard.move')
   removeItem(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(removeYardItemSchema))

@@ -77,7 +77,7 @@ export function EnterpriseKpiCard({
   if (isSkeleton) {
     return (
       <section
-        className={`relative h-[108px] overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/90 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] animate-pulse ${className}`}
+        className={`relative h-[92px] overflow-hidden rounded-lg border border-white/10 bg-[#08111f]/90 p-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.2)] ring-1 ring-white/[0.025] animate-pulse ${className}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2 min-w-0 flex-1">
@@ -118,7 +118,7 @@ export function EnterpriseKpiCard({
     </>
   )
 
-  const cardClassName = `relative h-[108px] overflow-hidden ${COCKPIT_SHELL} text-left p-3 transition ${
+  const cardClassName = `relative h-[92px] overflow-hidden ${COCKPIT_SHELL} text-left p-3 transition ${
     active ? 'border-cyan-400/55 bg-cyan-400/10' : ''
   } ${onClick ? 'cursor-pointer hover:border-cyan-400/35 hover:bg-white/[0.055]' : ''} ${className}`
 

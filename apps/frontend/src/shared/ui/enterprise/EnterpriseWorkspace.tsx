@@ -38,14 +38,14 @@ export function EnterpriseWorkspace({
           </div>
         ) : null}
         {contextualTabs.length ? (
-          <nav className="overflow-auto rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(18,30,60,0.58))] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.055)] backdrop-blur-xl">
+          <nav className="overflow-auto rounded-lg border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(18,30,60,0.58))] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.055)] backdrop-blur-xl">
             <div className="flex min-w-max gap-1">
               {contextualTabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => onTabChange?.(tab.id)}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
                     activeTab === tab.id
                       ? 'bg-blue-600 text-white shadow-[0_0_26px_rgba(37,99,235,0.28)] ring-1 ring-cyan-300/30'
                       : 'text-slate-400 hover:bg-cyan-300/10 hover:text-white'

@@ -11,13 +11,13 @@ import { ModalShell } from '@/components/ui-system/ModalShell'
 import { ModuleDetailDrawer } from '@/shared/ui/modules'
 
 export const enterpriseControlClass =
-  'h-9 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50 read-only:bg-slate-900/60 read-only:text-slate-300'
+  'h-9 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 text-sm font-medium text-slate-100 outline-none transition placeholder:font-normal placeholder:text-slate-500 hover:border-white/20 focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50 read-only:bg-slate-900/60 read-only:text-slate-300'
 
 export const enterpriseSecondaryButton =
-  'inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-4 text-sm font-medium text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/30 disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-9 items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.045] px-4 text-sm font-medium text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/30 disabled:cursor-not-allowed disabled:opacity-40'
 
 export const enterprisePrimaryButton =
-  'inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-600 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-950/30 transition hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-9 items-center justify-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-600 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-950/30 transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-40'
 
 export function EnterpriseForm({
   children,
@@ -30,7 +30,7 @@ export function EnterpriseForm({
   id?: string
   className?: string
 }) {
-  return <form id={id} onSubmit={onSubmit} className={`space-y-4 ${className}`}>{children}</form>
+  return <form id={id} onSubmit={onSubmit} className={`space-y-3 ${className}`}>{children}</form>
 }
 
 export function EnterpriseFormSection({
@@ -47,9 +47,9 @@ export function EnterpriseFormSection({
   className?: string
 }) {
   return (
-    <section className={`rounded-xl border border-cyan-300/10 bg-slate-950/35 p-4 ${className}`}>
+    <section className={`rounded-lg border border-cyan-300/10 bg-slate-950/35 p-3 ${className}`}>
       {title || description || action ? (
-        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             {title ? <h3 className="text-sm font-semibold text-slate-100">{title}</h3> : null}
             {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
@@ -109,7 +109,7 @@ export function EnterpriseAssistantPanel({
   className?: string
 }) {
   return (
-    <section className={`rounded-xl border border-cyan-300/10 bg-slate-950/50 p-4 text-xs ${className}`}>
+    <section className={`rounded-lg border border-cyan-300/10 bg-slate-950/50 p-3 text-xs ${className}`}>
       <header className="mb-3">
         <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
         {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
@@ -129,7 +129,7 @@ export function EnterpriseSummaryPanel({
   className?: string
 }) {
   return (
-    <section className={`rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-4 text-xs text-cyan-100 ${className}`}>
+    <section className={`rounded-lg border border-cyan-400/20 bg-cyan-950/20 p-3 text-xs text-cyan-100 ${className}`}>
       <div className="mb-3 font-semibold uppercase tracking-[0.14em] text-cyan-200">{title}</div>
       {children}
     </section>
@@ -177,12 +177,12 @@ export function EnterpriseField({
   className?: string
 }) {
   return (
-    <div className={`min-w-0 space-y-1.5 ${className}`}>
+    <div className={`min-w-0 space-y-1 ${className}`}>
       <label htmlFor={htmlFor} className="block text-xs font-medium text-slate-300">
         {label}{required ? <span className="ml-1 text-red-300" aria-hidden="true">*</span> : null}
       </label>
       {children}
-      {error ? <p role="alert" className="text-xs text-red-300">{error}</p> : hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
+      {error ? <p role="alert" aria-live="polite" className="text-xs font-medium text-red-300">{error}</p> : hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
     </div>
   )
 }
@@ -204,7 +204,7 @@ export function ValidationSummary({ errors }: { errors: string[] }) {
   if (!errors.length) return null
 
   return (
-    <div role="alert" className="rounded-lg border border-red-400/20 bg-red-950/30 px-3 py-2 text-xs text-red-200">
+    <div role="alert" aria-live="polite" className="rounded-lg border border-red-400/20 bg-red-950/30 px-3 py-2 text-xs text-red-200">
       <div className="font-semibold text-red-100">Kiểm tra lại thông tin</div>
       <ul className="mt-1 list-disc space-y-1 pl-4">
         {errors.map((error) => <li key={error}>{error}</li>)}

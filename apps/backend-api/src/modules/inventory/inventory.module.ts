@@ -16,6 +16,7 @@ import { InventoryRepository } from './inventory.repository'
 import { InventoryEventService } from './inventory-event.service'
 import { InventoryReadModelService } from './inventory-read-model.service'
 import { InventoryPostingService } from './inventory-posting.service'
+import { InventoryTransactionPermissionsGuard } from './guards/inventory-transaction-permissions.guard'
 
 import { ZonesController } from './zones.controller'
 import { InventoryCategoriesController } from './inventory-categories.controller'
@@ -48,6 +49,7 @@ controllers: [
     InventoryEventService,
     InventoryReadModelService,
     InventoryPostingService,
+    InventoryTransactionPermissionsGuard,
     ReturnWorkflowService,
     InventoryGateway,
     CreateTransactionHandler,
@@ -60,6 +62,7 @@ controllers: [
     InventoryEventService,
     InventoryReadModelService,
     InventoryPostingService,
+    ReturnWorkflowService,
   ],
 })
 export class InventoryModule {}

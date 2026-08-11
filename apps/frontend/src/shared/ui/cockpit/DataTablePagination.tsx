@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+
 import { formatQuantity } from '@/shared/utils/number-format'
 
 type DataTablePaginationProps = {
@@ -28,18 +30,38 @@ export function DataTablePagination({
   const pages = Array.from({ length: Math.min(windowSize, pageCount) }, (_, index) => firstPage + index)
 
   return (
-    <div className={`grid grid-cols-1 items-center gap-1 px-4 py-1 text-xs text-slate-400 md:grid-cols-3 border-t border-white/5 mt-2 ${className}`}>
-      <div>
+    <div className={`mt-2 grid min-h-11 grid-cols-1 items-center gap-2 border-t border-white/5 px-3 py-1.5 text-xs font-medium text-slate-400 md:grid-cols-3 ${className}`}>
+      <div className="whitespace-nowrap">
         Hiển thị {start}-{end}/{formatQuantity(total, 0)}
       </div>
-      <div className="flex justify-center gap-2">
+      <div className="flex items-center justify-center gap-1">
+        <button
+          type="button"
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(1)}
+          className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-white/[0.035] text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label="Trang đầu"
+          title="Trang đầu"
+        >
+          <ChevronsLeft size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(Math.max(1, safePage - 1))}
+          className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-white/[0.035] text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label="Trang trước"
+          title="Trang trước"
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+        </button>
         {pages[0] > 1 ? <span className="px-1 py-2 text-slate-500">...</span> : null}
         {pages.map((pageNo) => (
           <button
             key={pageNo}
             type="button"
             onClick={() => onPageChange(pageNo)}
-            className={`h-8 min-w-8 rounded-xl border px-2 transition ${
+            className={`h-8 min-w-8 rounded-md border px-2 font-medium transition ${
               safePage === pageNo
                 ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                 : 'border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10'
@@ -49,6 +71,26 @@ export function DataTablePagination({
           </button>
         ))}
         {pages[pages.length - 1] < pageCount ? <span className="px-1 py-2 text-slate-500">...</span> : null}
+        <button
+          type="button"
+          disabled={safePage >= pageCount}
+          onClick={() => onPageChange(Math.min(pageCount, safePage + 1))}
+          className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-white/[0.035] text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label="Trang sau"
+          title="Trang sau"
+        >
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={safePage >= pageCount}
+          onClick={() => onPageChange(pageCount)}
+          className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-white/[0.035] text-slate-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label="Trang cuối"
+          title="Trang cuối"
+        >
+          <ChevronsRight size={14} aria-hidden="true" />
+        </button>
       </div>
       <div className="flex flex-wrap justify-start gap-2 md:justify-end">
         {pageSizeOptions?.length && onPageSizeChange ? (
@@ -65,22 +107,6 @@ export function DataTablePagination({
             ))}
           </select>
         ) : null}
-        <button
-          type="button"
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          className="rounded border border-slate-700 bg-transparent px-3 py-1 text-xs text-slate-300 transition hover:bg-white/5 disabled:opacity-40"
-        >
-          Trước
-        </button>
-        <button
-          type="button"
-          disabled={safePage >= pageCount}
-          onClick={() => onPageChange(Math.min(pageCount, safePage + 1))}
-          className="rounded border border-slate-700 bg-transparent px-3 py-1 text-xs text-slate-300 transition hover:bg-white/5 disabled:opacity-40"
-        >
-          Sau
-        </button>
       </div>
     </div>
   )

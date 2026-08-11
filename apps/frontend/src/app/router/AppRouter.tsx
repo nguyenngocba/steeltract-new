@@ -11,6 +11,7 @@ import {
 } from 'react-router-dom'
 
 import { useAuthStore } from '@/store/auth.store'
+import { RoutePermissionGuard } from '@/shared/permissions/PermissionGuard'
 import { ModuleLoadingState } from '@/shared/ui/modules'
 
 const lazyNamed = <T extends Record<string, unknown>, K extends keyof T>(
@@ -114,7 +115,12 @@ export function AppRouter() {
 
   return (
     <Suspense fallback={<RouteFallback />}>
+    <RoutePermissionGuard>
     <Routes>
+      <Route
+        path="/unauthorized"
+        element={<AccessDenied />}
+      />
       <Route
         path="/"
         element={<DashboardPage />}
@@ -482,7 +488,22 @@ export function AppRouter() {
         element={<Navigate to="/" replace />}
       />
     </Routes>
+    </RoutePermissionGuard>
     </Suspense>
+  )
+}
+
+function AccessDenied() {
+  return (
+    <div className="grid min-h-[60vh] place-items-center bg-[#07111f] p-6 text-center text-slate-100">
+      <div>
+        <div className="text-sm font-semibold uppercase text-amber-300">403</div>
+        <h1 className="mt-2 text-xl font-semibold">Không có quyền truy cập</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          Tài khoản hiện tại không được cấp quyền sử dụng workspace này.
+        </p>
+      </div>
+    </div>
   )
 }
 

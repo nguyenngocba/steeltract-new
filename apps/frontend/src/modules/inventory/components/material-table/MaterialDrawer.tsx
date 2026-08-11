@@ -10,6 +10,7 @@ import { useMaterialTypes } from '../../hooks/useMaterialTypes'
 import { useZones } from '../../hooks/useZones'
 import { formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import { useQueryClient } from '@tanstack/react-query'
+import { warehouseAllows } from '../../utils/warehouse-capabilities'
 type Props = {
   open: boolean
   material?: any | null
@@ -44,7 +45,7 @@ function usageLabel(value: string) {
 }
 
 function isMainWarehouseZone(zone: any) {
-  return zone?.active !== false && zone?.warehouse?.code === 'MAIN' && !String(zone?.code ?? '').startsWith('ST-WH-')
+  return zone?.active !== false && warehouseAllows(zone, 'allowReceipt') && !warehouseAllows(zone, 'allowProduction') && !String(zone?.code ?? '').startsWith('ST-WH-')
 }
 
 function isZoneFull(zone: any) {

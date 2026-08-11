@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, Layers, MapPinned, Plus, ArrowRightLeft, Upload, Download } from 'lucide-react'
+import { ActionGuard, usePermission } from '@/shared/permissions/PermissionGuard'
 import { useYardActions } from '../context/YardActionContext'
 
 export interface YardGlobalActionBarProps {
@@ -18,6 +19,7 @@ export function YardGlobalActionBar({
   onCreateSlot,
 }: YardGlobalActionBarProps = {}) {
   const actions = useYardActions()
+  const canMove = usePermission('yard.move')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -40,27 +42,27 @@ export function YardGlobalActionBar({
   return (
     <div className="flex shrink-0 items-center gap-2 text-xs font-semibold">
       {/* 1. Primary: + Nhập bãi */}
-      <button
+      <ActionGuard permission="yard.stage"><button
         type="button"
         onClick={handleInbound}
         className="flex h-10 items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-600/90 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500"
       >
         <Plus size={15} />
         + Nhập bãi
-      </button>
+      </button></ActionGuard>
 
       {/* 2. Secondary: Xuất bãi */}
-      <button
+      <ActionGuard permission="yard.move"><button
         type="button"
         onClick={handleOutbound}
         className="flex h-10 items-center gap-1.5 rounded-lg border border-white/15 bg-slate-900/80 px-4 text-sm font-semibold text-slate-100 shadow-lg shadow-black/20 transition hover:border-white/25 hover:bg-slate-800"
       >
         <Download size={15} className="text-amber-400" />
         Xuất bãi
-      </button>
+      </button></ActionGuard>
 
       {/* 3. Dropdown: Khác ▼ */}
-      <div className="relative" ref={menuRef}>
+      {canMove ? <div className="relative" ref={menuRef}>
         <button
           type="button"
           onClick={() => setDropdownOpen((prev) => !prev)}
@@ -108,7 +110,7 @@ export function YardGlobalActionBar({
             </button>
           </div>
         ) : null}
-      </div>
+      </div> : null}
     </div>
   )
 }

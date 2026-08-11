@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { useAuthStore } from '@/store/auth.store'
+import { canAccessPath, hasPermission } from '@/shared/permissions/authorization'
 
 import { SidebarItem }
   from './SidebarItem'
@@ -199,16 +200,7 @@ function SidebarNestedGroup({ item }: { item: Item }) {
 }
 
 function canAccessSidebarItem(item: Item, user: ReturnType<typeof useAuthStore.getState>['user']) {
-  if (!item.adminOnly) return true
   if (!user) return false
-
-  const roles = user.roles?.map((role) => role.toLowerCase()) ?? []
-  const permissions = user.permissions ?? []
-
-  return (
-    roles.some((role) => role.includes('admin') || role.includes('quản trị')) ||
-    permissions.includes('*') ||
-    permissions.includes('admin.read') ||
-    permissions.includes('admin.write')
-  )
+  if (item.path && !canAccessPath(user, item.path)) return false
+  return !item.adminOnly || hasPermission(user.permissions, 'permissions.view')
 }

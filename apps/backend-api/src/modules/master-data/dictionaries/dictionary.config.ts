@@ -2,8 +2,8 @@ export interface MasterDataDomainConfig {
   model: string;
   entity: string;
   include?: Record<string, unknown>;
-  relationKey?: 'categoryId' | 'warehouseId';
-  relationName?: 'category' | 'warehouse';
+  relationKey?: 'categoryId' | 'warehouseId' | 'warehouseTypeId';
+  relationName?: 'category' | 'warehouse' | 'warehouseType';
 }
 
 export const masterDataDomains: Record<string, MasterDataDomainConfig> = {
@@ -52,9 +52,32 @@ export const masterDataDomains: Record<string, MasterDataDomainConfig> = {
     model: 'masterWarehouse',
     entity: 'MasterWarehouse',
     include: {
+      warehouseType: true,
       _count: {
         select: {
           zones: true,
+          locationStocks: true,
+          transactions: true,
+          transactionItems: true,
+          returnRequests: true,
+          productionMaterialReservationLines: true,
+          productionMaterialLedgers: true,
+          inventoryDashboardSnapshots: true,
+          inventoryMaterialSnapshots: true,
+          inventoryLocationSnapshots: true,
+        },
+      },
+    },
+    relationKey: 'warehouseTypeId',
+    relationName: 'warehouseType',
+  },
+  'warehouse-types': {
+    model: 'masterWarehouseType',
+    entity: 'MasterWarehouseType',
+    include: {
+      _count: {
+        select: {
+          warehouses: true,
         },
       },
     },

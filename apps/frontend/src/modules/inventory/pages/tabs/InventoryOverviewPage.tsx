@@ -34,6 +34,7 @@ import { useInventoryMaterials, useInventoryOverview } from '../../hooks/useInve
 import { CircleDollarSign, Clock, PackageCheck, RefreshCw, ShieldX, TriangleAlert, Package } from 'lucide-react'
 import { formatCurrencyVnd, formatDateTime, formatQuantity } from '@/shared/utils/number-format'
 import { getReturnRequests } from '../../api/transactions.api'
+import { warehouseAllows } from '../../utils/warehouse-capabilities'
 // ================= CHART CARD COMPONENT =================
 function ChartCard({
   title,
@@ -144,15 +145,11 @@ function materialUsageLabel(value: string | undefined) {
 }
 
 function isMainWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+  return warehouseAllows(location, 'allowReceipt') && !warehouseAllows(location, 'allowProduction')
 }
 
 function isProductionWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(location, 'allowProduction')
 }
 
 function allLocationBalances(item: any) {

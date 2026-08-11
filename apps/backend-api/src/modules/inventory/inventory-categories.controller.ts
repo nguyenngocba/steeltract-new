@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common'
 
 import { InventoryRepository } from './inventory.repository'
@@ -19,7 +20,12 @@ import type {
   CreateInventoryCategoryDto,
   UpdateInventoryCategoryDto,
 } from './dto/inventory.dto'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../rbac/guards/permissions.guard'
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('inventory.view')
 @Controller('inventory/categories')
 export class InventoryCategoriesController {
 
@@ -35,6 +41,7 @@ export class InventoryCategoriesController {
   }
 
   @Post()
+  @RequirePermissions('settings.edit')
   async createCategory(
     @Body(new ZodValidationPipe(createInventoryCategorySchema))
     body: CreateInventoryCategoryDto,
@@ -57,6 +64,7 @@ export class InventoryCategoriesController {
   }
 
   @Put(':id')
+  @RequirePermissions('settings.edit')
   async updateCategory(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateInventoryCategorySchema))
@@ -83,6 +91,7 @@ export class InventoryCategoriesController {
   }
 
   @Delete(':id')
+  @RequirePermissions('settings.edit')
   async deleteCategory(
     @Param('id') id: string,
   ) {

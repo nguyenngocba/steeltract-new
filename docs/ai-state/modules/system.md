@@ -231,3 +231,49 @@ idempotency; checkpoints, failures and lag provide health; retained Outbox rows
 provide resume/rebuild replay. `/query-api/projections` is GET-only and additive.
 The new migration is not deployed by this sprint, and existing UI consumers have
 not been cut over.
+# SYSTEM.RBAC.2 authorization baseline
+
+- Backend authorization is expressed as Module x Action permissions.
+- Frontend navigation, routes, dashboards and actions consume the shared
+  permission engine; role names are display/assignment data, not authorization.
+- Backend guards remain authoritative and return 403 for missing grants.
+- Legacy `.read`/`.write` permissions are compatibility aliases and must not
+  widen view access into command access.
+- Canonical role presets are served by `GET /system/role-matrix` and persisted
+  through ordinary Role/Permission relations.
+
+# SYSTEM.WAREHOUSE.1 canonical Warehouse master
+
+- Settings Master Data owns Warehouse CRUD through the generic dictionary API.
+- Warehouse Type classifies a Warehouse; capability flags govern business use.
+- Referenced Warehouses cannot be deactivated and return dependency evidence.
+- SYSTEM.RESET preserves Warehouse and WarehouseZone configuration.
+- Inventory Locations requires an active parent Warehouse and links operators
+  to Warehouse Master when none exists.
+
+# UI.MASTERDATA.1 unified workspace
+
+- Master-data administration uses one shared workspace composition: compact
+  header, real KPI strip, shared toolbar, compact table and right detail drawer.
+- Detail drawers expose Overview, Dependencies, History and Settings; History
+  remains controlled-unavailable when no canonical API exists.
+- Warehouse, Category, Usage Type, Technical Group and UOM Settings capabilities
+  use the 96vw workspace. Inventory Location and Yard reuse the same toolbar and
+  drawer conventions in their existing operational routes.
+- Warehouse Zone and Yard Zone stay under their canonical topology owners; no
+  parallel dictionary was created.
+- Destructive actions must display canonical dependency counts and respect the
+  existing deactivate/delete backend contract.
+
+# UI.AUDIT.1 enterprise presentation contract
+
+- `docs/ui/STEELTRACK_UI_GUIDELINES.md` is the official active UI standard.
+- Canonical shared metrics: KPI 92px, control/table row 36px, surface radius
+  8px, detail drawer 64vw and full-list workspace 96vw.
+- Canonical toolbar order is Search, Filter, Refresh, Density, Export, View,
+  Add.
+- Record details use right drawers. Centered overlays are restricted to focused
+  commands, confirmations, media previews and the documented full-list
+  workspace exception.
+- Runtime visual certification remains required after PostgreSQL availability
+  is restored.

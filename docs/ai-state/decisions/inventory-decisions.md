@@ -286,3 +286,73 @@ Phase 1 constraints:
   route per material.
 - Lot/batch/serial, persistent drafts, multiple same-material transfer routes
   and durable public request idempotency require separate approval.
+
+## INV-017: Warehouse Behavior Is Capability-Driven
+
+Decision:
+
+- `MasterWarehouse` is the canonical Warehouse master.
+- Runtime Inventory logic must not infer behavior from Warehouse code or name.
+- Material custody/stock-health scope uses active Warehouses with
+  `allowReceipt = true` and `allowProduction = false`.
+- Production custody uses active Warehouses with `allowProduction = true`.
+- Posting validates `allowReceipt` and `allowIssue` for each affected bucket.
+- Warehouse Type is classification metadata; capabilities are the business
+  authorization for storage operations.
+
+Storage boundary:
+
+- A new or updated WarehouseZone requires an active parent Warehouse.
+- V1 topology remains Warehouse -> Zone -> row/column(slot)/level -> location
+  stock. Do not create parallel location masters without a separate decision.
+
+Supersedes:
+
+- The code/name matching portions of INV-005, INV-006 and INV-014.
+- The stock semantics remain unchanged: production custody cannot hide a
+  purchasing shortage in material custody.
+
+## INV-018: Purchase Order Receipts Use Transaction-Level Idempotency
+
+Decision:
+
+- One Purchase Order may reference multiple IMPORT Inventory transactions.
+- Each receipt command must provide a distinct explicit idempotency key.
+- `InventoryTransaction.idempotencyKey` is unique and stores the matching
+  command hash on the stock document.
+- Same key/same payload replays the existing transaction; same key/different
+  payload is a conflict.
+
+Rationale:
+
+- Partial receipt requires N stock documents for one PO without weakening
+  duplicate protection.
+- A unique marker on the Inventory transaction makes concurrent duplicate
+  commands roll back atomically before duplicate stock can commit.
+
+Compatibility:
+
+- Only `IMPORT` with `referenceModule = PURCHASE_ORDER` and an explicit key
+  enables multi-reference posting.
+- Other Inventory references keep their existing single-reference behavior.
+- Existing Outbox command receipts remain a historical replay fallback.
+
+## INV-019: Procurement Receipt And Supplier Return Remain Inventory-Owned
+
+Decision:
+
+- Approved PO receipt calls the internal `InventoryPostingService` RECEIVE
+  boundary inside the same Serializable transaction that updates PO lines.
+- Procurement never writes InventoryTransaction, InventoryItem quantity or
+  InventoryLocationStock directly.
+- Supplier Return delegates to `ReturnWorkflowService` and derives the exact
+  Warehouse/Zone/Slot/Level outbound buckets from its canonical source receipt.
+- Active Supplier Returns for one receipt are quantity-capped cumulatively.
+
+Implications:
+
+- PO receipt failure rolls back both stock and PO progress.
+- Receipt date, Supplier, valuation and location identity remain on the
+  Inventory document.
+- Legacy Supplier Returns without source receipt relations remain readable;
+  new Procurement returns require PO and receipt lineage.

@@ -18,11 +18,13 @@ export function useInventoryMaterials(query: InventoryMaterialQuery) {
 
 export function useInventoryOverview(
   query: Omit<InventoryMaterialQuery, 'page' | 'pageSize' | 'sortBy' | 'sortOrder'>,
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: ['inventory', 'overview', query],
     queryFn: ({ signal }) => getInventoryOverview(query, signal),
     staleTime: 10_000,
+    enabled: options?.enabled,
   })
 }
 

@@ -15,7 +15,7 @@ import { RequirePermissions } from '../../rbac/decorators/permissions.decorator'
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard'
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('master-data.read')
+@RequirePermissions('suppliers.view')
 @Controller('suppliers')
 export class SuppliersController {
   constructor(
@@ -54,7 +54,7 @@ export class SuppliersController {
   }
 
   @Post()
-  @RequirePermissions('master-data.write')
+  @RequirePermissions('suppliers.edit')
   async create(
     @Body() body: any,
   ) {
@@ -62,7 +62,7 @@ export class SuppliersController {
   }
 
   @Put(':id')
-  @RequirePermissions('master-data.write')
+  @RequirePermissions('suppliers.edit')
   async update(
     @Param('id') id: string,
     @Body() body: any,

@@ -49,7 +49,7 @@ import { ComponentsReadModelService } from './services/components-read-model.ser
 import { ComponentsSnapshotReadService } from './services/components-snapshot-read.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('components.read')
+@RequirePermissions('components.view')
 @Controller('components')
 export class ComponentsController {
   constructor(
@@ -115,21 +115,21 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/costing/recalculate')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.edit')
   recalculateCosting(@Param('id') id: string) {
     return this.componentCostingService.recalculate(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/deliver')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.edit')
   deliver(@Param('id') id: string) {
     return this.componentsService.deliver(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/install')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.edit')
   install(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(installComponentSchema))
@@ -140,7 +140,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.create')
   create(
     @Body(new ZodValidationPipe(createComponentSchema))
     body: CreateComponentDto,
@@ -166,7 +166,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('upload')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.create')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -186,7 +186,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('timeline-upload')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.create')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -206,7 +206,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.edit')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateComponentSchema))
@@ -217,7 +217,7 @@ export class ComponentsController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.delete')
   remove(@Param('id') id: string) {
     return this.componentsService.remove(id);
   }

@@ -10,7 +10,6 @@ import {
   Globe2,
   Link2,
   Package,
-  Plus,
   Power,
   RefreshCw,
   Ruler,
@@ -19,9 +18,11 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Workflow,
+  Warehouse,
   X,
   XCircle,
 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 
 import { EnterpriseWorkspace } from '@/shared/ui/enterprise'
 import { apiErrorMessage } from '@/shared/api/api-error-message'
@@ -46,6 +47,17 @@ import {
   modulePrimaryButton,
 } from '@/shared/ui/modules'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
+import { WarehouseMasterWorkspace } from '../components/WarehouseMasterWorkspace'
+import {
+  MasterDataDependencyTree,
+  UnifiedMasterDataDrawer,
+  UnifiedMasterDataToolbar,
+  UnifiedMasterDataWorkspace,
+  exportMasterDataCsv,
+  type MasterDataDensity,
+  type MasterDataDrawerTab,
+  type MasterDataView,
+} from '@/modules/master-data/components/UnifiedMasterDataWorkspace'
 
 type Tab =
   | 'overview'
@@ -79,7 +91,17 @@ const date = (value?: string) => (value ? formatDateTime(value) : '—')
 
 export function SettingsPage() {
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+
+  useEffect(() => {
+    const requested = searchParams.get('tab')
+    setActiveTab(
+      requested && tabs.some((tab) => tab.id === requested)
+        ? (requested as Tab)
+        : 'overview',
+    )
+  }, [searchParams])
 
   const { data, isLoading } = useQuery({
     queryKey: ['system-overview'],
@@ -180,7 +202,10 @@ export function SettingsPage() {
 
       {/* Workspace content based on Tab */}
       {activeTab === 'master' ? (
-        <SettingsCatalogs settingsCatalog={settingsCatalog} />
+        <SettingsCatalogs
+          settingsCatalog={settingsCatalog}
+          initialWorkspace={searchParams.get('workspace')}
+        />
       ) : activeTab === 'organization' ? (
         <PlatformFoundation
           title="Cấu hình Tổ chức & Quy mô"
@@ -532,7 +557,7 @@ function Overview({
 
 function ownerForCatalog(key: string) {
   if (['users', 'roles', 'permissions'].includes(key)) return 'RBAC'
-  if (['uom', 'material-categories', 'material-types', 'material-usage-types'].includes(key)) return 'Master Data'
+  if (['uom', 'material-categories', 'material-types', 'material-usage-types', 'warehouses'].includes(key)) return 'Master Data'
   if (key === 'backup') return 'SYSTEM.7'
   if (key === 'activity-log') return 'ActivityLog'
   return 'System'
@@ -544,6 +569,7 @@ function iconForCatalog(key: string, iconByName: Map<string, any>) {
   if (key === 'roles' || key === 'permissions') return ShieldCheck
   if (key === 'activity-log') return Workflow
   if (key === 'backup') return DatabaseBackup
+  if (key === 'warehouses') return Warehouse
   return iconByName.get(key.toLowerCase()) ?? Settings
 }
 
@@ -601,7 +627,7 @@ function WorkflowPanel({ workflow }: { workflow?: WorkflowCheck }) {
   )
 }
 
-type MasterWorkspace = 'categories' | 'usage' | 'materials' | 'technical' | 'uom'
+type MasterWorkspace = 'categories' | 'usage' | 'materials' | 'technical' | 'uom' | 'warehouses'
 
 function workspaceForCatalogKey(key: string): MasterWorkspace | null {
   if (key === 'material-categories') return 'categories'
@@ -609,6 +635,7 @@ function workspaceForCatalogKey(key: string): MasterWorkspace | null {
   if (key === 'materials') return 'materials'
   if (key === 'material-types') return 'technical'
   if (key === 'uom') return 'uom'
+  if (key === 'warehouses') return 'warehouses'
   return null
 }
 
@@ -643,9 +670,12 @@ const emptyUomForm = {
   active: true,
 }
 
-function SettingsCatalogs({ settingsCatalog }: { settingsCatalog?: SystemSettingsCatalog }) {
+function SettingsCatalogs({ settingsCatalog, initialWorkspace }: { settingsCatalog?: SystemSettingsCatalog; initialWorkspace?: string | null }) {
   const queryClient = useQueryClient()
   const [workspace, setWorkspace] = useState<MasterWorkspace | null>(null)
+  useEffect(() => {
+    if (initialWorkspace === 'warehouses') setWorkspace('warehouses')
+  }, [initialWorkspace])
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<MasterDataRecord[]>({
     queryKey: ['master-data-records', 'material-categories'],
     queryFn: () => getMasterDataRecords('material-categories'),
@@ -705,6 +735,14 @@ function SettingsCatalogs({ settingsCatalog }: { settingsCatalog?: SystemSetting
       count: materialTypes.length,
       badge: 'YELLOW',
       icon: Ruler,
+    },
+    {
+      id: 'warehouses' as const,
+      title: 'Kho',
+      description: 'Warehouse Master và capability vận hành dùng chung toàn hệ thống.',
+      count: settingsCatalog?.categories.find((item) => item.key === 'warehouses')?.count ?? 0,
+      badge: 'REAL_EDITABLE',
+      icon: Warehouse,
     },
     {
       id: 'uom' as const,
@@ -793,17 +831,21 @@ function SettingsCatalogs({ settingsCatalog }: { settingsCatalog?: SystemSetting
         </aside>
       </div>
 
-      <MasterDataManagementModal
-        workspace={workspace}
-        categories={categories}
-        materialUsageTypes={materialUsageTypes}
-        materialTypes={materialTypes}
-        materials={materialRows}
-        units={units}
-        loading={categoriesLoading || materialTypesLoading || materialUsageTypesLoading || unitsLoading || materialsLoading}
-        onClose={() => setWorkspace(null)}
-        onChanged={refresh}
-      />
+      {workspace === 'warehouses' ? (
+        <WarehouseMasterWorkspace onClose={() => setWorkspace(null)} onChanged={refresh} />
+      ) : (
+        <MasterDataManagementModal
+          workspace={workspace}
+          categories={categories}
+          materialUsageTypes={materialUsageTypes}
+          materialTypes={materialTypes}
+          materials={materialRows}
+          units={units}
+          loading={categoriesLoading || materialTypesLoading || materialUsageTypesLoading || unitsLoading || materialsLoading}
+          onClose={() => setWorkspace(null)}
+          onChanged={refresh}
+        />
+      )}
     </div>
   )
 }
@@ -841,6 +883,10 @@ function MasterDataCrudHost({ workspace, onClose }: { workspace: MasterWorkspace
     queryClient.invalidateQueries({ queryKey: ['inventory-items'] })
     queryClient.invalidateQueries({ queryKey: ['inventory-materials'] })
     queryClient.invalidateQueries({ queryKey: ['system-settings-catalog'] })
+  }
+
+  if (workspace === 'warehouses') {
+    return <WarehouseMasterWorkspace onClose={onClose} onChanged={refresh} />
   }
 
   return (
@@ -891,6 +937,10 @@ function MasterDataManagementModal({
   const [unitFilter, setUnitFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  const [density, setDensity] = useState<MasterDataDensity>('compact')
+  const [view, setView] = useState<MasterDataView>('essential')
+  const [drawerTab, setDrawerTab] = useState<MasterDataDrawerTab>('overview')
+  const [pendingDeactivate, setPendingDeactivate] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
   const [dictionaryForm, setDictionaryForm] = useState(emptyDictionaryForm)
   const [materialForm, setMaterialForm] = useState(emptyMaterialForm)
@@ -899,6 +949,8 @@ function MasterDataManagementModal({
 
   const closeForm = () => {
     setEditing(null)
+    setPendingDeactivate(false)
+    setDrawerTab('overview')
     setDictionaryForm(emptyDictionaryForm)
     setMaterialForm(emptyMaterialForm)
     setUomForm(emptyUomForm)
@@ -1014,6 +1066,8 @@ function MasterDataManagementModal({
 
   const startCreate = () => {
     setEditing({ mode: 'create' })
+    setPendingDeactivate(false)
+    setDrawerTab('settings')
     setDictionaryForm(emptyDictionaryForm)
     setMaterialForm({
       ...emptyMaterialForm,
@@ -1030,6 +1084,7 @@ function MasterDataManagementModal({
 
   const startEdit = (row: any) => {
     setEditing(row)
+    setPendingDeactivate(false)
     if (workspace === 'materials') {
       setMaterialForm({
         code: row.materialCode ?? row.code ?? '',
@@ -1125,9 +1180,7 @@ function MasterDataManagementModal({
   }
 
   const deactivateRow = (row: any) => {
-    const target = row.materialCode ?? row.code ?? row.name ?? 'bản ghi này'
     if (!canDeactivateRow(row)) return
-    if (!window.confirm(`Xác nhận ngưng sử dụng/ẩn ${target}?`)) return
     if (workspace === 'materials') materialDelete.mutate(row.materialId ?? row.id)
     if (workspace === 'categories') dictionaryDeactivate.mutate({ domain: 'material-categories', id: row.id })
     if (workspace === 'usage') dictionaryDeactivate.mutate({ domain: 'material-usage-types', id: row.id })
@@ -1135,182 +1188,250 @@ function MasterDataManagementModal({
     if (workspace === 'uom') uomDeactivate.mutate(row.id)
   }
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="flex h-[90vh] w-[95vw] max-w-[1720px] flex-col overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#07111f] shadow-2xl shadow-cyan-950/40">
-        <header className="flex min-h-[58px] items-center justify-between border-b border-cyan-300/15 px-4 py-2.5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">Master Data · {title}</p>
-            <p className="mt-1 truncate text-xs text-slate-500">{description}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Đóng modal" className="rounded-lg border border-white/10 p-2 text-slate-300 hover:bg-white/10"><X size={16} /></button>
-        </header>
+  const selectRow = (row: any, tab: MasterDataDrawerTab = 'overview') => {
+    startEdit(row)
+    setDrawerTab(tab)
+  }
 
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-3 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
-          <section className="flex min-h-0 flex-col gap-3 overflow-hidden">
-            <MasterDataKpiStrip
-              workspace={workspace}
-              rows={rows}
-              activeRows={activeRows}
-              linkedRows={linkedRows}
-              materials={materials}
-              units={units}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-cyan-300/10 bg-slate-950/35 p-2">
-              <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-2">
-                <Search size={14} className="shrink-0 text-cyan-300" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên, mô tả..." className="h-8 w-full bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-500" />
-              </div>
-              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400">
+  const dependencyNodes = editing && editing.mode !== 'create'
+    ? workspace === 'materials'
+      ? [
+          { label: 'Tồn kho', count: Number(editing.currentStock ?? editing.quantity ?? 0), detail: 'Số lượng tồn hiện tại' },
+          { label: 'BOM', count: Number(editing.bomUsageCount ?? 0), detail: 'BOM đang tham chiếu vật tư' },
+        ]
+      : workspace === 'uom'
+        ? [{ label: 'Material Master', count: materials.filter((material) => material.unit === editing.code || material.unitId === editing.id).length }]
+        : workspace === 'categories'
+          ? [{ label: 'Material Master', count: Number(editing._count?.items ?? 0) }]
+          : [{ label: 'Material Master', count: Number(editing._count?.inventoryItems ?? 0) }]
+    : []
+
+  const rowPadding = density === 'compact' ? 'py-1.5' : 'py-2.5'
+
+  return (
+    <UnifiedMasterDataWorkspace
+      title={title}
+      subtitle={description}
+      onClose={onClose}
+      error={error ? apiErrorMessage(error) : undefined}
+      kpis={
+        <MasterDataKpiStrip
+          workspace={workspace}
+          rows={rows}
+          activeRows={activeRows}
+          linkedRows={linkedRows}
+          materials={materials}
+          units={units}
+        />
+      }
+      toolbar={
+        <UnifiedMasterDataToolbar
+          query={query}
+          searchPlaceholder="Tìm mã, tên, mô tả..."
+          density={density}
+          view={view}
+          createLabel={createLabelForWorkspace(workspace)}
+          refreshing={loading}
+          onQueryChange={setQuery}
+          onDensityChange={setDensity}
+          onViewChange={setView}
+          onRefresh={onChanged}
+          onCreate={startCreate}
+          onExport={() => exportMasterDataCsv(
+            `${workspace}-${new Date().toISOString().slice(0, 10)}.csv`,
+            ['Mã', 'Tên', 'Trạng thái', 'Số tham chiếu', 'Cập nhật'],
+            filtered.map((row: any) => [
+              row.materialCode ?? row.code,
+              row.materialName ?? row.name,
+              workspace === 'materials' ? (!row.deletedAt ? 'Hoạt động' : 'Ngưng') : (row.active !== false ? 'Hoạt động' : 'Ngưng'),
+              workspace === 'materials'
+                ? Number(row.bomUsageCount ?? 0)
+                : workspace === 'categories'
+                  ? Number(row._count?.items ?? 0)
+                  : Number(row._count?.inventoryItems ?? 0),
+              row.updatedAt,
+            ]),
+          )}
+          filters={
+            <>
+              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-9 border border-white/10 bg-slate-950/55 px-2 text-xs font-medium text-slate-200 outline-none focus:border-cyan-400">
                 <option value="all">Tất cả trạng thái</option>
                 <option value="active">Đang hoạt động</option>
                 <option value="inactive">Ngưng sử dụng</option>
               </select>
-              {workspace === 'materials' && (
+              {workspace === 'materials' ? (
                 <>
-                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400">
+                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-9 max-w-48 border border-white/10 bg-slate-950/55 px-2 text-xs font-medium text-slate-200 outline-none focus:border-cyan-400">
                     <option value="all">Tất cả danh mục</option>
                     {categories.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
                   </select>
-                  <select value={materialTypeFilter} onChange={(event) => setMaterialTypeFilter(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400">
+                  <select value={materialTypeFilter} onChange={(event) => setMaterialTypeFilter(event.target.value)} className="h-9 max-w-48 border border-white/10 bg-slate-950/55 px-2 text-xs font-medium text-slate-200 outline-none focus:border-cyan-400">
                     <option value="all">Tất cả nhóm kỹ thuật</option>
                     {materialTypes.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
                   </select>
-                  <select value={usageTypeFilter} onChange={(event) => setUsageTypeFilter(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400">
+                  <select value={usageTypeFilter} onChange={(event) => setUsageTypeFilter(event.target.value)} className="h-9 max-w-44 border border-white/10 bg-slate-950/55 px-2 text-xs font-medium text-slate-200 outline-none focus:border-cyan-400">
                     <option value="all">Tất cả loại vật tư</option>
                     {materialUsageTypes.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
                   </select>
-                  <select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-200 outline-none focus:border-cyan-400">
+                  <select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)} className="h-9 max-w-40 border border-white/10 bg-slate-950/55 px-2 text-xs font-medium text-slate-200 outline-none focus:border-cyan-400">
                     <option value="all">Tất cả đơn vị</option>
                     {units.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
                   </select>
                 </>
-              )}
-              <button type="button" onClick={startCreate} className={modulePrimaryButton}>
-                <Plus size={14} /> {createLabelForWorkspace(workspace)}
-              </button>
-            </div>
-
-            <CockpitTableShell className="min-h-0 flex-1 overflow-auto">
-              {loading ? (
-                <ModuleLoadingState label={`Đang tải ${title.toLowerCase()}`} />
-              ) : filtered.length > 0 ? (
-                <table className="w-full min-w-[980px] table-fixed text-xs">
-                  <thead className="sticky top-0 border-b border-cyan-400/10 bg-[#07111f] text-slate-300">
-                    {workspace === 'materials' ? <MaterialHeader /> : workspace === 'uom' ? <UomHeader /> : <DictionaryHeader workspace={workspace} />}
-                  </thead>
-                  <tbody>
-                    {paginatedRows.map((row: any) => (
-                      <tr key={row.id ?? row.materialId} className="border-b border-cyan-300/10 text-slate-300 hover:bg-cyan-300/[0.055]">
-                        {workspace === 'materials' ? (
-                          <MaterialRow row={row} materialUsageTypes={materialUsageTypes} />
-                        ) : workspace === 'uom' ? (
-                          <UomRow row={row} materials={materials} />
-                        ) : (
-                          <DictionaryRow row={row} workspace={workspace} />
-                        )}
-                        <td className="px-2 py-2 text-right">
-                          <button type="button" onClick={() => startEdit(row)} aria-label="Sửa bản ghi" title="Sửa" className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20">
-                            <Edit3 size={13} />
-                          </button>
-                          <button type="button" onClick={() => deactivateRow(row)} disabled={deactivating || !canDeactivateRow(row)} aria-label="Ngừng sử dụng bản ghi" title={canDeactivateRow(row) ? 'Ngừng sử dụng' : 'Đang được tham chiếu'} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40">
-                            <Power size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <CockpitEmptyState title="Chưa có dữ liệu" description="Không tìm thấy bản ghi phù hợp. Dữ liệu chỉ lấy từ backend thật." />
-              )}
-            </CockpitTableShell>
-            {!loading && filtered.length > pageSize && (
-              <DataTablePagination
-                page={page}
-                pageSize={pageSize}
-                total={filtered.length}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                pageSizeOptions={[10, 20, 50, 100]}
-              />
-            )}
-          </section>
-
-          <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-cyan-300/10 bg-slate-950/35">
-            {editing ? (
-              <MasterDataForm
-                workspace={workspace}
-                editing={editing}
-                dictionaryForm={dictionaryForm}
-                setDictionaryForm={setDictionaryForm}
-                materialForm={materialForm}
-                setMaterialForm={setMaterialForm}
-                uomForm={uomForm}
-                setUomForm={setUomForm}
-                categories={categories}
-                materialUsageTypes={materialUsageTypes}
-                materialTypes={materialTypes}
-                units={units}
-                saving={saving}
-                error={error}
-                onSave={save}
-                onCancel={closeForm}
-                onDeactivate={() => {
-                  const target = editing.materialCode ?? editing.code ?? editing.name ?? 'bản ghi này'
-                  if (!window.confirm(`Xác nhận ngưng sử dụng/ẩn ${target}?`)) return
-                  if (workspace === 'materials') materialDelete.mutate(editing.materialId ?? editing.id)
-                  if (workspace === 'categories') dictionaryDeactivate.mutate({ domain: 'material-categories', id: editing.id })
-                  if (workspace === 'usage') dictionaryDeactivate.mutate({ domain: 'material-usage-types', id: editing.id })
-                  if (workspace === 'technical') dictionaryDeactivate.mutate({ domain: 'material-types', id: editing.id })
-                  if (workspace === 'uom') uomDeactivate.mutate(editing.id)
-                }}
-              />
-            ) : (
-              <div className="overflow-y-auto p-3">
-                <WorkspaceSummary workspace={workspace} materials={materials} categories={categories} materialUsageTypes={materialUsageTypes} materialTypes={materialTypes} units={units} />
-              </div>
-            )}
-          </aside>
-        </div>
+              ) : null}
+            </>
+          }
+        />
+      }
+    >
+      <div className="flex h-full min-h-0 flex-col pt-4">
+        <CockpitTableShell className="min-h-0 flex-1 overflow-auto rounded-none">
+          {loading ? (
+            <ModuleLoadingState label={`Đang tải ${title.toLowerCase()}`} />
+          ) : filtered.length > 0 ? (
+            <table className={`w-full table-fixed text-xs ${view === 'essential' ? 'min-w-[880px]' : 'min-w-[1180px]'}`}>
+              <thead className="sticky top-0 z-10 border-b border-cyan-400/10 bg-[#0b1b2d] text-slate-300">
+                {workspace === 'materials' ? <MaterialHeader view={view} /> : workspace === 'uom' ? <UomHeader view={view} /> : <DictionaryHeader workspace={workspace} view={view} />}
+              </thead>
+              <tbody>
+                {paginatedRows.map((row: any) => (
+                  <tr key={row.id ?? row.materialId} onClick={() => selectRow(row)} className="cursor-pointer border-b border-cyan-300/10 font-medium text-slate-300 hover:bg-cyan-300/[0.055]">
+                    {workspace === 'materials' ? (
+                      <MaterialRow row={row} materialUsageTypes={materialUsageTypes} view={view} rowPadding={rowPadding} />
+                    ) : workspace === 'uom' ? (
+                      <UomRow row={row} materials={materials} view={view} rowPadding={rowPadding} />
+                    ) : (
+                      <DictionaryRow row={row} workspace={workspace} view={view} rowPadding={rowPadding} />
+                    )}
+                    <td className={`px-2 ${rowPadding} text-right`}>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); selectRow(row, 'settings') }} aria-label="Sửa bản ghi" title="Sửa" className="mr-1 inline-flex h-7 w-7 items-center justify-center border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20">
+                        <Edit3 size={13} />
+                      </button>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); selectRow(row, 'dependencies'); setPendingDeactivate(true) }} disabled={deactivating} aria-label="Kiểm tra phụ thuộc" title="Kiểm tra phụ thuộc trước khi ngưng sử dụng" className="inline-flex h-7 w-7 items-center justify-center border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40">
+                        <Power size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <CockpitEmptyState title="Chưa có dữ liệu" description="Không tìm thấy bản ghi phù hợp. Dữ liệu chỉ lấy từ backend thật." />
+          )}
+        </CockpitTableShell>
+        {!loading && filtered.length > pageSize ? (
+          <DataTablePagination
+            page={page}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
+        ) : null}
       </div>
-    </div>
+
+      <UnifiedMasterDataDrawer
+        open={Boolean(editing)}
+        title={editing?.mode === 'create' ? createLabelForWorkspace(workspace) : `${editing?.materialCode ?? editing?.code ?? ''} · ${editing?.materialName ?? editing?.name ?? title}`}
+        subtitle={sourceForWorkspace(workspace)}
+        activeTab={drawerTab}
+        onTabChange={setDrawerTab}
+        onClose={closeForm}
+      >
+        {drawerTab === 'overview' ? (
+          <WorkspaceSummary workspace={workspace} materials={materials} categories={categories} materialUsageTypes={materialUsageTypes} materialTypes={materialTypes} units={units} />
+        ) : drawerTab === 'dependencies' ? (
+          <div className="space-y-4">
+            <MasterDataDependencyTree nodes={dependencyNodes} />
+            {editing?.mode !== 'create' ? (
+              <section className="border border-amber-400/20 bg-amber-400/[0.05] p-4">
+                <h3 className="text-sm font-semibold text-white">Kiểm tra trước khi ngưng sử dụng</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  Thao tác dùng đúng contract deactivate/soft-delete hiện có. Vật tư còn tồn hoặc đang được BOM tham chiếu sẽ bị chặn.
+                </p>
+                {pendingDeactivate ? (
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-amber-400/15 pt-3">
+                    <span className="text-xs font-medium text-amber-200">Xác nhận ngưng sử dụng bản ghi này?</span>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setPendingDeactivate(false)} className={moduleMutedButton}>Hủy</button>
+                      <button type="button" onClick={() => deactivateRow(editing)} disabled={!canDeactivateRow(editing) || deactivating} className="h-8 bg-amber-600 px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Ngưng sử dụng</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setPendingDeactivate(true)} disabled={!canDeactivateRow(editing)} className="mt-3 h-8 border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-40">Kiểm tra và ngưng sử dụng</button>
+                )}
+              </section>
+            ) : null}
+          </div>
+        ) : drawerTab === 'history' ? (
+          <section className="border border-cyan-300/15 bg-slate-950/35 p-4">
+            <h3 className="text-xs font-semibold uppercase text-cyan-300">Lịch sử khả dụng</h3>
+            <div className="mt-3 border-l border-cyan-300/25 pl-4 text-xs">
+              <p className="font-medium text-slate-200">Cập nhật gần nhất</p>
+              <p className="mt-1 font-mono text-slate-500">{date(editing?.updatedAt)}</p>
+              <p className="mt-3 text-slate-500">API hiện không cung cấp audit timeline riêng cho bản ghi này; không tạo lịch sử giả ở frontend.</p>
+            </div>
+          </section>
+        ) : (
+          <MasterDataForm
+            workspace={workspace}
+            editing={editing}
+            dictionaryForm={dictionaryForm}
+            setDictionaryForm={setDictionaryForm}
+            materialForm={materialForm}
+            setMaterialForm={setMaterialForm}
+            uomForm={uomForm}
+            setUomForm={setUomForm}
+            categories={categories}
+            materialUsageTypes={materialUsageTypes}
+            materialTypes={materialTypes}
+            units={units}
+            saving={saving}
+            error={error}
+            onSave={save}
+            onCancel={closeForm}
+            onDeactivate={() => { setDrawerTab('dependencies'); setPendingDeactivate(true) }}
+          />
+        )}
+      </UnifiedMasterDataDrawer>
+    </UnifiedMasterDataWorkspace>
   )
 }
 
-function DictionaryHeader({ workspace }: { workspace: MasterWorkspace }) {
+function DictionaryHeader({ workspace, view }: { workspace: MasterWorkspace; view: MasterDataView }) {
   return (
     <tr>
       <th className="w-[120px] px-2 py-2 text-left font-medium">Mã</th>
       <th className="w-[180px] px-2 py-2 text-left font-medium">Tên</th>
       {workspace === 'technical' && <th className="w-[180px] px-2 py-2 text-left font-medium">Danh mục</th>}
-      <th className="px-2 py-2 text-left font-medium">Mô tả</th>
+      {view === 'complete' ? <th className="px-2 py-2 text-left font-medium">Mô tả</th> : null}
       <th className="w-[90px] px-2 py-2 text-right font-medium">Số vật tư</th>
       <th className="w-[110px] px-2 py-2 text-right font-medium">Trạng thái</th>
-      <th className="w-[120px] px-2 py-2 text-right font-medium">Cập nhật</th>
+      {view === 'complete' ? <th className="w-[120px] px-2 py-2 text-right font-medium">Cập nhật</th> : null}
       <th className="w-[76px] px-2 py-2 text-right font-medium">Thao tác</th>
     </tr>
   )
 }
 
-function DictionaryRow({ row, workspace }: { row: MasterDataRecord; workspace: MasterWorkspace }) {
+function DictionaryRow({ row, workspace, view, rowPadding }: { row: MasterDataRecord; workspace: MasterWorkspace; view: MasterDataView; rowPadding: string }) {
   const used = workspace === 'categories'
     ? Number(row._count?.items ?? 0)
     : Number(row._count?.inventoryItems ?? 0)
   return (
     <>
-      <td className="truncate px-2 py-2 font-mono font-semibold text-cyan-300" title={row.code}>{row.code}</td>
-      <td className="truncate px-2 py-2 font-semibold text-white" title={row.name}>{row.name}</td>
-      {workspace === 'technical' && <td className="truncate px-2 py-2 text-slate-400" title={row.category?.name ?? ''}>{row.category?.name ?? '—'}</td>}
-      <td className="truncate px-2 py-2 text-slate-400" title={row.description ?? ''}>{row.description ?? '—'}</td>
-      <td className="px-2 py-2 text-right font-mono text-slate-300">{fmt(used)}</td>
-      <td className="px-2 py-2 text-right"><ActiveBadge active={row.active} /></td>
-      <td className="px-2 py-2 text-right font-mono text-[11px] text-slate-500">{date(row.updatedAt)}</td>
+      <td className={`truncate px-2 ${rowPadding} font-mono font-semibold text-cyan-300`} title={row.code}>{row.code}</td>
+      <td className={`truncate px-2 ${rowPadding} font-semibold text-white`} title={row.name}>{row.name}</td>
+      {workspace === 'technical' && <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.category?.name ?? ''}>{row.category?.name ?? '—'}</td>}
+      {view === 'complete' ? <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.description ?? ''}>{row.description ?? '—'}</td> : null}
+      <td className={`px-2 ${rowPadding} text-right font-mono text-slate-300`}>{fmt(used)}</td>
+      <td className={`px-2 ${rowPadding} text-right`}><ActiveBadge active={row.active} /></td>
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-right font-mono text-[11px] text-slate-500`}>{date(row.updatedAt)}</td> : null}
     </>
   )
 }
 
-function MaterialHeader() {
+function MaterialHeader({ view }: { view: MasterDataView }) {
   return (
     <tr>
       <th className="w-[120px] px-2 py-2 text-left font-medium">Mã vật tư</th>
@@ -1319,63 +1440,63 @@ function MaterialHeader() {
       <th className="w-[150px] px-2 py-2 text-left font-medium">Nhóm kỹ thuật</th>
       <th className="w-[100px] px-2 py-2 text-left font-medium">Loại dùng</th>
       <th className="w-[80px] px-2 py-2 text-left font-medium">Đơn vị</th>
-      <th className="w-[100px] px-2 py-2 text-right font-medium">Tồn hiện tại</th>
-      <th className="w-[70px] px-2 py-2 text-right font-medium">BOM</th>
+      {view === 'complete' ? <th className="w-[100px] px-2 py-2 text-right font-medium">Tồn hiện tại</th> : null}
+      {view === 'complete' ? <th className="w-[70px] px-2 py-2 text-right font-medium">BOM</th> : null}
       <th className="w-[110px] px-2 py-2 text-right font-medium">Trạng thái</th>
-      <th className="w-[120px] px-2 py-2 text-right font-medium">Cập nhật</th>
+      {view === 'complete' ? <th className="w-[120px] px-2 py-2 text-right font-medium">Cập nhật</th> : null}
       <th className="w-[76px] px-2 py-2 text-right font-medium">Thao tác</th>
     </tr>
   )
 }
 
-function MaterialRow({ row, materialUsageTypes }: { row: any; materialUsageTypes: MasterDataRecord[] }) {
+function MaterialRow({ row, materialUsageTypes, view, rowPadding }: { row: any; materialUsageTypes: MasterDataRecord[]; view: MasterDataView; rowPadding: string }) {
   const usageType = materialUsageTypes.find((item) => item.id === row.materialUsageTypeId || item.code === row.materialUsageTypeCode || item.code === row.materialUsageType)
   return (
     <>
-      <td className="truncate px-2 py-2 font-mono font-semibold text-cyan-300" title={row.materialCode ?? row.code}>{row.materialCode ?? row.code}</td>
-      <td className="truncate px-2 py-2 font-semibold text-white" title={row.materialName ?? row.name}>{row.materialName ?? row.name}</td>
-      <td className="truncate px-2 py-2 text-slate-400" title={row.category ?? ''}>{row.category ?? '—'}</td>
-      <td className="truncate px-2 py-2 text-slate-400" title={row.materialType ?? ''}>{row.materialType ?? '—'}</td>
-      <td className="px-2 py-2"><UsageTypeBadge value={usageType?.name ?? row.materialUsageTypeName ?? row.materialUsageType} /></td>
-      <td className="truncate px-2 py-2 text-slate-400" title={row.unit ?? ''}>{row.unit ?? '—'}</td>
-      <td className="px-2 py-2 text-right font-mono">{fmt(Number(row.currentStock ?? row.quantity ?? 0))}</td>
-      <td className="px-2 py-2 text-right font-mono">{fmt(Number(row.bomUsageCount ?? 0))}</td>
-      <td className="px-2 py-2 text-right"><ActiveBadge active={!row.deletedAt} /></td>
-      <td className="px-2 py-2 text-right font-mono text-[11px] text-slate-500">{date(row.updatedAt)}</td>
+      <td className={`truncate px-2 ${rowPadding} font-mono font-semibold text-cyan-300`} title={row.materialCode ?? row.code}>{row.materialCode ?? row.code}</td>
+      <td className={`truncate px-2 ${rowPadding} font-semibold text-white`} title={row.materialName ?? row.name}>{row.materialName ?? row.name}</td>
+      <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.category ?? ''}>{row.category ?? '—'}</td>
+      <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.materialType ?? ''}>{row.materialType ?? '—'}</td>
+      <td className={`px-2 ${rowPadding}`}><UsageTypeBadge value={usageType?.name ?? row.materialUsageTypeName ?? row.materialUsageType} /></td>
+      <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.unit ?? ''}>{row.unit ?? '—'}</td>
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-right font-mono`}>{fmt(Number(row.currentStock ?? row.quantity ?? 0))}</td> : null}
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-right font-mono`}>{fmt(Number(row.bomUsageCount ?? 0))}</td> : null}
+      <td className={`px-2 ${rowPadding} text-right`}><ActiveBadge active={!row.deletedAt} /></td>
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-right font-mono text-[11px] text-slate-500`}>{date(row.updatedAt)}</td> : null}
     </>
   )
 }
 
-function UomHeader() {
+function UomHeader({ view }: { view: MasterDataView }) {
   return (
     <tr>
       <th className="w-[90px] px-2 py-2 text-left font-medium">Mã</th>
       <th className="w-[150px] px-2 py-2 text-left font-medium">Tên đơn vị</th>
       <th className="w-[90px] px-2 py-2 text-left font-medium">Ký hiệu</th>
-      <th className="w-[100px] px-2 py-2 text-left font-medium">Loại</th>
-      <th className="w-[130px] px-2 py-2 text-left font-medium">Đơn vị cơ sở</th>
-      <th className="w-[90px] px-2 py-2 text-right font-medium">Hệ số</th>
+      {view === 'complete' ? <th className="w-[100px] px-2 py-2 text-left font-medium">Loại</th> : null}
+      {view === 'complete' ? <th className="w-[130px] px-2 py-2 text-left font-medium">Đơn vị cơ sở</th> : null}
+      {view === 'complete' ? <th className="w-[90px] px-2 py-2 text-right font-medium">Hệ số</th> : null}
       <th className="w-[80px] px-2 py-2 text-right font-medium">Sử dụng</th>
       <th className="w-[110px] px-2 py-2 text-right font-medium">Trạng thái</th>
-      <th className="w-[120px] px-2 py-2 text-right font-medium">Cập nhật</th>
+      {view === 'complete' ? <th className="w-[120px] px-2 py-2 text-right font-medium">Cập nhật</th> : null}
       <th className="w-[76px] px-2 py-2 text-right font-medium">Thao tác</th>
     </tr>
   )
 }
 
-function UomRow({ row, materials }: { row: MasterUnit; materials: any[] }) {
+function UomRow({ row, materials, view, rowPadding }: { row: MasterUnit; materials: any[]; view: MasterDataView; rowPadding: string }) {
   const used = materials.filter((material) => material.unit === row.code || material.unitId === row.id).length
   return (
     <>
-      <td className="truncate px-2 py-2 font-mono font-semibold text-cyan-300" title={row.code}>{row.code}</td>
-      <td className="truncate px-2 py-2 font-semibold text-white" title={row.name}>{row.name}</td>
-      <td className="truncate px-2 py-2 text-slate-400" title={row.symbol}>{row.symbol}</td>
-      <td className="px-2 py-2 text-slate-400">{uomCategoryLabel(row.category)}</td>
-      <td className="truncate px-2 py-2 text-slate-400" title={row.baseUnit?.code ?? ''}>{row.baseUnit?.code ?? 'Đơn vị cơ sở'}</td>
-      <td className="px-2 py-2 text-right font-mono">{row.conversionFactor ?? '—'}</td>
-      <td className="px-2 py-2 text-right font-mono">{fmt(used)}</td>
-      <td className="px-2 py-2 text-right"><ActiveBadge active={row.active} /></td>
-      <td className="px-2 py-2 text-right font-mono text-[11px] text-slate-500">{date(row.updatedAt)}</td>
+      <td className={`truncate px-2 ${rowPadding} font-mono font-semibold text-cyan-300`} title={row.code}>{row.code}</td>
+      <td className={`truncate px-2 ${rowPadding} font-semibold text-white`} title={row.name}>{row.name}</td>
+      <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.symbol}>{row.symbol}</td>
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-slate-400`}>{uomCategoryLabel(row.category)}</td> : null}
+      {view === 'complete' ? <td className={`truncate px-2 ${rowPadding} text-slate-400`} title={row.baseUnit?.code ?? ''}>{row.baseUnit?.code ?? 'Đơn vị cơ sở'}</td> : null}
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-right font-mono`}>{row.conversionFactor ?? '—'}</td> : null}
+      <td className={`px-2 ${rowPadding} text-right font-mono`}>{fmt(used)}</td>
+      <td className={`px-2 ${rowPadding} text-right`}><ActiveBadge active={row.active} /></td>
+      {view === 'complete' ? <td className={`px-2 ${rowPadding} text-right font-mono text-[11px] text-slate-500`}>{date(row.updatedAt)}</td> : null}
     </>
   )
 }

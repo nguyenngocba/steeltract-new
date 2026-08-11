@@ -1,0 +1,40 @@
+{
+  "runId": "SYSTEM-REVERSE-CERT1-1786431968315",
+  "generatedAt": "2026-08-11T07:08:54.590Z",
+  "expectedStates": {
+    "pass": "IN_YARD",
+    "rework": "IN_YARD",
+    "scrap": "SCRAPPED"
+  },
+  "visibility": [
+    {
+      "name": "qc-returned",
+      "fixtureVisible": true
+    },
+    {
+      "name": "yard-returned-pass",
+      "fixtureVisible": true
+    },
+    {
+      "name": "yard-returned-rework",
+      "fixtureVisible": true
+    },
+    {
+      "name": "logistics-return",
+      "fixtureVisible": true
+    },
+    {
+      "name": "project-lineage",
+      "fixtureVisible": true
+    }
+  ],
+  "screenshots": [
+    "../../test-results/reverse-cert1/qc-returned.png",
+    "../../test-results/reverse-cert1/yard-returned-pass.png",
+    "../../test-results/reverse-cert1/yard-returned-rework.png",
+    "../../test-results/reverse-cert1/logistics-return.png",
+    "../../test-results/reverse-cert1/project-lineage.png"
+  ],
+  "pageErrors": [],
+  "failedRequests": []
+}

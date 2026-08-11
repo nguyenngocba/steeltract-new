@@ -19,7 +19,7 @@ import {
 import { ComponentDomainFoundationService } from './services/component-domain-foundation.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('components.read')
+@RequirePermissions('components.view')
 @Controller('components/foundation')
 export class ComponentDomainFoundationController {
   constructor(
@@ -27,7 +27,7 @@ export class ComponentDomainFoundationController {
   ) {}
 
   @Post('definition-requirements')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.create')
   createDefinitionRequirement(
     @Body(new ZodValidationPipe(createComponentDefinitionRequirementSchema))
     body: CreateComponentDefinitionRequirementDto,
@@ -36,7 +36,7 @@ export class ComponentDomainFoundationController {
   }
 
   @Post('requirements')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.create')
   createRequirement(
     @Body(new ZodValidationPipe(createProjectComponentRequirementSchema))
     body: CreateProjectComponentRequirementDto,
@@ -53,7 +53,7 @@ export class ComponentDomainFoundationController {
   }
 
   @Post('instances')
-  @RequirePermissions('components.write')
+  @RequirePermissions('components.create')
   createInstance(
     @Body(new ZodValidationPipe(createComponentInstanceSchema))
     body: CreateComponentInstanceDto,

@@ -1887,11 +1887,14 @@ export class ProductionCommandService {
     command: ProductionCommandContext,
     tx: Tx,
   ) {
+    const productionOrderId =
+      rework.reworkProductionOrderId ?? rework.originalProductionOrderId;
     return this.recordEvent(
       eventName,
       rework.id,
       rework.aggregateVersion,
       {
+        productionOrderId,
         reworkRequestId: rework.reworkRequestId,
         qcNcrId: rework.qcNcrId,
         originalProductionOrderId: rework.originalProductionOrderId,
@@ -1917,7 +1920,7 @@ export class ProductionCommandService {
     eventName: string,
     aggregateId: string,
     aggregateVersion: number,
-    payload: Record<string, unknown>,
+    payload: Record<string, unknown> & { productionOrderId: string },
     context: ProductionCommandContext,
     tx: Tx,
     aggregateType: string,
@@ -1926,7 +1929,7 @@ export class ProductionCommandService {
     const eventId = randomUUID();
     const occurredAt = new Date();
     const idempotencyKey = `${context.idempotencyKey}:${eventName}`;
-    const productionOrderId = this.productionOrderId(payload, aggregateId);
+    const { productionOrderId } = payload;
     await this.repository.createProductionLog(
       {
         productionOrderId,
@@ -2268,15 +2271,6 @@ export class ProductionCommandService {
         scrap.createdAt
       ).toISOString(),
     };
-  }
-
-  private productionOrderId(
-    payload: Record<string, unknown>,
-    fallback: string,
-  ) {
-    return typeof payload.productionOrderId === 'string'
-      ? payload.productionOrderId
-      : fallback;
   }
 
   private orderUnit(order: OrderLike) {

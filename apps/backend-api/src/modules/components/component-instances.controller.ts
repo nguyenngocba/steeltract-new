@@ -11,7 +11,7 @@ import {
 import { FinishedGoodsEligibilityService } from './services/finished-goods-eligibility.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('components.read')
+@RequirePermissions('components.view')
 @Controller('components/instances')
 export class ComponentInstancesController {
   constructor(private readonly service: FinishedGoodsEligibilityService) {}

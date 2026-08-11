@@ -34,6 +34,7 @@ import {
 import { getUsers } from '../api/users.api'
 import { systemApi, type SystemRole, type SystemUser } from '@/modules/system/api/system.api'
 import { formatDateTime, formatQuantity } from '@/shared/utils/number-format'
+import { ActionGuard, usePermission } from '@/shared/permissions/PermissionGuard'
 
 const fmt = (value = 0) => formatQuantity(value, 0)
 const date = (value?: string | null) => (value ? formatDateTime(value) : '—')
@@ -73,6 +74,8 @@ export function UsersPage() {
   const [resetPassword, setResetPassword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const canEditUsers = usePermission('users.edit')
+  const canDisableUsers = usePermission('users.disable')
 
   const { data = [], isLoading, refetch } = useQuery<SystemUser[]>({
     queryKey: ['system-users'],
@@ -180,9 +183,11 @@ export function UsersPage() {
           <button className={moduleMutedButton} onClick={() => refetch()} type="button">
             <RefreshCw size={14} /> Làm mới
           </button>
-          <button className={modulePrimaryButton} type="button" onClick={() => setCreateOpen(true)}>
-            <Plus size={14} /> Thêm người dùng
-          </button>
+          <ActionGuard permission="users.create">
+            <button className={modulePrimaryButton} type="button" onClick={() => setCreateOpen(true)}>
+              <Plus size={14} /> Thêm người dùng
+            </button>
+          </ActionGuard>
         </div>
       }
     >
@@ -310,6 +315,8 @@ export function UsersPage() {
         resetPassword={resetPassword}
         saving={updateStatus.isPending || replaceRoles.isPending || resetPasswordMutation.isPending}
         error={updateStatus.error || replaceRoles.error || resetPasswordMutation.error}
+        canEdit={canEditUsers}
+        canDisable={canDisableUsers}
         onClose={() => setSelectedUserId(null)}
         onStatus={(nextStatus) => selectedDetail && updateStatus.mutate({ id: selectedDetail.id, status: nextStatus })}
         onRoles={(roleIds) => selectedDetail && replaceRoles.mutate({ id: selectedDetail.id, roleIds })}
@@ -368,7 +375,7 @@ function CreateUserModal({ open, form, roles, saving, error, onClose, onChange, 
   )
 }
 
-function UserDetailDrawer({ user, loading, roles, resetPassword, saving, error, onClose, onStatus, onRoles, onResetPassword, onResetPasswordChange }: { user: SystemUser | null; loading: boolean; roles: SystemRole[]; resetPassword: string; saving: boolean; error: unknown; onClose: () => void; onStatus: (status: 'ACTIVE' | 'BLOCKED') => void; onRoles: (roleIds: string[]) => void; onResetPassword: () => void; onResetPasswordChange: (value: string) => void }) {
+function UserDetailDrawer({ user, loading, roles, resetPassword, saving, error, canEdit, canDisable, onClose, onStatus, onRoles, onResetPassword, onResetPasswordChange }: { user: SystemUser | null; loading: boolean; roles: SystemRole[]; resetPassword: string; saving: boolean; error: unknown; canEdit: boolean; canDisable: boolean; onClose: () => void; onStatus: (status: 'ACTIVE' | 'BLOCKED') => void; onRoles: (roleIds: string[]) => void; onResetPassword: () => void; onResetPasswordChange: (value: string) => void }) {
   const [localRoleIds, setLocalRoleIds] = useState<string[]>([])
   useEffect(() => { setLocalRoleIds(user?.roles.map((role) => role.id) ?? []) }, [user])
   if (!user && !loading) return null
@@ -380,9 +387,9 @@ function UserDetailDrawer({ user, loading, roles, resetPassword, saving, error, 
         <div className="space-y-3 text-sm text-slate-300">
           <div className="flex items-center gap-3 rounded-xl border border-cyan-300/10 bg-slate-950/35 p-3"><Avatar user={user} large /><div><h3 className="font-semibold text-white">{displayName(user)}</h3><p className="text-xs text-slate-400">{roleLabel(user)}</p></div></div>
           <section className="grid gap-2 md:grid-cols-2"><Info label="Email" value={user.email} /><Info label="Username" value={user.username} /><Info label="Trạng thái" value={statusText(user.status)} /><Info label="Tạo ngày" value={date(user.createdAt)} /><Info label="Hoạt động cuối" value={date(user.lastActivityAt)} /><Info label="Module gần đây" value={user.lastActivityModule} /></section>
-          <section className="rounded-2xl border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2"><h4 className="text-xs font-semibold text-white uppercase tracking-wider">Assigned profiles</h4><div className="grid gap-2">{roles.map((role) => <label key={role.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={localRoleIds.includes(role.id)} onChange={(event) => setLocalRoleIds(event.target.checked ? [...localRoleIds, role.id] : localRoleIds.filter((id) => id !== role.id))} /><span>{role.name}</span><span className="text-slate-500">({role.permissions.length})</span></label>)}</div><button className={moduleMutedButton} type="button" disabled={saving} onClick={() => onRoles(localRoleIds)}>Lưu vai trò</button></section>
+          <section className="rounded-2xl border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2"><h4 className="text-xs font-semibold text-white uppercase tracking-wider">Assigned profiles</h4><div className="grid gap-2">{roles.map((role) => <label key={role.id} className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={!canEdit} checked={localRoleIds.includes(role.id)} onChange={(event) => setLocalRoleIds(event.target.checked ? [...localRoleIds, role.id] : localRoleIds.filter((id) => id !== role.id))} /><span>{role.name}</span><span className="text-slate-500">({role.permissions.length})</span></label>)}</div>{canEdit && <button className={moduleMutedButton} type="button" disabled={saving} onClick={() => onRoles(localRoleIds)}>Lưu vai trò</button>}</section>
           <AccessPreview title="Effective permissions" roles={selectedRoles} permissions={effectivePermissions(selectedRoles)} username={user.username} status={user.status} compact />
-          <section className="rounded-2xl border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2"><h4 className="text-xs font-semibold text-white uppercase tracking-wider">Tác vụ tài khoản</h4><div className="flex flex-wrap gap-2"><button className={moduleMutedButton} type="button" disabled={saving} onClick={() => onStatus(user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')}>{user.status === 'ACTIVE' ? 'Disable' : 'Enable'}</button></div><div className="flex gap-2"><input className={inputClass} type="password" value={resetPassword} placeholder="Mật khẩu mới" onChange={(event) => onResetPasswordChange(event.target.value)} /><button className={moduleMutedButton} type="button" disabled={saving || resetPassword.length < 8} onClick={onResetPassword}><Lock size={14} /> Reset</button></div></section>
+          {(canEdit || canDisable) && <section className="rounded-2xl border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2"><h4 className="text-xs font-semibold text-white uppercase tracking-wider">Tác vụ tài khoản</h4>{canDisable && <div className="flex flex-wrap gap-2"><button className={moduleMutedButton} type="button" disabled={saving} onClick={() => onStatus(user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')}>{user.status === 'ACTIVE' ? 'Disable' : 'Enable'}</button></div>}{canEdit && <div className="flex gap-2"><input className={inputClass} type="password" value={resetPassword} placeholder="Mật khẩu mới" onChange={(event) => onResetPasswordChange(event.target.value)} /><button className={moduleMutedButton} type="button" disabled={saving || resetPassword.length < 8} onClick={onResetPassword}><Lock size={14} /> Reset</button></div>}</section>}
           <ErrorText error={error} />
           <footer className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-cyan-300/10 bg-[#07111f]/95 px-1 py-3 backdrop-blur"><button className={moduleMutedButton} onClick={onClose} type="button">Đóng</button></footer>
         </div>

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  ProcurementActivityEvent,
   ReturnDisposition,
   ReturnFlowType,
   ReturnRequestStatus,
@@ -78,6 +79,7 @@ export class ReturnWorkflowService {
       if (!supplier) {
         throw new BadRequestException('Supplier return supplierId is invalid.');
       }
+      await this.validateSupplierReturnLineage(dto);
     }
     if (dto.flowType === ReturnFlowType.SITE_RETURN) {
       await this.validateSiteReturnAvailability(dto);
@@ -97,6 +99,8 @@ export class ReturnWorkflowService {
           flowType: dto.flowType,
           projectId: dto.projectId,
           supplierId: dto.supplierId,
+          purchaseOrderId: dto.purchaseOrderId,
+          receiptTransactionId: dto.receiptTransactionId,
           warehouseId: dto.warehouseId,
           requestedBy: dto.requestedBy,
           remarks: dto.remarks,
@@ -118,6 +122,10 @@ export class ReturnWorkflowService {
         entity: 'ReturnRequest',
         entityId: request.id,
         module: 'inventory',
+        procurementEvent:
+          request.flowType === ReturnFlowType.SUPPLIER_RETURN
+            ? ProcurementActivityEvent.SUPPLIER_RETURN
+            : undefined,
         metadata: {
           returnNo: request.returnNo,
           flowType: request.flowType,
@@ -430,6 +438,10 @@ export class ReturnWorkflowService {
       request.flowType === ReturnFlowType.SUPPLIER_RETURN &&
       supplierReturnItems.length > 0
     ) {
+      const postingItems = this.supplierReturnPostingItems(
+        request,
+        supplierReturnItems,
+      );
       await this.inventoryService.createTransaction(
         {
           type: TransactionType.EXPORT,
@@ -440,17 +452,7 @@ export class ReturnWorkflowService {
           supplierId: request.supplierId ?? undefined,
           performedBy: dto.performedBy,
           remarks: dto.remarks ?? `Return ${request.returnNo} to supplier`,
-          items: supplierReturnItems.map((item) => ({
-            inventoryItemId: item.inventoryItemId,
-            quantity: -Math.abs(
-              item.inspectedQuantity ??
-                item.receivedQuantity ??
-                item.requestedQuantity,
-            ),
-            unitId: item.unitId ?? undefined,
-            warehouseId: request.warehouseId ?? undefined,
-            zoneId: item.zoneId ?? undefined,
-          })),
+          items: postingItems,
         },
         `supplier-return:${request.id}`,
       );
@@ -522,6 +524,7 @@ export class ReturnWorkflowService {
           entity: 'ReturnRequest',
           entityId: result.id,
           module: 'inventory',
+          procurementEvent: ProcurementActivityEvent.SUPPLIER_RETURN,
           metadata: {
             returnNo: result.returnNo,
             supplierId: result.supplierId,
@@ -605,6 +608,152 @@ export class ReturnWorkflowService {
 
       return updated;
     });
+  }
+
+  private async validateSupplierReturnLineage(dto: CreateReturnRequestDto) {
+    if (!dto.purchaseOrderId && !dto.receiptTransactionId) return;
+    if (!dto.purchaseOrderId || !dto.receiptTransactionId) {
+      throw new BadRequestException(
+        'Canonical Supplier Return requires both purchaseOrderId and receiptTransactionId.',
+      );
+    }
+
+    const [order, receipt] = await Promise.all([
+      this.inventoryRepository.findPurchaseOrderById(dto.purchaseOrderId),
+      this.inventoryRepository.findTransactionById(dto.receiptTransactionId),
+    ]);
+    if (!order || order.supplierId !== dto.supplierId) {
+      throw new BadRequestException(
+        'Supplier Return Purchase Order does not belong to the selected Supplier.',
+      );
+    }
+    if (
+      !receipt ||
+      receipt.type !== TransactionType.IMPORT ||
+      receipt.referenceModule !== 'PURCHASE_ORDER' ||
+      receipt.referenceId !== order.id ||
+      receipt.supplierId !== dto.supplierId
+    ) {
+      throw new BadRequestException(
+        'Supplier Return source receipt is not a canonical receipt for this Purchase Order.',
+      );
+    }
+
+    const existingReturns =
+      await this.inventoryRepository.findSupplierReturnsByReceipt(
+        receipt.id,
+      );
+    const receivedByMaterial = new Map<string, number>();
+    for (const line of receipt.items) {
+      if (
+        dto.warehouseId &&
+        line.warehouseId &&
+        line.warehouseId !== dto.warehouseId
+      ) {
+        continue;
+      }
+      receivedByMaterial.set(
+        line.inventoryItemId,
+        (receivedByMaterial.get(line.inventoryItemId) ?? 0) +
+          Math.max(0, Number(line.quantity)),
+      );
+    }
+    const alreadyRequestedByMaterial = new Map<string, number>();
+    for (const item of existingReturns.flatMap((entry) => entry.items)) {
+      alreadyRequestedByMaterial.set(
+        item.inventoryItemId,
+        (alreadyRequestedByMaterial.get(item.inventoryItemId) ?? 0) +
+          Number(item.requestedQuantity),
+      );
+    }
+    const requestedByMaterial = new Map<string, number>();
+    for (const item of dto.items) {
+      requestedByMaterial.set(
+        item.inventoryItemId,
+        (requestedByMaterial.get(item.inventoryItemId) ?? 0) +
+          item.requestedQuantity,
+      );
+    }
+    for (const [inventoryItemId, requested] of requestedByMaterial) {
+      const received = receivedByMaterial.get(inventoryItemId) ?? 0;
+      const alreadyRequested =
+        alreadyRequestedByMaterial.get(inventoryItemId) ?? 0;
+      if (requested + alreadyRequested > received + 0.000001) {
+        throw new BadRequestException(
+          'Supplier Return quantity exceeds the referenced receipt quantity.',
+        );
+      }
+    }
+  }
+
+  private supplierReturnPostingItems(
+    request: Awaited<ReturnType<ReturnWorkflowService['requireRequest']>>,
+    returnItems: typeof request.items,
+  ) {
+    const receiptLines = request.receiptTransaction?.items;
+    if (!receiptLines?.length) {
+      return returnItems.map((item) => ({
+        inventoryItemId: item.inventoryItemId,
+        quantity: -Math.abs(
+          item.inspectedQuantity ??
+            item.receivedQuantity ??
+            item.requestedQuantity,
+        ),
+        unitId: item.unitId ?? undefined,
+        warehouseId: request.warehouseId ?? undefined,
+        zoneId: item.zoneId ?? undefined,
+      }));
+    }
+
+    const remainingByReceiptLine = new Map(
+      receiptLines.map((line) => [line.id, Math.max(0, Number(line.quantity))]),
+    );
+    const postingItems: Array<{
+      inventoryItemId: string;
+      quantity: number;
+      unitId?: string;
+      warehouseId?: string;
+      zoneId?: string;
+      slotId?: string;
+      level?: string;
+    }> = [];
+
+    for (const item of returnItems) {
+      let remaining = Math.abs(
+        item.inspectedQuantity ??
+          item.receivedQuantity ??
+          item.requestedQuantity,
+      );
+      const candidates = receiptLines.filter(
+        (line) =>
+          line.inventoryItemId === item.inventoryItemId &&
+          (!item.zoneId || line.zoneId === item.zoneId) &&
+          (!request.warehouseId || line.warehouseId === request.warehouseId),
+      );
+      for (const line of candidates) {
+        if (remaining <= 0.000001) break;
+        const available = remainingByReceiptLine.get(line.id) ?? 0;
+        const quantity = Math.min(remaining, available);
+        if (quantity <= 0.000001) continue;
+        postingItems.push({
+          inventoryItemId: item.inventoryItemId,
+          quantity: -quantity,
+          unitId: line.unitId ?? item.unitId ?? undefined,
+          warehouseId: line.warehouseId ?? request.warehouseId ?? undefined,
+          zoneId: line.zoneId ?? item.zoneId ?? undefined,
+          slotId: line.slotId ?? undefined,
+          level: line.level ?? undefined,
+        });
+        remainingByReceiptLine.set(line.id, available - quantity);
+        remaining -= quantity;
+      }
+      if (remaining > 0.000001) {
+        throw new BadRequestException(
+          'Supplier Return cannot be allocated to the referenced receipt locations.',
+        );
+      }
+    }
+    return postingItems;
   }
 
   private async validateSiteReturnAvailability(dto: CreateReturnRequestDto) {

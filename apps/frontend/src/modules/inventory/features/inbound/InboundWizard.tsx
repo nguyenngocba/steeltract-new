@@ -10,6 +10,7 @@ import {
 import { useSuppliers } from '../../hooks/useSuppliers'
 import { useZones } from '../../hooks/useZones'
 import { formatCurrencyInput, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
+import { warehouseAllows } from '../../utils/warehouse-capabilities'
 
 const INBOUND_CELLS = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((row) =>
   ['01', '02', '03', '04', '05', '06'].map((column) => `${row}${column}`),
@@ -61,7 +62,8 @@ export function InboundWizard() {
   const mainZones = zones.filter(
     (zone: any) =>
       zone?.active !== false &&
-      zone?.warehouse?.code === 'MAIN' &&
+      warehouseAllows(zone, 'allowReceipt') &&
+      !warehouseAllows(zone, 'allowProduction') &&
       !String(zone?.code ?? '').startsWith('ST-WH-'),
   )
   const selectedZone = mainZones.find(

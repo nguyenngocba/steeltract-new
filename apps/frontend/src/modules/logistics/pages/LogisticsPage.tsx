@@ -50,6 +50,7 @@ import {
   modulePrimaryButton,
 } from '@/shared/ui/modules'
 import { formatQuantity } from '@/shared/utils/number-format'
+import { usePermission } from '@/shared/permissions/PermissionGuard'
 
 type LogisticsTab =
   | 'overview'
@@ -788,6 +789,8 @@ function DispatchDetailDrawer({
   onAction: (action: 'loading' | 'depart' | 'arrive' | 'receive' | 'complete' | 'cancel') => void
   pending: boolean
 }) {
+  const canDispatch = usePermission('logistics.dispatch')
+  const canReceive = usePermission('logistics.receive')
   const { data: freshOrder } = useQuery({
     queryKey: ['logistics-dispatch-detail', order?.id],
     queryFn: () => getDispatchOrder(order!.id),
@@ -797,6 +800,11 @@ function DispatchDetailDrawer({
   if (!order) return null
   const detailOrder = freshOrder ?? order
   const action = nextAction(detailOrder.status)
+  const canRunAction = action
+    ? ['arrive', 'receive', 'complete'].includes(action.id)
+      ? canReceive
+      : canDispatch
+    : false
 
   return (
     <ModuleDetailDrawer
@@ -856,12 +864,12 @@ function DispatchDetailDrawer({
         </Section>
 
         <footer className="sticky bottom-0 -mx-1 flex flex-wrap justify-end gap-2 border-t border-cyan-300/10 bg-[#07111f]/95 px-1 py-3 backdrop-blur">
-          {detailOrder.status !== 'COMPLETED' && detailOrder.status !== 'CANCELLED' ? (
+          {canDispatch && detailOrder.status !== 'COMPLETED' && detailOrder.status !== 'CANCELLED' ? (
             <button className={moduleMutedButton} onClick={() => onAction('cancel')} disabled={pending} type="button">
               <X size={14} /> Hủy lệnh
             </button>
           ) : null}
-          {action ? (
+          {action && canRunAction ? (
             <button className={modulePrimaryButton} onClick={() => onAction(action.id)} disabled={pending} type="button">
               {action.label}
             </button>

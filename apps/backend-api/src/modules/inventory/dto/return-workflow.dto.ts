@@ -20,6 +20,8 @@ export const createReturnRequestSchema = z.object({
   flowType: z.nativeEnum(ReturnFlowType),
   projectId: optionalTextFilter,
   supplierId: optionalTextFilter,
+  purchaseOrderId: optionalTextFilter,
+  receiptTransactionId: optionalTextFilter,
   warehouseId: optionalTextFilter,
   requestedBy: optionalTextFilter,
   remarks: z.string().optional(),

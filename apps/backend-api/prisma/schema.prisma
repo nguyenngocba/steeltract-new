@@ -225,10 +225,31 @@ enum ApprovalStatus {
 
 enum PurchaseOrderStatus {
   DRAFT
+  SUBMITTED
   PENDING
   APPROVED
+  REJECTED
+  PARTIALLY_RECEIVED
   COMPLETED
   CANCELLED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ProcurementActivityEvent {
+  PURCHASE_REQUEST_CREATED
+  PURCHASE_REQUEST_APPROVED
+  PURCHASE_ORDER_CREATED
+  PURCHASE_ORDER_APPROVED
+  PURCHASE_ORDER_CANCELLED
+  PURCHASE_RECEIVED
+  SUPPLIER_RETURN
 }
 
 enum InspectionStatus {
@@ -695,8 +716,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens RefreshToken[]
-  userRoles     UserRole[]
+  refreshTokens             RefreshToken[]
+  userRoles                 UserRole[]
+  requestedPurchaseOrders   PurchaseOrder[]   @relation("PurchaseOrderRequester")
+  approvedPurchaseOrders    PurchaseOrder[]   @relation("PurchaseOrderApprover")
+  rejectedPurchaseOrders    PurchaseOrder[]   @relation("PurchaseOrderRejector")
+  cancelledPurchaseOrders   PurchaseOrder[]   @relation("PurchaseOrderCanceller")
+  requestedMaterialRequests MaterialRequest[] @relation("MaterialRequestRequester")
+  approvedMaterialRequests  MaterialRequest[] @relation("MaterialRequestApprover")
 
   @@map("users")
 }
@@ -839,19 +866,54 @@ model MasterTransactionType {
   @@map("master_transaction_types")
 }
 
-model MasterWarehouse {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  name        String
-  description String?
-  active      Boolean  @default(true)
-  color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String?
-  updatedBy   String?
+model MasterWarehouseType {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  description  String?
+  active       Boolean  @default(true)
+  color        String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdBy    String?
+  updatedBy    String?
 
+  warehouses MasterWarehouse[]
+
+  @@index([active, displayOrder])
+  @@map("master_warehouse_types")
+}
+
+model MasterWarehouse {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  name                String
+  warehouseTypeId     String?
+  description         String?
+  active              Boolean  @default(true)
+  color               String?
+  displayOrder        Int      @default(0)
+  allowReceipt        Boolean  @default(false)
+  allowIssue          Boolean  @default(false)
+  allowProduction     Boolean  @default(false)
+  allowQc             Boolean  @default(false)
+  allowDispatch       Boolean  @default(false)
+  allowInstallation   Boolean  @default(false)
+  allowSupplierReturn Boolean  @default(false)
+  allowScrap          Boolean  @default(false)
+  allowReverse        Boolean  @default(false)
+  dashboardVisible    Boolean  @default(true)
+  planningVisible     Boolean  @default(true)
+  reportingVisible    Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  createdBy           String?
+  updatedBy           String?
+
+  warehouseType                      MasterWarehouseType?                @relation(fields: [warehouseTypeId], references: [id], onDelete: Restrict)
   zones                              WarehouseZone[]
+  locationStocks                     InventoryLocationStock[]
   transactions                       InventoryTransaction[]
   transactionItems                   InventoryTransactionItem[]
   returnRequests                     ReturnRequest[]
@@ -860,8 +922,10 @@ model MasterWarehouse {
   inventoryDashboardSnapshots        InventoryDashboardSnapshot[]
   inventoryMaterialSnapshots         InventoryMaterialSnapshot[]
   inventoryLocationSnapshots         InventoryLocationSnapshot[]
+  purchaseOrderItems                 PurchaseOrderItem[]
 
-  @@index([active])
+  @@index([warehouseTypeId])
+  @@index([active, displayOrder])
   @@map("master_warehouses")
 }
 
@@ -1016,9 +1080,10 @@ model MasterUnit {
 
   derivedUnits MasterUnit[] @relation("UnitConversionBase")
 
-  inventoryItems   InventoryItem[]
-  transactionItems InventoryTransactionItem[]
-  returnItems      ReturnRequestItem[]
+  inventoryItems     InventoryItem[]
+  transactionItems   InventoryTransactionItem[]
+  returnItems        ReturnRequestItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([category])
   @@index([active])
@@ -1085,6 +1150,8 @@ model InventoryItem {
   projectTaskMaterialAllocations     ProjectTaskMaterialAllocation[]
   dispatchItems                      DispatchItem[]
   materialSnapshots                  InventoryMaterialSnapshot[]
+  materialRequestItems               MaterialRequestItem[]
+  purchaseOrderItems                 PurchaseOrderItem[]
 
   @@index([code])
   @@index([name])
@@ -1127,6 +1194,10 @@ model InventoryTransaction {
 
   referenceId String?
 
+  idempotencyKey String? @unique
+
+  commandHash String?
+
   projectId String?
 
   supplierId String?
@@ -1153,6 +1224,8 @@ model InventoryTransaction {
 
   items InventoryTransactionItem[]
 
+  supplierReturnRequests ReturnRequest[] @relation("SupplierReturnSourceReceipt")
+
   @@index([type])
   @@index([transactionTypeId])
   @@index([direction])
@@ -1164,6 +1237,7 @@ model InventoryTransaction {
   @@index([type, transactionDate(sort: Desc)], map: "inventory_transactions_type_transactionDate_idx")
   @@index([projectId, transactionDate(sort: Desc)], map: "inventory_transactions_projectId_transactionDate_idx")
   @@index([type, referenceModule, referenceId], map: "inventory_transactions_reference_idx")
+  @@index([referenceModule, referenceId, transactionDate(sort: Desc)], map: "inventory_transactions_reference_date_idx")
   @@map("inventory_transactions")
 }
 
@@ -1208,51 +1282,61 @@ model InventoryTransactionItem {
 }
 
 model InventoryLocationStock {
-  id              String         @id @default(cuid())
+  id              String           @id @default(cuid())
   inventoryItemId String
   warehouseId     String?
   zoneId          String?
   slotId          String?
   level           String?
-  quantity        Float          @default(0)
-  inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  zone            WarehouseZone? @relation(fields: [zoneId], references: [id])
+  quantity        Float            @default(0)
+  inventoryItem   InventoryItem    @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  warehouse       MasterWarehouse? @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  zone            WarehouseZone?   @relation(fields: [zoneId], references: [id])
 
   @@index([inventoryItemId])
+  @@index([warehouseId])
   @@index([zoneId, slotId, level])
   @@index([inventoryItemId, warehouseId, zoneId, slotId, level], map: "inventory_location_stocks_item_bucket_idx")
   @@map("inventory_location_stocks")
 }
 
 model ReturnRequest {
-  id          String              @id @default(cuid())
-  returnNo    String              @unique
-  flowType    ReturnFlowType
-  status      ReturnRequestStatus @default(REQUESTED)
-  projectId   String?
-  supplierId  String?
-  warehouseId String?
-  requestedBy String?
-  approvedBy  String?
-  receivedBy  String?
-  inspectedBy String?
-  remarks     String?
-  requestedAt DateTime            @default(now())
-  approvedAt  DateTime?
-  receivedAt  DateTime?
-  inspectedAt DateTime?
-  disposedAt  DateTime?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id                   String              @id @default(cuid())
+  returnNo             String              @unique
+  flowType             ReturnFlowType
+  status               ReturnRequestStatus @default(REQUESTED)
+  projectId            String?
+  supplierId           String?
+  warehouseId          String?
+  purchaseOrderId      String?
+  receiptTransactionId String?
+  requestedBy          String?
+  approvedBy           String?
+  receivedBy           String?
+  inspectedBy          String?
+  remarks              String?
+  requestedAt          DateTime            @default(now())
+  approvedAt           DateTime?
+  receivedAt           DateTime?
+  inspectedAt          DateTime?
+  disposedAt           DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  project   Project?            @relation(fields: [projectId], references: [id])
-  warehouse MasterWarehouse?    @relation(fields: [warehouseId], references: [id])
-  items     ReturnRequestItem[]
+  project            Project?              @relation(fields: [projectId], references: [id])
+  warehouse          MasterWarehouse?      @relation(fields: [warehouseId], references: [id])
+  supplier           Supplier?             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder      PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  receiptTransaction InventoryTransaction? @relation("SupplierReturnSourceReceipt", fields: [receiptTransactionId], references: [id], onDelete: Restrict)
+  items              ReturnRequestItem[]
 
   @@index([flowType])
   @@index([status])
   @@index([projectId])
   @@index([warehouseId])
+  @@index([supplierId])
+  @@index([purchaseOrderId])
+  @@index([receiptTransactionId])
   @@index([projectId, status, createdAt(sort: Desc)], map: "return_requests_projectId_status_createdAt_idx")
   @@index([flowType, status, createdAt(sort: Desc)], map: "return_requests_flowType_status_createdAt_idx")
   @@map("return_requests")
@@ -2517,9 +2601,21 @@ model PurchaseOrder {
 
   supplierName String
 
+  supplierId String?
+
+  materialRequestId String?
+
   projectName String?
 
   requestedBy String
+
+  requestedById String?
+
+  approvedById String?
+
+  rejectedById String?
+
+  cancelledById String?
 
   status PurchaseOrderStatus @default(DRAFT)
 
@@ -2527,13 +2623,48 @@ model PurchaseOrder {
 
   note String?
 
+  submittedAt DateTime?
+
+  approvedAt DateTime?
+
+  rejectedAt DateTime?
+
+  cancelledAt DateTime?
+
+  rejectionReason String?
+
+  cancellationReason String?
+
+  expectedDeliveryDate DateTime?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
 
   items PurchaseOrderItem[]
 
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  materialRequest MaterialRequest? @relation(fields: [materialRequestId], references: [id], onDelete: SetNull)
+
+  requester User? @relation("PurchaseOrderRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  approver User? @relation("PurchaseOrderApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  rejector User? @relation("PurchaseOrderRejector", fields: [rejectedById], references: [id], onDelete: SetNull)
+
+  canceller User? @relation("PurchaseOrderCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  supplierReturns ReturnRequest[]
+
   @@index([status])
+  @@index([supplierId])
+  @@index([materialRequestId])
+  @@index([requestedById])
+  @@index([approvedById])
+  @@index([rejectedById])
+  @@index([cancelledById])
+  @@index([status, expectedDeliveryDate])
   @@map("purchase_orders")
 }
 
@@ -2542,18 +2673,53 @@ model PurchaseOrderItem {
 
   purchaseOrderId String
 
+  materialId String?
+
+  uomId String?
+
+  warehouseId String?
+
   itemName String
 
   quantity Float
 
+  requestedQty Float?
+
+  orderedQty Float?
+
+  receivedQty Float?
+
+  rejectedQty Float?
+
+  remainingQty Float?
+
   unitPrice Float
 
+  discount Float?
+
+  tax Float?
+
   totalPrice Float
+
+  amount Float?
+
+  expectedDate DateTime?
 
   createdAt DateTime @default(now())
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 
+  material InventoryItem? @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  uom MasterUnit? @relation(fields: [uomId], references: [id], onDelete: Restrict)
+
+  warehouse MasterWarehouse? @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseOrderId])
+  @@index([materialId])
+  @@index([uomId])
+  @@index([warehouseId])
+  @@index([purchaseOrderId, materialId])
   @@map("purchase_order_items")
 }
 
@@ -2570,9 +2736,31 @@ model MaterialRequest {
 
   requestedBy String
 
+  requesterId String?
+
+  approvedById String?
+
+  departmentId String?
+
+  requiredDate DateTime?
+
+  priority TaskPriority?
+
+  reason String?
+
   status ApprovalStatus @default(PENDING)
 
+  lifecycleStatus PurchaseRequestStatus @default(DRAFT)
+
   note String?
+
+  submittedAt DateTime?
+
+  approvedAt DateTime?
+
+  rejectedAt DateTime?
+
+  cancelledAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -2580,7 +2768,18 @@ model MaterialRequest {
 
   items MaterialRequestItem[]
 
+  purchaseOrders PurchaseOrder[]
+
+  requester User? @relation("MaterialRequestRequester", fields: [requesterId], references: [id], onDelete: SetNull)
+
+  approver User? @relation("MaterialRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
   @@index([status])
+  @@index([lifecycleStatus])
+  @@index([requesterId])
+  @@index([approvedById])
+  @@index([departmentId])
+  @@index([requiredDate])
   @@map("material_requests")
 }
 
@@ -2588,6 +2787,8 @@ model MaterialRequestItem {
   id String @id @default(cuid())
 
   requestId String
+
+  materialId String?
 
   itemName String
 
@@ -2599,6 +2800,10 @@ model MaterialRequestItem {
 
   request MaterialRequest @relation(fields: [requestId], references: [id])
 
+  material InventoryItem? @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@index([materialId])
   @@map("material_request_items")
 }
 
@@ -2680,6 +2885,7 @@ model WarehouseZone {
   inventoryLocationSnapshots         InventoryLocationSnapshot[]
 
   @@index([warehouseId])
+  @@index([warehouseId, row, column, level])
   @@index([active])
   @@index([row])
   @@index([column])
@@ -3900,6 +4106,8 @@ model ActivityLog {
 
   module String?
 
+  procurementEvent ProcurementActivityEvent?
+
   userId String?
 
   metadata Json?
@@ -3908,6 +4116,7 @@ model ActivityLog {
 
   @@index([createdAt])
   @@index([module, createdAt(sort: Desc)], map: "activity_logs_module_createdAt_idx")
+  @@index([procurementEvent, createdAt(sort: Desc)], map: "activity_logs_procurementEvent_createdAt_idx")
   @@index([entity, entityId, createdAt(sort: Desc)], map: "activity_logs_entity_entityId_createdAt_idx")
   @@map("activity_logs")
 }
@@ -3934,6 +4143,9 @@ model Supplier {
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  returnRequests ReturnRequest[]
 }
 
 // =========================================================
@@ -3954,6 +4166,9 @@ model PurchaseReceiving {
   status String @default("RECEIVED")
 
   createdAt DateTime @default(now())
+
+  // Legacy candidate: canonical purchasing receipts are InventoryTransaction
+  // records with referenceModule = PURCHASE_ORDER and referenceId = PurchaseOrder.id.
 }
 
 // =========================================================

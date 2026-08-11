@@ -1,5 +1,115 @@
 # Current State
 
+## SYSTEM.REVERSE.CERT.1 - Canonical Reverse Runtime Certification
+
+Status: **GO / RUNTIME CERTIFIED**
+
+Authenticated REST certified installed-component return, returned-component
+PASS, REWORK with the same physical identity, SCRAP, canonical Production
+material return and Supplier Return. The retained fixture completed 305 steps
+and 71 assertions; database reconciliation passed 18/18 and Playwright passed
+1/1 across QC, Yard, Logistics and Projects. Inventory cache, location balance
+and signed movements all reconciled to 92. No business, API, schema, migration
+or UI behavior changed.
+
+Report: `docs/audits/system-reverse-cert1-runtime.md`.
+
+## SYSTEM.REWORK.1 - Canonical Rework Aggregate Repair
+
+Status: **IMPLEMENTED / RUNTIME CERTIFIED / P0 CLOSED**
+
+Production Rework logging now keeps `ProductionRework.id` as the event/entity
+aggregate while using the actual rework `ProductionOrder.id` for
+`ProductionLog.productionOrderId`. The unsafe aggregate fallback was removed
+and the event payload now requires an explicit PO identity. Runtime completed
+FAIL -> REWORK -> same ComponentInstance execution -> FINAL PASS -> Finished
+Goods -> Yard with 42/42 assertions and 29/29 database checks.
+
+Report: `docs/audits/system-rework1-canonical-aggregate-repair.md`.
+
+## PROCUREMENT.DOMAIN.1 - Canonical Purchasing Workflow
+
+Status: **IMPLEMENTED / RUNTIME CERTIFIED**
+
+Purchase Requests and Purchase Orders now use typed guarded
+Controller -> Service -> Repository flows. PR/PO lifecycle transitions,
+canonical FK validation, aggregate requirement limits, atomic Inventory-owned
+partial receipts, idempotent replay, Supplier Return lineage, ActivityLog and
+the Procurement read model are operational. REST proved receipt `40 + 40 + 20`,
+PO completion, return `-10`, net stock `+90`, RBAC 401/403 and exact Inventory
+conservation. Full backend tests pass 96 suites / 327 tests.
+
+Report: `docs/audits/procurement-domain1-canonical-workflow.md`.
+
+## PROCUREMENT.GATE.1 - Canonical Procurement Gate
+
+Status: **IMPLEMENTED / MIGRATION DEPLOYED / DOMAIN WORKFLOW PENDING**
+
+Purchase Request lifecycle persistence, PO rejection/cancellation audit fields,
+partial-receipt Inventory idempotency, Supplier Return PO/receipt lineage and
+six Procurement permissions are now available. Migration
+`20260811123000_procurement_canonical_gate` is deployed. Targeted tests pass
+11/11 and backend build passes. No Purchasing command API or UI was added.
+
+Report: `docs/audits/procurement-gate1-canonical-approval.md`.
+
+## SYSTEM.WAREHOUSE.1 - Canonical Warehouse Master
+
+Status: **IMPLEMENTED / STATIC PASS / BROWSER RUNTIME PENDING**
+
+Warehouse is now canonical Master Data with typed classification, operational
+capabilities and visibility flags. Inventory and Production select storage
+custody by capabilities rather than `MAIN`/`PRODUCTION` codes. Settings exposes
+real Warehouse CRUD with dependency-aware soft deactivation, and Inventory
+locations require an active parent Warehouse from the API. The additive
+migration is deployed and all tests/typecheck/builds pass. Playwright coverage
+is prepared but runtime execution is blocked by sandbox PostgreSQL access.
+
+Report: `docs/audits/system-warehouse1-canonical-master.md`.
+
+## SYSTEM.AUTH.1 - Administrator Restoration
+
+Status: **PASS**
+
+The preserved `admin` account is active and assigned the canonical `admin`
+role with 29/29 permissions. Its requested password was restored through the
+existing protected User Administration service. Pre-reset refresh credentials
+are revoked, new login and `/auth/me` pass, and the new JWT accesses all 12
+representative module boundaries.
+
+Report: `docs/audits/system-auth1-admin-restore.md`.
+
+## SYSTEM.RESET.1 - Clean Demo Data
+
+Status: **COMPLETE - READY FOR A NEW SAMPLE DATASET**
+
+The local runtime database now contains zero Inventory, Project, Production,
+Component, QC, Finished Goods, Warehouse/Yard and Logistics business records.
+The reset deleted 21,678 rows with dependency-ordered `DELETE` statements in a
+single transaction and preserved canonical RBAC and Material Master taxonomy.
+Health, login, RBAC, Settings and Master Data runtime checks passed. The active
+Snapshot Engine may create authoritative current-day zero-state snapshots,
+which contain no former demo data.
+
+Report: `docs/audits/system-reset1-clean-demo-data.md`.
+
+## SYSTEM.FREEZE.1 - V1 RC1 Freeze
+
+Status: **NO-GO - RELEASE CONTROLS NOT READY**
+
+Business runtime remains certified, but RC1 cannot be tagged or deployed. The
+current deployed dependency graph has 1 critical and 10 high advisories;
+backend lint fails with 4,010 errors; the frontend has no valid production image
+or Compose/reverse-proxy contract; restore/PITR is unverified; and external
+security headers, rate limiting, metrics/alerts and backup automation are not
+certified.
+
+A fresh 2.1 MB PostgreSQL dump completed in 1.44 seconds with valid checksum and
+archive catalog, but no clean restore was performed. Tests, builds, typecheck,
+Prisma validation/generation and 90-migration status pass.
+
+Report: `docs/audits/system-freeze1-release-candidate-freeze.md`.
+
 ## SYSTEM.RUNTIME.2 - Production Runtime Closure
 
 Status: **GO FOR STEELTRACK V1 RC1**
@@ -4198,3 +4308,118 @@ The final runtime also logged five Yard dashboard snapshot/live parity
 mismatches, so dashboard/read-model certification is PARTIAL.
 
 Report: `docs/audits/system-runtime1-production-runtime-certification.md`.
+
+# SYSTEM.RBAC.2 Enterprise Authorization Matrix (2026-08-10)
+
+Status: **IMPLEMENTED - REST/BROWSER GREEN**
+
+SteelTrack now uses one action-level authorization vocabulary across backend
+guards, routes, sidebars, dashboards and shared action gates. The role editor
+supports nine ERP presets, grouped matrix selection and cloning. Seven runtime
+users prove distinct navigation, route and action surfaces with 401/403 API
+enforcement. Legacy broad permissions remain compatibility aliases only.
+
+Report: `docs/audits/system-rbac2-enterprise-authorization-matrix.md`.
+
+# UI.MASTERDATA.1 Unified Master Data Workspace (2026-08-11)
+
+Status: **IMPLEMENTED - TEST/TYPECHECK/BUILD PASS, BROWSER BLOCKED**
+
+Master-data administration now shares a 96vw workspace, compact KPI/toolbar/
+table composition and one right-side detail drawer with Overview, Dependencies,
+History and Settings tabs. Warehouse, Inventory Location, Yard, Material
+Category, Material Usage Type, Technical Group and UOM consume existing
+canonical APIs and usage counts. Warehouse Zone and Yard Zone remain in their
+canonical topology workspaces rather than becoming duplicate dictionaries.
+
+No backend, Prisma, migration, API or workflow change was made. Playwright is
+prepared but could not complete because backend startup reached PostgreSQL's
+client limit. See `docs/audits/ui-masterdata1-unified-workspace.md`.
+
+# UI.AUDIT.1 Enterprise UI Consistency (2026-08-11)
+
+Status: **P0 SHARED UI COMPLETE - VISUAL RUNTIME BLOCKED**
+
+The active frontend route inventory has been scored across 21 UI categories.
+Shared cockpit/module primitives now establish the official 92px KPI, 8px
+surface, 36px table/control, 64vw detail drawer and accessible pagination
+contracts. Full-list workspaces remain the explicit 96vw exception; focused
+command modals retain their workflow semantics.
+
+Tests, typecheck, full ESLint and frontend build pass. Playwright could not be
+certified because the backend cannot reach PostgreSQL at `localhost:5432`.
+Guideline: `docs/ui/STEELTRACK_UI_GUIDELINES.md`. Report:
+`docs/audits/ui-audit1-enterprise-consistency.md`.
+
+# UI.POLISH.1 Enterprise UX Polish (2026-08-11)
+
+Status: **SHARED POLISH COMPLETE - TARGETED RUNTIME GREEN**
+
+Shared tables now own sticky headers, selected/hover states and clipped-value
+disclosure. Detail drawers own compact fixed tabs and retain one scrolling body.
+Enterprise forms and chart states follow the compact cockpit contract. Master
+Data, Components Production and canonical QC consume the shared drawer tabs.
+
+Frontend tests, typecheck, lint and build pass. Playwright completed seven RBAC
+profiles and the full Warehouse CRUD/location/Yard scenario. The
+credential-gated full runtime workflow is skipped and four-breakpoint visual
+diff baselines remain pending. See
+`docs/audits/ui-polish1-enterprise-ux.md`.
+
+# UAT.WAREHOUSE.1 Operator Experience (2026-08-11)
+
+Status: **UI HARDENED - OPERATIONAL UAT NO-GO**
+
+Real Playwright login, RBAC dashboard, Inventory command forms, export and
+logout run without runtime errors, failed requests or page-level horizontal
+overflow. Tested transaction forms now have complete accessible names and
+standard command/menu interaction. The canonical workflow cannot start because
+Warehouse Operator cannot create Suppliers and the reset runtime has zero
+suppliers; Production Return and Supplier Return also have no Inventory command
+surface for this role. No permissions, API or business behavior was changed.
+
+Report: `docs/audits/uat-warehouse1-operator-experience.md`.
+
+# PROCUREMENT.SCHEMA.1 Canonical Purchasing Model (2026-08-11)
+
+Status: **SCHEMA IMPLEMENTED AND DEPLOYED**
+
+Existing MaterialRequest and PurchaseOrder tables now carry nullable canonical
+Supplier, Material, UOM, Warehouse, Requester and Approver identities without
+removing legacy text fields. The PO lifecycle includes SUBMITTED and
+PARTIALLY_RECEIVED while retaining PENDING. InventoryTransaction remains the
+future authoritative Goods Receipt ledger; PurchaseReceiving is retained as an
+unchanged legacy candidate. Migration `20260811103000_canonical_procurement_schema`
+is deployed and database status is current.
+
+Report: `docs/audits/procurement-schema1-canonical-data-model.md`.
+
+# SYSTEM.E2E.2 Canonical Enterprise Certification (2026-08-11)
+
+Status: **CORE RUNTIME GREEN - FINAL GATE NO-GO**
+
+The canonical Supplier -> Procurement -> Inventory -> Production -> physical
+QC PASS -> Finished Goods -> Yard -> Logistics -> Installation -> return-to-
+Yard path is proven by real REST and PostgreSQL evidence. Partial PO receipts,
+payload-bound idempotency and inventory conservation pass. Playwright renders
+18 resulting workspaces without runtime errors.
+
+The final gate remains closed: QC FAIL dispositions and full Project Return are
+not runtime-certified, browser mutations are not end-to-end, latest historical
+snapshot is unavailable and Project snapshot parity logs one mismatch. See
+`docs/audits/system-e2e2-enterprise-final-certification.md`.
+
+# SYSTEM.QC.CERT.1 Physical QC Certification (2026-08-11)
+
+Status: **FOUR BRANCHES GREEN - REWORK NO-GO**
+
+Real REST, PostgreSQL and Playwright evidence certifies physical PASS, FAIL,
+USE-AS-IS and SCRAP against ComponentInstance. Finished Goods/Yard gates,
+inventory conservation, ActivityLog uniqueness and QC projections pass.
+
+Production rework acceptance returns HTTP 500 because the rework aggregate ID
+is written as `ProductionLog.productionOrderId`, violating its FK. The
+transaction rolls back and prevents rework execution and second FINAL PASS.
+Canonical QC UI paths do not use Component.status, but Components Overview and
+Reports still contain legacy STOCK/READY fallbacks. Report:
+`docs/audits/system-qc-cert1-physical-runtime.md`.

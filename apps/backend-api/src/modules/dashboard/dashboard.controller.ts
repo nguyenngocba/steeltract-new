@@ -14,6 +14,8 @@ import {
 import { PrismaService } from '../../core/prisma/prisma.service'
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
+import { PermissionsGuard } from '../rbac/guards/permissions.guard'
 import { DashboardActivityService } from './dashboard-activity.service'
 import { DashboardInsightService } from './dashboard-insight.service'
 import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
@@ -21,6 +23,8 @@ import { DashboardMetricsService } from './dashboard-metrics.service'
 import { DashboardNotificationService } from './dashboard-notification.service'
 import { DashboardRecommendationService } from './dashboard-recommendation.service'
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('dashboard.view')
 @Controller('dashboard')
 export class DashboardController {
   constructor(
@@ -33,7 +37,7 @@ export class DashboardController {
     private readonly dashboardRecommendations: DashboardRecommendationService,
   ) {}
 
- @UseGuards(JwtAuthGuard)
+  @RequirePermissions('dashboard.executive')
   @Get('executive-cockpit')
   async executiveCockpit() {
     const [
@@ -59,7 +63,6 @@ export class DashboardController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('cockpit')
   async cockpit() {
     const [
@@ -219,7 +222,6 @@ export class DashboardController {
     }
   }
 
- @UseGuards(JwtAuthGuard)
   @Get('stats')
   async stats() {
     const [
@@ -242,17 +244,14 @@ export class DashboardController {
       lowStockCount: inventoryStats.lowStockCount,
     }
   }
-  @UseGuards(JwtAuthGuard)
   @Get('recent-transactions')
   async recentTransactions() {
     return this.inventoryReadModel.getRecentTransactions(5)
   }
-  @UseGuards(JwtAuthGuard)
   @Get('low-stock')
   async lowStock() {
     return this.inventoryReadModel.getLowStockItems()
   }
-  @UseGuards(JwtAuthGuard)
   @Get('construction-progress')
   async constructionProgress() {
     const total =
@@ -296,7 +295,7 @@ export class DashboardController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('dashboard.executive')
   @Get('analytics')
   async analytics() {
     const components =
@@ -344,7 +343,7 @@ export class DashboardController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('dashboard.executive')
   @Get('forecast')
   async forecast() {
     const since = new Date()
@@ -394,7 +393,7 @@ export class DashboardController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('dashboard.executive')
   @Get('costs')
   async costs() {
     const components =
@@ -437,19 +436,18 @@ export class DashboardController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('dashboard.executive')
   @Get('procurement')
   async procurement() {
     return this.inventoryReadModel.getProcurementSuggestions()
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('dashboard.executive')
   @Get('anomalies')
   async anomalies() {
     return this.inventoryReadModel.getAnomalies()
   }
   
-  @UseGuards(JwtAuthGuard)
   @Get('activities')
   async activities() {
     return this.prisma.activityLog.findMany({

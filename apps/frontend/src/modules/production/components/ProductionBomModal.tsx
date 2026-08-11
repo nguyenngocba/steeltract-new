@@ -20,6 +20,7 @@ import {
   EnterpriseSuggestionButton,
   enterpriseSecondaryButton,
 } from '@/shared/forms'
+import { warehouseAllows } from '../../inventory/utils/warehouse-capabilities'
 
 const defaultRouting = [
   ['Cutting', 'Workshop Cutting', false],
@@ -89,15 +90,11 @@ function numeric(value: unknown) {
 }
 
 function isProductionWarehouseBalance(location: LocationBalanceLike) {
-  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(location, 'allowProduction')
 }
 
 function isMainWarehouseBalance(location: LocationBalanceLike) {
-  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location.warehouseName ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+  return warehouseAllows(location, 'allowReceipt') && !warehouseAllows(location, 'allowProduction')
 }
 
 function productionLocationLabel(location: LocationBalanceLike) {

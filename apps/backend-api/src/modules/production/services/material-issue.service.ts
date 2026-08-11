@@ -390,7 +390,7 @@ export class MaterialIssueService {
         );
       }
 
-      const destination = await this.resolveMainWarehouseReturnDestination(
+      const destination = await this.resolveMaterialWarehouseReturnDestination(
         issue,
         tx,
       );
@@ -402,7 +402,7 @@ export class MaterialIssueService {
           remarks:
             body.remarks ??
             issue.remarks ??
-            `[PRODUCTION_MATERIAL_RETURN] Return unused material to main warehouse`,
+            `[PRODUCTION_MATERIAL_RETURN] Return unused material to material warehouse`,
           lines: [
             {
               inventoryItemId: issue.inventoryItemId,
@@ -556,7 +556,7 @@ export class MaterialIssueService {
     );
   }
 
-  private async resolveMainWarehouseReturnDestination(
+  private async resolveMaterialWarehouseReturnDestination(
     issue: {
       inventoryItemId: string;
       inventoryItem: {
@@ -577,13 +577,13 @@ export class MaterialIssueService {
     },
     tx: MaterialIssueTx,
   ) {
-    const mainWarehouse = await this.inventoryRepository.findWarehouseByCode(
-      'MAIN',
-      tx,
-    );
+    const mainWarehouse =
+      await this.inventoryRepository.findPrimaryMaterialWarehouse(tx);
 
     if (!mainWarehouse) {
-      throw new BadRequestException('Main warehouse is not configured');
+      throw new BadRequestException(
+        'No active material warehouse is configured for receipts',
+      );
     }
 
     const currentMainStock =
@@ -604,7 +604,7 @@ export class MaterialIssueService {
 
     const itemZone = issue.inventoryItem.zone;
     if (
-      itemZone?.warehouse?.code === 'MAIN' &&
+      itemZone?.warehouseId === mainWarehouse.id &&
       itemZone.warehouseId &&
       itemZone.id
     ) {
@@ -620,14 +620,14 @@ export class MaterialIssueService {
       };
     }
 
-    const fallbackZone = await this.inventoryRepository.findActiveWarehouseZone(
-      'MAIN',
-      tx,
-    );
+    const fallbackZone =
+      await this.inventoryRepository.findActivePrimaryMaterialWarehouseZone(
+        tx,
+      );
 
     if (!fallbackZone?.warehouseId) {
       throw new BadRequestException(
-        'No active main warehouse return location is available',
+        'No active material warehouse return location is available',
       );
     }
 

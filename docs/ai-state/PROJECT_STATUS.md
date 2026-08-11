@@ -1,5 +1,81 @@
 # Project Status
 
+On 2026-08-11 completed **SYSTEM.REVERSE.CERT.1 - Canonical Reverse Workflow
+Runtime Certification** with a GO decision. Real authenticated REST ran 305
+steps and 71 assertions across Logistics return, Project return, QC PASS,
+REWORK, SCRAP, Production material return and Supplier Return. Read-only DB
+verification passed 18/18, Playwright passed 1/1 with five screenshots, backend
+tests passed 96/96 suites and 330/330 tests, and all frontend tests, typecheck
+and builds passed. No domain/API/schema/migration/UI behavior, stage or commit.
+
+Report: `docs/audits/system-reverse-cert1-runtime.md`.
+
+On 2026-08-11 completed **SYSTEM.REWORK.1 - Canonical Rework Aggregate
+Repair**. Removed the invalid fallback that wrote `ProductionRework.id` into
+`ProductionLog.productionOrderId`; ACCEPTED/COMPLETED now log against the
+rework PO and REJECTED logs against the original PO. Outbox and ActivityLog
+retain the distinct Rework aggregate identity. Authenticated runtime passed
+155 steps, 42/42 assertions, 29/29 database checks and Playwright 1/1 through
+FINAL PASS, Finished Goods and Yard. Full backend tests pass 96 suites / 330
+tests. No schema, migration, API, UI, stage or commit.
+
+Report: `docs/audits/system-rework1-canonical-aggregate-repair.md`.
+
+On 2026-08-11 implemented **PROCUREMENT.DOMAIN.1 - Canonical Purchasing
+Business Workflow**. Replaced direct-Prisma purchasing controllers with typed
+guarded domain orchestration, implemented PR/PO lifecycle, canonical identity
+validation, aggregate requirement protection, atomic Inventory-owned partial
+receipts, Supplier Return lineage and a real Procurement read model. Runtime
+proved `40 + 40 + 20`, PO completion, idempotency conflict behavior, return
+`-10`, net inventory `+90`, conservation and RBAC. Full backend tests pass 96
+suites / 327 tests. No frontend, schema, migration, stage or commit.
+
+Report: `docs/audits/procurement-domain1-canonical-workflow.md`.
+
+On 2026-08-11 implemented **PROCUREMENT.GATE.1 - Procurement Canonical Gate**.
+Added the canonical Purchase Request lifecycle, PO rejection/cancellation audit
+fields, transaction-level Inventory idempotency for multiple partial receipts,
+Supplier Return PO/source-receipt lineage and six Procurement permissions.
+The additive migration is deployed; 2 targeted suites / 11 tests, Prisma,
+runtime RBAC catalog, compatibility probes and backend build pass. No workflow,
+UI, stage or commit was introduced. Report:
+`docs/audits/procurement-gate1-canonical-approval.md`.
+
+On 2026-08-10 implemented **SYSTEM.WAREHOUSE.1 - Canonical Warehouse Master &
+Storage Topology**. Added typed Warehouse Master capabilities, deployed the
+additive migration, exposed Settings CRUD/dependency protection, required
+active Warehouse parents for Inventory locations, preserved Warehouse during
+SYSTEM.RESET and removed runtime warehouse selection by MAIN/PRODUCTION code.
+Prisma, tests, typecheck and builds pass. Browser runtime remains pending
+because the sandbox cannot connect the backend to local PostgreSQL. Report:
+`docs/audits/system-warehouse1-canonical-master.md`.
+
+On 2026-08-10 completed **SYSTEM.AUTH.1 - Restore Administrator Account**.
+The existing `admin` user was retained, activated already, and assigned the
+canonical `admin` role with all 29 permissions. Password restoration used the
+authenticated `SystemUserAdminService` endpoint, revoked old refresh tokens,
+created the required audit log and passed login, `/auth/me` and 12/12 module
+authorization checks. No source, schema or migration changed. Report:
+`docs/audits/system-auth1-admin-restore.md`.
+
+On 2026-08-10 completed **SYSTEM.RESET.1 - Clean Demo Data & Preserve Canonical
+Master Data**. A verified 2.1 MB PostgreSQL backup was created before a
+transactional, FK-ordered `DELETE` cleanup removed 21,678 demo/business rows.
+Users, roles, permissions, settings dictionaries, UOM, material categories,
+material usage types and technical groups retained exact row counts. Runtime
+health, login, RBAC, Settings and Master Data checks pass; Inventory, Projects,
+Production, Component, QC, Yard, Warehouse and Dispatch authoritative counts
+are zero. Report: `docs/audits/system-reset1-clean-demo-data.md`.
+
+On 2026-08-10 completed **SYSTEM.FREEZE.1 - SteelTrack V1 RC1 Freeze Audit** as
+documentation/audit only. Business runtime remains GO, but release decision is
+**NO-GO**: deployed dependencies contain 1 critical/10 high advisories, backend
+lint fails, frontend production packaging is incomplete, restore/PITR is not
+certified and external security/monitoring controls are absent. Tests, builds,
+typecheck, Prisma validation/generation and migration status pass. Created the
+freeze audit plus RC1 release, deployment, rollback and operations documents.
+No source/schema/dependency change, stage or commit was performed.
+
 On 2026-08-10 completed **SYSTEM.RUNTIME.2 - Production Runtime Closure**.
 Implemented deployment-grade live/ready/startup probes, stale Yard snapshot
 watermark detection, exact Yard KPI parity certification, complete Playwright
@@ -2093,3 +2169,99 @@ available; EPIC144 did not invent missing workflows.
 - Full browser mutation workflow: NOT CERTIFIED.
 - V1 RC1: NO-GO pending browser workflow, deployment probes and Yard snapshot
   parity.
+
+# SYSTEM.RBAC.2
+
+- Canonical permission catalog: PASS, 87 total (58 action + 29 legacy aliases).
+- Backend action enforcement: PASS for core operational and administration
+  modules.
+- Dynamic sidebar and route authorization: PASS.
+- Dashboard permission scoping: PASS.
+- Role matrix, presets and clone: PASS.
+- REST runtime profiles: PASS, anonymous 401 and cross-role 403 proven.
+- Playwright: PASS, 7/7 profiles with screenshots.
+- Schema/migration changes: NONE.
+
+# UI.MASTERDATA.1
+
+- Unified Master Data layout and right drawer: PASS.
+- Existing canonical API/read-model reuse: PASS.
+- Frontend tests: PASS, 3 files / 8 tests.
+- Frontend typecheck: PASS.
+- Targeted ESLint: PASS with warnings, 0 errors.
+- Frontend build: PASS.
+- `git diff --check`: PASS.
+- Browser CRUD/visual certification: BLOCKED by PostgreSQL connection
+  exhaustion; not reported as GREEN.
+- Backend/schema/API changes: NONE.
+
+# UI.AUDIT.1
+
+- Active route/workspace inventory: PASS.
+- Eleven-module, 21-category consistency matrix: PASS.
+- Official UI guideline: PUBLISHED.
+- Shared P0 typography/spacing/KPI/table/drawer/pagination fixes: PASS.
+- Frontend tests: PASS, 4 files / 11 tests.
+- Typecheck: PASS.
+- Full ESLint: PASS, 0 errors / 384 baseline warnings.
+- Frontend build: PASS.
+- Playwright visual: BLOCKED by unavailable PostgreSQL runtime.
+- Backend/API/schema/migration changes: NONE.
+
+# UI.POLISH.1
+
+- Shared table, drawer, form, filter and chart polish: PASS.
+- Drawer tab convergence for Master Data, Components Production and QC: PASS.
+- Frontend tests: PASS, 4 files / 12 tests.
+- Typecheck: PASS.
+- Full ESLint: PASS, 0 errors / 384 baseline warnings.
+- Frontend build: PASS.
+- Playwright: PASS for 7 RBAC profiles and Warehouse CRUD/location/Yard; one
+  credential-gated full runtime workflow skipped.
+- Backend/API/schema/migration changes: NONE.
+
+# UAT.WAREHOUSE.1
+
+- Real Warehouse Operator Playwright journey: PASS as an audit harness.
+- React runtime errors / failed browser requests: 0 / 0.
+- Receipt/Transfer/Issue/Count unlabelled controls: 0 after UI fixes.
+- Page-level horizontal overflow: 0 px.
+- Full operational workflow: NO-GO; Supplier creation/RBAC, empty supplier
+  prerequisite, Production Return and Supplier Return are P0 blockers.
+- Warehouse Operator readiness: 40%.
+- Backend/API/schema/migration/business changes: NONE.
+
+# PROCUREMENT.SCHEMA.1
+
+- Canonical Purchasing identity schema: PASS.
+- Additive migration: DEPLOYED.
+- Prisma validate/generate: PASS.
+- Migration status: PASS, 92 migrations current.
+- Backend build: PASS.
+- Business workflow/UI/Receipt implementation: NOT STARTED by design.
+- PurchaseReceiving: retained unchanged as legacy candidate.
+
+# SYSTEM.E2E.2
+
+- Canonical Procurement + operational REST: PASS, 91 steps / 15 assertions.
+- PostgreSQL source-of-truth parity: PASS, 15/15 checks.
+- Inventory conservation: PASS, retained fixture net quantity 91.
+- Dashboard payload deltas: PASS for six workspaces.
+- Browser render/logout: PASS, 1/1 test and 18 screenshots.
+- Backend tests: PASS, 96 suites / 327 tests.
+- Frontend tests: PASS, 4 files / 12 tests.
+- Builds/typecheck: PASS.
+- Final certification: NO-GO due QC branch, browser-command, Historical
+  Snapshot and Project snapshot parity gaps.
+
+# SYSTEM.QC.CERT.1
+
+- PASS / FAIL / USE-AS-IS / SCRAP runtime: PASS.
+- Finished Goods and Yard eligibility boundaries: PASS.
+- Inventory conservation: PASS at 175 across item, location stock and ledger.
+- ActivityLog: PASS, 22 QC rows and no duplicate action/entity keys.
+- QC projections: PASS, 9/9 fixture inspection/NCR documents.
+- Playwright: PASS, 1/1 with four screenshots and no browser errors.
+- REWORK: FAIL; `POST /production/commands/rework/accept` returns 500/P2003.
+- Full certification: NO-GO until Production rework logging and legacy
+  Components dashboard status dependencies are closed.

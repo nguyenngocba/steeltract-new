@@ -17,6 +17,7 @@ import {
   SystemRoleAdminRepository,
   SystemRoleDetail,
 } from './system-role-admin.repository';
+import { ROLE_PRESETS } from '../rbac/services/rbac.service';
 
 const ADMIN_PERMISSION = 'rbac.write';
 
@@ -189,6 +190,7 @@ export class SystemRoleAdminService {
       actions: [...new Set(permissions.map((item) => item.name.split('.')[1] ?? 'access'))],
       permissionCount: permissions.length,
       permissions,
+      presets: ROLE_PRESETS,
     };
   }
 
@@ -302,11 +304,18 @@ export class SystemRoleAdminService {
       logistics: 'Logistics',
       'master-data': 'Danh mục',
       production: 'Sản xuất',
+      dashboard: 'Dashboard',
+      permissions: 'Permission catalog',
+      planning: 'Kế hoạch',
       project: 'Duyệt dự án',
       projects: 'Dự án',
       qc: 'QC',
       rbac: 'Quản trị hệ thống',
       tasks: 'Công việc',
+      roles: 'Vai trò',
+      settings: 'Cài đặt',
+      suppliers: 'Nhà cung cấp',
+      users: 'Người dùng',
       workflow: 'Workflow',
       yard: 'Yard',
     };
@@ -317,7 +326,29 @@ export class SystemRoleAdminService {
   private actionLabel(action: string) {
     const labels: Record<string, string> = {
       approve: 'Duyệt',
+      cancel: 'Hủy',
+      complete: 'Hoàn thành',
+      create: 'Tạo',
+      delete: 'Xóa',
+      disable: 'Vô hiệu hóa',
+      dispatch: 'Điều phối',
+      edit: 'Sửa',
+      execute: 'Thực thi',
+      export: 'Xuất dữ liệu',
+      fail: 'Không đạt',
+      inspect: 'Kiểm tra',
+      issue: 'Xuất kho',
+      move: 'Di chuyển',
+      pass: 'Đạt',
+      receive: 'Nhận',
       read: 'Xem',
+      release: 'Phát hành',
+      return: 'Hoàn trả',
+      rework: 'Làm lại',
+      scrap: 'Phế phẩm',
+      stage: 'Đưa vào bãi',
+      transfer: 'Điều chuyển',
+      view: 'Xem',
       write: 'Thao tác',
     };
     return labels[action] ?? action;

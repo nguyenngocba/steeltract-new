@@ -7,7 +7,6 @@ import {
   Construction,
   MapPinned,
   Radio,
-  Search,
   Truck,
   Warehouse,
 } from 'lucide-react'
@@ -24,10 +23,19 @@ import {
 import {
   CockpitChartCard,
   CockpitEmptyState,
+  CockpitKpiCard,
   DataTablePagination,
-  EnterpriseKpiCard,
 } from '@/shared/ui/cockpit'
-import { ModuleDetailDrawer, ModuleEmptyState } from '@/shared/ui/modules'
+import { ModuleEmptyState } from '@/shared/ui/modules'
+import {
+  MasterDataDependencyTree,
+  UnifiedMasterDataDrawer,
+  UnifiedMasterDataToolbar,
+  exportMasterDataCsv,
+  type MasterDataDensity,
+  type MasterDataDrawerTab,
+  type MasterDataView,
+} from '@/modules/master-data/components/UnifiedMasterDataWorkspace'
 import { formatQuantity } from '@/shared/utils/number-format'
 import { YardTabWorkspace } from '../components/YardTabWorkspace'
 import { YardZoneDetailDialog } from '../components/YardZoneDetailDialog'
@@ -118,16 +126,17 @@ export function YardPage() {
 
   // Filter state for Toolbar
   const [search, setSearch] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState('ALL')
   const [zoneFilter, setZoneFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [projectFilter, setProjectFilter] = useState('ALL')
+  const [density, setDensity] = useState<MasterDataDensity>('compact')
+  const [view, setView] = useState<MasterDataView>('essential')
   const [page, setPage] = useState(1)
   const [expandedModalOpen, setExpandedModalOpen] = useState(false)
   const [detailDrawerSlot, setDetailDrawerSlot] = useState<YardSlotRuntime | null>(null)
 
   const { data: components = [] } = useComponents()
-  const { data: workspace } = useYardWorkspace()
+  const { data: workspace, refetch: refetchWorkspace, isFetching: workspaceFetching } = useYardWorkspace()
   const { data: dashboard } = useYardDashboard()
 
   const zones = workspace?.zones ?? []
@@ -203,7 +212,6 @@ export function YardPage() {
   }
 
   // Dynamic filter option lists
-  const warehouses = ['Bãi tập kết chính (Main Yard)', 'Bãi kết cấu phụ (Aux Yard)']
   const projectCodes = useMemo(() => {
     const set = new Set<string>()
     slots.forEach((s) => {
@@ -232,7 +240,7 @@ export function YardPage() {
     })
   }, [slots, search, zoneFilter, statusFilter, projectFilter])
 
-  const pageSize = 14
+  const pageSize = density === 'compact' ? 14 : 10
   const pagedSlots = filteredSlots.slice((page - 1) * pageSize, page * pageSize)
 
   useEffect(() => {
@@ -266,135 +274,94 @@ export function YardPage() {
       <div className="space-y-2 text-xs -mt-2">
         {/* Phase 1: ENTERPRISE KPI CARDS */}
         <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-6">
-          <EnterpriseKpiCard
+          <CockpitKpiCard
             title="Sức chứa bãi Tập kết"
             value={`${metrics?.occupiedSlots ?? 0}/${metrics?.totalSlots ?? 0}`}
+            note="Slot đã dùng / tổng slot"
             tone="blue"
             icon={<Warehouse size={15} />}
+            className="h-[92px]"
           />
-          <EnterpriseKpiCard
+          <CockpitKpiCard
             title="Sức chứa khả dụng"
             value={`${emptySlots} slot trống`}
+            note="Khả dụng hiện tại"
             tone="cyan"
             icon={<MapPinned size={15} />}
+            className="h-[92px]"
           />
-          <EnterpriseKpiCard
+          <CockpitKpiCard
             title="Cấu kiện lưu bãi"
             value={formatQuantity(metrics?.placements ?? 0, 0)}
+            note="Placement đang hoạt động"
             tone="emerald"
             icon={<Boxes size={15} />}
+            className="h-[92px]"
           />
-          <EnterpriseKpiCard
+          <CockpitKpiCard
             title="Giao dịch bãi hôm nay"
             value={formatQuantity(movementsToday, 0)}
+            note="Movement trong ngày"
             tone="purple"
             icon={<Activity size={15} />}
+            className="h-[92px]"
           />
-          <EnterpriseKpiCard
+          <CockpitKpiCard
             title="Zone quá tải (>=90%)"
             value={formatQuantity(overloadedZones, 0)}
+            note="Cần điều phối"
             tone={overloadedZones ? 'red' : 'amber'}
             icon={<Radio size={15} />}
+            className="h-[92px]"
           />
-          <EnterpriseKpiCard
+          <CockpitKpiCard
             title="Cầu trục vận hành"
             value={`${metrics?.craneAvailableCount ?? 0}/${cranes.length}`}
+            note="Khả dụng / tổng số"
             tone="cyan"
             icon={<Construction size={15} />}
+            className="h-[92px]"
           />
         </div>
 
-        {/* Phase 3: COMPACT TOOLBAR */}
+        {/* Phase 3: UNIFIED MASTER-DATA TOOLBAR */}
         <EnterprisePanel className="rounded-xl -mt-1">
-          <div className="grid grid-cols-1 gap-1 xl:grid-cols-[1fr_160px_160px_160px_160px_110px_110px]">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') setPage(1)
-              }}
-              placeholder="Tìm mã slot, tên zone, mã cấu kiện, dự án..."
-              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-[#08111f]"
-            />
-
-            <select
-              value={warehouseFilter}
-              onChange={(e) => {
-                setWarehouseFilter(e.target.value)
-                setPage(1)
-              }}
-              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
-            >
-              <option value="ALL">Tất cả bãi tập kết</option>
-              {warehouses.map((w) => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-            </select>
-
-            <select
-              value={zoneFilter}
-              onChange={(e) => {
-                setZoneFilter(e.target.value)
-                setPage(1)
-              }}
-              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
-            >
-              <option value="ALL">Tất cả Zone</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.code}>{z.code} · {z.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setPage(1)
-              }}
-              className="h-9 w-full rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="AVAILABLE">AVAILABLE (Sẵn sàng)</option>
-              <option value="OCCUPIED">OCCUPIED (Đang dùng)</option>
-              <option value="BLOCKED">BLOCKED (Tạm khóa)</option>
-            </select>
-
-            <select
-              value={projectFilter}
-              onChange={(e) => {
-                setProjectFilter(e.target.value)
-                setPage(1)
-              }}
-              className="h-9 w-full truncate rounded-lg border border-white/10 bg-[#08111f]/90 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:bg-[#08111f]"
-            >
-              <option value="ALL">Tất cả dự án</option>
-              {projectCodes.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => setPage(1)}
-              className="h-9 self-end rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
-            >
-              Tìm kiếm
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSearch('')
-                setWarehouseFilter('ALL')
-                setZoneFilter('ALL')
-                setStatusFilter('ALL')
-                setProjectFilter('ALL')
-                setPage(1)
-              }}
-              className="h-9 self-end rounded-lg border border-white/10 bg-white/[0.055] px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-            >
-              Làm mới
-            </button>
-          </div>
+          <UnifiedMasterDataToolbar
+            query={search}
+            searchPlaceholder="Tìm mã slot, tên zone, mã cấu kiện, dự án..."
+            density={density}
+            view={view}
+            createLabel="Thêm Zone"
+            refreshing={workspaceFetching}
+            onQueryChange={(value) => { setSearch(value); setPage(1) }}
+            onDensityChange={setDensity}
+            onViewChange={setView}
+            onRefresh={() => { void refetchWorkspace() }}
+            onCreate={actions.openCreateZone}
+            onExport={() => exportMasterDataCsv(
+              `yard-slots-${new Date().toISOString().slice(0, 10)}.csv`,
+              ['Slot', 'Zone', 'Tầng hiện tại', 'Tầng tối đa', 'Cấu kiện', 'Khối lượng', 'Trạng thái'],
+              filteredSlots.map((slot) => [slot.code, slot.zone.name, slot.currentStackLevel, slot.maxStackLevel, slot.placements.length, slot.placements.reduce((sum, placement) => sum + Number(placement.weight || 0), 0), slot.status]),
+            )}
+            filters={
+              <>
+                <select value={zoneFilter} onChange={(event) => { setZoneFilter(event.target.value); setPage(1) }} className="h-9 max-w-44 border border-white/10 bg-[#08111f]/90 px-2 text-xs font-medium text-slate-100 outline-none focus:border-cyan-400">
+                  <option value="ALL">Tất cả Zone</option>
+                  {zones.map((zone) => <option key={zone.id} value={zone.code}>{zone.code} · {zone.name}</option>)}
+                </select>
+                <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} className="h-9 max-w-44 border border-white/10 bg-[#08111f]/90 px-2 text-xs font-medium text-slate-100 outline-none focus:border-cyan-400">
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="AVAILABLE">Sẵn sàng</option>
+                  <option value="OCCUPIED">Đang dùng</option>
+                  <option value="BLOCKED">Tạm khóa</option>
+                </select>
+                <select value={projectFilter} onChange={(event) => { setProjectFilter(event.target.value); setPage(1) }} className="h-9 max-w-44 border border-white/10 bg-[#08111f]/90 px-2 text-xs font-medium text-slate-100 outline-none focus:border-cyan-400">
+                  <option value="ALL">Tất cả dự án</option>
+                  {projectCodes.map((project) => <option key={project} value={project}>{project}</option>)}
+                </select>
+              </>
+            }
+          />
         </EnterprisePanel>
 
         {/* Phase 2: ANALYTICS DASHBOARD WIDGETS */}
@@ -431,17 +398,17 @@ export function YardPage() {
               </div>
 
               <div className="h-[380px] overflow-auto scrollbar-none rounded-lg border border-white/10">
-                <table className="w-full min-w-[900px] table-fixed text-sm border-collapse">
+                <table className={`w-full table-fixed text-sm border-collapse ${view === 'essential' ? 'min-w-[820px]' : 'min-w-[900px]'}`}>
                   <thead
                     className={`${inventoryTableHead} text-slate-300 border-b border-cyan-400/10 sticky top-0 z-10`}
                     style={{ backgroundColor: 'rgba(30, 41, 59, 1)' }}
                   >
                     <tr>
-                      {['Vị trí Slot', 'Zone', 'Tầng khả dụng', 'Cấu kiện lưu bãi', 'Khối lượng (tấn)', 'Trạng thái', 'Thao tác'].map(
-                        (header, idx) => (
+                      {['Vị trí Slot', 'Zone', 'Tầng khả dụng', 'Cấu kiện lưu bãi', ...(view === 'complete' ? ['Khối lượng (tấn)'] : []), 'Trạng thái', 'Thao tác'].map(
+                        (header) => (
                           <th
                             key={header}
-                            className={`px-2 py-2 text-xs font-semibold text-slate-300 ${idx === 6 ? 'text-right' : 'text-left'}`}
+                            className={`px-2 py-2 text-xs font-semibold text-slate-300 ${header === 'Thao tác' ? 'text-right' : 'text-left'}`}
                           >
                             {header}
                           </th>
@@ -467,9 +434,9 @@ export function YardPage() {
                         <td className="px-2 py-1.5 text-slate-300 text-xs truncate">
                           {slot.placements.map((p) => p.itemCode).join(', ') || '—'}
                         </td>
-                        <td className="px-2 py-1.5 font-mono text-slate-200 text-xs">
+                        {view === 'complete' ? <td className="px-2 py-1.5 font-mono text-slate-200 text-xs">
                           {fmt(slot.placements.reduce((sum, p) => sum + Number(p.weight || 0), 0))}
-                        </td>
+                        </td> : null}
                         <td className="px-2 py-1.5">
                           <span
                             className={`rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${
@@ -499,7 +466,7 @@ export function YardPage() {
                     ))}
                     {!pagedSlots.length ? (
                       <tr>
-                        <td colSpan={7} className="px-2 py-10">
+                        <td colSpan={view === 'complete' ? 7 : 6} className="px-2 py-10">
                           <ModuleEmptyState
                             icon={<Warehouse size={18} />}
                             title="Chưa có dữ liệu slot bãi"
@@ -715,18 +682,20 @@ export function YardPage() {
 }
 
 function YardDetailDrawer({ slot, onClose }: { slot: YardSlotRuntime | null; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<MasterDataDrawerTab>('overview')
   if (!slot) return null
 
   return (
-    <ModuleDetailDrawer
+    <UnifiedMasterDataDrawer
       open={Boolean(slot)}
       onClose={onClose}
       title={`Vị trí Slot ${slot.code}`}
       subtitle={`Thuộc Zone: ${slot.zone.name} (${slot.zone.code})`}
-      size="md"
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
     >
       <div className="space-y-3 text-sm text-slate-300">
-        <section className="grid gap-2 md:grid-cols-2">
+        {activeTab === 'overview' ? <section className="grid gap-2 md:grid-cols-2">
           <div className="rounded-lg border border-cyan-300/10 bg-slate-950/35 px-3 py-2">
             <p className="text-[11px] text-slate-500">Mã Slot</p>
             <p className="mt-1 text-sm text-white font-semibold font-mono">{slot.code}</p>
@@ -743,9 +712,11 @@ function YardDetailDrawer({ slot, onClose }: { slot: YardSlotRuntime | null; onC
             <p className="text-[11px] text-slate-500">Trạng thái Slot</p>
             <p className="mt-1 text-sm text-emerald-400 font-semibold">{slot.status}</p>
           </div>
-        </section>
+        </section> : null}
 
-        <section className="rounded-2xl border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2">
+        {activeTab === 'dependencies' ? <div className="space-y-3">
+        <MasterDataDependencyTree nodes={[{ label: 'ComponentInstance placements', count: slot.placements.length, detail: 'Cấu kiện vật lý đang chiếm slot' }]} />
+        <section className="border border-cyan-300/10 bg-slate-950/25 p-3 space-y-2">
           <h3 className="text-sm font-semibold text-white">Danh sách cấu kiện đang lưu giữ ({slot.placements.length})</h3>
           <div className="space-y-1.5">
             {slot.placements.map((item) => (
@@ -762,8 +733,10 @@ function YardDetailDrawer({ slot, onClose }: { slot: YardSlotRuntime | null; onC
             ))}
             {!slot.placements.length && <ModuleEmptyState title="Slot đang trống" description="Chưa có cấu kiện xếp chồng tại slot này." />}
           </div>
-        </section>
+        </section></div> : null}
+        {activeTab === 'history' ? <section className="border border-cyan-300/10 bg-slate-950/25 p-4"><h3 className="text-sm font-semibold text-white">Lịch sử Slot</h3><p className="mt-2 text-xs text-slate-500">Read model hiện tại không trả timeline theo từng slot. Không hiển thị movement giả.</p></section> : null}
+        {activeTab === 'settings' ? <section className="border border-cyan-300/10 bg-slate-950/25 p-4"><h3 className="text-sm font-semibold text-white">Thiết lập topology</h3><div className="mt-3 grid gap-2 md:grid-cols-2"><div className="border border-white/10 p-3"><span className="text-xs text-slate-500">Tầng tối đa</span><strong className="float-right font-mono text-white">{slot.maxStackLevel}</strong></div><div className="border border-white/10 p-3"><span className="text-xs text-slate-500">Tầng hiện tại</span><strong className="float-right font-mono text-white">{slot.currentStackLevel}</strong></div></div><p className="mt-3 text-xs text-slate-500">Thay đổi Zone/Slot tiếp tục dùng command hiện có; drawer này không tạo source-of-truth riêng.</p></section> : null}
       </div>
-    </ModuleDetailDrawer>
+    </UnifiedMasterDataDrawer>
   )
 }

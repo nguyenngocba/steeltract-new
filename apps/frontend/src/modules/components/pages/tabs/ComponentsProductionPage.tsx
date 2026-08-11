@@ -387,16 +387,12 @@ export function ComponentsProductionPage() {
         subtitle={selectedOrder && selectedCanonical ? `${projectTitle(selectedCanonical)} · ${statusLabel[selectedOrder.status] ?? selectedOrder.status}` : undefined}
         onClose={() => setSelectedOrder(null)}
         widthClass="w-screen md:w-[64vw] md:min-w-[860px] md:max-w-[1280px]"
+        tabs={detailTabs.map((tab) => ({ id: tab.key, label: tab.label }))}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as DetailTab)}
       >
         {selectedOrder && selectedCanonical ? (
           <div className="space-y-3">
-            <div className="flex gap-1 overflow-auto rounded-xl border border-cyan-300/15 bg-white/[0.035] p-1">
-              {detailTabs.map((tab) => (
-                <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition ${activeTab === tab.key ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
             <DetailTabPanel tab={activeTab} order={selectedOrder} canonical={selectedCanonical} />
           </div>
         ) : null}

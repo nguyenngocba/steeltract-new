@@ -52,6 +52,7 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { HistoricalSnapshotEngineModule } from './core/historical-snapshots/historical-snapshot-engine.module';
 import { HistoricalDashboardModule } from './core/historical-dashboard/historical-dashboard.module';
 import { HealthModule } from './modules/health/health.module';
+import { PurchasingModule } from './modules/purchasing/purchasing.module';
 @Module({
   imports: [
     EventsModule,
@@ -78,6 +79,7 @@ import { HealthModule } from './modules/health/health.module';
     MaterialRequestsModule,
     ApprovalsModule,
     PurchaseOrdersModule,
+    PurchasingModule,
     AnalyticsModule,
     AnalyticsEngineModule,
     WorkflowModule,

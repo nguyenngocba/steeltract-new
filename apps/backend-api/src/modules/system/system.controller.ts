@@ -43,7 +43,7 @@ import {
 import { SystemUserAdminService } from './system-user-admin.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('rbac.read')
+@RequirePermissions('settings.view')
 @Controller('system')
 export class SystemController {
   constructor(
@@ -152,16 +152,18 @@ export class SystemController {
   }
 
   @Get('users')
+  @RequirePermissions('users.view')
   async users() {
     return this.userAdminService.listUsers();
   }
 
   @Get('users/:id')
+  @RequirePermissions('users.view')
   async userDetail(@Param('id') id: string) {
     return this.userAdminService.getUser(id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('users.create')
   @Post('users')
   async createUser(
     @Req() req: { user: AuthUser },
@@ -171,7 +173,7 @@ export class SystemController {
     return this.userAdminService.createUser(dto, req.user.id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('users.edit')
   @Patch('users/:id')
   async updateUser(
     @Param('id') id: string,
@@ -182,7 +184,7 @@ export class SystemController {
     return this.userAdminService.updateUser(id, dto, req.user.id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('users.edit')
   @Put('users/:id/roles')
   async replaceUserRoles(
     @Param('id') id: string,
@@ -193,7 +195,7 @@ export class SystemController {
     return this.userAdminService.replaceRoles(id, dto, req.user.id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('users.disable')
   @Post('users/:id/status')
   async updateUserStatus(
     @Param('id') id: string,
@@ -204,7 +206,7 @@ export class SystemController {
     return this.userAdminService.updateStatus(id, dto, req.user.id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('users.edit')
   @Post('users/:id/reset-password')
   async resetUserPassword(
     @Param('id') id: string,
@@ -216,16 +218,18 @@ export class SystemController {
   }
 
   @Get('roles')
+  @RequirePermissions('roles.view')
   async roles() {
     return this.roleAdminService.listRoles();
   }
 
   @Get('permissions')
+  @RequirePermissions('permissions.view')
   async permissions() {
     return this.roleAdminService.listPermissions();
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('roles.edit')
   @Post('roles')
   async createRole(
     @Req() req: { user: AuthUser },
@@ -235,7 +239,7 @@ export class SystemController {
     return this.roleAdminService.createRole(dto, req.user.id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('roles.edit')
   @Patch('roles/:id')
   async updateRole(
     @Param('id') id: string,
@@ -246,7 +250,7 @@ export class SystemController {
     return this.roleAdminService.updateRole(id, dto, req.user.id);
   }
 
-  @RequirePermissions('rbac.write')
+  @RequirePermissions('roles.edit')
   @Put('roles/:id/permissions')
   async replaceRolePermissions(
     @Param('id') id: string,
@@ -258,6 +262,7 @@ export class SystemController {
   }
 
   @Get('role-matrix')
+  @RequirePermissions('roles.view')
   async roleMatrix() {
     return this.roleAdminService.roleMatrix();
   }
@@ -275,6 +280,8 @@ export class SystemController {
       materialUsageTypes,
       materialTypes,
       materials,
+      warehouses,
+      activeWarehouses,
       notifications,
     ] = await Promise.all([
       this.prisma.user.count(),
@@ -287,6 +294,8 @@ export class SystemController {
       this.prisma.masterMaterialUsageType.count(),
       this.prisma.materialType.count(),
       this.prisma.inventoryItem.count({ where: { deletedAt: null } }),
+      this.prisma.masterWarehouse.count(),
+      this.prisma.masterWarehouse.count({ where: { active: true } }),
       this.prisma.notification.count(),
     ]);
 
@@ -377,6 +386,18 @@ export class SystemController {
             canonicalModel: 'MaterialType',
             schemaGate:
               'Profile/specification/grade/dimension chi tiết chưa có model riêng.',
+          },
+        },
+        {
+          key: 'warehouses',
+          label: 'Kho',
+          status: 'REAL_EDITABLE',
+          source: '/master-data/warehouses',
+          editable: true,
+          count: warehouses,
+          metadata: {
+            active: activeWarehouses,
+            canonicalModel: 'MasterWarehouse',
           },
         },
         {

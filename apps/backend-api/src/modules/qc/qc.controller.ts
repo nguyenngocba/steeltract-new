@@ -73,7 +73,7 @@ type AuthenticatedRequest = Request & {
 };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('qc.read')
+@RequirePermissions('qc.view')
 @Controller('qc')
 export class QcController {
   constructor(
@@ -124,7 +124,7 @@ export class QcController {
   }
 
   @Post('checklists')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   createChecklist(
     @Body(new ZodValidationPipe(createQcChecklistSchema))
     body: CreateQcChecklistDto,
@@ -134,7 +134,7 @@ export class QcController {
   }
 
   @Patch('checklists/:id')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   updateChecklist(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateQcChecklistSchema))
@@ -153,7 +153,7 @@ export class QcController {
   }
 
   @Post('inspections')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   createInspection(
     @Body(new ZodValidationPipe(createQcInspectionSchema))
     body: CreateQcInspectionDto,
@@ -168,7 +168,7 @@ export class QcController {
   }
 
   @Patch('inspections/:id')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   updateInspection(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateQcInspectionSchema))
@@ -179,7 +179,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/start')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   startInspection(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(startQcInspectionSchema))
@@ -190,7 +190,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/results')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   recordResult(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(recordQcResultSchema))
@@ -201,7 +201,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/issues')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   createIssue(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createQcIssueSchema))
@@ -212,7 +212,7 @@ export class QcController {
   }
 
   @Patch('issues/:id')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   updateIssue(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateQcIssueSchema))
@@ -223,7 +223,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/complete')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.inspect')
   completeInspection(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(completeQcInspectionSchema))
@@ -234,7 +234,7 @@ export class QcController {
   }
 
   @Post('commands/inspections/:id/pass')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.pass')
   passInspectionCommand(
     @Param('id') inspectionId: string,
     @Body(new ZodValidationPipe(completeQcInspectionCommandSchema))
@@ -256,7 +256,7 @@ export class QcController {
   }
 
   @Post('commands/inspections/:id/fail')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.fail')
   failInspectionCommand(
     @Param('id') inspectionId: string,
     @Body(new ZodValidationPipe(completeQcInspectionCommandSchema))
@@ -278,7 +278,7 @@ export class QcController {
   }
 
   @Post('commands/inspections/:id/ncr')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.fail')
   createNcrCommand(
     @Param('id') inspectionId: string,
     @Body(new ZodValidationPipe(createQcNcrCommandSchema))
@@ -306,7 +306,7 @@ export class QcController {
   }
 
   @Post('commands/ncr/:id/rework')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.rework')
   reworkDispositionCommand(
     @Param('id') ncrId: string,
     @Body(new ZodValidationPipe(completeQcDispositionCommandSchema))
@@ -331,7 +331,7 @@ export class QcController {
   }
 
   @Post('commands/ncr/:id/scrap')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.scrap')
   scrapDispositionCommand(
     @Param('id') ncrId: string,
     @Body(new ZodValidationPipe(completeQcDispositionCommandSchema))
@@ -356,7 +356,7 @@ export class QcController {
   }
 
   @Post('commands/ncr/:id/use-as-is')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.use-as-is')
   useAsIsDispositionCommand(
     @Param('id') ncrId: string,
     @Body(new ZodValidationPipe(completeQcDispositionCommandSchema))
@@ -382,7 +382,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/approve')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.pass')
   approveInspection(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(approveQcInspectionSchema))
@@ -393,7 +393,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/reject')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.fail')
   rejectInspection(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(rejectQcInspectionSchema))
@@ -412,7 +412,7 @@ export class QcController {
   }
 
   @Post('inspections/:id/ncr')
-  @RequirePermissions('qc.write')
+  @RequirePermissions('qc.fail')
   createNcr(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createNcrSchema)) body: CreateNcrDto,

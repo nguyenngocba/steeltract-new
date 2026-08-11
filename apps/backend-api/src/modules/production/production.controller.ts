@@ -91,7 +91,7 @@ type AuthenticatedRequest = Request & {
 };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('production.read')
+@RequirePermissions('production.view')
 @Controller('production')
 export class ProductionController {
   constructor(
@@ -130,7 +130,7 @@ export class ProductionController {
   }
 
   @Post('work-centers')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.create')
   createWorkCenter(
     @Body(new ZodValidationPipe(createWorkCenterSchema))
     body: CreateWorkCenterDto,
@@ -144,7 +144,7 @@ export class ProductionController {
   }
 
   @Post('machines')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.create')
   createMachine(
     @Body(new ZodValidationPipe(createMachineSchema)) body: CreateMachineDto,
   ) {
@@ -157,7 +157,7 @@ export class ProductionController {
   }
 
   @Post('schedules')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.create')
   createSchedule(
     @Body(new ZodValidationPipe(createProductionScheduleSchema))
     body: CreateProductionScheduleDto,
@@ -171,7 +171,7 @@ export class ProductionController {
   }
 
   @Post('boms')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.create')
   createBom(@Body(new ZodValidationPipe(createBomSchema)) body: CreateBomDto) {
     return this.bomService.create(body);
   }
@@ -182,7 +182,7 @@ export class ProductionController {
   }
 
   @Patch('boms/:id')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.edit')
   updateBom(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateBomSchema)) body: UpdateBomDto,
@@ -191,13 +191,13 @@ export class ProductionController {
   }
 
   @Post('boms/:id/clone')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.create')
   cloneBom(@Param('id') id: string) {
     return this.bomService.clone(id);
   }
 
   @Post('boms/:id/archive')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.edit')
   archiveBom(@Param('id') id: string) {
     return this.bomService.archive(id);
   }
@@ -211,7 +211,7 @@ export class ProductionController {
   }
 
   @Post('material-issues')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-issue')
   createMaterialIssue(
     @Body(new ZodValidationPipe(createMaterialIssueSchema))
     body: CreateMaterialIssueDto,
@@ -221,7 +221,7 @@ export class ProductionController {
   }
 
   @Patch('material-issues/:id')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-issue')
   updateMaterialIssue(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateMaterialIssueSchema))
@@ -231,7 +231,7 @@ export class ProductionController {
   }
 
   @Post('material-issues/:id/return')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-issue')
   returnMaterialIssue(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(returnMaterialIssueSchema))
@@ -255,7 +255,7 @@ export class ProductionController {
   }
 
   @Post('reservations/:id/reserve')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-reserve')
   reserveReservation(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(reserveProductionReservationSchema))
@@ -270,7 +270,7 @@ export class ProductionController {
   }
 
   @Post('reservations/:id/release')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-reserve')
   releaseReservation(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(releaseProductionReservationSchema))
@@ -285,7 +285,7 @@ export class ProductionController {
   }
 
   @Post('reservations/:id/expire')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-reserve')
   expireReservation(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(releaseProductionReservationSchema))
@@ -296,7 +296,7 @@ export class ProductionController {
   }
 
   @Post('reservations/:id/issue')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-issue')
   issueReservation(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(issueFromReservationSchema))
@@ -352,7 +352,7 @@ export class ProductionController {
   }
 
   @Post(':id/reservations')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-reserve')
   createReservation(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createProductionReservationSchema))
@@ -363,7 +363,7 @@ export class ProductionController {
   }
 
   @Post(':id/consume')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.material-issue')
   consumeMaterial(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createProductionConsumptionSchema))
@@ -388,7 +388,7 @@ export class ProductionController {
   }
 
   @Post()
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.create')
   create(
     @Body(new ZodValidationPipe(createProductionOrderSchema))
     body: CreateProductionOrderDto,
@@ -398,7 +398,7 @@ export class ProductionController {
   }
 
   @Patch(':id')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.edit')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProductionOrderSchema))
@@ -409,7 +409,7 @@ export class ProductionController {
   }
 
   @Post(':id/release')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.release')
   releaseOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -420,7 +420,7 @@ export class ProductionController {
   }
 
   @Post(':id/ready')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.release')
   readyOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -431,7 +431,7 @@ export class ProductionController {
   }
 
   @Post(':id/start')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   start(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(startProductionSchema))
@@ -442,7 +442,7 @@ export class ProductionController {
   }
 
   @Post(':id/pause')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   pauseOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -453,7 +453,7 @@ export class ProductionController {
   }
 
   @Post(':id/resume')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   resumeOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -464,7 +464,7 @@ export class ProductionController {
   }
 
   @Post(':id/complete')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.complete')
   completeOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -475,7 +475,7 @@ export class ProductionController {
   }
 
   @Post(':id/close')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.complete')
   closeOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -486,7 +486,7 @@ export class ProductionController {
   }
 
   @Post(':id/cancel')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.cancel')
   cancelOrder(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(productionOrderTransitionSchema))
@@ -497,7 +497,7 @@ export class ProductionController {
   }
 
   @Post(':id/stage-to-yard')
-  @RequirePermissions('production.write')
+  @RequirePermissions('yard.stage')
   stageToYard(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(stageProductionToYardSchema))
@@ -513,7 +513,7 @@ export class ProductionController {
   }
 
   @Post(':id/component')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.complete')
   createComponentFromProduction(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
@@ -525,7 +525,7 @@ export class ProductionController {
   }
 
   @Post(':id/tasks')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   createTask(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createProductionTaskSchema))
@@ -536,7 +536,7 @@ export class ProductionController {
   }
 
   @Post(':id/logs')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   createLog(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createProductionLogSchema))
@@ -547,7 +547,7 @@ export class ProductionController {
   }
 
   @Post('stages/:stageId/complete')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.complete')
   completeStage(
     @Param('stageId') stageId: string,
     @Body(new ZodValidationPipe(completeStageSchema)) body: CompleteStageDto,
@@ -561,7 +561,7 @@ export class ProductionController {
   }
 
   @Patch('tasks/:taskId')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   updateTask(
     @Param('taskId') taskId: string,
     @Body(new ZodValidationPipe(updateProductionTaskSchema))
@@ -572,7 +572,7 @@ export class ProductionController {
   }
 
   @Post('tasks/:taskId/assign')
-  @RequirePermissions('production.write')
+  @RequirePermissions('production.execute')
   assignTask(
     @Param('taskId') taskId: string,
     @Body(new ZodValidationPipe(assignProductionTaskSchema))

@@ -7,6 +7,7 @@ import {
   ProductionExecutionState,
   ProductionOrderKind,
   ProductionOrderStatus,
+  ProductionReworkState,
   ProductionWorkOrderState,
 } from '@prisma/client';
 
@@ -711,5 +712,249 @@ describe('ProductionCommandService', () => {
     expect(repository.createProductionLog).not.toHaveBeenCalled();
     expect(repository.createActivity).not.toHaveBeenCalled();
     expect(repository.createOutboxEvent).not.toHaveBeenCalled();
+  });
+
+  it('logs an accepted Rework against its Rework Production Order while retaining the Rework aggregate identity', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const originalOrder = {
+      id: 'po-original-1',
+      projectId: 'project-1',
+      aggregateVersion: 4,
+    };
+    const reworkOrder = {
+      id: 'po-rework-1',
+      orderNo: 'PO-REWORK-001',
+      title: 'Rework PO',
+      projectId: 'project-1',
+      orderKind: ProductionOrderKind.REWORK,
+      status: ProductionOrderStatus.DRAFT,
+      aggregateVersion: 1,
+      componentId: 'component-1',
+      componentRequirementId: null,
+      componentRevisionId: 'revision-1',
+      bomDefinitionId: 'bom-definition-1',
+      quantity: 1,
+      metadata: { unit: 'PCS' },
+    };
+    const rework = {
+      id: 'rework-aggregate-1',
+      reworkRequestId: 'rework-request-1',
+      qcNcrId: 'ncr-1',
+      originalProductionOrderId: originalOrder.id,
+      reworkProductionOrderId: reworkOrder.id,
+      componentInstanceId: 'instance-1',
+      state: ProductionReworkState.ACCEPTED,
+      routingScope: {},
+      reason: 'Repair weld',
+      aggregateVersion: 1,
+      decidedBy: 'operator-1',
+      decidedAt: new Date('2026-08-11T08:00:00.000Z'),
+      completedAt: null,
+    };
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReworkByRequest: jest.fn().mockResolvedValue(null),
+      findReleasedEngineeringBasis: jest
+        .fn()
+        .mockResolvedValue(releasedEngineeringBasis),
+      findAggregate: jest.fn().mockResolvedValue(originalOrder),
+      findQcNcrForRework: jest.fn().mockResolvedValue({
+        id: 'ncr-1',
+        componentInstanceId: 'instance-1',
+        productionOrderId: originalOrder.id,
+      }),
+      updateAggregateOrder: jest.fn().mockResolvedValue({
+        ...originalOrder,
+        aggregateVersion: 5,
+      }),
+      createAggregateOrder: jest.fn().mockResolvedValue(reworkOrder),
+      createRework: jest.fn().mockResolvedValue(rework),
+      createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      createActivity: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+      {
+        materializeReleasedEngineeringBom: jest
+          .fn()
+          .mockResolvedValue({ id: 'production-bom-1' }),
+      } as unknown as ProductionBomMaterializationService,
+    );
+
+    await service.acceptRework({
+      reworkRequestId: rework.reworkRequestId,
+      qcNcrId: rework.qcNcrId,
+      originalProductionOrderId: originalOrder.id,
+      expectedVersion: 4,
+      orderNo: reworkOrder.orderNo,
+      title: reworkOrder.title,
+      reason: rework.reason,
+      engineeringBasis: {
+        componentId: 'component-1',
+        componentRevisionId: 'revision-1',
+        bomDefinitionId: 'bom-definition-1',
+        contentHash: 'a'.repeat(64),
+        verifiedAt: '2026-08-11T08:00:00.000Z',
+      },
+      actorId: 'operator-1',
+      idempotencyKey: 'accept-rework-1',
+    });
+
+    expect(repository.createProductionLog).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        productionOrderId: reworkOrder.id,
+        message: 'production.rework.accepted',
+        metadata: expect.objectContaining({
+          aggregateType: 'ProductionRework',
+          aggregateId: rework.id,
+        }),
+      }),
+      tx,
+    );
+    expect(repository.createActivity).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        entityId: rework.id,
+        metadata: expect.objectContaining({
+          productionOrderId: reworkOrder.id,
+        }),
+      }),
+      tx,
+    );
+    expect(repository.createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'production.rework.accepted',
+        payload: expect.objectContaining({
+          productionOrderId: reworkOrder.id,
+          reworkProductionOrderId: reworkOrder.id,
+        }),
+        metadata: expect.objectContaining({
+          aggregateType: 'ProductionRework',
+          aggregateId: rework.id,
+        }),
+      }),
+      tx,
+    );
+  });
+
+  it('logs a rejected Rework against the original Production Order because no Rework order exists', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const originalOrder = { id: 'po-original-2', aggregateVersion: 2 };
+    const rework = {
+      id: 'rework-aggregate-2',
+      reworkRequestId: 'rework-request-2',
+      qcNcrId: 'ncr-2',
+      originalProductionOrderId: originalOrder.id,
+      reworkProductionOrderId: null,
+      componentInstanceId: null,
+      state: ProductionReworkState.REJECTED,
+      routingScope: null,
+      reason: 'Reject rework request',
+      aggregateVersion: 1,
+      decidedBy: 'operator-1',
+      decidedAt: new Date('2026-08-11T09:00:00.000Z'),
+      completedAt: null,
+    };
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReworkByRequest: jest.fn().mockResolvedValue(null),
+      findAggregate: jest.fn().mockResolvedValue(originalOrder),
+      updateAggregateOrder: jest.fn().mockResolvedValue({
+        ...originalOrder,
+        aggregateVersion: 3,
+      }),
+      createRework: jest.fn().mockResolvedValue(rework),
+      createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      createActivity: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+      {} as ProductionBomMaterializationService,
+    );
+
+    await service.rejectRework({
+      reworkRequestId: rework.reworkRequestId,
+      qcNcrId: rework.qcNcrId,
+      originalProductionOrderId: originalOrder.id,
+      expectedVersion: 2,
+      reason: rework.reason,
+      actorId: 'operator-1',
+      idempotencyKey: 'reject-rework-2',
+    });
+
+    expect(repository.createProductionLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productionOrderId: originalOrder.id,
+        message: 'production.rework.rejected',
+        metadata: expect.objectContaining({ aggregateId: rework.id }),
+      }),
+      tx,
+    );
+  });
+
+  it('logs completed Rework against the closed Rework Production Order', async () => {
+    const tx = { marker: 'production-transaction' } as never;
+    const rework = {
+      id: 'rework-aggregate-3',
+      reworkRequestId: 'rework-request-3',
+      qcNcrId: 'ncr-3',
+      originalProductionOrderId: 'po-original-3',
+      reworkProductionOrderId: 'po-rework-3',
+      componentInstanceId: 'instance-3',
+      state: ProductionReworkState.ACCEPTED,
+      routingScope: {},
+      reason: 'Completed repair',
+      aggregateVersion: 1,
+      decidedBy: 'operator-1',
+      decidedAt: new Date('2026-08-11T10:00:00.000Z'),
+      completedAt: null,
+    };
+    const completed = {
+      ...rework,
+      state: ProductionReworkState.COMPLETED,
+      aggregateVersion: 2,
+      completedAt: new Date('2026-08-11T11:00:00.000Z'),
+    };
+    const repository = {
+      transaction: jest.fn(async (callback) => callback(tx)),
+      findOutboxEvent: jest.fn().mockResolvedValue(null),
+      findReworkByRequest: jest.fn().mockResolvedValue(rework),
+      findAggregate: jest.fn().mockResolvedValue({
+        id: rework.reworkProductionOrderId,
+        status: ProductionOrderStatus.CLOSED,
+      }),
+      updateRework: jest.fn().mockResolvedValue(completed),
+      createProductionLog: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      createActivity: jest.fn().mockResolvedValue({ id: 'activity-1' }),
+      createOutboxEvent: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+    } as unknown as ProductionOrderRepository;
+    const service = new ProductionCommandService(
+      repository,
+      {} as InventoryPostingService,
+      {} as ProductionBomMaterializationService,
+    );
+
+    await service.completeRework({
+      reworkRequestId: rework.reworkRequestId,
+      expectedVersion: 1,
+      actorId: 'operator-1',
+      idempotencyKey: 'complete-rework-3',
+    });
+
+    expect(repository.createProductionLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productionOrderId: rework.reworkProductionOrderId,
+        message: 'production.rework.completed',
+        metadata: expect.objectContaining({ aggregateId: rework.id }),
+      }),
+      tx,
+    );
   });
 });

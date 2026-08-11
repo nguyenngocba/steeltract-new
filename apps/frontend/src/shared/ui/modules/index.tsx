@@ -2,31 +2,32 @@ import { Box, X } from 'lucide-react'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 export type ModuleTone = 'blue' | 'emerald' | 'amber' | 'red' | 'purple' | 'cyan'
+export type ModuleDetailTab = { id: string; label: string; disabled?: boolean }
 
 export const modulePanel =
-  'rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] backdrop-blur-2xl'
+  'rounded-lg border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(7,18,34,0.72)_55%,rgba(23,31,71,0.62))] shadow-[0_24px_80px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-cyan-400/[0.055] backdrop-blur-2xl'
 
 export const moduleInput =
-  'h-8 rounded-lg border border-white/10 bg-slate-950/45 px-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65'
+  'h-9 rounded-md border border-white/10 bg-slate-950/45 px-3 text-xs font-medium text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950/65 focus:ring-2 focus:ring-cyan-400/15'
 
 export const modulePageStack = 'space-y-3'
 
 export const moduleGridGap = 'gap-3'
 
 export const moduleTableShell =
-  'overflow-hidden rounded-2xl border border-cyan-300/15 bg-slate-950/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]'
+  'overflow-hidden rounded-lg border border-cyan-300/15 bg-slate-950/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]'
 
 export const moduleTableHead =
-  'bg-cyan-300/[0.055] text-xs uppercase tracking-[0.08em] text-slate-400'
+  'h-9 whitespace-nowrap bg-cyan-300/[0.055] text-xs font-medium uppercase tracking-[0.08em] text-slate-400'
 
 export const moduleTableRow =
-  'border-t border-cyan-300/10 text-slate-200 transition hover:bg-cyan-300/[0.055]'
+  'h-9 whitespace-nowrap border-t border-cyan-300/10 text-xs font-medium text-slate-200 transition hover:bg-cyan-300/[0.055]'
 
 export const moduleMutedButton =
-  'rounded-xl border border-cyan-300/15 bg-white/[0.055] px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 hover:text-cyan-100 hover:shadow-[0_0_24px_rgba(34,211,238,0.14)] disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-cyan-300/15 bg-white/[0.055] px-3 text-xs font-medium text-slate-300 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 hover:text-cyan-100 hover:shadow-[0_0_24px_rgba(34,211,238,0.14)] disabled:cursor-not-allowed disabled:opacity-40'
 
 export const modulePrimaryButton =
-  'rounded-xl border border-blue-400/30 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500'
+  'inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-blue-400/30 bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60'
 
 const toneGradient: Record<ModuleTone, string> = {
   blue: 'from-blue-500 to-sky-400',
@@ -49,10 +50,10 @@ export function ModulePageHeader({
   action?: ReactNode
 }) {
   return (
-    <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
       <div>
         {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">{eyebrow}</p> : null}
-        <h1 className="mt-1 text-2xl font-semibold text-white">{title}</h1>
+        <h1 className="mt-1 text-xl font-semibold text-white">{title}</h1>
         {description ? <p className="mt-1 text-xs text-slate-400">{description}</p> : null}
       </div>
       {action ? <div className="flex items-center gap-2">{action}</div> : null}
@@ -95,7 +96,7 @@ export function ModuleKpiCard({
     </>
   )
 
-  const classes = `${modulePanel} h-[118px] p-4 text-left transition ${active ? 'border-cyan-300/70 bg-cyan-400/10 ring-cyan-300/20' : ''} ${onClick ? 'cursor-pointer hover:border-cyan-300/50 hover:bg-cyan-300/[0.065] hover:shadow-[0_0_34px_rgba(34,211,238,0.16)]' : ''} ${className}`
+  const classes = `${modulePanel} h-[92px] p-3 text-left transition ${active ? 'border-cyan-300/70 bg-cyan-400/10 ring-cyan-300/20' : ''} ${onClick ? 'cursor-pointer hover:border-cyan-300/50 hover:bg-cyan-300/[0.065] hover:shadow-[0_0_34px_rgba(34,211,238,0.16)]' : ''} ${className}`
 
   if (onClick) {
     return (
@@ -119,7 +120,7 @@ export function ModuleKpiStrip({
   children: ReactNode
   className?: string
 }) {
-  return <div className={`grid grid-cols-1 gap-3 md:grid-cols-3 2xl:grid-cols-6 ${className}`}>{children}</div>
+  return <div className={`grid grid-cols-1 gap-2 md:grid-cols-3 2xl:grid-cols-6 ${className}`}>{children}</div>
 }
 
 export function ModuleFilterBar({
@@ -132,7 +133,7 @@ export function ModuleFilterBar({
   sticky?: boolean
 }) {
   return (
-    <section className={`${modulePanel} rounded-xl p-3 ${sticky ? 'sticky top-3 z-30' : ''} ${className}`}>
+    <section className={`${modulePanel} p-2 ${sticky ? 'sticky top-3 z-30' : ''} ${className}`}>
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-12">{children}</div>
     </section>
   )
@@ -150,14 +151,14 @@ export function ModuleTabs<T extends string>({
   className?: string
 }) {
   return (
-    <nav className={`overflow-auto rounded-2xl border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(18,30,60,0.58))] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.055)] backdrop-blur-xl ${className}`}>
+    <nav className={`overflow-auto rounded-lg border border-cyan-300/15 bg-[linear-gradient(135deg,rgba(15,35,59,0.82),rgba(18,30,60,0.58))] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.055)] backdrop-blur-xl ${className}`}>
       <div className="flex min-w-max gap-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => onChange(tab.key)}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+            className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
               active === tab.key
                 ? 'bg-blue-600 text-white shadow-[0_0_26px_rgba(37,99,235,0.28)] ring-1 ring-cyan-300/30'
                 : 'text-slate-400 hover:bg-cyan-300/10 hover:text-white'
@@ -222,7 +223,7 @@ export function ModuleEmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-8 text-center">
+    <div className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-8 text-center">
       <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-slate-950/60 text-slate-400">
         {icon ?? <Box size={18} />}
       </div>
@@ -285,6 +286,9 @@ export function ModuleDetailDrawer({
   maxHeightClass,
   size = 'md',
   placement = 'right',
+  tabs,
+  activeTab,
+  onTabChange,
 }: {
   open: boolean
   title: string
@@ -297,6 +301,9 @@ export function ModuleDetailDrawer({
   maxHeightClass?: string
   size?: 'sm' | 'md' | 'lg'
   placement?: 'right' | 'center'
+  tabs?: ModuleDetailTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
 }) {
   const drawerRef = useRef<HTMLElement>(null)
   const closeRef = useRef(onClose)
@@ -360,11 +367,17 @@ export function ModuleDetailDrawer({
   if (!open) return null
 
   const sizeClass = {
-    sm: 'w-screen md:w-[45vw] md:min-w-[720px] md:max-w-[820px]',
-    md: 'w-screen md:w-[58vw] md:min-w-[900px] md:max-w-[1180px]',
-    lg: 'w-screen md:w-[62vw] md:min-w-[980px] md:max-w-[1280px]',
+    sm: 'w-screen md:w-[64vw] md:max-w-[1080px]',
+    md: 'w-screen md:w-[64vw] md:max-w-[1280px]',
+    lg: 'w-screen md:w-[64vw] md:max-w-[1440px]',
   }[size]
-  const resolvedWidthClass = widthClass ? widthClass : sizeClass
+  const explicitWidth = widthClass?.trim() ?? ''
+  const hasWidthOverride = /(?:^|\s)(?:[a-z]+:)?w-/.test(explicitWidth)
+  const resolvedWidthClass = explicitWidth
+    ? hasWidthOverride
+      ? explicitWidth
+      : `${sizeClass} ${explicitWidth}`
+    : sizeClass
   const resolvedMaxHeight = maxHeightClass ?? (placement === 'center' ? 'max-h-[88vh]' : 'h-full')
 
   const shellClass =
@@ -373,7 +386,7 @@ export function ModuleDetailDrawer({
       : 'fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-sm'
   const asideClass =
     placement === 'center'
-      ? `flex ${resolvedMaxHeight} w-full ${resolvedWidthClass} flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
+      ? `flex ${resolvedMaxHeight} w-full ${resolvedWidthClass} flex-col overflow-hidden rounded-lg border border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
       : `flex ${resolvedMaxHeight} ${resolvedWidthClass} flex-col border-l border-cyan-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(29,124,255,0.18),transparent_32%),radial-gradient(circle_at_92%_10%,rgba(124,58,237,0.16),transparent_28%),linear-gradient(180deg,rgba(5,12,24,0.98),rgba(7,19,35,0.97))] shadow-2xl ring-1 ring-cyan-300/[0.06]`
 
   return (
@@ -386,23 +399,39 @@ export function ModuleDetailDrawer({
         tabIndex={-1}
         className={asideClass}
       >
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-cyan-300/15 px-5 py-4">
+        <header className="flex min-h-14 shrink-0 items-center justify-between gap-4 border-b border-cyan-300/15 px-4 py-3">
           <div className="min-w-0">
-            <h3 id={titleId} className="truncate text-xl font-semibold text-white">{title}</h3>
-            {subtitle ? <p className="mt-1 truncate text-sm text-slate-400">{subtitle}</p> : null}
+            <h3 id={titleId} className="truncate text-lg font-semibold text-white">{title}</h3>
+            {subtitle ? <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p> : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {actions}
-            <button type="button" onClick={onClose} className={moduleMutedButton} aria-label="Đóng">
+            <button type="button" onClick={onClose} className={`${moduleMutedButton} w-9 px-0`} aria-label="Đóng" title="Đóng">
               <X size={14} aria-hidden="true" />
-              Đóng
             </button>
           </div>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {tabs?.length ? (
+          <nav role="tablist" aria-label={`Điều hướng ${title}`} className="flex shrink-0 gap-1 overflow-x-auto border-b border-cyan-300/15 bg-[#091827]/95 px-4 py-1.5 scrollbar-thin">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                disabled={tab.disabled}
+                onClick={() => onTabChange?.(tab.id)}
+                className={`h-8 shrink-0 rounded-md px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'} disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin">
           {children}
         </div>
-        {footer ? <footer className="shrink-0 border-t border-cyan-300/15 bg-slate-950/80 px-5 py-4">{footer}</footer> : null}
+        {footer ? <footer className="shrink-0 border-t border-cyan-300/15 bg-slate-950/80 px-4 py-3">{footer}</footer> : null}
       </aside>
     </div>
   )

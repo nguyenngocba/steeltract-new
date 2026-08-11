@@ -34,7 +34,7 @@ import type {
 import { ReturnWorkflowService } from './return-workflow.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('inventory.read')
+@RequirePermissions('inventory.view')
 @Controller('inventory/returns')
 export class ReturnWorkflowController {
   constructor(private readonly service: ReturnWorkflowService) {}
@@ -48,7 +48,7 @@ export class ReturnWorkflowController {
   }
 
   @Post()
-  @RequirePermissions('inventory.write')
+  @RequirePermissions('inventory.return')
   create(
     @Body(new ZodValidationPipe(createReturnRequestSchema))
     body: CreateReturnRequestDto,
@@ -57,7 +57,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/approve')
-  @RequirePermissions('inventory.write')
+  @RequirePermissions('inventory.approve')
   approve(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(approveReturnRequestSchema))
@@ -67,7 +67,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/receive')
-  @RequirePermissions('inventory.write')
+  @RequirePermissions('inventory.return')
   receive(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(receiveReturnRequestSchema))
@@ -77,7 +77,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/inspect')
-  @RequirePermissions('inventory.write')
+  @RequirePermissions('inventory.return')
   inspect(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(inspectReturnRequestSchema))
@@ -87,7 +87,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/dispose')
-  @RequirePermissions('inventory.write')
+  @RequirePermissions('inventory.return')
   dispose(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(disposeReturnRequestSchema))
@@ -97,7 +97,7 @@ export class ReturnWorkflowController {
   }
 
   @Patch(':id/reject')
-  @RequirePermissions('inventory.write')
+  @RequirePermissions('inventory.approve')
   reject(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(rejectReturnRequestSchema))

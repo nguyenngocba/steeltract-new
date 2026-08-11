@@ -53,7 +53,7 @@ import {
 type AuthenticatedRequest = Request & { user?: AuthUser };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('projects.read')
+@RequirePermissions('projects.view')
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
@@ -71,13 +71,13 @@ export class ProjectsController {
     return this.projectsService.runtimeDashboard();
   }
 
-  @RequirePermissions('projects.read')
+  @RequirePermissions('projects.view')
   @Get('templates')
   templates() {
     return this.projectsService.listTemplates();
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.create')
   @Post('templates')
   createTemplate(
     @Body(new ZodValidationPipe(createProjectTemplateSchema))
@@ -86,7 +86,7 @@ export class ProjectsController {
     return this.projectsService.createTemplate(body);
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   @Patch('templates/:templateId')
   updateTemplate(
     @Param('templateId') templateId: string,
@@ -96,37 +96,37 @@ export class ProjectsController {
     return this.projectsService.updateTemplate(templateId, body);
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.create')
   @Post('templates/:templateId/duplicate')
   duplicateTemplate(@Param('templateId') templateId: string) {
     return this.projectsService.duplicateTemplate(templateId);
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.approve')
   @Post('templates/:templateId/publish')
   publishTemplate(@Param('templateId') templateId: string) {
     return this.projectsService.publishTemplate(templateId);
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   @Post('templates/:templateId/deactivate')
   deactivateTemplate(@Param('templateId') templateId: string) {
     return this.projectsService.deactivateTemplate(templateId);
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   @Post('templates/:templateId/default')
   setDefaultTemplate(@Param('templateId') templateId: string) {
     return this.projectsService.setDefaultTemplate(templateId);
   }
 
-  @RequirePermissions('projects.read')
+  @RequirePermissions('projects.view')
   @Get('templates/:templateId/export')
   exportTemplate(@Param('templateId') templateId: string) {
     return this.projectsService.exportTemplate(templateId);
   }
 
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.create')
   @Post('templates/import')
   importTemplates(
     @Body(new ZodValidationPipe(importProjectTemplateSchema))
@@ -136,7 +136,7 @@ export class ProjectsController {
   }
 
   @Post()
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.create')
   create(
     @Body(new ZodValidationPipe(createProjectSchema))
     body: CreateProjectDto,
@@ -145,7 +145,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProjectSchema))
@@ -155,7 +155,7 @@ export class ProjectsController {
   }
 
   @Post(':id/components/:componentId/return')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   returnComponent(
     @Param('id') id: string,
     @Param('componentId') componentId: string,
@@ -166,7 +166,7 @@ export class ProjectsController {
   }
 
   @Post(':id/component-instances/:componentInstanceId/return-to-yard')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   returnComponentInstance(
     @Param('id') id: string,
     @Param('componentInstanceId') componentInstanceId: string,
@@ -183,7 +183,7 @@ export class ProjectsController {
   }
 
   @Get(':id/execution')
-  @RequirePermissions('projects.read')
+  @RequirePermissions('projects.view')
   execution(@Param('id') id: string) {
     return this.projectsService.executionReadModel(id);
   }
@@ -199,7 +199,7 @@ export class ProjectsController {
   }
 
   @Post(':id/wbs')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   createWbsTask(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createProjectWbsTaskSchema))
@@ -209,7 +209,7 @@ export class ProjectsController {
   }
 
   @Post(':id/wbs/generate')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   generateWbs(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(generateProjectWbsSchema))
@@ -219,7 +219,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/wbs/bulk')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   bulkUpdateWbs(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(bulkProjectWbsSchema))
@@ -229,7 +229,7 @@ export class ProjectsController {
   }
 
   @Post(':id/site-update')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   siteUpdate(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(siteProjectUpdateSchema))
@@ -239,7 +239,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/wbs/:taskId')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   updateWbsTask(
     @Param('id') id: string,
     @Param('taskId') taskId: string,
@@ -250,7 +250,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/wbs/:taskId/move')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.edit')
   moveWbsTask(
     @Param('id') id: string,
     @Param('taskId') taskId: string,
@@ -261,7 +261,7 @@ export class ProjectsController {
   }
 
   @Delete(':id/wbs/:taskId')
-  @RequirePermissions('projects.write')
+  @RequirePermissions('projects.delete')
   deleteWbsTask(@Param('id') id: string, @Param('taskId') taskId: string) {
     return this.projectsService.deleteWbsTask(id, taskId);
   }

@@ -1,14 +1,8 @@
-type Props = {
-
-  children:
-    React.ReactNode
-
-  permission?: string
-}
-
-export function PermissionGuard({
-  children,
-}: Props) {
-
-  return <>{children}</>
-}
+export {
+  ActionGuard,
+  PermissionGate,
+  PermissionGuard,
+  RoutePermissionGuard,
+  useModuleAccess,
+  usePermission,
+} from '@/shared/permissions/PermissionGuard'

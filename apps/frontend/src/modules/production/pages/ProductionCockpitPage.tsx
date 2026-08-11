@@ -47,6 +47,7 @@ import {
 import { useInventoryAudit } from '@/modules/inventory/hooks/useInventoryAudit'
 import { useInventoryItems } from '@/modules/inventory/hooks/useInventoryItems'
 import { InventoryPanel, InventoryPagination } from '@/modules/inventory/components/InventoryVisuals'
+import { warehouseAllows } from '@/modules/inventory/utils/warehouse-capabilities'
 import { formatCurrencyVnd, formatDateTime, formatQuantity, formatQuantityInput, parseLocaleNumber } from '@/shared/utils/number-format'
 import {
   useMaterialRequirements,
@@ -76,6 +77,7 @@ import {
   useYardSlots,
 } from '../hooks/useProductionCockpit'
 import { useStageComponentInstanceToYard } from '@/modules/yard/hooks/queries/useYardRuntime'
+import { usePermission } from '@/shared/permissions/PermissionGuard'
 
 const number = (value = 0) => formatQuantity(value, 3)
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
@@ -1484,6 +1486,7 @@ function Orders({
 }
 
 function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row: ProductionBom) => void; onCreate: () => void }) {
+  const canEdit = usePermission('production.edit')
   const clone = useCloneProductionBom()
   const archive = useArchiveProductionBom()
 
@@ -1645,8 +1648,8 @@ function Boms({ rows, onOpen, onCreate }: { rows: ProductionBom[]; onOpen: (row:
                       <td className="px-2 py-1.5">
                         <div className="flex gap-2 text-xs">
                           <button onClick={(event) => { event.stopPropagation(); onOpen(row) }} className="text-cyan-300 hover:underline">Xem</button>
-                          <button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }} className="text-blue-300 hover:underline">Clone</button>
-                          {row.status !== 'ARCHIVED' && (
+                          {canEdit ? <button onClick={(event) => { event.stopPropagation(); void cloneBom(row.id) }} className="text-blue-300 hover:underline">Clone</button> : null}
+                          {canEdit && row.status !== 'ARCHIVED' && (
                             <button onClick={(event) => { event.stopPropagation(); void archiveBom(row.id) }} className="text-amber-300 hover:underline">Archive</button>
                           )}
                         </div>
@@ -1800,15 +1803,11 @@ function numeric(value: unknown) {
 }
 
 function isMainWarehouseBalance(location: LocationBalanceLike) {
-  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location.warehouseName ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+  return warehouseAllows(location, 'allowReceipt') && !warehouseAllows(location, 'allowProduction')
 }
 
 function isProductionWarehouseBalance(location: LocationBalanceLike) {
-  const code = String(location.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(location, 'allowProduction')
 }
 
 function stockFromLocations(item: InventoryItemLike, predicate: (location: LocationBalanceLike) => boolean) {
@@ -2333,6 +2332,7 @@ function Issues({
   consumptions: ProductionMaterialConsumption[]
   orders: ProductionOrder[]
 }) {
+  const canIssueMaterial = usePermission('production.material-issue')
   const [selectedIssue, setSelectedIssue] = useState<IssueControlRow | null>(null)
   const [returnTarget, setReturnTarget] = useState<IssueControlRow | null>(null)
   const [search, setSearch] = useState('')
@@ -2497,11 +2497,9 @@ function Issues({
                         </td>
                         <td className="px-2 py-1.5"><StatusChip status={issue.status} /></td>
                         <td className="px-2 py-1.5">
-                          {row.returnableQty > 0 ? (
+                          {canIssueMaterial ? row.returnableQty > 0 ? (
                             <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row) }} className="text-amber-300 hover:underline text-xs font-semibold">Return</button>
-                          ) : (
-                            <span className="text-slate-500 text-xs">Đã cân bằng</span>
-                          )}
+                          ) : <span className="text-slate-500 text-xs">Đã cân bằng</span> : null}
                         </td>
                       </tr>
                     )
@@ -2594,11 +2592,9 @@ function Issues({
                             </td>
                             <td className="px-2 py-2"><StatusChip status={issue.status} /></td>
                             <td className="px-2 py-2">
-                              {row.returnableQty > 0 ? (
+                              {canIssueMaterial ? row.returnableQty > 0 ? (
                                 <button type="button" onClick={(event) => { event.stopPropagation(); setReturnTarget(row); setExpandedModalOpen(false) }} className="text-amber-300 hover:underline text-xs font-semibold">Return</button>
-                              ) : (
-                                <span className="text-slate-500 text-xs">Đã cân bằng</span>
-                              )}
+                              ) : <span className="text-slate-500 text-xs">Đã cân bằng</span> : null}
                             </td>
                           </tr>
                         )
@@ -2701,6 +2697,7 @@ type ConsumptionSummaryRow = {
 }
 
 function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssue[]; consumptions: ProductionMaterialConsumption[] }) {
+  const canIssueMaterial = usePermission('production.material-issue')
   const [consumeTarget, setConsumeTarget] = useState<ProductionConsumptionTarget | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -2810,11 +2807,9 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
                       <td className={`px-2 py-1.5 font-mono tabular-nums ${row.remainingQty > 0 ? 'text-amber-300 font-semibold' : 'text-slate-500'}`}>{number(row.remainingQty)}</td>
                       <td className="px-2 py-1.5 text-slate-300 text-xs">{row.unit ?? '-'}</td>
                       <td className="px-2 py-1.5">
-                        {row.remainingQty > 0 ? (
+                        {canIssueMaterial ? row.remainingQty > 0 ? (
                           <button type="button" onClick={() => setConsumeTarget(row)} className="text-cyan-300 hover:underline text-xs font-semibold">Consume</button>
-                        ) : (
-                          <span className="text-slate-500 text-xs">Đã cân bằng</span>
-                        )}
+                        ) : <span className="text-slate-500 text-xs">Đã cân bằng</span> : null}
                       </td>
                     </tr>
                   ))}
@@ -2901,11 +2896,9 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
                           <td className={`px-2 py-2 font-mono tabular-nums ${row.remainingQty > 0 ? 'text-amber-300 font-semibold' : 'text-slate-500'}`}>{number(row.remainingQty)}</td>
                           <td className="px-2 py-2 text-slate-300 text-xs">{row.unit ?? '-'}</td>
                           <td className="px-2 py-2">
-                            {row.remainingQty > 0 ? (
+                            {canIssueMaterial ? row.remainingQty > 0 ? (
                               <button type="button" onClick={() => { setConsumeTarget(row); setExpandedModalOpen(false) }} className="text-cyan-300 hover:underline text-xs font-semibold">Consume</button>
-                            ) : (
-                              <span className="text-slate-500 text-xs">Đã cân bằng</span>
-                            )}
+                            ) : <span className="text-slate-500 text-xs">Đã cân bằng</span> : null}
                           </td>
                         </tr>
                       ))}
@@ -2926,6 +2919,8 @@ function Consumptions({ issues, consumptions }: { issues: ProductionMaterialIssu
 }
 
 function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[]; orders: ProductionOrder[]; onOpen: (row: ProductionOrder) => void }) {
+  const canReserveMaterials = usePermission('production.material-reserve')
+  const canIssueMaterials = usePermission('production.material-issue')
   const reserve = useReserveProductionReservation()
   const issue = useIssueProductionReservation()
   const release = useReleaseProductionReservation()
@@ -3082,10 +3077,10 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
                         <td className="px-2 py-1.5"><StatusChip status={row.status} /></td>
                         <td className="px-2 py-1.5">
                           <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
-                            {row.status === 'DRAFT' && <button className="text-cyan-300 hover:underline" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
-                            {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300 hover:underline" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
-                            {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-amber-300 hover:underline" onClick={() => run(() => release.mutateAsync({ id: row.id }), 'Đã hủy giữ chỗ')}>Release</button>}
-                            {['DRAFT','RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-red-300 hover:underline" onClick={() => run(() => expire.mutateAsync({ id: row.id }), 'Đã hết hạn giữ chỗ')}>Expire</button>}
+                            {canReserveMaterials && row.status === 'DRAFT' && <button className="text-cyan-300 hover:underline" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
+                            {canIssueMaterials && ['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300 hover:underline" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
+                            {canReserveMaterials && ['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-amber-300 hover:underline" onClick={() => run(() => release.mutateAsync({ id: row.id }), 'Đã hủy giữ chỗ')}>Release</button>}
+                            {canReserveMaterials && ['DRAFT','RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-red-300 hover:underline" onClick={() => run(() => expire.mutateAsync({ id: row.id }), 'Đã hết hạn giữ chỗ')}>Expire</button>}
                           </div>
                         </td>
                       </tr>
@@ -3170,8 +3165,8 @@ function Reservations({ rows, orders, onOpen }: { rows: ProductionReservation[];
                             <td className="px-2 py-2"><StatusChip status={row.status} /></td>
                             <td className="px-2 py-2">
                               <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
-                                {row.status === 'DRAFT' && <button className="text-cyan-300 hover:underline" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
-                                {['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300 hover:underline" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
+                                {canReserveMaterials && row.status === 'DRAFT' && <button className="text-cyan-300 hover:underline" onClick={() => run(() => reserve.mutateAsync({ id: row.id }), 'Đã giữ chỗ vật tư')}>Reserve</button>}
+                                {canIssueMaterials && ['RESERVED','PARTIALLY_ISSUED'].includes(row.status) && <button className="text-emerald-300 hover:underline" onClick={() => run(() => issue.mutateAsync({ id: row.id }), 'Đã issue vật tư từ reservation')}>Issue</button>}
                               </div>
                             </td>
                           </tr>
@@ -3635,6 +3630,11 @@ function Logs({ rows }: { rows: ReturnType<typeof useProductionLogs>['data'] }) 
 }
 
 function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: () => void }) {
+  const canRelease = usePermission('production.release')
+  const canExecute = usePermission('production.execute')
+  const canComplete = usePermission('production.complete')
+  const canReserveMaterials = usePermission('production.material-reserve')
+  const canStage = usePermission('yard.stage')
   const { data: latest = order } = useProductionOrder(order.id)
   const { data: requirements = [] } = useMaterialRequirements(order.id)
   const { data: reservationPreview } = useReservationPreview(order.id)
@@ -3912,7 +3912,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-slate-400">{formatQuantity(orderReservations.filter((item) => item.status === 'RESERVED').length, 0)} reservation đang active cho MO này</span>
-              <button onClick={reserveMaterials} disabled={!reservationPreview || reservationPreview.status === 'SHORTAGE' || createReservation.isPending} className="rounded bg-cyan-600 px-3 py-2 font-semibold text-white disabled:opacity-40">Tạo và giữ chỗ vật tư</button>
+              {canReserveMaterials ? <button onClick={reserveMaterials} disabled={!reservationPreview || reservationPreview.status === 'SHORTAGE' || createReservation.isPending} className="rounded bg-cyan-600 px-3 py-2 font-semibold text-white disabled:opacity-40">Tạo và giữ chỗ vật tư</button> : null}
             </div>
           </ProductionPanel>
         </div>
@@ -3933,7 +3933,7 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
           </ProductionPanel>
           <ProductionPanel title="Thao tác thực thi">
             <div className="space-y-2">
-              {canReleaseCanonicalOrder ? (
+              {canRelease && canReleaseCanonicalOrder ? (
                 <button
                   onClick={() => run(
                     () => releaseCanonical.mutateAsync({
@@ -3953,14 +3953,14 @@ function OrderWorkspace({ order, onClose }: { order: ProductionOrder; onClose: (
                 </button>
               ) : null}
               {latest.status === 'DRAFT' && latest.componentRequirementId && !canonicalReleaseWorkOrders.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-300">Chưa có routing/work order basis từ BOM materialized để phát hành PO.</p> : null}
-              {latest.status !== 'IN_PROGRESS' && !canStageToYard && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}
+              {canExecute && latest.status !== 'IN_PROGRESS' && !canStageToYard && <button onClick={() => run(() => start.mutateAsync(latest.id), 'Đã bắt đầu sản xuất')} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-semibold">Bắt đầu sản xuất</button>}
               {!componentInstances.length ? <p className="rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-300">Chưa có instance vật lý. Release Production Order canonical sẽ tạo ComponentInstance theo quantity của PO.</p> : null}
-              {latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}
+              {canComplete && latest.status === 'IN_PROGRESS' && activeStage && <button onClick={() => run(() => complete.mutateAsync(activeStage.id), `Đã hoàn tất ${activeStage.name}`)} className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold">Hoàn tất bước: {activeStage.name}</button>}
               {canStageToYard && <p className="rounded border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-300">Tất cả công đoạn đã hoàn tất. Có thể chuyển thành phẩm ra bãi.</p>}
               <p className="text-xs text-slate-400">Mỗi lần hoàn tất sẽ chuyển trạng thái cấu kiện sang công đoạn kế tiếp.</p>
             </div>
           </ProductionPanel>
-          {canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi">
+          {canStage && canStageToYard && <ProductionPanel title="Chuyển thành phẩm ra bãi">
             <div className="space-y-2 text-xs">
               <EnterpriseFormGrid columns={1}>
                 <EnterpriseField label="Vị trí bãi" required htmlFor="production-yard-slot">

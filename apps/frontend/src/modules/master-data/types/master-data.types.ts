@@ -8,6 +8,7 @@ export type MasterDataDomainId =
   | 'material-usage-types'
   | 'transaction-types'
   | 'warehouses'
+  | 'warehouse-types'
   | 'yard-zones'
   | 'qc-statuses'
   | 'priorities'
@@ -33,6 +34,22 @@ export interface MasterDataRecord {
   affectsStock?: boolean
   requiresApproval?: boolean
   sortOrder?: number
+  displayOrder?: number
+  warehouseTypeId?: string | null
+  warehouseType?: MasterDataRecord | null
+  allowReceipt?: boolean
+  allowIssue?: boolean
+  allowProduction?: boolean
+  allowQc?: boolean
+  allowDispatch?: boolean
+  allowInstallation?: boolean
+  allowSupplierReturn?: boolean
+  allowScrap?: boolean
+  allowReverse?: boolean
+  dashboardVisible?: boolean
+  planningVisible?: boolean
+  reportingVisible?: boolean
+  usageCount?: number
   category?: MasterDataRecord | null
   warehouse?: MasterDataRecord | null
   _count?: Record<string, number>
@@ -50,6 +67,20 @@ export interface MasterDataPayload {
   affectsStock?: boolean
   requiresApproval?: boolean
   sortOrder?: number
+  displayOrder?: number
+  warehouseTypeId?: string
+  allowReceipt?: boolean
+  allowIssue?: boolean
+  allowProduction?: boolean
+  allowQc?: boolean
+  allowDispatch?: boolean
+  allowInstallation?: boolean
+  allowSupplierReturn?: boolean
+  allowScrap?: boolean
+  allowReverse?: boolean
+  dashboardVisible?: boolean
+  planningVisible?: boolean
+  reportingVisible?: boolean
   updatedBy?: string
 }
 
@@ -63,7 +94,7 @@ export interface MasterDataDomainConfig {
   label: string
   description: string
   relation?: {
-    field: 'categoryId' | 'warehouseId'
+    field: 'categoryId' | 'warehouseId' | 'warehouseTypeId'
     domain: MasterDataDomainId
     label: string
   }

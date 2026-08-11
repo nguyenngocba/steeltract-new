@@ -1,0 +1,19 @@
+{
+  "runId": "SYSTEM-QC-CERT1-1786430974526",
+  "generatedAt": "2026-08-11T06:51:00.858Z",
+  "states": {
+    "cmsoavn0x009ypvpo7svf07ed": "IN_YARD",
+    "cmsoavn0x009xpvpoz48ejedv": "QC_FAILED",
+    "cmsoavn0x009wpvpowidhpju1": "IN_YARD",
+    "cmsoavn0x009vpvpo9jtzqedr": "IN_YARD",
+    "cmsoavn0x009upvpo5qr1vynw": "SCRAPPED"
+  },
+  "screenshots": [
+    "../../test-results/qc-cert1/qc-final.png",
+    "../../test-results/qc-cert1/components-qc.png",
+    "../../test-results/qc-cert1/finished-goods.png",
+    "../../test-results/qc-cert1/yard-components.png"
+  ],
+  "pageErrors": [],
+  "failedRequests": []
+}

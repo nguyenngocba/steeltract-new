@@ -593,7 +593,10 @@ export class ProductionReservationService {
     if (!materialIds.length) return buckets;
 
     const productionWarehouse =
-      await this.inventoryRepository.findWarehouseByCode('PRODUCTION', tx);
+      await this.inventoryRepository.findWarehouseByCapability(
+        'allowProduction',
+        tx,
+      );
 
     if (!productionWarehouse) return buckets;
 
@@ -601,7 +604,6 @@ export class ProductionReservationService {
       await this.inventoryRepository.findPositiveLocationStocks(
         materialIds,
         productionWarehouse.id,
-        'PRODUCTION',
         tx,
       );
 

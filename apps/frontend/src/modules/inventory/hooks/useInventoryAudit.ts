@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 
 import { getInventoryAudit } from '../api/endpoints/inventory.endpoint'
 
-export function useInventoryAudit() {
+export function useInventoryAudit(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['inventory-audit'],
     queryFn: getInventoryAudit,
     refetchInterval: 5000,
+    enabled: options?.enabled,
   })
 }

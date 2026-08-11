@@ -1,5 +1,131 @@
 # SteelTrack AI Changelog
 
+## 2026-08-11 SYSTEM.REVERSE.CERT.1 - Canonical Reverse Runtime Certification
+
+Completed:
+
+- Added REST and read-only database certification harnesses for canonical
+  reverse workflows.
+- Certified installed return, returned PASS, same-instance REWORK, SCRAP,
+  Production material return and Supplier Return on the real runtime.
+- Added Playwright coverage and five screenshots for QC, Yard, Logistics and
+  Projects reverse states.
+- Recorded 305 REST steps, 71 assertions, 18/18 DB checks, 182 ActivityLog rows
+  and exact Inventory conservation at 92 units.
+
+Verification: backend 96 suites / 330 tests, frontend 12/12, Playwright 1/1,
+typecheck and both builds PASS. No business, API, schema, migration or UI
+behavior changed; no stage or commit.
+
+Report: `docs/audits/system-reverse-cert1-runtime.md`.
+
+## 2026-08-11 SYSTEM.REWORK.1 - Canonical Rework Aggregate Repair
+
+Completed:
+
+- Removed the unsafe ProductionLog fallback from aggregate identity.
+- Bound accepted/completed rework logs to the rework Production Order and
+  rejected rework logs to the original Production Order.
+- Preserved `ProductionRework.id` for Outbox aggregate and ActivityLog entity
+  lineage.
+- Added regression tests for accepted, rejected and completed Rework events.
+- Runtime-certified the same ComponentInstance through FAIL, NCR, REWORK,
+  rework execution, second FINAL PASS, Finished Goods and Yard.
+
+Verification: targeted 12/12, backend 96 suites / 330 tests, frontend 12/12,
+REST 42/42 assertions, database 29/29 checks, Playwright 1/1, builds and
+typecheck PASS. No schema, migration, API, UI, stage or commit.
+
+## 2026-08-11 PROCUREMENT.DOMAIN.1 - Canonical Purchasing Workflow
+
+Completed:
+
+- Replaced direct-Prisma Material Request and Purchase Order controllers with
+  typed, permission-guarded Procurement service/repository orchestration.
+- Implemented canonical PR/PO lifecycle commands and aggregate approved-request
+  quantity protection.
+- Added atomic Inventory-owned PO receipt posting with `40 + 40 + 20` partial
+  receipt support and strict idempotent replay.
+- Connected Supplier Return to PO/source receipt and preserved exact receipt
+  location buckets during outbound posting.
+- Added authoritative Procurement workspace summary/Supplier performance and
+  transactional ActivityLog coverage.
+- Runtime certified RBAC, PO completion, Supplier Return and net stock `+90`
+  with item/location conservation.
+
+Verification: Prisma validate/status, 4 targeted suites / 20 tests, full backend
+96 suites / 327 tests, backend build, REST workflow, RBAC and `git diff --check`
+PASS. No frontend, schema, migration, stage or commit.
+
+## 2026-08-11 PROCUREMENT.GATE.1 - Procurement Canonical Gate
+
+Completed:
+
+- Added additive Purchase Request lifecycle, requester/planning and audit
+  persistence while retaining legacy ApprovalStatus compatibility.
+- Added PO rejection/cancellation actor, timestamp and reason fields.
+- Added durable InventoryTransaction idempotency so one PO can own multiple
+  receipt transactions without replaying stock.
+- Added canonical ReturnRequest links to Supplier, PO and source receipt.
+- Added and runtime-seeded six `procurement.*` permissions for admin.
+- Deployed migration `20260811123000_procurement_canonical_gate` and published
+  `docs/audits/procurement-gate1-canonical-approval.md`.
+
+Verification: Prisma, migration status, 2 targeted suites / 11 tests, backend
+build, RBAC runtime catalog, compatibility probe and `git diff --check` PASS.
+No stage or commit.
+
+## 2026-08-10 SYSTEM.AUTH.1 - Restore Administrator Account
+
+Completed:
+
+- Audited the preserved `admin` account and confirmed it is `ACTIVE`, assigned
+  the canonical `admin` role and receives all 29 registered permissions.
+- Reset the requested password through the protected System User Admin REST
+  endpoint and existing `SystemUserAdminService`; no direct password-hash write
+  or authentication bypass was used.
+- Proved the pre-reset refresh token is revoked (`401`), new login succeeds
+  (`201`), `/auth/me` is correct and 12/12 module read boundaries return `200`.
+- Published `docs/audits/system-auth1-admin-restore.md`.
+
+No schema, migration, stage or commit.
+
+## 2026-08-10 SYSTEM.RESET.1 - Clean Demo Data
+
+Completed:
+
+- Created a fail-closed, dry-run-first maintenance utility that deletes an
+  explicit business-table allowlist in FK-safe order inside one serializable
+  transaction. It does not use `TRUNCATE`, schema reset or migrations.
+- Created and catalog-verified a 2.1 MB pre-reset PostgreSQL backup.
+- Deleted 21,678 demo/business rows while preserving users, RBAC, Settings
+  dictionaries, UOM, material categories, usage types and technical groups.
+- Runtime-certified health, login, RBAC, Settings and Master Data APIs; all
+  required business aggregates now equal zero.
+- Published `docs/audits/system-reset1-clean-demo-data.md`.
+
+Verification: Prisma validate/migration status and backend/frontend builds
+PASS. No stage or commit.
+
+## 2026-08-10 SYSTEM.FREEZE.1 - V1 RC1 Release Candidate Freeze Audit
+
+Completed:
+
+- Audited source debt, dependencies, production configuration, backup/restore,
+  monitoring, performance, security and release documentation without changing
+  application source or schema.
+- Verified business tests/builds/Prisma remain green, but identified release
+  blockers: 1 critical and 10 high deployed dependency advisories, backend lint
+  failure, incomplete frontend deployment, unverified restore/PITR and missing
+  external security/monitoring controls.
+- Created RC1 release notes, deployment guide, rollback guide and operations
+  runbook under `docs/release/`.
+- Published `docs/audits/system-freeze1-release-candidate-freeze.md` with a
+  **NO-GO** decision for tag, internal deployment and production deployment.
+
+No source, dependency, schema, migration, staging or commit action was
+performed.
+
 ## 2026-08-10 SYSTEM.RUNTIME.2 - Production Runtime Closure
 
 Completed:
@@ -7655,3 +7781,135 @@ Notes:
 - Full browser mutation workflow and deployment probe contracts remain P0;
   SteelTrack V1 RC1 remains NO-GO.
 - Report: `docs/audits/system-runtime1-production-runtime-certification.md`.
+
+# 2026-08-10 - SYSTEM.RBAC.2 Enterprise Authorization Matrix
+
+- Added 58 action-level permissions while retaining 29 legacy grants as
+  compatibility aliases with no read-to-write widening.
+- Mapped Inventory, Components, Production, QC, Projects, Yard, Logistics,
+  Suppliers, Dashboard and System Administration controllers to canonical
+  permissions.
+- Implemented shared frontend permission hooks/gates, route enforcement,
+  dynamic sidebar filtering, permission-scoped Dashboard queries and guarded
+  operational actions.
+- Added role presets, matrix row/column selection and role cloning.
+- Certified seven real runtime profiles through REST and Playwright (7/7).
+- Report: `docs/audits/system-rbac2-enterprise-authorization-matrix.md`.
+
+# 2026-08-10 - SYSTEM.WAREHOUSE.1 Canonical Warehouse Master
+
+- Added canonical Warehouse Type dictionary, Warehouse capabilities,
+  visibility flags, display order, relations and indexes.
+- Deployed additive migration `20260810190000_canonical_warehouse_master`.
+- Added Settings Warehouse CRUD, dependency-aware soft deactivation and active
+  parent Warehouse selection for Inventory locations.
+- Replaced runtime MAIN/PRODUCTION code selection in Inventory, snapshots,
+  Production and frontend pickers with capability metadata.
+- Changed SYSTEM.RESET to preserve Warehouse and WarehouseZone master data.
+- Tests, typecheck and builds pass; prepared Playwright mutation scenario could
+  not run because sandboxed backend access to local PostgreSQL was blocked.
+
+# 2026-08-11 - UI.MASTERDATA.1 Unified Master Data Workspace
+
+- Added one shared 96vw Master Data workspace, toolbar, dependency tree and
+  four-tab `ModuleDetailDrawer` presentation layer.
+- Converged Warehouse, Inventory Location, Yard, Material Category, Material
+  Usage Type, Technical Group and UOM administration without changing APIs or
+  schema; Warehouse/Yard zones remain inside their canonical topology owners.
+- Replaced centered record forms in migrated flows with right drawers and moved
+  destructive review into real dependency views.
+- Frontend tests, typecheck, targeted lint, build and `git diff --check` pass.
+- Playwright mutation/visual certification remains blocked by PostgreSQL
+  connection exhaustion (`too many clients already`).
+- Report: `docs/audits/ui-masterdata1-unified-workspace.md`.
+
+# 2026-08-11 - UI.AUDIT.1 Enterprise UI Consistency
+
+- Audited active Dashboard, Inventory, Components, Production, QC, Yard,
+  Logistics, Projects, Settings, Master Data and Executive BI routes against 21
+  consistency categories.
+- Published `docs/ui/STEELTRACK_UI_GUIDELINES.md` as the official frontend
+  presentation contract.
+- Standardized shared KPI height to 92px, operational surface radius to 8px,
+  table row/header height to 36px, detail drawer width to 64vw and pagination
+  first/previous/next/last accessibility.
+- Standardized Master Data toolbar order without changing query or command
+  behavior.
+- Frontend tests, typecheck, ESLint and build pass. Authenticated Playwright
+  visual certification is blocked because PostgreSQL is unavailable at
+  `localhost:5432`.
+- Report: `docs/audits/ui-audit1-enterprise-consistency.md`.
+
+# 2026-08-11 - UI.POLISH.1 Enterprise UX Polish
+
+- Added shared sticky table header, row hover/selection, clipped-cell title and
+  opt-in sticky action-column behavior.
+- Added fixed, accessible contextual tabs to `ModuleDetailDrawer` and migrated
+  Master Data, Components Production and canonical physical QC consumers.
+- Compacted shared drawer, filter and enterprise-form geometry and standardized
+  focus/validation presentation.
+- Added controlled chart loading, empty and realtime presentation without fake
+  data.
+- Tests, typecheck, ESLint and frontend build pass. Seven RBAC Playwright
+  profiles and the complete Warehouse CRUD browser scenario pass; the
+  credential-gated full runtime workflow remains skipped.
+- Report: `docs/audits/ui-polish1-enterprise-ux.md`.
+
+# 2026-08-11 - UAT.WAREHOUSE.1 Operator Experience
+
+- Added a real Warehouse Operator Playwright audit journey with screenshots and
+  structured runtime evidence.
+- Standardized Inventory global command geometry/icons, menu semantics and
+  keyboard dismissal without changing permissions or transaction behavior.
+- Added complete accessible names to Receipt, Issue, Transfer, Count and
+  attachment controls; replaced pending-row emoji actions with Lucide icons.
+- Added clear Inventory Count validation and success/error feedback.
+- Certified zero runtime exceptions, failed browser requests, page overflow and
+  unnamed tested controls.
+- Reported operational NO-GO at 40% because Supplier creation/RBAC, clean-runtime
+  supplier data, Production Return and Supplier Return block the canonical UAT.
+- Report: `docs/audits/uat-warehouse1-operator-experience.md`.
+
+# 2026-08-11 - PROCUREMENT.SCHEMA.1 Canonical Purchasing Data Model
+
+- Extended existing Material Request and Purchase Order models with additive,
+  nullable canonical Supplier, Material, UOM, Warehouse and User relations.
+- Added SUBMITTED and PARTIALLY_RECEIVED while preserving legacy PENDING.
+- Added PO quantity/receipt/value planning fields and Procurement ActivityLog
+  event vocabulary without implementing workflow logic.
+- Preserved all legacy text fields and PurchaseReceiving runtime shape.
+- Deployed migration `20260811103000_canonical_procurement_schema`; Prisma
+  validate/generate, migration status and backend build pass.
+- Report: `docs/audits/procurement-schema1-canonical-data-model.md`.
+
+# 2026-08-11 - SYSTEM.E2E.2 Enterprise Workflow Certification
+
+- Extended the runtime certification harness to use canonical Warehouse
+  capabilities and the completed Procurement workflow, including receipt
+  40/40/20, count adjustment, Production return and Supplier Return.
+- Added API-only runtime bootstrap for a missing FINAL checklist and exhausted
+  Yard capacity; no direct database mutation was used.
+- REST passed 91 steps/15 assertions; PostgreSQL parity passed 15/15 checks and
+  inventory conservation ended at 91 for the retained fixture.
+- Added Playwright E2E.2 coverage for 18 workspaces; 1/1 test passed with no
+  browser exception or real network failure.
+- Full tests, typecheck and builds pass. Final decision remains NO-GO because QC
+  disposition branches, browser command mutations, authoritative snapshot and
+  Project snapshot parity are incomplete.
+- Report: `docs/audits/system-e2e2-enterprise-final-certification.md`.
+
+# 2026-08-11 - SYSTEM.QC.CERT.1 Physical QC Runtime Certification
+
+- Added REST and PostgreSQL certification harnesses for five physical
+  ComponentInstance QC outcomes.
+- Certified PASS, FAIL, USE-AS-IS and SCRAP, including Finished Goods/Yard
+  boundaries, 175-unit inventory conservation, ActivityLog uniqueness and all
+  fixture QC projection documents.
+- Added Playwright coverage and four screenshots for QC Final, Components QC,
+  Finished Goods and Yard; 1/1 passed with no browser errors.
+- Found a deterministic P0: Production rework acceptance logs
+  `ProductionRework.id` as `ProductionLog.productionOrderId`, causing P2003 and
+  transaction rollback before rework execution.
+- Recorded remaining legacy Component.status fallback usage in Components
+  Overview/Reports. No business, API, schema, migration or UI code was changed.
+- Report: `docs/audits/system-qc-cert1-physical-runtime.md`.

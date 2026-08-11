@@ -4,6 +4,7 @@ import { Boxes, Truck, X } from 'lucide-react'
 import { useRemoveYardItem } from '../hooks/queries/useYardRuntime'
 import type { YardSlotRuntime } from '../services/api/yard.api'
 import { formatQuantity } from '@/shared/utils/number-format'
+import { usePermission } from '@/shared/permissions/PermissionGuard'
 
 const fmt = (value = 0) => formatQuantity(value, 2)
 const tone = (slot: YardSlotRuntime) => {
@@ -27,6 +28,7 @@ export function YardZoneDetailDialog({
   onSelectSlot: (id: string) => void
   onClose: () => void
 }) {
+  const canMove = usePermission('yard.move')
   const remove = useRemoveYardItem()
   const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null)
   const zoneSlots = zoneId ? slots.filter((slot) => slot.zone.id === zoneId) : []
@@ -84,10 +86,10 @@ export function YardZoneDetailDialog({
                     <h4 className="mt-0.5 text-sm font-semibold text-white font-mono">{selectedPlacement.itemCode}</h4>
                     <p className="mt-0.5 text-slate-400">{selectedPlacement.itemName ?? 'Chưa có tên cấu kiện'}</p>
                   </div>
-                  <button disabled={pending} onClick={outboundSelectedPlacement} className="inline-flex items-center gap-1.5 rounded bg-amber-500 px-3 py-1.5 font-semibold text-slate-950 disabled:opacity-50 transition hover:bg-amber-600">
+                  {canMove ? <button disabled={pending} onClick={outboundSelectedPlacement} className="inline-flex items-center gap-1.5 rounded bg-amber-500 px-3 py-1.5 font-semibold text-slate-950 disabled:opacity-50 transition hover:bg-amber-600">
                     <Truck size={13} />
                     {pending ? 'Đang xuất...' : 'Xuất bãi'}
-                  </button>
+                  </button> : null}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1 text-slate-350 text-[11px] font-mono">
                   <span>Zone: <b className="text-white">{selectedPlacementSlot?.zone.code ?? selected?.zone.code}</b></span>

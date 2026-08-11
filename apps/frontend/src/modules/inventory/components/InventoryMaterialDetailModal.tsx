@@ -22,6 +22,7 @@ import {
   type ModuleTone,
 } from '@/shared/ui/modules';
 import { useMaterialTransactions } from '../hooks/useInventoryReadModels';
+import { warehouseAllows } from '../utils/warehouse-capabilities';
 
 type Props = {
   open: boolean
@@ -85,15 +86,11 @@ function money(value: any) {
 }
 
 function isMainWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'MAIN' || name.includes('kho chính') || name.includes('kho chinh')
+  return warehouseAllows(location, 'allowReceipt') && !warehouseAllows(location, 'allowProduction')
 }
 
 function isProductionWarehouseLocation(location: any) {
-  const code = String(location?.warehouseCode ?? '').trim().toUpperCase()
-  const name = String(location?.warehouseName ?? '').trim().toLowerCase()
-  return code === 'PRODUCTION' || name.includes('sản xuất') || name.includes('san xuat')
+  return warehouseAllows(location, 'allowProduction')
 }
 
 function sumLocationQty(rows: any[]) {

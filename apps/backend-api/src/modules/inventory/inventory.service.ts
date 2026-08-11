@@ -14,6 +14,7 @@ import { InventoryRepository } from './inventory.repository';
 import { InventoryEventService } from './inventory-event.service';
 import { InventoryReadModelService } from './inventory-read-model.service';
 import { inventoryCodePrefix } from './inventory-transaction-code';
+import { warehouseMetadata } from './warehouse-metadata';
 import {
   aggregateInventoryBuckets,
   aggregateInventoryMaterials,
@@ -97,9 +98,7 @@ export class InventoryService {
             : null;
           const warehouse = stock.zone?.warehouse ?? directWarehouse ?? null;
           return {
-            warehouseId: stock.warehouseId ?? stock.zone?.warehouseId ?? null,
-            warehouseCode: warehouse?.code ?? null,
-            warehouseName: warehouse?.name ?? null,
+            ...warehouseMetadata(warehouse),
             zoneId: stock.zoneId,
             zoneCode: stock.zone?.code ?? null,
             zoneName: stock.zone
@@ -728,6 +727,7 @@ export class InventoryService {
     const resolvedItems = await this.resolveLineWarehouses(
       this.normalizeItems(payload, type),
     );
+    await this.assertWarehouseCapabilities(resolvedItems, type);
     const orderedItems = this.validateAndOrderTransactionLines(
       resolvedItems,
       type,
@@ -739,6 +739,11 @@ export class InventoryService {
       payload,
       normalizedIdempotencyKey,
     );
+    const supportsMultipleReferenceTransactions =
+      type === TransactionType.IMPORT &&
+      String(payload.referenceModule ?? '').toUpperCase() ===
+        'PURCHASE_ORDER' &&
+      Boolean(normalizedIdempotencyKey);
     const commandHash = this.inventoryCommandHash(
       type,
       direction,
@@ -769,7 +774,11 @@ export class InventoryService {
             if (replay) return replay;
           }
 
-          if (payload.referenceModule && payload.referenceId) {
+          if (
+            payload.referenceModule &&
+            payload.referenceId &&
+            !supportsMultipleReferenceTransactions
+          ) {
             const existing =
               await this.inventoryRepository.findTransactionByReference(
                 {
@@ -892,6 +901,8 @@ export class InventoryService {
               approvedBy: payload.approvedBy,
               referenceModule: payload.referenceModule,
               referenceId: payload.referenceId,
+              idempotencyKey: receiptKey,
+              commandHash: receiptKey ? commandHash : undefined,
               supplierId: payload.supplierId,
               remarks: payload.remarks ?? payload.invoiceNo ?? '',
               transactionDate: payload.transactionDate
@@ -1123,24 +1134,31 @@ export class InventoryService {
           return transaction;
         });
       } catch (error) {
+        if (
+          receiptKey &&
+          this.isUniqueInventoryIdempotencyError(error)
+        ) {
+          const replay =
+            await this.inventoryRepository.findTransactionByIdempotencyKey(
+              receiptKey,
+            );
+          if (replay?.commandHash === commandHash) {
+            return replay;
+          }
+          if (replay) {
+            await this.logInventoryIdempotencyConflict(
+              new InventoryIdempotencyConflict(
+                receiptKey,
+                replay.id,
+                replay.commandHash,
+                commandHash,
+              ),
+              payload,
+            );
+          }
+        }
         if (error instanceof InventoryIdempotencyConflict) {
-          await this.inventoryRepository.createActivityLog({
-            action: 'INVENTORY_IDEMPOTENCY_CONFLICT',
-            entity: 'InventoryTransaction',
-            entityId: error.transactionId,
-            module: 'inventory',
-            userId: payload.performedBy,
-            metadata: {
-              idempotencyKey: error.key,
-              expectedHash: error.expectedHash,
-              receivedHash: error.receivedHash,
-              referenceModule: payload.referenceModule ?? null,
-              referenceId: payload.referenceId ?? null,
-            },
-          });
-          throw new ConflictException(
-            'Idempotency key was already used with a different Inventory payload',
-          );
+          await this.logInventoryIdempotencyConflict(error, payload);
         }
         if (
           this.isRetryableInventoryTransactionError(error) &&
@@ -1189,6 +1207,21 @@ export class InventoryService {
       : [String(error.meta?.target ?? '')];
 
     return target.some((field) => ['code', 'transactionNo'].includes(field));
+  }
+
+  private isUniqueInventoryIdempotencyError(error: unknown) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== 'P2002'
+    ) {
+      return false;
+    }
+
+    const target = Array.isArray(error.meta?.target)
+      ? error.meta.target.map(String)
+      : [String(error.meta?.target ?? '')];
+
+    return target.some((field) => field.includes('idempotencyKey'));
   }
 
   private isRetryableInventoryTransactionError(error: unknown) {
@@ -1255,6 +1288,23 @@ export class InventoryService {
     commandHash: string,
     tx: Prisma.TransactionClient,
   ) {
+    const transaction =
+      await this.inventoryRepository.findTransactionByIdempotencyKey(
+        receiptKey,
+        tx,
+      );
+    if (transaction) {
+      if (transaction.commandHash !== commandHash) {
+        throw new InventoryIdempotencyConflict(
+          receiptKey,
+          transaction.id,
+          transaction.commandHash,
+          commandHash,
+        );
+      }
+      return transaction;
+    }
+
     const receipt = await this.inventoryRepository.findOutboxEvent(
       receiptKey,
       tx,
@@ -1276,6 +1326,29 @@ export class InventoryService {
     return transactionId
       ? this.inventoryRepository.findTransactionById(transactionId, tx)
       : null;
+  }
+
+  private async logInventoryIdempotencyConflict(
+    error: InventoryIdempotencyConflict,
+    payload: CreateTransactionDto,
+  ): Promise<never> {
+    await this.inventoryRepository.createActivityLog({
+      action: 'INVENTORY_IDEMPOTENCY_CONFLICT',
+      entity: 'InventoryTransaction',
+      entityId: error.transactionId,
+      module: 'inventory',
+      userId: payload.performedBy,
+      metadata: {
+        idempotencyKey: error.key,
+        expectedHash: error.expectedHash,
+        receivedHash: error.receivedHash,
+        referenceModule: payload.referenceModule ?? null,
+        referenceId: payload.referenceId ?? null,
+      },
+    });
+    throw new ConflictException(
+      'Idempotency key was already used with a different Inventory payload',
+    );
   }
 
   private async recordInventoryCommandReceipt(
@@ -1594,6 +1667,57 @@ export class InventoryService {
           ? (warehouseByZoneId.get(line.zoneId) ?? undefined)
           : undefined),
     }));
+  }
+
+  private async assertWarehouseCapabilities(
+    lines: NormalizedInventoryLine[],
+    type: TransactionType,
+  ) {
+    const warehouseIds = Array.from(
+      new Set(
+        lines
+          .map((line) => line.warehouseId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    if (!warehouseIds.length) return;
+
+    const warehouses = await this.inventoryRepository.findWarehousesByIds(
+      warehouseIds,
+    );
+    const byId = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+
+    for (const line of lines) {
+      if (!line.warehouseId) continue;
+      const warehouse = byId.get(line.warehouseId);
+      if (!warehouse?.active) {
+        throw new BadRequestException(
+          'Warehouse is invalid or inactive.',
+        );
+      }
+      const requiresReceipt =
+        type === TransactionType.IMPORT ||
+        type === TransactionType.RETURN ||
+        ((type === TransactionType.TRANSFER ||
+          type === TransactionType.ADJUSTMENT) &&
+          Number(line.quantity) > 0);
+      const requiresIssue =
+        type === TransactionType.EXPORT ||
+        ((type === TransactionType.TRANSFER ||
+          type === TransactionType.ADJUSTMENT) &&
+          Number(line.quantity) < 0);
+
+      if (requiresReceipt && !warehouse.allowReceipt) {
+        throw new BadRequestException(
+          `Warehouse ${warehouse.code} does not allow receipts.`,
+        );
+      }
+      if (requiresIssue && !warehouse.allowIssue) {
+        throw new BadRequestException(
+          `Warehouse ${warehouse.code} does not allow issues.`,
+        );
+      }
+    }
   }
 
   private async publishCanonicalInventoryFacts(params: {

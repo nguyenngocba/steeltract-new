@@ -68,7 +68,7 @@ import { ProductionInstanceExecutionService } from './services/production-instan
 type AuthenticatedRequest = Request & { user?: AuthUser };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('production.write')
+@RequirePermissions('production.execute')
 @Controller('production/commands')
 export class ProductionCommandController {
   constructor(
@@ -77,6 +77,7 @@ export class ProductionCommandController {
   ) {}
 
   @Post('orders')
+  @RequirePermissions('production.create')
   createOrder(
     @Body(new ZodValidationPipe(createProductionOrderCommandSchema))
     body: CreateProductionOrderCommandDto,
@@ -92,6 +93,7 @@ export class ProductionCommandController {
   }
 
   @Post('orders/:id/release')
+  @RequirePermissions('production.release')
   releaseOrder(
     @Param('id') productionOrderId: string,
     @Body(new ZodValidationPipe(releaseProductionOrderCommandSchema))
@@ -109,6 +111,7 @@ export class ProductionCommandController {
   }
 
   @Post('orders/:id/ready')
+  @RequirePermissions('production.release')
   readyOrder(
     @Param('id') productionOrderId: string,
     @Body(new ZodValidationPipe(readyProductionOrderCommandSchema))
@@ -177,6 +180,7 @@ export class ProductionCommandController {
   }
 
   @Post('orders/:id/complete')
+  @RequirePermissions('production.complete')
   completeOrder(
     @Param('id') productionOrderId: string,
     @Body(new ZodValidationPipe(versionedProductionOrderCommandSchema))
@@ -194,6 +198,7 @@ export class ProductionCommandController {
   }
 
   @Post('orders/:id/close')
+  @RequirePermissions('production.complete')
   closeOrder(
     @Param('id') productionOrderId: string,
     @Body(new ZodValidationPipe(closeProductionOrderCommandSchema))
@@ -211,6 +216,7 @@ export class ProductionCommandController {
   }
 
   @Post('orders/:id/cancel')
+  @RequirePermissions('production.cancel')
   cancelOrder(
     @Param('id') productionOrderId: string,
     @Body(new ZodValidationPipe(versionedProductionOrderCommandSchema))
@@ -417,7 +423,7 @@ export class ProductionCommandController {
   }
 
   @Get('component-instances/:componentInstanceId/executions')
-  @RequirePermissions('production.read')
+  @RequirePermissions('production.view')
   getComponentInstanceExecutionHistory(
     @Param('componentInstanceId') componentInstanceId: string,
   ) {

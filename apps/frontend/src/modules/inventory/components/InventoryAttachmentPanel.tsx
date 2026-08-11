@@ -87,7 +87,7 @@ export function InventoryAttachmentPicker({
           <div className="text-xs text-slate-400">Upload sau khi phiếu được lưu thành công</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={category} onChange={(event) => setCategory(event.target.value as AttachmentCategory)} className="h-9 rounded-lg border border-white/10 bg-slate-950 px-2 text-xs text-slate-100">
+          <select aria-label="Loại tài liệu đính kèm" value={category} onChange={(event) => setCategory(event.target.value as AttachmentCategory)} className="h-9 rounded-lg border border-white/10 bg-slate-950 px-2 text-xs text-slate-100">
             {inventoryAttachmentCategories.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}
@@ -117,7 +117,7 @@ export function InventoryAttachmentPicker({
                 <div className="truncate font-semibold text-slate-100">{item.file.name}</div>
                 <div className="mt-0.5 text-slate-500">{categoryLabel(item.category)} · {formatFileSize(item.file.size)}</div>
               </div>
-              <button type="button" onClick={() => onChange(files.filter((file) => file.id !== item.id))} className="rounded-lg border border-red-400/20 bg-red-500/10 p-2 text-red-200 hover:bg-red-500/15">
+              <button type="button" aria-label={`Xóa tệp ${item.file.name}`} title="Xóa tệp" onClick={() => onChange(files.filter((file) => file.id !== item.id))} className="rounded-lg border border-red-400/20 bg-red-500/10 p-2 text-red-200 hover:bg-red-500/15">
                 <Trash2 size={14} />
               </button>
             </div>

@@ -8,6 +8,7 @@ const rest = JSON.parse(await readFile(evidenceFile, 'utf8'));
 const ids = rest.summary.ids;
 const runId = rest.runId;
 const reverseWorkflow = Boolean(ids.reverseTransferId);
+const expectedInventoryQuantity = Number(rest.summary.expectedSignedMovement ?? 95);
 
 try {
   const [material, requirement, order, instance, inspection, placement, dispatch, activity] = await Promise.all([
@@ -43,8 +44,8 @@ try {
 
   const checks = [
     ['REST material exists in DB', material?.id === ids.materialId],
-    ['Inventory item denormalized quantity is 95', Number(material?.quantity) === 95],
-    ['Location stock total is 95', material?.locationStocks.reduce((sum, row) => sum + Number(row.quantity), 0) === 95],
+    [`Inventory item denormalized quantity is ${expectedInventoryQuantity}`, Number(material?.quantity) === expectedInventoryQuantity],
+    [`Location stock total is ${expectedInventoryQuantity}`, material?.locationStocks.reduce((sum, row) => sum + Number(row.quantity), 0) === expectedInventoryQuantity],
     ['Requirement points to Project and Component', requirement?.projectId === ids.projectId && requirement?.componentId === ids.componentId],
     ['Requirement has one ProductionOrder and one physical instance', requirement?.productionOrders.length === 1 && requirement?.componentInstances.length === 1],
     ['ProductionOrder lineage matches requirement', order?.componentRequirementId === ids.requirementId],

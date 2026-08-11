@@ -28,7 +28,7 @@ import { LogisticsService } from './logistics.service'
 type AuthenticatedRequest = Request & { user?: AuthUser }
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermissions('logistics.read')
+@RequirePermissions('logistics.view')
 @Controller('logistics')
 export class LogisticsController {
   constructor(
@@ -51,19 +51,19 @@ export class LogisticsController {
   }
 
   @Post('dispatch-orders/suggest')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.dispatch')
   suggestDispatchItems(@Body() body: any) {
     return this.logisticsService.suggestDispatchItems(body)
   }
 
   @Post('dispatch-orders')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.dispatch')
   createDispatchOrder(@Body() body: any) {
     return this.logisticsService.createDispatchOrder(body)
   }
 
   @Patch('dispatch-orders/:id/loading')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.dispatch')
   markLoading(
     @Param('id') id: string,
     @Body() body: any,
@@ -72,7 +72,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/depart')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.dispatch')
   depart(
     @Param('id') id: string,
     @Body() body: any,
@@ -81,7 +81,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/arrive')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.receive')
   arrive(
     @Param('id') id: string,
     @Body() body: any,
@@ -90,7 +90,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/receive')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.receive')
   receive(
     @Param('id') id: string,
     @Body() body: any,
@@ -99,7 +99,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/complete')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.receive')
   complete(
     @Param('id') id: string,
     @Body() body: any,
@@ -108,7 +108,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/cancel')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.return')
   cancel(
     @Param('id') id: string,
     @Body() body: any,
@@ -117,7 +117,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/return-request')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.return')
   requestReturn(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(requestDispatchReturnSchema))
@@ -131,7 +131,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/return-depart')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.return')
   departReturn(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(departDispatchReturnSchema))
@@ -145,7 +145,7 @@ export class LogisticsController {
   }
 
   @Patch('dispatch-orders/:id/return-to-yard')
-  @RequirePermissions('logistics.write')
+  @RequirePermissions('logistics.return')
   receiveReturnToYard(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(receiveDispatchReturnSchema))

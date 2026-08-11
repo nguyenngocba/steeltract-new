@@ -9,6 +9,7 @@ import { navigation }
 import { SidebarGroup }
   from './SidebarGroup'
 import { useAuthStore } from '@/store/auth.store'
+import { canAccessPath } from '@/shared/permissions/authorization'
 import sidebarLogo from '../../../../../../images/logo-tv.png'
 
 type NavigationItem = {
@@ -342,18 +343,12 @@ function filterNavigationItems(items: NavigationItem[], user: ReturnType<typeof 
 }
 
 function canAccessNavigationItem(item: NavigationItem, user: ReturnType<typeof useAuthStore.getState>['user']) {
-  if (!item.adminOnly) return true
   if (!user) return false
-
-  const roles = user.roles?.map((role) => role.toLowerCase()) ?? []
-  const permissions = user.permissions ?? []
-
-  return (
-    roles.some((role) => role.includes('admin') || role.includes('quản trị')) ||
-    permissions.includes('*') ||
-    permissions.includes('admin.read') ||
-    permissions.includes('admin.write')
-  )
+  if (item.path && !canAccessPath(user, item.path)) return false
+  if (item.adminOnly) {
+    return canAccessPath(user, '/system-logs')
+  }
+  return true
 }
 
 function groupHasActiveRoute(group: NavigationGroup, activePath: string) {
