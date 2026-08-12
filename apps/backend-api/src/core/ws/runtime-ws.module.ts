@@ -1,16 +1,10 @@
-import { Module }
-  from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { RuntimeGateway }
-  from './runtime.gateway'
+import { RuntimeGateway } from './runtime.gateway';
 
 @Module({
-  providers: [
-    RuntimeGateway,
-  ],
+  providers: [RuntimeGateway],
 
-  exports: [
-    RuntimeGateway,
-  ],
+  exports: [RuntimeGateway],
 })
 export class RuntimeWsModule {}

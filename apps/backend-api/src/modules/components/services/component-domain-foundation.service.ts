@@ -66,7 +66,9 @@ export class ComponentDomainFoundationService {
     await this.assertBomLineage(dto.bomDefinitionId, dto.componentRevisionId);
 
     if (dto.requirementId) {
-      const requirement = await this.repository.findRequirement(dto.requirementId);
+      const requirement = await this.repository.findRequirement(
+        dto.requirementId,
+      );
       if (!requirement) {
         throw new NotFoundException('Project component requirement not found');
       }
@@ -86,7 +88,9 @@ export class ComponentDomainFoundationService {
     }
 
     if (dto.productionOrderId) {
-      const order = await this.repository.findProductionOrder(dto.productionOrderId);
+      const order = await this.repository.findProductionOrder(
+        dto.productionOrderId,
+      );
       if (!order) {
         throw new NotFoundException('Production order not found');
       }
@@ -166,7 +170,10 @@ export class ComponentDomainFoundationService {
     if (!bom) {
       throw new NotFoundException('Component BOM definition not found');
     }
-    if (componentRevisionId && bom.componentRevisionId !== componentRevisionId) {
+    if (
+      componentRevisionId &&
+      bom.componentRevisionId !== componentRevisionId
+    ) {
       throw new BadRequestException(
         'Component BOM definition must belong to the Component revision',
       );

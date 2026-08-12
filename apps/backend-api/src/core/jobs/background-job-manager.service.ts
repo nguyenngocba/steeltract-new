@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { JobSchedulerService, ScheduleJobInput } from './job-scheduler.service';
 

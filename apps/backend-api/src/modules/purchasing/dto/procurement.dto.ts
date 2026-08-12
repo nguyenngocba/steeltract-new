@@ -122,9 +122,10 @@ export const transitionReasonSchema = z.object({
   reason: z.string().trim().min(1).optional(),
 });
 
-export const legacyPurchaseOrderTransitionSchema = transitionReasonSchema.extend({
-  status: z.enum(['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED']),
-});
+export const legacyPurchaseOrderTransitionSchema =
+  transitionReasonSchema.extend({
+    status: z.enum(['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED']),
+  });
 
 export type ListPurchaseRequestsDto = z.infer<
   typeof listPurchaseRequestsSchema
@@ -136,12 +137,8 @@ export type UpdatePurchaseRequestDto = z.infer<
   typeof updatePurchaseRequestSchema
 >;
 export type ListPurchaseOrdersDto = z.infer<typeof listPurchaseOrdersSchema>;
-export type CreatePurchaseOrderDto = z.infer<
-  typeof createPurchaseOrderSchema
->;
-export type UpdatePurchaseOrderDto = z.infer<
-  typeof updatePurchaseOrderSchema
->;
+export type CreatePurchaseOrderDto = z.infer<typeof createPurchaseOrderSchema>;
+export type UpdatePurchaseOrderDto = z.infer<typeof updatePurchaseOrderSchema>;
 export type ReceivePurchaseOrderDto = z.infer<
   typeof receivePurchaseOrderSchema
 >;

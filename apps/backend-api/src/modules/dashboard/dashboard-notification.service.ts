@@ -1,33 +1,33 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
 import {
   ProductionOrderStatus,
   ProjectStatus,
   QcInspectionStatus,
-} from '@prisma/client'
+} from '@prisma/client';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
-import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service';
 
-type NotificationPriority = 'Critical' | 'Warning' | 'Information'
+type NotificationPriority = 'Critical' | 'Warning' | 'Information';
 
 type ExecutiveNotification = {
-  id: string
-  priority: NotificationPriority
-  module: string
-  title: string
-  description: string
-  entityCode: string | null
-  createdAt: string
-  actionLabel: string | null
-}
+  id: string;
+  priority: NotificationPriority;
+  module: string;
+  title: string;
+  description: string;
+  entityCode: string | null;
+  createdAt: string;
+  actionLabel: string | null;
+};
 
 function nowIso() {
-  return new Date().toISOString()
+  return new Date().toISOString();
 }
 
 function toNumber(value: number | null | undefined) {
-  return Number(value ?? 0)
+  return Number(value ?? 0);
 }
 
 @Injectable()
@@ -54,7 +54,7 @@ export class DashboardNotificationService {
       this.projectRules(),
       this.purchaseRules(),
       this.persistedRules(),
-    ])
+    ]);
 
     const items = [
       ...inventoryNotifications,
@@ -64,34 +64,40 @@ export class DashboardNotificationService {
       ...projectNotifications,
       ...purchaseNotifications,
       ...persistedNotifications,
-    ].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    ].sort(
+      (a, b) =>
+        priorityRank(a.priority) - priorityRank(b.priority) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 
     return {
       counts: {
         critical: items.filter((item) => item.priority === 'Critical').length,
         warning: items.filter((item) => item.priority === 'Warning').length,
-        information: items.filter((item) => item.priority === 'Information').length,
+        information: items.filter((item) => item.priority === 'Information')
+          .length,
       },
       items,
-    }
+    };
   }
 
   private async inventoryRules(): Promise<ExecutiveNotification[]> {
-    const snapshot = await this.inventoryReadModel.getSnapshot()
+    const snapshot = await this.inventoryReadModel.getSnapshot();
     return snapshot.items
       .map((item): ExecutiveNotification | null => {
-        const stock = item.stock
+        const stock = item.stock;
         if (stock <= 0) {
           return {
             id: `inventory-out-${item.id}`,
             priority: 'Critical',
             module: 'Inventory',
             title: 'Hết vật tư',
-            description: `${item.code} · ${item.name} đang bằng 0 ${item.unit ?? ''}`.trim(),
+            description:
+              `${item.code} · ${item.name} đang bằng 0 ${item.unit ?? ''}`.trim(),
             entityCode: item.code,
             createdAt: nowIso(),
             actionLabel: 'Lập kế hoạch nhập',
-          }
+          };
         }
         if (stock <= toNumber(item.minimumStock)) {
           return {
@@ -99,15 +105,16 @@ export class DashboardNotificationService {
             priority: 'Warning',
             module: 'Inventory',
             title: 'Vật tư dưới Min Stock',
-            description: `${item.code} · tồn ${stock}/${item.minimumStock} ${item.unit ?? ''}`.trim(),
+            description:
+              `${item.code} · tồn ${stock}/${item.minimumStock} ${item.unit ?? ''}`.trim(),
             entityCode: item.code,
             createdAt: nowIso(),
             actionLabel: 'Xem tồn kho',
-          }
+          };
         }
-        return null
+        return null;
       })
-      .filter(Boolean) as ExecutiveNotification[]
+      .filter(Boolean);
   }
 
   private async productionRules(): Promise<ExecutiveNotification[]> {
@@ -124,27 +131,36 @@ export class DashboardNotificationService {
       },
       take: 100,
       orderBy: { updatedAt: 'desc' },
-    })
+    });
 
-    const now = Date.now()
+    const now = Date.now();
     return orders
       .map((order): ExecutiveNotification | null => {
-        const isLate = order.status === ProductionOrderStatus.DELAYED ||
-          (!!order.plannedEndAt && order.plannedEndAt.getTime() < now && order.status !== ProductionOrderStatus.COMPLETED)
+        const isLate =
+          order.status === ProductionOrderStatus.DELAYED ||
+          (!!order.plannedEndAt &&
+            order.plannedEndAt.getTime() < now &&
+            order.status !== ProductionOrderStatus.COMPLETED);
 
-        if (!isLate) return null
+        if (!isLate) return null;
         return {
           id: `production-delay-${order.id}`,
-          priority: order.status === ProductionOrderStatus.DELAYED ? 'Critical' : 'Warning',
+          priority:
+            order.status === ProductionOrderStatus.DELAYED
+              ? 'Critical'
+              : 'Warning',
           module: 'Production',
-          title: order.status === ProductionOrderStatus.DELAYED ? 'Sản xuất dừng/chậm' : 'Lệnh sản xuất sắp trễ',
+          title:
+            order.status === ProductionOrderStatus.DELAYED
+              ? 'Sản xuất dừng/chậm'
+              : 'Lệnh sản xuất sắp trễ',
           description: `${order.orderNo} · ${order.title}`,
           entityCode: order.orderNo,
           createdAt: order.updatedAt.toISOString(),
           actionLabel: 'Xem lệnh sản xuất',
-        }
+        };
       })
-      .filter(Boolean) as ExecutiveNotification[]
+      .filter(Boolean);
   }
 
   private async yardRules(): Promise<ExecutiveNotification[]> {
@@ -154,23 +170,25 @@ export class DashboardNotificationService {
         where: { removedAt: null },
         take: 1000,
       }),
-    ])
+    ]);
 
-    if (!slots.length) return []
+    if (!slots.length) return [];
 
-    const occupancy = (placements.length / slots.length) * 100
-    if (occupancy < 90) return []
+    const occupancy = (placements.length / slots.length) * 100;
+    if (occupancy < 90) return [];
 
-    return [{
-      id: 'yard-occupancy-over-90',
-      priority: occupancy >= 100 ? 'Critical' : 'Warning',
-      module: 'Yard',
-      title: occupancy >= 100 ? 'Bãi quá tải' : 'Sức chứa bãi > 90%',
-      description: `Đang sử dụng ${placements.length}/${slots.length} vị trí (${occupancy.toFixed(1)}%)`,
-      entityCode: null,
-      createdAt: nowIso(),
-      actionLabel: 'Xem bãi',
-    }]
+    return [
+      {
+        id: 'yard-occupancy-over-90',
+        priority: occupancy >= 100 ? 'Critical' : 'Warning',
+        module: 'Yard',
+        title: occupancy >= 100 ? 'Bãi quá tải' : 'Sức chứa bãi > 90%',
+        description: `Đang sử dụng ${placements.length}/${slots.length} vị trí (${occupancy.toFixed(1)}%)`,
+        entityCode: null,
+        createdAt: nowIso(),
+        actionLabel: 'Xem bãi',
+      },
+    ];
   }
 
   private async qcRules(): Promise<ExecutiveNotification[]> {
@@ -187,18 +205,26 @@ export class DashboardNotificationService {
       },
       take: 100,
       orderBy: { updatedAt: 'desc' },
-    })
+    });
 
     return inspections.map((inspection) => ({
       id: `qc-${inspection.id}`,
-      priority: ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(inspection.status) ? 'Critical' : 'Warning',
+      priority: ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(
+        inspection.status,
+      )
+        ? 'Critical'
+        : 'Warning',
       module: 'QC',
-      title: ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(inspection.status) ? 'NCR/QC nghiêm trọng' : 'QC chờ xử lý',
+      title: ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(
+        inspection.status,
+      )
+        ? 'NCR/QC nghiêm trọng'
+        : 'QC chờ xử lý',
       description: `${inspection.inspectionNo} · ${inspection.status}`,
       entityCode: inspection.inspectionNo,
       createdAt: inspection.updatedAt.toISOString(),
       actionLabel: 'Xem QC',
-    }))
+    }));
   }
 
   private async projectRules(): Promise<ExecutiveNotification[]> {
@@ -210,18 +236,22 @@ export class DashboardNotificationService {
       },
       take: 100,
       orderBy: { updatedAt: 'desc' },
-    })
+    });
 
     return projects.map((project) => ({
       id: `project-${project.id}`,
-      priority: project.status === ProjectStatus.DELAYED ? 'Warning' : 'Information',
+      priority:
+        project.status === ProjectStatus.DELAYED ? 'Warning' : 'Information',
       module: 'Projects',
-      title: project.status === ProjectStatus.DELAYED ? 'Công trình chậm tiến độ' : 'Công trình tạm dừng',
+      title:
+        project.status === ProjectStatus.DELAYED
+          ? 'Công trình chậm tiến độ'
+          : 'Công trình tạm dừng',
       description: `${project.code} · ${project.name}`,
       entityCode: project.code,
       createdAt: project.updatedAt.toISOString(),
       actionLabel: 'Xem công trình',
-    }))
+    }));
   }
 
   private async purchaseRules(): Promise<ExecutiveNotification[]> {
@@ -233,7 +263,7 @@ export class DashboardNotificationService {
       },
       take: 50,
       orderBy: { updatedAt: 'desc' },
-    })
+    });
 
     return orders.map((order) => ({
       id: `purchase-${order.id}`,
@@ -244,14 +274,14 @@ export class DashboardNotificationService {
       entityCode: order.poNumber,
       createdAt: order.updatedAt.toISOString(),
       actionLabel: 'Xem đơn mua',
-    }))
+    }));
   }
 
   private async persistedRules(): Promise<ExecutiveNotification[]> {
     const rows = await this.prisma.notification.findMany({
       take: 50,
       orderBy: { createdAt: 'desc' },
-    })
+    });
 
     return rows.map((row) => ({
       id: `notification-${row.id}`,
@@ -262,19 +292,19 @@ export class DashboardNotificationService {
       entityCode: null,
       createdAt: row.createdAt.toISOString(),
       actionLabel: row.link ? 'Mở thông báo' : null,
-    }))
+    }));
   }
 }
 
 function priorityRank(priority: NotificationPriority) {
-  if (priority === 'Critical') return 0
-  if (priority === 'Warning') return 1
-  return 2
+  if (priority === 'Critical') return 0;
+  if (priority === 'Warning') return 1;
+  return 2;
 }
 
 function normalizeSeverity(severity: string | null): NotificationPriority {
-  const value = (severity ?? '').toUpperCase()
-  if (['CRITICAL', 'ERROR', 'HIGH'].includes(value)) return 'Critical'
-  if (['WARNING', 'WARN', 'MEDIUM'].includes(value)) return 'Warning'
-  return 'Information'
+  const value = (severity ?? '').toUpperCase();
+  if (['CRITICAL', 'ERROR', 'HIGH'].includes(value)) return 'Critical';
+  if (['WARNING', 'WARN', 'MEDIUM'].includes(value)) return 'Warning';
+  return 'Information';
 }

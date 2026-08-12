@@ -275,7 +275,8 @@ export class ReturnWorkflowService {
     });
 
     if (updated.flowType === ReturnFlowType.SITE_RETURN) {
-      const singleItem = updated.items.length === 1 ? updated.items.at(0) : null;
+      const singleItem =
+        updated.items.length === 1 ? updated.items.at(0) : null;
       const projectLabel = updated.project
         ? `${updated.project.code} - ${updated.project.name}`
         : (updated.projectId ?? 'công trình');
@@ -302,7 +303,10 @@ export class ReturnWorkflowService {
           (item) => item.inventoryItem?.code ?? item.inventoryItemId,
         ),
         materialNames: updated.items.map(
-          (item) => item.inventoryItem?.name ?? item.inventoryItem?.code ?? item.inventoryItemId,
+          (item) =>
+            item.inventoryItem?.name ??
+            item.inventoryItem?.code ??
+            item.inventoryItemId,
         ),
         quantity: receivedQuantity,
       };
@@ -640,9 +644,7 @@ export class ReturnWorkflowService {
     }
 
     const existingReturns =
-      await this.inventoryRepository.findSupplierReturnsByReceipt(
-        receipt.id,
-      );
+      await this.inventoryRepository.findSupplierReturnsByReceipt(receipt.id);
     const receivedByMaterial = new Map<string, number>();
     for (const line of receipt.items) {
       if (

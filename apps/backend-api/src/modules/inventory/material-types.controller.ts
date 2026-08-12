@@ -7,37 +7,32 @@ import {
   Post,
   Put,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { InventoryRepository } from './inventory.repository'
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
+import { InventoryRepository } from './inventory.repository';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   createMaterialTypeSchema,
   updateMaterialTypeSchema,
-} from './dto/inventory.dto'
+} from './dto/inventory.dto';
 
 import type {
   CreateMaterialTypeDto,
   UpdateMaterialTypeDto,
-} from './dto/inventory.dto'
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
-import { PermissionsGuard } from '../rbac/guards/permissions.guard'
+} from './dto/inventory.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions('inventory.view')
 @Controller('inventory/material-types')
 export class MaterialTypesController {
-
-  constructor(
-    private readonly inventoryRepository:
-      InventoryRepository,
-  ) {}
+  constructor(private readonly inventoryRepository: InventoryRepository) {}
 
   @Get()
   async getMaterialTypes() {
-
-    return this.inventoryRepository.listMaterialTypes()
+    return this.inventoryRepository.listMaterialTypes();
   }
 
   @Post()
@@ -46,27 +41,19 @@ export class MaterialTypesController {
     @Body(new ZodValidationPipe(createMaterialTypeSchema))
     body: CreateMaterialTypeDto,
   ) {
-
     return this.inventoryRepository.createMaterialType({
-        code:
-          body.code,
+      code: body.code,
 
-        name:
-          body.name,
+      name: body.name,
 
-        category: {
-          connect: {
-            id:
-              body.categoryId,
-          },
+      category: {
+        connect: {
+          id: body.categoryId,
         },
-        description:
-          body.description ??
-          null,
-        color:
-          body.color ??
-          null,
-    })
+      },
+      description: body.description ?? null,
+      color: body.color ?? null,
+    });
   }
 
   @Put(':id')
@@ -76,40 +63,27 @@ export class MaterialTypesController {
     @Body(new ZodValidationPipe(updateMaterialTypeSchema))
     body: UpdateMaterialTypeDto,
   ) {
-
     return this.inventoryRepository.updateMaterialType(id, {
-        code:
-          body.code,
+      code: body.code,
 
-        name:
-          body.name,
+      name: body.name,
 
-        category: {
-          connect: {
-            id:
-              body.categoryId,
-          },
+      category: {
+        connect: {
+          id: body.categoryId,
         },
-        description:
-          body.description ??
-          null,
-        active:
-          body.active ??
-          true,
-        color:
-          body.color ??
-          null,
-    })
+      },
+      description: body.description ?? null,
+      active: body.active ?? true,
+      color: body.color ?? null,
+    });
   }
 
   @Delete(':id')
   @RequirePermissions('settings.edit')
-  async deleteMaterialType(
-    @Param('id') id: string,
-  ) {
-
+  async deleteMaterialType(@Param('id') id: string) {
     return this.inventoryRepository.updateMaterialType(id, {
-        active: false,
-    })
+      active: false,
+    });
   }
 }

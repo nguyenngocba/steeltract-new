@@ -1,7 +1,4 @@
-import {
-  Inject,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, OnModuleInit } from '@nestjs/common';
 
 import {
   MessageBody,

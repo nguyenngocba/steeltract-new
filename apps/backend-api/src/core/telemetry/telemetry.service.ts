@@ -1,41 +1,26 @@
-import { Injectable }
-  from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
-import { TelemetryMetric }
-  from './telemetry-metric'
+import { TelemetryMetric } from './telemetry-metric';
 
 @Injectable()
 export class TelemetryService {
-  private metrics:
-    TelemetryMetric[] = []
+  private metrics: TelemetryMetric[] = [];
 
-  track(
-    metric: string,
-    value: number,
-  ) {
+  track(metric: string, value: number) {
     this.metrics.unshift({
-      id:
-        Date.now().toString(),
+      id: Date.now().toString(),
 
       metric,
 
       value,
 
-      timestamp:
-        new Date().toISOString(),
-    })
+      timestamp: new Date().toISOString(),
+    });
 
-    console.log(
-      '[Telemetry]',
-      metric,
-      value,
-    )
+    console.log('[Telemetry]', metric, value);
   }
 
   latest() {
-    return this.metrics.slice(
-      0,
-      100,
-    )
+    return this.metrics.slice(0, 100);
   }
 }

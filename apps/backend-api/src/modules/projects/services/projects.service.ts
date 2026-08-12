@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 import {
   ComponentStatus,
@@ -151,15 +157,16 @@ export class ProjectsService {
     return buildProjectExecutionReadModel(
       {
         project: source,
-        requirements:
-          source.componentRequirements as ProjectExecutionRequirementSource[],
+        requirements: source.componentRequirements,
       },
       finishedGoodsByRequirement,
     );
   }
 
   create(dto: CreateProjectDto) {
-    this.logger.debug(`createProject code=${dto.code} templateId=${dto.templateId ?? 'none'}`);
+    this.logger.debug(
+      `createProject code=${dto.code} templateId=${dto.templateId ?? 'none'}`,
+    );
     return this.repository.transaction(async (tx) => {
       const project = await this.repository.create(
         {
@@ -172,14 +179,24 @@ export class ProjectsService {
       );
 
       if (dto.templateId) {
-        if (!(await this.hasProjectTaskTable()) || !(await this.hasProjectTemplateTable())) {
-          throw new BadRequestException('Project template tables are not ready. Apply migrations before creating from template.');
+        if (
+          !(await this.hasProjectTaskTable()) ||
+          !(await this.hasProjectTemplateTable())
+        ) {
+          throw new BadRequestException(
+            'Project template tables are not ready. Apply migrations before creating from template.',
+          );
         }
-        await this.applyProjectTemplate(project.id, dto.templateId, {
-          startDate: dto.startDate ?? project.createdAt,
-          handoverDate: dto.handoverDate ?? null,
-          contractValue: dto.contractValue ?? 0,
-        }, tx);
+        await this.applyProjectTemplate(
+          project.id,
+          dto.templateId,
+          {
+            startDate: dto.startDate ?? project.createdAt,
+            handoverDate: dto.handoverDate ?? null,
+            contractValue: dto.contractValue ?? 0,
+          },
+          tx,
+        );
       }
 
       await this.log('CREATE', project.id, project, tx);
@@ -191,7 +208,9 @@ export class ProjectsService {
   async listTemplates() {
     this.logger.debug('getTemplates');
     if (!(await this.hasProjectTemplateTable())) {
-      this.logger.warn('project_templates table is missing; returning empty template list');
+      this.logger.warn(
+        'project_templates table is missing; returning empty template list',
+      );
       return [];
     }
     return this.repository.findProjectTemplates();
@@ -211,12 +230,18 @@ export class ProjectsService {
           description: dto.description,
           status: dto.status ?? ProjectTemplateStatus.DRAFT,
           isDefault: Boolean(dto.isDefault),
-          structure: dto.structure as Prisma.InputJsonValue,
-          publishedAt: dto.status === ProjectTemplateStatus.PUBLISHED ? new Date() : null,
+          structure: dto.structure,
+          publishedAt:
+            dto.status === ProjectTemplateStatus.PUBLISHED ? new Date() : null,
         },
         tx,
       );
-      await this.emitProjectEvent('project.template.created', template.id, { code: template.code, name: template.name }, tx);
+      await this.emitProjectEvent(
+        'project.template.created',
+        template.id,
+        { code: template.code, name: template.name },
+        tx,
+      );
       return template;
     });
   }
@@ -236,12 +261,20 @@ export class ProjectsService {
           description: dto.description,
           status: dto.status,
           isDefault: dto.isDefault,
-          structure: dto.structure as Prisma.InputJsonValue | undefined,
-          publishedAt: dto.status === ProjectTemplateStatus.PUBLISHED ? new Date() : undefined,
+          structure: dto.structure,
+          publishedAt:
+            dto.status === ProjectTemplateStatus.PUBLISHED
+              ? new Date()
+              : undefined,
         },
         tx,
       );
-      await this.emitProjectEvent('project.template.updated', id, { code: template.code, name: template.name }, tx);
+      await this.emitProjectEvent(
+        'project.template.updated',
+        id,
+        { code: template.code, name: template.name },
+        tx,
+      );
       return template;
     });
   }
@@ -257,11 +290,16 @@ export class ProjectsService {
           description: source.description,
           status: ProjectTemplateStatus.DRAFT,
           isDefault: false,
-          structure: source.structure as Prisma.InputJsonValue,
+          structure: source.structure,
         },
         tx,
       );
-      await this.emitProjectEvent('project.template.duplicated', template.id, { sourceId: id, code: template.code }, tx);
+      await this.emitProjectEvent(
+        'project.template.duplicated',
+        template.id,
+        { sourceId: id, code: template.code },
+        tx,
+      );
       return template;
     });
   }
@@ -308,21 +346,29 @@ export class ProjectsService {
             description: template.description,
             status: template.status ?? ProjectTemplateStatus.DRAFT,
             isDefault: false,
-            structure: template.structure as Prisma.InputJsonValue,
-            publishedAt: template.status === ProjectTemplateStatus.PUBLISHED ? new Date() : null,
+            structure: template.structure,
+            publishedAt:
+              template.status === ProjectTemplateStatus.PUBLISHED
+                ? new Date()
+                : null,
           },
           {
             name: template.name,
             description: template.description,
             status: template.status,
-            structure: template.structure as Prisma.InputJsonValue,
+            structure: template.structure,
             updatedAt: new Date(),
           },
           tx,
         );
         rows.push(row);
       }
-      await this.emitProjectEvent('project.template.imported', 'project-template-import', { count: rows.length }, tx);
+      await this.emitProjectEvent(
+        'project.template.imported',
+        'project-template-import',
+        { count: rows.length },
+        tx,
+      );
       return rows;
     });
   }
@@ -465,7 +511,12 @@ export class ProjectsService {
         tx,
       );
       await this.replaceProjectTaskRelations(projectId, created.id, dto, tx);
-      await this.emitProjectEvent('project.task.created', created.id, { projectId, name: dto.name }, tx);
+      await this.emitProjectEvent(
+        'project.task.created',
+        created.id,
+        { projectId, name: dto.name },
+        tx,
+      );
       return this.repository.findProjectTaskOrThrow(created.id, tx);
     });
     return this.toProjectWbsRuntimeFromDomain(task);
@@ -488,12 +539,24 @@ export class ProjectsService {
           status: ProjectTaskStatus.PLANNED,
           progress: 0,
           plannedStartAt: startDate,
-          plannedFinishAt: this.addDays(startDate, dto.spans * dto.axes * dto.taskDurationDays),
+          plannedFinishAt: this.addDays(
+            startDate,
+            dto.spans * dto.axes * dto.taskDurationDays,
+          ),
           scheduledStartAt: startDate,
-          scheduledFinishAt: this.addDays(startDate, dto.spans * dto.axes * dto.taskDurationDays),
-          forecastFinishAt: this.addDays(startDate, dto.spans * dto.axes * dto.taskDurationDays),
+          scheduledFinishAt: this.addDays(
+            startDate,
+            dto.spans * dto.axes * dto.taskDurationDays,
+          ),
+          forecastFinishAt: this.addDays(
+            startDate,
+            dto.spans * dto.axes * dto.taskDurationDays,
+          ),
           baselineStartAt: startDate,
-          baselineFinishAt: this.addDays(startDate, dto.spans * dto.axes * dto.taskDurationDays),
+          baselineFinishAt: this.addDays(
+            startDate,
+            dto.spans * dto.axes * dto.taskDurationDays,
+          ),
           sortOrder: Date.now(),
         },
         tx,
@@ -515,24 +578,31 @@ export class ProjectsService {
         createdIds.push(spanTask.id);
 
         for (let floor = 1; floor <= dto.floors; floor += 1) {
-          const floorParent = dto.floors > 1
-            ? await this.repository.createProjectTask(
-              {
-                projectId,
-                parentTaskId: spanTask.id,
-                name: `Tầng ${floor}`,
-                status: ProjectTaskStatus.PLANNED,
-                progress: 0,
-                sortOrder: Date.now() + span * 1_000 + floor,
-              },
-              tx,
-            )
-            : spanTask;
+          const floorParent =
+            dto.floors > 1
+              ? await this.repository.createProjectTask(
+                  {
+                    projectId,
+                    parentTaskId: spanTask.id,
+                    name: `Tầng ${floor}`,
+                    status: ProjectTaskStatus.PLANNED,
+                    progress: 0,
+                    sortOrder: Date.now() + span * 1_000 + floor,
+                  },
+                  tx,
+                )
+              : spanTask;
           if (dto.floors > 1) createdIds.push(floorParent.id);
 
           for (let axis = 1; axis <= dto.axes; axis += 1) {
-            const axisStart = this.addDays(startDate, ((span - 1) * dto.axes + (axis - 1)) * dto.taskDurationDays);
-            const axisFinish = this.addDays(axisStart, dto.taskDurationDays - 1);
+            const axisStart = this.addDays(
+              startDate,
+              ((span - 1) * dto.axes + (axis - 1)) * dto.taskDurationDays,
+            );
+            const axisFinish = this.addDays(
+              axisStart,
+              dto.taskDurationDays - 1,
+            );
             const axisTask = await this.repository.createProjectTask(
               {
                 projectId,
@@ -555,12 +625,29 @@ export class ProjectsService {
           }
         }
       }
-      await this.emitProjectEvent('project.wbs.generated', root.id, { projectId, rootName: dto.rootName, spans: dto.spans, axes: dto.axes, floors: dto.floors, created: createdIds.length }, tx);
+      await this.emitProjectEvent(
+        'project.wbs.generated',
+        root.id,
+        {
+          projectId,
+          rootName: dto.rootName,
+          spans: dto.spans,
+          axes: dto.axes,
+          floors: dto.floors,
+          created: createdIds.length,
+        },
+        tx,
+      );
     });
     return {
       created: createdIds.length,
       ids: createdIds,
-      rows: this.applyProjectScheduling(this.buildProjectWbsFromDomain(projectId, await this.projectWbsTasks(projectId)) ?? []),
+      rows: this.applyProjectScheduling(
+        this.buildProjectWbsFromDomain(
+          projectId,
+          await this.projectWbsTasks(projectId),
+        ) ?? [],
+      ),
     };
   }
 
@@ -581,18 +668,49 @@ export class ProjectsService {
           task.description,
           dto.owner ? `Bulk owner: ${dto.owner}` : '',
           dto.checklist?.length ? `Checklist: ${dto.checklist.join(', ')}` : '',
-        ].filter(Boolean).join('\n');
+        ]
+          .filter(Boolean)
+          .join('\n');
         await this.repository.updateProjectTask(
           taskId,
           {
-            parentTaskId: Object.prototype.hasOwnProperty.call(dto, 'parentId') ? dto.parentId ?? null : task.parentTaskId,
+            parentTaskId: Object.prototype.hasOwnProperty.call(dto, 'parentId')
+              ? (dto.parentId ?? null)
+              : task.parentTaskId,
             description: notes,
-            status: dto.status ? this.toProjectTaskStatus(dto.status) : task.status,
-            plannedStartAt: Object.prototype.hasOwnProperty.call(dto, 'plannedStartAt') ? dto.plannedStartAt : task.plannedStartAt,
-            plannedFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt') ? dto.plannedFinishAt : task.plannedFinishAt,
-            scheduledStartAt: Object.prototype.hasOwnProperty.call(dto, 'plannedStartAt') ? dto.plannedStartAt : task.scheduledStartAt,
-            scheduledFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt') ? dto.plannedFinishAt : task.scheduledFinishAt,
-            forecastFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt') ? dto.plannedFinishAt : task.forecastFinishAt,
+            status: dto.status
+              ? this.toProjectTaskStatus(dto.status)
+              : task.status,
+            plannedStartAt: Object.prototype.hasOwnProperty.call(
+              dto,
+              'plannedStartAt',
+            )
+              ? dto.plannedStartAt
+              : task.plannedStartAt,
+            plannedFinishAt: Object.prototype.hasOwnProperty.call(
+              dto,
+              'plannedFinishAt',
+            )
+              ? dto.plannedFinishAt
+              : task.plannedFinishAt,
+            scheduledStartAt: Object.prototype.hasOwnProperty.call(
+              dto,
+              'plannedStartAt',
+            )
+              ? dto.plannedStartAt
+              : task.scheduledStartAt,
+            scheduledFinishAt: Object.prototype.hasOwnProperty.call(
+              dto,
+              'plannedFinishAt',
+            )
+              ? dto.plannedFinishAt
+              : task.scheduledFinishAt,
+            forecastFinishAt: Object.prototype.hasOwnProperty.call(
+              dto,
+              'plannedFinishAt',
+            )
+              ? dto.plannedFinishAt
+              : task.forecastFinishAt,
           },
           tx,
         );
@@ -611,33 +729,76 @@ export class ProjectsService {
         }
         updatedIds.push(taskId);
       }
-      await this.emitProjectEvent('project.tasks.bulk_updated', projectId, { projectId, taskIds: updatedIds, count: updatedIds.length }, tx);
+      await this.emitProjectEvent(
+        'project.tasks.bulk_updated',
+        projectId,
+        { projectId, taskIds: updatedIds, count: updatedIds.length },
+        tx,
+      );
     });
     return {
       updated: updatedIds.length,
       ids: updatedIds,
-      rows: this.applyProjectScheduling(this.buildProjectWbsFromDomain(projectId, await this.projectWbsTasks(projectId)) ?? []),
+      rows: this.applyProjectScheduling(
+        this.buildProjectWbsFromDomain(
+          projectId,
+          await this.projectWbsTasks(projectId),
+        ) ?? [],
+      ),
     };
   }
 
   async siteUpdate(projectId: string, dto: SiteProjectUpdateDto) {
     await this.assertProjectExists(projectId);
     const task = await this.assertProjectWbsTask(projectId, dto.taskId);
-    const nextProgress = Math.min(100, Math.max(Number(task.progress ?? 0), Number(task.progress ?? 0) + (dto.installedQuantity > 0 ? 12 : 0) + (dto.usedQuantity > 0 ? 8 : 0) + (dto.qcStatus === 'PASSED' ? 10 : 0) - (dto.hasIssue ? 5 : 0)));
+    const nextProgress = Math.min(
+      100,
+      Math.max(
+        Number(task.progress ?? 0),
+        Number(task.progress ?? 0) +
+          (dto.installedQuantity > 0 ? 12 : 0) +
+          (dto.usedQuantity > 0 ? 8 : 0) +
+          (dto.qcStatus === 'PASSED' ? 10 : 0) -
+          (dto.hasIssue ? 5 : 0),
+      ),
+    );
     const updated = await this.updateWbsTask(projectId, dto.taskId, {
       progress: nextProgress,
-      status: dto.hasIssue ? 'BLOCKED' : nextProgress >= 100 ? 'COMPLETED' : nextProgress > 0 ? 'IN_PROGRESS' : undefined,
+      status: dto.hasIssue
+        ? 'BLOCKED'
+        : nextProgress >= 100
+          ? 'COMPLETED'
+          : nextProgress > 0
+            ? 'IN_PROGRESS'
+            : undefined,
       actualStartAt: task.actualStartAt ?? new Date(),
       actualFinishAt: nextProgress >= 100 ? new Date() : task.actualFinishAt,
-      inspectionStatus: dto.qcStatus === 'PASSED' ? ProjectTaskInspectionStatus.INSPECTION_PASSED : dto.qcStatus === 'FAILED' ? ProjectTaskInspectionStatus.INSPECTION_FAILED : task.inspection?.status ?? undefined,
-      description: [task.description ?? '', dto.note ? `Site update: ${dto.note}` : '', dto.photoAttachmentIds?.length ? `Site photos: ${dto.photoAttachmentIds.join(', ')}` : ''].filter(Boolean).join('\n'),
+      inspectionStatus:
+        dto.qcStatus === 'PASSED'
+          ? ProjectTaskInspectionStatus.INSPECTION_PASSED
+          : dto.qcStatus === 'FAILED'
+            ? ProjectTaskInspectionStatus.INSPECTION_FAILED
+            : (task.inspection?.status ?? undefined),
+      description: [
+        task.description ?? '',
+        dto.note ? `Site update: ${dto.note}` : '',
+        dto.photoAttachmentIds?.length
+          ? `Site photos: ${dto.photoAttachmentIds.join(', ')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
       materials: task.materialAllocations.map((item, index) => ({
         id: item.inventoryItemId,
         planned: Number(item.plannedQty ?? 0),
         issued: Number(item.issuedQty ?? 0),
         used: Number(item.usedQty ?? 0) + (index === 0 ? dto.usedQuantity : 0),
         returned: Number(item.returnedQty ?? 0),
-        remaining: Math.max(0, Number(item.remainingQty ?? item.plannedQty ?? 0) - (index === 0 ? dto.usedQuantity : 0)),
+        remaining: Math.max(
+          0,
+          Number(item.remainingQty ?? item.plannedQty ?? 0) -
+            (index === 0 ? dto.usedQuantity : 0),
+        ),
         cost: Number(item.totalCost ?? 0),
       })),
       components: task.componentAllocations.map((item, index) => ({
@@ -649,36 +810,55 @@ export class ProjectsService {
         installed: item.installedAt || index < dto.installedQuantity ? 1 : 0,
         returned: item.returnedAt ? 1 : 0,
         remaining: 0,
-        status: index < dto.installedQuantity ? ProjectTaskComponentStatus.HANDED_OVER : item.status,
+        status:
+          index < dto.installedQuantity
+            ? ProjectTaskComponentStatus.HANDED_OVER
+            : item.status,
         cost: Number(item.cost ?? 0),
       })),
-      workers: task.resources.filter((item) => item.type === ProjectTaskResourceType.WORKER).map((item) => ({ role: item.name, required: Number(item.quantity ?? 0), allocated: Number(item.allocatedQuantity ?? 0) })),
-      machines: task.resources.filter((item) => item.type === ProjectTaskResourceType.MACHINE).map((item) => ({ type: item.name, required: Number(item.quantity ?? 0), allocated: Number(item.allocatedQuantity ?? 0) })),
+      workers: task.resources
+        .filter((item) => item.type === ProjectTaskResourceType.WORKER)
+        .map((item) => ({
+          role: item.name,
+          required: Number(item.quantity ?? 0),
+          allocated: Number(item.allocatedQuantity ?? 0),
+        })),
+      machines: task.resources
+        .filter((item) => item.type === ProjectTaskResourceType.MACHINE)
+        .map((item) => ({
+          type: item.name,
+          required: Number(item.quantity ?? 0),
+          allocated: Number(item.allocatedQuantity ?? 0),
+        })),
     });
     await this.repository.createActivityLog({
-        action: 'PROJECT_SITE_UPDATE',
-        entity: 'ProjectTask',
-        entityId: dto.taskId,
-        module: 'projects',
-        metadata: {
-          projectId,
-          installedQuantity: dto.installedQuantity,
-          usedQuantity: dto.usedQuantity,
-          qcStatus: dto.qcStatus,
-          hasIssue: dto.hasIssue,
-          note: dto.note,
-          photoAttachmentIds: dto.photoAttachmentIds ?? [],
-        },
-      });
+      action: 'PROJECT_SITE_UPDATE',
+      entity: 'ProjectTask',
+      entityId: dto.taskId,
+      module: 'projects',
+      metadata: {
+        projectId,
+        installedQuantity: dto.installedQuantity,
+        usedQuantity: dto.usedQuantity,
+        qcStatus: dto.qcStatus,
+        hasIssue: dto.hasIssue,
+        note: dto.note,
+        photoAttachmentIds: dto.photoAttachmentIds ?? [],
+      },
+    });
     return updated;
   }
 
-  async updateWbsTask(projectId: string, taskId: string, dto: UpdateProjectWbsTaskDto) {
+  async updateWbsTask(
+    projectId: string,
+    taskId: string,
+    dto: UpdateProjectWbsTaskDto,
+  ) {
     await this.assertProjectTaskDomainReady();
     const existing = await this.assertProjectWbsTask(projectId, taskId);
     const nextParentId = Object.prototype.hasOwnProperty.call(dto, 'parentId')
       ? (dto.parentId ?? null)
-      : existing.parentTaskId ?? null;
+      : (existing.parentTaskId ?? null);
     if (nextParentId) {
       if (nextParentId === taskId) {
         throw new BadRequestException('Task cannot be its own parent.');
@@ -693,34 +873,65 @@ export class ProjectsService {
           parentTaskId: nextParentId,
           name: dto.name ?? existing.name,
           description: dto.description ?? existing.description,
-          status: dto.status ? this.toProjectTaskStatus(dto.status) : existing.status,
+          status: dto.status
+            ? this.toProjectTaskStatus(dto.status)
+            : existing.status,
           progress: dto.progress ?? existing.progress,
-          plannedStartAt: Object.prototype.hasOwnProperty.call(dto, 'plannedStartAt')
+          plannedStartAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'plannedStartAt',
+          )
             ? dto.plannedStartAt
             : existing.plannedStartAt,
-          plannedFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt')
+          plannedFinishAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'plannedFinishAt',
+          )
             ? dto.plannedFinishAt
             : existing.plannedFinishAt,
-          actualStartAt: Object.prototype.hasOwnProperty.call(dto, 'actualStartAt')
+          actualStartAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'actualStartAt',
+          )
             ? dto.actualStartAt
             : existing.actualStartAt,
-          actualFinishAt: Object.prototype.hasOwnProperty.call(dto, 'actualFinishAt')
+          actualFinishAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'actualFinishAt',
+          )
             ? dto.actualFinishAt
             : existing.actualFinishAt,
-          baselineStartAt: Object.prototype.hasOwnProperty.call(dto, 'baselineStartAt')
+          baselineStartAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'baselineStartAt',
+          )
             ? dto.baselineStartAt
             : existing.baselineStartAt,
-          baselineFinishAt: Object.prototype.hasOwnProperty.call(dto, 'baselineFinishAt')
+          baselineFinishAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'baselineFinishAt',
+          )
             ? dto.baselineFinishAt
             : existing.baselineFinishAt,
-          scheduledStartAt: Object.prototype.hasOwnProperty.call(dto, 'plannedStartAt')
+          scheduledStartAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'plannedStartAt',
+          )
             ? dto.plannedStartAt
             : existing.scheduledStartAt,
-          scheduledFinishAt: Object.prototype.hasOwnProperty.call(dto, 'plannedFinishAt')
+          scheduledFinishAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'plannedFinishAt',
+          )
             ? dto.plannedFinishAt
             : existing.scheduledFinishAt,
-          forecastFinishAt: Object.prototype.hasOwnProperty.call(dto, 'actualFinishAt')
-            ? dto.actualFinishAt ?? dto.plannedFinishAt ?? existing.forecastFinishAt
+          forecastFinishAt: Object.prototype.hasOwnProperty.call(
+            dto,
+            'actualFinishAt',
+          )
+            ? (dto.actualFinishAt ??
+              dto.plannedFinishAt ??
+              existing.forecastFinishAt)
             : existing.forecastFinishAt,
           sortOrder: dto.sortOrder ?? existing.sortOrder,
         },
@@ -729,13 +940,22 @@ export class ProjectsService {
       if (this.shouldReplaceProjectTaskRelations(dto)) {
         await this.replaceProjectTaskRelations(projectId, taskId, dto, tx);
       }
-      await this.emitProjectEvent('project.task.updated', taskId, { projectId, name: dto.name ?? existing.name }, tx);
+      await this.emitProjectEvent(
+        'project.task.updated',
+        taskId,
+        { projectId, name: dto.name ?? existing.name },
+        tx,
+      );
       return this.repository.findProjectTaskOrThrow(taskId, tx);
     });
     return this.toProjectWbsRuntimeFromDomain(updated);
   }
 
-  async moveWbsTask(projectId: string, taskId: string, dto: MoveProjectWbsTaskDto) {
+  async moveWbsTask(
+    projectId: string,
+    taskId: string,
+    dto: MoveProjectWbsTaskDto,
+  ) {
     return this.updateWbsTask(projectId, taskId, {
       parentId: dto.parentId,
       sortOrder: dto.sortOrder,
@@ -751,7 +971,11 @@ export class ProjectsService {
     while (changed) {
       changed = false;
       for (const task of tasks) {
-        if (task.parentTaskId && deleteIds.has(task.parentTaskId) && !deleteIds.has(task.id)) {
+        if (
+          task.parentTaskId &&
+          deleteIds.has(task.parentTaskId) &&
+          !deleteIds.has(task.id)
+        ) {
           deleteIds.add(task.id);
           changed = true;
         }
@@ -759,7 +983,12 @@ export class ProjectsService {
     }
     await this.repository.transaction(async (tx) => {
       await this.repository.deleteProjectTasks(Array.from(deleteIds), tx);
-      await this.emitProjectEvent('project.task.deleted', taskId, { projectId, deletedIds: Array.from(deleteIds) }, tx);
+      await this.emitProjectEvent(
+        'project.task.deleted',
+        taskId,
+        { projectId, deletedIds: Array.from(deleteIds) },
+        tx,
+      );
     });
     return {
       deleted: deleteIds.size,
@@ -778,9 +1007,13 @@ export class ProjectsService {
         }
         return {
           data: rows,
-          updatedAt: rows.reduce((oldest, row) =>
-            row.updatedAt.getTime() < oldest.getTime() ? row.updatedAt : oldest,
-          rows[0].updatedAt),
+          updatedAt: rows.reduce(
+            (oldest, row) =>
+              row.updatedAt.getTime() < oldest.getTime()
+                ? row.updatedAt
+                : oldest,
+            rows[0].updatedAt,
+          ),
           rowCount: rows.length,
         };
       },
@@ -818,7 +1051,9 @@ export class ProjectsService {
     this.logger.debug('runtimeDashboard');
     const hasProjectTaskDomain = await this.hasProjectTaskTable();
     if (!hasProjectTaskDomain) {
-      this.logger.warn('ProjectTask domain tables are missing; returning empty Projects runtime fallback');
+      this.logger.warn(
+        'ProjectTask domain tables are missing; returning empty Projects runtime fallback',
+      );
       return this.emptyProjectsRuntime();
     }
 
@@ -832,15 +1067,14 @@ export class ProjectsService {
       returnRequests,
       documents,
       activityLogs,
-    ] =
-      await this.repository.findRuntimeSources();
+    ] = await this.repository.findRuntimeSources();
 
     const projectRows = projects.map((project) => {
       const projectComponents = components.filter(
         (component) => component.projectId === project.id,
       );
-      const completedComponents = projectComponents.filter((component) =>
-        component.status === 'INSTALLED',
+      const completedComponents = projectComponents.filter(
+        (component) => component.status === 'INSTALLED',
       );
       const readyComponents = projectComponents.filter(
         (component) => component.status === 'READY',
@@ -866,7 +1100,8 @@ export class ProjectsService {
             ? 60
             : 0;
       const orderProgress = projectOrders.length
-        ? (projectOrders.filter((order) => order.status === 'COMPLETED').length /
+        ? (projectOrders.filter((order) => order.status === 'COMPLETED')
+            .length /
             projectOrders.length) *
           100
         : componentProgress;
@@ -880,7 +1115,8 @@ export class ProjectsService {
           (sum, transaction) =>
             sum +
             transaction.items.reduce(
-              (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+              (lineSum, item) =>
+                lineSum + Math.abs(Number(item.totalAmount ?? 0)),
               0,
             ),
           0,
@@ -894,16 +1130,20 @@ export class ProjectsService {
           (sum, transaction) =>
             sum +
             transaction.items.reduce(
-              (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+              (lineSum, item) =>
+                lineSum + Math.abs(Number(item.totalAmount ?? 0)),
               0,
             ),
           0,
         );
       const tonnage =
-        projectOrders.reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) ||
-        projectComponents.length;
-      const delayedOrders = projectOrders.filter((order) => order.status === 'DELAYED')
-        .length;
+        projectOrders.reduce(
+          (sum, order) => sum + Number(order.quantity ?? 0),
+          0,
+        ) || projectComponents.length;
+      const delayedOrders = projectOrders.filter(
+        (order) => order.status === 'DELAYED',
+      ).length;
 
       return {
         ...project,
@@ -938,7 +1178,8 @@ export class ProjectsService {
       0,
     );
     const totalProgress = projectRows.length
-      ? projectRows.reduce((sum, row) => sum + row.progress, 0) / projectRows.length
+      ? projectRows.reduce((sum, row) => sum + row.progress, 0) /
+        projectRows.length
       : 0;
     const allocationMetrics = new Map<
       string,
@@ -951,12 +1192,11 @@ export class ProjectsService {
     for (const task of projectTasks) {
       for (const allocation of task.materialAllocations) {
         const key = `${task.projectId}:${allocation.inventoryItemId}`;
-        const current =
-          allocationMetrics.get(key) ?? {
-            allocatedQuantity: 0,
-            usedQuantity: 0,
-            returnedQuantity: 0,
-          };
+        const current = allocationMetrics.get(key) ?? {
+          allocatedQuantity: 0,
+          usedQuantity: 0,
+          returnedQuantity: 0,
+        };
         current.allocatedQuantity += Number(allocation.issuedQty ?? 0);
         current.usedQuantity += Number(allocation.usedQty ?? 0);
         current.returnedQuantity += Number(allocation.returnedQty ?? 0);
@@ -978,11 +1218,10 @@ export class ProjectsService {
       if (!isPending && !isReturned) continue;
       for (const item of request.items) {
         const key = `${request.projectId}:${item.inventoryItemId}`;
-        const current =
-          returnMetrics.get(key) ?? {
-            pendingReturnQuantity: 0,
-            returnedQuantity: 0,
-          };
+        const current = returnMetrics.get(key) ?? {
+          pendingReturnQuantity: 0,
+          returnedQuantity: 0,
+        };
         if (isPending) {
           current.pendingReturnQuantity += Number(item.requestedQuantity ?? 0);
         }
@@ -999,12 +1238,16 @@ export class ProjectsService {
     }
     const materialRows = inventoryTransactions.flatMap((transaction) =>
       transaction.items.map((item) => {
-        const project = projects.find((row) => row.id === transaction.projectId);
+        const project = projects.find(
+          (row) => row.id === transaction.projectId,
+        );
         const key = `${transaction.projectId ?? ''}:${item.inventoryItemId}`;
         const allocation = allocationMetrics.get(key);
         const returns = returnMetrics.get(key);
         const fallbackAllocated =
-          transaction.type === 'EXPORT' ? Math.abs(Number(item.quantity ?? 0)) : 0;
+          transaction.type === 'EXPORT'
+            ? Math.abs(Number(item.quantity ?? 0))
+            : 0;
         const allocatedQuantity =
           allocation?.allocatedQuantity && allocation.allocatedQuantity > 0
             ? allocation.allocatedQuantity
@@ -1017,9 +1260,7 @@ export class ProjectsService {
         );
         const availableReturnQuantity = Math.max(
           0,
-          allocatedQuantity -
-            usedQuantity -
-            pendingReturnQuantity,
+          allocatedQuantity - usedQuantity - pendingReturnQuantity,
         );
         return {
           id: item.id,
@@ -1064,20 +1305,21 @@ export class ProjectsService {
         estimatedCost: Number(component.estimatedCost ?? 0),
         actualCost: Number(component.actualCost ?? 0),
       }));
-    const componentStatusCounts = componentRows.reduce(
-      (map, row) => {
-        map.set(row.status, (map.get(row.status) ?? 0) + 1);
-        return map;
-      },
-      new Map<string, number>(),
-    );
+    const componentStatusCounts = componentRows.reduce((map, row) => {
+      map.set(row.status, (map.get(row.status) ?? 0) + 1);
+      return map;
+    }, new Map<string, number>());
 
     return {
       metrics: {
         totalProjects: projectRows.length,
-        activeProjects: projectRows.filter((row) => row.status === 'ACTIVE').length,
-        planningProjects: projectRows.filter((row) => row.status === 'PLANNING').length,
-        completedProjects: projectRows.filter((row) => row.status === 'COMPLETED').length,
+        activeProjects: projectRows.filter((row) => row.status === 'ACTIVE')
+          .length,
+        planningProjects: projectRows.filter((row) => row.status === 'PLANNING')
+          .length,
+        completedProjects: projectRows.filter(
+          (row) => row.status === 'COMPLETED',
+        ).length,
         contractValue: totalContractValue,
         actualValue: totalActualValue,
         averageProgress: totalProgress,
@@ -1105,9 +1347,20 @@ export class ProjectsService {
       components: componentRows,
       reports: {
         byStatus: [
-          { status: 'ACTIVE', count: projectRows.filter((row) => row.status === 'ACTIVE').length },
-          { status: 'PLANNING', count: projectRows.filter((row) => row.status === 'PLANNING').length },
-          { status: 'COMPLETED', count: projectRows.filter((row) => row.status === 'COMPLETED').length },
+          {
+            status: 'ACTIVE',
+            count: projectRows.filter((row) => row.status === 'ACTIVE').length,
+          },
+          {
+            status: 'PLANNING',
+            count: projectRows.filter((row) => row.status === 'PLANNING')
+              .length,
+          },
+          {
+            status: 'COMPLETED',
+            count: projectRows.filter((row) => row.status === 'COMPLETED')
+              .length,
+          },
         ],
         byType: Array.from(
           projectRows.reduce((map, row) => {
@@ -1119,28 +1372,41 @@ export class ProjectsService {
           .sort((a, b) => b.contractValue - a.contractValue)
           .slice(0, 5),
       },
-      wbs: projectRows.flatMap((project) =>
-        this.buildProjectWbsFromDomain(project.id, projectTasks) ??
-        this.buildProjectWbs(
-          project,
-          componentRows.filter((component) => component.projectId === project.id),
-          materialRows.filter((material) => material.projectId === project.id),
-          componentTasks.filter((task) => task.component?.projectId === project.id),
-        ),
+      wbs: projectRows.flatMap(
+        (project) =>
+          this.buildProjectWbsFromDomain(project.id, projectTasks) ??
+          this.buildProjectWbs(
+            project,
+            componentRows.filter(
+              (component) => component.projectId === project.id,
+            ),
+            materialRows.filter(
+              (material) => material.projectId === project.id,
+            ),
+            componentTasks.filter(
+              (task) => task.component?.projectId === project.id,
+            ),
+          ),
       ),
       financial: projectRows.map((project) =>
         this.buildProjectFinancial(
           project,
-          componentRows.filter((component) => component.projectId === project.id),
+          componentRows.filter(
+            (component) => component.projectId === project.id,
+          ),
           materialRows.filter((material) => material.projectId === project.id),
         ),
       ),
       health: projectRows.map((project) =>
         this.buildProjectHealth(
           project,
-          componentRows.filter((component) => component.projectId === project.id),
+          componentRows.filter(
+            (component) => component.projectId === project.id,
+          ),
           materialRows.filter((material) => material.projectId === project.id),
-          componentTasks.filter((task) => task.component?.projectId === project.id),
+          componentTasks.filter(
+            (task) => task.component?.projectId === project.id,
+          ),
           returnRequests.filter((request) => request.projectId === project.id),
         ),
       ),
@@ -1169,23 +1435,28 @@ export class ProjectsService {
           unit: item.unit?.symbol ?? item.inventoryItem.unit,
           zoneCode: item.zone?.code ?? '-',
           zoneName: item.zone?.name ?? '-',
-          })),
+        })),
       })),
       documents: documents.map((document) => {
         const version = document.versions[0];
-        const projectLink = document.links.find((link) => ['projects', 'project'].includes(link.module));
-        const projectId = document.entityType?.toLowerCase() === 'project'
-          ? document.entityId
-          : projectLink?.entityId ?? null;
-        const source = document.entityType?.toLowerCase() === 'project'
-          ? 'Project'
-          : document.entityType
-            ? `${document.module ?? 'Attachment'} · ${document.entityType}`
-            : document.module ?? 'Attachment';
+        const projectLink = document.links.find((link) =>
+          ['projects', 'project'].includes(link.module),
+        );
+        const projectId =
+          document.entityType?.toLowerCase() === 'project'
+            ? document.entityId
+            : (projectLink?.entityId ?? null);
+        const source =
+          document.entityType?.toLowerCase() === 'project'
+            ? 'Project'
+            : document.entityType
+              ? `${document.module ?? 'Attachment'} · ${document.entityType}`
+              : (document.module ?? 'Attachment');
         return {
           id: document.id,
           title: document.title,
-          originalName: document.originalName ?? version?.originalName ?? document.title,
+          originalName:
+            document.originalName ?? version?.originalName ?? document.title,
           category: document.category,
           mimeType: document.mimeType,
           fileSize: document.fileSize,
@@ -1199,19 +1470,29 @@ export class ProjectsService {
         };
       }),
       logs: activityLogs.map((log) => {
-        const metadata = log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
-          ? log.metadata as Record<string, unknown>
-          : {};
-        const projectId = typeof metadata.projectId === 'string'
-          ? metadata.projectId
-          : log.entity === 'Project'
-            ? log.entityId
-            : null;
+        const metadata =
+          log.metadata &&
+          typeof log.metadata === 'object' &&
+          !Array.isArray(log.metadata)
+            ? (log.metadata as Record<string, unknown>)
+            : {};
+        const projectId =
+          typeof metadata.projectId === 'string'
+            ? metadata.projectId
+            : log.entity === 'Project'
+              ? log.entityId
+              : null;
         const detail = [
-          typeof metadata.projectCode === 'string' ? metadata.projectCode : null,
-          typeof metadata.componentCode === 'string' ? metadata.componentCode : null,
+          typeof metadata.projectCode === 'string'
+            ? metadata.projectCode
+            : null,
+          typeof metadata.componentCode === 'string'
+            ? metadata.componentCode
+            : null,
           typeof metadata.returnNo === 'string' ? metadata.returnNo : null,
-        ].filter(Boolean).join(' · ');
+        ]
+          .filter(Boolean)
+          .join(' · ');
         return {
           id: log.id,
           action: log.action,
@@ -1239,8 +1520,12 @@ export class ProjectsService {
       }
       return {
         ...project,
-        progress: Math.round(Number(snapshot.progress ?? project.progress ?? 0)),
-        delayedOrders: Number(snapshot.delayedTaskCount ?? project.delayedOrders ?? 0),
+        progress: Math.round(
+          Number(snapshot.progress ?? project.progress ?? 0),
+        ),
+        delayedOrders: Number(
+          snapshot.delayedTaskCount ?? project.delayedOrders ?? 0,
+        ),
       };
     });
     const progress = runtime.progress.map((project) => {
@@ -1250,13 +1535,19 @@ export class ProjectsService {
       }
       return {
         ...project,
-        progress: Math.round(Number(snapshot.progress ?? project.progress ?? 0)),
-        delayedOrders: Number(snapshot.delayedTaskCount ?? project.delayedOrders ?? 0),
+        progress: Math.round(
+          Number(snapshot.progress ?? project.progress ?? 0),
+        ),
+        delayedOrders: Number(
+          snapshot.delayedTaskCount ?? project.delayedOrders ?? 0,
+        ),
       };
     });
     const averageProgress = projects.length
-      ? projects.reduce((sum, project) => sum + Number(project.progress ?? 0), 0) /
-        projects.length
+      ? projects.reduce(
+          (sum, project) => sum + Number(project.progress ?? 0),
+          0,
+        ) / projects.length
       : 0;
 
     return {
@@ -1284,12 +1575,14 @@ export class ProjectsService {
       if (Math.abs(snapshotValue - runtimeValue) <= 0.0001) {
         return [];
       }
-      return [{
-        field,
-        snapshotValue,
-        runtimeValue,
-        reason: 'VALUE_MISMATCH' as const,
-      }];
+      return [
+        {
+          field,
+          snapshotValue,
+          runtimeValue,
+          reason: 'VALUE_MISMATCH' as const,
+        },
+      ];
     });
   }
 
@@ -1300,7 +1593,10 @@ export class ProjectsService {
         projectId,
         normalizedTab,
       );
-      if (snapshot && this.isFreshProjectDetailSnapshot(snapshot.updatedAt, snapshot.stale)) {
+      if (
+        snapshot &&
+        this.isFreshProjectDetailSnapshot(snapshot.updatedAt, snapshot.stale)
+      ) {
         return snapshot.payload;
       }
 
@@ -1322,14 +1618,19 @@ export class ProjectsService {
     this.metrics.recordProjectReadModelHit();
     const hasProjectTaskDomain = await this.hasProjectTaskTable();
     if (!hasProjectTaskDomain) {
-      this.logger.warn(`ProjectTask domain tables are missing; returning empty detail for project ${projectId}`);
+      this.logger.warn(
+        `ProjectTask domain tables are missing; returning empty detail for project ${projectId}`,
+      );
       return {
         project: null,
         generatedAt: new Date().toISOString(),
       };
     }
 
-    const sources = await this.repository.findProjectDetailSources(projectId, tab);
+    const sources = await this.repository.findProjectDetailSources(
+      projectId,
+      tab,
+    );
     const project = sources.project;
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -1348,14 +1649,19 @@ export class ProjectsService {
       sources.inventoryTransactions,
       sources.productionOrders,
     );
-    const wbs = this.buildProjectWbsFromDomain(project.id, sources.projectTasks) ??
+    const wbs =
+      this.buildProjectWbsFromDomain(project.id, sources.projectTasks) ??
       this.buildProjectWbs(
         projectRow,
         components,
         materials,
         sources.componentTasks,
       );
-    const financial = this.buildProjectFinancial(projectRow, components, materials);
+    const financial = this.buildProjectFinancial(
+      projectRow,
+      components,
+      materials,
+    );
     const health = this.buildProjectHealth(
       projectRow,
       components,
@@ -1363,7 +1669,9 @@ export class ProjectsService {
       sources.componentTasks,
       sources.returnRequests,
     );
-    const returnRequests = this.mapProjectReturnRequests(sources.returnRequests);
+    const returnRequests = this.mapProjectReturnRequests(
+      sources.returnRequests,
+    );
     const documents = this.mapProjectDocuments(sources.documents);
     const logs = this.mapProjectLogs(sources.activityLogs);
 
@@ -1405,7 +1713,19 @@ export class ProjectsService {
 
   private normalizeProjectDetailTab(tab: string) {
     const value = String(tab || 'overview').toLowerCase();
-    if (['overview', 'materials', 'components', 'progress', 'command', 'site', 'costs', 'documents', 'logs'].includes(value)) {
+    if (
+      [
+        'overview',
+        'materials',
+        'components',
+        'progress',
+        'command',
+        'site',
+        'costs',
+        'documents',
+        'logs',
+      ].includes(value)
+    ) {
       return value;
     }
 
@@ -1450,8 +1770,8 @@ export class ProjectsService {
     inventoryTransactions: any[],
     productionOrders: any[],
   ) {
-    const completedComponents = components.filter((component) =>
-      component.status === 'INSTALLED',
+    const completedComponents = components.filter(
+      (component) => component.status === 'INSTALLED',
     );
     const readyComponents = components.filter(
       (component) => component.status === 'READY',
@@ -1470,7 +1790,8 @@ export class ProjectsService {
           ? 60
           : 0;
     const orderProgress = productionOrders.length
-      ? (productionOrders.filter((order) => order.status === 'COMPLETED').length /
+      ? (productionOrders.filter((order) => order.status === 'COMPLETED')
+          .length /
           productionOrders.length) *
         100
       : componentProgress;
@@ -1483,7 +1804,8 @@ export class ProjectsService {
         (sum, transaction) =>
           sum +
           transaction.items.reduce(
-            (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+            (lineSum, item) =>
+              lineSum + Math.abs(Number(item.totalAmount ?? 0)),
             0,
           ),
         0,
@@ -1497,7 +1819,8 @@ export class ProjectsService {
         (sum, transaction) =>
           sum +
           transaction.items.reduce(
-            (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+            (lineSum, item) =>
+              lineSum + Math.abs(Number(item.totalAmount ?? 0)),
             0,
           ),
         0,
@@ -1512,15 +1835,19 @@ export class ProjectsService {
       contractValue,
       actualValue,
       tonnage:
-        productionOrders.reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) ||
-        components.length,
+        productionOrders.reduce(
+          (sum, order) => sum + Number(order.quantity ?? 0),
+          0,
+        ) || components.length,
       readyComponents,
       shippedComponents,
       delivered: deliveredComponents,
       deliveredComponents,
       installedComponents: completedComponents.length,
       pending: Math.max(0, components.length - deliveredComponents),
-      delayedOrders: productionOrders.filter((order) => order.status === 'DELAYED').length,
+      delayedOrders: productionOrders.filter(
+        (order) => order.status === 'DELAYED',
+      ).length,
       componentCount: components.length,
       orderCount: productionOrders.length,
       materialTransactions: inventoryTransactions.length,
@@ -1557,11 +1884,14 @@ export class ProjectsService {
     projectTasks: ProjectTaskDomain[],
     returnRequests: any[],
   ) {
-    const allocationMetrics = new Map<string, {
-      allocatedQuantity: number;
-      usedQuantity: number;
-      returnedQuantity: number;
-    }>();
+    const allocationMetrics = new Map<
+      string,
+      {
+        allocatedQuantity: number;
+        usedQuantity: number;
+        returnedQuantity: number;
+      }
+    >();
     for (const task of projectTasks) {
       for (const allocation of task.materialAllocations) {
         const key = `${task.projectId}:${allocation.inventoryItemId}`;
@@ -1577,10 +1907,13 @@ export class ProjectsService {
       }
     }
 
-    const returnMetrics = new Map<string, {
-      pendingReturnQuantity: number;
-      returnedQuantity: number;
-    }>();
+    const returnMetrics = new Map<
+      string,
+      {
+        pendingReturnQuantity: number;
+        returnedQuantity: number;
+      }
+    >();
     for (const request of returnRequests) {
       if (!request.projectId || request.flowType !== 'SITE_RETURN') continue;
       const status = String(request.status);
@@ -1614,7 +1947,9 @@ export class ProjectsService {
         const allocation = allocationMetrics.get(key);
         const returns = returnMetrics.get(key);
         const fallbackAllocated =
-          transaction.type === 'EXPORT' ? Math.abs(Number(item.quantity ?? 0)) : 0;
+          transaction.type === 'EXPORT'
+            ? Math.abs(Number(item.quantity ?? 0))
+            : 0;
         const allocatedQuantity =
           allocation?.allocatedQuantity && allocation.allocatedQuantity > 0
             ? allocation.allocatedQuantity
@@ -1688,19 +2023,24 @@ export class ProjectsService {
   private mapProjectDocuments(documents: any[]) {
     return documents.map((document) => {
       const version = document.versions[0];
-      const projectLink = document.links.find((link) => ['projects', 'project'].includes(link.module));
-      const projectId = document.entityType?.toLowerCase() === 'project'
-        ? document.entityId
-        : projectLink?.entityId ?? null;
-      const source = document.entityType?.toLowerCase() === 'project'
-        ? 'Project'
-        : document.entityType
-          ? `${document.module ?? 'Attachment'} · ${document.entityType}`
-          : document.module ?? 'Attachment';
+      const projectLink = document.links.find((link) =>
+        ['projects', 'project'].includes(link.module),
+      );
+      const projectId =
+        document.entityType?.toLowerCase() === 'project'
+          ? document.entityId
+          : (projectLink?.entityId ?? null);
+      const source =
+        document.entityType?.toLowerCase() === 'project'
+          ? 'Project'
+          : document.entityType
+            ? `${document.module ?? 'Attachment'} · ${document.entityType}`
+            : (document.module ?? 'Attachment');
       return {
         id: document.id,
         title: document.title,
-        originalName: document.originalName ?? version?.originalName ?? document.title,
+        originalName:
+          document.originalName ?? version?.originalName ?? document.title,
         category: document.category,
         mimeType: document.mimeType,
         fileSize: document.fileSize,
@@ -1717,19 +2057,27 @@ export class ProjectsService {
 
   private mapProjectLogs(activityLogs: any[]) {
     return activityLogs.map((log) => {
-      const metadata = log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
-        ? log.metadata as Record<string, unknown>
-        : {};
-      const projectId = typeof metadata.projectId === 'string'
-        ? metadata.projectId
-        : log.entity === 'Project'
-          ? log.entityId
-          : null;
+      const metadata =
+        log.metadata &&
+        typeof log.metadata === 'object' &&
+        !Array.isArray(log.metadata)
+          ? (log.metadata as Record<string, unknown>)
+          : {};
+      const projectId =
+        typeof metadata.projectId === 'string'
+          ? metadata.projectId
+          : log.entity === 'Project'
+            ? log.entityId
+            : null;
       const detail = [
         typeof metadata.projectCode === 'string' ? metadata.projectCode : null,
-        typeof metadata.componentCode === 'string' ? metadata.componentCode : null,
+        typeof metadata.componentCode === 'string'
+          ? metadata.componentCode
+          : null,
         typeof metadata.returnNo === 'string' ? metadata.returnNo : null,
-      ].filter(Boolean).join(' · ');
+      ]
+        .filter(Boolean)
+        .join(' · ');
       return {
         id: log.id,
         action: log.action,
@@ -1803,19 +2151,33 @@ export class ProjectsService {
       actualStartAt: project.startedAt,
       actualFinishAt: null,
       progress: project.progress,
-      status: project.progress >= 100 ? 'Completed' : project.progress > 0 ? 'In Progress' : 'Planned',
+      status:
+        project.progress >= 100
+          ? 'Completed'
+          : project.progress > 0
+            ? 'In Progress'
+            : 'Planned',
       materialCount: new Set(materials.map((item) => item.materialCode)).size,
       componentCount: components.length,
-      delayDays: this.delayDays(project.plannedEndAt, project.progress >= 100 ? project.plannedEndAt : null),
+      delayDays: this.delayDays(
+        project.plannedEndAt,
+        project.progress >= 100 ? project.plannedEndAt : null,
+      ),
       cost: this.sum([
         ...materials.map((item) => Math.abs(item.totalAmount)),
-        ...components.map((component) => component.actualCost || component.estimatedCost),
+        ...components.map(
+          (component) => component.actualCost || component.estimatedCost,
+        ),
       ]),
     });
 
     if (components.length > 0) {
       const componentProgress = components.length
-        ? this.sum(components.map((component) => this.componentProgress(component.status))) / components.length
+        ? this.sum(
+            components.map((component) =>
+              this.componentProgress(component.status),
+            ),
+          ) / components.length
         : 0;
       rows.push({
         id: componentPhaseId,
@@ -1834,12 +2196,18 @@ export class ProjectsService {
         materialCount: 0,
         componentCount: components.length,
         delayDays: 0,
-        cost: this.sum(components.map((component) => component.actualCost || component.estimatedCost)),
+        cost: this.sum(
+          components.map(
+            (component) => component.actualCost || component.estimatedCost,
+          ),
+        ),
       });
 
       for (const component of components) {
         const componentId = `component-${component.id}`;
-        const componentTasks = tasks.filter((task) => task.componentId === component.id);
+        const componentTasks = tasks.filter(
+          (task) => task.componentId === component.id,
+        );
         rows.push({
           id: componentId,
           projectId: project.id,
@@ -1850,13 +2218,17 @@ export class ProjectsService {
           owner: '-',
           plannedStartAt: component.plannedDate,
           plannedFinishAt: component.plannedDate,
-          actualStartAt: component.status === 'INSTALLED' ? component.installedDate : null,
+          actualStartAt:
+            component.status === 'INSTALLED' ? component.installedDate : null,
           actualFinishAt: component.installedDate,
           progress: this.componentProgress(component.status),
           status: this.componentStatus(component.status),
           materialCount: 0,
           componentCount: 1,
-          delayDays: this.delayDays(component.plannedDate, component.installedDate),
+          delayDays: this.delayDays(
+            component.plannedDate,
+            component.installedDate,
+          ),
           cost: component.actualCost || component.estimatedCost,
           resourceCode: component.code,
         });
@@ -1874,11 +2246,24 @@ export class ProjectsService {
             plannedFinishAt: task.dueDate,
             actualStartAt: task.status !== 'PENDING' ? task.updatedAt : null,
             actualFinishAt: task.status === 'DONE' ? task.updatedAt : null,
-            progress: task.status === 'DONE' ? 100 : task.status === 'IN_PROGRESS' ? 50 : 0,
-            status: task.status === 'DONE' ? 'Completed' : task.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started',
+            progress:
+              task.status === 'DONE'
+                ? 100
+                : task.status === 'IN_PROGRESS'
+                  ? 50
+                  : 0,
+            status:
+              task.status === 'DONE'
+                ? 'Completed'
+                : task.status === 'IN_PROGRESS'
+                  ? 'In Progress'
+                  : 'Not Started',
             materialCount: 0,
             componentCount: 0,
-            delayDays: this.delayDays(task.dueDate, task.status === 'DONE' ? task.updatedAt : null),
+            delayDays: this.delayDays(
+              task.dueDate,
+              task.status === 'DONE' ? task.updatedAt : null,
+            ),
             cost: 0,
             resourceCode: task.component?.code ?? '-',
           });
@@ -1887,13 +2272,16 @@ export class ProjectsService {
     }
 
     if (materials.length > 0) {
-      const materialMap = new Map<string, {
-        name: string;
-        issued: number;
-        returned: number;
-        value: number;
-        latest: Date;
-      }>();
+      const materialMap = new Map<
+        string,
+        {
+          name: string;
+          issued: number;
+          returned: number;
+          value: number;
+          latest: Date;
+        }
+      >();
       for (const material of materials) {
         const current = materialMap.get(material.materialCode) ?? {
           name: material.materialName,
@@ -1927,7 +2315,9 @@ export class ProjectsService {
         materialCount: materialMap.size,
         componentCount: 0,
         delayDays: 0,
-        cost: this.sum(Array.from(materialMap.values()).map((item) => item.value)),
+        cost: this.sum(
+          Array.from(materialMap.values()).map((item) => item.value),
+        ),
       });
 
       for (const [code, material] of materialMap.entries()) {
@@ -1943,8 +2333,20 @@ export class ProjectsService {
           plannedFinishAt: material.latest,
           actualStartAt: material.latest,
           actualFinishAt: null,
-          progress: material.issued > 0 ? Math.round(Math.min(100, ((material.issued - material.returned) / material.issued) * 100)) : 0,
-          status: material.issued - material.returned > 0 ? 'In Progress' : 'Completed',
+          progress:
+            material.issued > 0
+              ? Math.round(
+                  Math.min(
+                    100,
+                    ((material.issued - material.returned) / material.issued) *
+                      100,
+                  ),
+                )
+              : 0,
+          status:
+            material.issued - material.returned > 0
+              ? 'In Progress'
+              : 'Completed',
           materialCount: 1,
           componentCount: 0,
           delayDays: 0,
@@ -1957,7 +2359,10 @@ export class ProjectsService {
     return rows;
   }
 
-  private buildProjectWbsFromDomain(projectId: string, tasks: ProjectTaskDomain[]) {
+  private buildProjectWbsFromDomain(
+    projectId: string,
+    tasks: ProjectTaskDomain[],
+  ) {
     const rows = tasks
       .filter((task) => task.projectId === projectId)
       .map((task) => this.toProjectWbsRuntimeFromDomain(task))
@@ -1976,7 +2381,9 @@ export class ProjectsService {
 
   private async projectWbsTasks(projectId: string) {
     if (!(await this.hasProjectTaskTable())) {
-      this.logger.warn(`ProjectTask domain tables are missing; returning empty WBS for project ${projectId}`);
+      this.logger.warn(
+        `ProjectTask domain tables are missing; returning empty WBS for project ${projectId}`,
+      );
       return [];
     }
     return this.repository.findProjectTasks(projectId);
@@ -2048,11 +2455,16 @@ export class ProjectsService {
         required: resource.quantity,
         allocated: resource.allocatedQuantity,
       }));
-    const materialCost = Number(task.cost?.materialCost ?? this.sum(materials.map((item) => item.cost)));
+    const materialCost = Number(
+      task.cost?.materialCost ?? this.sum(materials.map((item) => item.cost)),
+    );
     const laborCost = Number(task.cost?.laborCost ?? 0);
     const machineCost = Number(task.cost?.machineCost ?? 0);
     const otherCost = Number(task.cost?.otherCost ?? 0);
-    const actualCost = Number(task.cost?.actualCost ?? materialCost + laborCost + machineCost + otherCost);
+    const actualCost = Number(
+      task.cost?.actualCost ??
+        materialCost + laborCost + machineCost + otherCost,
+    );
     const revenue = Number(task.cost?.budgetCost ?? 0);
     return {
       id: task.id,
@@ -2139,7 +2551,10 @@ export class ProjectsService {
     }
 
     for (const material of dto.materials ?? []) {
-      const inventoryItemId = await this.resolveInventoryItemId(material.id || material.code, tx);
+      const inventoryItemId = await this.resolveInventoryItemId(
+        material.id || material.code,
+        tx,
+      );
       if (!inventoryItemId) continue;
       const plannedQty = Number(material.planned ?? 0);
       const totalCost = Number(material.cost ?? 0);
@@ -2152,7 +2567,13 @@ export class ProjectsService {
           usedQty: Number(material.used ?? 0),
           returnedQty: Number(material.returned ?? 0),
           remainingQty: Number(
-            material.remaining ?? Math.max(0, plannedQty - Number(material.used ?? 0) - Number(material.returned ?? 0)),
+            material.remaining ??
+              Math.max(
+                0,
+                plannedQty -
+                  Number(material.used ?? 0) -
+                  Number(material.returned ?? 0),
+              ),
           ),
           unitCost: plannedQty > 0 ? totalCost / plannedQty : 0,
           totalCost,
@@ -2162,7 +2583,10 @@ export class ProjectsService {
     }
 
     for (const component of dto.components ?? []) {
-      const componentId = await this.resolveComponentId(component.id || component.code, tx);
+      const componentId = await this.resolveComponentId(
+        component.id || component.code,
+        tx,
+      );
       if (!componentId) continue;
       await this.repository.createProjectTaskComponentAllocation(
         {
@@ -2212,12 +2636,17 @@ export class ProjectsService {
       );
     }
 
-    const materialCost = this.sum((dto.materials ?? []).map((item) => Number(item.cost ?? 0)));
-    const componentCost = this.sum((dto.components ?? []).map((item) => Number(item.cost ?? 0)));
+    const materialCost = this.sum(
+      (dto.materials ?? []).map((item) => Number(item.cost ?? 0)),
+    );
+    const componentCost = this.sum(
+      (dto.components ?? []).map((item) => Number(item.cost ?? 0)),
+    );
     const laborCost = Number(dto.laborCost ?? 0);
     const machineCost = Number(dto.machineCost ?? 0);
     const otherCost = Number(dto.otherCost ?? 0);
-    const actualCost = materialCost + componentCost + laborCost + machineCost + otherCost;
+    const actualCost =
+      materialCost + componentCost + laborCost + machineCost + otherCost;
     await this.repository.upsertProjectTaskCost(
       taskId,
       {
@@ -2231,14 +2660,31 @@ export class ProjectsService {
       },
       tx,
     );
-    await this.emitProjectEvent('project.material.changed', taskId, { projectId }, tx);
-    await this.emitProjectEvent('project.cost.changed', taskId, { projectId, actualCost }, tx);
+    await this.emitProjectEvent(
+      'project.material.changed',
+      taskId,
+      { projectId },
+      tx,
+    );
+    await this.emitProjectEvent(
+      'project.cost.changed',
+      taskId,
+      { projectId, actualCost },
+      tx,
+    );
     if (dto.inspectionStatus) {
-      await this.emitProjectEvent('project.inspection.changed', taskId, { projectId, status: dto.inspectionStatus }, tx);
+      await this.emitProjectEvent(
+        'project.inspection.changed',
+        taskId,
+        { projectId, status: dto.inspectionStatus },
+        tx,
+      );
     }
   }
 
-  private shouldReplaceProjectTaskRelations(dto: Partial<CreateProjectWbsTaskDto>) {
+  private shouldReplaceProjectTaskRelations(
+    dto: Partial<CreateProjectWbsTaskDto>,
+  ) {
     return [
       'materials',
       'components',
@@ -2254,14 +2700,20 @@ export class ProjectsService {
     ].some((key) => Object.prototype.hasOwnProperty.call(dto, key));
   }
 
-  private async resolveInventoryItemId(value: unknown, tx: Prisma.TransactionClient) {
+  private async resolveInventoryItemId(
+    value: unknown,
+    tx: Prisma.TransactionClient,
+  ) {
     const key = String(value ?? '').trim();
     if (!key) return null;
     const item = await this.repository.findInventoryItemByIdOrCode(key, tx);
     return item?.id ?? null;
   }
 
-  private async resolveComponentId(value: unknown, tx: Prisma.TransactionClient) {
+  private async resolveComponentId(
+    value: unknown,
+    tx: Prisma.TransactionClient,
+  ) {
     const key = String(value ?? '').trim();
     if (!key) return null;
     const component = await this.repository.findComponentByIdOrCode(key, tx);
@@ -2273,7 +2725,9 @@ export class ProjectsService {
       const rows = await this.repository.tableExists(tableName);
       return Boolean(rows[0]?.exists);
     } catch (error) {
-      this.logger.warn(`Unable to check table ${tableName}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Unable to check table ${tableName}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return false;
     }
   }
@@ -2288,7 +2742,9 @@ export class ProjectsService {
       'project_task_inspections',
       'project_task_costs',
     ];
-    const checks = await Promise.all(tables.map((table) => this.hasTable(table)));
+    const checks = await Promise.all(
+      tables.map((table) => this.hasTable(table)),
+    );
     return checks.every(Boolean);
   }
 
@@ -2298,13 +2754,17 @@ export class ProjectsService {
 
   private async assertProjectTaskDomainReady() {
     if (!(await this.hasProjectTaskTable())) {
-      throw new BadRequestException('Project task domain tables are not ready. Apply migrations before using WBS operations.');
+      throw new BadRequestException(
+        'Project task domain tables are not ready. Apply migrations before using WBS operations.',
+      );
     }
   }
 
   private async assertProjectTemplateTableReady() {
     if (!(await this.hasProjectTemplateTable())) {
-      throw new BadRequestException('Project template tables are not ready. Apply migrations before using templates.');
+      throw new BadRequestException(
+        'Project template tables are not ready. Apply migrations before using templates.',
+      );
     }
   }
 
@@ -2369,19 +2829,36 @@ export class ProjectsService {
     },
     tx: Prisma.TransactionClient,
   ) {
-    this.logger.debug(`buildProjectFromTemplate projectId=${projectId} templateId=${templateId}`);
-    const template = await this.repository.findActiveProjectTemplate(templateId, tx);
+    this.logger.debug(
+      `buildProjectFromTemplate projectId=${projectId} templateId=${templateId}`,
+    );
+    const template = await this.repository.findActiveProjectTemplate(
+      templateId,
+      tx,
+    );
     if (!template) {
       throw new NotFoundException('Project template not found');
     }
     const structure = this.readTemplateStructure(template.structure);
     const idByKey = new Map<string, string>();
-    const createdTasks = new Map<string, Awaited<ReturnType<typeof tx.projectTask.create>>>();
+    const createdTasks = new Map<
+      string,
+      Awaited<ReturnType<typeof tx.projectTask.create>>
+    >();
 
     for (const task of structure.tasks) {
-      const parentId = task.parentKey ? idByKey.get(task.parentKey) ?? null : null;
-      const startAt = this.templateTaskStart(task, structure.tasks, options.startDate);
-      const finishAt = this.addDays(startAt, Math.max(1, task.durationDays ?? 1) - 1);
+      const parentId = task.parentKey
+        ? (idByKey.get(task.parentKey) ?? null)
+        : null;
+      const startAt = this.templateTaskStart(
+        task,
+        structure.tasks,
+        options.startDate,
+      );
+      const finishAt = this.addDays(
+        startAt,
+        Math.max(1, task.durationDays ?? 1) - 1,
+      );
       const created = await this.repository.createProjectTask(
         {
           projectId,
@@ -2389,9 +2866,15 @@ export class ProjectsService {
           name: task.name,
           description: [
             task.description,
-            task.suggestedMaterials?.length ? `Gợi ý vật tư: ${task.suggestedMaterials.join(', ')}` : '',
-            task.suggestedComponents?.length ? `Gợi ý cấu kiện: ${task.suggestedComponents.join(', ')}` : '',
-          ].filter(Boolean).join('\n'),
+            task.suggestedMaterials?.length
+              ? `Gợi ý vật tư: ${task.suggestedMaterials.join(', ')}`
+              : '',
+            task.suggestedComponents?.length
+              ? `Gợi ý cấu kiện: ${task.suggestedComponents.join(', ')}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
           status: ProjectTaskStatus.PLANNED,
           progress: 0,
           plannedStartAt: startAt,
@@ -2423,7 +2906,10 @@ export class ProjectsService {
       }
 
       for (const materialName of task.suggestedMaterials ?? []) {
-        const inventoryItemId = await this.resolveInventoryItemId(materialName, tx);
+        const inventoryItemId = await this.resolveInventoryItemId(
+          materialName,
+          tx,
+        );
         if (!inventoryItemId) continue;
         await this.repository.createProjectTaskMaterialAllocation(
           {
@@ -2457,7 +2943,10 @@ export class ProjectsService {
       await this.repository.upsertProjectTaskCost(
         created.id,
         {
-          budgetCost: task.key === structure.tasks[0]?.key ? Number(options.contractValue ?? 0) : 0,
+          budgetCost:
+            task.key === structure.tasks[0]?.key
+              ? Number(options.contractValue ?? 0)
+              : 0,
         },
         tx,
       );
@@ -2498,11 +2987,16 @@ export class ProjectsService {
       }
     }
 
-    await this.emitProjectEvent('project.template.applied', projectId, {
-      templateId,
-      templateCode: template.code,
-      taskCount: createdTasks.size,
-    }, tx);
+    await this.emitProjectEvent(
+      'project.template.applied',
+      projectId,
+      {
+        templateId,
+        templateCode: template.code,
+        taskCount: createdTasks.size,
+      },
+      tx,
+    );
   }
 
   private readTemplateStructure(value: Prisma.JsonValue) {
@@ -2515,7 +3009,12 @@ export class ProjectsService {
         parentKey?: string;
         durationDays?: number;
         dependsOn?: Array<{ key?: string; type?: string; lagDays?: number }>;
-        resources?: Array<{ type?: string; name?: string; quantity?: number; cost?: number }>;
+        resources?: Array<{
+          type?: string;
+          name?: string;
+          quantity?: number;
+          cost?: number;
+        }>;
         suggestedMaterials?: string[];
         suggestedComponents?: string[];
       }>;
@@ -2553,19 +3052,36 @@ export class ProjectsService {
 
   private templateTaskStart(
     task: { dependsOn?: Array<{ key: string }>; parentKey?: string },
-    tasks: Array<{ key: string; durationDays?: number; dependsOn?: Array<{ key: string }>; parentKey?: string }>,
+    tasks: Array<{
+      key: string;
+      durationDays?: number;
+      dependsOn?: Array<{ key: string }>;
+      parentKey?: string;
+    }>,
     projectStart: Date,
   ) {
     const dependency = task.dependsOn?.[0];
     if (!dependency) return projectStart;
     const predecessor = tasks.find((item) => item.key === dependency.key);
     if (!predecessor) return projectStart;
-    const predecessorStart = this.templateTaskStart(predecessor, tasks, projectStart);
-    return this.addDays(predecessorStart, Number(predecessor.durationDays ?? 1));
+    const predecessorStart = this.templateTaskStart(
+      predecessor,
+      tasks,
+      projectStart,
+    );
+    return this.addDays(
+      predecessorStart,
+      Number(predecessor.durationDays ?? 1),
+    );
   }
 
   private toProjectTaskResourceType(type?: string) {
-    if (type && Object.values(ProjectTaskResourceType).includes(type as ProjectTaskResourceType)) {
+    if (
+      type &&
+      Object.values(ProjectTaskResourceType).includes(
+        type as ProjectTaskResourceType,
+      )
+    ) {
       return type as ProjectTaskResourceType;
     }
     return ProjectTaskResourceType.OTHER;
@@ -2581,7 +3097,9 @@ export class ProjectsService {
       dto.handoverDate ? `Bàn giao: ${dto.handoverDate.toISOString()}` : '',
       dto.contractValue ? `Giá trị hợp đồng: ${dto.contractValue}` : '',
       explicit ?? '',
-    ].filter(Boolean).join('; ');
+    ]
+      .filter(Boolean)
+      .join('; ');
     return generated || dto.description;
   }
 
@@ -2597,28 +3115,46 @@ export class ProjectsService {
   }
 
   private toProjectTaskStatus(status?: string) {
-    if (status && Object.values(ProjectTaskStatus).includes(status as ProjectTaskStatus)) {
+    if (
+      status &&
+      Object.values(ProjectTaskStatus).includes(status as ProjectTaskStatus)
+    ) {
       return status as ProjectTaskStatus;
     }
     return ProjectTaskStatus.PLANNED;
   }
 
   private toProjectTaskDependencyType(type?: string) {
-    if (type && Object.values(ProjectTaskDependencyType).includes(type as ProjectTaskDependencyType)) {
+    if (
+      type &&
+      Object.values(ProjectTaskDependencyType).includes(
+        type as ProjectTaskDependencyType,
+      )
+    ) {
       return type as ProjectTaskDependencyType;
     }
     return ProjectTaskDependencyType.FS;
   }
 
   private toProjectTaskInspectionStatus(status?: string) {
-    if (status && Object.values(ProjectTaskInspectionStatus).includes(status as ProjectTaskInspectionStatus)) {
+    if (
+      status &&
+      Object.values(ProjectTaskInspectionStatus).includes(
+        status as ProjectTaskInspectionStatus,
+      )
+    ) {
       return status as ProjectTaskInspectionStatus;
     }
     return ProjectTaskInspectionStatus.PENDING_INSPECTION;
   }
 
   private toProjectTaskComponentStatus(status?: string) {
-    if (status && Object.values(ProjectTaskComponentStatus).includes(status as ProjectTaskComponentStatus)) {
+    if (
+      status &&
+      Object.values(ProjectTaskComponentStatus).includes(
+        status as ProjectTaskComponentStatus,
+      )
+    ) {
       return status as ProjectTaskComponentStatus;
     }
     return ProjectTaskComponentStatus.NOT_STARTED;
@@ -2631,9 +3167,7 @@ export class ProjectsService {
     tx: Prisma.TransactionClient,
   ) {
     const projectId =
-      typeof metadata.projectId === 'string'
-        ? metadata.projectId
-        : undefined;
+      typeof metadata.projectId === 'string' ? metadata.projectId : undefined;
 
     await this.events.publishPersistent(
       action,
@@ -2702,26 +3236,39 @@ export class ProjectsService {
           const predecessor = byId.get(String(dependency.taskId));
           if (!predecessor) continue;
           const type = dependency.type ?? 'FS';
-          const predecessorStart = this.parseMetaDate(predecessor.actualStartAt)
-            ?? this.parseMetaDate(predecessor.scheduledStartAt);
-          const predecessorFinish = this.parseMetaDate(predecessor.actualFinishAt)
-            ?? this.parseMetaDate(predecessor.scheduledFinishAt);
+          const predecessorStart =
+            this.parseMetaDate(predecessor.actualStartAt) ??
+            this.parseMetaDate(predecessor.scheduledStartAt);
+          const predecessorFinish =
+            this.parseMetaDate(predecessor.actualFinishAt) ??
+            this.parseMetaDate(predecessor.scheduledFinishAt);
           let nextStart = this.parseMetaDate(row.scheduledStartAt);
           let nextFinish = this.parseMetaDate(row.scheduledFinishAt);
 
           if (type === 'FS' && predecessorFinish) {
-            nextStart = this.maxDate(nextStart, this.addDays(predecessorFinish, 1));
-            nextFinish = nextStart ? this.addDays(nextStart, duration) : nextFinish;
+            nextStart = this.maxDate(
+              nextStart,
+              this.addDays(predecessorFinish, 1),
+            );
+            nextFinish = nextStart
+              ? this.addDays(nextStart, duration)
+              : nextFinish;
           } else if (type === 'SS' && predecessorStart) {
             nextStart = this.maxDate(nextStart, predecessorStart);
-            nextFinish = nextStart ? this.addDays(nextStart, duration) : nextFinish;
+            nextFinish = nextStart
+              ? this.addDays(nextStart, duration)
+              : nextFinish;
           } else if (type === 'FF' && predecessorFinish) {
             nextFinish = this.maxDate(nextFinish, predecessorFinish);
-            nextStart = nextFinish ? this.addDays(nextFinish, -duration) : nextStart;
+            nextStart = nextFinish
+              ? this.addDays(nextFinish, -duration)
+              : nextStart;
           }
 
-          row.scheduledStartAt = nextStart?.toISOString() ?? row.scheduledStartAt;
-          row.scheduledFinishAt = nextFinish?.toISOString() ?? row.scheduledFinishAt;
+          row.scheduledStartAt =
+            nextStart?.toISOString() ?? row.scheduledStartAt;
+          row.scheduledFinishAt =
+            nextFinish?.toISOString() ?? row.scheduledFinishAt;
           row.forecastFinishAt = row.actualFinishAt ?? row.scheduledFinishAt;
         }
       }
@@ -2777,7 +3324,11 @@ export class ProjectsService {
       const amount = Math.abs(item.totalAmount);
       return item.type === 'RETURN' ? sum - amount : sum + amount;
     }, 0);
-    const componentCost = this.sum(components.map((component) => component.actualCost || component.estimatedCost));
+    const componentCost = this.sum(
+      components.map(
+        (component) => component.actualCost || component.estimatedCost,
+      ),
+    );
     const actualCost = Math.max(0, materialCost) + componentCost;
     const budget = project.contractValue;
     const profit = budget - actualCost;
@@ -2826,25 +3377,43 @@ export class ProjectsService {
     tasks: Array<{ status: string; dueDate: Date | null }>,
     returns: Array<{ status: string }>,
   ) {
-    const overdueTasks = tasks.filter((task) =>
-      task.dueDate && task.dueDate.getTime() < Date.now() && task.status !== 'DONE',
+    const overdueTasks = tasks.filter(
+      (task) =>
+        task.dueDate &&
+        task.dueDate.getTime() < Date.now() &&
+        task.status !== 'DONE',
     ).length;
-    const missingComponents = components.filter((component) =>
-      !['DELIVERED', 'INSTALLED'].includes(component.status),
+    const missingComponents = components.filter(
+      (component) => !['DELIVERED', 'INSTALLED'].includes(component.status),
     ).length;
     const materialBalance = materials.reduce((sum, item) => {
       const quantity = Math.abs(item.quantity);
       return item.type === 'RETURN' ? sum - quantity : sum + quantity;
     }, 0);
-    const actualCost = materials.reduce((sum, item) => sum + Math.abs(item.totalAmount), 0);
-    const overBudget = project.contractValue > 0 && actualCost > project.contractValue;
-    const openReturns = returns.filter((item) => !['DISPOSED', 'CANCELLED'].includes(item.status)).length;
-    const delayed = project.delayedOrders > 0 || overdueTasks > 0 || this.delayDays(project.plannedEndAt, null) > 0;
+    const actualCost = materials.reduce(
+      (sum, item) => sum + Math.abs(item.totalAmount),
+      0,
+    );
+    const overBudget =
+      project.contractValue > 0 && actualCost > project.contractValue;
+    const openReturns = returns.filter(
+      (item) => !['DISPOSED', 'CANCELLED'].includes(item.status),
+    ).length;
+    const delayed =
+      project.delayedOrders > 0 ||
+      overdueTasks > 0 ||
+      this.delayDays(project.plannedEndAt, null) > 0;
     const warnings = [
       overdueTasks > 0 ? `${overdueTasks} công việc quá hạn` : '',
-      project.delayedOrders > 0 ? `${project.delayedOrders} lệnh sản xuất chậm` : '',
-      missingComponents > 0 ? `${missingComponents} cấu kiện chưa bàn giao/lắp đặt` : '',
-      materialBalance <= 0 && materials.length > 0 ? 'Không còn vật tư tồn tại công trình' : '',
+      project.delayedOrders > 0
+        ? `${project.delayedOrders} lệnh sản xuất chậm`
+        : '',
+      missingComponents > 0
+        ? `${missingComponents} cấu kiện chưa bàn giao/lắp đặt`
+        : '',
+      materialBalance <= 0 && materials.length > 0
+        ? 'Không còn vật tư tồn tại công trình'
+        : '',
       overBudget ? 'Chi phí vật tư vượt giá trị hợp đồng' : '',
       openReturns > 0 ? `${openReturns} phiếu trả đang mở` : '',
     ].filter(Boolean);
@@ -2855,16 +3424,20 @@ export class ProjectsService {
       overBudget ? 'Rà soát ngân sách và chi phí phát sinh' : '',
       openReturns > 0 ? 'Hoàn tất quy trình nhận/kiểm/nhập trả' : '',
     ].filter(Boolean);
-    const status = delayed || overBudget
-      ? 'DELAYED'
-      : warnings.length > 0
-        ? 'RISK'
-        : 'NORMAL';
+    const status =
+      delayed || overBudget
+        ? 'DELAYED'
+        : warnings.length > 0
+          ? 'RISK'
+          : 'NORMAL';
 
     return {
       projectId: project.id,
       status,
-      score: Math.max(0, 100 - warnings.length * 12 - project.delayedOrders * 8),
+      score: Math.max(
+        0,
+        100 - warnings.length * 12 - project.delayedOrders * 8,
+      ),
       warnings,
       suggestedActions,
       blockedTasks: 0,
@@ -2889,7 +3462,17 @@ export class ProjectsService {
 
   private componentStatus(status: string) {
     if (status === 'INSTALLED') return 'Completed';
-    if (['DELIVERED', 'SHIPPED', 'READY', 'PAINTING', 'WELDING', 'CUTTING'].includes(status)) return 'In Progress';
+    if (
+      [
+        'DELIVERED',
+        'SHIPPED',
+        'READY',
+        'PAINTING',
+        'WELDING',
+        'CUTTING',
+      ].includes(status)
+    )
+      return 'In Progress';
     return 'Planned';
   }
 
@@ -2905,7 +3488,9 @@ export class ProjectsService {
   }
 
   private projectType(name: string, description?: string | null) {
-    const explicit = description?.match(/(?:loại|type)\s*:\s*([^;]+)/i)?.[1]?.trim();
+    const explicit = description
+      ?.match(/(?:loại|type)\s*:\s*([^;]+)/i)?.[1]
+      ?.trim();
     if (explicit) return explicit;
 
     const value = name.toLowerCase();

@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { SnapshotValidatorService } from '../snapshots/snapshot-validator.service';
 
@@ -14,11 +11,7 @@ export class SnapshotParityValidationService {
 
   async validateAll() {
     const generatedAt = new Date().toISOString();
-    const [
-      inventory,
-      projects,
-      logistics,
-    ] = await Promise.all([
+    const [inventory, projects, logistics] = await Promise.all([
       this.snapshots.validateInventory(new Date()),
       this.snapshots.validateProject(),
       this.snapshots.validateDispatch(),
@@ -37,9 +30,7 @@ export class SnapshotParityValidationService {
           projects.warnings.length +
           logistics.warnings.length,
         checkedRows:
-          inventory.checkedRows +
-          projects.checkedRows +
-          logistics.checkedRows,
+          inventory.checkedRows + projects.checkedRows + logistics.checkedRows,
       },
     };
   }

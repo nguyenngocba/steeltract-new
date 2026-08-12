@@ -8,14 +8,8 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { TransactionsController } from './transactions.controller';
 
 @Module({
-  imports: [
-    PrismaModule,
-    InventoryModule,
-    CqrsModule,
-  ],
+  imports: [PrismaModule, InventoryModule, CqrsModule],
 
-  controllers: [
-    TransactionsController,
-  ],
+  controllers: [TransactionsController],
 })
 export class TransactionsModule {}

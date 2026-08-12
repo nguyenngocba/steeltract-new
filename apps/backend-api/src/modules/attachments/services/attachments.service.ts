@@ -523,7 +523,9 @@ export class AttachmentsService {
   }
 
   private validateFile(file: Express.Multer.File) {
-    const maxSize = Number(process.env.ATTACHMENT_MAX_FILE_SIZE ?? 25 * 1024 * 1024);
+    const maxSize = Number(
+      process.env.ATTACHMENT_MAX_FILE_SIZE ?? 25 * 1024 * 1024,
+    );
     const allowedMimeTypes = new Set([
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -534,7 +536,10 @@ export class AttachmentsService {
       throw new BadRequestException(`File exceeds max size ${maxSize} bytes`);
     }
 
-    if (!file.mimetype.startsWith('image/') && !allowedMimeTypes.has(file.mimetype)) {
+    if (
+      !file.mimetype.startsWith('image/') &&
+      !allowedMimeTypes.has(file.mimetype)
+    ) {
       throw new BadRequestException('Unsupported file type');
     }
   }
@@ -549,27 +554,49 @@ export class AttachmentsService {
     const category = String(dto.category ?? '').toLowerCase();
 
     if (module === 'inventory') {
-      if (entityType === 'material' || entityType === 'materials') return 'inventory/materials';
+      if (entityType === 'material' || entityType === 'materials')
+        return 'inventory/materials';
       if (entityType === 'transaction' || entityType === 'transactions') {
-        const transactionType = this.metadataString(dto, 'transactionType') ?? this.metadataString(dto, 'businessType') ?? String(dto.purpose ?? '').toLowerCase();
+        const transactionType =
+          this.metadataString(dto, 'transactionType') ??
+          this.metadataString(dto, 'businessType') ??
+          String(dto.purpose ?? '').toLowerCase();
 
-        if (transactionType.includes('inbound') || transactionType.includes('import')) return 'inventory/transactions/inbound';
-        if (transactionType.includes('outbound') || transactionType.includes('export')) return 'inventory/transactions/outbound';
-        if (transactionType.includes('transfer')) return 'inventory/transactions/transfer';
-        if (transactionType.includes('stock') || transactionType.includes('adjust')) return 'inventory/transactions/stocktake';
-        if (transactionType.includes('return')) return 'inventory/transactions/return';
+        if (
+          transactionType.includes('inbound') ||
+          transactionType.includes('import')
+        )
+          return 'inventory/transactions/inbound';
+        if (
+          transactionType.includes('outbound') ||
+          transactionType.includes('export')
+        )
+          return 'inventory/transactions/outbound';
+        if (transactionType.includes('transfer'))
+          return 'inventory/transactions/transfer';
+        if (
+          transactionType.includes('stock') ||
+          transactionType.includes('adjust')
+        )
+          return 'inventory/transactions/stocktake';
+        if (transactionType.includes('return'))
+          return 'inventory/transactions/return';
 
         return 'inventory/transactions';
       }
       if (entityType === 'inbound') return 'inventory/inbound';
       if (entityType === 'outbound') return 'inventory/outbound';
-      if (entityType === 'transfer' || entityType === 'transfers') return 'inventory/transfers';
-      if (entityType === 'adjustment' || entityType === 'adjustments') return 'inventory/adjustments';
+      if (entityType === 'transfer' || entityType === 'transfers')
+        return 'inventory/transfers';
+      if (entityType === 'adjustment' || entityType === 'adjustments')
+        return 'inventory/adjustments';
     }
 
     if (module === 'components') {
-      if (category === 'photo' || category === 'photos') return 'components/photos';
-      if (category === 'drawing' || category === 'drawings') return 'components/drawings';
+      if (category === 'photo' || category === 'photos')
+        return 'components/photos';
+      if (category === 'drawing' || category === 'drawings')
+        return 'components/drawings';
       if (entityType === 'delivery') return 'components/delivery';
       if (entityType === 'installation') return 'components/installation';
     }
@@ -582,15 +609,19 @@ export class AttachmentsService {
     }
 
     if (module === 'projects') {
-      if (category === 'contract' || entityType === 'contract') return 'projects/contracts';
-      if (category === 'drawing' || entityType === 'drawing') return 'projects/drawings';
+      if (category === 'contract' || entityType === 'contract')
+        return 'projects/contracts';
+      if (category === 'drawing' || entityType === 'drawing')
+        return 'projects/drawings';
       if (entityType === 'handover') return 'projects/handover';
     }
 
     if (module === 'suppliers') {
       if (category === 'co' || category === 'cq') return 'suppliers/cocq';
-      if (entityType === 'quotation' || category === 'quotation') return 'suppliers/quotation';
-      if (entityType === 'invoice' || category === 'invoice') return 'suppliers/invoices';
+      if (entityType === 'quotation' || category === 'quotation')
+        return 'suppliers/quotation';
+      if (entityType === 'invoice' || category === 'invoice')
+        return 'suppliers/invoices';
     }
 
     if (module === 'assets') {
@@ -602,7 +633,11 @@ export class AttachmentsService {
     return 'attachments';
   }
 
-  private storedNameFor(dto: UploadAttachmentDto, checksum: string, extension: string) {
+  private storedNameFor(
+    dto: UploadAttachmentDto,
+    checksum: string,
+    extension: string,
+  ) {
     const prefix = this.prefixFor(dto);
     const entityId = this.safeName(dto.entityId ?? 'unlinked');
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -620,7 +655,10 @@ export class AttachmentsService {
     if (module === 'INVENTORY' && entityType === 'TRANSFER') return 'INV_TRF';
     if (module === 'INVENTORY' && entityType === 'ADJUSTMENT') return 'INV_ADJ';
 
-    return `${module.slice(0, 3)}_${entityType.slice(0, 4)}`.replace(/[^A-Z0-9_]/g, '');
+    return `${module.slice(0, 3)}_${entityType.slice(0, 4)}`.replace(
+      /[^A-Z0-9_]/g,
+      '',
+    );
   }
 
   private safeName(value: string) {

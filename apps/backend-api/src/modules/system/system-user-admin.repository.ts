@@ -103,7 +103,10 @@ export class SystemUserAdminRepository {
     });
   }
 
-  createUser(data: Prisma.UserUncheckedCreateInput, db: DbClient = this.prisma) {
+  createUser(
+    data: Prisma.UserUncheckedCreateInput,
+    db: DbClient = this.prisma,
+  ) {
     return db.user.create({
       data,
     });
@@ -120,7 +123,11 @@ export class SystemUserAdminRepository {
     });
   }
 
-  replaceUserRoles(userId: string, roleIds: string[], db: DbClient = this.prisma) {
+  replaceUserRoles(
+    userId: string,
+    roleIds: string[],
+    db: DbClient = this.prisma,
+  ) {
     return Promise.all([
       db.userRole.deleteMany({
         where: { userId },

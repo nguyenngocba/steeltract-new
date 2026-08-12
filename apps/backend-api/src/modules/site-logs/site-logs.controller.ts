@@ -6,17 +6,15 @@ import {
   Delete,
   Param,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('site-logs')
 export class SiteLogsController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -25,40 +23,32 @@ export class SiteLogsController {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
-  ) {
+  async create(@Body() body: any) {
     return this.prisma.siteLog.create({
       data: {
-        title:
-          body.title,
+        title: body.title,
 
-        description:
-          body.description,
+        description: body.description,
 
-        weather:
-          body.weather,
+        weather: body.weather,
 
-        createdBy:
-          body.createdBy,
+        createdBy: body.createdBy,
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ) {
+  async remove(@Param('id') id: string) {
     return this.prisma.siteLog.delete({
       where: {
         id,
       },
-    })
+    });
   }
 }

@@ -1,12 +1,6 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import {
-  DispatchOrderStatus,
-  Prisma,
-} from '@prisma/client';
+import { DispatchOrderStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -43,7 +37,9 @@ export class DispatchSnapshotRepository {
     });
   }
 
-  async calculate(dispatchOrderId?: string): Promise<DispatchSnapshotPayload[]> {
+  async calculate(
+    dispatchOrderId?: string,
+  ): Promise<DispatchSnapshotPayload[]> {
     const orders = await this.prisma.dispatchOrder.findMany({
       where: {
         id: dispatchOrderId,
@@ -61,24 +57,25 @@ export class DispatchSnapshotRepository {
       dispatchOrderId: order.id,
       projectId: order.projectId,
       loadingCount: order.status === DispatchOrderStatus.LOADING ? 1 : 0,
-      inTransitCount:
-        order.status === DispatchOrderStatus.IN_TRANSIT ? 1 : 0,
-      arrivedCount:
-        ([
+      inTransitCount: order.status === DispatchOrderStatus.IN_TRANSIT ? 1 : 0,
+      arrivedCount: (
+        [
           DispatchOrderStatus.ARRIVED,
           DispatchOrderStatus.RECEIVED,
-        ] as DispatchOrderStatus[]).includes(order.status)
-          ? 1
-          : 0,
-      completedCount:
-        order.status === DispatchOrderStatus.COMPLETED ? 1 : 0,
+        ] as DispatchOrderStatus[]
+      ).includes(order.status)
+        ? 1
+        : 0,
+      completedCount: order.status === DispatchOrderStatus.COMPLETED ? 1 : 0,
       delayCount:
         order.plannedAt &&
         order.plannedAt < now &&
-        !([
-          DispatchOrderStatus.COMPLETED,
-          DispatchOrderStatus.CANCELLED,
-        ] as DispatchOrderStatus[]).includes(order.status)
+        !(
+          [
+            DispatchOrderStatus.COMPLETED,
+            DispatchOrderStatus.CANCELLED,
+          ] as DispatchOrderStatus[]
+        ).includes(order.status)
           ? 1
           : 0,
     }));

@@ -1,21 +1,12 @@
-import { Module }
-  from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { CommandBus }
-  from './command.bus'
+import { CommandBus } from './command.bus';
 
-import { QueryBus }
-  from './query.bus'
+import { QueryBus } from './query.bus';
 
 @Module({
-  providers: [
-    CommandBus,
-    QueryBus,
-  ],
+  providers: [CommandBus, QueryBus],
 
-  exports: [
-    CommandBus,
-    QueryBus,
-  ],
+  exports: [CommandBus, QueryBus],
 })
 export class CqrsModule {}

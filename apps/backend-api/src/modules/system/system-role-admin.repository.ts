@@ -73,7 +73,10 @@ export class SystemRoleAdminRepository {
     });
   }
 
-  createRole(data: Prisma.RoleUncheckedCreateInput, db: DbClient = this.prisma) {
+  createRole(
+    data: Prisma.RoleUncheckedCreateInput,
+    db: DbClient = this.prisma,
+  ) {
     return db.role.create({
       data,
     });

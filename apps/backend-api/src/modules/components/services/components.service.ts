@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { ComponentLifecycleState, ComponentStatus, Prisma } from '@prisma/client';
+import {
+  ComponentLifecycleState,
+  ComponentStatus,
+  Prisma,
+} from '@prisma/client';
 
 import {
   CreateComponentDto,
@@ -409,7 +413,7 @@ export class ComponentsService {
 
   async getComponents() {
     if (typeof this.findAll === 'function') {
-      return this.findAll({} as any);
+      return this.findAll({});
     }
 
     return [];

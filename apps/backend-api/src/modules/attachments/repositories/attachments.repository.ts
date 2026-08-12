@@ -47,10 +47,10 @@ export class AttachmentsRepository {
   findMany(params: {
     search?: string;
     category?: Prisma.EnumAttachmentCategoryFilter['equals'];
-	    mimeType?: string;
-	    module?: string;
-	    entityType?: string;
-	    entityId?: string;
+    mimeType?: string;
+    module?: string;
+    entityType?: string;
+    entityId?: string;
     tag?: string;
     includeDeleted?: boolean;
     skip?: number;
@@ -70,10 +70,10 @@ export class AttachmentsRepository {
   count(params: {
     search?: string;
     category?: Prisma.EnumAttachmentCategoryFilter['equals'];
-	    mimeType?: string;
-	    module?: string;
-	    entityType?: string;
-	    entityId?: string;
+    mimeType?: string;
+    module?: string;
+    entityType?: string;
+    entityId?: string;
     tag?: string;
     includeDeleted?: boolean;
   }) {
@@ -90,22 +90,22 @@ export class AttachmentsRepository {
     });
   }
 
-	  createVersion(data: Prisma.AttachmentVersionCreateInput, tx: AttachmentsTx) {
-	    return tx.attachmentVersion.create({
-	      data,
-	    });
-	  }
+  createVersion(data: Prisma.AttachmentVersionCreateInput, tx: AttachmentsTx) {
+    return tx.attachmentVersion.create({
+      data,
+    });
+  }
 
-	  findVersionByChecksum(checksum: string, tx: AttachmentsTx = this.prisma) {
-	    return tx.attachmentVersion.findFirst({
-	      where: {
-	        checksum,
-	      },
-	      orderBy: {
-	        createdAt: 'asc',
-	      },
-	    });
-	  }
+  findVersionByChecksum(checksum: string, tx: AttachmentsTx = this.prisma) {
+    return tx.attachmentVersion.findFirst({
+      where: {
+        checksum,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
 
   createLink(
     attachmentId: string,
@@ -170,20 +170,20 @@ export class AttachmentsRepository {
   private where(params: {
     search?: string;
     category?: Prisma.EnumAttachmentCategoryFilter['equals'];
-	    mimeType?: string;
-	    module?: string;
-	    entityType?: string;
-	    entityId?: string;
+    mimeType?: string;
+    module?: string;
+    entityType?: string;
+    entityId?: string;
     tag?: string;
     includeDeleted?: boolean;
   }): Prisma.AttachmentWhereInput {
     return {
-	      deletedAt: params.includeDeleted ? undefined : null,
-	      category: params.category,
-	      module: params.module,
-	      entityType: params.entityType,
-	      entityId: params.entityId,
-	      mimeType: params.mimeType
+      deletedAt: params.includeDeleted ? undefined : null,
+      category: params.category,
+      module: params.module,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      mimeType: params.mimeType
         ? {
             contains: params.mimeType,
             mode: 'insensitive',

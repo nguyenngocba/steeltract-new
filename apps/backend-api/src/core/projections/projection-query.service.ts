@@ -3,12 +3,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ProjectionRegistryService } from './projection-registry.service';
 import { ProjectionRepository } from './projection.repository';
 import { ProjectionListQuery } from './projection.types';
+import { ProjectionWatermarkService } from './projection-watermark.service';
 
 @Injectable()
 export class ProjectionQueryService {
   constructor(
     private readonly registry: ProjectionRegistryService,
     private readonly repository: ProjectionRepository,
+    private readonly watermarks: ProjectionWatermarkService,
   ) {}
 
   catalog() {
@@ -20,40 +22,7 @@ export class ProjectionQueryService {
   }
 
   async health() {
-    const [checkpoints, failures, documents] = await Promise.all([
-      this.repository.checkpoints(),
-      this.repository.activeFailureCounts(),
-      this.repository.documentCounts(),
-    ]);
-    const checkpointMap = new Map(
-      checkpoints.map((item) => [item.projectionName, item]),
-    );
-    const failureMap = new Map(
-      failures.map((item) => [item.projectionName, item._count._all]),
-    );
-    const documentMap = new Map(
-      documents.map((item) => [item.projectionName, item._count._all]),
-    );
-
-    return this.registry.names().map((name) => {
-      const checkpoint = checkpointMap.get(name);
-      const activeFailures = failureMap.get(name) ?? 0;
-      return {
-        projectionName: name,
-        status:
-          activeFailures > 0
-            ? 'DEGRADED'
-            : (checkpoint?.status ?? 'NOT_INITIALIZED'),
-        schemaVersion: checkpoint?.schemaVersion ?? 1,
-        documents: documentMap.get(name) ?? 0,
-        processedCount: checkpoint?.processedCount ?? 0,
-        failedCount: checkpoint?.failedCount ?? 0,
-        activeFailures,
-        lagMs: checkpoint?.lagMs ?? null,
-        lastProcessedAt: checkpoint?.lastProcessedAt ?? null,
-        lastError: checkpoint?.lastError ?? null,
-      };
-    });
+    return this.watermarks.health();
   }
 
   async list(projectionName: string, query: ProjectionListQuery) {

@@ -7,11 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { EventBusService } from '../../../core/events/event-bus.service';
-import type {
-  CreateUomDto,
-  ListUomDto,
-  UpdateUomDto,
-} from './dto/uom.dto';
+import type { CreateUomDto, ListUomDto, UpdateUomDto } from './dto/uom.dto';
 import { UomRepository } from './uom.repository';
 
 @Injectable()
@@ -22,8 +18,7 @@ export class UomService {
   ) {}
 
   async findAll(query: ListUomDto) {
-    const hasPagination =
-      query.page !== undefined || query.limit !== undefined;
+    const hasPagination = query.page !== undefined || query.limit !== undefined;
 
     if (!hasPagination) {
       return this.repository.findMany(query);
@@ -131,9 +126,7 @@ export class UomService {
     }
 
     if (dto.category && baseUnit.category !== dto.category) {
-      throw new BadRequestException(
-        'Base unit must use the same category.',
-      );
+      throw new BadRequestException('Base unit must use the same category.');
     }
 
     if (!baseUnit.active) {

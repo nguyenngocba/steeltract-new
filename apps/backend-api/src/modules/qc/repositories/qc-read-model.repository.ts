@@ -3,10 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, QcInspectionStatus } from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
-import type {
-  QcInspectionHistoryDto,
-  QcWorkspaceReadDto,
-} from '../dto/qc.dto';
+import type { QcInspectionHistoryDto, QcWorkspaceReadDto } from '../dto/qc.dto';
 
 @Injectable()
 export class QcReadModelRepository {
@@ -125,10 +122,7 @@ export class QcReadModelRepository {
       ]),
     );
     const orderIds = Array.from(
-      new Set([
-        ...inspectionOrderIds,
-        ...completedOrders.map((row) => row.id),
-      ]),
+      new Set([...inspectionOrderIds, ...completedOrders.map((row) => row.id)]),
     );
     const [components, projects, orderInspectionStatuses] = await Promise.all([
       this.prisma.component.findMany({
@@ -430,7 +424,8 @@ export class QcReadModelRepository {
       inspectionNo: 'qi."inspectionNo"',
       status: 'qi."status"',
     };
-    const order = query.sortOrder === 'asc' ? Prisma.raw('ASC') : Prisma.raw('DESC');
+    const order =
+      query.sortOrder === 'asc' ? Prisma.raw('ASC') : Prisma.raw('DESC');
     const sortColumn = Prisma.raw(sortColumns[query.sortBy]);
     const search = Prisma.sql`
       FROM "qc_inspections" qi
@@ -503,11 +498,11 @@ export class QcReadModelRepository {
           QcInspectionStatus.FAILED,
           QcInspectionStatus.REWORK_REQUIRED,
         ] as QcInspectionStatus[]
-      ).includes(status) || failedResults > 0
+      ).includes(status) ||
+      failedResults > 0
     ) {
       return 'FAIL' as const;
     }
     return 'PENDING' as const;
   }
-
 }

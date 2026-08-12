@@ -1,11 +1,5 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
-import {
-  BackgroundJobStatus,
-  OutboxEventStatus,
-} from '@prisma/client';
+import { Inject, Injectable } from '@nestjs/common';
+import { BackgroundJobStatus, OutboxEventStatus } from '@prisma/client';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
 
@@ -21,9 +15,7 @@ export class OperationsCenterRepository {
       by: ['status'],
       _count: { _all: true },
     });
-    const counts = new Map(
-      rows.map((row) => [row.status, row._count._all]),
-    );
+    const counts = new Map(rows.map((row) => [row.status, row._count._all]));
     return Object.values(BackgroundJobStatus).map((status) => ({
       status,
       count: counts.get(status) ?? 0,
@@ -53,9 +45,7 @@ export class OperationsCenterRepository {
       by: ['status'],
       _count: { _all: true },
     });
-    const counts = new Map(
-      rows.map((row) => [row.status, row._count._all]),
-    );
+    const counts = new Map(rows.map((row) => [row.status, row._count._all]));
     return Object.values(OutboxEventStatus).map((status) => ({
       status,
       count: counts.get(status) ?? 0,
@@ -299,8 +289,9 @@ export class OperationsCenterRepository {
       detailSnapshotCount,
       latestDetailSnapshotAt: latestDetailSnapshot?.updatedAt ?? null,
       staleDetailSnapshots,
-      detailSnapshotWarnings:
-        Number(detailSnapshotWarnings._sum.warningCount ?? 0),
+      detailSnapshotWarnings: Number(
+        detailSnapshotWarnings._sum.warningCount ?? 0,
+      ),
       pendingOutbox,
       failedOutbox,
       activeJobs,

@@ -1,5 +1,18 @@
 # Current State
 
+## SYSTEM.SNAPSHOT.1 - Snapshot & Projection Certification
+
+Status: **NO-GO / P0 SNAPSHOT COVERAGE AND FRESHNESS BLOCKERS**
+
+Live Inventory, Production, QC, Projects, Yard, Logistics and Executive read
+models respond, and browser certification renders all eight workspaces.
+Historical certification fails: `/history/dashboard/latest` returns 404, only
+Inventory/Yard snapshots exist, they diverge from live data while marked
+authoritative/non-stale, and balance/monthly rollups are empty. Projection
+health is partial: 25/31 healthy, six not initialized, zero active failures.
+
+Report: `docs/audits/system-snapshot1-projection-certification.md`.
+
 ## SYSTEM.REVERSE.CERT.1 - Canonical Reverse Runtime Certification
 
 Status: **GO / RUNTIME CERTIFIED**
@@ -4423,3 +4436,18 @@ transaction rolls back and prevents rework execution and second FINAL PASS.
 Canonical QC UI paths do not use Component.status, but Components Overview and
 Reports still contain legacy STOCK/READY fallbacks. Report:
 `docs/audits/system-qc-cert1-physical-runtime.md`.
+
+# SYSTEM.PROJECTION.1 Canonical Projection/Snapshot (2026-08-11)
+
+Status: **CORE WATERMARK/PARITY GREEN - CONTROLLED EVENT GAPS**
+
+Historical snapshot freshness now follows the latest canonical Outbox event
+ID/aggregate version and projection processing watermark. Same-day source
+changes schedule replacements; generation captures stable before/after
+watermarks; History reads dynamically invalidate superseded rows.
+
+All ten Historical modules have additive scheduler metadata. ERP, Inventory,
+Production, QC, Projects and Yard converge to fresh parity. Six of 31
+projection definitions and Logistics/Dispatch remain `NOT_INITIALIZED` because
+no matching source events exist. Monthly rollups remain empty on the reset
+runtime. Report: `docs/audits/system-projection1-canonical-architecture.md`.

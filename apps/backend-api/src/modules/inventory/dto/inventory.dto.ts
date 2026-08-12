@@ -53,7 +53,8 @@ export const inventoryMaterialListQuerySchema = z.object({
   materialUsageType: z.nativeEnum(MaterialUsageType).optional(),
   warehouse: optionalTextFilter,
   stockStatus: z.enum(['OUT', 'LOW', 'NORMAL']).optional(),
-  sortBy: z.enum(['code', 'name', 'currentStock', 'inventoryValue', 'updatedAt'])
+  sortBy: z
+    .enum(['code', 'name', 'currentStock', 'inventoryValue', 'updatedAt'])
     .default('code'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
@@ -87,7 +88,10 @@ export const createInventoryItemSchema = z.object({
   category: optionalTextFilter,
   materialTypeId: optionalTextFilter,
   materialUsageTypeId: optionalTextFilter,
-  materialUsageType: z.nativeEnum(MaterialUsageType).optional().default(MaterialUsageType.PRIMARY),
+  materialUsageType: z
+    .nativeEnum(MaterialUsageType)
+    .optional()
+    .default(MaterialUsageType.PRIMARY),
   zoneId: optionalNullableText,
   slotId: optionalNullableText,
   level: optionalNullableText,
@@ -119,8 +123,9 @@ export const createInventoryCategorySchema = z.object({
   color: optionalNullableText,
 });
 
-export const updateInventoryCategorySchema =
-  createInventoryCategorySchema.partial().extend({
+export const updateInventoryCategorySchema = createInventoryCategorySchema
+  .partial()
+  .extend({
     active: z.boolean().optional(),
   });
 
@@ -143,9 +148,11 @@ export const createMaterialTypeSchema = z.object({
   color: optionalNullableText,
 });
 
-export const updateMaterialTypeSchema = createMaterialTypeSchema.partial().extend({
-  active: z.boolean().optional(),
-});
+export const updateMaterialTypeSchema = createMaterialTypeSchema
+  .partial()
+  .extend({
+    active: z.boolean().optional(),
+  });
 
 export const stockItemSchema = z.object({
   inventoryItemId: itemIdSchema,
@@ -216,38 +223,39 @@ const transactionItemSchema = z.object({
   totalAmount: optionalNumber,
 });
 
-export const createTransactionSchema = z.object({
-  code: optionalTextFilter,
-  transactionNo: optionalTextFilter,
-  type: transactionTypeSchema,
-  note: z.string().optional(),
-  performedBy: optionalTextFilter,
-  approvedBy: optionalTextFilter,
-  referenceModule: optionalTextFilter,
-  referenceId: optionalTextFilter,
-  projectId: optionalTextFilter,
-  supplierId: optionalTextFilter,
-  warehouseId: optionalTextFilter,
-  zoneId: optionalTextFilter,
-  remarks: z.string().optional(),
-  transactionTypeId: optionalTextFilter,
-  transactionTypeCode: optionalTextFilter,
-  transactionDate: z.coerce.date().optional(),
-  invoiceNo: optionalTextFilter,
-  supplierName: optionalTextFilter,
-  projectName: optionalTextFilter,
-  referenceType: optionalTextFilter,
-  materialId: optionalTextFilter,
-  quantity: signedQuantity.optional(),
-  unitId: optionalTextFilter,
-  slotId: optionalTextFilter,
-  level: optionalTextFilter,
-  unitPrice: optionalNumber,
-  totalAmount: optionalNumber,
-  items: z.array(transactionItemSchema).min(1).optional(),
-}).superRefine((payload, context) => {
-  const items =
-    payload.items?.length
+export const createTransactionSchema = z
+  .object({
+    code: optionalTextFilter,
+    transactionNo: optionalTextFilter,
+    type: transactionTypeSchema,
+    note: z.string().optional(),
+    performedBy: optionalTextFilter,
+    approvedBy: optionalTextFilter,
+    referenceModule: optionalTextFilter,
+    referenceId: optionalTextFilter,
+    projectId: optionalTextFilter,
+    supplierId: optionalTextFilter,
+    warehouseId: optionalTextFilter,
+    zoneId: optionalTextFilter,
+    remarks: z.string().optional(),
+    transactionTypeId: optionalTextFilter,
+    transactionTypeCode: optionalTextFilter,
+    transactionDate: z.coerce.date().optional(),
+    invoiceNo: optionalTextFilter,
+    supplierName: optionalTextFilter,
+    projectName: optionalTextFilter,
+    referenceType: optionalTextFilter,
+    materialId: optionalTextFilter,
+    quantity: signedQuantity.optional(),
+    unitId: optionalTextFilter,
+    slotId: optionalTextFilter,
+    level: optionalTextFilter,
+    unitPrice: optionalNumber,
+    totalAmount: optionalNumber,
+    items: z.array(transactionItemSchema).min(1).optional(),
+  })
+  .superRefine((payload, context) => {
+    const items = payload.items?.length
       ? payload.items
       : payload.materialId && payload.quantity
         ? [
@@ -262,32 +270,32 @@ export const createTransactionSchema = z.object({
           ]
         : [];
 
-  if (items.length === 0) {
-    context.addIssue({
-      code: 'custom',
-      path: ['items'],
-      message: 'Transaction requires at least one item',
-    });
-    return;
-  }
-
-  if (!['IMPORT', 'INBOUND'].includes(payload.type)) {
-    return;
-  }
-
-  items.forEach((item, index) => {
-    if (
-      Number(item.quantity) > 0 &&
-      (!item.zoneId || !item.slotId || !item.level)
-    ) {
+    if (items.length === 0) {
       context.addIssue({
         code: 'custom',
-        path: payload.items?.length ? ['items', index] : ['items'],
-        message: 'Vui lòng chọn vị trí lưu kho cho tất cả vật tư nhập.',
+        path: ['items'],
+        message: 'Transaction requires at least one item',
       });
+      return;
     }
+
+    if (!['IMPORT', 'INBOUND'].includes(payload.type)) {
+      return;
+    }
+
+    items.forEach((item, index) => {
+      if (
+        Number(item.quantity) > 0 &&
+        (!item.zoneId || !item.slotId || !item.level)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: payload.items?.length ? ['items', index] : ['items'],
+          message: 'Vui lòng chọn vị trí lưu kho cho tất cả vật tư nhập.',
+        });
+      }
+    });
   });
-});
 
 export type ListInventoryDto = z.infer<typeof listInventorySchema>;
 

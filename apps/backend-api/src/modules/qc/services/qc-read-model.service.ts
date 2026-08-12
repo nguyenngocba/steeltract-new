@@ -1,10 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PerformanceMetricsService } from '../../../core/performance/performance-metrics.service';
 
-import type {
-  QcInspectionHistoryDto,
-  QcWorkspaceReadDto,
-} from '../dto/qc.dto';
+import type { QcInspectionHistoryDto, QcWorkspaceReadDto } from '../dto/qc.dto';
 import { QcReadModelRepository } from '../repositories/qc-read-model.repository';
 
 @Injectable()

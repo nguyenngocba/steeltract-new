@@ -123,7 +123,10 @@ export class SystemController {
         system: true,
       },
       integrations: [
-        { name: 'Email SMTP', status: process.env.SMTP_HOST ? 'CONNECTED' : 'NOT_CONFIGURED' },
+        {
+          name: 'Email SMTP',
+          status: process.env.SMTP_HOST ? 'CONNECTED' : 'NOT_CONFIGURED',
+        },
         { name: 'Excel Export', status: 'ENABLED' },
         { name: 'AutoCAD', status: 'NOT_CONFIGURED' },
         { name: 'Accounting Software', status: 'NOT_CONFIGURED' },
@@ -142,10 +145,8 @@ export class SystemController {
         roles,
         permissions,
         activityTotal,
-        masterDataTotal:
-          inventoryItems + suppliers + projects + components,
-        operationalRecords:
-          qcInspections + yardPlacements,
+        masterDataTotal: inventoryItems + suppliers + projects + components,
+        operationalRecords: qcInspections + yardPlacements,
       },
       recentActivities,
     };
@@ -452,7 +453,7 @@ export class SystemController {
 
     const userIds = Array.from(
       new Set(logs.map((log) => log.userId).filter(Boolean)),
-    ) as string[];
+    );
     const users = userIds.length
       ? await this.prisma.user.findMany({
           where: { id: { in: userIds } },
@@ -463,7 +464,7 @@ export class SystemController {
 
     return logs.map((log) => ({
       ...log,
-      user: log.userId ? userMap.get(log.userId) ?? null : null,
+      user: log.userId ? (userMap.get(log.userId) ?? null) : null,
     }));
   }
 
@@ -502,7 +503,9 @@ export class SystemController {
 
     const unread = notifications.filter((item) => !item.isRead).length;
     const highPriority = notifications.filter((item) =>
-      ['CRITICAL', 'WARNING', 'HIGH'].includes((item.severity ?? '').toUpperCase()),
+      ['CRITICAL', 'WARNING', 'HIGH'].includes(
+        (item.severity ?? '').toUpperCase(),
+      ),
     ).length;
     const bySeverity: Record<string, number> = {};
     const byType: Record<string, number> = {};

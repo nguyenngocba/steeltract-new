@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { HistoricalDashboardModule, Prisma } from '@prisma/client';
 
 import {
   DashboardMonthlyQueryDto,
@@ -11,6 +11,7 @@ import {
   SnapshotJobsQueryDto,
 } from './historical-dashboard.dto';
 import { HistoricalDashboardRepository } from './historical-dashboard.repository';
+import { ProjectionWatermarkService } from '../projections/projection-watermark.service';
 import {
   formatSnapshotBusinessDate,
   parseSnapshotBusinessDate,
@@ -18,7 +19,10 @@ import {
 
 @Injectable()
 export class HistoricalDashboardService {
-  constructor(private readonly repository: HistoricalDashboardRepository) {}
+  constructor(
+    private readonly repository: HistoricalDashboardRepository,
+    private readonly watermarks: ProjectionWatermarkService,
+  ) {}
 
   async dashboard(query: DashboardSnapshotQueryDto) {
     const snapshot = await this.repository.findDashboardSnapshot({
@@ -32,7 +36,13 @@ export class HistoricalDashboardService {
       throw new NotFoundException('Historical dashboard snapshot not found');
     }
 
-    return this.serialize(snapshot);
+    const result = await this.withFreshness(snapshot);
+    if (query.authoritative === true && !result.authoritative) {
+      throw new NotFoundException(
+        'Authoritative historical dashboard snapshot not found',
+      );
+    }
+    return this.serialize(result);
   }
 
   async latestDashboard(query: LatestDashboardSnapshotQueryDto) {
@@ -42,12 +52,10 @@ export class HistoricalDashboardService {
     });
 
     if (!snapshot) {
-      throw new NotFoundException(
-        'Latest authoritative dashboard snapshot not found',
-      );
+      throw new NotFoundException('Latest dashboard snapshot not found');
     }
 
-    return this.serialize(snapshot);
+    return this.serialize(await this.withFreshness(snapshot));
   }
 
   async dashboardMonthly(
@@ -175,6 +183,23 @@ export class HistoricalDashboardService {
     }
 
     return value;
+  }
+
+  private async withFreshness<
+    T extends {
+      module: HistoricalDashboardModule;
+      sourceWatermark: string | null;
+      generatedAt: Date;
+      metadata: Prisma.JsonValue;
+    },
+  >(snapshot: T) {
+    const freshness = await this.watermarks.evaluateSnapshot(snapshot);
+    return {
+      ...snapshot,
+      authoritative: freshness.authoritative,
+      stale: freshness.stale,
+      freshness,
+    };
   }
 
   private isPrismaDecimal(value: unknown): value is Prisma.Decimal {

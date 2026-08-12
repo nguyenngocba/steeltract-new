@@ -137,8 +137,12 @@ export class CostingEngineService {
         this.buildProductionOrderCost(order),
       ),
     );
-    const materialCost = this.sum(productionOrders.map((row) => row.materialCost));
-    const producedQty = this.sum(productionOrders.map((row) => row.producedQty));
+    const materialCost = this.sum(
+      productionOrders.map((row) => row.materialCost),
+    );
+    const producedQty = this.sum(
+      productionOrders.map((row) => row.producedQty),
+    );
 
     return {
       componentId: component.id,
@@ -229,7 +233,9 @@ export class CostingEngineService {
       ...components.flatMap((component) => component.productionOrders),
       ...directOrderCosts,
     ];
-    const materialCost = this.sum(productionOrders.map((row) => row.materialCost));
+    const materialCost = this.sum(
+      productionOrders.map((row) => row.materialCost),
+    );
 
     return {
       projectId: project.id,
@@ -329,7 +335,8 @@ export class CostingEngineService {
     );
     const materialCost = this.sum(materials.map((row) => row.materialCost));
     const producedQty = Number(order.quantity ?? 1) || 1;
-    const project = order.component?.project ?? (await this.findProject(order.projectId));
+    const project =
+      order.component?.project ?? (await this.findProject(order.projectId));
 
     return {
       productionOrderId: order.id,
@@ -542,7 +549,10 @@ export class CostingEngineService {
     }
 
     for (const [materialId, aggregate] of aggregates.entries()) {
-      costs.set(materialId, this.safeDivide(aggregate.value, aggregate.quantity));
+      costs.set(
+        materialId,
+        this.safeDivide(aggregate.value, aggregate.quantity),
+      );
     }
 
     return costs;

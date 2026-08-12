@@ -10,12 +10,7 @@ export type InventoryTransactionLine = {
   totalAmount?: number | null;
 };
 
-const locationFields = [
-  'warehouseId',
-  'zoneId',
-  'slotId',
-  'level',
-] as const;
+const locationFields = ['warehouseId', 'zoneId', 'slotId', 'level'] as const;
 
 function keyPart(value: string | null | undefined) {
   return String(value ?? '').trim();
@@ -51,7 +46,10 @@ export function aggregateInventoryBuckets<T extends InventoryTransactionLine>(
 export function aggregateInventoryMaterials<T extends InventoryTransactionLine>(
   lines: T[],
 ) {
-  const materials = new Map<string, { inventoryItemId: string; quantity: number }>();
+  const materials = new Map<
+    string,
+    { inventoryItemId: string; quantity: number }
+  >();
 
   for (const line of lines) {
     const current = materials.get(line.inventoryItemId) ?? {
@@ -97,8 +95,8 @@ export function orderAndValidateTransferLines<
       );
     }
 
-    const source = sources.at(0) as T;
-    const destination = destinations.at(0) as T;
+    const source = sources.at(0);
+    const destination = destinations.at(0);
     if (Math.abs(Math.abs(source.quantity) - destination.quantity) > 0.000001) {
       throw new Error(
         `Transfer material ${materialId} source and destination quantities must match`,

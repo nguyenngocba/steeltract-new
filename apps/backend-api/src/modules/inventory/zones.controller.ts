@@ -9,82 +9,91 @@ import {
   Post,
   Put,
   UseGuards,
-} from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
-import { InventoryRepository } from './inventory.repository'
-import { InventoryReadModelService } from './inventory-read-model.service'
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
-import { PermissionsGuard } from '../rbac/guards/permissions.guard'
+import { InventoryRepository } from './inventory.repository';
+import { InventoryReadModelService } from './inventory-read-model.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
 type ZonePayload = {
-  code?: string
-  name?: string
-  description?: string
-  color?: string
-  row?: string
-  column?: string
-  level?: string
-  capacity?: number | string
-  active?: boolean
-  warehouseId?: string
-}
+  code?: string;
+  name?: string;
+  description?: string;
+  color?: string;
+  row?: string;
+  column?: string;
+  level?: string;
+  capacity?: number | string;
+  active?: boolean;
+  warehouseId?: string;
+};
 
 type OccupancyItem = {
-  id: string
-  code: string
-  name: string
-  quantity: Prisma.Decimal | number | string | null
-  unit?: string | null
-  slotId?: string | null
-  level?: string | null
-}
+  id: string;
+  code: string;
+  name: string;
+  quantity: Prisma.Decimal | number | string | null;
+  unit?: string | null;
+  slotId?: string | null;
+  level?: string | null;
+};
 
 const normalizeText = (value: unknown) => {
-  const text = String(value ?? '').trim()
-  return text || null
-}
+  const text = String(value ?? '').trim();
+  return text || null;
+};
 
-const normalizeInternalSlot = (slotId?: string | null, level?: string | null) => {
-  const rawSlot = String(slotId ?? '').trim()
-  const [cellFromCombined, levelFromCombined] = rawSlot.includes(':') ? rawSlot.split(':') : ['', '']
-  const cell = (rawSlot.includes(':') ? cellFromCombined : rawSlot).trim()
-  const normalizedLevel = String(level ?? levelFromCombined ?? '').trim() || 'L1'
+const normalizeInternalSlot = (
+  slotId?: string | null,
+  level?: string | null,
+) => {
+  const rawSlot = String(slotId ?? '').trim();
+  const [cellFromCombined, levelFromCombined] = rawSlot.includes(':')
+    ? rawSlot.split(':')
+    : ['', ''];
+  const cell = (rawSlot.includes(':') ? cellFromCombined : rawSlot).trim();
+  const normalizedLevel =
+    String(level ?? levelFromCombined ?? '').trim() || 'L1';
 
-  if (!cell) return null
+  if (!cell) return null;
 
   return {
     slotId: cell.toUpperCase(),
     level: normalizedLevel.toUpperCase(),
-  }
-}
+  };
+};
 
-const buildCellOccupancy = (items: OccupancyItem[], includeMaterials = false) => {
+const buildCellOccupancy = (
+  items: OccupancyItem[],
+  includeMaterials = false,
+) => {
   const occupancy = new Map<
     string,
     {
-      key: string
-      slotId: string
-      level: string
-      materialCount: number
-      totalQuantity: number
-      materialIds: string[]
+      key: string;
+      slotId: string;
+      level: string;
+      materialCount: number;
+      totalQuantity: number;
+      materialIds: string[];
       materials?: Array<{
-        id: string
-        code: string
-        name: string
-        quantity: number
-        unit?: string | null
-      }>
+        id: string;
+        code: string;
+        name: string;
+        quantity: number;
+        unit?: string | null;
+      }>;
     }
-  >()
+  >();
 
   items.forEach((item) => {
-    const location = normalizeInternalSlot(item.slotId, item.level)
-    if (!location) return
+    const location = normalizeInternalSlot(item.slotId, item.level);
+    if (!location) return;
 
-    const key = `${location.slotId}:${location.level}`
+    const key = `${location.slotId}:${location.level}`;
     const current = occupancy.get(key) ?? {
       key,
       slotId: location.slotId,
@@ -93,23 +102,25 @@ const buildCellOccupancy = (items: OccupancyItem[], includeMaterials = false) =>
       totalQuantity: 0,
       materialIds: [],
       materials: includeMaterials ? [] : undefined,
-    }
+    };
 
-    current.materialCount += 1
-    current.totalQuantity += Number(item.quantity ?? 0)
-    current.materialIds.push(item.id)
+    current.materialCount += 1;
+    current.totalQuantity += Number(item.quantity ?? 0);
+    current.materialIds.push(item.id);
     current.materials?.push({
       id: item.id,
       code: item.code,
       name: item.name,
       quantity: Number(item.quantity ?? 0),
       unit: item.unit,
-    })
-    occupancy.set(key, current)
-  })
+    });
+    occupancy.set(key, current);
+  });
 
-  return Array.from(occupancy.values()).sort((a, b) => a.key.localeCompare(b.key))
-}
+  return Array.from(occupancy.values()).sort((a, b) =>
+    a.key.localeCompare(b.key),
+  );
+};
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions('inventory.view')
@@ -122,54 +133,58 @@ export class ZonesController {
 
   @Get()
   async getZones() {
-    return this.readModel.locations()
+    return this.readModel.locations();
   }
-  
+
   @Get(':id')
   async getZone(@Param('id') id: string) {
-    const zones = await this.readModel.locations()
-    return zones.find((zone) => zone.id === id) ?? null
+    const zones = await this.readModel.locations();
+    return zones.find((zone) => zone.id === id) ?? null;
   }
 
   @Post()
   @RequirePermissions('inventory.edit')
   async createZone(@Body() body: ZonePayload) {
-    const warehouseId = await this.requireActiveWarehouse(body.warehouseId)
+    const warehouseId = await this.requireActiveWarehouse(body.warehouseId);
     return this.inventoryRepository.createZone(
       this.toCreateZoneData({ ...body, warehouseId }),
-    )
+    );
   }
 
   @Put(':id')
   @RequirePermissions('inventory.edit')
   async updateZone(@Param('id') id: string, @Body() body: ZonePayload) {
     if (body.warehouseId !== undefined) {
-      body.warehouseId = await this.requireActiveWarehouse(body.warehouseId)
+      body.warehouseId = await this.requireActiveWarehouse(body.warehouseId);
     }
-    return this.inventoryRepository.updateZone(id, this.toUpdateZoneData(body))
+    return this.inventoryRepository.updateZone(id, this.toUpdateZoneData(body));
   }
 
   @Patch(':id/activate')
   @RequirePermissions('inventory.edit')
   async activateZone(@Param('id') id: string) {
-    return this.inventoryRepository.updateZone(id, { active: true })
+    return this.inventoryRepository.updateZone(id, { active: true });
   }
 
   @Patch(':id/deactivate')
   @RequirePermissions('inventory.edit')
   async deactivateZone(@Param('id') id: string) {
-    return this.inventoryRepository.updateZone(id, { active: false })
+    return this.inventoryRepository.updateZone(id, { active: false });
   }
 
   @Delete(':id')
   @RequirePermissions('inventory.edit')
   async deleteZone(@Param('id') id: string) {
-    return this.inventoryRepository.updateZone(id, { active: false })
+    return this.inventoryRepository.updateZone(id, { active: false });
   }
 
-  private toCreateZoneData(body: ZonePayload): Prisma.WarehouseZoneUncheckedCreateInput {
+  private toCreateZoneData(
+    body: ZonePayload,
+  ): Prisma.WarehouseZoneUncheckedCreateInput {
     return {
-      code: String(body.code ?? '').trim().toUpperCase(),
+      code: String(body.code ?? '')
+        .trim()
+        .toUpperCase(),
       name: String(body.name ?? '').trim(),
       description: normalizeText(body.description),
       color: normalizeText(body.color) ?? '#06b6d4',
@@ -179,35 +194,44 @@ export class ZonesController {
       capacity: Number(body.capacity) || 0,
       active: body.active ?? true,
       warehouseId: normalizeText(body.warehouseId),
-    }
+    };
   }
 
-  private toUpdateZoneData(body: ZonePayload): Prisma.WarehouseZoneUncheckedUpdateInput {
-    const data: Prisma.WarehouseZoneUncheckedUpdateInput = {}
+  private toUpdateZoneData(
+    body: ZonePayload,
+  ): Prisma.WarehouseZoneUncheckedUpdateInput {
+    const data: Prisma.WarehouseZoneUncheckedUpdateInput = {};
 
-    if (body.code !== undefined) data.code = String(body.code ?? '').trim().toUpperCase()
-    if (body.name !== undefined) data.name = String(body.name ?? '').trim()
-    if (body.description !== undefined) data.description = normalizeText(body.description)
-    if (body.color !== undefined) data.color = normalizeText(body.color) ?? '#06b6d4'
-    if (body.row !== undefined) data.row = normalizeText(body.row)
-    if (body.column !== undefined) data.column = normalizeText(body.column)
-    if (body.level !== undefined) data.level = normalizeText(body.level)
-    if (body.capacity !== undefined) data.capacity = Number(body.capacity) || 0
-    if (body.active !== undefined) data.active = Boolean(body.active)
-    if (body.warehouseId !== undefined) data.warehouseId = normalizeText(body.warehouseId)
+    if (body.code !== undefined)
+      data.code = String(body.code ?? '')
+        .trim()
+        .toUpperCase();
+    if (body.name !== undefined) data.name = String(body.name ?? '').trim();
+    if (body.description !== undefined)
+      data.description = normalizeText(body.description);
+    if (body.color !== undefined)
+      data.color = normalizeText(body.color) ?? '#06b6d4';
+    if (body.row !== undefined) data.row = normalizeText(body.row);
+    if (body.column !== undefined) data.column = normalizeText(body.column);
+    if (body.level !== undefined) data.level = normalizeText(body.level);
+    if (body.capacity !== undefined) data.capacity = Number(body.capacity) || 0;
+    if (body.active !== undefined) data.active = Boolean(body.active);
+    if (body.warehouseId !== undefined)
+      data.warehouseId = normalizeText(body.warehouseId);
 
-    return data
+    return data;
   }
 
   private async requireActiveWarehouse(value?: string) {
-    const warehouseId = normalizeText(value)
+    const warehouseId = normalizeText(value);
     if (!warehouseId) {
-      throw new BadRequestException('Parent warehouse is required.')
+      throw new BadRequestException('Parent warehouse is required.');
     }
-    const warehouse = await this.inventoryRepository.findWarehouseById(warehouseId)
+    const warehouse =
+      await this.inventoryRepository.findWarehouseById(warehouseId);
     if (!warehouse?.active) {
-      throw new BadRequestException('Parent warehouse is invalid or inactive.')
+      throw new BadRequestException('Parent warehouse is invalid or inactive.');
     }
-    return warehouse.id
+    return warehouse.id;
   }
 }

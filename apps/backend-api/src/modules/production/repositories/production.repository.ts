@@ -643,16 +643,20 @@ export class ProductionRepository {
           0,
         ),
         waitingQc: aggregates.reduce(
-          (sum, { row }) => sum + componentInstancesByState(row, [
-            ComponentInstanceState.PRODUCED_WAITING_QC,
-          ]),
+          (sum, { row }) =>
+            sum +
+            componentInstancesByState(row, [
+              ComponentInstanceState.PRODUCED_WAITING_QC,
+            ]),
           0,
         ),
         qcPassed: aggregates.reduce(
-          (sum, { row }) => sum + componentInstancesByState(row, [
-            ComponentInstanceState.QC_PASSED,
-            ComponentInstanceState.USE_AS_IS,
-          ]),
+          (sum, { row }) =>
+            sum +
+            componentInstancesByState(row, [
+              ComponentInstanceState.QC_PASSED,
+              ComponentInstanceState.USE_AS_IS,
+            ]),
           0,
         ),
       },
@@ -1118,7 +1122,12 @@ type CockpitOrder = {
       issuedQty: number;
       returnedQty: number;
       status: string;
-      inventoryItem: { id: string; code: string; name: string; unit?: string | null };
+      inventoryItem: {
+        id: string;
+        code: string;
+        name: string;
+        unit?: string | null;
+      };
       warehouse?: { id: string; code: string; name: string } | null;
       zone?: { id: string; code: string; name: string } | null;
       slotId?: string | null;
@@ -1247,7 +1256,8 @@ function productionOrderCanonical(order: CockpitOrder) {
     productionOrder: {
       id: order.id,
       componentRequirementId: order.componentRequirementId ?? null,
-      projectId: order.projectId ?? order.componentRequirement?.project?.id ?? null,
+      projectId:
+        order.projectId ?? order.componentRequirement?.project?.id ?? null,
       updatedAt: order.updatedAt ?? null,
     },
     project: order.componentRequirement?.project ?? null,
@@ -1255,7 +1265,9 @@ function productionOrderCanonical(order: CockpitOrder) {
       ? {
           id: order.componentRequirement.id,
           requirementNo: order.componentRequirement.requirementNo,
-          requiredQuantity: Number(order.componentRequirement.requiredQuantity ?? 0),
+          requiredQuantity: Number(
+            order.componentRequirement.requiredQuantity ?? 0,
+          ),
         }
       : null,
     componentDefinition:

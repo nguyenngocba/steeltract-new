@@ -1,5 +1,5 @@
 export type CreateTransactionCommand = {
-  type: string
+  type: string;
 
-  material: string
-}
+  material: string;
+};

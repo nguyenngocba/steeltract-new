@@ -88,7 +88,7 @@ export class ProcurementService {
           status: ApprovalStatus.PENDING,
           items: {
             create: dto.items.map((item) => {
-              const material = materials.get(item.materialId)!;
+              const material = materials.get(item.materialId);
               return {
                 material: { connect: { id: material.id } },
                 itemName: material.name,
@@ -110,18 +110,17 @@ export class ProcurementService {
         request.id,
         actor.id,
         ProcurementActivityEvent.PURCHASE_REQUEST_CREATED,
-        { requestNumber: request.requestNumber, itemCount: request.items.length },
+        {
+          requestNumber: request.requestNumber,
+          itemCount: request.items.length,
+        },
         tx,
       );
       return request;
     });
   }
 
-  updateRequest(
-    id: string,
-    dto: UpdatePurchaseRequestDto,
-    actorId: string,
-  ) {
+  updateRequest(id: string, dto: UpdatePurchaseRequestDto, actorId: string) {
     return this.repository.transaction(async (tx) => {
       await this.repository.lockRequest(id, tx);
       const request = await this.requireRequest(id, tx);
@@ -138,7 +137,7 @@ export class ProcurementService {
         await this.repository.replaceRequestItems(
           id,
           dto.items.map((item) => {
-            const material = materials.get(item.materialId)!;
+            const material = materials.get(item.materialId);
             return {
               requestId: id,
               materialId: material.id,
@@ -335,8 +334,8 @@ export class ProcurementService {
 
       let totalAmount = Number(order.totalAmount);
       if (dto.items) {
-        await this.repository.lockRequest(order.materialRequestId!, tx);
-        const request = await this.requireRequest(order.materialRequestId!, tx);
+        await this.repository.lockRequest(order.materialRequestId, tx);
+        const request = await this.requireRequest(order.materialRequestId, tx);
         const lines = await this.canonicalOrderLines(
           dto.items,
           request.items,
@@ -618,16 +617,25 @@ export class ProcurementService {
       ),
     ];
     const suppliers = await this.repository.findSuppliers(supplierIds);
-    const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
+    const supplierById = new Map(
+      suppliers.map((supplier) => [supplier.id, supplier]),
+    );
     const performance = new Map<
       string,
-      { supplierId: string; supplierName: string; orders: number; completed: number; value: number }
+      {
+        supplierId: string;
+        supplierName: string;
+        orders: number;
+        completed: number;
+        value: number;
+      }
     >();
     for (const group of groups) {
       if (!group.supplierId) continue;
       const current = performance.get(group.supplierId) ?? {
         supplierId: group.supplierId,
-        supplierName: supplierById.get(group.supplierId)?.name ?? group.supplierId,
+        supplierName:
+          supplierById.get(group.supplierId)?.name ?? group.supplierId,
         orders: 0,
         completed: 0,
         value: 0,
@@ -669,7 +677,9 @@ export class ProcurementService {
         'Supplier Return receipt does not belong to this Purchase Order',
       );
     }
-    const receiptLineById = new Map(receipt.items.map((line) => [line.id, line]));
+    const receiptLineById = new Map(
+      receipt.items.map((line) => [line.id, line]),
+    );
     const selected = dto.items.map((item) => {
       const line = receiptLineById.get(item.receiptItemId);
       if (!line || item.quantity > Number(line.quantity) + 0.000001) {
@@ -696,7 +706,7 @@ export class ProcurementService {
       supplierId: order.supplierId,
       purchaseOrderId: order.id,
       receiptTransactionId: receipt.id,
-      warehouseId: selected[0].line.warehouseId!,
+      warehouseId: selected[0].line.warehouseId,
       requestedBy: actorId,
       remarks: dto.remarks,
       items: selected.map((selection) => ({
@@ -837,7 +847,9 @@ export class ProcurementService {
       request.flowType !== ReturnFlowType.SUPPLIER_RETURN ||
       request.purchaseOrderId !== orderId
     ) {
-      throw new NotFoundException('Supplier Return not found for Purchase Order');
+      throw new NotFoundException(
+        'Supplier Return not found for Purchase Order',
+      );
     }
     return request;
   }
@@ -895,7 +907,10 @@ export class ProcurementService {
     const materialIds = items.map((item) => item.materialId);
     const [materials, units, warehouses] = await Promise.all([
       this.materialMap(materialIds, tx),
-      this.repository.findUnits(items.map((item) => item.uomId), tx),
+      this.repository.findUnits(
+        items.map((item) => item.uomId),
+        tx,
+      ),
       this.repository.findWarehouses(
         items.map((item) => item.warehouseId),
         tx,
@@ -951,7 +966,7 @@ export class ProcurementService {
     }
     return items.map((item) => ({
       ...item,
-      itemName: materials.get(item.materialId)!.name,
+      itemName: materials.get(item.materialId).name,
       requestedQty: item.requestedQty ?? item.orderedQty,
       amount: item.orderedQty * item.unitPrice,
     }));

@@ -77,12 +77,8 @@ export class HistoricalDashboardRepository {
       where: {
         module: filters.module,
         scopeKey: filters.scopeKey,
-        authoritative: true,
       },
-      orderBy: [
-        { snapshotDate: 'desc' },
-        { generatedAt: 'desc' },
-      ],
+      orderBy: [{ snapshotDate: 'desc' }, { generatedAt: 'desc' }],
     });
   }
 
@@ -121,10 +117,7 @@ export class HistoricalDashboardRepository {
         where,
         skip: filters.skip,
         take: filters.take,
-        orderBy: [
-          { materialCode: 'asc' },
-          { locationBucketKey: 'asc' },
-        ],
+        orderBy: [{ materialCode: 'asc' }, { locationBucketKey: 'asc' }],
       }),
       this.prisma.inventoryBalanceSnapshot.count({ where }),
     ]);
@@ -144,10 +137,7 @@ export class HistoricalDashboardRepository {
         where,
         skip: filters.skip,
         take: filters.take,
-        orderBy: [
-          { monthStart: 'desc' },
-          { materialCode: 'asc' },
-        ],
+        orderBy: [{ monthStart: 'desc' }, { materialCode: 'asc' }],
       }),
       this.prisma.inventoryMonthlyRollup.count({ where }),
     ]);
@@ -172,10 +162,7 @@ export class HistoricalDashboardRepository {
         where,
         skip: filters.skip,
         take: filters.take,
-        orderBy: [
-          { createdAt: 'desc' },
-          { id: 'desc' },
-        ],
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
       this.prisma.snapshotJob.count({ where }),
     ]);

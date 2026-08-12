@@ -40,7 +40,9 @@ export class PerformanceBenchmarkService {
     };
   }
 
-  private async runCase(benchmarkCase: BenchmarkCase): Promise<BenchmarkResult> {
+  private async runCase(
+    benchmarkCase: BenchmarkCase,
+  ): Promise<BenchmarkResult> {
     const durations: number[] = [];
     let failures = 0;
     const iterations = Math.max(1, benchmarkCase.iterations ?? 5);

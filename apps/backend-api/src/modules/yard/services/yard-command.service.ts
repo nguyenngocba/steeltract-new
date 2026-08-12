@@ -354,7 +354,7 @@ export class YardCommandService {
       tx,
     );
     if (!updated) this.stale('YardItem');
-    return updated!;
+    return updated;
   }
 
   private async recordEvent(

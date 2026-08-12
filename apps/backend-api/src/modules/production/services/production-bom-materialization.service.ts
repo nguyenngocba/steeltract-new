@@ -223,7 +223,7 @@ export class ProductionBomMaterializationService {
           `Engineering BOM material identity mismatch at line ${index + 1}`,
         );
       }
-      return byMaterialId ?? byMaterialCode!;
+      return byMaterialId ?? byMaterialCode;
     });
   }
 

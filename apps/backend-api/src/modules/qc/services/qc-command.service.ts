@@ -106,7 +106,7 @@ export class QcCommandService {
         tx,
         `qc-inspection:${inspection.id}`,
       );
-      return updated!;
+      return updated;
     });
   }
 
@@ -267,7 +267,7 @@ export class QcCommandService {
         tx,
         `qc-ncr:${ncr.id}`,
       );
-      return updated!;
+      return updated;
     });
   }
 
@@ -323,7 +323,7 @@ export class QcCommandService {
             inspectionId: inspection.id,
             checklistId: inspection.checklistId,
             productionOrderId: inspection.productionOrderId,
-          } as Prisma.InputJsonObject,
+          },
         },
         tx,
       );
@@ -351,7 +351,7 @@ export class QcCommandService {
             inspectionId: inspection.id,
             checklistId: inspection.checklistId,
             productionOrderId: inspection.productionOrderId,
-          } as Prisma.InputJsonObject,
+          },
         },
         tx,
       );
@@ -394,7 +394,7 @@ export class QcCommandService {
             ncrId: ncr.id,
             dispositionType: command.dispositionType,
             reason: command.reason ?? null,
-          } as Prisma.InputJsonObject,
+          },
         },
         tx,
       );
@@ -433,7 +433,7 @@ export class QcCommandService {
             ncrId: ncr.id,
             dispositionType: command.dispositionType,
             reason: command.reason ?? null,
-          } as Prisma.InputJsonObject,
+          },
         },
         tx,
       );
@@ -472,7 +472,7 @@ export class QcCommandService {
             ncrId: ncr.id,
             dispositionType: command.dispositionType,
             reason: command.reason ?? null,
-          } as Prisma.InputJsonObject,
+          },
         },
         tx,
       );

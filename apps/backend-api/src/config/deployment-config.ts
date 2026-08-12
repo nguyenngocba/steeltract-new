@@ -104,7 +104,10 @@ function requireProductionSecret(value?: string) {
 function validateBooleanFlags(env: NodeJS.ProcessEnv) {
   for (const key of booleanKeys) {
     const value = env[key];
-    if (value !== undefined && !['true', 'false'].includes(value.toLowerCase())) {
+    if (
+      value !== undefined &&
+      !['true', 'false'].includes(value.toLowerCase())
+    ) {
       throw new Error(`${key} must be true or false`);
     }
   }

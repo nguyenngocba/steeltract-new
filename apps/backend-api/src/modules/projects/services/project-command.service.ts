@@ -478,7 +478,7 @@ export class ProjectCommandService {
       tx,
     );
     if (!updated) this.stale();
-    return updated!;
+    return updated;
   }
 
   private async recordEvent(

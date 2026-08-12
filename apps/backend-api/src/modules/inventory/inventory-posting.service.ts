@@ -142,10 +142,7 @@ export class InventoryPostingService {
       command.lines,
       (line) => line.warehouseId,
     );
-    const headerZoneId = sharedLineValue(
-      command.lines,
-      (line) => line.zoneId,
-    );
+    const headerZoneId = sharedLineValue(command.lines, (line) => line.zoneId);
     const transaction = await this.repository.createTransaction(
       {
         code: transactionNo,

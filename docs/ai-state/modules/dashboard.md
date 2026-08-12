@@ -40,6 +40,7 @@ In Progress.
 * EPIC107 SNAP.2 adds `DashboardReaderService`, `SnapshotReaderStrategy`, and `RuntimeAggregateStrategy`. Inventory, Projects, and Logistics dashboard reads now prefer persisted snapshots and fall back to runtime aggregate without changing response contracts.
 * EPIC108 adds validation services to compare snapshot output against runtime/source recalculation and benchmark runtime vs snapshot dashboard read paths before further cutover expansion.
 * EPIC109 OPS.1 consumes Dashboard/runtime foundation signals in Operations Center, but keeps the business Dashboard separate from system administration.
+* SYSTEM.PROJECTION.1 makes Historical Dashboard authority depend on canonical Outbox/projection watermarks rather than calendar date. Same-day events trigger replacement snapshots, History exposes freshness/parity/lag/age, and projection health reports event ID, aggregate version and processed time for all 31 definitions.
 
 ## Database Models
 
@@ -65,6 +66,8 @@ Key sources:
 * `GET /dashboard/cockpit`
 * `GET /dashboard/executive-cockpit`
 * `GET /system/notifications`
+* `GET /history/dashboard/latest`
+* `GET /query-api/projections/health`
 
 Internal read-model services:
 
@@ -90,6 +93,7 @@ Internal read-model services:
 * Add formal procurement links once Purchasing exists so material replenishment recommendations can create purchase requests.
 * Validate Sprint 70EXEC.1/70EXEC.2 prediction, notification, health score, and recommendation thresholds with live operator data.
 * Validate snapshot parity warnings and hit/fallback rates with real traffic.
+* Initialize Logistics/Dispatch projections with real canonical events and certify the first closed-month rollups.
 * Run EPIC108 benchmark cases for Dashboard runtime vs snapshot reads before expanding snapshot schemas or disabling parity checks.
 * Expand snapshot schemas if chart-level dashboard payloads need to stop using runtime compatibility data.
 * Apply `docs/audit/enterprise-performance-gate.md` before adding new Dashboard widgets or trends.

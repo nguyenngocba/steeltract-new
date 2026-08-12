@@ -54,7 +54,9 @@ export class YardSnapshotRepository {
   }
 
   findWorkspaceSnapshot(scopeKey = 'ALL') {
-    return this.prisma.yardWorkspaceSnapshot.findUnique({ where: { scopeKey } });
+    return this.prisma.yardWorkspaceSnapshot.findUnique({
+      where: { scopeKey },
+    });
   }
 
   findWorkspaceSnapshots(zoneId?: string) {
@@ -97,28 +99,34 @@ export class YardSnapshotRepository {
     ]);
     const zoneUtilization = this.zoneUtilization(zoneRows);
 
-    return [{
-      scopeKey: 'ALL',
-      snapshotDate: today,
-      totalZones,
-      totalSlots,
-      occupiedSlots,
-      availableSlots: Math.max(0, totalSlots - occupiedSlots),
-      activePlacementCount: placements,
-      totalWeight: Number(weight._sum.weight ?? 0),
-      movementToday,
-      movementMonth,
-      overloadedZoneCount: zoneUtilization.filter((row) => row.occupancyRate >= 90).length,
-      craneCount: cranes.length,
-      availableCraneCount: cranes.filter((row) => row.status !== 'MAINTENANCE').length,
-      payload: this.toJson({
-        movementCounts: movementGroups.map((row) => ({
-          type: row.type,
-          count: row._count,
-        })),
-        zoneUtilization,
-      }),
-    }];
+    return [
+      {
+        scopeKey: 'ALL',
+        snapshotDate: today,
+        totalZones,
+        totalSlots,
+        occupiedSlots,
+        availableSlots: Math.max(0, totalSlots - occupiedSlots),
+        activePlacementCount: placements,
+        totalWeight: Number(weight._sum.weight ?? 0),
+        movementToday,
+        movementMonth,
+        overloadedZoneCount: zoneUtilization.filter(
+          (row) => row.occupancyRate >= 90,
+        ).length,
+        craneCount: cranes.length,
+        availableCraneCount: cranes.filter(
+          (row) => row.status !== 'MAINTENANCE',
+        ).length,
+        payload: this.toJson({
+          movementCounts: movementGroups.map((row) => ({
+            type: row.type,
+            count: row._count,
+          })),
+          zoneUtilization,
+        }),
+      },
+    ];
   }
 
   async calculateWorkspaceSnapshots(
@@ -241,7 +249,9 @@ export class YardSnapshotRepository {
     }>,
   ) {
     return zones.map((zone) => {
-      const occupied = zone.slots.filter((slot) => slot.status === 'OCCUPIED').length;
+      const occupied = zone.slots.filter(
+        (slot) => slot.status === 'OCCUPIED',
+      ).length;
       return {
         id: zone.id,
         code: zone.code,
@@ -269,7 +279,9 @@ export class YardSnapshotRepository {
     }>;
   }): YardWorkspaceSnapshotPayload {
     const placements = zone.slots.flatMap((slot) => slot.placements);
-    const occupiedSlots = zone.slots.filter((slot) => slot.status === 'OCCUPIED').length;
+    const occupiedSlots = zone.slots.filter(
+      (slot) => slot.status === 'OCCUPIED',
+    ).length;
     return {
       scopeKey: `ZONE:${zone.id}`,
       zoneId: zone.id,
@@ -277,7 +289,10 @@ export class YardSnapshotRepository {
       occupiedSlots,
       availableSlots: Math.max(0, zone.slots.length - occupiedSlots),
       placementCount: placements.length,
-      totalWeight: placements.reduce((sum, row) => sum + Number(row.weight ?? 0), 0),
+      totalWeight: placements.reduce(
+        (sum, row) => sum + Number(row.weight ?? 0),
+        0,
+      ),
       payload: this.toJson({
         zoneCode: zone.code,
         zoneName: zone.name,

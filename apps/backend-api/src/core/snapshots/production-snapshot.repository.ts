@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import {
   Prisma,
@@ -174,7 +171,9 @@ export class ProductionSnapshotRepository {
       .filter((stage) => stage.status === ProductionStageStatus.BLOCKED)
       .reduce((sum, stage) => sum + Number(stage._count ?? 0), 0);
     const machineUtilization = machines.length
-      ? this.average(machines.map((machine) => Number(machine.utilization ?? 0)))
+      ? this.average(
+          machines.map((machine) => Number(machine.utilization ?? 0)),
+        )
       : 0;
 
     return [

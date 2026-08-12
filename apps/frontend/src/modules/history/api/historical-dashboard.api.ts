@@ -21,6 +21,26 @@ export type SnapshotJobStatus =
 
 export type HistoricalJson = Record<string, unknown>
 
+export type HistoricalSnapshotFreshness = {
+  status: 'HEALTHY' | 'LAGGING' | 'REBUILDING' | 'NOT_INITIALIZED' | 'FAILED'
+  fresh: boolean
+  stale: boolean
+  authoritative: boolean
+  parity: boolean
+  lagMs: number
+  ageMs: number
+  snapshotWatermark?: string | null
+  currentWatermark: {
+    lastEventId?: string | null
+    lastAggregateVersion?: string | null
+    lastProcessedAt?: string | null
+    sourceOccurredAt?: string | null
+    status: string
+    fresh: boolean
+    lagMs: number
+  }
+}
+
 export type HistoricalDashboardSnapshot = {
   id: string
   snapshotDate: string
@@ -42,6 +62,7 @@ export type HistoricalDashboardSnapshot = {
   rowCount: number
   warningCount: number
   generatedAt: string
+  freshness?: HistoricalSnapshotFreshness
 }
 
 export type HistoricalDashboardMonthlyRollup = {

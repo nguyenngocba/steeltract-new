@@ -1,9 +1,9 @@
 export type DomainEvent = {
-  id: string
+  id: string;
 
-  type: string
+  type: string;
 
-  payload: unknown
+  payload: unknown;
 
-  createdAt: string
-}
+  createdAt: string;
+};

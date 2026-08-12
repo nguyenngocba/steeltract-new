@@ -20,6 +20,6 @@ export class WebsocketRoomService {
     return [
       this.domainRoom(eventName),
       this.entityRoom(eventName, entityId),
-    ].filter(Boolean) as string[];
+    ].filter(Boolean);
   }
 }

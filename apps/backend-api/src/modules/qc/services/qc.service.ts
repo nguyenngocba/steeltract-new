@@ -303,7 +303,9 @@ export class QcService {
       await this.validateComponentInstanceLineage(
         {
           componentInstanceId:
-            dto.componentInstanceId ?? existing.componentInstanceId ?? undefined,
+            dto.componentInstanceId ??
+            existing.componentInstanceId ??
+            undefined,
           componentId: dto.componentId ?? existing.componentId ?? undefined,
           productionOrderId:
             dto.productionOrderId ?? existing.productionOrderId ?? undefined,
@@ -507,12 +509,7 @@ export class QcService {
         },
       });
 
-      await this.createQcOutboxEvent(
-        tx,
-        'qc.issue.created',
-        created,
-        actorId,
-      );
+      await this.createQcOutboxEvent(tx, 'qc.issue.created', created, actorId);
       if (this.requiresRework(created.severity)) {
         await this.createQcOutboxEvent(
           tx,
@@ -690,9 +687,7 @@ export class QcService {
             undefined,
           componentId: dto.componentId ?? inspection.componentId ?? undefined,
           productionOrderId:
-            dto.productionOrderId ??
-            inspection.productionOrderId ??
-            undefined,
+            dto.productionOrderId ?? inspection.productionOrderId ?? undefined,
           projectId: inspection.projectId ?? undefined,
         },
         tx,
@@ -762,23 +757,14 @@ export class QcService {
           },
         },
       );
-      await this.createQcOutboxEvent(
-        tx,
-        'qc.ncr.created',
-        created,
-        actorId,
-      );
+      await this.createQcOutboxEvent(tx, 'qc.ncr.created', created, actorId);
       await this.createQcOutboxEvent(
         tx,
         'qc.rework.required',
         created,
         actorId,
       );
-      await this.createNotificationOutboxEvent(
-        tx,
-        'qc.ncr.created',
-        created,
-      );
+      await this.createNotificationOutboxEvent(tx, 'qc.ncr.created', created);
 
       return created;
     });
@@ -812,20 +798,33 @@ export class QcService {
   }
 
   async cockpit() {
-    const [metrics, inspections, checklists, ncrs, productionOrders, components, projects] =
-      await Promise.all([
-        this.metrics(),
-        this.repository.findInspections({ take: 200 }),
-        this.repository.findChecklists({ take: 100 }),
-        this.repository.findNcrs({ take: 100 }),
-        this.cockpitRepository.findCompletedProductionOrders(),
-        this.cockpitRepository.findComponents(),
-        this.cockpitRepository.findProjects(),
-      ]);
+    const [
+      metrics,
+      inspections,
+      checklists,
+      ncrs,
+      productionOrders,
+      components,
+      projects,
+    ] = await Promise.all([
+      this.metrics(),
+      this.repository.findInspections({ take: 200 }),
+      this.repository.findChecklists({ take: 100 }),
+      this.repository.findNcrs({ take: 100 }),
+      this.cockpitRepository.findCompletedProductionOrders(),
+      this.cockpitRepository.findComponents(),
+      this.cockpitRepository.findProjects(),
+    ]);
 
-    const componentMap = new Map(components.map((component) => [component.id, component]));
-    const projectMap = new Map(projects.map((project) => [project.id, project]));
-    const orderMap = new Map(productionOrders.map((order) => [order.id, order]));
+    const componentMap = new Map(
+      components.map((component) => [component.id, component]),
+    );
+    const projectMap = new Map(
+      projects.map((project) => [project.id, project]),
+    );
+    const orderMap = new Map(
+      productionOrders.map((order) => [order.id, order]),
+    );
     const inspectionsByOrder = new Map<string, typeof inspections>();
     const inspectionsByComponent = new Map<string, typeof inspections>();
 
@@ -860,8 +859,12 @@ export class QcService {
           : order?.projectId
             ? projectMap.get(order.projectId)
             : undefined;
-      const failedResults = inspection.results.filter((result) => result.status === 'FAIL').length;
-      const passResults = inspection.results.filter((result) => result.status === 'PASS').length;
+      const failedResults = inspection.results.filter(
+        (result) => result.status === 'FAIL',
+      ).length;
+      const passResults = inspection.results.filter(
+        (result) => result.status === 'PASS',
+      ).length;
       const totalResults = inspection.results.length;
 
       return {
@@ -888,7 +891,9 @@ export class QcService {
               : 'PENDING',
         status: inspection.status,
         inspectorId: inspection.inspectorId,
-        passRate: totalResults ? Math.round((passResults / totalResults) * 100) : 0,
+        passRate: totalResults
+          ? Math.round((passResults / totalResults) * 100)
+          : 0,
         issueCount: inspection.issues.length,
         ncrCount: inspection.ncrs.length,
       };
@@ -897,7 +902,9 @@ export class QcService {
     const productionQueue = productionOrders.map((order) => {
       const orderInspections = [
         ...(inspectionsByOrder.get(order.id) ?? []),
-        ...(order.componentId ? inspectionsByComponent.get(order.componentId) ?? [] : []),
+        ...(order.componentId
+          ? (inspectionsByComponent.get(order.componentId) ?? [])
+          : []),
       ];
       const approved = orderInspections.some(
         (inspection) =>
@@ -920,7 +927,11 @@ export class QcService {
         componentName: order.component?.name ?? '-',
         projectId: order.projectId,
         status: order.status,
-        qcStatus: approved ? 'APPROVED' : failed ? 'REWORK_REQUIRED' : 'WAITING_QC',
+        qcStatus: approved
+          ? 'APPROVED'
+          : failed
+            ? 'REWORK_REQUIRED'
+            : 'WAITING_QC',
         inspectionCount: orderInspections.length,
         completedAt: order.completedAt ?? order.updatedAt,
       };
@@ -952,7 +963,9 @@ export class QcService {
         projectName,
         total: value.total,
         passed: value.passed,
-        passRate: value.total ? Math.round((value.passed / value.total) * 100) : 0,
+        passRate: value.total
+          ? Math.round((value.passed / value.total) * 100)
+          : 0,
       })),
     };
   }
@@ -1182,12 +1195,15 @@ export class QcService {
             subjectId: row.componentInstanceId,
           }
         : row.productionOrderId
-        ? { subjectType: 'PRODUCTION_ORDER', subjectId: row.productionOrderId }
-        : row.componentId
-          ? { subjectType: 'COMPONENT', subjectId: row.componentId }
-          : row.projectId
-            ? { subjectType: 'PROJECT', subjectId: row.projectId }
-            : { subjectType: 'INSPECTION', subjectId: row.id };
+          ? {
+              subjectType: 'PRODUCTION_ORDER',
+              subjectId: row.productionOrderId,
+            }
+          : row.componentId
+            ? { subjectType: 'COMPONENT', subjectId: row.componentId }
+            : row.projectId
+              ? { subjectType: 'PROJECT', subjectId: row.projectId }
+              : { subjectType: 'INSPECTION', subjectId: row.id };
       return {
         inspectionId: row.id,
         ...subject,
@@ -1208,10 +1224,13 @@ export class QcService {
             subjectId: row.componentInstanceId,
           }
         : row.productionOrderId
-        ? { subjectType: 'PRODUCTION_ORDER', subjectId: row.productionOrderId }
-        : row.componentId
-          ? { subjectType: 'COMPONENT', subjectId: row.componentId }
-          : { subjectType: 'INSPECTION', subjectId: row.inspectionId };
+          ? {
+              subjectType: 'PRODUCTION_ORDER',
+              subjectId: row.productionOrderId,
+            }
+          : row.componentId
+            ? { subjectType: 'COMPONENT', subjectId: row.componentId }
+            : { subjectType: 'INSPECTION', subjectId: row.inspectionId };
       return {
         ncrId: row.id,
         ...subject,

@@ -38,7 +38,10 @@ export class ComponentDomainFoundationRepository {
     });
   }
 
-  findComponentByCode(code: string, tx: Prisma.TransactionClient = this.prisma) {
+  findComponentByCode(
+    code: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
     return tx.component.findUnique({
       where: { code },
       select: { id: true, code: true },
@@ -238,7 +241,8 @@ export class ComponentDomainFoundationRepository {
       requirementId: query.requirementId,
       projectId: query.projectId,
       projectTaskId: query.projectTaskId,
-      state: query.state ?? (query.qcScope ? { in: qcInstanceStates } : undefined),
+      state:
+        query.state ?? (query.qcScope ? { in: qcInstanceStates } : undefined),
       instanceNo: query.instanceNo
         ? { contains: query.instanceNo, mode: 'insensitive' }
         : undefined,
@@ -288,9 +292,7 @@ export class ComponentDomainFoundationRepository {
       where,
       _count: { _all: true },
     });
-    const byState = new Map(
-      rows.map((row) => [row.state, row._count._all]),
-    );
+    const byState = new Map(rows.map((row) => [row.state, row._count._all]));
     const count = (state: ComponentInstanceState) => byState.get(state) ?? 0;
     return {
       waitingQc: count(ComponentInstanceState.PRODUCED_WAITING_QC),
@@ -329,7 +331,9 @@ export class ComponentDomainFoundationRepository {
 const requirementInclude = {
   project: { select: { id: true, code: true, name: true } },
   projectTask: { select: { id: true, name: true } },
-  component: { select: { id: true, code: true, name: true, lifecycleState: true } },
+  component: {
+    select: { id: true, code: true, name: true, lifecycleState: true },
+  },
   componentRevision: { select: { id: true, revisionNo: true, state: true } },
   bomDefinition: { select: { id: true, state: true, contentHash: true } },
   productionOrders: {
@@ -348,11 +352,23 @@ const requirementInclude = {
 } satisfies Prisma.ProjectComponentRequirementInclude;
 
 const instanceInclude = {
-  component: { select: { id: true, code: true, name: true, lifecycleState: true } },
+  component: {
+    select: { id: true, code: true, name: true, lifecycleState: true },
+  },
   componentRevision: { select: { id: true, revisionNo: true, state: true } },
   bomDefinition: { select: { id: true, state: true, contentHash: true } },
-  productionOrder: { select: { id: true, orderNo: true, title: true, quantity: true, status: true } },
-  requirement: { select: { id: true, requirementNo: true, requiredQuantity: true } },
+  productionOrder: {
+    select: {
+      id: true,
+      orderNo: true,
+      title: true,
+      quantity: true,
+      status: true,
+    },
+  },
+  requirement: {
+    select: { id: true, requirementNo: true, requiredQuantity: true },
+  },
   project: { select: { id: true, code: true, name: true } },
   projectTask: { select: { id: true, name: true } },
   executions: {

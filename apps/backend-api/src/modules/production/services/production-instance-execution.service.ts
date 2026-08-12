@@ -179,7 +179,7 @@ export class ProductionInstanceExecutionService {
         metadata: {
           productionExecutionId: record.productionExecutionId,
           workOrderId: record.workOrderId,
-        } as Prisma.InputJsonObject,
+        },
       },
       tx,
     );
@@ -203,7 +203,7 @@ export class ProductionInstanceExecutionService {
         metadata: {
           productionExecutionId: record.productionExecutionId,
           workOrderId: record.workOrderId,
-        } as Prisma.InputJsonObject,
+        },
       },
       tx,
     );
@@ -261,7 +261,7 @@ export class ProductionInstanceExecutionService {
           productionOrderId,
           completedWorkOrderCount: completedIds.size,
           mandatoryWorkOrderCount: mandatoryWorkOrders.length,
-        } as Prisma.InputJsonObject,
+        },
       },
       tx,
     );

@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { BackgroundJobStatus, Prisma } from '@prisma/client';
 
@@ -126,10 +123,7 @@ export class JobSchedulerService {
   private includeExecutions() {
     return {
       executions: {
-        orderBy: [
-          { startedAt: 'desc' as const },
-          { id: 'desc' as const },
-        ],
+        orderBy: [{ startedAt: 'desc' as const }, { id: 'desc' as const }],
         take: 10,
       },
     };

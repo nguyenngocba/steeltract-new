@@ -10,24 +10,12 @@ import { AttachmentsRepository } from './repositories/attachments.repository';
 import { AttachmentsService } from './services/attachments.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-    StorageModule,
-    RbacModule,
-    EventsModule,
-  ],
+  imports: [PrismaModule, StorageModule, RbacModule, EventsModule],
 
-  controllers: [
-    AttachmentsController,
-  ],
+  controllers: [AttachmentsController],
 
-  providers: [
-    AttachmentsRepository,
-    AttachmentsService,
-  ],
+  providers: [AttachmentsRepository, AttachmentsService],
 
-  exports: [
-    AttachmentsService,
-  ],
+  exports: [AttachmentsService],
 })
 export class AttachmentsModule {}

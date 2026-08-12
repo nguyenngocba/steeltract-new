@@ -1,16 +1,12 @@
-import { Module } from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { SupplierScoreController } from './supplier-score.controller'
+import { SupplierScoreController } from './supplier-score.controller';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
 @Module({
-  controllers: [
-    SupplierScoreController,
-  ],
+  controllers: [SupplierScoreController],
 
-  providers: [
-    PrismaService,
-  ],
+  providers: [PrismaService],
 })
 export class SupplierScoreModule {}

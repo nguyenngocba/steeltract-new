@@ -115,9 +115,9 @@ export class ProcurementRepository {
     items: Prisma.MaterialRequestItemCreateManyInput[],
     tx: ProcurementTx,
   ) {
-    return tx.materialRequestItem.deleteMany({ where: { requestId } }).then(() =>
-      tx.materialRequestItem.createMany({ data: items }),
-    );
+    return tx.materialRequestItem
+      .deleteMany({ where: { requestId } })
+      .then(() => tx.materialRequestItem.createMany({ data: items }));
   }
 
   listOrders(
@@ -136,7 +136,11 @@ export class ProcurementRepository {
       ...(params.search && {
         OR: [
           { poNumber: { contains: params.search, mode: 'insensitive' } },
-          { supplier: { name: { contains: params.search, mode: 'insensitive' } } },
+          {
+            supplier: {
+              name: { contains: params.search, mode: 'insensitive' },
+            },
+          },
         ],
       }),
     };

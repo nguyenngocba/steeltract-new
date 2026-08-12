@@ -7,6 +7,7 @@ import { ProjectionQueryService } from './projection-query.service';
 import { ProjectionRegistryService } from './projection-registry.service';
 import { ProjectionReplayService } from './projection-replay.service';
 import { ProjectionRepository } from './projection.repository';
+import { ProjectionWatermarkService } from './projection-watermark.service';
 import { EnterpriseQueryController } from './enterprise-query.controller';
 import { EnterpriseQueryService } from './enterprise-query.service';
 
@@ -15,6 +16,7 @@ import { EnterpriseQueryService } from './enterprise-query.service';
   controllers: [ProjectionController, EnterpriseQueryController],
   providers: [
     ProjectionRepository,
+    ProjectionWatermarkService,
     ProjectionRegistryService,
     ProjectionEngineService,
     ProjectionReplayService,
@@ -25,6 +27,7 @@ import { EnterpriseQueryService } from './enterprise-query.service';
     ProjectionEngineService,
     ProjectionReplayService,
     ProjectionQueryService,
+    ProjectionWatermarkService,
     EnterpriseQueryService,
   ],
 })

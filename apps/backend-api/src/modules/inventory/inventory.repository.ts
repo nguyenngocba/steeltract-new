@@ -172,7 +172,7 @@ export class InventoryRepository {
       where: {
         active: true,
         [capability]: true,
-      } as Prisma.MasterWarehouseWhereInput,
+      },
       include: { warehouseType: true },
       orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }],
     });
@@ -253,7 +253,7 @@ export class InventoryRepository {
         warehouse: {
           active: true,
           [capability]: true,
-        } as Prisma.MasterWarehouseWhereInput,
+        },
       },
       include: {
         warehouse: { include: { warehouseType: true } },
@@ -1436,7 +1436,7 @@ export class InventoryRepository {
     prefix: string,
     db: DbClient = this.prisma,
   ) {
-    return nextOperationalCode(db, modelName as any, fieldName, prefix);
+    return nextOperationalCode(db, modelName, fieldName, prefix);
   }
 
   createOutboxEvent(

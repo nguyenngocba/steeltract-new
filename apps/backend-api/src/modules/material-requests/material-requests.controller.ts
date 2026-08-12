@@ -57,7 +57,7 @@ export class MaterialRequestsController {
     body: CreatePurchaseRequestDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.createRequest(body, request.user!.id);
+    return this.service.createRequest(body, request.user.id);
   }
 
   @Patch(':id')
@@ -68,19 +68,19 @@ export class MaterialRequestsController {
     body: UpdatePurchaseRequestDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.updateRequest(id, body, request.user!.id);
+    return this.service.updateRequest(id, body, request.user.id);
   }
 
   @Patch(':id/submit')
   @RequirePermissions('procurement.request.create')
   submit(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.service.submitRequest(id, request.user!.id);
+    return this.service.submitRequest(id, request.user.id);
   }
 
   @Patch(':id/approve')
   @RequirePermissions('procurement.po.approve')
   approve(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.service.approveRequest(id, request.user!.id);
+    return this.service.approveRequest(id, request.user.id);
   }
 
   @Patch(':id/reject')
@@ -91,7 +91,7 @@ export class MaterialRequestsController {
     body: TransitionReasonDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.rejectRequest(id, request.user!.id, body);
+    return this.service.rejectRequest(id, request.user.id, body);
   }
 
   @Patch(':id/cancel')
@@ -102,12 +102,12 @@ export class MaterialRequestsController {
     body: TransitionReasonDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.cancelRequest(id, request.user!.id, body);
+    return this.service.cancelRequest(id, request.user.id, body);
   }
 
   @Delete(':id')
   @RequirePermissions('procurement.request.create')
   legacyCancel(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.service.cancelRequest(id, request.user!.id, {});
+    return this.service.cancelRequest(id, request.user.id, {});
   }
 }

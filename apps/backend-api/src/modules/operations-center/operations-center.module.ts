@@ -9,18 +9,8 @@ import { OperationsCenterRepository } from './operations-center.repository';
 import { OperationsCenterService } from './operations-center.service';
 
 @Module({
-  imports: [
-    InventoryModule,
-    PerformanceModule,
-    PrismaModule,
-    SnapshotsModule,
-  ],
-  controllers: [
-    OperationsCenterController,
-  ],
-  providers: [
-    OperationsCenterRepository,
-    OperationsCenterService,
-  ],
+  imports: [InventoryModule, PerformanceModule, PrismaModule, SnapshotsModule],
+  controllers: [OperationsCenterController],
+  providers: [OperationsCenterRepository, OperationsCenterService],
 })
 export class OperationsCenterModule {}

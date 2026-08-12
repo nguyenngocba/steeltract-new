@@ -11,9 +11,7 @@ interface CacheEntry<T> {
 export class CacheService {
   private readonly store = new Map<string, CacheEntry<unknown>>();
 
-  constructor(
-    private readonly metrics: PerformanceMetricsService,
-  ) {}
+  constructor(private readonly metrics: PerformanceMetricsService) {}
 
   get<T>(key: string): T | undefined {
     const entry = this.store.get(key);

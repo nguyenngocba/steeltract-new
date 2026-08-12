@@ -254,9 +254,7 @@ export type UpdateQcIssueDto = z.infer<typeof updateQcIssueSchema>;
 export type CreateNcrDto = z.infer<typeof createNcrSchema>;
 export type ListNcrDto = z.infer<typeof listNcrSchema>;
 export type QcWorkspaceReadDto = z.infer<typeof qcWorkspaceReadSchema>;
-export type QcInspectionHistoryDto = z.infer<
-  typeof qcInspectionHistorySchema
->;
+export type QcInspectionHistoryDto = z.infer<typeof qcInspectionHistorySchema>;
 export type CompleteQcInspectionCommandDto = z.infer<
   typeof completeQcInspectionCommandSchema
 >;

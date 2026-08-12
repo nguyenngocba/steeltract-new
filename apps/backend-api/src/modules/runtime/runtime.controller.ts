@@ -1,27 +1,15 @@
-import {
-  Controller,
-  Get,
-  UseGuards,
-} from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common';
 
-import { PrismaService }
-  from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import {
-  QcInspectionStatus,
-  TransactionType,
-} from '@prisma/client'
+import { QcInspectionStatus, TransactionType } from '@prisma/client';
 
-import { JwtAuthGuard }
-  from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('runtime')
 export class RuntimeController {
-  constructor(
-    private readonly prisma:
-      PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   @Get('overview')
   async overview() {
@@ -44,11 +32,10 @@ export class RuntimeController {
         take: 10,
 
         orderBy: {
-          createdAt:
-            'desc',
+          createdAt: 'desc',
         },
       }),
-    ])
+    ]);
 
     return {
       summary: {
@@ -58,9 +45,8 @@ export class RuntimeController {
         transactionCount,
       },
 
-      activities:
-        recentActivities,
-    }
+      activities: recentActivities,
+    };
   }
 
   @Get('operational-workflow')
@@ -145,39 +131,38 @@ export class RuntimeController {
           ],
         },
       }),
-    ])
+    ]);
 
     const completedOrders = productionOrders.filter(
       (order) => order.status === 'COMPLETED',
-    )
+    );
     const approvedQc = qcInspections.filter(
       (inspection) =>
         inspection.status === QcInspectionStatus.PASSED ||
         inspection.status === QcInspectionStatus.APPROVED,
-    )
+    );
     const failedQc = qcInspections.filter(
       (inspection) =>
         inspection.status === QcInspectionStatus.FAILED ||
         inspection.status === QcInspectionStatus.REWORK_REQUIRED ||
         inspection.status === QcInspectionStatus.REJECTED,
-    )
+    );
     const completedWithoutQc = completedOrders.filter((order) => {
       if (!order.componentId) {
-        return false
+        return false;
       }
       return !approvedQc.some(
-        (inspection) =>
-          inspection.productionOrderId === order.id,
-      )
-    })
+        (inspection) => inspection.productionOrderId === order.id,
+      );
+    });
     const stagedWithoutQc = activePlacements.filter((placement) => {
       if (placement.itemType !== 'COMPONENT') {
-        return false
+        return false;
       }
       return !approvedQc.some(
         (inspection) => inspection.componentId === placement.itemId,
-      )
-    })
+      );
+    });
 
     const steps = [
       this.step(
@@ -235,7 +220,9 @@ export class RuntimeController {
         'Trả vật tư dư và công trình trả về',
         productionReturns > 0 || projectReturnedPlacements > 0,
         `${productionReturns} giao dịch trả vật tư SX, ${projectReturnedPlacements} lượt nhập bãi dạng trả về`,
-        productionReturns > 0 || projectReturnedPlacements > 0 ? undefined : 'WARN',
+        productionReturns > 0 || projectReturnedPlacements > 0
+          ? undefined
+          : 'WARN',
       ),
       this.step(
         'QC_FAILURE',
@@ -244,7 +231,7 @@ export class RuntimeController {
         `${failedQc.length} phiếu QC không đạt/rework/rejected`,
         failedQc.length > 0 ? undefined : 'WARN',
       ),
-    ]
+    ];
 
     return {
       generatedAt: new Date().toISOString(),
@@ -281,7 +268,7 @@ export class RuntimeController {
           itemName: placement.itemName,
         })),
       },
-    }
+    };
   }
 
   private step(
@@ -296,6 +283,6 @@ export class RuntimeController {
       name,
       status: forcedStatus ?? (passed ? 'OK' : 'BLOCKED'),
       detail,
-    }
+    };
   }
 }

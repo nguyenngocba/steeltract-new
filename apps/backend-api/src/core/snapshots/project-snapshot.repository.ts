@@ -1,13 +1,6 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import {
-  DispatchOrderStatus,
-  Prisma,
-  ProjectTaskStatus,
-} from '@prisma/client';
+import { DispatchOrderStatus, Prisma, ProjectTaskStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -203,7 +196,10 @@ export class ProjectSnapshotRepository {
     });
   }
 
-  upsertDetail(payload: ProjectDetailSnapshotPayload, tx: Prisma.TransactionClient) {
+  upsertDetail(
+    payload: ProjectDetailSnapshotPayload,
+    tx: Prisma.TransactionClient,
+  ) {
     return tx.projectDetailSnapshot.upsert({
       where: {
         projectId_tab: {
@@ -328,7 +324,10 @@ export class ProjectSnapshotRepository {
         where: {
           deletedAt: null,
           OR: [
-            { entityType: { in: ['project', 'Project'] }, entityId: { in: projectIds } },
+            {
+              entityType: { in: ['project', 'Project'] },
+              entityId: { in: projectIds },
+            },
             {
               links: {
                 some: {
@@ -366,19 +365,33 @@ export class ProjectSnapshotRepository {
       const payload = this.buildProjectDetailPayload({
         project,
         components: components.filter((row) => row.projectId === project.id),
-        inventoryTransactions: inventoryTransactions.filter((row) => row.projectId === project.id),
-        productionOrders: productionOrders.filter((row) => row.projectId === project.id),
-        componentTasks: componentTasks.filter((row) => row.component?.projectId === project.id),
-        projectTasks: projectTasks.filter((row) => row.projectId === project.id),
-        returnRequests: returnRequests.filter((row) => row.projectId === project.id),
+        inventoryTransactions: inventoryTransactions.filter(
+          (row) => row.projectId === project.id,
+        ),
+        productionOrders: productionOrders.filter(
+          (row) => row.projectId === project.id,
+        ),
+        componentTasks: componentTasks.filter(
+          (row) => row.component?.projectId === project.id,
+        ),
+        projectTasks: projectTasks.filter(
+          (row) => row.projectId === project.id,
+        ),
+        returnRequests: returnRequests.filter(
+          (row) => row.projectId === project.id,
+        ),
         documents: documents.filter((row) => {
-          const direct = row.entityType?.toLowerCase() === 'project' && row.entityId === project.id;
+          const direct =
+            row.entityType?.toLowerCase() === 'project' &&
+            row.entityId === project.id;
           const linked = row.links.some((link) => link.entityId === project.id);
           return direct || linked;
         }),
         activityLogs: activityLogs.filter((row) => {
           const metadata = this.objectMetadata(row.metadata);
-          return row.entityId === project.id || metadata.projectId === project.id;
+          return (
+            row.entityId === project.id || metadata.projectId === project.id
+          );
         }),
       });
 
@@ -418,8 +431,15 @@ export class ProjectSnapshotRepository {
       input.projectTasks,
       input.returnRequests,
     );
-    const wbs = this.buildProjectWbsFromDomain(input.project.id, input.projectTasks);
-    const financial = this.buildProjectFinancial(project, components, materials);
+    const wbs = this.buildProjectWbsFromDomain(
+      input.project.id,
+      input.projectTasks,
+    );
+    const financial = this.buildProjectFinancial(
+      project,
+      components,
+      materials,
+    );
     const health = this.buildProjectHealth(
       project,
       components,
@@ -449,12 +469,31 @@ export class ProjectSnapshotRepository {
 
   private pickDetailTabPayload(detail: Record<string, any>, tab: string) {
     const base = detail.base;
-    if (tab === 'materials') return { ...base, materials: detail.materials, returnRequests: detail.returnRequests };
+    if (tab === 'materials')
+      return {
+        ...base,
+        materials: detail.materials,
+        returnRequests: detail.returnRequests,
+      };
     if (tab === 'components') return { ...base, components: detail.components };
-    if (['progress', 'command', 'site'].includes(tab)) return { ...base, wbs: detail.wbs, health: detail.health, documents: detail.documents, logs: detail.logs };
-    if (tab === 'costs') return { ...base, financial: detail.financial, wbs: detail.wbs };
+    if (['progress', 'command', 'site'].includes(tab))
+      return {
+        ...base,
+        wbs: detail.wbs,
+        health: detail.health,
+        documents: detail.documents,
+        logs: detail.logs,
+      };
+    if (tab === 'costs')
+      return { ...base, financial: detail.financial, wbs: detail.wbs };
     if (tab === 'documents') return { ...base, documents: detail.documents };
-    if (tab === 'logs') return { ...base, logs: detail.logs, wbs: detail.wbs, returnRequests: detail.returnRequests };
+    if (tab === 'logs')
+      return {
+        ...base,
+        logs: detail.logs,
+        wbs: detail.wbs,
+        returnRequests: detail.returnRequests,
+      };
     return {
       ...base,
       materials: detail.materials,
@@ -474,8 +513,12 @@ export class ProjectSnapshotRepository {
     inventoryTransactions: any[],
     productionOrders: any[],
   ) {
-    const completedComponents = components.filter((component) => component.status === 'INSTALLED');
-    const deliveredComponents = components.filter((component) => ['DELIVERED', 'INSTALLED'].includes(component.status)).length;
+    const completedComponents = components.filter(
+      (component) => component.status === 'INSTALLED',
+    );
+    const deliveredComponents = components.filter((component) =>
+      ['DELIVERED', 'INSTALLED'].includes(component.status),
+    ).length;
     const componentProgress = components.length
       ? (completedComponents.length / components.length) * 100
       : project.status === 'COMPLETED'
@@ -484,15 +527,28 @@ export class ProjectSnapshotRepository {
           ? 60
           : 0;
     const orderProgress = productionOrders.length
-      ? (productionOrders.filter((order) => order.status === 'COMPLETED').length / productionOrders.length) * 100
+      ? (productionOrders.filter((order) => order.status === 'COMPLETED')
+          .length /
+          productionOrders.length) *
+        100
       : componentProgress;
     const transactionValue = inventoryTransactions.reduce(
       (sum, transaction) =>
-        sum + transaction.items.reduce((lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)), 0),
+        sum +
+        transaction.items.reduce(
+          (lineSum, item) => lineSum + Math.abs(Number(item.totalAmount ?? 0)),
+          0,
+        ),
       0,
     );
-    const componentEstimate = components.reduce((sum, component) => sum + Number(component.estimatedCost ?? 0), 0);
-    const componentActual = components.reduce((sum, component) => sum + Number(component.actualCost ?? 0), 0);
+    const componentEstimate = components.reduce(
+      (sum, component) => sum + Number(component.estimatedCost ?? 0),
+      0,
+    );
+    const componentActual = components.reduce(
+      (sum, component) => sum + Number(component.actualCost ?? 0),
+      0,
+    );
     return {
       ...project,
       progress: Math.round((componentProgress + orderProgress) / 2),
@@ -501,14 +557,24 @@ export class ProjectSnapshotRepository {
       owner: this.projectOwner(project.description),
       contractValue: componentEstimate || transactionValue,
       actualValue: componentActual || transactionValue,
-      tonnage: productionOrders.reduce((sum, order) => sum + Number(order.quantity ?? 0), 0) || components.length,
-      readyComponents: components.filter((component) => component.status === 'READY').length,
-      shippedComponents: components.filter((component) => component.status === 'SHIPPED').length,
+      tonnage:
+        productionOrders.reduce(
+          (sum, order) => sum + Number(order.quantity ?? 0),
+          0,
+        ) || components.length,
+      readyComponents: components.filter(
+        (component) => component.status === 'READY',
+      ).length,
+      shippedComponents: components.filter(
+        (component) => component.status === 'SHIPPED',
+      ).length,
       delivered: deliveredComponents,
       deliveredComponents,
       installedComponents: completedComponents.length,
       pending: Math.max(0, components.length - deliveredComponents),
-      delayedOrders: productionOrders.filter((order) => order.status === 'DELAYED').length,
+      delayedOrders: productionOrders.filter(
+        (order) => order.status === 'DELAYED',
+      ).length,
       componentCount: components.length,
       orderCount: productionOrders.length,
       materialTransactions: inventoryTransactions.length,
@@ -543,18 +609,32 @@ export class ProjectSnapshotRepository {
     projectTasks: any[],
     returnRequests: any[],
   ) {
-    const allocationMetrics = new Map<string, { allocatedQuantity: number; usedQuantity: number; returnedQuantity: number }>();
+    const allocationMetrics = new Map<
+      string,
+      {
+        allocatedQuantity: number;
+        usedQuantity: number;
+        returnedQuantity: number;
+      }
+    >();
     for (const task of projectTasks) {
       for (const allocation of task.materialAllocations) {
         const key = `${task.projectId}:${allocation.inventoryItemId}`;
-        const current = allocationMetrics.get(key) ?? { allocatedQuantity: 0, usedQuantity: 0, returnedQuantity: 0 };
+        const current = allocationMetrics.get(key) ?? {
+          allocatedQuantity: 0,
+          usedQuantity: 0,
+          returnedQuantity: 0,
+        };
         current.allocatedQuantity += Number(allocation.issuedQty ?? 0);
         current.usedQuantity += Number(allocation.usedQty ?? 0);
         current.returnedQuantity += Number(allocation.returnedQty ?? 0);
         allocationMetrics.set(key, current);
       }
     }
-    const returnMetrics = new Map<string, { pendingReturnQuantity: number; returnedQuantity: number }>();
+    const returnMetrics = new Map<
+      string,
+      { pendingReturnQuantity: number; returnedQuantity: number }
+    >();
     for (const request of returnRequests) {
       if (!request.projectId || request.flowType !== 'SITE_RETURN') continue;
       const status = String(request.status);
@@ -563,9 +643,19 @@ export class ProjectSnapshotRepository {
       if (!isPending && !isReturned) continue;
       for (const item of request.items) {
         const key = `${request.projectId}:${item.inventoryItemId}`;
-        const current = returnMetrics.get(key) ?? { pendingReturnQuantity: 0, returnedQuantity: 0 };
-        if (isPending) current.pendingReturnQuantity += Number(item.requestedQuantity ?? 0);
-        if (isReturned) current.returnedQuantity += Number(item.receivedQuantity ?? item.inspectedQuantity ?? item.requestedQuantity ?? 0);
+        const current = returnMetrics.get(key) ?? {
+          pendingReturnQuantity: 0,
+          returnedQuantity: 0,
+        };
+        if (isPending)
+          current.pendingReturnQuantity += Number(item.requestedQuantity ?? 0);
+        if (isReturned)
+          current.returnedQuantity += Number(
+            item.receivedQuantity ??
+              item.inspectedQuantity ??
+              item.requestedQuantity ??
+              0,
+          );
         returnMetrics.set(key, current);
       }
     }
@@ -574,14 +664,20 @@ export class ProjectSnapshotRepository {
         const key = `${transaction.projectId ?? ''}:${item.inventoryItemId}`;
         const allocation = allocationMetrics.get(key);
         const returns = returnMetrics.get(key);
-        const fallbackAllocated = transaction.type === 'EXPORT' ? Math.abs(Number(item.quantity ?? 0)) : 0;
+        const fallbackAllocated =
+          transaction.type === 'EXPORT'
+            ? Math.abs(Number(item.quantity ?? 0))
+            : 0;
         const allocatedQuantity =
           allocation?.allocatedQuantity && allocation.allocatedQuantity > 0
             ? allocation.allocatedQuantity
             : fallbackAllocated;
         const usedQuantity = allocation?.usedQuantity ?? 0;
         const pendingReturnQuantity = returns?.pendingReturnQuantity ?? 0;
-        const returnedQuantity = Math.max(allocation?.returnedQuantity ?? 0, returns?.returnedQuantity ?? 0);
+        const returnedQuantity = Math.max(
+          allocation?.returnedQuantity ?? 0,
+          returns?.returnedQuantity ?? 0,
+        );
         return {
           id: item.id,
           projectId: transaction.projectId,
@@ -598,7 +694,10 @@ export class ProjectSnapshotRepository {
           usedQuantity,
           pendingReturnQuantity,
           returnedQuantity,
-          availableReturnQuantity: Math.max(0, allocatedQuantity - usedQuantity - pendingReturnQuantity),
+          availableReturnQuantity: Math.max(
+            0,
+            allocatedQuantity - usedQuantity - pendingReturnQuantity,
+          ),
           unitPrice: Number(item.unitPrice ?? 0),
           totalAmount: Number(item.totalAmount ?? 0),
           type: transaction.type,
@@ -633,11 +732,17 @@ export class ProjectSnapshotRepository {
           status: item.status,
           cost: Number(item.cost ?? 0),
         }));
-        const materialCost = Number(task.cost?.materialCost ?? this.sum(materials.map((item) => item.cost)));
+        const materialCost = Number(
+          task.cost?.materialCost ??
+            this.sum(materials.map((item) => item.cost)),
+        );
         const laborCost = Number(task.cost?.laborCost ?? 0);
         const machineCost = Number(task.cost?.machineCost ?? 0);
         const otherCost = Number(task.cost?.otherCost ?? 0);
-        const actualCost = Number(task.cost?.actualCost ?? materialCost + laborCost + machineCost + otherCost);
+        const actualCost = Number(
+          task.cost?.actualCost ??
+            materialCost + laborCost + machineCost + otherCost,
+        );
         const revenue = Number(task.cost?.budgetCost ?? 0);
         return {
           id: task.id,
@@ -714,15 +819,25 @@ export class ProjectSnapshotRepository {
       const amount = Math.abs(Number(item.totalAmount ?? 0));
       return item.type === 'RETURN' ? sum - amount : sum + amount;
     }, 0);
-    const componentCost = this.sum(components.map((component) => component.actualCost || component.estimatedCost));
+    const componentCost = this.sum(
+      components.map(
+        (component) => component.actualCost || component.estimatedCost,
+      ),
+    );
     const actualCost = Math.max(0, materialCost) + componentCost;
     const budget = Number(project.contractValue ?? 0);
     const profit = budget - actualCost;
     const marginPercent = budget > 0 ? (profit / budget) * 100 : 0;
     const byTime = Array.from(
       materials.reduce((map, item) => {
-        const key = item.date instanceof Date ? item.date.toISOString().slice(0, 10) : new Date(item.date).toISOString().slice(0, 10);
-        map.set(key, (map.get(key) ?? 0) + Math.abs(Number(item.totalAmount ?? 0)));
+        const key =
+          item.date instanceof Date
+            ? item.date.toISOString().slice(0, 10)
+            : new Date(item.date).toISOString().slice(0, 10);
+        map.set(
+          key,
+          (map.get(key) ?? 0) + Math.abs(Number(item.totalAmount ?? 0)),
+        );
         return map;
       }, new Map<string, number>()),
     ).map(([date, value]) => ({ date, value }));
@@ -750,31 +865,55 @@ export class ProjectSnapshotRepository {
   }
 
   private buildProjectHealth(
-    project: { id: string; progress: number; plannedEndAt: Date; delayedOrders: number; contractValue: number },
+    project: {
+      id: string;
+      progress: number;
+      plannedEndAt: Date;
+      delayedOrders: number;
+      contractValue: number;
+    },
     components: Array<{ status: string }>,
     materials: Array<{ quantity: number; type: string; totalAmount: number }>,
     tasks: Array<{ status: string; dueDate: Date | null }>,
     returns: Array<{ status: string }>,
   ) {
-    const overdueTasks = tasks.filter((task) =>
-      task.dueDate && task.dueDate.getTime() < Date.now() && task.status !== 'DONE',
+    const overdueTasks = tasks.filter(
+      (task) =>
+        task.dueDate &&
+        task.dueDate.getTime() < Date.now() &&
+        task.status !== 'DONE',
     ).length;
-    const missingComponents = components.filter((component) =>
-      !['DELIVERED', 'INSTALLED'].includes(component.status),
+    const missingComponents = components.filter(
+      (component) => !['DELIVERED', 'INSTALLED'].includes(component.status),
     ).length;
     const materialBalance = materials.reduce((sum, item) => {
       const quantity = Math.abs(Number(item.quantity ?? 0));
       return item.type === 'RETURN' ? sum - quantity : sum + quantity;
     }, 0);
-    const actualCost = materials.reduce((sum, item) => sum + Math.abs(Number(item.totalAmount ?? 0)), 0);
-    const overBudget = project.contractValue > 0 && actualCost > project.contractValue;
-    const openReturns = returns.filter((item) => !['DISPOSED', 'CANCELLED'].includes(item.status)).length;
-    const delayed = project.delayedOrders > 0 || overdueTasks > 0 || this.delayDays(project.plannedEndAt, null) > 0;
+    const actualCost = materials.reduce(
+      (sum, item) => sum + Math.abs(Number(item.totalAmount ?? 0)),
+      0,
+    );
+    const overBudget =
+      project.contractValue > 0 && actualCost > project.contractValue;
+    const openReturns = returns.filter(
+      (item) => !['DISPOSED', 'CANCELLED'].includes(item.status),
+    ).length;
+    const delayed =
+      project.delayedOrders > 0 ||
+      overdueTasks > 0 ||
+      this.delayDays(project.plannedEndAt, null) > 0;
     const warnings = [
       overdueTasks > 0 ? `${overdueTasks} công việc quá hạn` : '',
-      project.delayedOrders > 0 ? `${project.delayedOrders} lệnh sản xuất chậm` : '',
-      missingComponents > 0 ? `${missingComponents} cấu kiện chưa bàn giao/lắp đặt` : '',
-      materialBalance <= 0 && materials.length > 0 ? 'Không còn vật tư tồn tại công trình' : '',
+      project.delayedOrders > 0
+        ? `${project.delayedOrders} lệnh sản xuất chậm`
+        : '',
+      missingComponents > 0
+        ? `${missingComponents} cấu kiện chưa bàn giao/lắp đặt`
+        : '',
+      materialBalance <= 0 && materials.length > 0
+        ? 'Không còn vật tư tồn tại công trình'
+        : '',
       overBudget ? 'Chi phí vật tư vượt giá trị hợp đồng' : '',
       openReturns > 0 ? `${openReturns} phiếu trả đang mở` : '',
     ].filter(Boolean);
@@ -787,8 +926,16 @@ export class ProjectSnapshotRepository {
     ].filter(Boolean);
     return {
       projectId: project.id,
-      status: delayed || overBudget ? 'DELAYED' : warnings.length > 0 ? 'RISK' : 'NORMAL',
-      score: Math.max(0, 100 - warnings.length * 12 - project.delayedOrders * 8),
+      status:
+        delayed || overBudget
+          ? 'DELAYED'
+          : warnings.length > 0
+            ? 'RISK'
+            : 'NORMAL',
+      score: Math.max(
+        0,
+        100 - warnings.length * 12 - project.delayedOrders * 8,
+      ),
       warnings,
       suggestedActions,
       blockedTasks: 0,
@@ -833,19 +980,24 @@ export class ProjectSnapshotRepository {
   private mapProjectDocuments(documents: any[]) {
     return documents.map((document) => {
       const version = document.versions[0];
-      const projectLink = document.links.find((link) => ['projects', 'project'].includes(link.module));
-      const projectId = document.entityType?.toLowerCase() === 'project'
-        ? document.entityId
-        : projectLink?.entityId ?? null;
-      const source = document.entityType?.toLowerCase() === 'project'
-        ? 'Project'
-        : document.entityType
-          ? `${document.module ?? 'Attachment'} · ${document.entityType}`
-          : document.module ?? 'Attachment';
+      const projectLink = document.links.find((link) =>
+        ['projects', 'project'].includes(link.module),
+      );
+      const projectId =
+        document.entityType?.toLowerCase() === 'project'
+          ? document.entityId
+          : (projectLink?.entityId ?? null);
+      const source =
+        document.entityType?.toLowerCase() === 'project'
+          ? 'Project'
+          : document.entityType
+            ? `${document.module ?? 'Attachment'} · ${document.entityType}`
+            : (document.module ?? 'Attachment');
       return {
         id: document.id,
         title: document.title,
-        originalName: document.originalName ?? version?.originalName ?? document.title,
+        originalName:
+          document.originalName ?? version?.originalName ?? document.title,
         category: document.category,
         mimeType: document.mimeType,
         fileSize: document.fileSize,
@@ -863,16 +1015,21 @@ export class ProjectSnapshotRepository {
   private mapProjectLogs(activityLogs: any[]) {
     return activityLogs.map((log) => {
       const metadata = this.objectMetadata(log.metadata);
-      const projectId = typeof metadata.projectId === 'string'
-        ? metadata.projectId
-        : log.entity === 'Project'
-          ? log.entityId
-          : null;
+      const projectId =
+        typeof metadata.projectId === 'string'
+          ? metadata.projectId
+          : log.entity === 'Project'
+            ? log.entityId
+            : null;
       const detail = [
         typeof metadata.projectCode === 'string' ? metadata.projectCode : null,
-        typeof metadata.componentCode === 'string' ? metadata.componentCode : null,
+        typeof metadata.componentCode === 'string'
+          ? metadata.componentCode
+          : null,
         typeof metadata.returnNo === 'string' ? metadata.returnNo : null,
-      ].filter(Boolean).join(' · ');
+      ]
+        .filter(Boolean)
+        .join(' · ');
       return {
         id: log.id,
         action: log.action,
@@ -934,24 +1091,39 @@ export class ProjectSnapshotRepository {
           const predecessor = byId.get(String(dependency.taskId));
           if (!predecessor) continue;
           const type = dependency.type ?? 'FS';
-          const predecessorStart = this.parseDate(predecessor.actualStartAt) ?? this.parseDate(predecessor.scheduledStartAt);
-          const predecessorFinish = this.parseDate(predecessor.actualFinishAt) ?? this.parseDate(predecessor.scheduledFinishAt);
+          const predecessorStart =
+            this.parseDate(predecessor.actualStartAt) ??
+            this.parseDate(predecessor.scheduledStartAt);
+          const predecessorFinish =
+            this.parseDate(predecessor.actualFinishAt) ??
+            this.parseDate(predecessor.scheduledFinishAt);
           let nextStart = this.parseDate(row.scheduledStartAt);
           let nextFinish = this.parseDate(row.scheduledFinishAt);
 
           if (type === 'FS' && predecessorFinish) {
-            nextStart = this.maxDate(nextStart, this.addDays(predecessorFinish, 1));
-            nextFinish = nextStart ? this.addDays(nextStart, duration) : nextFinish;
+            nextStart = this.maxDate(
+              nextStart,
+              this.addDays(predecessorFinish, 1),
+            );
+            nextFinish = nextStart
+              ? this.addDays(nextStart, duration)
+              : nextFinish;
           } else if (type === 'SS' && predecessorStart) {
             nextStart = this.maxDate(nextStart, predecessorStart);
-            nextFinish = nextStart ? this.addDays(nextStart, duration) : nextFinish;
+            nextFinish = nextStart
+              ? this.addDays(nextStart, duration)
+              : nextFinish;
           } else if (type === 'FF' && predecessorFinish) {
             nextFinish = this.maxDate(nextFinish, predecessorFinish);
-            nextStart = nextFinish ? this.addDays(nextFinish, -duration) : nextStart;
+            nextStart = nextFinish
+              ? this.addDays(nextFinish, -duration)
+              : nextStart;
           }
 
-          row.scheduledStartAt = nextStart?.toISOString() ?? row.scheduledStartAt;
-          row.scheduledFinishAt = nextFinish?.toISOString() ?? row.scheduledFinishAt;
+          row.scheduledStartAt =
+            nextStart?.toISOString() ?? row.scheduledStartAt;
+          row.scheduledFinishAt =
+            nextFinish?.toISOString() ?? row.scheduledFinishAt;
           row.forecastFinishAt = row.actualFinishAt ?? row.scheduledFinishAt;
         }
       }
@@ -974,7 +1146,9 @@ export class ProjectSnapshotRepository {
   }
 
   private projectType(name: string, description?: string | null) {
-    const explicit = description?.match(/(?:loại|type)\s*:\s*([^;]+)/i)?.[1]?.trim();
+    const explicit = description
+      ?.match(/(?:loại|type)\s*:\s*([^;]+)/i)?.[1]
+      ?.trim();
     if (explicit) return explicit;
     const value = name.toLowerCase();
     if (value.includes('kho') || value.includes('logistics')) return 'Kho bãi';

@@ -1,31 +1,37 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
-import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service';
 
-type ActivityModule = 'Inventory' | 'Production' | 'Yard' | 'QC' | 'Purchasing' | 'Projects'
+type ActivityModule =
+  | 'Inventory'
+  | 'Production'
+  | 'Yard'
+  | 'QC'
+  | 'Purchasing'
+  | 'Projects';
 
 type ExecutiveActivity = {
-  id: string
-  module: ActivityModule
-  type: string
-  title: string
-  description: string
-  entityCode: string | null
-  occurredAt: string
-  relativeTime: string
-  severity: 'info' | 'warning' | 'critical'
-}
+  id: string;
+  module: ActivityModule;
+  type: string;
+  title: string;
+  description: string;
+  entityCode: string | null;
+  occurredAt: string;
+  relativeTime: string;
+  severity: 'info' | 'warning' | 'critical';
+};
 
 function relativeTime(value: Date) {
-  const diffMs = Date.now() - value.getTime()
-  const diffMinutes = Math.floor(diffMs / 60000)
-  if (diffMinutes < 1) return 'Vừa xong'
-  if (diffMinutes < 60) return `${diffMinutes} phút trước`
-  const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) return `${diffHours} giờ trước`
-  if (diffHours < 48) return 'Hôm qua'
-  return value.toLocaleDateString('vi-VN')
+  const diffMs = Date.now() - value.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return 'Vừa xong';
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffHours < 48) return 'Hôm qua';
+  return value.toLocaleDateString('vi-VN');
 }
 
 @Injectable()
@@ -36,8 +42,8 @@ export class DashboardActivityService {
   ) {}
 
   async getRecentActivities(): Promise<{
-    filters: ActivityModule[]
-    items: ExecutiveActivity[]
+    filters: ActivityModule[];
+    items: ExecutiveActivity[];
   }> {
     const [
       inventoryTransactions,
@@ -73,36 +79,47 @@ export class DashboardActivityService {
         take: 20,
         orderBy: { updatedAt: 'desc' },
       }),
-    ])
+    ]);
 
-    const inventoryItems: ExecutiveActivity[] = inventoryTransactions.map((transaction) => {
-      const totalQty = transaction.items.reduce((sum, item) => {
-        if (transaction.type === 'TRANSFER') {
-          return sum + Math.max(0, Number(item.quantity ?? 0))
-        }
-        return sum + Math.abs(Number(item.quantity ?? 0))
-      }, 0)
-      const materialNames = Array.from(new Set(
-        transaction.items
-          .map((item) => item.inventoryItem?.name ?? item.inventoryItem?.code)
-          .filter(Boolean),
-      ))
-      const materialSummary = materialNames.length
-        ? materialNames.join(', ')
-        : (transaction.transactionNo ?? transaction.code)
-      const sign = transaction.type === 'IMPORT' || transaction.type === 'RETURN' ? '+' : transaction.type === 'EXPORT' ? '-' : ''
-      return {
-        id: `inventory-${transaction.id}`,
-        module: 'Inventory',
-        type: transaction.type,
-        title: this.inventoryTitle(transaction.type),
-        description: `${materialSummary}${totalQty ? ` · ${sign}${totalQty}` : ''}`,
-        entityCode: transaction.transactionNo ?? transaction.code,
-        occurredAt: transaction.transactionDate.toISOString(),
-        relativeTime: relativeTime(transaction.transactionDate),
-        severity: transaction.type === 'ADJUSTMENT' ? 'warning' : 'info',
-      }
-    })
+    const inventoryItems: ExecutiveActivity[] = inventoryTransactions.map(
+      (transaction) => {
+        const totalQty = transaction.items.reduce((sum, item) => {
+          if (transaction.type === 'TRANSFER') {
+            return sum + Math.max(0, Number(item.quantity ?? 0));
+          }
+          return sum + Math.abs(Number(item.quantity ?? 0));
+        }, 0);
+        const materialNames = Array.from(
+          new Set(
+            transaction.items
+              .map(
+                (item) => item.inventoryItem?.name ?? item.inventoryItem?.code,
+              )
+              .filter(Boolean),
+          ),
+        );
+        const materialSummary = materialNames.length
+          ? materialNames.join(', ')
+          : (transaction.transactionNo ?? transaction.code);
+        const sign =
+          transaction.type === 'IMPORT' || transaction.type === 'RETURN'
+            ? '+'
+            : transaction.type === 'EXPORT'
+              ? '-'
+              : '';
+        return {
+          id: `inventory-${transaction.id}`,
+          module: 'Inventory',
+          type: transaction.type,
+          title: this.inventoryTitle(transaction.type),
+          description: `${materialSummary}${totalQty ? ` · ${sign}${totalQty}` : ''}`,
+          entityCode: transaction.transactionNo ?? transaction.code,
+          occurredAt: transaction.transactionDate.toISOString(),
+          relativeTime: relativeTime(transaction.transactionDate),
+          severity: transaction.type === 'ADJUSTMENT' ? 'warning' : 'info',
+        };
+      },
+    );
 
     const productionItems: ExecutiveActivity[] = productionLogs.map((log) => ({
       id: `production-${log.id}`,
@@ -113,8 +130,9 @@ export class DashboardActivityService {
       entityCode: log.productionOrder.orderNo,
       occurredAt: log.createdAt.toISOString(),
       relativeTime: relativeTime(log.createdAt),
-      severity: log.type === 'DELAY' || log.type === 'MATERIAL' ? 'warning' : 'info',
-    }))
+      severity:
+        log.type === 'DELAY' || log.type === 'MATERIAL' ? 'warning' : 'info',
+    }));
 
     const yardItems: ExecutiveActivity[] = yardMovements.map((movement) => ({
       id: `yard-${movement.id}`,
@@ -126,7 +144,7 @@ export class DashboardActivityService {
       occurredAt: movement.createdAt.toISOString(),
       relativeTime: relativeTime(movement.createdAt),
       severity: 'info',
-    }))
+    }));
 
     const qcItems: ExecutiveActivity[] = qcInspections.map((inspection) => ({
       id: `qc-${inspection.id}`,
@@ -137,20 +155,26 @@ export class DashboardActivityService {
       entityCode: inspection.inspectionNo,
       occurredAt: inspection.updatedAt.toISOString(),
       relativeTime: relativeTime(inspection.updatedAt),
-      severity: ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(inspection.status) ? 'critical' : 'info',
-    }))
+      severity: ['FAILED', 'REWORK_REQUIRED', 'REJECTED'].includes(
+        inspection.status,
+      )
+        ? 'critical'
+        : 'info',
+    }));
 
-    const purchasingItems: ExecutiveActivity[] = purchaseOrders.map((order) => ({
-      id: `purchase-${order.id}`,
-      module: 'Purchasing',
-      type: order.status,
-      title: 'Đơn mua',
-      description: `${order.poNumber} · ${order.supplierName}`,
-      entityCode: order.poNumber,
-      occurredAt: order.updatedAt.toISOString(),
-      relativeTime: relativeTime(order.updatedAt),
-      severity: order.status === 'CANCELLED' ? 'warning' : 'info',
-    }))
+    const purchasingItems: ExecutiveActivity[] = purchaseOrders.map(
+      (order) => ({
+        id: `purchase-${order.id}`,
+        module: 'Purchasing',
+        type: order.status,
+        title: 'Đơn mua',
+        description: `${order.poNumber} · ${order.supplierName}`,
+        entityCode: order.poNumber,
+        occurredAt: order.updatedAt.toISOString(),
+        relativeTime: relativeTime(order.updatedAt),
+        severity: order.status === 'CANCELLED' ? 'warning' : 'info',
+      }),
+    );
 
     const projectItems: ExecutiveActivity[] = projects.map((project) => ({
       id: `project-${project.id}`,
@@ -162,10 +186,17 @@ export class DashboardActivityService {
       occurredAt: project.updatedAt.toISOString(),
       relativeTime: relativeTime(project.updatedAt),
       severity: project.status === 'DELAYED' ? 'warning' : 'info',
-    }))
+    }));
 
     return {
-      filters: ['Inventory', 'Production', 'Yard', 'QC', 'Purchasing', 'Projects'],
+      filters: [
+        'Inventory',
+        'Production',
+        'Yard',
+        'QC',
+        'Purchasing',
+        'Projects',
+      ],
       items: [
         ...inventoryItems,
         ...productionItems,
@@ -174,25 +205,28 @@ export class DashboardActivityService {
         ...purchasingItems,
         ...projectItems,
       ]
-        .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+        )
         .slice(0, 60),
-    }
+    };
   }
 
   private inventoryTitle(type: string) {
     switch (type) {
       case 'IMPORT':
-        return 'Nhập kho'
+        return 'Nhập kho';
       case 'EXPORT':
-        return 'Xuất kho'
+        return 'Xuất kho';
       case 'TRANSFER':
-        return 'Điều chuyển'
+        return 'Điều chuyển';
       case 'RETURN':
-        return 'Trả hàng'
+        return 'Trả hàng';
       case 'ADJUSTMENT':
-        return 'Điều chỉnh tồn'
+        return 'Điều chỉnh tồn';
       default:
-        return 'Giao dịch kho'
+        return 'Giao dịch kho';
     }
   }
 }

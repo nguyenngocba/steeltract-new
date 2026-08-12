@@ -8,10 +8,7 @@ import { SnapshotParityValidationService } from './snapshot-parity-validation.se
 import { StressHarnessService } from './stress-harness.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-    SnapshotsModule,
-  ],
+  imports: [PrismaModule, SnapshotsModule],
   providers: [
     BackgroundRecoveryValidationService,
     PerformanceBenchmarkService,

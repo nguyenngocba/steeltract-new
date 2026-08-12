@@ -124,8 +124,6 @@ export const masterDataDomains: Record<string, MasterDataDomainConfig> = {
 
 export type MasterDataDomain = keyof typeof masterDataDomains;
 
-export function isMasterDataDomain(
-  value: string,
-): value is MasterDataDomain {
+export function isMasterDataDomain(value: string): value is MasterDataDomain {
   return value in masterDataDomains;
 }

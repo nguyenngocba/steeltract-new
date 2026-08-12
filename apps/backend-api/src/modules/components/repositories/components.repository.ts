@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { ComponentLifecycleState, ComponentStatus, Prisma } from '@prisma/client';
+import {
+  ComponentLifecycleState,
+  ComponentStatus,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../../../core/prisma/prisma.service';
 

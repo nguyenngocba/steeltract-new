@@ -42,7 +42,7 @@ export class InventoryTransactionPermissionsGuard implements CanActivate {
       ? (
           await Promise.all(
             candidates.map((permission) =>
-              this.rbacService.hasPermissions(request.user!.id, [permission]),
+              this.rbacService.hasPermissions(request.user.id, [permission]),
             ),
           )
         ).some(Boolean)

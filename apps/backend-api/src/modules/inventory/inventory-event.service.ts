@@ -191,7 +191,7 @@ export class InventoryEventService {
     return this.repository.createOutboxEvent(
       {
         eventName,
-        payload: payload as Prisma.InputJsonObject,
+        payload: payload,
         metadata: {
           module: 'inventory',
           persistToOutbox: true,
@@ -217,7 +217,7 @@ export class InventoryEventService {
     return this.repository.createOutboxEvent(
       {
         eventName,
-        payload: payload as Prisma.InputJsonObject,
+        payload: payload,
         metadata: {
           eventId: randomUUID(),
           eventName,

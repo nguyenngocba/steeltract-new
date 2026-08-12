@@ -259,6 +259,8 @@ export function HistoricalDashboardPage() {
           </div>
         </section>
 
+        <SnapshotFreshnessStrip snapshot={latest} />
+
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-6">
           {kpis.map((item) => (
             <CockpitKpiCard
@@ -952,6 +954,57 @@ function buildKpis(
       icon: <ShieldCheck size={16} />,
     },
   ]
+}
+
+function SnapshotFreshnessStrip({
+  snapshot,
+}: {
+  snapshot?: HistoricalDashboardSnapshot
+}) {
+  const freshness = snapshot?.freshness
+  const cells = [
+    {
+      label: 'Live',
+      value: freshness?.status ?? 'NOT INITIALIZED',
+      tone: freshness?.fresh ? 'text-emerald-300' : 'text-amber-300',
+    },
+    {
+      label: 'Snapshot',
+      value: freshness?.parity ? 'Đồng bộ' : 'Lệch watermark',
+      tone: freshness?.parity ? 'text-cyan-300' : 'text-red-300',
+    },
+    {
+      label: 'Lag',
+      value: formatDuration(freshness?.lagMs),
+      tone: (freshness?.lagMs ?? 0) > 60_000 ? 'text-amber-300' : 'text-white',
+    },
+    {
+      label: 'Age',
+      value: formatDuration(freshness?.ageMs),
+      tone: 'text-white',
+    },
+  ]
+
+  return (
+    <section className="grid grid-cols-2 overflow-hidden rounded-lg border border-cyan-300/10 bg-slate-950/35 md:grid-cols-4">
+      {cells.map((cell) => (
+        <div key={cell.label} className="border-cyan-300/10 px-3 py-2 not-last:border-r">
+          <div className="text-[10px] font-semibold uppercase text-slate-500">{cell.label}</div>
+          <div className={`mt-0.5 truncate text-xs font-medium ${cell.tone}`} title={cell.value}>
+            {cell.value}
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function formatDuration(value?: number) {
+  if (value === undefined) return '—'
+  if (value < 1_000) return `${Math.round(value)} ms`
+  if (value < 60_000) return `${(value / 1_000).toFixed(1)} s`
+  if (value < 3_600_000) return `${(value / 60_000).toFixed(1)} min`
+  return `${(value / 3_600_000).toFixed(1)} h`
 }
 
 function dailyMetricRows(snapshot?: HistoricalDashboardSnapshot): ChartRow[] {

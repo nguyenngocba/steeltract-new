@@ -36,9 +36,9 @@ const engineeringBomLineSchema = z
     (value) =>
       Boolean(
         value.materialId ||
-          value.inventoryItemId ||
-          value.materialCode ||
-          value.code,
+        value.inventoryItemId ||
+        value.materialCode ||
+        value.code,
       ),
     'Engineering BOM line requires materialId or materialCode',
   )

@@ -187,7 +187,11 @@ export class SystemRoleAdminService {
       modules: Array.from(groups.values()).sort((a, b) =>
         a.label.localeCompare(b.label),
       ),
-      actions: [...new Set(permissions.map((item) => item.name.split('.')[1] ?? 'access'))],
+      actions: [
+        ...new Set(
+          permissions.map((item) => item.name.split('.')[1] ?? 'access'),
+        ),
+      ],
       permissionCount: permissions.length,
       permissions,
       presets: ROLE_PRESETS,

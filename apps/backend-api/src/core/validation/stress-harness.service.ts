@@ -46,9 +46,7 @@ export class StressHarnessService {
       }
     };
 
-    await Promise.all(
-      Array.from({ length: concurrency }, () => worker()),
-    );
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
     return {
       name: stressCase.name,

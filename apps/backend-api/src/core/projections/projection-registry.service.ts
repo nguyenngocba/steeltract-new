@@ -126,7 +126,7 @@ function timeline(
         ...payload(event),
         eventName: event.eventName,
         occurredAt: eventOccurredAt(event),
-      } as Prisma.InputJsonObject,
+      },
     }),
   };
 }

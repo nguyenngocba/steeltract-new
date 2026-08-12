@@ -469,7 +469,9 @@ export class YardService {
   ) {
     const execute = (tx: YardTx) =>
       this.returnComponentInstanceToYardInTransaction(dto, actorId, tx);
-    return transaction ? execute(transaction) : this.repository.transaction(execute);
+    return transaction
+      ? execute(transaction)
+      : this.repository.transaction(execute);
   }
 
   async acceptReturnedComponentAfterQc(
@@ -628,8 +630,10 @@ export class YardService {
     if (slot.status === YardSlotStatus.BLOCKED) {
       throw new BadRequestException('Yard slot is blocked');
     }
-    const activePlacements =
-      await this.repository.findActivePlacementsForSlot(dto.slotId, tx);
+    const activePlacements = await this.repository.findActivePlacementsForSlot(
+      dto.slotId,
+      tx,
+    );
     const stackLevel = dto.stackLevel ?? activePlacements.length + 1;
     this.assertStackAvailable(slot.maxStackLevel, activePlacements, stackLevel);
 

@@ -316,7 +316,7 @@ export class ComponentCommandService {
       }
       await this.recordRevision(
         'component.revision.content.updated',
-        updated!,
+        updated,
         command,
         tx,
         { changedSections: command.changedSections },
@@ -457,7 +457,7 @@ export class ComponentCommandService {
       );
       await this.recordRevision(
         'component.revision.content.updated',
-        updatedRevision!,
+        updatedRevision,
         { ...command, idempotencyKey: `${command.idempotencyKey}:revision` },
         tx,
         { changedSections: ['bom'], contentHash },
@@ -564,7 +564,7 @@ export class ComponentCommandService {
         }
         await this.recordRevision(
           'component.revision.superseded',
-          superseded!,
+          superseded,
           command,
           tx,
           { supersededByRevisionId: revision.id },
@@ -609,7 +609,7 @@ export class ComponentCommandService {
       );
       await this.recordRevision(
         'component.revision.released',
-        released!,
+        released,
         command,
         tx,
         {
@@ -699,7 +699,7 @@ export class ComponentCommandService {
         );
         this.assertVersion(archivedBom, 'ComponentBomDefinition');
       }
-      await this.recordRevision(eventName, updated!, command, tx, eventExtra);
+      await this.recordRevision(eventName, updated, command, tx, eventExtra);
       return updated;
     });
   }
@@ -1017,6 +1017,5 @@ type VersionedComponent =
 type VersionedRevision =
   | SubmitRevisionForReviewCommand
   | ReturnRevisionToDraftCommand
-  | ApproveComponentRevisionCommand
   | WithdrawRevisionApprovalCommand
   | ArchiveComponentRevisionCommand;

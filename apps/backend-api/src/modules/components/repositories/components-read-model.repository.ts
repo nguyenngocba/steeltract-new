@@ -267,7 +267,7 @@ export class ComponentsReadModelRepository {
   }
 
   private workspaceWhere(
-    query: ComponentWorkspaceListDto | ComponentOverviewDto,
+    query: ComponentWorkspaceListDto,
   ): Prisma.ComponentWhereInput {
     const search = query.search || query.q;
     const statuses = this.componentStatuses(query.status);
@@ -480,18 +480,19 @@ export class ComponentsReadModelRepository {
           producedQuantity: Number(requirement.producedQuantity ?? 0),
           acceptedQuantity: Number(requirement.acceptedQuantity ?? 0),
           installedQuantity: Number(requirement.installedQuantity ?? 0),
-          allocatedProductionQuantity: (requirement.productionOrders ?? []).reduce(
-            (sum, order) => sum + Number(order.quantity ?? 0),
-            0,
-          ),
+          allocatedProductionQuantity: (
+            requirement.productionOrders ?? []
+          ).reduce((sum, order) => sum + Number(order.quantity ?? 0), 0),
           status: requirement.status,
           requiredBy: requirement.requiredBy?.toISOString() ?? null,
-          productionOrders: (requirement.productionOrders ?? []).map((order) => ({
-            id: order.id,
-            orderNo: order.orderNo,
-            quantity: Number(order.quantity ?? 0),
-            status: order.status,
-          })),
+          productionOrders: (requirement.productionOrders ?? []).map(
+            (order) => ({
+              id: order.id,
+              orderNo: order.orderNo,
+              quantity: Number(order.quantity ?? 0),
+              status: order.status,
+            }),
+          ),
         })),
         rawCreatedAt: source.createdAt.toISOString(),
         createdAt: source.createdAt.toISOString(),
@@ -527,9 +528,7 @@ export class ComponentsReadModelRepository {
         quantity,
         qcQuantity: Number(
           metadata.qcQuantity ??
-            (source.status === ComponentStatus.READY
-              ? quantity
-              : 0),
+            (source.status === ComponentStatus.READY ? quantity : 0),
         ),
         createdAt: source.createdAt.toISOString(),
       };
@@ -563,7 +562,11 @@ export class ComponentsReadModelRepository {
           OR: [
             { currentRevisionId: null },
             { currentRevision: { bomDefinition: null } },
-            { currentRevision: { bomDefinition: { state: { not: 'VALIDATED' } } } },
+            {
+              currentRevision: {
+                bomDefinition: { state: { not: 'VALIDATED' } },
+              },
+            },
           ],
         },
       }),

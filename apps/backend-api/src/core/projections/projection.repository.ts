@@ -169,8 +169,8 @@ export class ProjectionRepository {
           projectionName,
           outboxEventId: event.id,
           eventName: event.eventName,
-          payload: event.payload as Prisma.InputJsonValue,
-          metadata: event.metadata as Prisma.InputJsonValue | undefined,
+          payload: event.payload,
+          metadata: event.metadata,
           error: message,
           status: deadLetter ? 'DEAD_LETTER' : 'RETRYING',
         },
@@ -288,6 +288,37 @@ export class ProjectionRepository {
     });
   }
 
+  latestOutboxEvent(prefixes: string[]) {
+    if (prefixes.length === 0) return Promise.resolve(null);
+    return this.prisma.outboxEvent.findFirst({
+      where: {
+        OR: prefixes.map((prefix) => ({ eventName: { startsWith: prefix } })),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
+  async latestCheckpointReceipts() {
+    const checkpoints =
+      await this.prisma.enterpriseProjectionCheckpoint.findMany({
+        where: { lastOutboxEventId: { not: null } },
+        select: { projectionName: true, lastOutboxEventId: true },
+      });
+    if (checkpoints.length === 0) return [];
+    return this.prisma.enterpriseProjectionReceipt.findMany({
+      where: {
+        OR: checkpoints.map((checkpoint) => ({
+          projectionName: checkpoint.projectionName,
+          outboxEventId: checkpoint.lastOutboxEventId,
+        })),
+      },
+      select: {
+        projectionName: true,
+        aggregateVersion: true,
+      },
+    });
+  }
+
   outboxPage(cursor?: OutboxCursor, limit = 250) {
     return this.prisma.outboxEvent.findMany({
       where: cursor
@@ -360,7 +391,7 @@ export class ProjectionRepository {
 
   private record(value: Prisma.JsonValue | null): Record<string, unknown> {
     return value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
+      ? value
       : {};
   }
 

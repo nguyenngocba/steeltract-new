@@ -79,8 +79,7 @@ export class OperationalSampleDataSeeder {
     await this.prisma.$transaction(async (tx) => {
       for (const prefix of [operationalPrefix, legacyDemoPrefix]) {
         const keyPrefix = prefix === legacyDemoPrefix ? 'demo.' : 'steeltrack.';
-        const eventPrefix =
-          prefix === legacyDemoPrefix ? 'demo' : 'steeltrack';
+        const eventPrefix = prefix === legacyDemoPrefix ? 'demo' : 'steeltrack';
 
         await tx.activityLog.deleteMany({
           where: { module: { startsWith: prefix } },
@@ -271,9 +270,9 @@ export class OperationalSampleDataSeeder {
 
   private seedSuppliers() {
     const suppliers = [
-        ['ST-SUP-STEEL-01', 'Hoa Phat Steel'],
-        ['ST-SUP-STEEL-02', 'Pomina Steel'],
-        ['ST-SUP-STEEL-03', 'Vina Kyoei Steel'],
+      ['ST-SUP-STEEL-01', 'Hoa Phat Steel'],
+      ['ST-SUP-STEEL-02', 'Pomina Steel'],
+      ['ST-SUP-STEEL-03', 'Vina Kyoei Steel'],
     ] as const;
 
     return Promise.all(
@@ -306,9 +305,7 @@ export class OperationalSampleDataSeeder {
     projects: Array<{ id: string }>,
     zoneId?: string,
   ) {
-    const itemByCode = new Map(
-      inventoryItems.map((item) => [item.code, item]),
-    );
+    const itemByCode = new Map(inventoryItems.map((item) => [item.code, item]));
 
     const inboundSeeds = [
       ['ST-MAT-HB200', 40, 15200000, 608000000, 0],
@@ -432,20 +429,19 @@ export class OperationalSampleDataSeeder {
 
     // Keep legacy quantity snapshot in sync for existing modules.
     for (const item of inventoryItems) {
-      const aggregate =
-        await this.prisma.inventoryTransactionItem.aggregate({
-          where: {
-            inventoryItemId: item.id,
-            transaction: {
-              code: {
-                startsWith: 'ST-TXN-',
-              },
+      const aggregate = await this.prisma.inventoryTransactionItem.aggregate({
+        where: {
+          inventoryItemId: item.id,
+          transaction: {
+            code: {
+              startsWith: 'ST-TXN-',
             },
           },
-          _sum: {
-            quantity: true,
-          },
-        });
+        },
+        _sum: {
+          quantity: true,
+        },
+      });
 
       await this.prisma.inventoryItem.update({
         where: { id: item.id },
@@ -798,27 +794,77 @@ export class OperationalSampleDataSeeder {
       ['E', 'Zone E · Chờ giao', '#3b82f6'],
       ['F', 'Zone F · Hàng lỗi', '#ef4444'],
     ];
-    const zones = await Promise.all(zoneSeeds.map(([suffix, name, color], index) =>
-      this.prisma.yardZone.upsert({
-        where: { code: `ST-YARD-${suffix}` },
-        create: { code: `ST-YARD-${suffix}`, name, originX: (index % 3) * 240, originY: Math.floor(index / 3) * 180, width: 220, height: 160, color },
-        update: { name, originX: (index % 3) * 240, originY: Math.floor(index / 3) * 180, width: 220, height: 160, color },
-      })));
-    const cranes = await Promise.all([
-      ['ST-CRANE-1', 'Gantry Crane A', 180, 90, 68],
-      ['ST-CRANE-2', 'Gantry Crane E', 480, 250, 52],
-    ].map(([code, name, currentX, currentY, utilization]) =>
-      this.prisma.crane.upsert({
-        where: { code: String(code) },
-        create: { code: String(code), name: String(name), currentX: Number(currentX), currentY: Number(currentY), utilization: Number(utilization) },
-        update: { name: String(name), currentX: Number(currentX), currentY: Number(currentY), utilization: Number(utilization) },
-      })));
-    const slots = (await Promise.all(zones.flatMap((zone, zoneIndex) =>
-      Array.from({ length: 12 }, (_, index) => this.prisma.yardSlot.upsert({
-        where: { zoneId_code: { zoneId: zone.id, code: `${zone.code.replace('YARD-', '')}-${String(index + 1).padStart(2, '0')}` } },
-        create: { zoneId: zone.id, code: `${zone.code.replace('YARD-', '')}-${String(index + 1).padStart(2, '0')}`, x: zoneIndex * 100 + (index % 4) * 20, y: Math.floor(index / 4) * 20, maxStackLevel: 4 },
-        update: { currentStackLevel: 0, status: 'AVAILABLE' },
-      }))))).flat();
+    const zones = await Promise.all(
+      zoneSeeds.map(([suffix, name, color], index) =>
+        this.prisma.yardZone.upsert({
+          where: { code: `ST-YARD-${suffix}` },
+          create: {
+            code: `ST-YARD-${suffix}`,
+            name,
+            originX: (index % 3) * 240,
+            originY: Math.floor(index / 3) * 180,
+            width: 220,
+            height: 160,
+            color,
+          },
+          update: {
+            name,
+            originX: (index % 3) * 240,
+            originY: Math.floor(index / 3) * 180,
+            width: 220,
+            height: 160,
+            color,
+          },
+        }),
+      ),
+    );
+    const cranes = await Promise.all(
+      [
+        ['ST-CRANE-1', 'Gantry Crane A', 180, 90, 68],
+        ['ST-CRANE-2', 'Gantry Crane E', 480, 250, 52],
+      ].map(([code, name, currentX, currentY, utilization]) =>
+        this.prisma.crane.upsert({
+          where: { code: String(code) },
+          create: {
+            code: String(code),
+            name: String(name),
+            currentX: Number(currentX),
+            currentY: Number(currentY),
+            utilization: Number(utilization),
+          },
+          update: {
+            name: String(name),
+            currentX: Number(currentX),
+            currentY: Number(currentY),
+            utilization: Number(utilization),
+          },
+        }),
+      ),
+    );
+    const slots = (
+      await Promise.all(
+        zones.flatMap((zone, zoneIndex) =>
+          Array.from({ length: 12 }, (_, index) =>
+            this.prisma.yardSlot.upsert({
+              where: {
+                zoneId_code: {
+                  zoneId: zone.id,
+                  code: `${zone.code.replace('YARD-', '')}-${String(index + 1).padStart(2, '0')}`,
+                },
+              },
+              create: {
+                zoneId: zone.id,
+                code: `${zone.code.replace('YARD-', '')}-${String(index + 1).padStart(2, '0')}`,
+                x: zoneIndex * 100 + (index % 4) * 20,
+                y: Math.floor(index / 4) * 20,
+                maxStackLevel: 4,
+              },
+              update: { currentStackLevel: 0, status: 'AVAILABLE' },
+            }),
+          ),
+        ),
+      )
+    ).flat();
 
     await this.prisma.yardMovement.deleteMany({
       where: {
@@ -836,7 +882,9 @@ export class OperationalSampleDataSeeder {
         ],
       },
     });
-    await this.prisma.yardSlot.deleteMany({ where: { code: { startsWith: 'ST-SLOT-' } } });
+    await this.prisma.yardSlot.deleteMany({
+      where: { code: { startsWith: 'ST-SLOT-' } },
+    });
     const componentInstances = await this.prisma.componentInstance.findMany({
       where: {
         componentId: { in: components.map((component) => component.id) },
@@ -855,39 +903,65 @@ export class OperationalSampleDataSeeder {
     });
     const placementSlots = [0, 0, 1, 12, 13, 24, 25, 36, 48, 49, 49, 60];
     const placementCounts = new Map<string, number>();
-    const placements = await Promise.all(componentInstances.map((instance, index) => {
-      const slot = slots[placementSlots[index]];
-      const stackLevel = (placementCounts.get(slot.id) ?? 0) + 1;
-      placementCounts.set(slot.id, stackLevel);
-      return this.prisma.yardItemPlacement.create({
-        data: {
-          id: `steeltrack-placement-${index + 1}`,
-          slotId: slot.id,
-          componentInstanceId: instance.id,
-          itemType: 'COMPONENT',
-          itemId: instance.id,
-          itemCode: instance.instanceNo,
-          itemName: instance.component.name,
-          quantity: 1,
-          stackLevel,
-          weight: 1.85 + index * 0.42,
-          metadata: {
-            canonicalSource: 'ComponentInstance',
-            componentId: instance.componentId,
-            productionOrderId: instance.productionOrderId,
-            requirementId: instance.requirementId,
-            projectId: instance.projectId,
+    const placements = await Promise.all(
+      componentInstances.map((instance, index) => {
+        const slot = slots[placementSlots[index]];
+        const stackLevel = (placementCounts.get(slot.id) ?? 0) + 1;
+        placementCounts.set(slot.id, stackLevel);
+        return this.prisma.yardItemPlacement.create({
+          data: {
+            id: `steeltrack-placement-${index + 1}`,
+            slotId: slot.id,
+            componentInstanceId: instance.id,
+            itemType: 'COMPONENT',
+            itemId: instance.id,
+            itemCode: instance.instanceNo,
+            itemName: instance.component.name,
+            quantity: 1,
+            stackLevel,
+            weight: 1.85 + index * 0.42,
+            metadata: {
+              canonicalSource: 'ComponentInstance',
+              componentId: instance.componentId,
+              productionOrderId: instance.productionOrderId,
+              requirementId: instance.requirementId,
+              projectId: instance.projectId,
+            },
           },
-        },
-      });
-    }));
-    await Promise.all(slots.map((slot) => this.prisma.yardSlot.update({
-      where: { id: slot.id },
-      data: { currentStackLevel: placementCounts.get(slot.id) ?? 0, status: placementCounts.has(slot.id) ? 'OCCUPIED' : 'AVAILABLE' },
-    })));
-    await Promise.all(placements.map((placement, index) => this.prisma.yardMovement.create({
-      data: { placementId: placement.id, componentInstanceId: placement.componentInstanceId, type: 'PLACE', itemType: 'COMPONENT', itemId: placement.itemId, itemCode: placement.itemCode, toSlotId: placement.slotId, craneId: cranes[index % cranes.length].id, reason: index % 3 === 0 ? 'QC passed · staged for delivery' : 'Finished structure received from workshop' },
-    })));
+        });
+      }),
+    );
+    await Promise.all(
+      slots.map((slot) =>
+        this.prisma.yardSlot.update({
+          where: { id: slot.id },
+          data: {
+            currentStackLevel: placementCounts.get(slot.id) ?? 0,
+            status: placementCounts.has(slot.id) ? 'OCCUPIED' : 'AVAILABLE',
+          },
+        }),
+      ),
+    );
+    await Promise.all(
+      placements.map((placement, index) =>
+        this.prisma.yardMovement.create({
+          data: {
+            placementId: placement.id,
+            componentInstanceId: placement.componentInstanceId,
+            type: 'PLACE',
+            itemType: 'COMPONENT',
+            itemId: placement.itemId,
+            itemCode: placement.itemCode,
+            toSlotId: placement.slotId,
+            craneId: cranes[index % cranes.length].id,
+            reason:
+              index % 3 === 0
+                ? 'QC passed · staged for delivery'
+                : 'Finished structure received from workshop',
+          },
+        }),
+      ),
+    );
 
     return slots.length;
   }
@@ -908,7 +982,8 @@ export class OperationalSampleDataSeeder {
     await this.prisma.notification.create({
       data: {
         title: 'SteelTrack operational data ready',
-        message: 'Inventory, production, QC, and yard operational data is available.',
+        message:
+          'Inventory, production, QC, and yard operational data is available.',
         type: 'steeltrack.simulation',
         severity: 'info',
       },

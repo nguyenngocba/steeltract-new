@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { PerformanceMetricsService } from '../performance/performance-metrics.service';
 import {
@@ -79,7 +76,10 @@ export class SnapshotReaderStrategy {
   }
 
   private confidence(ageSeconds: number, maxAgeSeconds: number) {
-    if (!Number.isFinite(ageSeconds) || ageSeconds === Number.MAX_SAFE_INTEGER) {
+    if (
+      !Number.isFinite(ageSeconds) ||
+      ageSeconds === Number.MAX_SAFE_INTEGER
+    ) {
       return 0;
     }
 
@@ -91,9 +91,6 @@ export class SnapshotReaderStrategy {
       return 0;
     }
 
-    return Math.max(
-      0,
-      Math.round(90 * (1 - ageSeconds / maxAgeSeconds)),
-    );
+    return Math.max(0, Math.round(90 * (1 - ageSeconds / maxAgeSeconds)));
   }
 }

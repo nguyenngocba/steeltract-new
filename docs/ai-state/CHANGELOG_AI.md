@@ -1,5 +1,15 @@
 # SteelTrack AI Changelog
 
+## 2026-08-11 SYSTEM.SNAPSHOT.1 - Snapshot & Projection Certification
+
+Completed certification without production source changes. Live dashboard
+routes and Playwright 1/1 passed, initialized projections had no active failure,
+orphan or duplicate snapshot identity. Decision is **NO-GO**: enterprise latest
+returns 404, only Inventory/Yard historical snapshots exist, Inventory parity
+is 3,025 vs 0 stock, Yard parity is 25 vs 0 placements, and balance/monthly
+rollup tables are empty. Report:
+`docs/audits/system-snapshot1-projection-certification.md`.
+
 ## 2026-08-11 SYSTEM.REVERSE.CERT.1 - Canonical Reverse Runtime Certification
 
 Completed:
@@ -7913,3 +7923,17 @@ Notes:
 - Recorded remaining legacy Component.status fallback usage in Components
   Overview/Reports. No business, API, schema, migration or UI code was changed.
 - Report: `docs/audits/system-qc-cert1-physical-runtime.md`.
+
+# 2026-08-11 - SYSTEM.PROJECTION.1 Canonical Projection & Snapshot Architecture
+
+- Replaced calendar-date freshness with outbox event ID, aggregate version and
+  projection processing watermark semantics.
+- Added same-day event-driven scheduling and stable before/after watermark
+  parity checks during snapshot generation.
+- Latest History reads dynamically expose authoritative, stale, freshness,
+  parity, lag and age instead of filtering into a false 404.
+- Projection health now reports event/version/time for all 31 definitions; the
+  Historical Dashboard shows Live/Snapshot/Lag/Age.
+- Runtime parity passed for ERP, Inventory, Production, QC, Projects and Yard;
+  Logistics/Dispatch remain controlled `NOT_INITIALIZED` without source events.
+- Report: `docs/audits/system-projection1-canonical-architecture.md`.

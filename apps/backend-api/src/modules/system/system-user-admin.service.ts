@@ -227,13 +227,7 @@ export class SystemUserAdminService {
         tx,
       );
       await this.repository.revokeUserRefreshTokens(id, tx);
-      await this.logAdminAction(
-        'USER_PASSWORD_RESET',
-        actorId,
-        id,
-        {},
-        tx,
-      );
+      await this.logAdminAction('USER_PASSWORD_RESET', actorId, id, {}, tx);
 
       return this.getUserInTransaction(id, tx);
     });
@@ -247,10 +241,7 @@ export class SystemUserAdminService {
     return user;
   }
 
-  private async getUserInTransaction(
-    id: string,
-    tx: Prisma.TransactionClient,
-  ) {
+  private async getUserInTransaction(id: string, tx: Prisma.TransactionClient) {
     const user = await this.repository.findUserById(id, tx);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -303,11 +294,10 @@ export class SystemUserAdminService {
       return;
     }
 
-    const activeAdmins =
-      await this.repository.countActiveUsersWithPermission(
-        ADMIN_PERMISSION,
-        tx,
-      );
+    const activeAdmins = await this.repository.countActiveUsersWithPermission(
+      ADMIN_PERMISSION,
+      tx,
+    );
     if (activeAdmins <= 1) {
       throw new ForbiddenException(
         'Cannot disable the last active administrator',
@@ -339,11 +329,10 @@ export class SystemUserAdminService {
       return;
     }
 
-    const activeAdmins =
-      await this.repository.countActiveUsersWithPermission(
-        ADMIN_PERMISSION,
-        params.db,
-      );
+    const activeAdmins = await this.repository.countActiveUsersWithPermission(
+      ADMIN_PERMISSION,
+      params.db,
+    );
     if (activeAdmins <= 1) {
       throw new ForbiddenException(
         'Cannot remove the final active administrator permission',
@@ -355,8 +344,7 @@ export class SystemUserAdminService {
     return Promise.resolve(
       user.userRoles.some((userRole) =>
         userRole.role.rolePermissions.some(
-          (rolePermission) =>
-            rolePermission.permission.name === permissionName,
+          (rolePermission) => rolePermission.permission.name === permissionName,
         ),
       ),
     );

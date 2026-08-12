@@ -19,6 +19,7 @@ describe('ProjectionQueryService', () => {
     const service = new ProjectionQueryService(
       registry as never,
       repository as never,
+      { health: jest.fn() } as never,
     );
 
     const first = await service.list('ProductionOrderSummary', {
@@ -50,6 +51,7 @@ describe('ProjectionQueryService', () => {
       {
         listDocuments: jest.fn(),
       } as never,
+      { health: jest.fn() } as never,
     );
 
     await expect(
@@ -76,6 +78,7 @@ describe('ProjectionQueryService', () => {
     const service = new ProjectionQueryService(
       registry as never,
       repository as never,
+      { health: jest.fn() } as never,
     );
 
     await expect(

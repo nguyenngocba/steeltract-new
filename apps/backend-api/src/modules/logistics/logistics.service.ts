@@ -307,12 +307,12 @@ export class LogisticsService {
           instances
             .filter((instance) => instance.projectTask)
             .map((instance) => [
-              instance.projectTask!.id,
+              instance.projectTask.id,
               {
-                id: instance.projectTask!.id,
-                name: instance.projectTask!.name,
-                plannedStartAt: instance.projectTask!.plannedStartAt,
-                scheduledStartAt: instance.projectTask!.scheduledStartAt,
+                id: instance.projectTask.id,
+                name: instance.projectTask.name,
+                plannedStartAt: instance.projectTask.plannedStartAt,
+                scheduledStartAt: instance.projectTask.scheduledStartAt,
               },
             ]),
         ).values(),
@@ -326,7 +326,7 @@ export class LogisticsService {
               .join(' / ')
           : null;
         return {
-          type: 'COMPONENT' as DispatchItemType,
+          type: 'COMPONENT',
           componentInstanceId: instance.id,
           instanceNo: instance.instanceNo,
           projectTaskId: instance.projectTaskId ?? undefined,
@@ -743,7 +743,9 @@ export class LogisticsService {
       if (
         new Set(requestedIds).size !== requestedIds.length ||
         requestedIds.length !== componentInstanceIds.length ||
-        requestedIds.some((instanceId) => !componentInstanceIds.includes(instanceId))
+        requestedIds.some(
+          (instanceId) => !componentInstanceIds.includes(instanceId),
+        )
       ) {
         throw new BadRequestException(
           'Return placements must cover each dispatched ComponentInstance exactly once',

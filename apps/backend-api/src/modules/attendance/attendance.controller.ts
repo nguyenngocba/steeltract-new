@@ -6,17 +6,15 @@ import {
   Param,
   Body,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('attendance')
 export class AttendanceController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -25,36 +23,30 @@ export class AttendanceController {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('check-in')
-  async checkIn(
-    @Body() body: any,
-  ) {
+  async checkIn(@Body() body: any) {
     return this.prisma.attendance.create({
       data: {
-        workerName:
-          body.workerName,
+        workerName: body.workerName,
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/check-out')
-  async checkOut(
-    @Param('id') id: string,
-  ) {
+  async checkOut(@Param('id') id: string) {
     return this.prisma.attendance.update({
       where: {
         id,
       },
 
       data: {
-        checkOut:
-          new Date(),
+        checkOut: new Date(),
       },
-    })
+    });
   }
 }

@@ -112,7 +112,7 @@ export class DashboardInventoryReadModelService {
       quantity: toNumber(item.quantity),
       minimumStock: toNumber(item.minimumStock),
       stock: stockByItem.has(item.id)
-        ? stockByItem.get(item.id)!
+        ? stockByItem.get(item.id)
         : toNumber(item.quantity),
     }));
 

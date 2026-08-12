@@ -6,17 +6,15 @@ import {
   Body,
   Param,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('approvals')
 export class ApprovalsController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -25,76 +23,58 @@ export class ApprovalsController {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
-  ) {
+  async create(@Body() body: any) {
     return this.prisma.approval.create({
       data: {
-        module:
-          body.module,
+        module: body.module,
 
-        referenceId:
-          body.referenceId,
+        referenceId: body.referenceId,
 
-        requester:
-          body.requester,
+        requester: body.requester,
 
-        note:
-          body.note,
+        note: body.note,
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/approve')
-  async approve(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
+  async approve(@Param('id') id: string, @Body() body: any) {
     return this.prisma.approval.update({
       where: {
         id,
       },
 
       data: {
-        approver:
-          body.approver,
+        approver: body.approver,
 
-        status:
-          'APPROVED',
+        status: 'APPROVED',
 
-        approvedAt:
-          new Date(),
+        approvedAt: new Date(),
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/reject')
-  async reject(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
+  async reject(@Param('id') id: string, @Body() body: any) {
     return this.prisma.approval.update({
       where: {
         id,
       },
 
       data: {
-        approver:
-          body.approver,
+        approver: body.approver,
 
-        status:
-          'REJECTED',
+        status: 'REJECTED',
 
-        approvedAt:
-          new Date(),
+        approvedAt: new Date(),
       },
-    })
+    });
   }
 }

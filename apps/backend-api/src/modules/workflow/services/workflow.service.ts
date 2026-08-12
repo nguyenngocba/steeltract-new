@@ -592,8 +592,8 @@ export class WorkflowService {
         message: `${instance.referenceModule}:${instance.referenceId}`,
         type: 'workflow',
         severity: this.notificationSeverity(instance.status),
-        link: () =>
-          `/workflow/${instance.id}`,        metadata: this.toEventPayload(instance),
+        link: () => `/workflow/${instance.id}`,
+        metadata: this.toEventPayload(instance),
       },
       {
         module: 'workflow',
@@ -654,17 +654,11 @@ export class WorkflowService {
     return value as Prisma.InputJsonValue | undefined;
   }
 
-
   async getApprovals() {
-
-    return []
+    return [];
   }
 
-  async createApproval(
-    body: any,
-  ) {
-
-    return body
+  async createApproval(body: any) {
+    return body;
   }
-
 }

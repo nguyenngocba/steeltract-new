@@ -1,16 +1,10 @@
-import { Module }
-  from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { OutboxService }
-  from './outbox.service'
+import { OutboxService } from './outbox.service';
 
 @Module({
-  providers: [
-    OutboxService,
-  ],
+  providers: [OutboxService],
 
-  exports: [
-    OutboxService,
-  ],
+  exports: [OutboxService],
 })
 export class OutboxModule {}

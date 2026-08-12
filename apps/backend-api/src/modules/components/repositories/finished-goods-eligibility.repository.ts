@@ -48,10 +48,8 @@ export class FinishedGoodsEligibilityRepository {
       data,
       summary: {
         total,
-        qcPassed:
-          countByState.get(ComponentInstanceState.QC_PASSED) ?? 0,
-        useAsIs:
-          countByState.get(ComponentInstanceState.USE_AS_IS) ?? 0,
+        qcPassed: countByState.get(ComponentInstanceState.QC_PASSED) ?? 0,
+        useAsIs: countByState.get(ComponentInstanceState.USE_AS_IS) ?? 0,
         projectCount: projectRows.length,
       },
       meta: {
@@ -76,7 +74,7 @@ export class FinishedGoodsEligibilityRepository {
     return new Map(
       rows
         .filter((row) => row.requirementId)
-        .map((row) => [row.requirementId!, row._count._all]),
+        .map((row) => [row.requirementId, row._count._all]),
     );
   }
 

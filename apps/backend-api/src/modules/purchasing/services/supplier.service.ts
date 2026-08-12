@@ -1,38 +1,22 @@
-import {
-  Injectable,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
-import { PrismaService }
-from '../../../core/prisma/prisma.service'
+import { PrismaService } from '../../../core/prisma/prisma.service';
 
 @Injectable()
 export class SupplierService {
-
-  constructor(
-
-    private readonly prisma:
-      PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-
     return this.prisma.supplier.findMany({
-
       orderBy: {
-
-        createdAt:
-          'desc',
+        createdAt: 'desc',
       },
-    })
+    });
   }
 
-  async create(
-    body: any,
-  ) {
-
+  async create(body: any) {
     return this.prisma.supplier.create({
-
       data: body,
-    })
+    });
   }
 }

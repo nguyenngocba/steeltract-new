@@ -158,7 +158,9 @@ export class ProductionCommandService {
   }
 
   private async assertReleasedEngineeringBasis(
-    command: { engineeringBasis: CreateProductionOrderCommand['engineeringBasis'] },
+    command: {
+      engineeringBasis: CreateProductionOrderCommand['engineeringBasis'];
+    },
     tx: Tx,
   ) {
     const basis = await this.repository.findReleasedEngineeringBasis(
@@ -193,7 +195,8 @@ export class ProductionCommandService {
       );
     }
     if (
-      basis.currentRevision.contentHash !== command.engineeringBasis.contentHash ||
+      basis.currentRevision.contentHash !==
+        command.engineeringBasis.contentHash ||
       bom.contentHash !== command.engineeringBasis.contentHash
     ) {
       throw new ConflictException(
@@ -234,7 +237,8 @@ export class ProductionCommandService {
     }
     if (
       requirement.componentRevisionId &&
-      requirement.componentRevisionId !== command.engineeringBasis.componentRevisionId
+      requirement.componentRevisionId !==
+        command.engineeringBasis.componentRevisionId
     ) {
       throw new BadRequestException(
         'Production Order revision must match the Project requirement revision',
@@ -253,11 +257,10 @@ export class ProductionCommandService {
         'Production Order Project must match the Project component requirement',
       );
     }
-    const allocated =
-      await this.repository.sumProductionQuantityForRequirement(
-        requirement.id,
-        tx,
-      );
+    const allocated = await this.repository.sumProductionQuantityForRequirement(
+      requirement.id,
+      tx,
+    );
     const activeQuantity = Number(allocated._sum.quantity ?? 0);
     if (
       activeQuantity + command.quantity >
@@ -303,7 +306,7 @@ export class ProductionCommandService {
       );
       this.assertVersion(updated, 'ProductionOrder');
       const createdInstances = await this.createPlannedComponentInstances(
-        updated!.id,
+        updated.id,
         command,
         tx,
       );
@@ -343,9 +346,9 @@ export class ProductionCommandService {
       await this.recordOrderEvent(
         'production.order.released',
         {
-          ...updated!,
+          ...updated,
           metadata: {
-            ...this.metadataObject(updated!.metadata),
+            ...this.metadataObject(updated.metadata),
             componentInstancesCreated: createdInstances.created,
             componentInstancesTotal: createdInstances.total,
           },
@@ -362,7 +365,10 @@ export class ProductionCommandService {
     command: ProductionCommandContext,
     tx: Tx,
   ) {
-    const order = await this.repository.findReleaseLineage(productionOrderId, tx);
+    const order = await this.repository.findReleaseLineage(
+      productionOrderId,
+      tx,
+    );
     if (!order?.componentRequirementId) {
       return { created: 0, total: 0 };
     }
@@ -397,7 +403,8 @@ export class ProductionCommandService {
     }
     if (
       order.componentRequirement.componentRevisionId &&
-      order.componentRequirement.componentRevisionId !== order.componentRevisionId
+      order.componentRequirement.componentRevisionId !==
+        order.componentRevisionId
     ) {
       throw new BadRequestException(
         'Production Order revision does not match Component requirement revision',
@@ -433,8 +440,10 @@ export class ProductionCommandService {
         'Production Order already has more ComponentInstances than its quantity',
       );
     }
-    const missingSequences = Array.from({ length: quantity }, (_, index) => index + 1)
-      .filter((sequence) => !existingSequences.has(sequence));
+    const missingSequences = Array.from(
+      { length: quantity },
+      (_, index) => index + 1,
+    ).filter((sequence) => !existingSequences.has(sequence));
     const now = new Date();
     const metadata = this.json({
       source: 'production.release',
@@ -446,8 +455,8 @@ export class ProductionCommandService {
     await this.repository.createComponentInstances(
       missingSequences.map((sequence) => ({
         instanceNo: `${componentCode}-${orderNo}-${String(sequence).padStart(3, '0')}`,
-        componentId: order.componentId!,
-        componentRevisionId: order.componentRevisionId!,
+        componentId: order.componentId,
+        componentRevisionId: order.componentRevisionId,
         bomDefinitionId: order.bomDefinitionId,
         productionOrderId: order.id,
         requirementId: order.componentRequirementId,
@@ -485,7 +494,8 @@ export class ProductionCommandService {
     );
     return {
       created: createdInstances.length,
-      total: refreshed?.componentInstances.length ?? order.componentInstances.length,
+      total:
+        refreshed?.componentInstances.length ?? order.componentInstances.length,
     };
   }
 
@@ -540,7 +550,7 @@ export class ProductionCommandService {
       this.assertVersion(updated, 'ProductionOrder');
       await this.recordOrderEvent(
         'production.order.ready',
-        updated!,
+        updated,
         command,
         tx,
       );
@@ -602,7 +612,7 @@ export class ProductionCommandService {
       this.assertVersion(updated, 'ProductionOrder');
       await this.recordOrderEvent(
         'production.order.started',
-        updated!,
+        updated,
         command,
         tx,
       );
@@ -672,7 +682,7 @@ export class ProductionCommandService {
       this.assertVersion(updated, 'ProductionOrder');
       await this.recordOrderEvent(
         'production.order.completed',
-        updated!,
+        updated,
         command,
         tx,
       );
@@ -681,7 +691,7 @@ export class ProductionCommandService {
         order.id,
         command.expectedVersion + 1,
         this.completionPayload(
-          updated!,
+          updated,
           order.completions.at(-1) ?? null,
           order.completions,
         ),
@@ -722,7 +732,7 @@ export class ProductionCommandService {
       this.assertVersion(updated, 'ProductionOrder');
       await this.recordOrderEvent(
         'production.order.closed',
-        updated!,
+        updated,
         command,
         tx,
       );
@@ -751,7 +761,7 @@ export class ProductionCommandService {
       this.assertVersion(updated, 'ProductionOrder');
       await this.recordOrderEvent(
         'production.order.cancelled',
-        updated!,
+        updated,
         command,
         tx,
       );
@@ -1204,7 +1214,7 @@ export class ProductionCommandService {
         'production.scrap.posted',
         scrap.id,
         command.expectedVersion + 1,
-        this.scrapPayload(updated!),
+        this.scrapPayload(updated),
         command,
         tx,
         'ProductionScrap',
@@ -1314,10 +1324,7 @@ export class ProductionCommandService {
         command.originalProductionOrderId,
         tx,
       );
-      const ncr = await this.repository.findQcNcrForRework(
-        command.qcNcrId,
-        tx,
-      );
+      const ncr = await this.repository.findQcNcrForRework(command.qcNcrId, tx);
       if (!ncr?.componentInstanceId) {
         throw new BadRequestException(
           'Production Rework requires an NCR linked to a physical ComponentInstance',
@@ -1469,7 +1476,7 @@ export class ProductionCommandService {
       this.assertVersion(updated, 'ProductionRework');
       await this.recordReworkEvent(
         'production.rework.completed',
-        updated!,
+        updated,
         command,
         tx,
       );
@@ -1551,7 +1558,7 @@ export class ProductionCommandService {
         tx,
       );
       this.assertVersion(updated, 'ProductionOrder');
-      await this.recordOrderEvent(eventName, updated!, command, tx);
+      await this.recordOrderEvent(eventName, updated, command, tx);
       return updated;
     });
   }
@@ -1646,7 +1653,7 @@ export class ProductionCommandService {
       tx,
     );
     this.assertVersion(updated, 'WorkOrder');
-    return updated!;
+    return updated;
   }
 
   private async createStartedExecution(
@@ -1771,11 +1778,11 @@ export class ProductionCommandService {
     };
     await this.recordExecutionEvent(
       eventByCommand[operation],
-      updated!,
+      updated,
       command,
       tx,
     );
-    return updated!;
+    return updated;
   }
 
   private recordOrderEvent(

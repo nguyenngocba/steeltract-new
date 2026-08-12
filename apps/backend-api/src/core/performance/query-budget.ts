@@ -38,11 +38,7 @@ const lookupPatterns = [
   '/material-types',
 ];
 
-const searchPatterns = [
-  '/search',
-  '?search=',
-  '&search=',
-];
+const searchPatterns = ['/search', '?search=', '&search='];
 
 const detailPatterns = [
   '/detail',
@@ -56,8 +52,7 @@ export function classifyQueryBudget(
   method: string,
   path: string,
 ): QueryBudgetClass {
-  const normalized =
-    `${path ?? ''}`.toLowerCase();
+  const normalized = `${path ?? ''}`.toLowerCase();
 
   if (dashboardPatterns.some((pattern) => normalized.includes(pattern))) {
     return 'dashboard';
@@ -84,4 +79,3 @@ export function classifyQueryBudget(
 
   return 'default';
 }
-

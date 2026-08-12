@@ -65,7 +65,10 @@ export function parseEngineeringBomRouting(
         `Engineering BOM routing[${index}] requires stepName`,
       );
     }
-    const stepNo = optionalPositiveNumber(row.stepNo, `routing[${index}].stepNo`);
+    const stepNo = optionalPositiveNumber(
+      row.stepNo,
+      `routing[${index}].stepNo`,
+    );
     const expectedHours = optionalNonNegativeNumber(
       row.expectedHours,
       `routing[${index}].expectedHours`,

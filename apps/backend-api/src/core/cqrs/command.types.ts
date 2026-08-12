@@ -1,5 +1,5 @@
 export type Command = {
-  type: string
+  type: string;
 
-  payload: unknown
-}
+  payload: unknown;
+};

@@ -46,7 +46,7 @@ export class SnapshotValidatorService {
         row.scopeKey === 'ALL'
           ? await this.inventorySnapshots.findOverviewSnapshot(row.snapshotDate)
           : await this.inventorySnapshots.findLatest(
-              row.warehouseId as string,
+              row.warehouseId,
               row.snapshotDate,
             );
 

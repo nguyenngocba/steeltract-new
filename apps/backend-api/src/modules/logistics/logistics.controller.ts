@@ -7,14 +7,14 @@ import {
   Post,
   Req,
   UseGuards,
-} from '@nestjs/common'
-import { Request } from 'express'
+} from '@nestjs/common';
+import { Request } from 'express';
 
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe'
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
-import { PermissionsGuard } from '../rbac/guards/permissions.guard'
-import { AuthUser } from '../rbac/types/auth-user'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { AuthUser } from '../rbac/types/auth-user';
 import {
   departDispatchReturnSchema,
   DepartDispatchReturnDto,
@@ -22,98 +22,78 @@ import {
   ReceiveDispatchReturnDto,
   requestDispatchReturnSchema,
   RequestDispatchReturnDto,
-} from './logistics-reverse.dto'
-import { LogisticsService } from './logistics.service'
+} from './logistics-reverse.dto';
+import { LogisticsService } from './logistics.service';
 
-type AuthenticatedRequest = Request & { user?: AuthUser }
+type AuthenticatedRequest = Request & { user?: AuthUser };
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions('logistics.view')
 @Controller('logistics')
 export class LogisticsController {
-  constructor(
-    private readonly logisticsService: LogisticsService,
-  ) {}
+  constructor(private readonly logisticsService: LogisticsService) {}
 
   @Get('dispatch-dashboard')
   dashboard() {
-    return this.logisticsService.dashboard()
+    return this.logisticsService.dashboard();
   }
 
   @Get('dispatch-orders')
   listDispatchOrders() {
-    return this.logisticsService.listDispatchOrders()
+    return this.logisticsService.listDispatchOrders();
   }
 
   @Get('dispatch-orders/:id')
   getDispatchOrder(@Param('id') id: string) {
-    return this.logisticsService.getDispatchOrder(id)
+    return this.logisticsService.getDispatchOrder(id);
   }
 
   @Post('dispatch-orders/suggest')
   @RequirePermissions('logistics.dispatch')
   suggestDispatchItems(@Body() body: any) {
-    return this.logisticsService.suggestDispatchItems(body)
+    return this.logisticsService.suggestDispatchItems(body);
   }
 
   @Post('dispatch-orders')
   @RequirePermissions('logistics.dispatch')
   createDispatchOrder(@Body() body: any) {
-    return this.logisticsService.createDispatchOrder(body)
+    return this.logisticsService.createDispatchOrder(body);
   }
 
   @Patch('dispatch-orders/:id/loading')
   @RequirePermissions('logistics.dispatch')
-  markLoading(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    return this.logisticsService.markLoading(id, body)
+  markLoading(@Param('id') id: string, @Body() body: any) {
+    return this.logisticsService.markLoading(id, body);
   }
 
   @Patch('dispatch-orders/:id/depart')
   @RequirePermissions('logistics.dispatch')
-  depart(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    return this.logisticsService.depart(id, body)
+  depart(@Param('id') id: string, @Body() body: any) {
+    return this.logisticsService.depart(id, body);
   }
 
   @Patch('dispatch-orders/:id/arrive')
   @RequirePermissions('logistics.receive')
-  arrive(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    return this.logisticsService.arrive(id, body)
+  arrive(@Param('id') id: string, @Body() body: any) {
+    return this.logisticsService.arrive(id, body);
   }
 
   @Patch('dispatch-orders/:id/receive')
   @RequirePermissions('logistics.receive')
-  receive(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    return this.logisticsService.receive(id, body)
+  receive(@Param('id') id: string, @Body() body: any) {
+    return this.logisticsService.receive(id, body);
   }
 
   @Patch('dispatch-orders/:id/complete')
   @RequirePermissions('logistics.receive')
-  complete(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    return this.logisticsService.complete(id, body)
+  complete(@Param('id') id: string, @Body() body: any) {
+    return this.logisticsService.complete(id, body);
   }
 
   @Patch('dispatch-orders/:id/cancel')
   @RequirePermissions('logistics.return')
-  cancel(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    return this.logisticsService.cancel(id, body)
+  cancel(@Param('id') id: string, @Body() body: any) {
+    return this.logisticsService.cancel(id, body);
   }
 
   @Patch('dispatch-orders/:id/return-request')
@@ -127,7 +107,7 @@ export class LogisticsController {
     return this.logisticsService.requestReturn(id, {
       ...body,
       createdBy: request.user?.id,
-    })
+    });
   }
 
   @Patch('dispatch-orders/:id/return-depart')
@@ -141,7 +121,7 @@ export class LogisticsController {
     return this.logisticsService.departReturn(id, {
       ...body,
       createdBy: request.user?.id,
-    })
+    });
   }
 
   @Patch('dispatch-orders/:id/return-to-yard')
@@ -155,6 +135,6 @@ export class LogisticsController {
     return this.logisticsService.receiveReturnToYard(id, {
       ...body,
       createdBy: request.user?.id,
-    })
+    });
   }
 }

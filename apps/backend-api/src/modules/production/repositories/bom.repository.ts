@@ -23,7 +23,10 @@ export class BomRepository {
     });
   }
 
-  create(data: Prisma.BOMCreateInput, tx: Prisma.TransactionClient = this.prisma) {
+  create(
+    data: Prisma.BOMCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
     return tx.bOM.create({
       data,
       include: this.include(),

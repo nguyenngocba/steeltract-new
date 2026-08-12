@@ -1,23 +1,14 @@
-import { Module }
-  from '@nestjs/common'
+import { Module } from '@nestjs/common';
 
-import { TelemetryService }
-  from './telemetry.service'
+import { TelemetryService } from './telemetry.service';
 
-import { TelemetryController }
-  from './telemetry.controller'
+import { TelemetryController } from './telemetry.controller';
 
 @Module({
-  controllers: [
-    TelemetryController,
-  ],
+  controllers: [TelemetryController],
 
-  providers: [
-    TelemetryService,
-  ],
+  providers: [TelemetryService],
 
-  exports: [
-    TelemetryService,
-  ],
+  exports: [TelemetryService],
 })
 export class TelemetryModule {}

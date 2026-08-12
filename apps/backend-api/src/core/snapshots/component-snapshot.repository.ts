@@ -141,13 +141,16 @@ export class ComponentSnapshotRepository {
       },
       include: {
         slot: { include: { zone: true } },
-        componentInstance: { select: { id: true, instanceNo: true, componentId: true } },
+        componentInstance: {
+          select: { id: true, instanceNo: true, componentId: true },
+        },
       },
       orderBy: { placedAt: 'desc' },
     });
     const placementByComponent = new Map<string, (typeof placements)[number]>();
     for (const placement of placements) {
-      const componentKey = placement.componentInstance?.componentId ?? placement.itemId;
+      const componentKey =
+        placement.componentInstance?.componentId ?? placement.itemId;
       if (!placementByComponent.has(componentKey)) {
         placementByComponent.set(componentKey, placement);
       }

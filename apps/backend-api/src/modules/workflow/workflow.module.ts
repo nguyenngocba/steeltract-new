@@ -8,11 +8,7 @@ import { WorkflowService } from './services/workflow.service';
 import { WorkflowController } from './workflow.controller';
 import { EventsModule } from '../../core/events/events.module';
 @Module({
-imports: [
-  PrismaModule,
-  RbacModule,
-  EventsModule,
-],
+  imports: [PrismaModule, RbacModule, EventsModule],
   controllers: [WorkflowController],
   providers: [
     WorkflowRepository,

@@ -621,9 +621,7 @@ export class MaterialIssueService {
     }
 
     const fallbackZone =
-      await this.inventoryRepository.findActivePrimaryMaterialWarehouseZone(
-        tx,
-      );
+      await this.inventoryRepository.findActivePrimaryMaterialWarehouseZone(tx);
 
     if (!fallbackZone?.warehouseId) {
       throw new BadRequestException(

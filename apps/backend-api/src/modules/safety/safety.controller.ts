@@ -6,17 +6,15 @@ import {
   Delete,
   Param,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('safety')
 export class SafetyController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -25,45 +23,34 @@ export class SafetyController {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
-  ) {
+  async create(@Body() body: any) {
     return this.prisma.safetyInspection.create({
       data: {
-        title:
-          body.title,
+        title: body.title,
 
-        location:
-          body.location,
+        location: body.location,
 
-        inspector:
-          body.inspector,
+        inspector: body.inspector,
 
-        note:
-          body.note,
+        note: body.note,
 
-        score:
-          Number(
-            body.score || 0,
-          ),
+        score: Number(body.score || 0),
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ) {
+  async remove(@Param('id') id: string) {
     return this.prisma.safetyInspection.delete({
       where: {
         id,
       },
-    })
+    });
   }
 }

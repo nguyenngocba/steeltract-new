@@ -1,24 +1,22 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../../../core/prisma/prisma.service'
+import { PrismaService } from '../../../core/prisma/prisma.service';
 
 type SupplierPayload = {
-  code: string
-  name: string
-  contact?: string
-  phone?: string
-  email?: string
-  address?: string
-}
+  code: string;
+  name: string;
+  contact?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+};
 
 @Injectable()
 export class SuppliersService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(search?: string) {
-    const keyword = search?.trim()
+    const keyword = search?.trim();
 
     return this.prisma.supplier.findMany({
       where: keyword
@@ -60,13 +58,13 @@ export class SuppliersService {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 
   async getById(id: string) {
     return this.prisma.supplier.findUnique({
       where: { id },
-    })
+    });
   }
 
   async getCockpitSummary() {
@@ -87,16 +85,13 @@ export class SuppliersService {
           _all: true,
         },
       }),
-    ])
+    ]);
 
     const usedMap = new Map(
       usedSuppliers
         .filter((row) => row.supplierId)
-        .map((row) => [
-          row.supplierId as string,
-          row._count._all,
-        ]),
-    )
+        .map((row) => [row.supplierId, row._count._all]),
+    );
 
     return {
       total: suppliers.length,
@@ -123,16 +118,16 @@ export class SuppliersService {
         .filter((supplier) => supplier.count > 0)
         .sort((a, b) => b.count - a.count)
         .slice(0, 5),
-    }
+    };
   }
 
   async getCockpitDetail(id: string) {
     const supplier = await this.prisma.supplier.findUnique({
       where: { id },
-    })
+    });
 
     if (!supplier) {
-      return null
+      return null;
     }
 
     const [transactions, score] = await Promise.all([
@@ -165,24 +160,24 @@ export class SuppliersService {
           updatedAt: 'desc',
         },
       }),
-    ])
+    ]);
 
     const materialMap = new Map<
       string,
       {
-        id: string
-        code: string
-        name: string
-        unit?: string | null
-        inboundCount: number
-        totalQuantity: number
-        lastInboundAt?: Date
+        id: string;
+        code: string;
+        name: string;
+        unit?: string | null;
+        inboundCount: number;
+        totalQuantity: number;
+        lastInboundAt?: Date;
       }
-    >()
+    >();
 
     const inboundHistory = transactions.flatMap((transaction) =>
       transaction.items.map((item) => {
-        const material = item.inventoryItem
+        const material = item.inventoryItem;
         const existing = materialMap.get(material.id) ?? {
           id: material.id,
           code: material.code,
@@ -191,16 +186,16 @@ export class SuppliersService {
           inboundCount: 0,
           totalQuantity: 0,
           lastInboundAt: undefined,
-        }
+        };
 
-        existing.inboundCount += 1
-        existing.totalQuantity += Number(item.quantity ?? 0)
+        existing.inboundCount += 1;
+        existing.totalQuantity += Number(item.quantity ?? 0);
         existing.lastInboundAt = existing.lastInboundAt
           ? existing.lastInboundAt > transaction.transactionDate
             ? existing.lastInboundAt
             : transaction.transactionDate
-          : transaction.transactionDate
-        materialMap.set(material.id, existing)
+          : transaction.transactionDate;
+        materialMap.set(material.id, existing);
 
         return {
           id: item.id,
@@ -213,13 +208,12 @@ export class SuppliersService {
           unitPrice: Number(item.unitPrice ?? 0),
           totalAmount: Number(
             item.totalAmount ??
-              Number(item.quantity ?? 0) *
-                Number(item.unitPrice ?? 0),
+              Number(item.quantity ?? 0) * Number(item.unitPrice ?? 0),
           ),
           unit: item.unit?.symbol ?? material.unit,
-        }
+        };
       }),
-    )
+    );
 
     return {
       supplier,
@@ -242,7 +236,7 @@ export class SuppliersService {
             overall: 0,
             updatedAt: null,
           },
-    }
+    };
   }
 
   async getCockpitEvaluations() {
@@ -268,31 +262,28 @@ export class SuppliersService {
           _all: true,
         },
       }),
-    ])
+    ]);
 
-    const scoreByName = new Map<string, (typeof scores)[number]>()
+    const scoreByName = new Map<string, (typeof scores)[number]>();
     scores.forEach((score) => {
-      const key = score.supplierName.trim().toLowerCase()
+      const key = score.supplierName.trim().toLowerCase();
       if (!scoreByName.has(key)) {
-        scoreByName.set(key, score)
+        scoreByName.set(key, score);
       }
-    })
+    });
 
     const usageMap = new Map(
       usage
         .filter((row) => row.supplierId)
-        .map((row) => [
-          row.supplierId as string,
-          row._count._all,
-        ]),
-    )
+        .map((row) => [row.supplierId, row._count._all]),
+    );
 
     const rows = suppliers.map((supplier) => {
-      const score = scoreByName.get(supplier.name.trim().toLowerCase())
-      const quality = Number(score?.quality ?? 0)
-      const delivery = Number(score?.delivery ?? 0)
-      const pricing = Number(score?.pricing ?? 0)
-      const overall = Number(score?.overall ?? 0)
+      const score = scoreByName.get(supplier.name.trim().toLowerCase());
+      const quality = Number(score?.quality ?? 0);
+      const delivery = Number(score?.delivery ?? 0);
+      const pricing = Number(score?.pricing ?? 0);
+      const overall = Number(score?.overall ?? 0);
       const classification =
         overall >= 4.5
           ? 'EXCELLENT'
@@ -302,7 +293,7 @@ export class SuppliersService {
               ? 'PASS'
               : overall > 0
                 ? 'WARNING'
-                : 'UNRATED'
+                : 'UNRATED';
 
       return {
         id: supplier.id,
@@ -319,39 +310,45 @@ export class SuppliersService {
         pricing,
         overall,
         classification,
-      }
-    })
+      };
+    });
 
-    const evaluatedRows = rows.filter((row) => row.overall > 0)
+    const evaluatedRows = rows.filter((row) => row.overall > 0);
     const averageOverall = evaluatedRows.length
       ? evaluatedRows.reduce((sum, row) => sum + row.overall, 0) /
         evaluatedRows.length
-      : 0
+      : 0;
 
     const trend = Array.from({ length: 6 }, (_, index) => {
-      const month = new Date()
-      month.setMonth(month.getMonth() - (5 - index))
-      const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+      const month = new Date();
+      month.setMonth(month.getMonth() - (5 - index));
+      const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
       const monthScores = scores.filter((score) => {
-        const value = new Date(score.updatedAt)
-        return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}` === monthKey
-      })
+        const value = new Date(score.updatedAt);
+        return (
+          `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}` ===
+          monthKey
+        );
+      });
       const average = monthScores.length
-        ? monthScores.reduce((sum, score) => sum + Number(score.overall ?? 0), 0) /
-          monthScores.length
-        : averageOverall
+        ? monthScores.reduce(
+            (sum, score) => sum + Number(score.overall ?? 0),
+            0,
+          ) / monthScores.length
+        : averageOverall;
       return {
         month: `${String(month.getMonth() + 1).padStart(2, '0')}/${month.getFullYear()}`,
         average,
-      }
-    })
+      };
+    });
 
     return {
       metrics: {
         total: suppliers.length,
         evaluated: evaluatedRows.length,
         averageOverall,
-        excellent: rows.filter((row) => row.classification === 'EXCELLENT').length,
+        excellent: rows.filter((row) => row.classification === 'EXCELLENT')
+          .length,
         good: rows.filter((row) => row.classification === 'GOOD').length,
         pass: rows.filter((row) => row.classification === 'PASS').length,
         warning: rows.filter((row) => row.classification === 'WARNING').length,
@@ -361,9 +358,13 @@ export class SuppliersService {
       trend,
       recent: rows
         .filter((row) => row.lastEvaluationAt)
-        .sort((a, b) => new Date(b.lastEvaluationAt as Date).getTime() - new Date(a.lastEvaluationAt as Date).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.lastEvaluationAt).getTime() -
+            new Date(a.lastEvaluationAt).getTime(),
+        )
         .slice(0, 8),
-    }
+    };
   }
 
   async create(payload: SupplierPayload) {
@@ -376,13 +377,10 @@ export class SuppliersService {
         email: payload.email?.trim() || null,
         address: payload.address?.trim() || null,
       },
-    })
+    });
   }
 
-  async update(
-    id: string,
-    payload: Partial<SupplierPayload>,
-  ) {
+  async update(id: string, payload: Partial<SupplierPayload>) {
     return this.prisma.supplier.update({
       where: { id },
       data: {
@@ -405,6 +403,6 @@ export class SuppliersService {
           address: payload.address?.trim() || null,
         }),
       },
-    })
+    });
   }
 }

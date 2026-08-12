@@ -1,5 +1,19 @@
 # Next Tasks
 
+- **SYSTEM.SNAPSHOT.1 P0 - Historical coverage**: provision enabled metadata
+  and successful authoritative snapshots for ERP, Production, QC, Projects,
+  Yard and Logistics; default `/history/dashboard/latest` must return 200.
+- **SYSTEM.SNAPSHOT.1 P0 - freshness contract**: invalidate or refresh current-
+  day snapshots when source watermarks advance. Do not mark a row authoritative
+  merely because its business date is today.
+- **SYSTEM.SNAPSHOT.1 P0 - as-of correctness**: replace current-state reads in
+  Inventory, Projects and Yard historical generators with authoritative as-of
+  sources, or mark those snapshots non-authoritative.
+- **SYSTEM.SNAPSHOT.1 P1 - rollups/projections**: populate Inventory Balance and
+  monthly rollups; initialize or intentionally retire ComponentSummary,
+  YardLoadingSummary, ShipmentSummary/Timeline and Project allocation/
+  acceptance projections.
+
 - **SYSTEM.REVERSE.CERT.1 closure - COMPLETE**: installed return, returned
   PASS, same-instance REWORK, SCRAP, Production material return and Supplier
   Return now have REST, database, dashboard, ActivityLog and browser evidence.
@@ -1574,3 +1588,15 @@ Backlog after the locked order:
    from legacy `Component.status` to canonical definition/instance read models.
 5. Preserve the retained fixture and screenshots until the REWORK rerun is
    complete; do not treat its `REWORK` state as Finished Goods.
+
+# SYSTEM.PROJECTION.1 closeout
+
+1. Produce a real canonical Logistics/Dispatch event and require Shipment
+   projections plus latest Logistics snapshots to become HEALTHY/FRESH.
+2. Run the first closed-month cycle and certify dashboard and inventory monthly
+   rollups without synthetic dates.
+3. Add exact metric-level parity assertions for Production, QC, Projects and
+   Executive read models.
+4. Decide whether the six eventless projection definitions are future-facing
+   or should be retired in a separate architecture decision.
+5. Add monitoring alerts for FAILED, LAGGING and excessive watermark lag.

@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { DomainEventMetadata } from './domain-event.interface';
 import { EventBusService } from './event-bus.service';

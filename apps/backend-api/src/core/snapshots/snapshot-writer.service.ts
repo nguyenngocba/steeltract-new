@@ -201,7 +201,9 @@ export class SnapshotWriterService {
       }
       const [dashboardRows, workspaceRows] = await Promise.all([
         this.yardSnapshots.calculateDashboard(new Date()),
-        this.yardSnapshots.calculateWorkspaceSnapshots(request.scope.yardZoneId),
+        this.yardSnapshots.calculateWorkspaceSnapshots(
+          request.scope.yardZoneId,
+        ),
       ]);
       await this.prisma.$transaction(async (tx) => {
         for (const row of dashboardRows) {

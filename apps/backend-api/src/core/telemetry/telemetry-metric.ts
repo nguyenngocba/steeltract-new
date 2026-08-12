@@ -1,9 +1,9 @@
 export type TelemetryMetric = {
-  id: string
+  id: string;
 
-  metric: string
+  metric: string;
 
-  value: number
+  value: number;
 
-  timestamp: string
-}
+  timestamp: string;
+};

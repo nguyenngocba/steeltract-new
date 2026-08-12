@@ -1,47 +1,24 @@
-import { Injectable }
-  from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
-import { Command }
-  from './command.types'
+import { Command } from './command.types';
 
-type Handler = (
-  payload: any,
-) => Promise<any>
+type Handler = (payload: any) => Promise<any>;
 
 @Injectable()
 export class CommandBus {
-  private handlers =
-    new Map<
-      string,
-      Handler
-    >()
+  private handlers = new Map<string, Handler>();
 
-  register(
-    type: string,
-    handler: Handler,
-  ) {
-    this.handlers.set(
-      type,
-      handler,
-    )
+  register(type: string, handler: Handler) {
+    this.handlers.set(type, handler);
   }
 
-  async execute(
-    command: Command,
-  ) {
-    const handler =
-      this.handlers.get(
-        command.type,
-      )
+  async execute(command: Command) {
+    const handler = this.handlers.get(command.type);
 
     if (!handler) {
-      throw new Error(
-        `No handler for ${command.type}`,
-      )
+      throw new Error(`No handler for ${command.type}`);
     }
 
-    return handler(
-      command.payload,
-    )
+    return handler(command.payload);
   }
 }

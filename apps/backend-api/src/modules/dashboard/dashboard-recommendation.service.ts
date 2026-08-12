@@ -1,20 +1,20 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
 type RecommendedAction = {
-  id: string
-  priority: 'critical' | 'warning' | 'information'
-  module: string
-  actionType: string
-  title: string
-  description: string
-  entityCode: string | null
-  suggestedAction: string
-}
+  id: string;
+  priority: 'critical' | 'warning' | 'information';
+  module: string;
+  actionType: string;
+  title: string;
+  description: string;
+  entityCode: string | null;
+  suggestedAction: string;
+};
 
 @Injectable()
 export class DashboardRecommendationService {
   getRecommendations(trends: any, insights: any, notifications: any) {
-    const actions: RecommendedAction[] = []
+    const actions: RecommendedAction[] = [];
 
     for (const row of trends?.materialShortageForecast ?? []) {
       if (row.daysUntilStockout !== null && row.daysUntilStockout <= 7) {
@@ -24,10 +24,11 @@ export class DashboardRecommendationService {
           module: 'Inventory',
           actionType: 'Nhập vật tư',
           title: `Nhập thêm ${row.materialCode}`,
-          description: `Dự kiến hết sau ${row.daysUntilStockout} ngày; khuyến nghị nhập ${row.recommendedReorderQty} ${row.unit ?? ''}`.trim(),
+          description:
+            `Dự kiến hết sau ${row.daysUntilStockout} ngày; khuyến nghị nhập ${row.recommendedReorderQty} ${row.unit ?? ''}`.trim(),
           entityCode: row.materialCode,
           suggestedAction: 'Tạo yêu cầu mua/nhập kho',
-        })
+        });
       }
     }
 
@@ -41,10 +42,12 @@ export class DashboardRecommendationService {
         description: `${risk.missingMaterials?.length ?? 0} vật tư thiếu có thể làm chậm lệnh sản xuất.`,
         entityCode: risk.productionOrderNo,
         suggestedAction: 'Rà soát reservation/issue và ưu tiên cấp phát',
-      })
+      });
     }
 
-    const yard = insights?.health?.modules?.find((module: any) => module.module === 'Yard')
+    const yard = insights?.health?.modules?.find(
+      (module: any) => module.module === 'Yard',
+    );
     if ((yard?.metrics?.occupancy ?? 0) >= 90) {
       actions.push({
         id: 'action-yard-rebalance',
@@ -55,10 +58,12 @@ export class DashboardRecommendationService {
         description: `Sức chứa bãi đang ở ${(yard.metrics.occupancy ?? 0).toFixed(1)}%.`,
         entityCode: null,
         suggestedAction: 'Chuyển vị trí hoặc ưu tiên xuất bãi',
-      })
+      });
     }
 
-    const qc = insights?.health?.modules?.find((module: any) => module.module === 'QC')
+    const qc = insights?.health?.modules?.find(
+      (module: any) => module.module === 'QC',
+    );
     if ((qc?.metrics?.openNcr ?? 0) > 0) {
       actions.push({
         id: 'action-qc-ncr',
@@ -69,10 +74,12 @@ export class DashboardRecommendationService {
         description: `${qc.metrics.openNcr} NCR cần được xử lý để tránh nghẽn giao hàng/sản xuất.`,
         entityCode: null,
         suggestedAction: 'Ưu tiên phân công inspector/owner xử lý NCR',
-      })
+      });
     }
 
-    const projects = insights?.health?.modules?.find((module: any) => module.module === 'Projects')
+    const projects = insights?.health?.modules?.find(
+      (module: any) => module.module === 'Projects',
+    );
     if ((projects?.metrics?.delayedProjects ?? 0) > 0) {
       actions.push({
         id: 'action-project-progress',
@@ -82,8 +89,9 @@ export class DashboardRecommendationService {
         title: 'Rà soát công trình chậm',
         description: `${projects.metrics.delayedProjects} công trình đang ở trạng thái chậm tiến độ.`,
         entityCode: null,
-        suggestedAction: 'Kiểm tra kế hoạch, cấu kiện, vật tư và vận chuyển liên quan',
-      })
+        suggestedAction:
+          'Kiểm tra kế hoạch, cấu kiện, vật tư và vận chuyển liên quan',
+      });
     }
 
     for (const notice of notifications?.items ?? []) {
@@ -97,7 +105,7 @@ export class DashboardRecommendationService {
           description: notice.description,
           entityCode: notice.entityCode,
           suggestedAction: notice.actionLabel ?? 'Kiểm tra chi tiết',
-        })
+        });
       }
     }
 
@@ -106,22 +114,22 @@ export class DashboardRecommendationService {
       items: dedupe(actions)
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority))
         .slice(0, 12),
-    }
+    };
   }
 }
 
 function priorityRank(priority: RecommendedAction['priority']) {
-  if (priority === 'critical') return 0
-  if (priority === 'warning') return 1
-  return 2
+  if (priority === 'critical') return 0;
+  if (priority === 'warning') return 1;
+  return 2;
 }
 
 function dedupe(rows: RecommendedAction[]) {
-  const seen = new Set<string>()
+  const seen = new Set<string>();
   return rows.filter((row) => {
-    const key = `${row.module}:${row.actionType}:${row.entityCode ?? row.title}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+    const key = `${row.module}:${row.actionType}:${row.entityCode ?? row.title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

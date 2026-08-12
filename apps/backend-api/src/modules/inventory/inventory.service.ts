@@ -618,7 +618,7 @@ export class InventoryService {
 
     const supplierIds = Array.from(
       new Set(rows.map((row) => row.supplierId).filter(Boolean)),
-    ) as string[];
+    );
     const [suppliers, attachmentCounts] = await Promise.all([
       supplierIds.length
         ? this.inventoryRepository.findSuppliersByIds(supplierIds)
@@ -1134,10 +1134,7 @@ export class InventoryService {
           return transaction;
         });
       } catch (error) {
-        if (
-          receiptKey &&
-          this.isUniqueInventoryIdempotencyError(error)
-        ) {
+        if (receiptKey && this.isUniqueInventoryIdempotencyError(error)) {
           const replay =
             await this.inventoryRepository.findTransactionByIdempotencyKey(
               receiptKey,
@@ -1169,7 +1166,7 @@ export class InventoryService {
             {
               transactionType: type,
               attempt,
-              target: (error as any)?.meta?.target,
+              target: error?.meta?.target,
             },
           );
           continue;
@@ -1645,7 +1642,7 @@ export class InventoryService {
       new Set(
         lines
           .filter((line) => !line.warehouseId && line.zoneId)
-          .map((line) => line.zoneId as string),
+          .map((line) => line.zoneId),
       ),
     );
 
@@ -1682,18 +1679,17 @@ export class InventoryService {
     );
     if (!warehouseIds.length) return;
 
-    const warehouses = await this.inventoryRepository.findWarehousesByIds(
-      warehouseIds,
+    const warehouses =
+      await this.inventoryRepository.findWarehousesByIds(warehouseIds);
+    const byId = new Map(
+      warehouses.map((warehouse) => [warehouse.id, warehouse]),
     );
-    const byId = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
 
     for (const line of lines) {
       if (!line.warehouseId) continue;
       const warehouse = byId.get(line.warehouseId);
       if (!warehouse?.active) {
-        throw new BadRequestException(
-          'Warehouse is invalid or inactive.',
-        );
+        throw new BadRequestException('Warehouse is invalid or inactive.');
       }
       const requiresReceipt =
         type === TransactionType.IMPORT ||
@@ -2085,7 +2081,7 @@ export class InventoryService {
       return ['EXPORT'];
     }
     if (upper === 'TRANSFER' || upper === 'RETURN' || upper === 'ADJUSTMENT') {
-      return [upper as 'TRANSFER' | 'RETURN' | 'ADJUSTMENT'];
+      return [upper];
     }
     if (upper === 'IMPORT' || upper === 'EXPORT') {
       return [upper];

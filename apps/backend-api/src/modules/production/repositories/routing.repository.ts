@@ -59,7 +59,11 @@ export class RoutingRepository {
     });
   }
 
-  updateStage(id: string, data: Prisma.ProductionStageUpdateInput, tx: RoutingTx) {
+  updateStage(
+    id: string,
+    data: Prisma.ProductionStageUpdateInput,
+    tx: RoutingTx,
+  ) {
     return tx.productionStage.update({ where: { id }, data });
   }
 
@@ -67,7 +71,11 @@ export class RoutingRepository {
     return tx.productionTask.create({ data });
   }
 
-  updateTask(id: string, data: Prisma.ProductionTaskUpdateInput, tx: RoutingTx) {
+  updateTask(
+    id: string,
+    data: Prisma.ProductionTaskUpdateInput,
+    tx: RoutingTx,
+  ) {
     return tx.productionTask.update({ where: { id }, data });
   }
 
@@ -75,4 +83,3 @@ export class RoutingRepository {
     return tx.productionLog.create({ data });
   }
 }
-

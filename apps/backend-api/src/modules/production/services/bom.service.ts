@@ -25,7 +25,7 @@ export class BOMService {
     const bomItems = this.toBomItemCreates(body.items);
 
     return this.repository.create({
-      bomNo: body.bomNo ?? await this.repository.nextBomNo(),
+      bomNo: body.bomNo ?? (await this.repository.nextBomNo()),
       productCode: body.productCode,
       productName: body.productName,
       structureType: body.structureType,
@@ -42,26 +42,30 @@ export class BOMService {
   async update(id: string, body: UpdateBomDto) {
     await this.findOne(id);
 
-    return this.repository.updateWithChildren(id, {
-      bomNo: body.bomNo,
-      productCode: body.productCode,
-      productName: body.productName,
-      structureType: body.structureType,
-      projectId: body.projectId,
-      unit: body.unit,
-      estimatedWeight: body.estimatedWeight,
-      version: body.version,
-      status: body.status,
-      items: body.items
-        ? { create: this.toBomItemCreates(body.items) }
-        : undefined,
-      routingSteps: body.routingSteps
-        ? { create: body.routingSteps }
-        : undefined,
-    }, {
-      replaceItems: Boolean(body.items),
-      replaceRoutingSteps: Boolean(body.routingSteps),
-    });
+    return this.repository.updateWithChildren(
+      id,
+      {
+        bomNo: body.bomNo,
+        productCode: body.productCode,
+        productName: body.productName,
+        structureType: body.structureType,
+        projectId: body.projectId,
+        unit: body.unit,
+        estimatedWeight: body.estimatedWeight,
+        version: body.version,
+        status: body.status,
+        items: body.items
+          ? { create: this.toBomItemCreates(body.items) }
+          : undefined,
+        routingSteps: body.routingSteps
+          ? { create: body.routingSteps }
+          : undefined,
+      },
+      {
+        replaceItems: Boolean(body.items),
+        replaceRoutingSteps: Boolean(body.routingSteps),
+      },
+    );
   }
 
   async clone(id: string) {

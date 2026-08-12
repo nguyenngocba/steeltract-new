@@ -4,9 +4,7 @@ import { PerformanceMetricsService } from './performance-metrics.service';
 
 @Injectable()
 export class RuntimeHealthService {
-  constructor(
-    private readonly metrics: PerformanceMetricsService,
-  ) {}
+  constructor(private readonly metrics: PerformanceMetricsService) {}
 
   snapshot(): Record<string, unknown> {
     return this.metrics.snapshot();

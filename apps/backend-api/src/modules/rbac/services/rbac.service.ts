@@ -303,7 +303,9 @@ export class RbacService implements OnModuleInit {
 
     const [moduleKey, action] = requiredPermission.split('.');
     const legacyModule =
-      moduleKey === 'users' || moduleKey === 'roles' || moduleKey === 'permissions'
+      moduleKey === 'users' ||
+      moduleKey === 'roles' ||
+      moduleKey === 'permissions'
         ? 'rbac'
         : moduleKey === 'settings' || moduleKey === 'suppliers'
           ? 'master-data'

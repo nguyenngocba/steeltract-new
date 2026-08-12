@@ -1,5 +1,15 @@
 # Project Status
 
+On 2026-08-11 completed **SYSTEM.SNAPSHOT.1 - Canonical Snapshot & Projection
+Certification** with a **NO-GO** decision. Live REST and eight browser
+workspaces render, Playwright passed 1/1, and initialized projections show zero
+active failures/orphans. Historical coverage is incomplete: ERP latest returns
+404; only Inventory/Yard snapshots exist; live/snapshot parity fails at stock
+3,025 vs 0 and Yard placements 25 vs 0; balance and monthly rollup tables are
+empty. No business/API/schema/migration/UI source changed.
+
+Report: `docs/audits/system-snapshot1-projection-certification.md`.
+
 On 2026-08-11 completed **SYSTEM.REVERSE.CERT.1 - Canonical Reverse Workflow
 Runtime Certification** with a GO decision. Real authenticated REST ran 305
 steps and 71 assertions across Logistics return, Project return, QC PASS,
@@ -2265,3 +2275,16 @@ available; EPIC144 did not invent missing workflows.
 - REWORK: FAIL; `POST /production/commands/rework/accept` returns 500/P2003.
 - Full certification: NO-GO until Production rework logging and legacy
   Components dashboard status dependencies are closed.
+
+# SYSTEM.PROJECTION.1
+
+- Projection watermark service and canonical health vocabulary: PASS.
+- Per-projection event ID, aggregate version and processed time: PASS.
+- Same-day watermark-driven refresh and stable generation parity: PASS.
+- Dynamic History freshness/lag/age response: PASS.
+- `/history/dashboard/latest`: PASS for all probed modules.
+- Runtime Inventory and Yard KPI parity: PASS.
+- Projection workers: 25 HEALTHY, 6 NOT_INITIALIZED, 0 FAILED.
+- Monthly rollup runtime data: CONTROLLED EMPTY.
+- Tests/build/typecheck/targeted Playwright: PASS.
+- Schema/migration/business changes: NONE.

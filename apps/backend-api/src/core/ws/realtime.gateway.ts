@@ -3,10 +3,9 @@ import {
   WebSocketServer,
   SubscribeMessage,
   MessageBody,
-} from '@nestjs/websockets'
+} from '@nestjs/websockets';
 
-import { Server }
-from 'socket.io'
+import { Server } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
@@ -14,41 +13,24 @@ from 'socket.io'
   },
 })
 export class RealtimeGateway {
-
   @WebSocketServer()
-  server: Server
+  server: Server;
 
-  @SubscribeMessage(
-    'inventory:update',
-  )
-  handleInventoryUpdate(
-    @MessageBody() data: any,
-  ) {
-
-    this.server.emit(
-      'inventory:updated',
-      data,
-    )
+  @SubscribeMessage('inventory:update')
+  handleInventoryUpdate(@MessageBody() data: any) {
+    this.server.emit('inventory:updated', data);
 
     return {
       success: true,
-    }
+    };
   }
 
-  @SubscribeMessage(
-    'workflow:update',
-  )
-  handleWorkflowUpdate(
-    @MessageBody() data: any,
-  ) {
-
-    this.server.emit(
-      'workflow:updated',
-      data,
-    )
+  @SubscribeMessage('workflow:update')
+  handleWorkflowUpdate(@MessageBody() data: any) {
+    this.server.emit('workflow:updated', data);
 
     return {
       success: true,
-    }
+    };
   }
 }

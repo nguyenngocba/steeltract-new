@@ -22,9 +22,7 @@ import { ComponentDomainFoundationService } from './services/component-domain-fo
 @RequirePermissions('components.view')
 @Controller('components/foundation')
 export class ComponentDomainFoundationController {
-  constructor(
-    private readonly service: ComponentDomainFoundationService,
-  ) {}
+  constructor(private readonly service: ComponentDomainFoundationService) {}
 
   @Post('definition-requirements')
   @RequirePermissions('components.create')

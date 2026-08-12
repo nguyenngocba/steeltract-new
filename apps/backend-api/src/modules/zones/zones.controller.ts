@@ -6,17 +6,15 @@ import {
   Delete,
   Param,
   UseGuards,
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('zones')
 export class ZonesController {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -25,38 +23,32 @@ export class ZonesController {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
-  ) {
+  async create(@Body() body: any) {
     return this.prisma.warehouseZone.create({
       data: {
         code: body.code,
 
         name: body.name,
 
-        description:
-          body.description,
+        description: body.description,
 
-        color:
-          body.color,
+        color: body.color,
       },
-    })
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ) {
+  async remove(@Param('id') id: string) {
     return this.prisma.warehouseZone.delete({
       where: {
         id,
       },
-    })
+    });
   }
 }

@@ -300,7 +300,7 @@ export class LogisticsCommandService {
       tx,
     );
     if (!updated) this.stale();
-    return updated!;
+    return updated;
   }
 
   private async recordEvent(

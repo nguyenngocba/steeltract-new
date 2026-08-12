@@ -126,10 +126,7 @@ export class YardController {
 
   @Delete('zones/:id')
   @RequirePermissions('yard.write')
-  deleteZone(
-    @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
-  ) {
+  deleteZone(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.yardService.deleteZone(id, request.user?.id);
   }
 

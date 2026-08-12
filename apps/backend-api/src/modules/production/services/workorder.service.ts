@@ -1,46 +1,28 @@
-import {
-  Injectable,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
-import { WorkOrderRepository } from '../repositories/work-order.repository'
+import { WorkOrderRepository } from '../repositories/work-order.repository';
 
 @Injectable()
 export class WorkOrderService {
+  constructor(private readonly repository: WorkOrderRepository) {}
 
-  constructor(
-
-    private readonly repository:
-      WorkOrderRepository,
-  ) {}
-
-  async create(
-    body: any,
-  ) {
-
+  async create(body: any) {
     return this.repository.create({
-        productCode:
-          body.productCode,
+      productCode: body.productCode,
 
-        quantity:
-          body.quantity,
+      quantity: body.quantity,
 
-        plannedStart:
-          new Date(),
+      plannedStart: new Date(),
 
-        status:
-          'PLANNED',
-    })
+      status: 'PLANNED',
+    });
   }
 
-  async release(
-    id: string,
-  ) {
-
-    return this.repository.release(id)
+  async release(id: string) {
+    return this.repository.release(id);
   }
 
   async findAll() {
-
-    return this.repository.findAll()
+    return this.repository.findAll();
   }
 }

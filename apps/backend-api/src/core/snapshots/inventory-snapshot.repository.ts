@@ -1,7 +1,4 @@
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import {
   Prisma,
@@ -196,7 +193,9 @@ export class InventorySnapshotRepository {
     });
   }
 
-  async calculate(snapshotDate = new Date()): Promise<InventorySnapshotPayload[]> {
+  async calculate(
+    snapshotDate = new Date(),
+  ): Promise<InventorySnapshotPayload[]> {
     const dayStart = this.startOfDay(snapshotDate);
     const dayEnd = this.addDays(dayStart, 1);
     const monthStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), 1);
@@ -231,8 +230,7 @@ export class InventorySnapshotRepository {
           materialUsageType: true,
         },
       }),
-      this.prisma.inventoryLocationStock.findMany({
-      }),
+      this.prisma.inventoryLocationStock.findMany({}),
       this.prisma.productionMaterialReservationLine.findMany({
         where: {
           status: {
@@ -328,8 +326,7 @@ export class InventorySnapshotRepository {
     const mainWarehouseIds = new Set(
       warehouses
         .filter(
-          (warehouse) =>
-            warehouse.allowReceipt && !warehouse.allowProduction,
+          (warehouse) => warehouse.allowReceipt && !warehouse.allowProduction,
         )
         .map((warehouse) => warehouse.id),
     );
@@ -676,14 +673,18 @@ export class InventorySnapshotRepository {
       }),
     ]);
 
-    const supplierMap = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
+    const supplierMap = new Map(
+      suppliers.map((supplier) => [supplier.id, supplier]),
+    );
     const attachmentCount = new Map(
       attachments.map((row) => [row.entityId ?? '', row._count._all]),
     );
     const rows: InventoryMaterialSnapshotPayload[] = [];
 
     for (const item of items) {
-      const itemStocks = stocks.filter((row) => row.inventoryItemId === item.id);
+      const itemStocks = stocks.filter(
+        (row) => row.inventoryItemId === item.id,
+      );
       const itemLines = transactionItems.filter(
         (row) => row.inventoryItemId === item.id,
       );
@@ -696,24 +697,35 @@ export class InventorySnapshotRepository {
       const itemReturnRows = returnItems.filter(
         (row) => row.inventoryItemId === item.id,
       );
-      const inboundLines = itemLines.filter((line) => Number(line.quantity) > 0);
-      const outboundLines = itemLines.filter((line) => Number(line.quantity) < 0);
+      const inboundLines = itemLines.filter(
+        (line) => Number(line.quantity) > 0,
+      );
+      const outboundLines = itemLines.filter(
+        (line) => Number(line.quantity) < 0,
+      );
       // Location balances are the canonical live stock source. Transaction
       // history may contain legacy baselines that cannot reconstruct stock.
       const currentStock = this.sum(
         itemStocks.map((stock) => Number(stock.quantity ?? 0)),
       );
-      const inboundQuantity = this.sum(inboundLines.map((line) => Number(line.quantity ?? 0)));
-      const outboundQuantity = this.sum(outboundLines.map((line) => Math.abs(Number(line.quantity ?? 0))));
+      const inboundQuantity = this.sum(
+        inboundLines.map((line) => Number(line.quantity ?? 0)),
+      );
+      const outboundQuantity = this.sum(
+        outboundLines.map((line) => Math.abs(Number(line.quantity ?? 0))),
+      );
       const inboundCost = this.sum(
         inboundLines.map((line) =>
           Number(
             line.totalAmount ??
-              (line.unitPrice != null ? Number(line.unitPrice) * Number(line.quantity) : 0),
+              (line.unitPrice != null
+                ? Number(line.unitPrice) * Number(line.quantity)
+                : 0),
           ),
         ),
       );
-      const averageCost = inboundQuantity > 0 ? inboundCost / inboundQuantity : 0;
+      const averageCost =
+        inboundQuantity > 0 ? inboundCost / inboundQuantity : 0;
       const reservedStock = this.sum(
         itemReservations.map((line) =>
           Math.max(
@@ -730,21 +742,25 @@ export class InventorySnapshotRepository {
       const pendingReturn = this.sum(
         itemReturnRows
           .filter((line) =>
-            ([
-              ReturnRequestStatus.REQUESTED,
-              ReturnRequestStatus.APPROVED,
-            ] as ReturnRequestStatus[]).includes(line.returnRequest.status),
+            (
+              [
+                ReturnRequestStatus.REQUESTED,
+                ReturnRequestStatus.APPROVED,
+              ] as ReturnRequestStatus[]
+            ).includes(line.returnRequest.status),
           )
           .map((line) => Number(line.requestedQuantity ?? 0)),
       );
       const returnedQuantity = this.sum(
         itemReturnRows
           .filter((line) =>
-            ([
-              ReturnRequestStatus.RECEIVED,
-              ReturnRequestStatus.INSPECTED,
-              ReturnRequestStatus.DISPOSED,
-            ] as ReturnRequestStatus[]).includes(line.returnRequest.status),
+            (
+              [
+                ReturnRequestStatus.RECEIVED,
+                ReturnRequestStatus.INSPECTED,
+                ReturnRequestStatus.DISPOSED,
+              ] as ReturnRequestStatus[]
+            ).includes(line.returnRequest.status),
           )
           .map((line) =>
             Number(line.receivedQuantity ?? line.requestedQuantity ?? 0),
@@ -754,27 +770,27 @@ export class InventorySnapshotRepository {
         .map((row) => {
           const warehouse = row.warehouse ?? row.zone?.warehouse ?? null;
           return {
-          zoneId: row.zoneId,
-          zoneCode: row.zone?.code ?? null,
-          zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
-          slotId: row.slotId,
-          level: row.level,
-          row: row.zone?.row ?? null,
-          column: row.zone?.column ?? null,
-          warehouseId: warehouse?.id ?? null,
-          warehouseName: warehouse?.name ?? null,
-          warehouseCode: warehouse?.code ?? null,
-          warehouseType: warehouse?.warehouseType ?? null,
-          allowReceipt: warehouse?.allowReceipt ?? false,
-          allowIssue: warehouse?.allowIssue ?? false,
-          allowProduction: warehouse?.allowProduction ?? false,
-          allowQc: warehouse?.allowQc ?? false,
-          allowDispatch: warehouse?.allowDispatch ?? false,
-          allowInstallation: warehouse?.allowInstallation ?? false,
-          allowSupplierReturn: warehouse?.allowSupplierReturn ?? false,
-          allowScrap: warehouse?.allowScrap ?? false,
-          allowReverse: warehouse?.allowReverse ?? false,
-          quantity: Number(row.quantity),
+            zoneId: row.zoneId,
+            zoneCode: row.zone?.code ?? null,
+            zoneName: row.zone ? `${row.zone.code} - ${row.zone.name}` : null,
+            slotId: row.slotId,
+            level: row.level,
+            row: row.zone?.row ?? null,
+            column: row.zone?.column ?? null,
+            warehouseId: warehouse?.id ?? null,
+            warehouseName: warehouse?.name ?? null,
+            warehouseCode: warehouse?.code ?? null,
+            warehouseType: warehouse?.warehouseType ?? null,
+            allowReceipt: warehouse?.allowReceipt ?? false,
+            allowIssue: warehouse?.allowIssue ?? false,
+            allowProduction: warehouse?.allowProduction ?? false,
+            allowQc: warehouse?.allowQc ?? false,
+            allowDispatch: warehouse?.allowDispatch ?? false,
+            allowInstallation: warehouse?.allowInstallation ?? false,
+            allowSupplierReturn: warehouse?.allowSupplierReturn ?? false,
+            allowScrap: warehouse?.allowScrap ?? false,
+            allowReverse: warehouse?.allowReverse ?? false,
+            quantity: Number(row.quantity),
           };
         })
         .sort((a, b) => b.quantity - a.quantity);
@@ -833,8 +849,8 @@ export class InventorySnapshotRepository {
         locationCount: locationBalances.length,
         lastInboundAt: inboundLines[0]?.transaction.transactionDate ?? null,
         lastOutboundAt: outboundLines[0]?.transaction.transactionDate ?? null,
-        detailPayload: detailPayload as Prisma.InputJsonValue,
-        locationPayload: locationBalances as Prisma.InputJsonValue,
+        detailPayload: detailPayload,
+        locationPayload: locationBalances,
         transactionPayload: {
           inboundCount: inboundLines.length,
           outboundCount: outboundLines.length,
@@ -854,7 +870,10 @@ export class InventorySnapshotRepository {
         ]);
       }
 
-      for (const [warehouseId, warehouseStocks] of stocksByWarehouse.entries()) {
+      for (const [
+        warehouseId,
+        warehouseStocks,
+      ] of stocksByWarehouse.entries()) {
         const warehouseCode = warehouseStocks[0]?.zone?.warehouse?.code ?? null;
         const warehouseCurrentStock = this.sum(
           warehouseStocks.map((stock) => Number(stock.quantity ?? 0)),
@@ -909,7 +928,7 @@ export class InventorySnapshotRepository {
             outboundLines.find((line) => line.warehouseId === warehouseId)
               ?.transaction.transactionDate ?? null,
           detailPayload: undefined,
-          locationPayload: warehouseLocations as Prisma.InputJsonValue,
+          locationPayload: warehouseLocations,
           transactionPayload: {
             inboundCount: inboundLines.filter(
               (line) => line.warehouseId === warehouseId,
@@ -925,7 +944,9 @@ export class InventorySnapshotRepository {
     return rows;
   }
 
-  async calculateLocationSnapshots(): Promise<InventoryLocationSnapshotPayload[]> {
+  async calculateLocationSnapshots(): Promise<
+    InventoryLocationSnapshotPayload[]
+  > {
     const stocks = await this.prisma.inventoryLocationStock.findMany({
       where: {
         quantity: {
@@ -970,26 +991,24 @@ export class InventorySnapshotRepository {
         slotId: stock.slotId,
         level: stock.level,
       });
-      const current =
-        grouped.get(key) ??
-        {
-          location: {
-            locationKey: key,
-            warehouseId: stock.warehouseId ?? stock.zone?.warehouseId ?? null,
-            warehouseCode: stock.zone?.warehouse?.code ?? null,
-            warehouseName: stock.zone?.warehouse?.name ?? null,
-            zoneId: stock.zoneId,
-            zoneCode: stock.zone?.code ?? null,
-            zoneName: stock.zone?.name ?? null,
-            slotId: stock.slotId,
-            level: stock.level,
-            quantity: 0,
-            occupied: false,
-            materialCount: 0,
-            materialPayload: [],
-          },
-          materials: [],
-        };
+      const current = grouped.get(key) ?? {
+        location: {
+          locationKey: key,
+          warehouseId: stock.warehouseId ?? stock.zone?.warehouseId ?? null,
+          warehouseCode: stock.zone?.warehouse?.code ?? null,
+          warehouseName: stock.zone?.warehouse?.name ?? null,
+          zoneId: stock.zoneId,
+          zoneCode: stock.zone?.code ?? null,
+          zoneName: stock.zone?.name ?? null,
+          slotId: stock.slotId,
+          level: stock.level,
+          quantity: 0,
+          occupied: false,
+          materialCount: 0,
+          materialPayload: [],
+        },
+        materials: [],
+      };
 
       current.location.quantity += Number(stock.quantity ?? 0);
       current.materials.push({
@@ -1006,7 +1025,7 @@ export class InventorySnapshotRepository {
       ...entry.location,
       occupied: entry.location.quantity > 0,
       materialCount: entry.materials.length,
-      materialPayload: entry.materials as Prisma.InputJsonValue,
+      materialPayload: entry.materials,
     }));
   }
 
@@ -1053,7 +1072,7 @@ export class InventorySnapshotRepository {
       unit: line.unit?.code ?? item.unit ?? item.unitMaster?.code ?? 'PCS',
       supplierId,
       supplierName: supplierId
-        ? supplierMap.get(supplierId)?.name ?? supplierId
+        ? (supplierMap.get(supplierId)?.name ?? supplierId)
         : null,
       projectId: line.transaction?.projectId,
       projectName: line.transaction?.project?.name ?? null,
@@ -1067,7 +1086,9 @@ export class InventorySnapshotRepository {
   }
 
   private toBusinessType(value: TransactionType | string | null | undefined) {
-    const upper = String(value ?? '').trim().toUpperCase();
+    const upper = String(value ?? '')
+      .trim()
+      .toUpperCase();
     if (upper === 'IMPORT' || upper === 'INBOUND') return 'INBOUND';
     if (upper === 'EXPORT' || upper === 'OUTBOUND') return 'OUTBOUND';
     if (upper === 'TRANSFER') return 'TRANSFER';
@@ -1122,8 +1143,7 @@ export class InventorySnapshotRepository {
             (row.warehouseId ?? row.transaction.warehouseId) === warehouseId,
         )
         .map((row) => {
-          const sign =
-            row.transaction.type === TransactionType.EXPORT ? -1 : 1;
+          const sign = row.transaction.type === TransactionType.EXPORT ? -1 : 1;
           return Math.abs(Number(row.quantity ?? 0) * sign);
         }),
     );

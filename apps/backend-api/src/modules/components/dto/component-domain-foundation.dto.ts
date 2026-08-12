@@ -1,4 +1,7 @@
-import { ComponentInstanceState, ProjectComponentRequirementStatus } from '@prisma/client';
+import {
+  ComponentInstanceState,
+  ProjectComponentRequirementStatus,
+} from '@prisma/client';
 import { z } from 'zod';
 
 import { baseQuerySchema } from '../../../common/dto/query.dto';

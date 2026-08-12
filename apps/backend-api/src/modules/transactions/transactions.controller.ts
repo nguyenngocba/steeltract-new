@@ -1,19 +1,10 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common'
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 
-import { JwtAuthGuard }
-  from '../auth/jwt-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { CommandBus }
-  from '../../core/cqrs/command.bus'
+import { CommandBus } from '../../core/cqrs/command.bus';
 
-import { QueryBus }
-  from '../../core/cqrs/query.bus'
+import { QueryBus } from '../../core/cqrs/query.bus';
 
 @Controller('transactions')
 export class TransactionsController {
@@ -25,29 +16,19 @@ export class TransactionsController {
   @UseGuards(JwtAuthGuard)
   @Get()
   async findAll() {
+    console.log('TRANSACTIONS GET HIT');
 
-    console.log(
-      'TRANSACTIONS GET HIT',
-    )
-
-    return this.queryBus.execute(
-      'inventory.list.transactions',
-    )
+    return this.queryBus.execute('inventory.list.transactions');
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(
-    @Body() body: any,
-  ) {
-    console.log(
-      'TRANSACTIONS POST HIT',
-      JSON.stringify(body, null, 2),
-    )
+  async create(@Body() body: any) {
+    console.log('TRANSACTIONS POST HIT', JSON.stringify(body, null, 2));
 
     return this.commandBus.execute({
       type: 'inventory.create.transaction',
       payload: body,
-    })
+    });
   }
 }

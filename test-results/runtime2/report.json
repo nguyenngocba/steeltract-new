@@ -3,7 +3,8 @@
     "argv": [
       "/usr/bin/node",
       "/opt/projects/steeltrack/apps/frontend/node_modules/@playwright/test/cli.js",
-      "test"
+      "test",
+      "e2e/snapshot-cert1.spec.ts"
     ],
     "configFile": "/opt/projects/steeltrack/apps/frontend/playwright.config.ts",
     "rootDir": "/opt/projects/steeltrack/apps/frontend/e2e",
@@ -72,25 +73,25 @@
   },
   "suites": [
     {
-      "title": "runtime-certification.spec.ts",
-      "file": "runtime-certification.spec.ts",
+      "title": "snapshot-cert1.spec.ts",
+      "file": "snapshot-cert1.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "SYSTEM.RUNTIME.2 production runtime closure",
-          "file": "runtime-certification.spec.ts",
-          "line": 30,
+          "title": "SYSTEM.SNAPSHOT.1 dashboard browser certification",
+          "file": "snapshot-cert1.spec.ts",
+          "line": 10,
           "column": 6,
           "specs": [
             {
-              "title": "certifies health, REST workflow, browser workspaces and logout",
+              "title": "renders live and historical dashboard workspaces without browser crashes",
               "ok": true,
               "tags": [],
               "tests": [
                 {
-                  "timeout": 600000,
+                  "timeout": 300000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "",
@@ -100,12 +101,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 58648,
+                      "duration": 33256,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-10T06:53:52.962Z",
+                      "startTime": "2026-08-11T08:29:47.520Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -113,9 +114,9 @@
                   "status": "expected"
                 }
               ],
-              "id": "7f0c7c369131befc9466-03cf0a73a507aa2e490e",
-              "file": "runtime-certification.spec.ts",
-              "line": 34,
+              "id": "b5b25e8bdcd1df5e529c-8b78bfbf9a4271062ff8",
+              "file": "snapshot-cert1.spec.ts",
+              "line": 14,
               "column": 3
             }
           ]
@@ -125,8 +126,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-10T06:53:49.996Z",
-    "duration": 62009.422999999995,
+    "startTime": "2026-08-11T08:29:44.356Z",
+    "duration": 36777.411,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,

@@ -26,12 +26,10 @@ export class DictionariesService {
   ) {}
 
   listDomains() {
-    return Object.entries(masterDataDomains).map(
-      ([id, config]) => ({
-        id,
-        entity: config.entity,
-      }),
-    );
+    return Object.entries(masterDataDomains).map(([id, config]) => ({
+      id,
+      entity: config.entity,
+    }));
   }
 
   async findAll(domain: string, query: ListDictionaryDto) {
@@ -51,21 +49,14 @@ export class DictionariesService {
       ...record,
       usageCount: Object.values(
         (record._count as Record<string, number> | undefined) ?? {},
-      ).reduce(
-        (sum: number, count) => sum + Number(count ?? 0),
-        0,
-      ),
+      ).reduce((sum: number, count) => sum + Number(count ?? 0), 0),
     }));
   }
 
   async create(domain: string, dto: DictionaryPayloadDto) {
     const config = this.getConfig(domain);
     const delegate = this.getDelegate(config.model);
-    await this.validateWarehouseType(
-      config.model,
-      dto.warehouseTypeId,
-      true,
-    );
+    await this.validateWarehouseType(config.model, dto.warehouseTypeId, true);
     const data = await this.toData(config, dto);
 
     const record = await delegate.create({
@@ -78,11 +69,7 @@ export class DictionariesService {
     return record;
   }
 
-  async update(
-    domain: string,
-    id: string,
-    dto: UpdateDictionaryPayloadDto,
-  ) {
+  async update(domain: string, id: string, dto: UpdateDictionaryPayloadDto) {
     const config = this.getConfig(domain);
     const delegate = this.getDelegate(config.model);
     const existing = await delegate.findUnique({
@@ -98,11 +85,7 @@ export class DictionariesService {
     if (config.model === 'masterWarehouse' && dto.active === false) {
       await this.assertWarehouseCanDeactivate(id);
     }
-    await this.validateWarehouseType(
-      config.model,
-      dto.warehouseTypeId,
-      false,
-    );
+    await this.validateWarehouseType(config.model, dto.warehouseTypeId, false);
 
     const record = await delegate.update({
       where: {
@@ -194,10 +177,7 @@ export class DictionariesService {
     return {
       warehouse,
       dependencies,
-      total: Object.values(dependencies).reduce(
-        (sum, count) => sum + count,
-        0,
-      ),
+      total: Object.values(dependencies).reduce((sum, count) => sum + count, 0),
       canDeactivate: Object.values(dependencies).every((count) => count === 0),
     };
   }
@@ -314,16 +294,10 @@ export class DictionariesService {
     }
 
     if (config.model === 'masterTransactionType' && !dto.direction) {
-      throw new BadRequestException(
-        'Transaction type direction is required.',
-      );
+      throw new BadRequestException('Transaction type direction is required.');
     }
 
-    if (
-      config.relationKey &&
-      config.relationName &&
-      dto[config.relationKey]
-    ) {
+    if (config.relationKey && config.relationName && dto[config.relationKey]) {
       data[config.relationName] = {
         connect: {
           id: dto[config.relationKey],
@@ -336,9 +310,7 @@ export class DictionariesService {
     }
 
     return Object.fromEntries(
-      Object.entries(data).filter(
-        ([, value]) => value !== undefined,
-      ),
+      Object.entries(data).filter(([, value]) => value !== undefined),
     );
   }
 
@@ -370,10 +342,7 @@ export class DictionariesService {
     return this.prisma.inventoryTransaction.count({
       where: {
         type,
-        OR: [
-          { warehouseId },
-          { items: { some: { warehouseId } } },
-        ],
+        OR: [{ warehouseId }, { items: { some: { warehouseId } } }],
       },
     });
   }
@@ -405,13 +374,9 @@ export class DictionariesService {
     };
 
     await Promise.all([
-      this.eventBus.emit(
-        `master-data.${domain}.${action}`,
-        metadata,
-        {
-          module: 'master-data',
-        },
-      ),
+      this.eventBus.emit(`master-data.${domain}.${action}`, metadata, {
+        module: 'master-data',
+      }),
       this.eventBus.emitAudit({
         action: action === 'created' ? 'CREATE' : 'UPDATE',
         entity,

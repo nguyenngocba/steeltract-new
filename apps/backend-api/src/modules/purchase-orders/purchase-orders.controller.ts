@@ -73,7 +73,7 @@ export class PurchaseOrdersController {
     body: CreatePurchaseOrderDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.createOrder(body, request.user!.id);
+    return this.service.createOrder(body, request.user.id);
   }
 
   @Patch(':id')
@@ -84,19 +84,19 @@ export class PurchaseOrdersController {
     body: UpdatePurchaseOrderDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.updateOrder(id, body, request.user!.id);
+    return this.service.updateOrder(id, body, request.user.id);
   }
 
   @Patch(':id/submit')
   @RequirePermissions('procurement.po.create')
   submit(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.service.submitOrder(id, request.user!.id);
+    return this.service.submitOrder(id, request.user.id);
   }
 
   @Patch(':id/approve')
   @RequirePermissions('procurement.po.approve')
   approve(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.service.approveOrder(id, request.user!.id);
+    return this.service.approveOrder(id, request.user.id);
   }
 
   @Patch(':id/reject')
@@ -107,7 +107,7 @@ export class PurchaseOrdersController {
     body: TransitionReasonDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.rejectOrder(id, request.user!.id, body);
+    return this.service.rejectOrder(id, request.user.id, body);
   }
 
   @Patch(':id/cancel')
@@ -118,7 +118,7 @@ export class PurchaseOrdersController {
     body: TransitionReasonDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.cancelOrder(id, request.user!.id, body);
+    return this.service.cancelOrder(id, request.user.id, body);
   }
 
   @Post(':id/receipts')
@@ -130,12 +130,7 @@ export class PurchaseOrdersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.receiveOrder(
-      id,
-      body,
-      request.user!.id,
-      idempotencyKey,
-    );
+    return this.service.receiveOrder(id, body, request.user.id, idempotencyKey);
   }
 
   @Post(':id/supplier-returns')
@@ -146,7 +141,7 @@ export class PurchaseOrdersController {
     body: CreateCanonicalSupplierReturnDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.service.createSupplierReturn(id, body, request.user!.id);
+    return this.service.createSupplierReturn(id, body, request.user.id);
   }
 
   @Patch(':id/supplier-returns/:returnId/approve')
@@ -162,7 +157,7 @@ export class PurchaseOrdersController {
       id,
       returnId,
       body,
-      request.user!.id,
+      request.user.id,
     );
   }
 
@@ -179,7 +174,7 @@ export class PurchaseOrdersController {
       id,
       returnId,
       body,
-      request.user!.id,
+      request.user.id,
     );
   }
 
@@ -196,7 +191,7 @@ export class PurchaseOrdersController {
       id,
       returnId,
       body,
-      request.user!.id,
+      request.user.id,
     );
   }
 
@@ -213,7 +208,7 @@ export class PurchaseOrdersController {
       id,
       returnId,
       body,
-      request.user!.id,
+      request.user.id,
     );
   }
 
@@ -226,14 +221,14 @@ export class PurchaseOrdersController {
     @Req() request: AuthenticatedRequest,
   ) {
     if (body.status === 'SUBMITTED') {
-      return this.service.submitOrder(id, request.user!.id);
+      return this.service.submitOrder(id, request.user.id);
     }
     if (body.status === 'APPROVED') {
-      return this.service.approveOrder(id, request.user!.id);
+      return this.service.approveOrder(id, request.user.id);
     }
     if (body.status === 'REJECTED') {
-      return this.service.rejectOrder(id, request.user!.id, body);
+      return this.service.rejectOrder(id, request.user.id, body);
     }
-    return this.service.cancelOrder(id, request.user!.id, body);
+    return this.service.cancelOrder(id, request.user.id, body);
   }
 }

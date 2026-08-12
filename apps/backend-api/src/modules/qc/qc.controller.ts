@@ -249,7 +249,9 @@ export class QcController {
       expectedVersion: body.expectedVersion,
       notes: body.notes,
       actorId: request.user?.id,
-      idempotencyKey: idempotencyKey ?? `qc-final-pass:${inspectionId}:${body.expectedVersion}`,
+      idempotencyKey:
+        idempotencyKey ??
+        `qc-final-pass:${inspectionId}:${body.expectedVersion}`,
       correlationId,
       causationId,
     });
@@ -271,7 +273,9 @@ export class QcController {
       expectedVersion: body.expectedVersion,
       notes: body.notes,
       actorId: request.user?.id,
-      idempotencyKey: idempotencyKey ?? `qc-final-fail:${inspectionId}:${body.expectedVersion}`,
+      idempotencyKey:
+        idempotencyKey ??
+        `qc-final-fail:${inspectionId}:${body.expectedVersion}`,
       correlationId,
       causationId,
     });
@@ -299,7 +303,8 @@ export class QcController {
       defectCode: body.defectCode,
       reasonCode: body.reasonCode,
       actorId: request.user?.id,
-      idempotencyKey: idempotencyKey ?? `qc-ncr:${inspectionId}:${body.expectedVersion}`,
+      idempotencyKey:
+        idempotencyKey ?? `qc-ncr:${inspectionId}:${body.expectedVersion}`,
       correlationId,
       causationId,
     });
@@ -324,7 +329,8 @@ export class QcController {
       approvedQuantity: body.approvedQuantity,
       unit: body.unit,
       actorId: request.user?.id,
-      idempotencyKey: idempotencyKey ?? `qc-ncr-rework:${ncrId}:${body.expectedVersion}`,
+      idempotencyKey:
+        idempotencyKey ?? `qc-ncr-rework:${ncrId}:${body.expectedVersion}`,
       correlationId,
       causationId,
     });
@@ -349,7 +355,8 @@ export class QcController {
       approvedQuantity: body.approvedQuantity,
       unit: body.unit,
       actorId: request.user?.id,
-      idempotencyKey: idempotencyKey ?? `qc-ncr-scrap:${ncrId}:${body.expectedVersion}`,
+      idempotencyKey:
+        idempotencyKey ?? `qc-ncr-scrap:${ncrId}:${body.expectedVersion}`,
       correlationId,
       causationId,
     });
@@ -375,7 +382,8 @@ export class QcController {
       approvedQuantity: body.approvedQuantity,
       unit: body.unit,
       actorId: request.user?.id,
-      idempotencyKey: idempotencyKey ?? `qc-ncr-use-as-is:${ncrId}:${body.expectedVersion}`,
+      idempotencyKey:
+        idempotencyKey ?? `qc-ncr-use-as-is:${ncrId}:${body.expectedVersion}`,
       correlationId,
       causationId,
     });

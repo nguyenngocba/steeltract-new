@@ -150,20 +150,22 @@ export class QcSnapshotRepository {
       QcInspectionStatus.PASSED,
       QcInspectionStatus.APPROVED,
     ]);
-    const waitingProductionCount = completedOrders.filter((order) =>
-      !releaseInspections.some(
-        (inspection) =>
-          (inspection.productionOrderId === order.id ||
-            Boolean(
-              order.componentId && inspection.componentId === order.componentId,
-            )) &&
-          (
-            [
-              QcInspectionStatus.PASSED,
-              QcInspectionStatus.APPROVED,
-            ] as QcInspectionStatus[]
-          ).includes(inspection.status),
-      ),
+    const waitingProductionCount = completedOrders.filter(
+      (order) =>
+        !releaseInspections.some(
+          (inspection) =>
+            (inspection.productionOrderId === order.id ||
+              Boolean(
+                order.componentId &&
+                inspection.componentId === order.componentId,
+              )) &&
+            (
+              [
+                QcInspectionStatus.PASSED,
+                QcInspectionStatus.APPROVED,
+              ] as QcInspectionStatus[]
+            ).includes(inspection.status),
+        ),
     ).length;
 
     return [
@@ -224,7 +226,9 @@ export class QcSnapshotRepository {
     });
 
     return rows.map((row) => {
-      const passed = row.results.filter((result) => result.status === 'PASS').length;
+      const passed = row.results.filter(
+        (result) => result.status === 'PASS',
+      ).length;
       return {
         inspectionId: row.id,
         inspectionNo: row.inspectionNo,
@@ -251,7 +255,10 @@ export class QcSnapshotRepository {
     });
   }
 
-  upsertDashboard(payload: QcDashboardSnapshotPayload, tx: Prisma.TransactionClient) {
+  upsertDashboard(
+    payload: QcDashboardSnapshotPayload,
+    tx: Prisma.TransactionClient,
+  ) {
     return tx.qcDashboardSnapshot.upsert({
       where: {
         scopeKey_snapshotDate: {

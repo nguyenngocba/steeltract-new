@@ -97,13 +97,15 @@ const equipmentResourceSchema = z.object({
   allocated: z.coerce.number().default(0),
 });
 
-const inspectionStatusSchema = z.enum([
-  'PENDING_INSPECTION',
-  'INSPECTION_FAILED',
-  'INSPECTION_PASSED',
-  'ACCEPTED',
-  'HANDED_OVER',
-]).optional();
+const inspectionStatusSchema = z
+  .enum([
+    'PENDING_INSPECTION',
+    'INSPECTION_FAILED',
+    'INSPECTION_PASSED',
+    'ACCEPTED',
+    'HANDED_OVER',
+  ])
+  .optional();
 
 const templateDependencySchema = z.object({
   key: z.string().trim().min(1),
@@ -124,8 +126,17 @@ const templateTaskSchema: z.ZodType<{
   description?: string;
   parentKey?: string;
   durationDays?: number;
-  dependsOn?: Array<{ key: string; type?: 'FS' | 'SS' | 'FF'; lagDays?: number }>;
-  resources?: Array<{ type: 'WORKER' | 'MACHINE' | 'OTHER'; name: string; quantity?: number; cost?: number }>;
+  dependsOn?: Array<{
+    key: string;
+    type?: 'FS' | 'SS' | 'FF';
+    lagDays?: number;
+  }>;
+  resources?: Array<{
+    type: 'WORKER' | 'MACHINE' | 'OTHER';
+    name: string;
+    quantity?: number;
+    cost?: number;
+  }>;
   suggestedMaterials?: string[];
   suggestedComponents?: string[];
   suggestedMachines?: string[];
@@ -169,7 +180,8 @@ export const createProjectTemplateSchema = z.object({
   structure: projectTemplateStructureSchema,
 });
 
-export const updateProjectTemplateSchema = createProjectTemplateSchema.partial();
+export const updateProjectTemplateSchema =
+  createProjectTemplateSchema.partial();
 
 export const importProjectTemplateSchema = z.object({
   templates: z.array(createProjectTemplateSchema).min(1),
@@ -246,14 +258,20 @@ export type CreateProjectDto = z.infer<typeof createProjectSchema>;
 
 export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
 
-export type ReturnProjectComponentDto = z.infer<typeof returnProjectComponentSchema>;
+export type ReturnProjectComponentDto = z.infer<
+  typeof returnProjectComponentSchema
+>;
 export type ReturnProjectComponentInstanceDto = z.infer<
   typeof returnProjectComponentInstanceSchema
 >;
 
-export type CreateProjectWbsTaskDto = z.infer<typeof createProjectWbsTaskSchema>;
+export type CreateProjectWbsTaskDto = z.infer<
+  typeof createProjectWbsTaskSchema
+>;
 
-export type UpdateProjectWbsTaskDto = z.infer<typeof updateProjectWbsTaskSchema>;
+export type UpdateProjectWbsTaskDto = z.infer<
+  typeof updateProjectWbsTaskSchema
+>;
 
 export type MoveProjectWbsTaskDto = z.infer<typeof moveProjectWbsTaskSchema>;
 
@@ -263,10 +281,18 @@ export type BulkProjectWbsDto = z.infer<typeof bulkProjectWbsSchema>;
 
 export type SiteProjectUpdateDto = z.infer<typeof siteProjectUpdateSchema>;
 
-export type ProjectTemplateStructureDto = z.infer<typeof projectTemplateStructureSchema>;
+export type ProjectTemplateStructureDto = z.infer<
+  typeof projectTemplateStructureSchema
+>;
 
-export type CreateProjectTemplateDto = z.infer<typeof createProjectTemplateSchema>;
+export type CreateProjectTemplateDto = z.infer<
+  typeof createProjectTemplateSchema
+>;
 
-export type UpdateProjectTemplateDto = z.infer<typeof updateProjectTemplateSchema>;
+export type UpdateProjectTemplateDto = z.infer<
+  typeof updateProjectTemplateSchema
+>;
 
-export type ImportProjectTemplateDto = z.infer<typeof importProjectTemplateSchema>;
+export type ImportProjectTemplateDto = z.infer<
+  typeof importProjectTemplateSchema
+>;

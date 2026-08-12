@@ -8,6 +8,26 @@ import {
 import { HistoricalDashboardService } from './historical-dashboard.service';
 
 describe('HistoricalDashboardService', () => {
+  const freshness = {
+    status: 'HEALTHY',
+    fresh: true,
+    stale: false,
+    authoritative: true,
+    parity: true,
+    lagMs: 100,
+    ageMs: 200,
+    snapshotWatermark: 'event-1',
+    currentWatermark: {
+      module: HistoricalDashboardModule.ERP,
+      lastEventId: 'event-1',
+      lastAggregateVersion: '1',
+      lastProcessedAt: null,
+      sourceOccurredAt: null,
+      status: 'HEALTHY',
+      fresh: true,
+      lagMs: 100,
+    },
+  };
   const repository = () => ({
     findDashboardSnapshot: jest.fn(),
     findLatestDashboardSnapshot: jest.fn(),
@@ -16,6 +36,10 @@ describe('HistoricalDashboardService', () => {
     findInventoryMonthlyRollups: jest.fn(),
     findSnapshotJobs: jest.fn(),
   });
+  const service = (repo: ReturnType<typeof repository>) =>
+    new HistoricalDashboardService(repo as any, {
+      evaluateSnapshot: jest.fn().mockResolvedValue(freshness),
+    } as any);
 
   it('returns a dashboard snapshot DTO for the requested date', async () => {
     const repo = repository();
@@ -29,9 +53,9 @@ describe('HistoricalDashboardService', () => {
       kpis: { inventoryValue: new Prisma.Decimal('158.26') },
       rowsRead: BigInt(12),
     });
-    const service = new HistoricalDashboardService(repo as any);
+    const subject = service(repo);
 
-    const result = await service.dashboard({
+    const result = await subject.dashboard({
       date: '2026-07-22',
       module: HistoricalDashboardModule.ERP,
     });
@@ -51,6 +75,8 @@ describe('HistoricalDashboardService', () => {
       authoritative: true,
       kpis: { inventoryValue: '158.26' },
       rowsRead: '12',
+      stale: false,
+      freshness,
     });
   });
 
@@ -64,9 +90,9 @@ describe('HistoricalDashboardService', () => {
       authoritative: true,
       kpis: {},
     });
-    const service = new HistoricalDashboardService(repo as any);
+    const subject = service(repo);
 
-    await service.dashboard({
+    await subject.dashboard({
       date: '2024-02-29',
       module: HistoricalDashboardModule.INVENTORY,
     });
@@ -87,7 +113,7 @@ describe('HistoricalDashboardService', () => {
       kpis: {},
     });
 
-    await service.dashboard({
+    await subject.dashboard({
       date: '2026-12-31',
       module: HistoricalDashboardModule.PROJECTS,
     });
@@ -103,10 +129,10 @@ describe('HistoricalDashboardService', () => {
   it('throws not found when latest authoritative snapshot is missing', async () => {
     const repo = repository();
     repo.findLatestDashboardSnapshot.mockResolvedValue(null);
-    const service = new HistoricalDashboardService(repo as any);
+    const subject = service(repo);
 
     await expect(
-      service.latestDashboard({
+      subject.latestDashboard({
         module: HistoricalDashboardModule.INVENTORY,
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -126,9 +152,9 @@ describe('HistoricalDashboardService', () => {
       ],
       total: 1,
     });
-    const service = new HistoricalDashboardService(repo as any);
+    const subject = service(repo);
 
-    const result = await service.jobs({
+    const result = await subject.jobs({
       status: SnapshotJobStatus.COMPLETED,
       page: 2,
       pageSize: 10,

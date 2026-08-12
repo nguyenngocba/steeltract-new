@@ -30,9 +30,7 @@ import { DictionariesService } from './dictionaries.service';
 @RequirePermissions('settings.view')
 @Controller('master-data')
 export class DictionariesController {
-  constructor(
-    private readonly dictionariesService: DictionariesService,
-  ) {}
+  constructor(private readonly dictionariesService: DictionariesService) {}
 
   @Get('domains')
   domains() {
@@ -49,10 +47,7 @@ export class DictionariesController {
   }
 
   @Get(':domain/:id/dependencies')
-  dependencies(
-    @Param('domain') domain: string,
-    @Param('id') id: string,
-  ) {
+  dependencies(@Param('domain') domain: string, @Param('id') id: string) {
     return this.dictionariesService.dependencies(domain, id);
   }
 
@@ -79,10 +74,7 @@ export class DictionariesController {
 
   @Delete(':domain/:id')
   @RequirePermissions('settings.edit')
-  deactivate(
-    @Param('domain') domain: string,
-    @Param('id') id: string,
-  ) {
+  deactivate(@Param('domain') domain: string, @Param('id') id: string) {
     return this.dictionariesService.deactivate(domain, id);
   }
 }

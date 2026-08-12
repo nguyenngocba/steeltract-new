@@ -1,9 +1,6 @@
-import {
-  WebSocketGateway,
-  WebSocketServer,
-} from '@nestjs/websockets'
+import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 
-import { Server } from 'socket.io'
+import { Server } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
@@ -12,14 +9,9 @@ import { Server } from 'socket.io'
 })
 export class InventoryGateway {
   @WebSocketServer()
-  server: Server
+  server: Server;
 
-  emitTransactionCreated(
-    payload: any,
-  ) {
-    this.server.emit(
-      'inventory.transaction.created',
-      payload,
-    )
+  emitTransactionCreated(payload: any) {
+    this.server.emit('inventory.transaction.created', payload);
   }
 }

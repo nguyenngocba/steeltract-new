@@ -1,115 +1,115 @@
 {
-  "runId": "SYSTEM-E2E2-BROWSER-1786427319173",
-  "generatedAt": "2026-08-11T05:49:39.355Z",
+  "runId": "SYSTEM-E2E2-BROWSER-1786436849124",
+  "generatedAt": "2026-08-11T08:28:45.928Z",
   "businessSteps": 92,
   "businessAssertions": 16,
   "stages": [
     {
       "stage": "dashboard",
       "route": "/",
-      "durationMs": 2443.71,
+      "durationMs": 5381.02,
       "fixtureVisible": true
     },
     {
       "stage": "procurement",
       "route": "/procurement",
-      "durationMs": 1214.42,
+      "durationMs": 1762.6,
       "fixtureVisible": false
     },
     {
       "stage": "receipt",
       "route": "/inventory/inbound",
-      "durationMs": 1596.27,
+      "durationMs": 2716.03,
       "fixtureVisible": true
     },
     {
       "stage": "transfer",
       "route": "/inventory/transfer",
-      "durationMs": 2794.55,
+      "durationMs": 3945.96,
       "fixtureVisible": true
     },
     {
       "stage": "inventory-count",
       "route": "/inventory/stock-take",
-      "durationMs": 2326.22,
+      "durationMs": 2995.28,
       "fixtureVisible": true
     },
     {
       "stage": "supplier-return",
       "route": "/inventory/returns",
-      "durationMs": 2059.02,
+      "durationMs": 2374.01,
       "fixtureVisible": false
     },
     {
       "stage": "project",
       "route": "/projects/list",
-      "durationMs": 2412.19,
+      "durationMs": 2639.12,
       "fixtureVisible": true
     },
     {
       "stage": "requirement",
       "route": "/components/list",
-      "durationMs": 2186.81,
+      "durationMs": 2598.89,
       "fixtureVisible": true
     },
     {
       "stage": "bom",
       "route": "/production/boms",
-      "durationMs": 2462.57,
+      "durationMs": 2927.74,
       "fixtureVisible": false
     },
     {
       "stage": "production-order",
       "route": "/production/orders",
-      "durationMs": 2229.48,
+      "durationMs": 2610.05,
       "fixtureVisible": true
     },
     {
       "stage": "execution",
       "route": "/production/execution",
-      "durationMs": 2569.47,
+      "durationMs": 3684.84,
       "fixtureVisible": true
     },
     {
       "stage": "qc",
       "route": "/qc/final",
-      "durationMs": 2203.47,
+      "durationMs": 2419.52,
       "fixtureVisible": true
     },
     {
       "stage": "finished-goods",
       "route": "/components/stock",
-      "durationMs": 1993,
+      "durationMs": 2191.31,
       "fixtureVisible": true
     },
     {
       "stage": "yard",
       "route": "/yard/components",
-      "durationMs": 2266.8,
+      "durationMs": 3528.89,
       "fixtureVisible": true
     },
     {
       "stage": "dispatch",
       "route": "/logistics/dispatch",
-      "durationMs": 2272.32,
+      "durationMs": 2410.28,
       "fixtureVisible": true
     },
     {
       "stage": "delivery",
       "route": "/logistics/deliveries",
-      "durationMs": 2307.96,
+      "durationMs": 2225.68,
       "fixtureVisible": true
     },
     {
       "stage": "installation",
       "route": "/projects/components",
-      "durationMs": 2034.87,
+      "durationMs": 2498.48,
       "fixtureVisible": true
     },
     {
       "stage": "reverse",
       "route": "/logistics/history",
-      "durationMs": 2075.3,
+      "durationMs": 2671.21,
       "fixtureVisible": true
     }
   ],

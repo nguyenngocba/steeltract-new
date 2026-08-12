@@ -59,7 +59,7 @@ export class EnterpriseProcessService {
           ? () =>
               this.production.cancelOrder(
                 this.command(
-                  flow.cancelOnFailure!,
+                  flow.cancelOnFailure,
                   context,
                   'production.release.compensate-cancel',
                 ),
@@ -71,7 +71,7 @@ export class EnterpriseProcessService {
       steps.push(
         this.step('production.ready', () =>
           this.production.readyOrder(
-            this.command(flow.ready!, context, 'production.ready'),
+            this.command(flow.ready, context, 'production.ready'),
           ),
         ),
       );
@@ -90,7 +90,7 @@ export class EnterpriseProcessService {
     if (flow.placement) {
       steps.push(
         this.step('yard.place', () =>
-          this.yard.place(this.command(flow.placement!, context, 'yard.place')),
+          this.yard.place(this.command(flow.placement, context, 'yard.place')),
         ),
       );
     }
@@ -217,7 +217,7 @@ export class EnterpriseProcessService {
       steps.push(
         this.step('project.track-delivery', () =>
           this.projects.trackDelivery(
-            this.command(flow.delivery!, context, 'project.track-delivery'),
+            this.command(flow.delivery, context, 'project.track-delivery'),
           ),
         ),
       );
@@ -227,7 +227,7 @@ export class EnterpriseProcessService {
         this.step('project.record-site-receipt', () =>
           this.projects.recordSiteReceipt(
             this.command(
-              flow.siteReceipt!,
+              flow.siteReceipt,
               context,
               'project.record-site-receipt',
             ),

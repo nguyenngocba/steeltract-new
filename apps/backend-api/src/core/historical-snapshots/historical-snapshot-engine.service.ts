@@ -25,6 +25,7 @@ import {
 
 import { safeErrorMessage } from '../../common/utils/safe-error-message';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectionWatermarkService } from '../projections/projection-watermark.service';
 import {
   endOfSnapshotBusinessDay,
   formatSnapshotBusinessDate,
@@ -42,6 +43,8 @@ type SnapshotJobMetadata = {
   durationMs?: number;
   lastError?: string;
   nextRetryAt?: string;
+  targetSourceWatermark?: string | null;
+  targetSourceOccurredAt?: string | null;
   [key: string]: unknown;
 };
 
@@ -88,10 +91,12 @@ export class HistoricalSnapshotEngineService
   private interval?: NodeJS.Timeout;
   private activeTick?: Promise<void>;
   private stopping = false;
+  private metadataInitialized = false;
 
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    private readonly watermarks: ProjectionWatermarkService,
   ) {}
 
   onModuleInit() {
@@ -147,21 +152,31 @@ export class HistoricalSnapshotEngineService
   }
 
   async scheduleDueJobs(snapshotDate = new Date()) {
+    await this.ensureCanonicalMetadata();
     const day = snapshotBusinessDateFromLocalCalendar(snapshotDate);
     const metadata = await this.prisma.snapshotMetadata.findMany({
       where: {
         enabled: true,
       },
-      orderBy: [
-        { module: 'asc' },
-        { snapshotType: 'asc' },
-      ],
+      orderBy: [{ module: 'asc' }, { snapshotType: 'asc' }],
     });
 
     let scheduled = 0;
 
     for (const row of metadata) {
-      if (this.shouldScheduleDaily(row.frequency, row.lastSuccessfulSnapshotDate, day)) {
+      const watermark = await this.watermarks.forModule(row.module);
+      const sourceChanged =
+        watermark.lastEventId !== null &&
+        watermark.lastEventId !== row.lastSourceWatermark;
+      if (
+        row.frequency === SnapshotFrequency.DAILY &&
+        (this.shouldScheduleDaily(
+          row.frequency,
+          row.lastSuccessfulSnapshotDate,
+          day,
+        ) ||
+          sourceChanged)
+      ) {
         const job = await this.ensureJob({
           jobType: SnapshotJobType.DAILY_SNAPSHOT,
           module: row.module,
@@ -171,6 +186,9 @@ export class HistoricalSnapshotEngineService
           metadata: {
             snapshotType: row.snapshotType,
             scheduledBy: 'SnapshotMetadata',
+            targetSourceWatermark: watermark.lastEventId,
+            targetSourceOccurredAt:
+              watermark.sourceOccurredAt?.toISOString() ?? null,
           },
         });
         scheduled += job ? 1 : 0;
@@ -264,11 +282,17 @@ export class HistoricalSnapshotEngineService
           createdAt: 'desc',
         },
       });
-      const existing = candidates.find(
-        (candidate) =>
-          this.readMetadata(candidate.metadata).snapshotType ===
-          input.metadata.snapshotType,
-      );
+      const existing = candidates.find((candidate) => {
+        const metadata = this.readMetadata(candidate.metadata);
+        return (
+          metadata.snapshotType === input.metadata.snapshotType &&
+          metadata.targetSourceWatermark ===
+            input.metadata.targetSourceWatermark &&
+          (candidate.status !== SnapshotJobStatus.COMPLETED ||
+            candidate.sourceWatermarkEnd ===
+              input.metadata.targetSourceWatermark)
+        );
+      });
 
       if (existing) {
         return null;
@@ -283,12 +307,11 @@ export class HistoricalSnapshotEngineService
           fromDate: input.fromDate,
           toDate: input.toDate,
           sourceWatermarkStart: input.sourceWatermarkStart,
-          priority:
-            input.jobType === SnapshotJobType.MONTHLY_ROLLUP ? 40 : 50,
+          priority: input.jobType === SnapshotJobType.MONTHLY_ROLLUP ? 40 : 50,
           metadata: {
             ...input.metadata,
             identityKey,
-          } as JsonObject,
+          },
         },
       });
     });
@@ -346,10 +369,7 @@ export class HistoricalSnapshotEngineService
           in: claimed.map((row) => row.id),
         },
       },
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'asc' },
-      ],
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
     });
 
     return jobs;
@@ -357,11 +377,16 @@ export class HistoricalSnapshotEngineService
 
   private async processJob(job: SnapshotJob) {
     const startedAt = Date.now();
-    await this.writeLog(job.id, SnapshotJobLogLevel.INFO, 'snapshot.job.started', {
-      jobType: job.jobType,
-      module: job.module,
-      attempt: job.attempt,
-    });
+    await this.writeLog(
+      job.id,
+      SnapshotJobLogLevel.INFO,
+      'snapshot.job.started',
+      {
+        jobType: job.jobType,
+        module: job.module,
+        attempt: job.attempt,
+      },
+    );
 
     try {
       const result = await this.withLeaseRenewal(job.id, () =>
@@ -400,11 +425,16 @@ export class HistoricalSnapshotEngineService
         await this.updateMetadataAfterSuccess(tx, job, result);
       });
 
-      await this.writeLog(job.id, SnapshotJobLogLevel.INFO, 'snapshot.job.completed', {
-        rowsRead: result.rowsRead,
-        rowsWritten: result.rowsWritten,
-        durationMs,
-      });
+      await this.writeLog(
+        job.id,
+        SnapshotJobLogLevel.INFO,
+        'snapshot.job.completed',
+        {
+          rowsRead: result.rowsRead,
+          rowsWritten: result.rowsWritten,
+          durationMs,
+        },
+      );
     } catch (error) {
       await this.failJob(job, error, Date.now() - startedAt);
     }
@@ -440,6 +470,8 @@ export class HistoricalSnapshotEngineService
     let rowsRead = 0;
     let rowsWritten = 0;
     let sourceWatermark: string | undefined;
+    let authoritative: boolean | undefined;
+    let stale: boolean | undefined;
 
     if (snapshotType === 'inventory_balance_daily') {
       const result = await this.generateInventoryBalanceSnapshot(
@@ -449,22 +481,40 @@ export class HistoricalSnapshotEngineService
       rowsRead += result.rowsRead;
       rowsWritten += result.rowsWritten;
       sourceWatermark = result.sourceWatermark;
+      authoritative = result.authoritative;
+      stale = result.stale;
     } else {
       const result = await this.generateDashboardSnapshot(job, snapshotDate);
       rowsRead += result.rowsRead;
       rowsWritten += result.rowsWritten;
       sourceWatermark = result.sourceWatermark;
+      authoritative = result.authoritative;
+      stale = result.stale;
     }
 
-    return { rowsRead, rowsWritten, sourceWatermark };
+    return { rowsRead, rowsWritten, sourceWatermark, authoritative, stale };
   }
 
-  private async generateDashboardSnapshot(job: SnapshotJob, snapshotDate: Date) {
+  private async generateDashboardSnapshot(
+    job: SnapshotJob,
+    snapshotDate: Date,
+  ) {
     const module = job.module ?? HistoricalDashboardModule.ERP;
+    const watermarkBefore = await this.watermarks.forModule(module);
     const payload = await this.dashboardPayload(module, snapshotDate);
-    const sourceWatermark =
-      payload.sourceMaxAt?.toISOString() ??
-      formatSnapshotBusinessDate(snapshotDate);
+    const watermarkAfter = await this.watermarks.forModule(module);
+    const parity =
+      watermarkBefore.lastEventId === watermarkAfter.lastEventId &&
+      watermarkBefore.lastAggregateVersion ===
+        watermarkAfter.lastAggregateVersion;
+    const authoritative = watermarkAfter.fresh && parity;
+    const sourceWatermark = watermarkAfter.lastEventId ?? undefined;
+    const snapshotMetadata = {
+      ...payload.metadata,
+      projectionWatermark: this.watermarkJson(watermarkAfter),
+      parity,
+      freshness: authoritative ? 'FRESH' : 'STALE',
+    } as JsonObject;
 
     await this.prisma.dashboardSnapshot.upsert({
       where: {
@@ -481,34 +531,34 @@ export class HistoricalSnapshotEngineService
         snapshotDate,
         granularity: HistoricalSnapshotGranularity.DAY,
         source: HistoricalSnapshotSource.READ_MODEL,
-        authoritative: payload.authoritative,
+        authoritative,
         kpis: payload.kpis,
         charts: payload.charts,
         tables: payload.tables,
         warnings: payload.warnings,
-        metadata: payload.metadata,
+        metadata: snapshotMetadata,
         sourceMinAt: payload.sourceMinAt,
         sourceMaxAt: payload.sourceMaxAt,
         sourceWatermark,
         rowCount: payload.rowCount,
         warningCount: payload.warningCount,
-        stale: payload.stale,
+        stale: !authoritative,
         generatedByJobId: job.id,
       },
       update: {
         source: HistoricalSnapshotSource.READ_MODEL,
-        authoritative: payload.authoritative,
+        authoritative,
         kpis: payload.kpis,
         charts: payload.charts,
         tables: payload.tables,
         warnings: payload.warnings,
-        metadata: payload.metadata,
+        metadata: snapshotMetadata,
         sourceMinAt: payload.sourceMinAt,
         sourceMaxAt: payload.sourceMaxAt,
         sourceWatermark,
         rowCount: payload.rowCount,
         warningCount: payload.warningCount,
-        stale: payload.stale,
+        stale: !authoritative,
         generatedByJobId: job.id,
         generatedAt: new Date(),
       },
@@ -529,8 +579,8 @@ export class HistoricalSnapshotEngineService
       rowsRead: payload.rowCount,
       rowsWritten: 1,
       sourceWatermark,
-      authoritative: payload.authoritative,
-      stale: payload.stale,
+      authoritative,
+      stale: !authoritative,
     };
   }
 
@@ -538,7 +588,10 @@ export class HistoricalSnapshotEngineService
     job: SnapshotJob,
     snapshotDate: Date,
   ): Promise<SnapshotRunResult> {
-    const authoritative = this.isCurrentDay(snapshotDate);
+    const watermarkBefore = await this.watermarks.forModule(
+      HistoricalDashboardModule.INVENTORY,
+    );
+    const authoritative = watermarkBefore.fresh;
     let cursor: string | undefined;
     let rowsRead = 0;
     let written = 0;
@@ -578,13 +631,6 @@ export class HistoricalSnapshotEngineService
           const item = row.inventoryItem;
           if (item.deletedAt) {
             continue;
-          }
-
-          if (
-            !sourceWatermark ||
-            item.updatedAt.toISOString() > sourceWatermark
-          ) {
-            sourceWatermark = item.updatedAt.toISOString();
           }
 
           const quantity = new Prisma.Decimal(row.quantity);
@@ -629,12 +675,13 @@ export class HistoricalSnapshotEngineService
               stockStatus: this.stockStatus(quantity, minimumStock),
               source: HistoricalSnapshotSource.READ_MODEL,
               locationBucketKey,
-              sourceWatermark: item.updatedAt.toISOString(),
+              sourceWatermark: watermarkBefore.lastEventId,
               generatedByJobId: job.id,
               metadata: {
                 authoritative,
                 stale: !authoritative,
                 source: 'InventoryLocationStock',
+                projectionWatermark: this.watermarkJson(watermarkBefore),
               },
             },
             update: {
@@ -657,18 +704,44 @@ export class HistoricalSnapshotEngineService
               minimumStock,
               stockStatus: this.stockStatus(quantity, minimumStock),
               source: HistoricalSnapshotSource.READ_MODEL,
-              sourceWatermark: item.updatedAt.toISOString(),
+              sourceWatermark: watermarkBefore.lastEventId,
               generatedByJobId: job.id,
               generatedAt: new Date(),
               metadata: {
                 authoritative,
                 stale: !authoritative,
                 source: 'InventoryLocationStock',
+                projectionWatermark: this.watermarkJson(watermarkBefore),
               },
             },
           });
           written += 1;
         }
+      });
+    }
+
+    const watermarkAfter = await this.watermarks.forModule(
+      HistoricalDashboardModule.INVENTORY,
+    );
+    const parity =
+      watermarkBefore.lastEventId === watermarkAfter.lastEventId &&
+      watermarkBefore.lastAggregateVersion ===
+        watermarkAfter.lastAggregateVersion;
+    const finalAuthoritative = watermarkAfter.fresh && parity;
+    sourceWatermark = watermarkAfter.lastEventId ?? undefined;
+    if (!finalAuthoritative || !parity) {
+      await this.prisma.inventoryBalanceSnapshot.updateMany({
+        where: { generatedByJobId: job.id },
+        data: {
+          sourceWatermark: watermarkAfter.lastEventId,
+          metadata: {
+            authoritative: finalAuthoritative,
+            stale: !finalAuthoritative,
+            source: 'InventoryLocationStock',
+            projectionWatermark: this.watermarkJson(watermarkAfter),
+            parity,
+          },
+        },
       });
     }
 
@@ -687,8 +760,8 @@ export class HistoricalSnapshotEngineService
       rowsRead,
       rowsWritten: written,
       sourceWatermark,
-      authoritative,
-      stale: !authoritative,
+      authoritative: finalAuthoritative,
+      stale: !finalAuthoritative,
     };
   }
 
@@ -836,8 +909,7 @@ export class HistoricalSnapshotEngineService
             lowStockDays:
               row.stockStatus === HistoricalSnapshotStockStatus.LOW ? 1 : 0,
             outStockDays:
-              row.stockStatus ===
-              HistoricalSnapshotStockStatus.OUT_OF_STOCK
+              row.stockStatus === HistoricalSnapshotStockStatus.OUT_OF_STOCK
                 ? 1
                 : 0,
             negativeStockDays:
@@ -1003,7 +1075,10 @@ export class HistoricalSnapshotEngineService
   private async inventoryDashboardPayload(snapshotDate: Date) {
     const [materials, stocks, transactions] = await Promise.all([
       this.prisma.inventoryItem.count({
-        where: { deletedAt: null, createdAt: { lte: this.endOfDay(snapshotDate) } },
+        where: {
+          deletedAt: null,
+          createdAt: { lte: this.endOfDay(snapshotDate) },
+        },
       }),
       this.prisma.inventoryLocationStock.findMany({
         include: { inventoryItem: true },
@@ -1024,7 +1099,8 @@ export class HistoricalSnapshotEngineService
 
     const totalStock = stocks.reduce((sum, row) => sum + row.quantity, 0);
     const lowStock = stocks.filter(
-      (row) => row.quantity > 0 && row.quantity <= row.inventoryItem.minimumStock,
+      (row) =>
+        row.quantity > 0 && row.quantity <= row.inventoryItem.minimumStock,
     ).length;
     const outOfStock = stocks.filter((row) => row.quantity <= 0).length;
     const inboundValue = this.transactionValue(transactions, 'IMPORT');
@@ -1045,7 +1121,11 @@ export class HistoricalSnapshotEngineService
         outboundValue,
       },
       charts: {
-        stockStatus: { lowStock, outOfStock, normal: Math.max(stocks.length - lowStock - outOfStock, 0) },
+        stockStatus: {
+          lowStock,
+          outOfStock,
+          normal: Math.max(stocks.length - lowStock - outOfStock, 0),
+        },
       },
       tables: {},
       warnings:
@@ -1120,7 +1200,8 @@ export class HistoricalSnapshotEngineService
         })),
       },
       tables: {},
-      warnings: delayed > 0 ? [{ code: 'PRODUCTION_DELAYED', count: delayed }] : [],
+      warnings:
+        delayed > 0 ? [{ code: 'PRODUCTION_DELAYED', count: delayed }] : [],
       metadata: { source: 'production read model' },
     });
   }
@@ -1148,7 +1229,8 @@ export class HistoricalSnapshotEngineService
         })),
       },
       tables: {},
-      warnings: delayed > 0 ? [{ code: 'PROJECT_DELAYED', count: delayed }] : [],
+      warnings:
+        delayed > 0 ? [{ code: 'PROJECT_DELAYED', count: delayed }] : [],
       metadata: {
         source: 'projects read model',
         snapshotDate: formatSnapshotBusinessDate(snapshotDate),
@@ -1274,7 +1356,8 @@ export class HistoricalSnapshotEngineService
 
     return this.payload({
       snapshotDate,
-      rowCount: zones + placements + slots.reduce((sum, row) => sum + row._count, 0),
+      rowCount:
+        zones + placements + slots.reduce((sum, row) => sum + row._count, 0),
       kpis: {
         zones,
         activePlacements: placements,
@@ -1366,15 +1449,22 @@ export class HistoricalSnapshotEngineService
     });
 
     if (owned.count !== 1) {
-      this.logger.warn(`Skipped snapshot job failure update after lease loss for ${job.id}`);
+      this.logger.warn(
+        `Skipped snapshot job failure update after lease loss for ${job.id}`,
+      );
       return;
     }
 
-    await this.writeLog(job.id, SnapshotJobLogLevel.ERROR, 'snapshot.job.failed', {
-      error: errorMessage,
-      durationMs,
-      retryable: job.attempt < job.maxAttempts,
-    });
+    await this.writeLog(
+      job.id,
+      SnapshotJobLogLevel.ERROR,
+      'snapshot.job.failed',
+      {
+        error: errorMessage,
+        durationMs,
+        retryable: job.attempt < job.maxAttempts,
+      },
+    );
   }
 
   private async updateMetadataAfterSuccess(
@@ -1412,8 +1502,10 @@ export class HistoricalSnapshotEngineService
       !this.shouldAdvanceMetadata(
         existing.lastSuccessfulSnapshotDate,
         existing.lastSourceWatermark,
+        this.readMetadata(existing.settings).lastSourceOccurredAt,
         completedDate,
         result.sourceWatermark,
+        metadata.targetSourceOccurredAt,
       )
     ) {
       return;
@@ -1432,6 +1524,9 @@ export class HistoricalSnapshotEngineService
           lastSuccessfulJobId: job.id,
           lastSourceWatermark: result.sourceWatermark,
           readinessStatus: SnapshotReadinessStatus.READY,
+          settings: metadata.targetSourceOccurredAt
+            ? { lastSourceOccurredAt: metadata.targetSourceOccurredAt }
+            : undefined,
         },
       });
       return;
@@ -1450,6 +1545,12 @@ export class HistoricalSnapshotEngineService
         lastSourceWatermark: result.sourceWatermark,
         staleFromDate: null,
         readinessStatus: SnapshotReadinessStatus.READY,
+        settings: metadata.targetSourceOccurredAt
+          ? {
+              ...this.readMetadata(existing.settings),
+              lastSourceOccurredAt: metadata.targetSourceOccurredAt,
+            }
+          : undefined,
       },
     });
   }
@@ -1457,8 +1558,10 @@ export class HistoricalSnapshotEngineService
   private shouldAdvanceMetadata(
     currentDate: Date | null,
     currentWatermark: string | null,
+    currentSourceOccurredAt: unknown,
     nextDate: Date,
     nextWatermark?: string,
+    nextSourceOccurredAt?: string | null,
   ) {
     if (!currentDate) {
       return true;
@@ -1478,7 +1581,10 @@ export class HistoricalSnapshotEngineService
     if (!nextWatermark) {
       return false;
     }
-    return nextWatermark >= currentWatermark;
+    if (typeof currentSourceOccurredAt === 'string' && nextSourceOccurredAt) {
+      return nextSourceOccurredAt >= currentSourceOccurredAt;
+    }
+    return currentWatermark === nextWatermark || Boolean(nextSourceOccurredAt);
   }
 
   private async markExpiredExhaustedJobs() {
@@ -1594,8 +1700,7 @@ export class HistoricalSnapshotEngineService
     snapshotDate?: Date;
     authoritative?: boolean;
   }) {
-    const authoritative =
-      input.authoritative ?? this.isCurrentDay(input.snapshotDate ?? new Date());
+    const authoritative = input.authoritative ?? true;
     return {
       rowCount: input.rowCount,
       warningCount: input.warnings.length,
@@ -1623,7 +1728,8 @@ export class HistoricalSnapshotEngineService
     return rows
       .filter((row) => row.transaction.type === type)
       .reduce(
-        (sum, row) => sum + (row.totalAmount ?? row.quantity * (row.unitPrice ?? 0)),
+        (sum, row) =>
+          sum + (row.totalAmount ?? row.quantity * (row.unitPrice ?? 0)),
         0,
       );
   }
@@ -1645,7 +1751,51 @@ export class HistoricalSnapshotEngineService
       input.snapshotDate ? formatSnapshotBusinessDate(input.snapshotDate) : '',
       input.fromDate ? formatSnapshotBusinessDate(input.fromDate) : '',
       input.toDate ? formatSnapshotBusinessDate(input.toDate) : '',
+      input.metadata.targetSourceWatermark ?? '',
     ].join('|');
+  }
+
+  private async ensureCanonicalMetadata() {
+    if (this.metadataInitialized) return;
+    await this.prisma.snapshotMetadata.createMany({
+      data: Object.values(HistoricalDashboardModule).map((module) => ({
+        module,
+        snapshotType: 'dashboard_daily',
+        frequency: SnapshotFrequency.DAILY,
+      })),
+      skipDuplicates: true,
+    });
+    await this.prisma.snapshotMetadata.createMany({
+      data: [
+        {
+          module: HistoricalDashboardModule.INVENTORY,
+          snapshotType: 'inventory_balance_daily',
+          frequency: SnapshotFrequency.DAILY,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    this.metadataInitialized = true;
+  }
+
+  private watermarkJson(watermark: {
+    lastEventId: string | null;
+    lastAggregateVersion: string | null;
+    lastProcessedAt: Date | null;
+    sourceOccurredAt: Date | null;
+    status: string;
+    fresh: boolean;
+    lagMs: number;
+  }): JsonObject {
+    return {
+      lastEventId: watermark.lastEventId,
+      lastAggregateVersion: watermark.lastAggregateVersion,
+      lastProcessedAt: watermark.lastProcessedAt?.toISOString() ?? null,
+      sourceOccurredAt: watermark.sourceOccurredAt?.toISOString() ?? null,
+      status: watermark.status,
+      fresh: watermark.fresh,
+      lagMs: watermark.lagMs,
+    };
   }
 
   private nextRetryAt(attempt: number) {
@@ -1662,7 +1812,10 @@ export class HistoricalSnapshotEngineService
     if (frequency !== SnapshotFrequency.DAILY) {
       return false;
     }
-    return !lastSuccessfulSnapshotDate || this.startOfDay(lastSuccessfulSnapshotDate) < day;
+    return (
+      !lastSuccessfulSnapshotDate ||
+      this.startOfDay(lastSuccessfulSnapshotDate) < day
+    );
   }
 
   private shouldScheduleMonthlyRollup(
@@ -1692,7 +1845,10 @@ export class HistoricalSnapshotEngineService
     if (quantity.equals(0)) {
       return HistoricalSnapshotStockStatus.OUT_OF_STOCK;
     }
-    if (minimumStock.greaterThan(0) && quantity.lessThanOrEqualTo(minimumStock)) {
+    if (
+      minimumStock.greaterThan(0) &&
+      quantity.lessThanOrEqualTo(minimumStock)
+    ) {
       return HistoricalSnapshotStockStatus.LOW;
     }
     return HistoricalSnapshotStockStatus.NORMAL;
@@ -1716,13 +1872,6 @@ export class HistoricalSnapshotEngineService
     return startOfSnapshotBusinessDay(date);
   }
 
-  private isCurrentDay(date: Date) {
-    return (
-      this.startOfDay(date).getTime() ===
-      snapshotBusinessDateFromLocalCalendar(new Date()).getTime()
-    );
-  }
-
   private endOfDay(date: Date) {
     return endOfSnapshotBusinessDay(date);
   }
@@ -1737,7 +1886,7 @@ export class HistoricalSnapshotEngineService
 
   private readMetadata(value: Prisma.JsonValue): SnapshotJobMetadata {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value as SnapshotJobMetadata;
+      return value;
     }
     return {};
   }
@@ -1817,7 +1966,9 @@ export class HistoricalSnapshotEngineService
   }
 
   private pollMs() {
-    const value = Number(process.env.HISTORICAL_SNAPSHOT_ENGINE_POLL_MS ?? 60000);
+    const value = Number(
+      process.env.HISTORICAL_SNAPSHOT_ENGINE_POLL_MS ?? 60000,
+    );
     if (!Number.isFinite(value)) {
       return 60000;
     }

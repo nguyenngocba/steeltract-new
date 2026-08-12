@@ -45,21 +45,24 @@ export class InventoryReadModelService {
   }
 
   async overview(query: InventoryOverviewQueryDto) {
-    const [summary, facets, transactionMetrics, overviewHistory] = await Promise.all([
-      this.repository.materialSnapshotSummary(query),
-      this.repository.materialSnapshotFacets(query),
-      this.repository.inventoryOverviewTransactionMetrics(),
-      this.snapshots.inventoryOverviewHistory(12),
-    ]);
+    const [summary, facets, transactionMetrics, overviewHistory] =
+      await Promise.all([
+        this.repository.materialSnapshotSummary(query),
+        this.repository.materialSnapshotFacets(query),
+        this.repository.inventoryOverviewTransactionMetrics(),
+        this.snapshots.inventoryOverviewHistory(12),
+      ]);
     const transactionMap = (rows: any[]) =>
-      Object.fromEntries(rows.map((row) => [
-        this.toBusinessType(row.type),
-        {
-          documents: Number(row.documentCount ?? 0),
-          quantity: Number(row.quantity ?? 0),
-          value: Number(row.value ?? 0),
-        },
-      ]));
+      Object.fromEntries(
+        rows.map((row) => [
+          this.toBusinessType(row.type),
+          {
+            documents: Number(row.documentCount ?? 0),
+            quantity: Number(row.quantity ?? 0),
+            value: Number(row.value ?? 0),
+          },
+        ]),
+      );
     const normalizedSummary = this.normalizeSummary(summary);
     const stockTrend = transactionMetrics.snapshotTrend
       .slice()
@@ -82,9 +85,7 @@ export class InventoryReadModelService {
         ...(row.primaryMaterialCount == null
           ? {}
           : { primaryCount: row.primaryMaterialCount }),
-        ...(row.primaryStock == null
-          ? {}
-          : { primaryStock: row.primaryStock }),
+        ...(row.primaryStock == null ? {} : { primaryStock: row.primaryStock }),
         ...(row.secondaryMaterialCount == null
           ? {}
           : { secondaryCount: row.secondaryMaterialCount }),
@@ -213,7 +214,7 @@ export class InventoryReadModelService {
 
     const supplierIds = Array.from(
       new Set(transactions.map((tx) => tx.supplierId).filter(Boolean)),
-    ) as string[];
+    );
     const suppliers = supplierIds.length
       ? await this.repository.findSuppliersByIds(supplierIds)
       : [];
@@ -240,12 +241,13 @@ export class InventoryReadModelService {
           transactionDate: tx.transactionDate,
           quantity: Number(line.quantity),
           unitPrice: line.unitPrice != null ? Number(line.unitPrice) : null,
-          totalAmount: line.totalAmount != null ? Number(line.totalAmount) : null,
+          totalAmount:
+            line.totalAmount != null ? Number(line.totalAmount) : null,
           signedQuantity: Number(line.quantity),
           unit: line.unit?.code ?? item.unit ?? item.unitMaster?.code ?? 'PCS',
           supplierId: tx.supplierId,
           supplierName: tx.supplierId
-            ? supplierMap.get(tx.supplierId)?.name ?? tx.supplierId
+            ? (supplierMap.get(tx.supplierId)?.name ?? tx.supplierId)
             : null,
           projectId: tx.projectId,
           projectName: tx.project?.name ?? null,
@@ -259,7 +261,8 @@ export class InventoryReadModelService {
               : item.zone
                 ? `${item.zone.code} - ${item.zone.name}`
                 : null,
-          zoneRawName: line.zone?.name ?? tx.zone?.name ?? item.zone?.name ?? null,
+          zoneRawName:
+            line.zone?.name ?? tx.zone?.name ?? item.zone?.name ?? null,
           attachmentName: null,
         })),
     );
@@ -279,7 +282,8 @@ export class InventoryReadModelService {
           quantity: Number(line.quantity),
           signedQuantity: Number(line.quantity),
           unitPrice: line.unitPrice != null ? Number(line.unitPrice) : null,
-          totalAmount: line.totalAmount != null ? Number(line.totalAmount) : null,
+          totalAmount:
+            line.totalAmount != null ? Number(line.totalAmount) : null,
           unit: line.unit?.code ?? item.unit ?? item.unitMaster?.code ?? 'PCS',
           projectId: tx.projectId,
           projectName: tx.project?.name ?? null,
@@ -293,7 +297,8 @@ export class InventoryReadModelService {
               : item.zone
                 ? `${item.zone.code} - ${item.zone.name}`
                 : null,
-          zoneRawName: line.zone?.name ?? tx.zone?.name ?? item.zone?.name ?? null,
+          zoneRawName:
+            line.zone?.name ?? tx.zone?.name ?? item.zone?.name ?? null,
           attachmentName: null,
         })),
     );
@@ -313,7 +318,10 @@ export class InventoryReadModelService {
       }))
       .sort((a, b) => b.quantity - a.quantity);
 
-    const inboundQuantity = inboundLines.reduce((acc, line) => acc + line.quantity, 0);
+    const inboundQuantity = inboundLines.reduce(
+      (acc, line) => acc + line.quantity,
+      0,
+    );
     const inboundCost = inboundLines.reduce(
       (acc, line) =>
         acc +
@@ -387,7 +395,6 @@ export class InventoryReadModelService {
     });
   }
 
-
   async inboundSuggestions(id: string) {
     const since = new Date();
     since.setDate(since.getDate() - 30);
@@ -418,7 +425,9 @@ export class InventoryReadModelService {
     const lastQuantity = Math.abs(Number(lastLine?.quantity ?? 0));
     const lastUnitPrice =
       Number(lastLine?.unitPrice ?? 0) ||
-      (lastQuantity > 0 ? Number(lastLine?.totalAmount ?? 0) / lastQuantity : 0);
+      (lastQuantity > 0
+        ? Number(lastLine?.totalAmount ?? 0) / lastQuantity
+        : 0);
 
     const locationOccupancy =
       lastLine?.zoneId && lastLine?.slotId && lastLine?.level
@@ -431,7 +440,9 @@ export class InventoryReadModelService {
     const capacity = Number(lastLine?.zone?.capacity ?? 0);
     const occupied = Number(locationOccupancy?._sum.quantity ?? 0);
     const freePercent =
-      capacity > 0 ? Math.max(0, Math.min(100, 100 - (occupied / capacity) * 100)) : null;
+      capacity > 0
+        ? Math.max(0, Math.min(100, 100 - (occupied / capacity) * 100))
+        : null;
 
     this.metrics.recordInventoryReadModelHit();
 
@@ -442,9 +453,12 @@ export class InventoryReadModelService {
       lastLocation:
         lastLine?.zoneId && lastLine?.slotId && lastLine?.level
           ? {
-              warehouseId: lastLine.warehouseId ?? lastLine.zone?.warehouseId ?? null,
+              warehouseId:
+                lastLine.warehouseId ?? lastLine.zone?.warehouseId ?? null,
               warehouseName:
-                lastLine.warehouse?.name ?? lastLine.zone?.warehouse?.name ?? null,
+                lastLine.warehouse?.name ??
+                lastLine.zone?.warehouse?.name ??
+                null,
               zoneId: lastLine.zoneId,
               zoneCode: lastLine.zone?.code ?? null,
               zoneName: lastLine.zone?.name ?? null,
@@ -460,7 +474,9 @@ export class InventoryReadModelService {
               transactionDate: lastLine?.transaction.transactionDate ?? null,
               supplierName: supplier?.name ?? null,
               transactionNo:
-                lastLine?.transaction.transactionNo ?? lastLine?.transaction.code ?? null,
+                lastLine?.transaction.transactionNo ??
+                lastLine?.transaction.code ??
+                null,
             }
           : null,
       averagePrice30Days:
@@ -469,7 +485,9 @@ export class InventoryReadModelService {
   }
 
   private toBusinessType(value: TransactionType | string | null | undefined) {
-    const upper = String(value ?? '').trim().toUpperCase();
+    const upper = String(value ?? '')
+      .trim()
+      .toUpperCase();
     if (upper === 'IMPORT' || upper === 'INBOUND') return 'INBOUND';
     if (upper === 'EXPORT' || upper === 'OUTBOUND') return 'OUTBOUND';
     if (upper === 'TRANSFER') return 'TRANSFER';
@@ -558,5 +576,4 @@ export class InventoryReadModelService {
       level: normalizedLevel.toUpperCase(),
     };
   }
-
 }

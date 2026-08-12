@@ -1,27 +1,23 @@
-import {
-  Controller,
-  Get,
-  UseGuards,
-} from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common';
 
 import {
   ComponentStatus,
   ProductionOrderStatus,
   ProjectStatus,
   QcInspectionStatus,
-} from '@prisma/client'
+} from '@prisma/client';
 
-import { PrismaService } from '../../core/prisma/prisma.service'
+import { PrismaService } from '../../core/prisma/prisma.service';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { RequirePermissions } from '../rbac/decorators/permissions.decorator'
-import { PermissionsGuard } from '../rbac/guards/permissions.guard'
-import { DashboardActivityService } from './dashboard-activity.service'
-import { DashboardInsightService } from './dashboard-insight.service'
-import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service'
-import { DashboardMetricsService } from './dashboard-metrics.service'
-import { DashboardNotificationService } from './dashboard-notification.service'
-import { DashboardRecommendationService } from './dashboard-recommendation.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { DashboardActivityService } from './dashboard-activity.service';
+import { DashboardInsightService } from './dashboard-insight.service';
+import { DashboardInventoryReadModelService } from './dashboard-inventory-read-model.service';
+import { DashboardMetricsService } from './dashboard-metrics.service';
+import { DashboardNotificationService } from './dashboard-notification.service';
+import { DashboardRecommendationService } from './dashboard-recommendation.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions('dashboard.view')
@@ -40,17 +36,20 @@ export class DashboardController {
   @RequirePermissions('dashboard.executive')
   @Get('executive-cockpit')
   async executiveCockpit() {
-    const [
-      trends,
-      activities,
-      notifications,
-    ] = await Promise.all([
+    const [trends, activities, notifications] = await Promise.all([
       this.dashboardMetrics.getPredictiveTrends(),
       this.dashboardActivity.getRecentActivities(),
       this.dashboardNotifications.getNotifications(),
-    ])
-    const insights = await this.dashboardInsights.getControlTowerInsights(trends, notifications)
-    const recommendations = this.dashboardRecommendations.getRecommendations(trends, insights, notifications)
+    ]);
+    const insights = await this.dashboardInsights.getControlTowerInsights(
+      trends,
+      notifications,
+    );
+    const recommendations = this.dashboardRecommendations.getRecommendations(
+      trends,
+      insights,
+      notifications,
+    );
 
     return {
       generatedAt: new Date().toISOString(),
@@ -60,7 +59,7 @@ export class DashboardController {
       trends,
       activities,
       notifications,
-    }
+    };
   }
 
   @Get('cockpit')
@@ -82,7 +81,9 @@ export class DashboardController {
     ] = await Promise.all([
       this.prisma.project.count(),
       this.prisma.project.count({
-        where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.DELAYED] } },
+        where: {
+          status: { in: [ProjectStatus.ACTIVE, ProjectStatus.DELAYED] },
+        },
       }),
       this.prisma.productionOrder.count(),
       this.prisma.productionOrder.count({
@@ -141,23 +142,23 @@ export class DashboardController {
         take: 8,
         orderBy: { createdAt: 'desc' },
       }),
-    ])
+    ]);
 
     const productionStatus = await this.prisma.productionOrder.groupBy({
       by: ['status'],
       _count: { _all: true },
-    })
+    });
     const projectRows = await this.prisma.project.findMany({
       take: 6,
       orderBy: { updatedAt: 'desc' },
       include: { components: true },
-    })
+    });
     const completedComponentStatuses: ComponentStatus[] = [
       ComponentStatus.READY,
       ComponentStatus.SHIPPED,
       ComponentStatus.DELIVERED,
       ComponentStatus.INSTALLED,
-    ]
+    ];
     return {
       generatedAt: new Date().toISOString(),
       kpis: {
@@ -167,7 +168,10 @@ export class DashboardController {
         productionActive,
         components,
         completedComponents,
-        componentCompletionRate: components > 0 ? Math.round((completedComponents / components) * 100) : 0,
+        componentCompletionRate:
+          components > 0
+            ? Math.round((completedComponents / components) * 100)
+            : 0,
         logisticsActive,
         inventoryTotal: inventory.inventoryTotal,
         inboundTransactions: inventory.inboundTransactions,
@@ -182,23 +186,34 @@ export class DashboardController {
       inventoryDistribution: inventory.distribution,
       movementTrend: inventory.movementTrend,
       projects: projectRows.map((project) => {
-        const total = project.components.length
+        const total = project.components.length;
         const done = project.components.filter((component) =>
           completedComponentStatuses.includes(component.status),
-        ).length
+        ).length;
         return {
           id: project.id,
           code: project.code,
           name: project.name,
           status: project.status,
-          progress: total > 0 ? Math.round((done / total) * 100) : project.status === ProjectStatus.COMPLETED ? 100 : 0,
-        }
+          progress:
+            total > 0
+              ? Math.round((done / total) * 100)
+              : project.status === ProjectStatus.COMPLETED
+                ? 100
+                : 0,
+        };
       }),
       productionSummary: {
         active: productionActive,
-        waiting: Math.max(0, productionOrders - productionActive - productionCompleted),
+        waiting: Math.max(
+          0,
+          productionOrders - productionActive - productionCompleted,
+        ),
         completed: productionCompleted,
-        delayed: productionStatus.find((row) => row.status === ProductionOrderStatus.DELAYED)?._count._all ?? 0,
+        delayed:
+          productionStatus.find(
+            (row) => row.status === ProductionOrderStatus.DELAYED,
+          )?._count._all ?? 0,
       },
       alerts: [
         {
@@ -209,7 +224,10 @@ export class DashboardController {
         {
           code: 'PRODUCTION_DELAYED',
           title: 'Lệnh sản xuất trễ tiến độ',
-          count: productionStatus.find((row) => row.status === ProductionOrderStatus.DELAYED)?._count._all ?? 0,
+          count:
+            productionStatus.find(
+              (row) => row.status === ProductionOrderStatus.DELAYED,
+            )?._count._all ?? 0,
         },
         {
           code: 'QC_OPEN',
@@ -219,22 +237,18 @@ export class DashboardController {
       ],
       recentActivities,
       recentNotifications,
-    }
+    };
   }
 
   @Get('stats')
   async stats() {
-    const [
-      projectCount,
-      componentCount,
-      inventoryStats,
-    ] = await Promise.all([
+    const [projectCount, componentCount, inventoryStats] = await Promise.all([
       this.prisma.project.count(),
 
       this.prisma.component.count(),
 
       this.inventoryReadModel.getStats(),
-    ])
+    ]);
 
     return {
       inventoryCount: inventoryStats.inventoryCount,
@@ -242,49 +256,39 @@ export class DashboardController {
       componentCount,
       transactionCount: inventoryStats.transactionCount,
       lowStockCount: inventoryStats.lowStockCount,
-    }
+    };
   }
   @Get('recent-transactions')
   async recentTransactions() {
-    return this.inventoryReadModel.getRecentTransactions(5)
+    return this.inventoryReadModel.getRecentTransactions(5);
   }
   @Get('low-stock')
   async lowStock() {
-    return this.inventoryReadModel.getLowStockItems()
+    return this.inventoryReadModel.getLowStockItems();
   }
   @Get('construction-progress')
   async constructionProgress() {
-    const total =
-      await this.prisma.component.count()
+    const total = await this.prisma.component.count();
 
-    const installed =
-      await this.prisma.component.count({
-        where: {
-          status: 'INSTALLED',
-        },
-      })
+    const installed = await this.prisma.component.count({
+      where: {
+        status: 'INSTALLED',
+      },
+    });
 
-    const delivered =
-      await this.prisma.component.count({
-        where: {
-          status: 'DELIVERED',
-        },
-      })
+    const delivered = await this.prisma.component.count({
+      where: {
+        status: 'DELIVERED',
+      },
+    });
 
-    const stock =
-      await this.prisma.component.count({
-        where: {
-          status: 'STOCK',
-        },
-      })
+    const stock = await this.prisma.component.count({
+      where: {
+        status: 'STOCK',
+      },
+    });
 
-    const progress =
-      total > 0
-        ? Math.round(
-            (installed / total) *
-              100,
-          )
-        : 0
+    const progress = total > 0 ? Math.round((installed / total) * 100) : 0;
 
     return {
       total,
@@ -292,47 +296,23 @@ export class DashboardController {
       delivered,
       stock,
       progress,
-    }
+    };
   }
 
   @RequirePermissions('dashboard.executive')
   @Get('analytics')
   async analytics() {
-    const components =
-      await this.prisma.component.findMany()
+    const components = await this.prisma.component.findMany();
 
-    const installed =
-      components.filter(
-        (c) =>
-          c.status ===
-          'INSTALLED',
-      ).length
+    const installed = components.filter((c) => c.status === 'INSTALLED').length;
 
-    const delivered =
-      components.filter(
-        (c) =>
-          c.status ===
-          'DELIVERED',
-      ).length
+    const delivered = components.filter((c) => c.status === 'DELIVERED').length;
 
-    const stock =
-      components.filter(
-        (c) =>
-          c.status ===
-          'STOCK',
-      ).length
+    const stock = components.filter((c) => c.status === 'STOCK').length;
 
-    const total =
-      components.length
+    const total = components.length;
 
-    const progress =
-      total
-        ? Math.round(
-            (installed /
-              total) *
-              100,
-          )
-        : 0
+    const progress = total ? Math.round((installed / total) * 100) : 0;
 
     return {
       total,
@@ -340,114 +320,82 @@ export class DashboardController {
       delivered,
       stock,
       progress,
-    }
+    };
   }
 
   @RequirePermissions('dashboard.executive')
   @Get('forecast')
   async forecast() {
-    const since = new Date()
-    since.setDate(since.getDate() - 30)
-    since.setHours(0, 0, 0, 0)
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+    since.setHours(0, 0, 0, 0);
 
-    const installed =
-      await this.prisma.component.count({
-        where: {
-          status:
-            'INSTALLED',
+    const installed = await this.prisma.component.count({
+      where: {
+        status: 'INSTALLED',
+      },
+    });
+
+    const total = await this.prisma.component.count();
+
+    const remaining = total - installed;
+
+    const completedRecently = await this.prisma.component.count({
+      where: {
+        status: 'INSTALLED',
+        installedDate: {
+          gte: since,
         },
-      })
+      },
+    });
 
-    const total =
-      await this.prisma.component.count()
-
-    const remaining =
-      total - installed
-
-    const completedRecently =
-      await this.prisma.component.count({
-        where: {
-          status: 'INSTALLED',
-          installedDate: {
-            gte: since,
-          },
-        },
-      })
-
-    const dailyRate =
-      completedRecently / 30
+    const dailyRate = completedRecently / 30;
 
     const estimatedDays =
-      dailyRate > 0
-        ? Math.ceil(
-            remaining /
-              dailyRate,
-          )
-        : null
+      dailyRate > 0 ? Math.ceil(remaining / dailyRate) : null;
 
     return {
       installed,
       total,
       remaining,
       estimatedDays,
-    }
+    };
   }
 
   @RequirePermissions('dashboard.executive')
   @Get('costs')
   async costs() {
-    const components =
-      await this.prisma.component.findMany()
+    const components = await this.prisma.component.findMany();
 
-    const estimated =
-      components.reduce(
-        (
-          acc,
-          item,
-        ) =>
-          acc +
-          (
-            item.estimatedCost ||
-            0
-          ),
-        0,
-      )
+    const estimated = components.reduce(
+      (acc, item) => acc + (item.estimatedCost || 0),
+      0,
+    );
 
-    const actual =
-      components.reduce(
-        (
-          acc,
-          item,
-        ) =>
-          acc +
-          (
-            item.actualCost ||
-            0
-          ),
-        0,
-      )
+    const actual = components.reduce(
+      (acc, item) => acc + (item.actualCost || 0),
+      0,
+    );
 
     return {
       estimated,
       actual,
-      variance:
-        actual -
-        estimated,
-    }
+      variance: actual - estimated,
+    };
   }
 
   @RequirePermissions('dashboard.executive')
   @Get('procurement')
   async procurement() {
-    return this.inventoryReadModel.getProcurementSuggestions()
+    return this.inventoryReadModel.getProcurementSuggestions();
   }
 
   @RequirePermissions('dashboard.executive')
   @Get('anomalies')
   async anomalies() {
-    return this.inventoryReadModel.getAnomalies()
+    return this.inventoryReadModel.getAnomalies();
   }
-  
+
   @Get('activities')
   async activities() {
     return this.prisma.activityLog.findMany({
@@ -456,6 +404,6 @@ export class DashboardController {
       orderBy: {
         createdAt: 'desc',
       },
-    })
+    });
   }
 }
