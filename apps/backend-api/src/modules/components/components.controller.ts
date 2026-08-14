@@ -14,7 +14,7 @@ import {
 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../rbac/decorators/permissions.decorator';
@@ -170,7 +170,7 @@ export class ComponentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/components',
+        destination: join(storageRoot(), 'components'),
 
         filename: (req, file, callback) => {
           const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -190,7 +190,7 @@ export class ComponentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/timeline',
+        destination: join(storageRoot(), 'timeline'),
 
         filename: (req, file, callback) => {
           const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -221,4 +221,8 @@ export class ComponentsController {
   remove(@Param('id') id: string) {
     return this.componentsService.remove(id);
   }
+}
+
+function storageRoot() {
+  return process.env.STORAGE_ROOT || './uploads';
 }

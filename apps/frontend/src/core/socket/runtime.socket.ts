@@ -1,10 +1,10 @@
 import { io }
   from 'socket.io-client'
 
-import { API_BASE_URL }
+import { SOCKET_BASE_URL }
   from '../../lib/api'
 
 export const runtimeSocket =
   io(
-    API_BASE_URL,
+    SOCKET_BASE_URL,
   )

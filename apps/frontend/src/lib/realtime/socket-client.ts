@@ -3,7 +3,7 @@ import {
   Socket,
 } from 'socket.io-client'
 
-import { API_BASE_URL } from '../api'
+import { SOCKET_BASE_URL } from '../api'
 
 export interface RealtimeEventPayload {
   event: string
@@ -14,7 +14,7 @@ export interface RealtimeEventPayload {
 }
 
 export const socketClient: Socket =
-  io(API_BASE_URL, {
+  io(SOCKET_BASE_URL, {
     autoConnect: false,
     reconnection: true,
     reconnectionAttempts: Infinity,

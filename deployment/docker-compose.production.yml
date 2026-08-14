@@ -1,9 +1,40 @@
+name: steeltrack
+
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${STEELTRACK_DATABASE_NAME:-steeltrack}
+      POSTGRES_USER: ${STEELTRACK_DATABASE_USER:-steeltrack}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300s
+      - -c
+      - archive_command=test ! -f /var/lib/postgresql/data/wal-archive/%f && mkdir -p /var/lib/postgresql/data/wal-archive && cp %p /var/lib/postgresql/data/wal-archive/%f
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   migrate:
-    image: ${STEELTRACK_BACKEND_IMAGE:?STEELTRACK_BACKEND_IMAGE is required}
+    image: ${STEELTRACK_MIGRATION_IMAGE:?STEELTRACK_MIGRATION_IMAGE is required}
     env_file:
       - ${STEELTRACK_BACKEND_ENV_FILE:?STEELTRACK_BACKEND_ENV_FILE is required}
-    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: "no"
 
   backend:
@@ -17,10 +48,9 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
-    ports:
-      - "${STEELTRACK_BIND_ADDRESS:-127.0.0.1}:${STEELTRACK_BACKEND_PORT:-3000}:3000"
+      TRUST_PROXY: 1
     volumes:
-      - ${STEELTRACK_STORAGE_PATH:?STEELTRACK_STORAGE_PATH is required}:/data/steeltrack-storage
+      - steeltrack_storage:/data/steeltrack-storage
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -30,3 +60,127 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 4
+
+  frontend:
+    image: ${STEELTRACK_FRONTEND_IMAGE:?STEELTRACK_FRONTEND_IMAGE is required}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+
+  reverse-proxy:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    environment:
+      STEELTRACK_SERVER_NAME: ${STEELTRACK_SERVER_NAME:?STEELTRACK_SERVER_NAME is required}
+    ports:
+      - "${STEELTRACK_HTTP_PORT:-80}:80"
+      - "${STEELTRACK_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/steeltrack.conf.template:/etc/nginx/templates/default.conf.template:ro
+    secrets:
+      - tls_certificate
+      - tls_private_key
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+
+  prometheus:
+    image: prom/prometheus:v3.10.0
+    profiles: ["observability"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      backend:
+        condition: service_healthy
+      alertmanager:
+        condition: service_healthy
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ${STEELTRACK_ALERTMANAGER_CONFIG_FILE:?STEELTRACK_ALERTMANAGER_CONFIG_FILE is required}:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9093/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+
+  alert-test-receiver:
+    image: node:22-alpine
+    profiles: ["certification"]
+    restart: unless-stopped
+    command: ["node", "/app/alert-test-receiver.mjs"]
+    volumes:
+      - ../scripts/release/alert-test-receiver.mjs:/app/alert-test-receiver.mjs:ro
+    networks:
+      default:
+        aliases: [alert-receiver]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 4
+
+  grafana:
+    image: grafana/grafana:12.4.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  steeltrack_storage:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+
+secrets:
+  postgres_password:
+    file: ${STEELTRACK_POSTGRES_PASSWORD_FILE:?STEELTRACK_POSTGRES_PASSWORD_FILE is required}
+  tls_certificate:
+    file: ${STEELTRACK_TLS_CERT_FILE:?STEELTRACK_TLS_CERT_FILE is required}
+  tls_private_key:
+    file: ${STEELTRACK_TLS_KEY_FILE:?STEELTRACK_TLS_KEY_FILE is required}
+  grafana_admin_password:
+    file: ${STEELTRACK_GRAFANA_PASSWORD_FILE:-./secrets/grafana-admin-password}

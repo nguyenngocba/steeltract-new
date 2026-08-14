@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { JobsModule } from './core/jobs/jobs.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { PerformanceModule } from './core/performance/performance.module';
@@ -53,6 +54,8 @@ import { HistoricalSnapshotEngineModule } from './core/historical-snapshots/hist
 import { HistoricalDashboardModule } from './core/historical-dashboard/historical-dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { PurchasingModule } from './modules/purchasing/purchasing.module';
+import { ObservabilityModule } from './core/observability/observability.module';
+import { RequestObservabilityMiddleware } from './core/observability/request-observability.middleware';
 @Module({
   imports: [
     EventsModule,
@@ -106,6 +109,8 @@ import { PurchasingModule } from './modules/purchasing/purchasing.module';
     HistoricalSnapshotEngineModule,
     HistoricalDashboardModule,
     HealthModule,
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 1_000 }]),
+    ObservabilityModule,
   ],
   controllers: [AppController],
   providers: [
@@ -117,6 +122,8 @@ import { PurchasingModule } from './modules/purchasing/purchasing.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(PermissionContextMiddleware).forRoutes('*');
+    consumer
+      .apply(RequestObservabilityMiddleware, PermissionContextMiddleware)
+      .forRoutes('*');
   }
 }

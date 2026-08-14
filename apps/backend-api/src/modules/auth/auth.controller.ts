@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuthUser } from '../rbac/types/auth-user';
@@ -9,10 +10,12 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { Public } from './public.decorator';
 
 @Controller('auth')
+@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
   login(
     @Body(new ZodValidationPipe(loginSchema))
@@ -22,6 +25,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('refresh')
   refresh(
     @Body(new ZodValidationPipe(refreshTokenSchema))

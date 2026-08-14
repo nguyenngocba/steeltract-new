@@ -1,6 +1,6 @@
 # SteelTrack V1 RC1 Deployment Guide
 
-Status: **BLOCKED UNTIL SYSTEM.FREEZE.1 P0 GATES PASS**
+Status: **RC1 CONDITIONAL GO - EXTERNAL PRODUCTION CONDITIONS OPEN**
 
 ## Deployment Invariants
 
@@ -13,16 +13,16 @@ Status: **BLOCKED UNTIL SYSTEM.FREEZE.1 P0 GATES PASS**
 
 ## Entry Gate
 
-- [ ] Freeze audit decision is GO.
+- [x] SYSTEM.RELEASE.1 repository-controlled P0 gates pass.
 - [ ] Zero critical/high advisories in deployed production graph, or signed risk
       acceptance with compensating controls and expiry.
 - [ ] Backend lint and frontend lint policy pass.
 - [ ] Backend and frontend immutable images are built, scanned and signed.
 - [ ] SBOM and license attribution are published for both images.
-- [ ] Frontend image serves static Vite `dist` through an approved server.
-- [ ] Reverse proxy/TLS/HSTS/CSP/security headers are validated.
-- [ ] Production API URL and socket URL contain no hardcoded private fallback.
-- [ ] Secrets are stored outside source/image; exposed local credentials rotated.
+- [x] Frontend image serves static Vite `dist` through unprivileged Nginx.
+- [x] Reverse proxy/TLS/HSTS/CSP/security headers are validated.
+- [x] Production API and socket defaults use the current origin.
+- [x] Secrets are stored outside source/image build contexts.
 - [ ] Backup restore/PITR drill meets approved RPO/RTO.
 - [ ] Monitoring and alert routing are receiving staging signals.
 - [ ] 24-hour snapshot parity and 80%-peak load gates pass.
@@ -58,8 +58,10 @@ Security owner:
 - [ ] `JOB_WORKER_ENABLED` enabled only on selected replicas
 - [ ] Lease/poll/snapshot values reviewed against staging measurements
 - [ ] Redis URL supplied only if Redis is an actual required dependency
-- [ ] `VITE_API_URL` and `VITE_SOCKET_URL` injected at frontend build time
+- [ ] Set `VITE_API_URL`/`VITE_SOCKET_URL` only for a deliberate cross-origin deployment
 - [ ] No `DATABASE_URL` or JWT secret exists in frontend build context
+- [ ] Cosign verification is pinned to the exact release-workflow identity and
+      GitHub Actions OIDC issuer, or to an operations-owned KMS/HSM public key
 
 ## Backup and Migration
 
@@ -70,10 +72,12 @@ Security owner:
 5. Record restore duration against RTO and backup age against RPO.
 6. Inspect every pending migration for `DROP`, `TRUNCATE`, `DELETE`, long locks
    and non-concurrent index creation.
-7. Run one migration job:
+7. Run one migration job using the dedicated production migration image. This
+   runner preserves immutable migration checksums and handles the approved
+   concurrent-index migration outside a transaction:
 
 ```bash
-docker compose -f deployment/docker-compose.production.yml up migrate
+docker compose -f deployment/docker-compose.production.yml up --abort-on-container-exit migrate
 ```
 
 8. Require exit 0, then run `prisma migrate status` against production.
@@ -108,3 +112,39 @@ docker compose -f deployment/docker-compose.production.yml up migrate
 Stop promotion and follow `RC1_ROLLBACK_GUIDE.md` for any P0, migration
 uncertainty, data mismatch, duplicate mutation, rising queue/projection lag,
 readiness instability, critical security alert or missing recovery evidence.
+
+## Production Compose Contract
+
+Start from `deployment/.env.production.example`. Supply immutable backend,
+migration and frontend image references, an external backend env file, and
+secret-file paths for PostgreSQL, TLS and Grafana. The supported production
+entrypoint verifies all three Cosign signatures and rejects mutable image tags
+before invoking Compose:
+
+```bash
+set -a
+. deployment/.env.production
+set +a
+scripts/release/deploy-verified.sh config --quiet
+scripts/release/deploy-verified.sh up -d
+```
+
+The preferred signing authority is the keyless release workflow at
+`.github/workflows/production-trust.yml`. Production must configure both
+`COSIGN_CERTIFICATE_IDENTITY` and `COSIGN_CERTIFICATE_OIDC_ISSUER`; the identity
+must exactly name this repository, this workflow file and the deployed release
+tag. The accepted issuer is `https://token.actions.githubusercontent.com`.
+The deploy gate also supports `COSIGN_PUBLIC_KEY_PATH` for an operations-owned
+KMS/HSM-backed key. A local developer key, disabled transparency verification,
+or a mutable image tag is not an accepted production trust configuration.
+
+The signing workflow publishes immutable GHCR digests, SBOMs and vulnerability
+scan evidence before signing. It verifies the accepted signature and proves
+that unsigned images, a mismatched digest, a mismatched workflow identity and a
+mutable tag are rejected. Deployment still requires the target environment to
+run `deploy-verified.sh`; CI signing alone is not deployment authorization.
+
+Enable monitoring by passing `--profile observability` after the script name.
+`STEELTRACK_ALERTMANAGER_CONFIG_FILE` must point to an operations-owned config
+with the approved on-call receiver. The repository test receiver is only for
+the `certification` profile and must not be used as a production destination.

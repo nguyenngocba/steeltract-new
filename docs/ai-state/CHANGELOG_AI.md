@@ -1,5 +1,39 @@
 # SteelTrack AI Changelog
 
+## 2026-08-14 SYSTEM.PRODUCT.AUDIT.1 - Product Structure/Data/UI/Domain Audit
+
+Completed a documentation-only product audit across architecture, canonical
+domain boundaries, runtime data, master data, RBAC, UI/UX and Dashboard truth.
+Browser verification passed 68/68 route/viewport combinations across 17 active
+routes and four desktop widths. Overall readiness is **72% / SIGNIFICANT
+GAPS**. The principal blockers are a hardcoded Procurement UI, synthetic
+Supplier sub-workspaces, legacy Component-status read models and misleading
+Executive date/KPI semantics. Database quantity/lineage invariants passed, but
+the runtime dataset is certification-fixture dominated. No source, schema,
+migration, stage or commit. Report:
+`docs/audits/system-product-audit1-final-report.md`.
+
+## 2026-08-14 RELEASE.READINESS.1 - RC1 Release Readiness Audit
+
+Completed an audit-only RC1 review of application, database, security,
+containers, recovery, observability and release documentation. Backend
+97 suites / 333 tests, frontend 12/12, both builds, Prisma validation and
+93-migration status pass; production-mode live/ready/startup return 200 and the
+backend image builds non-root. Decision remains **NO-GO**: the frontend image
+fails, the deployed graph has 1 critical / 10 unique high advisories, backend
+lint has 1,386 errors, PITR/restore is uncertified, and external TLS/security,
+monitoring, logging and alert controls are absent. No source, schema, migration,
+stage or commit. Report: `docs/audits/release-readiness1-rc1.md`.
+
+## 2026-08-11 SYSTEM.PROJECTION.1 - Canonical Projection & Snapshot Architecture
+
+Projection watermark freshness replaced date-based authority. Current runtime
+has 25 initialized projection checkpoints, zero active projection failures,
+40 authoritative/fresh dashboard snapshots and two controlled stale snapshots.
+Historical latest, dashboard freshness metadata and targeted browser coverage
+pass. Six eventless projections and closed-month rollup certification remain.
+Report: `docs/audits/system-projection1-canonical-architecture.md`.
+
 ## 2026-08-11 SYSTEM.SNAPSHOT.1 - Snapshot & Projection Certification
 
 Completed certification without production source changes. Live dashboard
@@ -7937,3 +7971,68 @@ Notes:
 - Runtime parity passed for ERP, Inventory, Production, QC, Projects and Yard;
   Logistics/Dispatch remain controlled `NOT_INITIALIZED` without source events.
 - Report: `docs/audits/system-projection1-canonical-architecture.md`.
+
+# 2026-08-14 - SYSTEM.RELEASE.1 Production Hardening
+
+- Closed deployed dependency security at zero Critical/High findings.
+- Added non-root backend, migration and static frontend images plus the complete
+  PostgreSQL/TLS reverse-proxy production Compose contract.
+- Added auth throttling, structured correlation logs, Prometheus metrics,
+  Grafana provisioning and seven critical alert rules.
+- Added backup/restore parity, secret/dependency gates, SBOM/image scanning and
+  the RC1 CI release gate.
+- Certified clean and existing database paths at 93 migrations without changing
+  the immutable concurrent-index migration.
+- Full tests/typecheck/build and runtime gates pass. Decision: RC1 CONDITIONAL
+  GO; signing, off-host DR and alert routing remain external conditions.
+- Report: `docs/audits/system-release1-production-hardening.md`.
+
+# 2026-08-14 - SYSTEM.PRODUCTION.CERT.1 Final Production Certification
+
+- Fixed the Vite login 404 by adding the canonical `/api` and `/socket.io`
+  development proxies; production Nginx and backend routes remain unchanged.
+- Added pinned Cosign sign/verify scripts and a verify-first deployment gate
+  that requires immutable digests and rejects mutable tags.
+- Added encrypted object-backup/restore and disposable PostgreSQL 17 PITR
+  certification; PITR recovered pre-target rows and excluded the post-target
+  row.
+- Added Alertmanager routing and a certification receiver; a real backend-down
+  rule fired through Prometheus, Alertmanager and the receiver.
+- Full tests/typecheck/build, Prisma, dependency, secret, image scan and signed
+  runtime gates pass. Decision remains NO-GO until approved admin auth,
+  physically off-host backup/WAL and production signing trust are certified.
+- Report: `docs/audits/system-production-cert1-final-certification.md`.
+
+# 2026-08-14 - SYSTEM.PRODUCTION.TRUST.1 Production Trust Closure
+
+- Reset the existing admin credential through canonical
+  `SystemUserAdminService`, revoking old refresh tokens without direct database
+  hash mutation.
+- Certified real HTTPS REST and Playwright admin login, `/auth/me`, refresh,
+  logout, local token clearing and 401/403/200 authorization behavior.
+- Fixed browser logout to call the existing backend logout contract before
+  clearing frontend session state.
+- Added an identity-bound GitHub OIDC/Sigstore keyless release workflow and
+  extended verify-first deployment to support keyless or KMS/HSM public-key
+  trust while continuing to reject mutable tags.
+- Re-certified PostgreSQL 17 timestamp PITR locally in 19 seconds, but did not
+  classify same-host storage as off-host.
+- Full tests, typecheck, builds, Prisma, dependency/secret/image gates pass.
+  Decision remains NO-GO because true off-host DR and hosted production signing
+  authority are not yet certified.
+- Report: `docs/audits/system-production-trust1-closure.md`.
+
+# 2026-08-14 - SYSTEM.PRODUCTION.TRUST.2 True DR and Signing Certification
+
+- Audited the actual host, storage mounts, external endpoint/credential
+  availability, GitHub remote refs, Actions metadata and release tags.
+- Confirmed there is no independent off-host storage failure domain; did not
+  misclassify a local container, volume or directory as off-host recovery.
+- Confirmed the approved GitHub repository has zero workflows, zero workflow
+  runs and zero release tags. The keyless signing workflow remains untracked
+  locally and cannot receive GitHub OIDC without a prohibited commit/push.
+- Reran tests, typecheck, builds, Prisma validate/generate, dependency, secret,
+  image and SBOM gates. Application runtime could not restart after the local
+  database became unavailable; no database workaround or mutation was used.
+- Decision: RC1 TRUST NO-GO, both external P0 controls remain open.
+- Report: `docs/audits/system-production-trust2-final-closure.md`.

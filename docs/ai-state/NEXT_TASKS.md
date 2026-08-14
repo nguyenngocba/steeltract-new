@@ -1,18 +1,54 @@
 # Next Tasks
 
-- **SYSTEM.SNAPSHOT.1 P0 - Historical coverage**: provision enabled metadata
-  and successful authoritative snapshots for ERP, Production, QC, Projects,
-  Yard and Logistics; default `/history/dashboard/latest` must return 200.
-- **SYSTEM.SNAPSHOT.1 P0 - freshness contract**: invalidate or refresh current-
-  day snapshots when source watermarks advance. Do not mark a row authoritative
-  merely because its business date is today.
-- **SYSTEM.SNAPSHOT.1 P0 - as-of correctness**: replace current-state reads in
-  Inventory, Projects and Yard historical generators with authoritative as-of
-  sources, or mark those snapshots non-authoritative.
-- **SYSTEM.SNAPSHOT.1 P1 - rollups/projections**: populate Inventory Balance and
-  monthly rollups; initialize or intentionally retire ComponentSummary,
-  YardLoadingSummary, ShipmentSummary/Timeline and Project allocation/
-  acceptance projections.
+- **SYSTEM.PRODUCT.AUDIT.1 P0 - Procurement UI truth**: replace the active
+  hardcoded Procurement cockpit with canonical `/material-requests`,
+  `/purchase-orders` and `/procurement/workspace` data, including controlled
+  loading, error and empty states.
+- **SYSTEM.PRODUCT.AUDIT.1 P0 - Supplier UI truth**: remove generated quotes,
+  purchase orders, deliveries, payables, logs and report rows from the active
+  Suppliers page; bind only to authoritative contracts or controlled empty
+  states.
+- **SYSTEM.PRODUCT.AUDIT.1 P0 - physical Component semantics**: migrate active
+  Components and Projects read models/snapshots from legacy
+  `Component.status` counts to ComponentInstance, requirements, Production,
+  QC, Finished Goods, Yard and Logistics lineage.
+- **SYSTEM.PRODUCT.AUDIT.1 P0 - legacy physical actions**: retire active
+  definition-level deliver/install consumers and endpoints after canonical
+  ComponentInstance routes cover every remaining caller.
+- **SYSTEM.PRODUCT.AUDIT.1 P0 - Dashboard truth contract**: correct global date
+  filter propagation, delivery-today semantics, QC/NCR labeling and
+  Project/Component physical metrics. Keep Historical mode separate and do not
+  simulate historical snapshots client-side.
+- **SYSTEM.PRODUCT.AUDIT.1 P1 - data cleanup plan**: define an approved,
+  service-level cleanup for retained SYSTEM/STABILITY fixtures, duplicate
+  semantic master names, legacy QC rows and unattributed ActivityLog events.
+  Do not use direct database deletion.
+- **SYSTEM.PRODUCT.AUDIT.1 P1 - UI convergence**: fix clipped module titles,
+  mixed Vietnamese/English labels, giant page ownership, emoji status visuals
+  and incomplete generic master-data dependency/pagination behavior.
+
+- **RELEASE.READINESS.1 P0 - dependency/security closure**: remediate the
+  deployed 1 critical / 10 unique high advisories, upgrade pnpm, add TLS/CSP/
+  security headers/rate limiting/upload limits and re-run security regression.
+- **RELEASE.READINESS.1 P0 - deployable frontend/edge**: replace the failing
+  frontend Dockerfile with a frozen-lockfile static image, remove hardcoded
+  runtime fallbacks, add frontend/reverse-proxy/TLS to the production contract
+  and certify immutable digests.
+- **RELEASE.READINESS.1 P0 - secrets**: remove server credentials from frontend
+  scope and Docker context, rotate them, enforce restrictive permissions and
+  use an approved secret manager/external secret contract.
+- **RELEASE.READINESS.1 P0 - recovery**: automate encrypted off-host database
+  and attachment backups, enable WAL archiving and complete clean restore/PITR
+  drills with approved RPO/RTO and canonical invariant comparison.
+- **RELEASE.READINESS.1 P0 - observability/quality**: add external metrics,
+  centralized structured logs, Grafana/alerts/on-call ownership, repair backend
+  lint and add CI for lint/test/build/migration/audit/image/release gates.
+- **SYSTEM.PROJECTION.1 closure - COMPLETE**: watermark-based freshness,
+  historical latest metadata and dashboard freshness display are implemented.
+  Do not restore date-based snapshot authority.
+- **SYSTEM.PROJECTION.1 P1 - coverage/rollups**: initialize or intentionally
+  retire the six eventless projections and certify closed-month dashboard and
+  inventory rollups. Keep historical as-of accuracy explicit per module.
 
 - **SYSTEM.REVERSE.CERT.1 closure - COMPLETE**: installed return, returned
   PASS, same-instance REWORK, SCRAP, Production material return and Supplier
@@ -1600,3 +1636,64 @@ Backlog after the locked order:
 4. Decide whether the six eventless projection definitions are future-facing
    or should be retired in a separate architecture decision.
 5. Add monitoring alerts for FAILED, LAGGING and excessive watermark lag.
+
+# SYSTEM.RELEASE.1 closeout
+
+1. Push images by digest to the approved registry and configure signing and
+   admission verification.
+2. Send encrypted backups and WAL archives to off-host immutable storage; run a
+   point-in-time restore drill.
+3. Connect Prometheus rules to Alertmanager/on-call and verify delivery.
+4. Execute `.github/workflows/release-gate.yml` in hosted CI and retain its SBOM,
+   scan and build attestations.
+5. Complete a 24-hour staging soak and approved peak-load test.
+6. Keep `apps/backend-experimental` outside deployment until its six High
+   dependency advisories are remediated.
+# SYSTEM.PRODUCTION.CERT.1 P0 closure
+
+- Provide the current admin credential through the approved secret file and
+  rerun login, `/auth/me`, permissions, refresh, logout, invalid-token, 403 and
+  successful browser login certification. Never place the secret in source or
+  documentation.
+- Configure encrypted full backup and continuous WAL archive in a physically
+  separate object-store failure domain with immutable retention; restore and
+  PITR from that destination.
+- Push the certified digest images to the approved durable registry and replace
+  the disposable Cosign key with production KMS/HSM or approved keyless OIDC
+  trust. Retain transparency/provenance evidence.
+- Install the operations-owned Alertmanager config and verify its approved
+  on-call receiver in the target environment.
+
+# SYSTEM.PRODUCTION.TRUST.1 remaining closure
+
+1. **P0 off-host DR**: provision a physically independent immutable object
+   destination, continuously archive encrypted WAL, simulate loss of the source
+   host and certify base restore/PITR, catalog/row parity, read-only application
+   smoke and measured production RPO/RTO.
+2. **P0 signing authority**: run `.github/workflows/production-trust.yml` from an
+   approved semantic release tag, retain Fulcio/Rekor and GHCR digest evidence,
+   and execute unsigned/wrong-digest/wrong-identity/valid admission tests in the
+   deployment trust boundary.
+3. Configure the exact deployed workflow certificate identity and GitHub OIDC
+   issuer in production; never use a broad identity regex, local developer key
+   or disabled transparency verification.
+4. Do not open additional UI/business sprints until these two P0 controls are
+   independently certified and `SYSTEM.FINAL.1` can make an unconditional GO
+   decision.
+
+# SYSTEM.PRODUCTION.TRUST.2 external execution gate
+
+1. Operations must supply a physically independent S3-compatible/NAS/cloud
+   endpoint, immutable retention policy and secret-managed credential. Then
+   repeat base backup, continuous WAL, source-host loss, PITR, parity and
+   application read-smoke measurements from that destination.
+2. An authorized release owner must review and commit the release workflows,
+   push an approved semantic tag and retain the GitHub Actions/GHCR/Fulcio/Rekor
+   evidence. This cannot be performed while commit/push remains prohibited.
+3. Run every signing admission case against the production trust policy:
+   valid, unsigned, wrong digest, tampered image, wrong identity, wrong issuer
+   and mutable tag.
+4. Restore stable runtime database availability and rerun health/readiness/
+   startup plus login/me/refresh/logout before final certification.
+5. Start `SYSTEM.FINAL.1` only after both P0 results are PASS. Do not use a
+   conditional GO and do not open another application hardening sprint.

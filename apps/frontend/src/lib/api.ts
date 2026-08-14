@@ -5,8 +5,10 @@ import {
 } from './auth/auth-interceptor'
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'http://172.168.53.116:3000'
+  import.meta.env.VITE_API_URL || '/api'
+
+export const SOCKET_BASE_URL =
+  import.meta.env.VITE_SOCKET_URL || window.location.origin
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

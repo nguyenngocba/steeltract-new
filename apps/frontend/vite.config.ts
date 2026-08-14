@@ -11,6 +11,23 @@ export default defineConfig({
   ],
 
   server: {
+    proxy: {
+      '/api': {
+        target:
+          process.env.STEELTRACK_API_PROXY_TARGET ??
+          'http://127.0.0.1:3000',
+        changeOrigin: true,
+        rewrite: (requestPath) =>
+          requestPath.replace(/^\/api/, ''),
+      },
+      '/socket.io': {
+        target:
+          process.env.STEELTRACK_API_PROXY_TARGET ??
+          'http://127.0.0.1:3000',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
     watch: {
       ignored: [
         '**/.git/**',

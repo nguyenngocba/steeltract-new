@@ -1,5 +1,45 @@
 # Project Status
 
+On 2026-08-14 completed **SYSTEM.PRODUCT.AUDIT.1 - Structure / Data / UI / UX /
+Domain Audit** with **72% readiness / SIGNIFICANT GAPS**. Runtime browser
+coverage passed 68/68 route/viewport combinations without console errors or
+document-level horizontal overflow. Canonical inventory and physical lineage
+are strong, but Procurement is a hardcoded active UI, Suppliers contains
+synthetic operational datasets, Project/Component summaries still depend on
+legacy `Component.status`, and Executive date/KPI semantics are not fully
+authoritative. The runtime database passed core quantity and lineage checks
+but is dominated by retained certification fixtures. Documentation only; no
+source, schema, migration, stage or commit. Final report:
+`docs/audits/system-product-audit1-final-report.md`.
+
+On 2026-08-14 completed **SYSTEM.PRODUCTION.CERT.1 - Final Production
+Certification** with a **NO-GO** decision. Fixed the login UI 404 by aligning
+the Vite `/api` proxy with production Nginx and backend `/auth/login`; browser
+network now reaches the API. Rebuilt and scanned current images, signed and
+verified all three immutable digests, and deployed the healthy disposable
+runtime through a verify-first gate. Encrypted backup restore, PostgreSQL PITR
+and real Prometheus -> Alertmanager -> receiver delivery pass. Remaining P0s
+are successful admin auth certification, actual off-host backup/WAL custody,
+and production registry/signing trust. Report:
+`docs/audits/system-production-cert1-final-certification.md`.
+
+On 2026-08-14 completed **RELEASE.READINESS.1 - RC1 Release Readiness Audit**
+with a **NO-GO** decision. Core tests/builds, Prisma 93-migration status,
+production health probes and backend image build pass. Release blockers remain:
+1 critical / 10 unique high deployed advisories, a failing frontend Docker
+image, backend lint 1,386 errors, no complete frontend/TLS proxy deployment,
+frontend secret-boundary risk, WAL archiving off, no restore/PITR proof and no
+external monitoring/logging/alerts. No source, schema, migration, stage or
+commit. Report: `docs/audits/release-readiness1-rc1.md`.
+
+On 2026-08-11 completed **SYSTEM.PROJECTION.1 - Canonical Projection &
+Snapshot Architecture**. Freshness and authority now follow projection
+watermarks rather than snapshot date. Historical latest and Dashboard expose
+fresh/stale/lag metadata; runtime records 25 initialized checkpoints, zero
+active failures and controlled stale snapshots. Six eventless projections and
+closed-month rollup certification remain. Report:
+`docs/audits/system-projection1-canonical-architecture.md`.
+
 On 2026-08-11 completed **SYSTEM.SNAPSHOT.1 - Canonical Snapshot & Projection
 Certification** with a **NO-GO** decision. Live REST and eight browser
 workspaces render, Playwright passed 1/1, and initialized projections show zero
@@ -2288,3 +2328,50 @@ available; EPIC144 did not invent missing workflows.
 - Monthly rollup runtime data: CONTROLLED EMPTY.
 - Tests/build/typecheck/targeted Playwright: PASS.
 - Schema/migration/business changes: NONE.
+
+# SYSTEM.RELEASE.1
+
+- Repository-controlled release P0: PASS.
+- Deployed dependency graph: Critical 0 / High 0.
+- Backend/frontend image scans: Critical 0 / High 0; SPDX SBOM generated.
+- Backend tests: PASS, 98 suites / 334 tests.
+- Frontend tests: PASS, 4 files / 12 tests.
+- Typecheck/build/Prisma: PASS.
+- Compose, TLS, headers, health/readiness and rate limit: PASS.
+- Backup checksum, disposable restore, row parity and app smoke: PASS.
+- Fresh and existing database migration paths: PASS, 93 migrations.
+- Prometheus target, seven alert rules and Grafana health: PASS.
+- Decision: RC1 CONDITIONAL GO; external signing, off-host DR and alert routing
+  remain release conditions.
+
+# SYSTEM.PRODUCTION.TRUST.1
+
+- Admin credential reset via canonical service: PASS.
+- REST login/me/refresh/logout and 401/403/200: PASS.
+- Real Playwright login/logout with backend token revocation: PASS.
+- PostgreSQL timestamp WAL replay: PASS, local disposable drill 19 seconds.
+- True physical off-host backup/WAL/host-loss recovery: FAIL, unavailable in
+  the single-node certification environment.
+- Keyless GitHub OIDC signing architecture and deploy policy: IMPLEMENTED.
+- Production OIDC certificate, transparency and registry negative tests: FAIL,
+  not executable in the local trust boundary.
+- Backend tests: PASS, 98 suites / 334 tests.
+- Frontend tests: PASS, 4 files / 12 tests.
+- Typecheck/build/Prisma/security scans: PASS.
+- Decision: NO-GO, remaining P0 count 2.
+
+# SYSTEM.PRODUCTION.TRUST.2
+
+- Independent off-host storage endpoint: FAIL, none available/configured.
+- Host-loss restore/PITR with measured production RPO/RTO: NOT RUN.
+- Approved remote GitHub workflow: FAIL, repository workflow count 0.
+- Hosted workflow runs/release tags: 0 / 0.
+- OIDC identity, production digest and transparency evidence: NOT ISSUED.
+- Backend tests: PASS, 98 suites / 334 tests.
+- Frontend tests: PASS, 4 files / 12 tests.
+- Typecheck/build/Prisma validate/generate: PASS.
+- Dependency/secret/backend/frontend image scans: PASS.
+- Runtime startup: BLOCKED by local database unavailability after initial
+  migration-status PASS.
+- Source/schema/migration/business changes: NONE.
+- Decision: RC1 TRUST NO-GO, remaining P0 count 2.

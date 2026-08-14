@@ -1,11 +1,11 @@
 import { io } from 'socket.io-client'
 
-import { API_BASE_URL } from '../../lib/api'
+import { SOCKET_BASE_URL } from '../../lib/api'
 import { useRuntimeStore } from './runtime.store'
 
 export const runtimeSocket =
   io(
-    API_BASE_URL,
+    SOCKET_BASE_URL,
     {
       transports: ['websocket'],
     },

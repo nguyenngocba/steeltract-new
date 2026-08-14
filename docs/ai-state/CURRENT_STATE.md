@@ -1,17 +1,60 @@
 # Current State
 
-## SYSTEM.SNAPSHOT.1 - Snapshot & Projection Certification
+## SYSTEM.PRODUCT.AUDIT.1 - Structure / Data / UI / UX / Domain Audit
 
-Status: **NO-GO / P0 SNAPSHOT COVERAGE AND FRESHNESS BLOCKERS**
+Status: **SIGNIFICANT GAPS / 72% PRODUCT READINESS**
 
-Live Inventory, Production, QC, Projects, Yard, Logistics and Executive read
-models respond, and browser certification renders all eight workspaces.
-Historical certification fails: `/history/dashboard/latest` returns 404, only
-Inventory/Yard snapshots exist, they diverge from live data while marked
-authoritative/non-stale, and balance/monthly rollups are empty. Projection
-health is partial: 25/31 healthy, six not initialized, zero active failures.
+The canonical operational backbone is present and runtime-stable: Inventory
+posting, physical ComponentInstance lineage, Production execution, QC,
+Finished Goods, Yard, Logistics, Procurement backend and RBAC are materially
+real. Product readiness is held back by active legacy Component-status read
+models, non-authoritative Dashboard semantics, a hardcoded Procurement UI and
+synthetic Supplier sub-workspaces. The database is internally consistent but
+is dominated by certification fixtures and is not a clean customer dataset.
 
-Report: `docs/audits/system-snapshot1-projection-certification.md`.
+Reports:
+`docs/audits/system-product-audit1-structure.md`,
+`docs/audits/system-product-audit1-data-cleanliness.md`,
+`docs/audits/system-product-audit1-ui-ux.md`,
+`docs/audits/system-product-audit1-dashboard-truth.md`, and
+`docs/audits/system-product-audit1-final-report.md`.
+
+## SYSTEM.PRODUCTION.CERT.1 - Final Production Certification
+
+Status: **NO-GO / LOGIN ROUTE FIXED / EXTERNAL P0 CONTROLS OPEN**
+
+The Vite `/api` proxy now matches the production Nginx/Nest auth contract and
+browser requests no longer return 404. Current images build/scan/sign/verify by
+digest, verify-first deployment runs healthy, encrypted backup round-trip and
+PostgreSQL PITR pass, and a real API-down alert reaches Alertmanager and the
+test receiver. Production remains blocked by missing approved admin runtime
+credentials, lack of a true off-host backup/WAL failure domain, and lack of a
+production registry/signing authority. Report:
+`docs/audits/system-production-cert1-final-certification.md`.
+
+## RELEASE.READINESS.1 - RC1 Release Readiness Audit
+
+Status: **NO-GO / RELEASE CONTROLS NOT READY**
+
+Business runtime, builds, database migrations and projection workers are
+healthy, but RC1 release controls fail. The frontend Docker image does not
+build, the deployed dependency graph has 1 critical / 10 unique high
+advisories, backend lint has 1,386 errors, PostgreSQL WAL archiving is disabled,
+restore/PITR is uncertified, and production TLS/security headers/rate limiting,
+external monitoring, centralized logging and alert routing are absent.
+
+Report: `docs/audits/release-readiness1-rc1.md`.
+
+## SYSTEM.PROJECTION.1 - Canonical Projection & Snapshot Architecture
+
+Status: **IMPLEMENTED / RUNTIME CERTIFIED WITH CONTROLLED GAPS**
+
+Snapshot authority now follows business-event/projection watermarks instead of
+snapshot date. Runtime has 25 initialized checkpoints, zero active projection
+failures, 40 authoritative/fresh snapshots and two controlled stale snapshots.
+Six eventless projections and closed-month rollup certification remain P1.
+
+Report: `docs/audits/system-projection1-canonical-architecture.md`.
 
 ## SYSTEM.REVERSE.CERT.1 - Canonical Reverse Runtime Certification
 
@@ -4451,3 +4494,51 @@ Production, QC, Projects and Yard converge to fresh parity. Six of 31
 projection definitions and Logistics/Dispatch remain `NOT_INITIALIZED` because
 no matching source events exist. Monthly rollups remain empty on the reset
 runtime. Report: `docs/audits/system-projection1-canonical-architecture.md`.
+
+# SYSTEM.RELEASE.1 Production Hardening (2026-08-14)
+
+Status: **RC1 CONDITIONAL GO**
+
+Production now has non-root backend, migration and frontend images behind a TLS
+reverse proxy with PostgreSQL and optional Prometheus/Grafana. Deployed
+dependencies and runtime images have zero known Critical/High findings. Auth
+rate limiting, correlation logs, health and Prometheus metrics are active.
+
+Backup checksum, disposable restore, catalog parity and application read-only
+smoke pass. Existing upgrade and clean 93-migration bootstrap are certified.
+Public production remains conditional on registry signing, encrypted off-host
+backup/WAL custody and tested Alertmanager/on-call delivery. Report:
+`docs/audits/system-release1-production-hardening.md`.
+
+# SYSTEM.PRODUCTION.TRUST.1 Trust Closure (2026-08-14)
+
+Status: **AUTH GREEN - EXTERNAL TRUST NO-GO**
+
+Admin authentication now passes canonical service reset, REST login/me/refresh/
+logout, role/permission checks and real Playwright. Browser logout invokes the
+backend contract and revokes the refresh session; no auth/backend contract or
+schema changed.
+
+The release path now supports Sigstore keyless GitHub OIDC identity/issuer
+verification and contains unsigned, wrong-digest, wrong-identity, mutable-tag
+and valid-signature tests. Local PITR replay passes, but the current environment
+has one physical Docker node and cannot certify off-host survival. Hosted OIDC
+signing also has not run against an approved production registry. RC1 trust
+closure is therefore NO-GO. Report:
+`docs/audits/system-production-trust1-closure.md`.
+
+# SYSTEM.PRODUCTION.TRUST.2 Final External Trust Check (2026-08-14)
+
+Status: **RC1 TRUST NO-GO - TWO P0 OPEN**
+
+The current host has no independent storage mount or configured cloud/object
+endpoint, so true host-loss recovery remains untestable. The approved GitHub
+repository exposes zero Actions workflows/runs and zero release tags; the
+keyless signing workflow exists only as an untracked worktree file. With commit
+and push prohibited, no OIDC identity, production digest or transparency entry
+can be issued.
+
+No source code changed. Tests/typecheck/build and security scans pass. Current
+runtime health/auth could not be rerun because the local database became
+unavailable after the first successful 93-migration status probe. Report:
+`docs/audits/system-production-trust2-final-closure.md`.

@@ -9,6 +9,8 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuthStore } from '../../../store/auth.store'
+import { logout } from '../../../lib/auth/auth-api'
+import { getRefreshToken } from '../../../lib/auth/token-storage'
 import { InventoryGlobalActionBar } from '../../../modules/inventory/components/InventoryGlobalActionBar'
 import { ComponentsGlobalActionBar } from '../../../modules/components/components/ComponentsGlobalActionBar'
 import { ProductionGlobalActionBar } from '../../../modules/production/components/ProductionGlobalActionBar'
@@ -21,7 +23,8 @@ import { DispatchGlobalActionBar } from '../../../modules/logistics/context/Disp
 
 export function AppTopbar() {
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
+  const clearSession = useAuthStore((s) => s.clearSession)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [openUserMenu, setOpenUserMenu] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -37,10 +40,16 @@ export function AppTopbar() {
   const isQcRoute = location.pathname.startsWith('/qc')
   const isLogisticsRoute = location.pathname.startsWith('/logistics')
 
-  function handleLogout() {
-    logout()
-    setOpenUserMenu(false)
-    navigate('/login')
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await logout(getRefreshToken())
+    } finally {
+      clearSession()
+      setLoggingOut(false)
+      setOpenUserMenu(false)
+      navigate('/login')
+    }
   }
 
   return (
@@ -124,6 +133,7 @@ export function AppTopbar() {
               <button
                 type="button"
                 onClick={handleLogout}
+                disabled={loggingOut}
                 className="flex w-full items-center gap-2 rounded-lg border border-red-700/40 px-3 py-2 text-sm text-red-300 hover:bg-red-900/20"
               >
                 <LogOut size={14} />

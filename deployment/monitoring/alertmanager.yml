@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: steeltrack-on-call
+  group_by: [alertname, severity]
+  group_wait: 5s
+  group_interval: 30s
+  repeat_interval: 4h
+
+receivers:
+  - name: steeltrack-on-call
+    webhook_configs:
+      - url: http://alert-receiver:8080/alerts
+        send_resolved: true

@@ -1,0 +1,233 @@
+name: Production Image Trust
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-scan-sign:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: steeltrack_ci
+          POSTGRES_USER: steeltrack
+          POSTGRES_PASSWORD: steeltrack-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U steeltrack -d steeltrack_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://steeltrack:steeltrack-ci-only@127.0.0.1:5432/steeltrack_ci
+      JWT_SECRET: ci-only-secret-with-at-least-thirty-two-characters
+      CORS_ORIGINS: https://ci.invalid
+      STORAGE_ROOT: /tmp/steeltrack-ci-storage
+      JOB_WORKER_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Verify source release gate
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -C apps/backend-api exec prisma validate
+          pnpm -C apps/backend-api exec prisma generate
+          pnpm -C apps/backend-api typecheck
+          pnpm -C apps/frontend typecheck
+          pnpm -C apps/backend-api test --runInBand
+          pnpm -C apps/frontend test
+          pnpm -C apps/backend-api build
+          pnpm -C apps/frontend build
+          bash scripts/release/dependency-audit.sh
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare immutable image names
+        id: names
+        shell: bash
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "Release tag must use vMAJOR.MINOR.PATCH: $GITHUB_REF_NAME" >&2
+            exit 1
+          }
+          repository="${GITHUB_REPOSITORY,,}"
+          {
+            echo "backend=${REGISTRY}/${repository}/backend"
+            echo "migration=${REGISTRY}/${repository}/migration"
+            echo "frontend=${REGISTRY}/${repository}/frontend"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend
+        id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend-api/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.backend }}:${{ github.ref_name }}
+
+      - name: Build and push migration runner
+        id: migration
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend-api/Dockerfile
+          target: migration
+          push: true
+          tags: ${{ steps.names.outputs.migration }}:${{ github.ref_name }}
+
+      - name: Build and push frontend
+        id: frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.frontend }}:${{ github.ref_name }}
+
+      - name: Define digest references and trust policy
+        shell: bash
+        run: |
+          {
+            echo "BACKEND_IMAGE=${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}"
+            echo "MIGRATION_IMAGE=${{ steps.names.outputs.migration }}@${{ steps.migration.outputs.digest }}"
+            echo "FRONTEND_IMAGE=${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}"
+            echo "SIGNING_IDENTITY=https://github.com/${GITHUB_REPOSITORY}/.github/workflows/production-trust.yml@${GITHUB_REF}"
+            echo "SIGNING_ISSUER=https://token.actions.githubusercontent.com"
+            echo "COSIGN_CERTIFICATE_IDENTITY=https://github.com/${GITHUB_REPOSITORY}/.github/workflows/production-trust.yml@${GITHUB_REF}"
+            echo "COSIGN_CERTIFICATE_OIDC_ISSUER=https://token.actions.githubusercontent.com"
+          } >> "$GITHUB_ENV"
+
+      - name: Prove unsigned image is rejected
+        shell: bash
+        run: |
+          if cosign verify \
+            --certificate-identity "$SIGNING_IDENTITY" \
+            --certificate-oidc-issuer "$SIGNING_ISSUER" \
+            "$FRONTEND_IMAGE"; then
+            echo 'Unsigned image was accepted' >&2
+            exit 1
+          fi
+
+      - name: Generate SBOMs
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
+          artifact-name: backend.spdx.json
+          output-file: artifacts/backend.spdx.json
+
+      - name: Generate frontend SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
+          artifact-name: frontend.spdx.json
+          output-file: artifacts/frontend.spdx.json
+
+      - name: Generate migration-runner SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.names.outputs.migration }}@${{ steps.migration.outputs.digest }}
+          artifact-name: migration.spdx.json
+          output-file: artifacts/migration.spdx.json
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan migration-runner image
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ steps.names.outputs.migration }}@${{ steps.migration.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Sign immutable digests with GitHub OIDC
+        shell: bash
+        run: |
+          cosign sign --yes "$BACKEND_IMAGE"
+          cosign sign --yes "$MIGRATION_IMAGE"
+          cosign sign --yes "$FRONTEND_IMAGE"
+
+      - name: Verify valid signed digests
+        shell: bash
+        run: |
+          for image in "$BACKEND_IMAGE" "$MIGRATION_IMAGE" "$FRONTEND_IMAGE"; do
+            cosign verify \
+              --certificate-identity "$SIGNING_IDENTITY" \
+              --certificate-oidc-issuer "$SIGNING_ISSUER" \
+              "$image" >/dev/null
+          done
+
+      - name: Prove wrong identity is rejected
+        shell: bash
+        run: |
+          if cosign verify \
+            --certificate-identity 'https://github.com/invalid/invalid/.github/workflows/release.yml@refs/tags/invalid' \
+            --certificate-oidc-issuer "$SIGNING_ISSUER" \
+            "$BACKEND_IMAGE"; then
+            echo 'Wrong signing identity was accepted' >&2
+            exit 1
+          fi
+
+      - name: Prove wrong digest is rejected
+        shell: bash
+        run: |
+          wrong_digest="${{ steps.names.outputs.backend }}@${{ steps.migration.outputs.digest }}"
+          if cosign verify \
+            --certificate-identity "$SIGNING_IDENTITY" \
+            --certificate-oidc-issuer "$SIGNING_ISSUER" \
+            "$wrong_digest"; then
+            echo 'Wrong digest was accepted' >&2
+            exit 1
+          fi
+
+      - name: Prove mutable tags are rejected by deployment policy
+        shell: bash
+        run: |
+          if scripts/release/verify-images.sh "${{ steps.names.outputs.backend }}:${GITHUB_REF_NAME}"; then
+            echo 'Mutable image tag was accepted' >&2
+            exit 1
+          fi

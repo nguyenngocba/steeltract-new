@@ -1,0 +1,122 @@
+name: RC1 Release Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: steeltrack_ci
+          POSTGRES_USER: steeltrack
+          POSTGRES_PASSWORD: steeltrack-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U steeltrack -d steeltrack_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://steeltrack:steeltrack-ci-only@127.0.0.1:5432/steeltrack_ci
+      JWT_SECRET: ci-only-secret-with-at-least-thirty-two-characters
+      CORS_ORIGINS: https://ci.invalid
+      STORAGE_ROOT: /tmp/steeltrack-ci-storage
+      JOB_WORKER_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+
+      - name: Prisma validate and generate
+        run: |
+          pnpm -C apps/backend-api exec prisma validate
+          pnpm -C apps/backend-api exec prisma generate
+
+      - name: Typecheck
+        run: |
+          pnpm -C apps/backend-api typecheck
+          pnpm -C apps/frontend typecheck
+
+      - name: Test
+        run: |
+          pnpm -C apps/backend-api test --runInBand
+          pnpm -C apps/frontend test
+
+      - name: Build applications
+        run: |
+          pnpm -C apps/backend-api build
+          pnpm -C apps/frontend build
+
+      - name: Production dependency gate
+        run: bash scripts/release/dependency-audit.sh
+
+      - name: Build production images
+        run: |
+          docker build -f apps/backend-api/Dockerfile -t steeltrack/backend:ci .
+          docker build -f apps/backend-api/Dockerfile --target migration -t steeltrack/migration:ci .
+          docker build -f apps/frontend/Dockerfile -t steeltrack/frontend:ci .
+
+      - name: Apply and verify migrations
+        run: |
+          docker run --rm --network host -e DATABASE_URL steeltrack/migration:ci
+          pnpm -C apps/backend-api exec prisma migrate status
+
+      - name: Frontend runtime smoke
+        run: |
+          docker run -d --name steeltrack-frontend-ci -p 18080:8080 steeltrack/frontend:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18080/health && break || sleep 1; done
+          curl -fsS http://127.0.0.1:18080/
+
+      - name: Generate image SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: steeltrack/backend:ci
+          artifact-name: backend.spdx.json
+          output-file: artifacts/backend.spdx.json
+
+      - name: Generate frontend image SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: steeltrack/frontend:ci
+          artifact-name: frontend.spdx.json
+          output-file: artifacts/frontend.spdx.json
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: steeltrack/backend:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: steeltrack/frontend:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'

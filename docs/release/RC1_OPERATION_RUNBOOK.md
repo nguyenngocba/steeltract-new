@@ -1,6 +1,6 @@
 # SteelTrack V1 RC1 Operation Runbook
 
-Status: **DRAFT - EXTERNAL MONITORING AND DR GATES OPEN**
+Status: **RC1 CONDITIONAL - BASELINE IMPLEMENTED, EXTERNAL ROUTING/DR OPEN**
 
 ## Service Map
 
@@ -21,6 +21,7 @@ User Browser
 | `/health/live` | Process liveness only | Restart after repeated failure |
 | `/health/ready` | DB/storage/queue/configured Redis | Remove replica from traffic |
 | `/health/startup` | Completed Nest bootstrap and dependencies | Block rollout |
+| `/metrics` | API, DB, worker, projection and snapshot metrics | Internal Prometheus only |
 
 Do not use readiness failure as a process restart signal. Do not call obsolete
 `/system/health`.
@@ -50,8 +51,9 @@ Do not use readiness failure as a process restart signal. Do not call obsolete
 | Backup failure/age or expired restore drill | P0 |
 | Unauthorized spike/login abuse | Security P1/P0 |
 
-Each alert needs a named owner, on-call destination, acknowledgement SLA and
-runbook link. Current repository does not provide this external configuration.
+Seven Prometheus rules are versioned under `deployment/monitoring/alerts.yml`.
+Each still needs a named owner, Alertmanager/on-call destination,
+acknowledgement SLA and runbook link in the target environment.
 
 ## Daily Operations
 
@@ -65,7 +67,7 @@ runbook link. Current repository does not provide this external configuration.
 
 ## Backup and Retention
 
-Recommended minimum policy pending business approval:
+RC1 minimum policy pending business approval:
 
 - Daily encrypted custom/base backup, retained 35 days.
 - Weekly verified restore point, retained 13 weeks.
@@ -76,6 +78,17 @@ Recommended minimum policy pending business approval:
 Retention must be enforced outside the application and must cover both
 PostgreSQL and persistent attachment storage. A successful `pg_dump` without a
 tested restore does not satisfy the policy.
+
+Repository verification commands:
+
+```bash
+scripts/release/backup-database.sh /secure/backup/path
+STEELTRACK_BACKEND_IMAGE=<digest> \
+  scripts/release/verify-database-restore.sh /secure/backup/path/<dump>
+```
+
+The Compose baseline enables WAL archiving with a five-minute archive timeout.
+Move archived WAL to encrypted off-host storage before public production.
 
 ## Common Incidents
 

@@ -1,0 +1,51 @@
+groups:
+  - name: steeltrack-critical
+    rules:
+      - alert: SteelTrackApiUnavailable
+        expr: up{job="steeltrack-backend"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: SteelTrack API is unavailable
+
+      - alert: SteelTrackDatabaseUnavailable
+        expr: steeltrack_database_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: SteelTrack database probe is failing
+
+      - alert: SteelTrackProjectionFailure
+        expr: steeltrack_projection_failures_active > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: SteelTrack has active projection failures
+
+      - alert: SteelTrackSnapshotFailure
+        expr: steeltrack_snapshot_jobs_failed > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: SteelTrack has failed snapshot jobs
+
+      - alert: SteelTrackWorkerFailure
+        expr: steeltrack_worker_jobs_failed > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: SteelTrack has failed or dead-letter worker jobs
+
+      - alert: SteelTrackHighErrorRate
+        expr: sum(rate(steeltrack_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum(rate(steeltrack_http_requests_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: SteelTrack HTTP 5xx rate is above 5 percent
+
+      - alert: SteelTrackHighAverageLatency
+        expr: sum(rate(steeltrack_http_request_duration_milliseconds_total[5m])) / clamp_min(sum(rate(steeltrack_http_requests_total[5m])), 0.001) > 2000
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: SteelTrack average HTTP latency is above 2 seconds
